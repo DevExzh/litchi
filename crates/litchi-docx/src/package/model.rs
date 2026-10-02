@@ -582,8 +582,16 @@ impl Package {
             std::sync::Arc::clone(&self.paragraph_index_cache),
         )?;
 
+        // Everything repaired while the document was read, in discovery
+        // order. Recording sites build their own report at the codec boundary
+        // and merge it into this aggregation with `ToleranceReport::append`,
+        // the open-time aggregation idiom litchi-doc established; the
+        // semantic text sink (`Document::write_text_to`) is the first. See
+        // `crate::leniency`.
+        let tolerance = crate::leniency::ToleranceReport::default();
+
         // Create and return Document with reference to OPC package
-        Ok(Document::new(doc_part, &self.opc))
+        Ok(Document::new(doc_part, &self.opc, tolerance))
     }
 
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payloads.

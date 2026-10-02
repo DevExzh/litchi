@@ -35,6 +35,12 @@ pub struct Document<'a> {
     pub(super) part: DocumentPart<'a>,
     /// Reference to the OPC package (needed for accessing related parts like styles)
     pub(super) opc: &'a OpcPackage,
+    /// Everything repaired while the document was read, aggregated from the
+    /// codecs that record. The semantic text sink merges each
+    /// `Document::write_text_to` call's repairs here; see `crate::leniency`.
+    /// Interior mutability keeps the lazy read facades on `&self` (and the
+    /// document `Send + Sync`) while still accumulating their repairs.
+    pub(super) tolerance: std::sync::Mutex<crate::leniency::ToleranceReport>,
 }
 
 /// A picture watermark discovered in a document header, with its media part
@@ -137,9 +143,47 @@ pub enum Block {
 impl<'a> Document<'a> {
     /// Create a new Document from a `DocumentPart` and `OpcPackage` reference.
     ///
-    /// This is typically called internally by `Package::document()`.
+    /// This is typically called internally by `Package::document()`, which
+    /// aggregates the repairs recorded while the document was opened into
+    /// `tolerance`.
     #[inline]
-    pub(crate) fn new(part: DocumentPart<'a>, opc: &'a OpcPackage) -> Self {
-        Self { part, opc }
+    pub(crate) fn new(
+        part: DocumentPart<'a>,
+        opc: &'a OpcPackage,
+        tolerance: crate::leniency::ToleranceReport,
+    ) -> Self {
+        Self {
+            part,
+            opc,
+            tolerance: std::sync::Mutex::new(tolerance),
+        }
+    }
+
+    /// Merge one read's repairs into the document-level report.
+    pub(super) fn merge_tolerance(&self, repaired: &crate::leniency::ToleranceReport) {
+        if repaired.is_clean() {
+            return;
+        }
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .append(repaired);
+    }
+
+    /// A snapshot of everything repaired while this document was read, in
+    /// discovery order.
+    ///
+    /// The report is the exhaustive record of the non-structural substitutions
+    /// described by [`crate::leniency`]: nothing is repaired silently. Reads
+    /// merge their repairs here as their codecs run — the semantic text sink
+    /// ([`Document::write_text_to`](crate::Document::write_text_to)) records
+    /// foreign `*:t` skips — so the report accumulates across calls in call
+    /// order and is empty only while every read conformed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 }

@@ -57,6 +57,14 @@ impl<'a> Document<'a> {
     /// established text projection. Paragraph separators and empty-object
     /// handling are selected by `options`.
     ///
+    /// Foreign text subtrees — OMML `m:t` inside `m:oMath`, DrawingML `a:t`
+    /// in an inline shape — are skipped as opaque the way Word and
+    /// `extract_word_text` treat them, never failing the extraction. Each
+    /// skip is recorded as [`crate::leniency::TextDefect::SkippedForeignMarkup`]
+    /// and merged into the document's report, enumerable through
+    /// [`Document::tolerance_report`]. Repairs are merged even when the call
+    /// fails later, since the skipped subtrees were already passed over.
+    ///
     /// The sink is never flushed or rolled back. Output can be partial when a
     /// document, resource-limit, or sink error is observed.
     pub fn write_text_to<W: Write + ?Sized>(
@@ -65,7 +73,11 @@ impl<'a> Document<'a> {
         options: litchi_core::TextOutputOptions<'_>,
     ) -> std::result::Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<Error>>
     {
-        crate::paragraph::write_text_to(self.part.xml_bytes(), output, options)
+        let mut repaired = crate::leniency::ToleranceReport::default();
+        let result =
+            crate::paragraph::write_text_to(self.part.xml_bytes(), output, options, &mut repaired);
+        self.merge_tolerance(&repaired);
+        result
     }
 
     /// Return numbered paragraphs with resolved, typed list markers.

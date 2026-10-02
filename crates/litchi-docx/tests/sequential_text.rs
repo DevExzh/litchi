@@ -8,7 +8,7 @@ use litchi_core::{
     SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_docx::source_backed::Package as SourceBackedPackage;
-use litchi_docx::{Package, ReadLimits};
+use litchi_docx::{Defect, Package, ReadLimits, TextDefect};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -151,7 +151,7 @@ fn nested_empty_paragraph_is_rejected_without_output() {
 }
 
 #[test]
-fn strict_namespaces_mce_fallback_and_foreign_text_are_checked() {
+fn strict_namespaces_mce_fallback_and_foreign_text_subtrees() {
     let strict = package_bytes(
         &strict_document_xml(r#"<w:p><w:r><w:t>strict</w:t></w:r></w:p>"#),
         false,
@@ -166,18 +166,30 @@ fn strict_namespaces_mce_fallback_and_foreign_text_are_checked() {
         b"fallback"
     );
 
+    // Foreign `*:t` elements — paired and empty — are skipped as opaque and
+    // recorded, never fatal: the paragraph yields no text but the extraction
+    // succeeds, and each element is enumerable through the tolerance report.
     let foreign = package_bytes(
-        &document_xml(r#"<w:p><w:r><x:t xmlns:x="urn:foreign">bad</x:t></w:r></w:p>"#),
+        &document_xml(
+            r#"<w:p><w:r><x:t xmlns:x="urn:foreign">bad</x:t><x:t xmlns:x="urn:foreign"/></w:r></w:p>"#,
+        ),
         false,
     );
     let package = eager_package(&foreign);
     let document = package.document().expect("foreign document");
     let mut output = Vec::new();
-    assert!(matches!(
-        document.write_text_to(&mut output, parity_options(true)),
-        Err(TextOutputError::Document { .. })
-    ));
+    document
+        .write_text_to(&mut output, parity_options(true))
+        .expect("foreign text subtrees are skipped, not fatal");
     assert!(output.is_empty());
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 2);
+    assert!(
+        report
+            .defects()
+            .iter()
+            .all(|d| d.defect == Defect::Text(TextDefect::SkippedForeignMarkup))
+    );
 }
 
 #[test]
@@ -205,7 +217,7 @@ fn oversized_namespace_event_is_rejected_before_resolution() {
 fn malformed_later_paragraph_preserves_prior_progress() {
     let bytes = package_bytes(
         &document_xml(
-            r#"<w:p><w:r><w:t>first</w:t></w:r></w:p><w:p><w:r><x:t xmlns:x="urn:foreign">bad</x:t></w:r></w:p>"#,
+            r#"<w:p><w:r><w:t>first</w:t></w:r></w:p><w:p><w:custom><w:p/></w:custom></w:p>"#,
         ),
         false,
     );
@@ -214,7 +226,7 @@ fn malformed_later_paragraph_preserves_prior_progress() {
     let mut output = Vec::new();
     let error = document
         .write_text_to(&mut output, parity_options(false))
-        .expect_err("foreign later paragraph must fail");
+        .expect_err("nested later paragraph must fail");
     assert_eq!(output, b"first");
     assert!(matches!(
         error,
@@ -813,4 +825,190 @@ fn truncated_documents_refuse_at_end_of_input_with_unchanged_message_and_progres
         assert_eq!(progress.objects_written(), 0);
         assert!(output.is_empty());
     }
+}
+
+/// Finding 2.1: an OMML equation inside a paragraph must not kill the
+/// semantic text sink. The `m:t` subtree is skipped as opaque — its text is
+/// absent from the output, not garbled into it — and the skip is recorded
+/// with the byte offset of the `m:t` start tag in both facades' reports.
+#[test]
+fn omml_equation_is_skipped_and_recorded_in_both_facades() {
+    let document = document_xml(
+        r#"<w:p><w:r><w:t>before</w:t></w:r><m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:r><m:t>x</m:t></m:r></m:oMath><w:r><w:t>after</w:t></w:r></w:p>"#,
+    );
+    let expected_offset = document
+        .windows(4)
+        .position(|window| window == b"<m:t")
+        .expect("fixture carries an m:t start tag") as u64;
+    let bytes = package_bytes(&document, false);
+
+    let package = eager_package(&bytes);
+    let eager_document = package.document().expect("equation document");
+    let mut output = Vec::new();
+    eager_document
+        .write_text_to(&mut output, parity_options(false))
+        .expect("an equation must not fail the eager text sink");
+    assert_eq!(output, b"beforeafter");
+    let report = eager_document.tolerance_report();
+    assert_eq!(report.total(), 1);
+    assert_eq!(
+        report.defects(),
+        &[litchi_docx::ToleratedDefect {
+            defect: Defect::Text(TextDefect::SkippedForeignMarkup),
+            context: expected_offset,
+        }]
+    );
+
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
+    let mut output = Vec::new();
+    source_package
+        .write_text_to(&mut output, parity_options(false))
+        .expect("an equation must not fail the source text sink");
+    assert_eq!(output, b"beforeafter");
+    let report = source_package.tolerance_report();
+    assert_eq!(report.total(), 1);
+    assert_eq!(
+        report.defects()[0],
+        litchi_docx::ToleratedDefect {
+            defect: Defect::Text(TextDefect::SkippedForeignMarkup),
+            context: expected_offset,
+        }
+    );
+}
+
+/// Conformant documents leave both facades' reports empty: an empty report
+/// means the document conformed, with nothing repaired silently.
+#[test]
+fn conformant_extraction_leaves_both_reports_clean() {
+    let bytes = package_bytes(
+        &document_xml(r#"<w:p><w:r><w:t>one &amp; 世界</w:t><w:tab/><w:t>two</w:t></w:r></w:p>"#),
+        false,
+    );
+
+    let package = eager_package(&bytes);
+    let document = package.document().expect("conformant document");
+    let mut output = Vec::new();
+    document
+        .write_text_to(&mut output, parity_options(false))
+        .expect("conformant text");
+    assert!(document.tolerance_report().is_clean());
+
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
+    let mut output = Vec::new();
+    source_package
+        .write_text_to(&mut output, parity_options(false))
+        .expect("conformant text");
+    assert!(source_package.tolerance_report().is_clean());
+}
+
+/// Finding 2.1, realistic shape: a display equation (`m:oMathPara`) whose
+/// `m:t` text carries entity references and CDATA, OMML run properties that
+/// embed WordprocessingML `w:rPr`, and an inline DrawingML `a:t`. Every
+/// foreign `*:t` subtree is opaque — none of its text leaks into the output —
+/// each one is recorded once, and repeated reads accumulate in call order.
+#[test]
+fn omml_and_drawingml_text_subtrees_are_opaque_and_each_recorded() {
+    const M: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    let document = document_xml(&format!(
+        r#"<w:p><w:r><w:t>Energy: </w:t></w:r><m:oMathPara xmlns:m="{M}"><m:oMath><m:r><w:rPr><w:rFonts w:ascii="Cambria Math"/></w:rPr><m:t>E=m</m:t></m:r><m:sSup><m:e><m:r><m:t>c</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup><m:r><m:t>&lt;&#x221E;</m:t></m:r><m:r><m:t><![CDATA[a<b]]></m:t></m:r></m:oMath></m:oMathPara><w:r><w:t xml:space="preserve"> holds</w:t></w:r></w:p><w:p><w:r><w:t>shape:</w:t></w:r><x:txBody xmlns:x="{A}"><x:p><x:r><x:t>inner</x:t></x:r></x:p></x:txBody></w:p>"#
+    ));
+    let offsets = |needle: &[u8]| -> Vec<u64> {
+        document
+            .windows(needle.len())
+            .enumerate()
+            .filter(|(_, window)| *window == needle)
+            .map(|(index, _)| index as u64)
+            .collect()
+    };
+    let mut expected = offsets(b"<m:t>");
+    expected.extend(offsets(b"<x:t>"));
+    assert_eq!(expected.len(), 6);
+    let bytes = package_bytes(&document, false);
+
+    let package = eager_package(&bytes);
+    let document = package.document().expect("equation document");
+    for _ in 0..2 {
+        let mut output = Vec::new();
+        document
+            .write_text_to(&mut output, parity_options(false))
+            .expect("equations and shape text must not fail the text sink");
+        assert_eq!(output, b"Energy:  holds\nshape:".as_slice());
+    }
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 12);
+    assert_eq!(report.unrecorded(), 0);
+    let contexts = report
+        .defects()
+        .iter()
+        .map(|tolerated| {
+            assert_eq!(
+                tolerated.defect,
+                Defect::Text(TextDefect::SkippedForeignMarkup)
+            );
+            tolerated.context
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(&contexts[..6], expected.as_slice());
+    assert_eq!(&contexts[6..], expected.as_slice());
+
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
+    let mut output = Vec::new();
+    source_package
+        .write_text_to(&mut output, parity_options(false))
+        .expect("equations and shape text must not fail the source text sink");
+    assert_eq!(output, b"Energy:  holds\nshape:".as_slice());
+    assert_eq!(source_package.tolerance_report().total(), 6);
+}
+
+/// The repair never extends to structural defects: ill-formed XML inside or
+/// around a foreign `*:t` subtree stays a hard error under the default
+/// posture, exactly as it is for WordprocessingML text.
+#[test]
+fn ill_formed_foreign_text_subtrees_remain_fatal() {
+    const M: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    for body in [
+        // Mismatched end tag inside the opaque subtree.
+        format!(r#"<w:p><m:oMath xmlns:m="{M}"><m:r><m:t>x</m:r></m:t></m:oMath></w:p>"#),
+        // Undeclared general entity inside the opaque subtree.
+        format!(r#"<w:p><m:oMath xmlns:m="{M}"><m:r><m:t>&bogus;</m:t></m:r></m:oMath></w:p>"#),
+        // Unbound namespace prefix on the foreign text element.
+        r#"<w:p><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p>"#.to_owned(),
+    ] {
+        let bytes = package_bytes(&document_xml(&body), false);
+        let package = eager_package(&bytes);
+        let document = package.document().expect("lazy document open");
+        let mut output = Vec::new();
+        assert!(
+            matches!(
+                document.write_text_to(&mut output, parity_options(false)),
+                Err(TextOutputError::Document { .. })
+            ),
+            "{body}"
+        );
+        let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+            .expect("source package");
+        let mut output = Vec::new();
+        assert!(
+            matches!(
+                source_package.write_text_to(&mut output, parity_options(false)),
+                Err(TextOutputError::Document { .. })
+            ),
+            "{body}"
+        );
+    }
+
+    // A truncated part that ends inside the opaque subtree is unbalanced.
+    let truncated =
+        format!(r#"<w:document xmlns:w="{W}"><w:body><w:p><m:oMath xmlns:m="{M}"><m:r><m:t>x"#);
+    let package = eager_package(package_bytes(truncated.as_bytes(), false));
+    let document = package.document().expect("lazy document open");
+    let mut output = Vec::new();
+    assert!(matches!(
+        document.write_text_to(&mut output, parity_options(false)),
+        Err(TextOutputError::Document { .. })
+    ));
 }

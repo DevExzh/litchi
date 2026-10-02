@@ -13,6 +13,7 @@
 //! Streaming text extraction for paragraph and run content.
 
 use crate::error::{Error, Result};
+use crate::leniency::{TextDefect, ToleranceReport};
 use litchi_core::{
     SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
 };
@@ -445,23 +446,26 @@ pub(crate) fn write_text_to<W: Write + ?Sized>(
     xml_bytes: &[u8],
     output: &mut W,
     options: TextOutputOptions<'_>,
+    tolerance: &mut ToleranceReport,
 ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
     let mut writer = SequentialTextWriter::new(output, options);
-    write_text_to_with_writer(xml_bytes, &mut writer)?;
+    write_text_to_with_writer(xml_bytes, &mut writer, tolerance)?;
     Ok(writer.finish())
 }
 
 pub(crate) fn write_text_to_with_writer<'options, 'output, W: Write + ?Sized>(
     xml_bytes: &[u8],
     writer: &mut SequentialTextWriter<'options, 'output, W>,
+    tolerance: &mut ToleranceReport,
 ) -> std::result::Result<(), TextOutputError<Error>> {
-    write_text_to_with_operation_check(xml_bytes, writer, || Ok(()))
+    write_text_to_with_operation_check(xml_bytes, writer, || Ok(()), tolerance)
 }
 
 pub(crate) fn write_text_to_with_operation_check<'options, 'output, W, F>(
     xml_bytes: &[u8],
     writer: &mut SequentialTextWriter<'options, 'output, W>,
     mut operation_check: F,
+    tolerance: &mut ToleranceReport,
 ) -> std::result::Result<(), TextOutputError<Error>>
 where
     W: Write + ?Sized,
@@ -516,8 +520,30 @@ where
             Event::End(element) => reader.resolver().resolve_element(element.name()).0,
             _ => ResolveResult::Unbound,
         };
+        // Byte offset of the element's start tag within the visible part XML,
+        // recorded as the defect context when the element is a foreign `*:t`.
+        // `read_event` leaves `buffer_position` just past the tag, and
+        // `BytesStart` borrows the tag with the angle brackets stripped (`<>`
+        // for `Start`, `</>` for `Empty`), so the raw tag length is the
+        // content length plus the bracket bytes.
+        let element_offset = match &event {
+            Event::Start(element) => reader
+                .buffer_position()
+                .saturating_sub(element.as_ref().len() as u64 + 2),
+            Event::Empty(element) => reader
+                .buffer_position()
+                .saturating_sub(element.as_ref().len() as u64 + 3),
+            _ => 0,
+        };
         if parser
-            .consume(namespace, event, writer, &mut operation_check)
+            .consume(
+                namespace,
+                event,
+                writer,
+                &mut operation_check,
+                tolerance,
+                element_offset,
+            )
             .map_err(|error| match error {
                 SemanticTextFailure::Document(source) => writer.document_error(source),
                 SemanticTextFailure::Output(error) => error,
@@ -851,6 +877,11 @@ struct SemanticTextParser {
     document_event_seen: bool,
     paragraph_depth: Option<usize>,
     text_depth: Option<usize>,
+    /// Depth of the outermost open foreign `*:t` element (OMML `m:t`,
+    /// DrawingML `a:t`). While set, the subtree is opaque: its events are
+    /// still budgeted and checked for well-formedness, but contribute no text
+    /// and no WordprocessingML structure.
+    foreign_text_depth: Option<usize>,
     paragraph: Option<String>,
     // Keep one bounded allocation across paragraphs. The parser still checks
     // each paragraph against MAX_SEMANTIC_TEXT_PARAGRAPH_BYTES before every
@@ -917,14 +948,11 @@ impl SemanticTextParser {
         &mut self,
         namespace: &ResolveResult<'_>,
         element: &quick_xml::events::BytesStart<'_>,
+        tolerance: &mut ToleranceReport,
+        element_offset: u64,
     ) -> Result<()> {
         validate_semantic_attributes(element)?;
         let name = element.name();
-        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
-            return Err(Error::InvalidFormat(
-                "foreign semantic DOCX text element is not w:t".into(),
-            ));
-        }
         if is_word_control_name(namespace, name) && self.paragraph.is_none() {
             return Err(Error::InvalidFormat(
                 "semantic DOCX control appears outside a paragraph".into(),
@@ -949,6 +977,18 @@ impl SemanticTextParser {
                 "nested semantic DOCX elements inside w:t are not permitted".into(),
             ));
         }
+        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
+            // A text-bearing element bound to a namespace other than
+            // WordprocessingML (OMML `m:t` inside `m:oMath`, DrawingML `a:t`
+            // in an inline shape). Word, LibreOffice, and this crate's
+            // `extract_word_text` scanner all treat the subtree as opaque: it
+            // contributes no text (capture opens only on `w:t`) and the walk
+            // resumes after its end tag. Apply that Word-compatible repair and
+            // record it instead of failing the whole extraction.
+            tolerance.record(TextDefect::SkippedForeignMarkup, element_offset);
+            self.foreign_text_depth = Some(self.budget.depth);
+            return Ok(());
+        }
         if is_word_control_name(namespace, name) {
             let character = if is_word_element(namespace, name, b"tab") {
                 '\t'
@@ -970,18 +1010,21 @@ impl SemanticTextParser {
         element: &quick_xml::events::BytesStart<'_>,
         writer: &mut SequentialTextWriter<'_, '_, W>,
         operation_check: &mut F,
+        tolerance: &mut ToleranceReport,
+        element_offset: u64,
     ) -> std::result::Result<(), SemanticTextFailure> {
         validate_semantic_attributes(element).map_err(SemanticTextFailure::Document)?;
         let name = element.name();
-        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
-            return Err(SemanticTextFailure::Document(Error::InvalidFormat(
-                "foreign semantic DOCX text element is not w:t".into(),
-            )));
-        }
         if self.text_depth.is_some() {
             return Err(SemanticTextFailure::Document(Error::InvalidFormat(
                 "nested semantic DOCX elements inside w:t are not permitted".into(),
             )));
+        }
+        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
+            // The `Start` repair above, for an empty foreign `*:t`: opaque,
+            // no text, recorded.
+            tolerance.record(TextDefect::SkippedForeignMarkup, element_offset);
+            return Ok(());
         }
         if is_word_element(namespace, name, b"p") {
             if self.paragraph_depth.is_some() {
@@ -1038,10 +1081,15 @@ impl SemanticTextParser {
     ) -> std::result::Result<(), SemanticTextFailure> {
         validate_semantic_element_namespace(namespace).map_err(SemanticTextFailure::Document)?;
         let name = element.name();
-        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
-            return Err(SemanticTextFailure::Document(Error::InvalidFormat(
-                "foreign semantic DOCX text element is not w:t".into(),
-            )));
+        // Inside an opaque foreign `*:t` subtree nothing needs a verdict: its
+        // start tag was already recorded once as
+        // `TextDefect::SkippedForeignMarkup`, and the reader's end-name check
+        // guarantees the tags balance. The subtree closes with its own end tag.
+        if let Some(foreign_depth) = self.foreign_text_depth {
+            if foreign_depth == self.budget.depth {
+                self.foreign_text_depth = None;
+            }
+            return Ok(());
         }
         if is_word_text_name(namespace, name) {
             if self.text_depth != Some(self.budget.depth) {
@@ -1088,6 +1136,13 @@ impl SemanticTextParser {
     }
 
     fn cdata_event(&mut self, text: &quick_xml::events::BytesCData<'_>) -> Result<()> {
+        let decoded = Self::decode_cdata(text)?;
+        self.append(&decoded)
+    }
+
+    fn decode_cdata<'text>(
+        text: &'text quick_xml::events::BytesCData<'_>,
+    ) -> Result<std::borrow::Cow<'text, str>> {
         let decoded = text
             .xml_content(XmlVersion::Explicit1_0)
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1097,10 +1152,15 @@ impl SemanticTextParser {
                 "semantic DOCX decoded CDATA event exceeds {MAX_SEMANTIC_TEXT_EVENT_BYTES} bytes"
             )));
         }
-        self.append(&decoded)
+        Ok(decoded)
     }
 
     fn reference_event(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<()> {
+        let decoded = Self::decode_reference(reference)?;
+        self.append(&decoded)
+    }
+
+    fn decode_reference(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
         if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "semantic DOCX XML reference exceeds {MAX_SEMANTIC_TEXT_REFERENCE_BYTES} bytes"
@@ -1113,7 +1173,7 @@ impl SemanticTextParser {
                 "semantic DOCX decoded reference exceeds {MAX_SEMANTIC_TEXT_EVENT_BYTES} bytes"
             )));
         }
-        self.append(&decoded)
+        Ok(decoded)
     }
 
     fn consume<W: Write + ?Sized, F: FnMut() -> Result<()>>(
@@ -1122,6 +1182,8 @@ impl SemanticTextParser {
         event: Event<'_>,
         writer: &mut SequentialTextWriter<'_, '_, W>,
         operation_check: &mut F,
+        tolerance: &mut ToleranceReport,
+        element_offset: u64,
     ) -> std::result::Result<bool, SemanticTextFailure> {
         self.budget
             .observe_event(&event)
@@ -1146,7 +1208,13 @@ impl SemanticTextParser {
                     .observe_namespaces(&element)
                     .map_err(SemanticTextFailure::Document)?;
                 self.budget.start().map_err(SemanticTextFailure::Document)?;
-                self.start_element(&namespace, &element)
+                if self.foreign_text_depth.is_some() {
+                    // Opaque foreign `*:t` subtree: checked, never interpreted.
+                    validate_semantic_attributes(&element)
+                        .map_err(SemanticTextFailure::Document)?;
+                    return Ok(false);
+                }
+                self.start_element(&namespace, &element, tolerance, element_offset)
                     .map_err(SemanticTextFailure::Document)?;
                 let name = element.name();
                 if is_word_element(&namespace, name, b"p") {
@@ -1177,7 +1245,20 @@ impl SemanticTextParser {
                 self.budget
                     .observe_namespaces(&element)
                     .map_err(SemanticTextFailure::Document)?;
-                self.empty_element(&namespace, &element, writer, operation_check)?;
+                if self.foreign_text_depth.is_some() {
+                    // Opaque foreign `*:t` subtree: checked, never interpreted.
+                    validate_semantic_attributes(&element)
+                        .map_err(SemanticTextFailure::Document)?;
+                    return Ok(false);
+                }
+                self.empty_element(
+                    &namespace,
+                    &element,
+                    writer,
+                    operation_check,
+                    tolerance,
+                    element_offset,
+                )?;
             },
             Event::End(element) => {
                 self.end_element(&namespace, &element, writer, operation_check)?;
@@ -1211,6 +1292,10 @@ impl SemanticTextParser {
                 self.cdata_event(&text)
                     .map_err(SemanticTextFailure::Document)?;
             },
+            Event::CData(text) if self.foreign_text_depth.is_some() => {
+                // Opaque foreign text: validated like any CDATA, never emitted.
+                Self::decode_cdata(&text).map_err(SemanticTextFailure::Document)?;
+            },
             Event::CData(_) => {
                 return Err(SemanticTextFailure::Document(Error::InvalidFormat(
                     "semantic DOCX CDATA is outside w:t".into(),
@@ -1219,6 +1304,11 @@ impl SemanticTextParser {
             Event::GeneralRef(reference) if self.text_depth.is_some() => {
                 self.reference_event(&reference)
                     .map_err(SemanticTextFailure::Document)?;
+            },
+            Event::GeneralRef(reference) if self.foreign_text_depth.is_some() => {
+                // Opaque foreign text (`<m:t>a&lt;b</m:t>`): the reference is
+                // decoded and checked like any other, never emitted.
+                Self::decode_reference(&reference).map_err(SemanticTextFailure::Document)?;
             },
             Event::GeneralRef(_) => {
                 return Err(SemanticTextFailure::Document(Error::InvalidFormat(
@@ -1258,6 +1348,7 @@ impl SemanticTextParser {
                 if self.budget.depth != 0
                     || self.paragraph_depth.is_some()
                     || self.text_depth.is_some()
+                    || self.foreign_text_depth.is_some()
                 {
                     return Err(SemanticTextFailure::Document(Error::InvalidFormat(
                         "semantic DOCX XML has unbalanced elements".into(),

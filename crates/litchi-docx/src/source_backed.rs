@@ -125,6 +125,10 @@ pub struct Package {
     package: SourceBackedPackage,
     execution: Option<ExecutionContext>,
     paragraph_index_cache: Arc<ParagraphIndexCache>,
+    /// Everything repaired while the package was read, aggregated from the
+    /// codecs that record. See `crate::leniency`. Interior mutability keeps
+    /// the lazy read facades on `&self`.
+    tolerance: Mutex<crate::leniency::ToleranceReport>,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -611,6 +615,7 @@ impl Package {
             package,
             execution,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
+            tolerance: Mutex::new(crate::leniency::ToleranceReport::default()),
         })
     }
 
@@ -803,6 +808,11 @@ impl Package {
     /// payload materialization; the payload reader still verifies its actual
     /// decoded length and source boundary. Only one bounded paragraph text
     /// value is retained by the semantic parser.
+    ///
+    /// Foreign text subtrees (OMML `m:t`, DrawingML `a:t`) are skipped as
+    /// opaque and recorded as
+    /// [`crate::leniency::TextDefect::SkippedForeignMarkup`], merged into the
+    /// package's report, enumerable through [`Package::tolerance_report`].
     pub fn write_text_to<W: Write + ?Sized>(
         &self,
         output: &mut W,
@@ -816,6 +826,7 @@ impl Package {
             failure: Arc::clone(&source_failure),
         };
         let mut writer = litchi_core::SequentialTextWriter::new(&mut checked_output, options);
+        let mut repaired = crate::leniency::ToleranceReport::default();
 
         let parsed = (|| -> std::result::Result<(), litchi_core::TextOutputError<Error>> {
             self.package
@@ -887,6 +898,7 @@ impl Package {
                     self.package.source_version().map_err(Error::from)?;
                     Ok(())
                 },
+                &mut repaired,
             )
         })();
         let progress = writer.progress();
@@ -897,10 +909,33 @@ impl Package {
             .map(Error::from)
             .or_else(|| self.package.source_version().err().map(Error::from))
             .or_else(|| take_source_text_failure(&source_failure));
+        // Every repair the pass applied is merged, output error or not: a
+        // failed call still skipped the subtrees it recorded.
+        if !repaired.is_clean() {
+            self.tolerance
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .append(&repaired);
+        }
         if let Some(source) = source {
             return Err(litchi_core::TextOutputError::Document { source, progress });
         }
         parsed.map(|()| writer.finish())
+    }
+
+    /// A snapshot of everything repaired while this package was read, in
+    /// discovery order.
+    ///
+    /// The report is the exhaustive record of the non-structural
+    /// substitutions described by [`crate::leniency`]: nothing is repaired
+    /// silently. Recording sites land with the roadmap findings; the
+    /// semantic text sink (`write_text_to`) records foreign `*:t` skips.
+    #[must_use]
+    pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// Load only the mandatory main-document payload and capture its immutable
