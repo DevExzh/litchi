@@ -10,6 +10,7 @@ use litchi_core::{
 use litchi_odf_common::{constants::ODF_PRESENTATION, core::PreparedPackage};
 use std::io::Write;
 use std::path::Path;
+use std::sync::OnceLock;
 
 const BODY_MARKER: &str = "<office:presentation";
 
@@ -39,9 +40,28 @@ const BODY_MARKER: &str = "<office:presentation";
 /// ```
 pub struct Presentation {
     package: Package,
+    /// Package repairs followed by the slide scan's content repairs,
+    /// computed by the first [`Self::tolerance_report`] or [`Self::slides`].
+    tolerance: OnceLock<litchi_odf_common::leniency::ToleranceReport>,
 }
 
 impl Presentation {
+    fn with_package(package: Package) -> Self {
+        Self {
+            package,
+            tolerance: OnceLock::new(),
+        }
+    }
+
+    /// Publish the merged report from one complete slide scan.
+    fn publish_tolerance(&self, content: &litchi_odf_common::leniency::ToleranceReport) {
+        if self.tolerance.get().is_none() {
+            let mut merged = self.package.tolerance_report().clone();
+            merged.append(content);
+            let _ = self.tolerance.set(merged);
+        }
+    }
+
     /// Open an ODP presentation from a file path.
     ///
     /// # Arguments
@@ -75,7 +95,7 @@ impl Presentation {
         password: impl Into<String>,
     ) -> Result<Self> {
         Package::open_with_password(path, password, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|package| Self { package })
+            .map(Self::with_package)
     }
 
     /// Create a Presentation from a byte buffer.
@@ -111,7 +131,7 @@ impl Presentation {
             },
             Ok(prepared) => Self::from_owned_package(prepared.into_package()),
             Err(bytes) => Package::from_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
-                .map(|package| Self { package }),
+                .map(Self::with_package),
         }
     }
 
@@ -137,7 +157,7 @@ impl Presentation {
     /// Adopt an already validated archive without copying its package bytes.
     pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
         Package::from_owned_package(package, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|validated| Self { package: validated })
+            .map(Self::with_package)
     }
 
     /// Return the identity of the archive index retained by smart detection.
@@ -153,7 +173,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         Package::from_bytes_with_password(bytes, password, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|package| Self { package })
+            .map(Self::with_package)
     }
 
     /// Create an ODP presentation from raw bytes (ZIP archive data).
@@ -176,11 +196,26 @@ impl Presentation {
     /// Everything a tolerant read repaired while this presentation was opened.
     ///
     /// An empty report means the document conformed; see
-    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    /// [`litchi_odf_common::leniency::ToleranceReport`]. Package repairs come
+    /// first, then the content repairs of the slide scan (LENIENCY_AUDIT
+    /// F9.10). Slides are parsed lazily, so the first call to this method
+    /// (or to [`Self::slides`]) runs that scan once.
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        self.package.tolerance_report()
+        self.tolerance.get_or_init(|| {
+            let mut merged = self.package.tolerance_report().clone();
+            // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
+            // scan. A scan that fails outright reports its error through
+            // `slides()`; the report then lists the package repairs only.
+            if let Ok((_slides, content)) = Parser::parse_slides_with_report(
+                self.package.content_xml(),
+                self.package.styles_xml(),
+            ) {
+                merged.append(&content);
+            }
+            merged
+        })
     }
 
     /// Discover embedded charts in presentation drawing order.
@@ -262,7 +297,12 @@ impl Presentation {
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn slides(&self) -> Result<Vec<Slide>> {
-        Parser::parse_slides_with_styles(self.package.content_xml(), self.package.styles_xml())
+        let (slides, content) = Parser::parse_slides_with_report(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+        )?;
+        self.publish_tolerance(&content);
+        Ok(slides)
     }
 
     /// Inspect inert slide-show settings and ordered custom shows.

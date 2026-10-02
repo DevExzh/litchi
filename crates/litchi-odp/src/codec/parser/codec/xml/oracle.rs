@@ -381,10 +381,8 @@ impl Parser {
                         },
                         _ if in_notes => {},
                         Element::UnknownAnimation if in_slide => {
-                            return Err(Error::InvalidFormat(format!(
-                                "unknown ODF animation element '{}'",
-                                String::from_utf8_lossy(element.local_name().as_ref()),
-                            )));
+                            Self::skip_animation_subtree(&mut reader, &mut discarded_collector)?;
+                            element_depth = Self::rewind_consumed_subtree(element_depth);
                         },
                         Element::Animation(kind)
                             if in_slide
@@ -403,6 +401,8 @@ impl Parser {
                                 kind,
                                 1,
                                 &mut animation_node_count,
+                                &mut litchi_odf_common::leniency::ToleranceReport::default(),
+                                0,
                             )?);
                             element_depth = Self::rewind_consumed_subtree(element_depth);
                         },
@@ -842,12 +842,7 @@ impl Parser {
                             validate_legacy_animation_root(&root)?;
                             current_legacy_animation = Some(root);
                         },
-                        Element::UnknownAnimation if in_slide => {
-                            return Err(Error::InvalidFormat(format!(
-                                "unknown ODF animation element '{}'",
-                                String::from_utf8_lossy(element.local_name().as_ref()),
-                            )));
-                        },
+                        Element::UnknownAnimation if in_slide => {},
                         Element::Animation(kind)
                             if in_slide
                                 && shape_stack.is_empty()
@@ -1551,9 +1546,20 @@ fn select_one_with_errors_around_selected_index() {
     );
 
     // Slide-scan errors surface even when the failing page is not selected.
-    let broken = doc("<draw:page/><draw:page><anim:bogus/></draw:page><draw:page/>");
+    let broken =
+        doc("<draw:page/><draw:page><anim:param anim:name=\"orphan\"/></draw:page><draw:page/>");
     assert_equivalent(&broken, None, "select-one with error on deselected page");
     assert!(Parser::parse_slide_with_styles_at(&broken, None, 2).is_err());
+
+    // LENIENCY_AUDIT F9.10: skipped unknown animation subtrees keep both
+    // passes equivalent, including the transition definitions fed to the
+    // collector from inside the skipped subtree.
+    let skipped = doc(
+        "<draw:page><anim:bogus><anim:par/></anim:bogus></draw:page>\
+         <draw:page><anim:par><anim:bogus/><anim:set/></anim:par></draw:page>",
+    );
+    assert_equivalent(&skipped, None, "skipped unknown animations");
+    assert!(Parser::parse_slide_with_styles_at(&skipped, None, 1).is_ok());
 }
 
 #[test]

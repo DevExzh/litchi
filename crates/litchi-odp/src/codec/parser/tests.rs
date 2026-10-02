@@ -694,7 +694,6 @@ fn rejects_invalid_animation_structure() {
         "<a:animate><a:set/></a:animate>",
         "<a:command><a:animate/></a:command>",
         "<a:param a:name=\"orphan\"/>",
-        "<a:notInOdf/>",
         "<a:par>not whitespace</a:par>",
     ];
     for tree in invalid_trees {
@@ -703,6 +702,14 @@ fn rejects_invalid_animation_structure() {
         );
         assert!(Parser::parse_slides(&xml).is_err(), "accepted {tree}");
     }
+
+    // LENIENCY_AUDIT F9.10: an element outside the modeled animation
+    // vocabulary is skipped with its subtree and recorded, not fatal.
+    let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:a="urn:oasis:names:tc:opendocument:xmlns:animation:1.0"><o:body><o:presentation><d:page><a:notInOdf/><a:par><a:notInOdf><a:set/></a:notInOdf></a:par></d:page></o:presentation></o:body></o:document-content>"#;
+    let (slides, report) = Parser::parse_slides_with_report(xml, None).unwrap();
+    assert_eq!(slides[0].animations().len(), 1);
+    assert!(slides[0].animations()[0].children().is_empty());
+    assert_eq!(report.total(), 2);
 }
 
 #[test]

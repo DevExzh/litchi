@@ -33,6 +33,7 @@ pub struct FlatPresentation {
     xml: Arc<str>,
     page_ranges: Arc<[Range<usize>]>,
     slides: Arc<[Slide]>,
+    tolerance: Arc<litchi_odf_common::leniency::ToleranceReport>,
 }
 
 impl FlatPresentation {
@@ -47,7 +48,7 @@ impl FlatPresentation {
         let xml = String::from_utf8(bytes.clone())
             .map_err(|error| Error::InvalidFormat(format!("flat ODP is not UTF-8: {error}")))?;
         let page_ranges = scan_flat(&xml)?;
-        let slides = Parser::parse_slides_with_styles(&xml, Some(&xml))?;
+        let (slides, tolerance) = Parser::parse_slides_with_report(&xml, Some(&xml))?;
         if slides.len() != page_ranges.len() {
             return invalid("flat ODP slide projection does not match its page structure");
         }
@@ -56,7 +57,18 @@ impl FlatPresentation {
             xml: Arc::from(xml),
             page_ranges: Arc::from(page_ranges),
             slides: Arc::from(slides),
+            tolerance: Arc::new(tolerance),
         })
+    }
+
+    /// Everything a tolerant read repaired while this presentation was
+    /// parsed (LENIENCY_AUDIT F9.10).
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        &self.tolerance
     }
 
     /// Borrow the exact source bytes.

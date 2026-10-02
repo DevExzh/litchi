@@ -209,6 +209,23 @@ pub enum ContentDefect {
     /// repair accepts both settings exactly as in schema order; a duplicate
     /// child stays a hard error. The context is 0. There is no location.
     CalculationSettingsReordered,
+    /// An ODP slide's animation tree contained an element the reader cannot
+    /// map: an animation-namespace element outside the SMIL vocabulary the
+    /// reader models (newer SMIL constructs, a later ODF version), or a
+    /// foreign-namespace element inside an animation node (LENIENCY_AUDIT
+    /// F9.10).
+    ///
+    /// ODF 1.2 Part 1 §3.3 makes foreign elements ignorable and the SMIL
+    /// profile is extensible. LibreOffice's `AnimationNodeContext`
+    /// (xmloff animationimport.cxx) creates no node for an unknown token and
+    /// skips its subtree, keeping the slide and its other animations. The
+    /// repair drops exactly that element and its subtree from the slide's
+    /// animation list; nothing else changes. A known animation element in a
+    /// disallowed position stays a hard error. The context is 0 for an
+    /// unknown animation-namespace element and 1 for a foreign-namespace
+    /// element inside an animation node; the location is the slide
+    /// ([`DefectLocation::Slide`]).
+    UnknownAnimationElement,
 }
 
 impl ContentDefect {
@@ -224,6 +241,9 @@ impl ContentDefect {
             },
             Self::CalculationSettingsReordered => {
                 "accepted table:null-date after table:iteration in table:calculation-settings"
+            },
+            Self::UnknownAnimationElement => {
+                "skipped an unmappable animation element and its subtree, keeping the slide"
             },
         }
     }
@@ -245,6 +265,11 @@ pub enum DefectLocation {
         row: u64,
         /// Logical column within the row.
         column: u64,
+    },
+    /// A presentation slide (drawing page), in document order.
+    Slide {
+        /// Slide index.
+        index: u32,
     },
 }
 
@@ -514,6 +539,7 @@ mod tests {
             Defect::from(ContentDefect::CellValueUnparseable),
             Defect::from(ContentDefect::CalculationSettingsUnknownChild),
             Defect::from(ContentDefect::CalculationSettingsReordered),
+            Defect::from(ContentDefect::UnknownAnimationElement),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

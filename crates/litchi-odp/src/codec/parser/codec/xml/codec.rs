@@ -11,10 +11,15 @@ use super::super::{
 };
 use super::validation::ElementAttrs;
 use litchi_core::{SequentialTextWriter, TextObjectKind, TextOutputError};
+use litchi_odf_common::leniency::{ContentDefect, DefectLocation, ToleranceReport};
 use quick_xml::name::ResolveResult;
 use std::io::Write;
 
 impl Parser {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the recursive subtree parser threads the shared scan state explicitly"
+    )]
     pub(super) fn parse_animation_node(
         reader: &mut NsReader<&[u8]>,
         collector: &mut TransitionStyleCollector,
@@ -22,6 +27,8 @@ impl Parser {
         kind: Kind,
         depth: usize,
         node_count: &mut usize,
+        tolerance: &mut ToleranceReport,
+        slide_index: usize,
     ) -> Result<Node> {
         if depth > 128 {
             return Err(Error::InvalidFormat(
@@ -46,13 +53,23 @@ impl Parser {
             let ns_class = NsClass::from_resolve(&namespace);
             collector.feed(reader, ns_class, &event);
             match event {
-                Event::Start(ref child) | Event::Empty(ref child) => {
-                    if ns_class != NsClass::Animation {
-                        return Err(Error::InvalidFormat(format!(
-                            "anim:{} contains a non-animation element",
-                            kind.local_name()
-                        )));
+                Event::Start(ref child) | Event::Empty(ref child)
+                    if ns_class != NsClass::Animation
+                        || Kind::from_local_name(child.local_name().as_ref()).is_none() =>
+                {
+                    // LENIENCY_AUDIT F9.10: LibreOffice's AnimationNodeContext
+                    // creates no node for an element it cannot map and
+                    // skips its subtree; the enclosing node is kept.
+                    record_unknown_animation(
+                        tolerance,
+                        ns_class != NsClass::Animation,
+                        slide_index,
+                    );
+                    if matches!(event, Event::Start(_)) {
+                        Self::skip_animation_subtree(reader, collector)?;
                     }
+                },
+                Event::Start(ref child) | Event::Empty(ref child) => {
                     let Some(child_kind) = Kind::from_local_name(child.local_name().as_ref())
                     else {
                         return Err(Error::InvalidFormat(format!(
@@ -89,6 +106,8 @@ impl Parser {
                             child_kind,
                             depth + 1,
                             node_count,
+                            tolerance,
+                            slide_index,
                         )?
                     };
                     children.push(node);
@@ -137,6 +156,51 @@ impl Parser {
                     )));
                 },
                 Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+            }
+            buffer.clear();
+        }
+    }
+
+    /// Consume the rest of a skipped animation element's subtree, whose
+    /// start tag was already read, feeding every event to the transition
+    /// collector exactly as the subtree parsers do.
+    pub(super) fn skip_animation_subtree(
+        reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
+    ) -> Result<()> {
+        let mut depth = 1usize;
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
+            match event {
+                Event::Start(_) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("XML element depth overflow".to_string())
+                    })?;
+                },
+                Event::End(_) => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(());
+                    }
+                },
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(
+                        "unterminated unknown animation element".to_string(),
+                    ));
+                },
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::GeneralRef(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_) => {},
             }
             buffer.clear();
         }
@@ -826,13 +890,25 @@ impl Parser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<Vec<Slide>> {
-        Self::parse_pages_with_styles::<false>(
+        Self::parse_slides_with_report(xml_content, styles_xml).map(|(slides, _report)| slides)
+    }
+
+    /// [`Self::parse_slides_with_styles`], also returning the content
+    /// repairs the slide scan applied (LENIENCY_AUDIT F9.10).
+    pub(crate) fn parse_slides_with_report(
+        xml_content: &str,
+        styles_xml: Option<&str>,
+    ) -> Result<(Vec<Slide>, ToleranceReport)> {
+        let mut tolerance = ToleranceReport::default();
+        let slides = Self::parse_pages_with_styles::<false>(
             xml_content,
             styles_xml,
             0,
             false,
             ShapeContainerScope::DrawPages,
-        )
+            &mut tolerance,
+        )?;
+        Ok((slides, tolerance))
     }
 
     /// Parse one slide while retaining full-document validation semantics.
@@ -847,6 +923,7 @@ impl Parser {
             index,
             false,
             ShapeContainerScope::DrawPages,
+            &mut ToleranceReport::default(),
         )?;
         Ok(slides.pop())
     }
@@ -863,6 +940,7 @@ impl Parser {
             0,
             true,
             ShapeContainerScope::DrawPages,
+            &mut ToleranceReport::default(),
         )
     }
 
@@ -879,6 +957,7 @@ impl Parser {
             0,
             true,
             ShapeContainerScope::SpreadsheetTables,
+            &mut ToleranceReport::default(),
         )?;
         Ok(tables.into_iter().map(|table| table.shapes).collect())
     }
@@ -901,6 +980,7 @@ impl Parser {
         selected_index: usize,
         retain_text_shapes: bool,
         container_scope: ShapeContainerScope,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Vec<Slide>> {
         let sheet_scope = container_scope == ShapeContainerScope::SpreadsheetTables;
         // Historical pass order: the styles.xml transition-definitions scan
@@ -1201,10 +1281,12 @@ impl Parser {
                         },
                         _ if in_notes => {},
                         Element::UnknownAnimation if in_slide => {
-                            return Err(Error::InvalidFormat(format!(
-                                "unknown ODF animation element '{}'",
-                                String::from_utf8_lossy(element.local_name().as_ref()),
-                            )));
+                            // LENIENCY_AUDIT F9.10: skip the unmappable
+                            // animation subtree and keep the slide, as
+                            // LibreOffice's Impress import does.
+                            record_unknown_animation(tolerance, false, slide_index);
+                            Self::skip_animation_subtree(reader, collector)?;
+                            element_depth = Self::rewind_consumed_subtree(element_depth);
                         },
                         Element::Animation(kind)
                             if in_slide
@@ -1223,6 +1305,8 @@ impl Parser {
                                 kind,
                                 1,
                                 &mut animation_node_count,
+                                tolerance,
+                                slide_index,
                             )?);
                             element_depth = Self::rewind_consumed_subtree(element_depth);
                         },
@@ -1656,10 +1740,7 @@ impl Parser {
                             current_legacy_animation = Some(root);
                         },
                         Element::UnknownAnimation if in_slide => {
-                            return Err(Error::InvalidFormat(format!(
-                                "unknown ODF animation element '{}'",
-                                String::from_utf8_lossy(element.local_name().as_ref()),
-                            )));
+                            record_unknown_animation(tolerance, false, slide_index);
                         },
                         Element::Animation(kind)
                             if in_slide
@@ -3098,6 +3179,19 @@ fn sink_push_reference(
     };
     budget.charge(value.len())?;
     sink_push_decoded_text(paragraph, value, value.len())
+}
+
+/// Record one skipped animation element (LENIENCY_AUDIT F9.10): context 0
+/// for an unknown animation-namespace element, 1 for a foreign-namespace
+/// element inside an animation node, located at its slide.
+fn record_unknown_animation(tolerance: &mut ToleranceReport, foreign: bool, slide_index: usize) {
+    tolerance.record_at(
+        ContentDefect::UnknownAnimationElement,
+        u16::from(foreign),
+        DefectLocation::Slide {
+            index: u32::try_from(slide_index).unwrap_or(u32::MAX),
+        },
+    );
 }
 
 #[derive(Default)]

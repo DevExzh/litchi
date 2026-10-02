@@ -71,6 +71,10 @@ pub struct SourceBackedPresentation {
     slides_cache: OnceLock<Option<Arc<[Slide]>>>,
     text_queries: AtomicUsize,
     text_cache: OnceLock<Option<String>>,
+    /// Package repairs followed by the slide scan's content repairs,
+    /// computed by the first [`Self::tolerance_report`] or complete slide
+    /// scan.
+    tolerance: OnceLock<litchi_odf_common::leniency::ToleranceReport>,
 }
 
 impl SourceBackedPresentation {
@@ -263,6 +267,7 @@ impl SourceBackedPresentation {
             metadata,
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
+            tolerance: OnceLock::new(),
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
         })
@@ -276,11 +281,25 @@ impl SourceBackedPresentation {
     /// Everything a tolerant read repaired while this presentation was opened.
     ///
     /// An empty report means the document conformed; see
-    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    /// [`litchi_odf_common::leniency::ToleranceReport`]. Package repairs come
+    /// first, then the content repairs of the slide scan (LENIENCY_AUDIT
+    /// F9.10). Slides are parsed lazily, so the first call to this method
+    /// (or a complete slide scan) runs that scan once.
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        self.package.tolerance_report()
+        self.tolerance.get_or_init(|| {
+            let mut merged = self.package.tolerance_report().clone();
+            // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
+            // scan; a scan that fails outright reports its error through
+            // `slides()`, and the report then lists the package repairs only.
+            if let Ok((_slides, content)) =
+                Parser::parse_slides_with_report(&self.content_xml, self.styles_xml.as_deref())
+            {
+                merged.append(&content);
+            }
+            merged
+        })
     }
 
     /// Return the source identity captured during open.
@@ -345,10 +364,16 @@ impl SourceBackedPresentation {
     fn slides_uncached(&self) -> Result<Vec<Slide>> {
         self.check_source()?;
         let result =
-            Parser::parse_slides_with_styles(&self.content_xml, self.styles_xml.as_deref());
+            Parser::parse_slides_with_report(&self.content_xml, self.styles_xml.as_deref());
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
-        result
+        let (slides, content) = result?;
+        if self.tolerance.get().is_none() {
+            let mut merged = self.package.tolerance_report().clone();
+            merged.append(&content);
+            let _ = self.tolerance.set(merged);
+        }
+        Ok(slides)
     }
 
     /// Parse one slide while retaining the parser's complete-document
