@@ -20,8 +20,8 @@ use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
 use litchi_ppt::writer::Writer;
 use litchi_ppt::writer::text_format::Paragraph;
 use litchi_ppt::{
-    Defect, DefectLocation, Package, Presentation, Shape as _, ShapeDefect, SlideListDefect,
-    SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect,
+    Defect, DefectLocation, Package, PersistDefect, Presentation, Shape as _, ShapeDefect,
+    SlideListDefect, SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -896,4 +896,122 @@ fn slide_persist_ref_to_a_non_slide_skips_the_slide_and_is_recorded() {
             Some(document_persist_id),
         )],
     );
+}
+
+/// `CurrentUserAtom.headerToken` of an unencrypted presentation.
+const CURRENT_USER_TOKEN: [u8; 4] = 0xE391_C05Fu32.to_le_bytes();
+
+impl Deck {
+    /// File offset of the Current User stream's `offsetToCurrentEdit`.
+    fn current_edit_field(&self) -> usize {
+        let tokens: Vec<usize> = self
+            .bytes
+            .windows(4)
+            .enumerate()
+            .filter(|(_, window)| *window == CURRENT_USER_TOKEN)
+            .map(|(offset, _)| offset)
+            .collect();
+        assert_eq!(tokens.len(), 1, "one CurrentUserAtom");
+        tokens[0] + 4
+    }
+
+    fn current_edit_offset(&self) -> u32 {
+        let at = self.current_edit_field();
+        u32::from_le_bytes(self.bytes[at..at + 4].try_into().unwrap())
+    }
+
+    /// Rename the "Current User" CFB directory entry (same length), so the
+    /// package no longer has that stream.
+    fn without_current_user(mut self) -> Self {
+        let name: Vec<u8> = "Current User"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let entries: Vec<usize> = self
+            .bytes
+            .windows(name.len())
+            .enumerate()
+            .filter(|(_, window)| *window == name.as_slice())
+            .map(|(offset, _)| offset)
+            .collect();
+        assert_eq!(entries.len(), 1, "one Current User directory entry");
+        // "Current User" -> "Current Usex"
+        let last = entries[0] + name.len() - 2;
+        self.bytes[last] = b'x';
+        self
+    }
+}
+
+#[test]
+fn zero_current_edit_offset_recovers_the_live_user_edit_by_scan() {
+    let deck = Deck::new(2);
+    let live = deck.current_edit_offset();
+    let at = deck.current_edit_field();
+    let deck = deck.patch_u32(at, 0);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(
+            PersistDefect::UnusableCurrentEditOffset,
+            live,
+            None,
+        )],
+    );
+}
+
+#[test]
+fn current_edit_offset_off_a_user_edit_recovers_by_scan() {
+    let deck = Deck::new(2);
+    let live = deck.current_edit_offset();
+    let at = deck.current_edit_field();
+    // Offset 8 is the first child record of the DocumentContainer.
+    let deck = deck.patch_u32(at, 8);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(
+            PersistDefect::UnusableCurrentEditOffset,
+            live,
+            None,
+        )],
+    );
+}
+
+#[test]
+fn missing_current_user_stream_recovers_by_scan() {
+    let deck = Deck::new(2);
+    let live = deck.current_edit_offset();
+    let deck = deck.without_current_user();
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(PersistDefect::MissingCurrentUser, live, None)],
+    );
+}
+
+#[test]
+fn user_edit_chain_corruption_stays_fatal() {
+    // With the Current User offset unusable *and* no UserEditAtom left in
+    // the stream, there is no chain to recover: the open still fails.
+    let deck = Deck::new(2);
+    let user_edit_header: [u8; 4] = [0x00, 0x00, 0xF5, 0x0F];
+    let headers: Vec<usize> = deck
+        .bytes
+        .windows(4)
+        .enumerate()
+        .filter(|(_, window)| *window == user_edit_header)
+        .map(|(offset, _)| offset)
+        .collect();
+    assert_eq!(headers.len(), 1);
+    let at = deck.current_edit_field();
+    let mut deck = deck.patch_u32(at, 0);
+    deck.bytes[headers[0] + 2] = 0xF4;
+    for result in [
+        Package::from_reader(Cursor::new(deck.bytes.clone()))
+            .and_then(|mut package| package.presentation())
+            .err(),
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(deck.bytes.clone())))
+            .and_then(|package| package.presentation())
+            .err(),
+    ] {
+        let error = result.expect("a stream without a UserEditAtom stays fatal");
+        assert!(error.to_string().contains("UserEditAtom"), "{error}");
+    }
 }

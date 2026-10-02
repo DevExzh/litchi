@@ -72,6 +72,13 @@
 //!   `SlideContainer`, is skipped as LibreOffice skips it; the presentation
 //!   opens with the remaining slides. A `SlideContainer` whose own length
 //!   overruns the stream stays fatal.
+//! - **F5.6** ([`PersistDefect::MissingCurrentUser`],
+//!   [`PersistDefect::UnusableCurrentEditOffset`]) — when the "Current User"
+//!   stream is missing or its edit offset does not land on a well-formed
+//!   `UserEditAtom`, the live `UserEditAtom` is recovered by scanning the
+//!   document stream's top-level records for the last one, LibreOffice's
+//!   algorithm. A recovered atom that names an encryption session is
+//!   rejected rather than read as plaintext.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
@@ -93,7 +100,8 @@
 //! - `shapes_with_report` appends that cached report to a caller-owned one,
 //!   on every call, so one report can be threaded across many slides.
 //! - [`crate::Presentation::tolerance_report`] is the open-time aggregate:
-//!   the repairs made while the slide directory was built
+//!   the repairs made while the `UserEdit`/persist chain was located and
+//!   read ([`PersistDefect`]) and while the slide directory was built
 //!   ([`SlideListDefect`]). The open path threads one `&mut ToleranceReport`
 //!   through each open-time parse that repairs anything.
 //! - [`crate::Presentation::collect_tolerance_report`] returns the open-time
@@ -399,6 +407,47 @@ impl SlideListDefect {
     }
 }
 
+/// The class of `UserEdit`/persist-chain defect the reader repairs the way
+/// LibreOffice repairs it (finding F5.6).
+///
+/// These repairs happen while the presentation is opened, so they are
+/// recorded in [`crate::Presentation::tolerance_report`]; the context is
+/// documented per variant. Every repair is applied under every [`Leniency`]
+/// variant. The chain grammar itself — each `UserEditAtom` and persist
+/// directory the chain reaches — stays strict, and an encrypted
+/// presentation is never opened through a recovered chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PersistDefect {
+    /// The package has no "Current User" stream; the live `UserEditAtom`
+    /// was recovered by scanning the document stream's top-level records
+    /// for the last `UserEditAtom`, as LibreOffice does (`pptin.cxx` treats
+    /// the stream as optional; `svdfppt.cxx` scans) (finding F5.6). The
+    /// context is the recovered atom's stream offset.
+    MissingCurrentUser,
+    /// The "Current User" stream's `offsetToCurrentEdit` was zero, pointed
+    /// outside the document stream, or did not land on a well-formed
+    /// `UserEditAtom`; the live `UserEditAtom` was recovered by the same
+    /// scan as [`Self::MissingCurrentUser`] (finding F5.6). The context is
+    /// the recovered atom's stream offset.
+    UnusableCurrentEditOffset,
+}
+
+impl PersistDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::MissingCurrentUser => {
+                "recovered the live UserEditAtom by scanning the document stream because the Current User stream is missing"
+            },
+            Self::UnusableCurrentEditOffset => {
+                "recovered the live UserEditAtom by scanning the document stream because the current edit offset is unusable"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a presentation was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of
@@ -415,6 +464,9 @@ pub enum Defect {
     /// A slide-list defect repaired at open time the way LibreOffice
     /// repairs it.
     SlideList(SlideListDefect),
+    /// A `UserEdit`/persist-chain defect repaired at open time the way
+    /// LibreOffice repairs it.
+    Persist(PersistDefect),
 }
 
 impl Defect {
@@ -425,6 +477,7 @@ impl Defect {
             Self::TextProp(defect) => defect.repair(),
             Self::Shape(defect) => defect.repair(),
             Self::SlideList(defect) => defect.repair(),
+            Self::Persist(defect) => defect.repair(),
         }
     }
 }
@@ -432,6 +485,12 @@ impl Defect {
 impl From<TextPropDefect> for Defect {
     fn from(defect: TextPropDefect) -> Self {
         Self::TextProp(defect)
+    }
+}
+
+impl From<PersistDefect> for Defect {
+    fn from(defect: PersistDefect) -> Self {
+        Self::Persist(defect)
     }
 }
 
@@ -776,6 +835,8 @@ mod tests {
             Defect::from(SlideListDefect::DuplicateSlideId),
             Defect::from(SlideListDefect::DuplicateSlidePersistRef),
             Defect::from(SlideListDefect::StaleSlidePersistRef),
+            Defect::from(PersistDefect::MissingCurrentUser),
+            Defect::from(PersistDefect::UnusableCurrentEditOffset),
             Defect::from(ShapeDefect::UnreadableShape),
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),

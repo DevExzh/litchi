@@ -2,7 +2,7 @@
 
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
-use crate::leniency::{DefectLocation, SlideListDefect, ToleranceReport};
+use crate::leniency::{DefectLocation, PersistDefect, SlideListDefect, ToleranceReport};
 use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
 use crate::records::Record;
@@ -93,11 +93,33 @@ impl SlideDirectory {
         )
     }
 
-    /// Build the directory, repairing non-structural slide-list defects
-    /// into `report` (findings F5.4 and F5.5; see [`SlideListDefect`]).
+    /// Build the directory from a "Current User" stream, repairing
+    /// non-structural slide-list defects into `report` (findings F5.4 and
+    /// F5.5; see [`SlideListDefect`]).
+    #[cfg(test)]
     pub(crate) fn build_with_limits(
         document_data: &[u8],
         current_user_data: &[u8],
+        persist_mapping: &PersistMapping,
+        limits: RecordLimits,
+        report: &mut ToleranceReport,
+    ) -> Result<Self> {
+        let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
+        Self::build_from_head(
+            document_data,
+            current_user.current_edit_offset(),
+            persist_mapping,
+            limits,
+            report,
+        )
+    }
+
+    /// Build the directory from the live `UserEditAtom` at
+    /// `user_edit_offset` (see [`locate_head_user_edit`]), repairing
+    /// non-structural slide-list defects into `report`.
+    pub(crate) fn build_from_head(
+        document_data: &[u8],
+        user_edit_offset: u32,
         persist_mapping: &PersistMapping,
         limits: RecordLimits,
         report: &mut ToleranceReport,
@@ -109,11 +131,9 @@ impl SlideDirectory {
                 limits.max_input_bytes
             )));
         }
-        let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
-        let user_edit_offset =
-            usize::try_from(current_user.current_edit_offset()).map_err(|_err| {
-                Error::Corrupted("current edit offset does not fit usize".to_string())
-            })?;
+        let user_edit_offset = usize::try_from(user_edit_offset).map_err(|_err| {
+            Error::Corrupted("current edit offset does not fit usize".to_string())
+        })?;
         let user_edit = read_header(document_data, user_edit_offset, "UserEditAtom")?;
         if user_edit.version != 0
             || user_edit.instance != 0
@@ -302,6 +322,103 @@ impl SlideDirectory {
             by_persist_id: HashMap::new(),
         }
     }
+}
+
+/// Locate the live (newest) `UserEditAtom` of an unencrypted presentation
+/// and return its stream offset.
+///
+/// The "Current User" stream's `offsetToCurrentEdit` names it. When the
+/// stream is missing, or the offset is zero or does not land on a
+/// well-formed `UserEditAtom` (finding F5.6), the document stream's
+/// top-level records are scanned and the last well-formed `UserEditAtom`
+/// wins — LibreOffice's recovery (`svdfppt.cxx`) — and the recovery is
+/// recorded as a [`PersistDefect`]. A Current User stream that declares
+/// encryption is returned untouched (the encrypted open path validates it),
+/// a recovered atom that names an encryption session is refused, and a
+/// stream without any `UserEditAtom` keeps the original error.
+pub(crate) fn locate_head_user_edit(
+    document_data: &[u8],
+    current_user_data: Option<&[u8]>,
+    limits: RecordLimits,
+    report: &mut ToleranceReport,
+) -> Result<u32> {
+    let defect = match current_user_data {
+        Some(data) => {
+            let current_user = CurrentUser::parse_with_limits(data, limits)?;
+            let offset = current_user.current_edit_offset();
+            if current_user.is_encrypted() || is_live_user_edit(document_data, offset) {
+                return Ok(offset);
+            }
+            PersistDefect::UnusableCurrentEditOffset
+        },
+        None => PersistDefect::MissingCurrentUser,
+    };
+
+    let Some(recovered) = last_user_edit(document_data, limits)? else {
+        return Err(match defect {
+            PersistDefect::MissingCurrentUser => Error::StreamNotFound("Current User".to_string()),
+            _ => {
+                Error::Corrupted("CurrentUser does not reference a valid UserEditAtom".to_string())
+            },
+        });
+    };
+    // `last_user_edit` only returns offsets whose header fits the stream.
+    let start = usize::try_from(recovered).unwrap_or(usize::MAX);
+    let header = read_header(document_data, start, "UserEditAtom")?;
+    let session = (header.data_len >= 32)
+        .then(|| read_u32(document_data, start + 8 + 28, "encryptSessionPersistIdRef"))
+        .transpose()?
+        .filter(|session| *session != 0 && *session != u32::MAX);
+    if session.is_some() {
+        return Err(Error::MalformedEncryptionHeader(
+            "encrypted presentation has no usable CurrentUser edit offset".to_string(),
+        ));
+    }
+    report.record(defect, recovered);
+    Ok(recovered)
+}
+
+/// Whether `offset` (nonzero) holds a `UserEditAtom` header — version 0,
+/// instance 0, a 28- or 32-byte payload — that fits in the stream.
+fn is_live_user_edit(document_data: &[u8], offset: u32) -> bool {
+    offset != 0
+        && usize::try_from(offset)
+            .ok()
+            .and_then(|offset| read_header(document_data, offset, "UserEditAtom").ok())
+            .is_some_and(|header| {
+                header.version == 0
+                    && header.instance == 0
+                    && header.record_type == USER_EDIT_ATOM
+                    && matches!(header.data_len, 28 | 32)
+            })
+}
+
+/// The offset of the last well-formed `UserEditAtom` among the document
+/// stream's top-level records. The walk stops at the first header that does
+/// not fit in the stream, as LibreOffice's record manager does.
+fn last_user_edit(document_data: &[u8], limits: RecordLimits) -> Result<Option<u32>> {
+    let mut offset = 0usize;
+    let mut records = 0usize;
+    let mut last = None;
+    while let Ok(header) = read_header(document_data, offset, "top-level record") {
+        records += 1;
+        if records > limits.max_records {
+            return Err(Error::ResourceLimit(format!(
+                "PowerPoint Document top-level record count exceeds limit {}",
+                limits.max_records
+            )));
+        }
+        let offset_u32 = u32::try_from(offset)
+            .map_err(|_err| Error::Corrupted("UserEditAtom offset overflow".to_string()))?;
+        if is_live_user_edit(document_data, offset_u32) {
+            last = Some(offset_u32);
+        }
+        offset = offset
+            .checked_add(8)
+            .and_then(|end| end.checked_add(header.data_len))
+            .ok_or_else(|| Error::Corrupted("top-level record offset overflow".to_string()))?;
+    }
+    Ok(last)
 }
 
 /// Decode one presentation `SlidePersistAtom` into a directory entry,
@@ -770,6 +887,91 @@ mod tests {
         let slide_offset = mapping.get_offset(3).unwrap() as usize;
         stream[slide_offset + 4..slide_offset + 8].copy_from_slice(&0x00FF_FFFFu32.to_le_bytes());
         assert!(SlideDirectory::build(&stream, &current_user, &mapping).is_err());
+    }
+
+    fn locate(
+        stream: &[u8],
+        current_user: Option<&[u8]>,
+    ) -> (Result<u32>, Vec<(crate::Defect, u32)>) {
+        let mut report = ToleranceReport::default();
+        let head =
+            locate_head_user_edit(stream, current_user, RecordLimits::default(), &mut report);
+        let defects = report
+            .defects()
+            .iter()
+            .map(|defect| (defect.defect, defect.context))
+            .collect();
+        (head, defects)
+    }
+
+    /// A usable Current User edit offset is taken as is; a missing stream or
+    /// an unusable offset recovers the last top-level UserEditAtom (F5.6).
+    #[test]
+    fn recovers_the_live_user_edit_by_stream_scan() {
+        use crate::Defect;
+
+        let (stream, good_user, _) = synthetic_directory(&[(3, 256, 0)], false);
+        let edit_offset = u32::try_from(stream.len() - 36).unwrap();
+        assert_eq!(locate(&stream, Some(&good_user)).0.unwrap(), edit_offset);
+        assert!(locate(&stream, Some(&good_user)).1.is_empty());
+
+        let (head, defects) = locate(&stream, None);
+        assert_eq!(head.unwrap(), edit_offset);
+        assert_eq!(
+            defects,
+            [(
+                Defect::Persist(PersistDefect::MissingCurrentUser),
+                edit_offset
+            )]
+        );
+
+        // Zero, out-of-stream, and not-a-UserEditAtom offsets.
+        for bad in [0, u32::try_from(stream.len()).unwrap() + 100, 0x10] {
+            let (head, defects) = locate(&stream, Some(&current_user(bad)));
+            assert_eq!(head.unwrap(), edit_offset);
+            assert_eq!(
+                defects,
+                [(
+                    Defect::Persist(PersistDefect::UnusableCurrentEditOffset),
+                    edit_offset
+                )]
+            );
+        }
+
+        // The last of several UserEditAtoms wins.
+        let mut longer = stream.clone();
+        let later = u32::try_from(longer.len()).unwrap();
+        let mut edit = vec![0u8; 28];
+        edit[16..20].copy_from_slice(&1u32.to_le_bytes());
+        longer.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
+        assert_eq!(locate(&longer, None).0.unwrap(), later);
+    }
+
+    #[test]
+    fn stream_scan_refuses_encrypted_or_missing_user_edits() {
+        let (mut stream, _, _) = synthetic_directory(&[(3, 256, 0)], false);
+        // Replace the trailing 28-byte UserEditAtom with a 32-byte one that
+        // names an encryption session.
+        stream.truncate(stream.len() - 36);
+        let mut edit = vec![0u8; 32];
+        edit[16..20].copy_from_slice(&1u32.to_le_bytes());
+        edit[28..32].copy_from_slice(&7u32.to_le_bytes());
+        stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
+        let (head, defects) = locate(&stream, None);
+        assert!(matches!(head, Err(Error::MalformedEncryptionHeader(_))));
+        assert!(defects.is_empty());
+
+        // No UserEditAtom at all keeps the original errors.
+        let (mut stream, _, _) = synthetic_directory(&[(3, 256, 0)], false);
+        stream.truncate(stream.len() - 36);
+        assert!(matches!(
+            locate(&stream, None).0,
+            Err(Error::StreamNotFound(_))
+        ));
+        assert!(matches!(
+            locate(&stream, Some(&current_user(0))).0,
+            Err(Error::Corrupted(_))
+        ));
     }
 
     #[test]

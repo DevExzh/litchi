@@ -38,12 +38,19 @@ pub(crate) fn inspect_live_document_from_ole<R: Read + Seek>(
     ))
 }
 
+#[cfg(test)]
 pub(crate) fn inspect_live_mapping(
     document: &[u8],
     current_user: &[u8],
 ) -> Result<crate::persist::PersistMapping> {
     validate_current_user(current_user)?;
-    let current_edit_offset = rewrite::u32_at(current_user, 16)?;
+    inspect_live_mapping_at(document, rewrite::u32_at(current_user, 16)?)
+}
+
+pub(crate) fn inspect_live_mapping_at(
+    document: &[u8],
+    current_edit_offset: u32,
+) -> Result<crate::persist::PersistMapping> {
     let (mappings, _) = mapping::read(document, current_edit_offset)?;
     let mut result = crate::persist::PersistMapping::new();
     for (persist_id, offset) in mappings {

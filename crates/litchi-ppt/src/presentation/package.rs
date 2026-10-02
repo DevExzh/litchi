@@ -108,9 +108,14 @@ impl Presentation {
         #[cfg(not(feature = "encryption"))]
         parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
 
-        let current_user_bytes = current_user_data
-            .as_deref()
-            .ok_or_else(|| Error::StreamNotFound("Current User".to_string()))?;
+        // The live UserEditAtom, recovered by a stream scan when the Current
+        // User stream is missing or its edit offset is unusable (F5.6).
+        let head_user_edit = crate::slide::directory::locate_head_user_edit(
+            &powerpoint_document,
+            current_user_data.as_deref(),
+            record_limits,
+            &mut tolerance,
+        )?;
         #[cfg(feature = "encryption")]
         let persist_mapping = if let Some(encryption) = &encrypted {
             let mut mapping = PersistMapping::new();
@@ -119,19 +124,19 @@ impl Presentation {
             }
             mapping
         } else {
-            crate::embedded::object::Editor::inspect_live_mapping(
+            crate::embedded::object::Editor::inspect_live_mapping_at(
                 &powerpoint_document,
-                current_user_bytes,
+                head_user_edit,
             )?
         };
         #[cfg(not(feature = "encryption"))]
-        let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping(
+        let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping_at(
             &powerpoint_document,
-            current_user_bytes,
+            head_user_edit,
         )?;
-        let slide_directory = SlideDirectory::build_with_limits(
+        let slide_directory = SlideDirectory::build_from_head(
             &powerpoint_document,
-            current_user_bytes,
+            head_user_edit,
             &persist_mapping,
             record_limits,
             &mut tolerance,
@@ -265,9 +270,14 @@ impl Presentation {
         #[cfg(not(feature = "encryption"))]
         parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
 
-        let current_user_bytes = current_user_data
-            .as_deref()
-            .ok_or_else(|| Error::StreamNotFound("Current User".to_string()))?;
+        // The live UserEditAtom, recovered by a stream scan when the Current
+        // User stream is missing or its edit offset is unusable (F5.6).
+        let head_user_edit = crate::slide::directory::locate_head_user_edit(
+            &powerpoint_document,
+            current_user_data.as_deref(),
+            record_limits,
+            &mut tolerance,
+        )?;
         #[cfg(feature = "encryption")]
         let persist_mapping = if let Some(encryption) = &encrypted {
             let mut mapping = PersistMapping::new();
@@ -276,19 +286,19 @@ impl Presentation {
             }
             mapping
         } else {
-            crate::embedded::object::Editor::inspect_live_mapping(
+            crate::embedded::object::Editor::inspect_live_mapping_at(
                 &powerpoint_document,
-                current_user_bytes,
+                head_user_edit,
             )?
         };
         #[cfg(not(feature = "encryption"))]
-        let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping(
+        let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping_at(
             &powerpoint_document,
-            current_user_bytes,
+            head_user_edit,
         )?;
-        let slide_directory = SlideDirectory::build_with_limits(
+        let slide_directory = SlideDirectory::build_from_head(
             &powerpoint_document,
-            current_user_bytes,
+            head_user_edit,
             &persist_mapping,
             record_limits,
             &mut tolerance,

@@ -65,11 +65,22 @@ impl Editor {
         lifecycle::open::inspect_live_document_from_ole(ole)
     }
 
+    #[cfg(test)]
     pub(crate) fn inspect_live_mapping(
         document: &[u8],
         current_user: &[u8],
     ) -> Result<crate::persist::PersistMapping> {
         lifecycle::inspect_live_mapping(document, current_user)
+    }
+
+    /// Read the live persist mapping from the `UserEdit` chain whose newest
+    /// atom sits at `head_offset` (see
+    /// `crate::slide::directory::locate_head_user_edit`).
+    pub(crate) fn inspect_live_mapping_at(
+        document: &[u8],
+        head_offset: u32,
+    ) -> Result<crate::persist::PersistMapping> {
+        lifecycle::inspect_live_mapping_at(document, head_offset)
     }
 
     /// Opens a transactional editor over an OLE-backed `PowerPoint` package.
