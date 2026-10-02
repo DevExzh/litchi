@@ -85,9 +85,11 @@
 //! workbook-scope report first, as [`Defect::Package`] entries that keep the
 //! OPC location ([`ToleratedDefect::part`], [`ToleratedDefect::item`],
 //! [`ToleratedDefect::value`]), and carries the OPC unrecorded count over.
-//! The XLSB package does not read core or custom properties at open, so no
-//! metadata report joins it. Worksheet-scope reports never repeat packaging
-//! defects.
+//! The XLSB package does not read core or custom properties at open. A caller
+//! that reads them alongside the workbook (the `litchi` facade does) folds
+//! the metadata report in with [`ToleranceReport::append_properties`], as
+//! [`Defect::Properties`] entries. Worksheet-scope reports never repeat
+//! packaging defects.
 //!
 //! Internally, parsers receive `&mut ToleranceReport` (or own one, as the
 //! worksheet cell reader does) and call `record` at the exact point they
@@ -384,6 +386,17 @@ pub enum Defect {
     /// [`ToleratedDefect::value`] carry the package location the OPC report
     /// recorded; its record type, location, and observed value are zero.
     Package(litchi_opc::leniency::Defect),
+    /// A core- or custom-properties defect `litchi_ooxml_common` repaired
+    /// while the package metadata was read (`litchi_ooxml_common::leniency`,
+    /// audit findings 8.1–8.4).
+    ///
+    /// The XLSB reader does not read metadata at open; a caller that reads it
+    /// alongside the workbook folds the metadata report in with
+    /// [`ToleranceReport::append_properties`]. The entry's
+    /// [`ToleratedDefect::part`], [`ToleratedDefect::item`], and
+    /// [`ToleratedDefect::value`] carry the metadata location; its record
+    /// type, location, and observed value are zero.
+    Properties(litchi_ooxml_common::leniency::Defect),
 }
 
 impl Defect {
@@ -396,6 +409,7 @@ impl Defect {
             Self::CachedNumber(defect) => defect.repair(),
             Self::ValueEncoding(defect) => defect.repair(),
             Self::Package(defect) => defect.repair(),
+            Self::Properties(defect) => defect.repair(),
         }
     }
 }
@@ -430,8 +444,14 @@ impl From<litchi_opc::leniency::Defect> for Defect {
     }
 }
 
-/// The package location of a [`Defect::Package`] entry, as the OPC report
-/// recorded it.
+impl From<litchi_ooxml_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ooxml_common::leniency::Defect) -> Self {
+        Self::Properties(defect)
+    }
+}
+
+/// The package location of a [`Defect::Package`] or [`Defect::Properties`]
+/// entry, as the lower layer's report recorded it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct PackageLocation {
     part: Box<str>,
@@ -490,7 +510,8 @@ impl ToleratedDefect {
 
     /// For a [`Defect::Package`] entry, the OPC part name the defect belongs
     /// to: the relationship source part (`/` for package relationships) or
-    /// `/[Content_Types].xml`. `None` for every BIFF12 record defect.
+    /// `/[Content_Types].xml`. For a [`Defect::Properties`] entry, the
+    /// metadata part. `None` for every BIFF12 record defect.
     #[must_use]
     pub fn part(&self) -> Option<&str> {
         self.package.as_deref().map(|location| &*location.part)
@@ -498,7 +519,8 @@ impl ToleratedDefect {
 
     /// For a [`Defect::Package`] entry, the item within the part — a
     /// relationship `Id`, or the extension or part name of a content-type
-    /// mapping — when the OPC report recorded one.
+    /// mapping — when the OPC report recorded one; for a
+    /// [`Defect::Properties`] entry, the property or element name.
     #[must_use]
     pub fn item(&self) -> Option<&str> {
         self.package
@@ -507,7 +529,8 @@ impl ToleratedDefect {
     }
 
     /// For a [`Defect::Package`] entry, the raw value the OPC repair replaced
-    /// or discarded, when the OPC report recorded one.
+    /// or discarded, when the OPC report recorded one; for a
+    /// [`Defect::Properties`] entry, the raw metadata value.
     #[must_use]
     pub fn value(&self) -> Option<&str> {
         self.package
@@ -619,6 +642,36 @@ impl ToleranceReport {
         self.unrecorded = self.unrecorded.saturating_add(package.unrecorded());
     }
 
+    /// Fold a core- or custom-properties report (`litchi_ooxml_common`) read
+    /// alongside the workbook into this one.
+    ///
+    /// Every metadata repair becomes a [`Defect::Properties`] entry that keeps
+    /// the metadata location ([`ToleratedDefect::part`],
+    /// [`ToleratedDefect::item`], [`ToleratedDefect::value`]), in discovery
+    /// order, and the metadata report's unrecorded count is carried over.
+    /// Callers that read package metadata with
+    /// `litchi_ooxml_common::properties::read_with_report` use this to keep
+    /// one report for the whole document.
+    pub fn append_properties(
+        &mut self,
+        properties: &litchi_ooxml_common::leniency::ToleranceReport,
+    ) {
+        for tolerated in properties {
+            self.push(ToleratedDefect {
+                defect: Defect::Properties(tolerated.defect()),
+                record_type: 0,
+                location: 0,
+                observed: 0,
+                package: Some(Box::new(PackageLocation {
+                    part: tolerated.part().into(),
+                    item: tolerated.item().map(Into::into),
+                    value: tolerated.value().map(Into::into),
+                })),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(properties.unrecorded());
+    }
+
     /// A workbook-scope report seeded with the packaging repairs of the OPC
     /// read that admitted the workbook's package.
     pub(crate) fn from_package(package: &litchi_opc::leniency::ToleranceReport) -> Self {
@@ -654,7 +707,7 @@ impl ToleranceReport {
     ///
     /// The stored-entry bound applies to the merged report as a whole;
     /// entries that no longer fit join the unrecorded count.
-    pub(crate) fn append(&mut self, other: &ToleranceReport) {
+    pub fn append(&mut self, other: &ToleranceReport) {
         for entry in &other.defects {
             self.push(entry.clone());
         }
