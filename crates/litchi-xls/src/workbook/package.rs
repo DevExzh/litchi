@@ -135,6 +135,11 @@ impl<R: Read + Seek> Workbook<R> {
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
         let workbook_data = prepare_workbook_stream(workbook_data, options.password())?;
         let mut tolerance = ToleranceLog::new(options.leniency());
+        // Container repairs come first: the compound-file reader applied them
+        // while the OLE file was opened, before any BIFF record was read.
+        tolerance
+            .report_mut()
+            .append_container(self.ole_file.tolerance_report());
 
         let mut records = Records::new(&workbook_data);
         let mut encoding = Encoding::from_codepage(1252)?; // Default codepage

@@ -1204,6 +1204,12 @@ impl SourceBackedWorkbook {
             }
         }
         let cache_sheet_count = parsed.sheets.len();
+        // Container repairs come first: the compound-file reader applied them
+        // while the positional index was built, before any BIFF record was
+        // read.
+        let mut tolerance = ToleranceReport::default();
+        tolerance.append_container(cfb.tolerance_report());
+        tolerance.absorb(parsed.tolerance);
         let inner = Arc::new(SourceInner {
             source,
             cfb,
@@ -1220,7 +1226,7 @@ impl SourceBackedWorkbook {
                 limits.max_query_index_bytes,
                 cache_sheet_count,
             )),
-            tolerance: Mutex::new(parsed.tolerance),
+            tolerance: Mutex::new(tolerance),
         });
         inner.ensure_current()?;
         Ok(Self { inner })

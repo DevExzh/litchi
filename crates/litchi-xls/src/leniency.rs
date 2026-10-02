@@ -19,6 +19,9 @@
 //! change what a conforming workbook means. Each substitutes the value
 //! documented on the corresponding [`CellFormatDefect`], [`EncodingDefect`],
 //! [`PaletteDefect`], [`SheetDefect`], or [`SharedStringDefect`] variant.
+//! The compound-file repairs the container reader applied while the
+//! workbook's OLE file was opened join the same report as
+//! [`Defect::Container`] entries, ahead of every BIFF-level repair.
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
@@ -674,6 +677,11 @@ pub enum Defect {
     SharedString(SharedStringDefect),
     /// A worksheet-name defect repaired by the opt-in [`Leniency`] variant.
     SheetName(SheetNameDefect),
+    /// A compound-file (CFB) repair the container reader applied while the
+    /// workbook's OLE file was opened; see [`litchi_cfb::Defect`] for the
+    /// closed set of container repairs and their substitutions. Applied under
+    /// every [`Leniency`] variant.
+    Container(litchi_cfb::Defect),
 }
 
 impl Defect {
@@ -681,7 +689,7 @@ impl Defect {
     ///
     /// `None` for [`CellFormatDefect::XfReference`], whose carrying record
     /// varies per occurrence: any cell record, `ROW` (0x0208), or `COLINFO`
-    /// (0x007D).
+    /// (0x007D), and for [`Defect::Container`], which no BIFF record carries.
     #[must_use]
     pub fn record_type(self) -> Option<u16> {
         match self {
@@ -692,6 +700,7 @@ impl Defect {
             Defect::Sheet(defect) => Some(defect.record_type()),
             Defect::SharedString(defect) => Some(defect.record_type()),
             Defect::SheetName(defect) => Some(defect.record_type()),
+            Defect::Container(_) => None,
         }
     }
 
@@ -706,6 +715,7 @@ impl Defect {
             Defect::Sheet(defect) => defect.description(),
             Defect::SharedString(defect) => defect.description(),
             Defect::SheetName(defect) => defect.description(),
+            Defect::Container(defect) => defect.repair(),
         }
     }
 }
@@ -752,6 +762,12 @@ impl From<EncodingDefect> for Defect {
     }
 }
 
+impl From<litchi_cfb::Defect> for Defect {
+    fn from(defect: litchi_cfb::Defect) -> Self {
+        Self::Container(defect)
+    }
+}
+
 /// One repaired defect, located within the workbook that carried it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -792,7 +808,10 @@ impl ToleratedDefect {
     /// every [`SharedStringDefect`] it is the zero-based shared-string index.
     /// For every [`SheetNameDefect`] and [`SheetDefect`] it is the zero-based workbook sheet index of the
     /// `BoundSheet8` record. For every [`PaletteDefect`] it is the byte
-    /// offset of the `Palette` record within the Workbook stream.
+    /// offset of the `Palette` record within the Workbook stream. For a
+    /// [`Defect::Container`] it is the compound-file context (a directory
+    /// SID, sector index, or header field value — see
+    /// [`litchi_cfb::ToleratedDefect::context`]).
     #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -841,7 +860,9 @@ impl ToleratedDefect {
     /// of `Palette` records seen so far. For [`SheetDefect::ReservedNameFlags`]
     /// it is the `stName` option byte, for [`SheetDefect::Visibility`] the
     /// `hsState` byte, for [`SheetDefect::SheetType`] the `dt` byte, and for
-    /// [`SheetDefect::TrailingBytes`] the number of bytes ignored.
+    /// [`SheetDefect::TrailingBytes`] the number of bytes ignored. For a
+    /// [`Defect::Container`] it is always zero; the container context is the
+    /// [`Self::ordinal`].
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
@@ -923,6 +944,17 @@ impl ToleranceReport {
             self.record(entry.defect, entry.ordinal, entry.observed);
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+
+    /// Merge the repairs the compound-file reader applied while opening the
+    /// workbook's container, as [`Defect::Container`] entries in discovery
+    /// order. The container's own overflow count joins this report's
+    /// unrecorded count.
+    pub(crate) fn append_container(&mut self, container: &litchi_cfb::ToleranceReport) {
+        for tolerated in container.defects() {
+            self.record(Defect::Container(tolerated.defect), tolerated.context, 0);
+        }
+        self.unrecorded = self.unrecorded.saturating_add(container.unrecorded());
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored

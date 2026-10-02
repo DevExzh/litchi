@@ -995,3 +995,71 @@ fn xfcrc_reserved_bytes_are_ignored_and_recorded() {
 fn a_conforming_xfcrc_records_nothing() {
     assert_clean(&with_xfcrc(0).0);
 }
+
+// ---------------------------------------------------------------------------
+// Compound-file (container) repairs join the workbook report
+// ---------------------------------------------------------------------------
+
+/// The simple fixture packaged with a 5000-byte `LeniencyProbe` stream beside
+/// the Workbook stream.
+fn package_with_probe() -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], &Stream::simple().serialize())
+        .unwrap();
+    writer
+        .create_stream(&["LeniencyProbe"], &[0xAB; 5000])
+        .unwrap();
+    let mut package = Vec::new();
+    writer.write_to(&mut Cursor::new(&mut package)).unwrap();
+    package
+}
+
+/// Shrink the probe's declared size from 5000 to 4096 bytes, so its
+/// ten-sector chain runs two sectors past the eight the size needs.
+fn shrink_probe(mut package: Vec<u8>) -> Vec<u8> {
+    let name = "LeniencyProbe"
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let entry = package
+        .windows(name.len())
+        .position(|window| window == name.as_slice())
+        .expect("probe directory entry");
+    assert_eq!(
+        u32::from_le_bytes(package[entry + 120..entry + 124].try_into().unwrap()),
+        5000
+    );
+    package[entry + 120..entry + 124].copy_from_slice(&4096u32.to_le_bytes());
+    package
+}
+
+/// A non-critical stream whose FAT chain runs past its declared size opens
+/// (POI and LibreOffice read exactly the declared bytes) on both read paths,
+/// and the compound-file repair is listed as a `Defect::Container` entry —
+/// located by the probe's directory SID — ahead of every BIFF-level repair.
+#[test]
+fn container_repairs_join_the_workbook_report_on_both_paths() {
+    let conformant = package_with_probe();
+    assert_clean(&conformant);
+
+    let package = shrink_probe(conformant);
+    // The container report, in discovery order: the over-long chain, then
+    // the two sectors it carries past the declared size.
+    let container = OleFile::open(Cursor::new(package.clone()))
+        .unwrap()
+        .tolerance_report()
+        .clone();
+    assert!(container.contains(litchi_cfb::AllocationDefect::ChainLongerThanSize));
+    let expected = container
+        .defects()
+        .iter()
+        .map(|tolerated| (Defect::Container(tolerated.defect), tolerated.context, 0))
+        .collect::<Vec<_>>();
+    let workbook = assert_repairs(&package, &expected);
+    assert_eq!(workbook.sheets()[0].name(), "Sheet1");
+    // The eager path built from an already-opened container folds it too.
+    let ole = OleFile::open(Cursor::new(package)).unwrap();
+    let workbook = Workbook::from_ole_file(ole).unwrap();
+    assert_eq!(workbook.tolerance_report().defects().len(), expected.len());
+}
