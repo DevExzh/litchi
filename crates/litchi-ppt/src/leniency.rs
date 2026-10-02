@@ -13,7 +13,7 @@
 //! bytes `PowerPoint`, POI, and LibreOffice read past without complaint, so
 //! rejecting them would cost the caller the entire presentation over
 //! metadata that cannot change what a conforming file means. Each
-//! substitutes the value documented on the corresponding [`TextPropDefect`]
+//! substitutes the value documented on the corresponding [`Defect`] class
 //! variant.
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
@@ -28,8 +28,8 @@
 //!
 //! # Roadmap state
 //!
-//! Two findings from `docs/LENIENCY_AUDIT.md` record into this report today,
-//! both `PowerPoint`-compatible (default) repairs on the text-box read path:
+//! The following findings from `docs/LENIENCY_AUDIT.md` record into this
+//! report today, all `PowerPoint`-compatible (default) repairs:
 //!
 //! - **F5.1** ([`TextPropDefect::StyleTextPropCoverage`]) — the read path
 //!   parses `StyleTextPropAtom` with the clamping POI/LibreOffice posture
@@ -44,10 +44,16 @@
 //!   [`TextPropDefect::ReservedWrapFlagBits`]) — reserved
 //!   `BulletFlags`/`PFWrapFlags` bits are masked to the defined set instead
 //!   of rejecting the paragraph; the defined bits are still applied.
+//! - **F5.11** ([`ShapeDefect`]) — shape conversion is isolated per shape:
+//!   a shape whose content cannot be read is dropped and recorded
+//!   ([`ShapeDefect::UnreadableShape`]) while its siblings are kept, a
+//!   duplicated `TextRulerAtom` or round-trip shape atom keeps its first
+//!   occurrence, and an undefined round-trip placeholder ID reads as absent.
+//!   A shape whose host-record framing is broken still fails the slide.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
-//! touched by either repair and stay fatal.
+//! touched by any of these repairs and stay fatal.
 //!
 //! # Where the report lives
 //!
@@ -93,7 +99,7 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 /// Structural defects — malformed record framing or container structure, a
 /// broken `UserEdit`/persist-chain grammar, or unsupported/absent decryption
 /// material — are hard errors under every variant. The
-/// `PowerPoint`-compatible repairs listed by [`TextPropDefect`] are applied
+/// `PowerPoint`-compatible repairs listed by [`Defect`] are applied
 /// and recorded under every variant, including [`Leniency::Strict`].
 ///
 /// The enumeration is non-exhaustive because opt-in variants arrive with the
@@ -104,7 +110,7 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 pub enum Leniency {
     /// Reject every defect whose repair requires opting in.
     ///
-    /// This is the default: the `PowerPoint`-compatible [`TextPropDefect`]
+    /// This is the default: the `PowerPoint`-compatible [`Defect`]
     /// repairs are still applied and recorded in the [`ToleranceReport`].
     #[default]
     Strict,
@@ -180,17 +186,91 @@ impl TextPropDefect {
     }
 }
 
+/// The class of `OfficeArt` shape defect the reader repairs the way
+/// `PowerPoint` and LibreOffice repair it (finding F5.11).
+///
+/// This enumeration is closed by design. Every repair is applied under every
+/// [`Leniency`] variant, including [`Leniency::Strict`], on the slide and
+/// notes shape read paths. Each recorded entry is located by the persist ID
+/// of the slide or notes page and the shape ID (`spid`) of the shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ShapeDefect {
+    /// One shape could not be converted and was dropped; its siblings, and
+    /// the rest of the slide, are still read (finding F5.11).
+    ///
+    /// `PowerPoint` and LibreOffice render the remaining shapes of a slide
+    /// when one is unreadable, so a content-level failure while one shape is
+    /// converted — malformed text styling, a malformed placeholder or
+    /// round-trip atom, an unreadable property — drops that shape only. The
+    /// shape's own record framing (its `ClientTextbox`/`ClientData` host
+    /// records and their child-record headers), resource limits, and the
+    /// shape-tree nesting bound stay fatal for the whole slide. Repairs
+    /// recorded while the dropped shape was being converted are discarded
+    /// with it. The context is the zero-based index of the shape among its
+    /// siblings (top-level shapes of the drawing, or children of a group).
+    UnreadableShape,
+    /// A `ClientTextbox` carried more than one `TextRulerAtom`; the first is
+    /// kept and every later one ignored (finding F5.11).
+    ///
+    /// MS-PPT 2.9.43 defines a single optional ruler, and POI's
+    /// `EscherTextboxWrapper` tolerates several. The context is the
+    /// one-based ordinal of the ignored ruler (1 for the second ruler).
+    DuplicateTextRuler,
+    /// A shape's `ClientData` carried a `PowerPoint` 2007 round-trip atom
+    /// (`RoundTripHFPlaceholder12Atom`, `RoundTripNewPlaceholderId12Atom`,
+    /// `RoundTripShapeId12Atom`, or
+    /// `RoundTripShapeCheckSumForCustomLayouts12Atom`) more than once; the
+    /// first occurrence is kept (finding F5.11).
+    ///
+    /// Duplicated round-trip atoms are exactly what round-tripping producers
+    /// emit, and none of the reference readers reject them. The context is
+    /// the record type of the ignored duplicate.
+    DuplicateRoundTripAtom,
+    /// A round-trip placeholder atom named a placeholder ID outside the set
+    /// MS-PPT defines (7–10 for `RoundTripHFPlaceholder12Atom`, 25–26 for
+    /// `RoundTripNewPlaceholderId12Atom`); the identity is treated as absent
+    /// (finding F5.11).
+    ///
+    /// POI never validates these IDs. The context is
+    /// `(record type << 16) | placeholder ID`.
+    UnknownRoundTripPlaceholderId,
+}
+
+impl ShapeDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnreadableShape => {
+                "dropped one unreadable shape and kept every other shape on the slide"
+            },
+            Self::DuplicateTextRuler => {
+                "kept the first TextRulerAtom of the text box and ignored the duplicate"
+            },
+            Self::DuplicateRoundTripAtom => {
+                "kept the first round-trip shape atom and ignored the duplicate"
+            },
+            Self::UnknownRoundTripPlaceholderId => {
+                "treated a round-trip placeholder atom with an undefined placeholder ID as absent"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a presentation was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of
-/// what a read may change about a presentation. [`Defect::TextProp`] classes
-/// are repaired under every [`Leniency`] variant; opt-in classes join this
+/// what a read may change about a presentation. [`Defect::TextProp`] and
+/// [`Defect::Shape`] classes are repaired under every [`Leniency`] variant; opt-in classes join this
 /// enumeration together with the [`Leniency`] variants that gate them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Defect {
     /// A text-property defect repaired the way `PowerPoint` repairs it.
     TextProp(TextPropDefect),
+    /// An `OfficeArt` shape defect repaired the way `PowerPoint` repairs it.
+    Shape(ShapeDefect),
 }
 
 impl Defect {
@@ -199,6 +279,7 @@ impl Defect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::TextProp(defect) => defect.repair(),
+            Self::Shape(defect) => defect.repair(),
         }
     }
 }
@@ -206,6 +287,12 @@ impl Defect {
 impl From<TextPropDefect> for Defect {
     fn from(defect: TextPropDefect) -> Self {
         Self::TextProp(defect)
+    }
+}
+
+impl From<ShapeDefect> for Defect {
+    fn from(defect: ShapeDefect) -> Self {
+        Self::Shape(defect)
     }
 }
 
@@ -233,7 +320,8 @@ pub struct ToleratedDefect {
     /// of the offending run within its `StyleTextPropAtom` (paragraph runs
     /// first, then character runs; a dropped tail records the index where
     /// another run would have started). The reserved-bit classes store the
-    /// raw, unmasked 16-bit flags value.
+    /// raw, unmasked 16-bit flags value. Every other class documents its
+    /// context on its variant.
     pub context: u32,
     /// The slide/notes page and shape the defect was found in.
     pub location: DefectLocation,
@@ -247,6 +335,13 @@ pub struct ToleratedDefect {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,
+    unrecorded: u32,
+}
+
+/// The extent of a [`ToleranceReport`] at one point of a parse.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ReportCheckpoint {
+    recorded: usize,
     unrecorded: u32,
 }
 
@@ -290,6 +385,34 @@ impl ToleranceReport {
         } else {
             self.unrecorded = self.unrecorded.saturating_add(1);
         }
+    }
+
+    /// Record one repair whose location is already known.
+    pub(crate) fn record_at(
+        &mut self,
+        defect: impl Into<Defect>,
+        context: u32,
+        location: DefectLocation,
+    ) {
+        let start = self.defects.len();
+        self.record(defect, context);
+        self.locate_from(start, location);
+    }
+
+    /// Capture the report's current extent, so the repairs recorded by a
+    /// parse that is later abandoned can be discarded with
+    /// [`Self::rollback`].
+    pub(crate) fn checkpoint(&self) -> ReportCheckpoint {
+        ReportCheckpoint {
+            recorded: self.defects.len(),
+            unrecorded: self.unrecorded,
+        }
+    }
+
+    /// Discard every repair recorded since `checkpoint` was taken.
+    pub(crate) fn rollback(&mut self, checkpoint: ReportCheckpoint) {
+        self.defects.truncate(checkpoint.recorded);
+        self.unrecorded = checkpoint.unrecorded;
     }
 
     /// Merge another parse's report into this one, keeping discovery order
@@ -425,6 +548,23 @@ mod tests {
     }
 
     #[test]
+    fn rolling_back_discards_later_repairs_only() {
+        let mut report = ToleranceReport::default();
+        report.record(TextPropDefect::StyleTextPropCoverage, 0);
+        let checkpoint = report.checkpoint();
+        for _ in 0..MAX_RECORDED_DEFECTS + 2 {
+            report.record(TextPropDefect::ReservedBulletFlagBits, 0x00F1);
+        }
+        assert_eq!(report.unrecorded(), 3);
+        report.rollback(checkpoint);
+        assert_eq!(report.total(), 1);
+        assert_eq!(
+            report.defects()[0].defect,
+            Defect::TextProp(TextPropDefect::StyleTextPropCoverage)
+        );
+    }
+
+    #[test]
     fn locating_fills_only_unknown_fields_of_later_defects() {
         let mut report = ToleranceReport::default();
         report.record(TextPropDefect::StyleTextPropCoverage, 0);
@@ -472,6 +612,10 @@ mod tests {
             Defect::from(TextPropDefect::StyleTextPropCoverage),
             Defect::from(TextPropDefect::ReservedBulletFlagBits),
             Defect::from(TextPropDefect::ReservedWrapFlagBits),
+            Defect::from(ShapeDefect::UnreadableShape),
+            Defect::from(ShapeDefect::DuplicateTextRuler),
+            Defect::from(ShapeDefect::DuplicateRoundTripAtom),
+            Defect::from(ShapeDefect::UnknownRoundTripPlaceholderId),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

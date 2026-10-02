@@ -17,4 +17,4 @@ pub use litchi_odraw::shape::{Bounds, Flags, Kind, Native, Shape};
 pub use litchi_odraw::{Container, Record, RecordKind};
 pub use model::{Anchor, Drawing, FrameKind, Placeholder, ShapeExt};
 
-pub(crate) use codec::textbox;
+pub(crate) use codec::{powerpoint12_shape_metadata, textbox, validate_host_framing};

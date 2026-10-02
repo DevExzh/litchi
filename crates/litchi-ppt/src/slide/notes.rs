@@ -388,9 +388,9 @@ impl SpeakerNotes {
         };
         let parsed = crate::odraw::parse(&drawing.data)?;
         let mut shapes = Vec::with_capacity(parsed.len());
-        for shape in &parsed {
+        for (index, shape) in parsed.iter().enumerate() {
             if let Some(mut converted_shape) =
-                Slide::<'static>::convert_odraw_to_shape_enum(shape, &mut report)?
+                Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &mut report)?
             {
                 converted_shape.mark_source_bound_recursive();
                 shapes.push(converted_shape);

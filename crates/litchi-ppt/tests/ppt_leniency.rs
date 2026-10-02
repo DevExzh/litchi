@@ -4,14 +4,15 @@
     reason = "fixture assertions panic on construction failure by design"
 )]
 
-//! Leniency acceptance tests for findings F5.1 and F5.2.
+//! Leniency acceptance tests for the litchi-ppt findings of
+//! `docs/LENIENCY_AUDIT.md`.
 //!
-//! Each fixture is a complete `.ppt` written by the crate's writer with one
-//! rich text box, whose `StyleTextPropAtom` payload is then patched in place
-//! (same length, so record framing and the persist directory stay valid) to
-//! carry exactly one cataloged non-conformity. Every fixture must open
-//! through the default path, keep its text, apply the defined formatting,
-//! and enumerate the repair; the unpatched control must report nothing.
+//! Each fixture is a complete `.ppt` written by the crate's writer, then
+//! patched in place (same length, so record framing and the persist
+//! directory stay valid unless a test breaks them on purpose) to carry
+//! exactly one cataloged non-conformity. Every fixture must open through the
+//! default path, keep what it can, and enumerate the repair; the unpatched
+//! control must report nothing.
 
 use litchi_core::OwnedSource;
 use litchi_ppt::shapes::ShapeEnum;
@@ -19,8 +20,8 @@ use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
 use litchi_ppt::writer::Writer;
 use litchi_ppt::writer::text_format::Paragraph;
 use litchi_ppt::{
-    Defect, DefectLocation, Package, Presentation, Shape as _, SourceBackedPackage, TextPropDefect,
-    ToleranceReport, ToleratedDefect,
+    Defect, DefectLocation, Package, Presentation, Shape as _, ShapeDefect, SourceBackedPackage,
+    TextPropDefect, ToleranceReport, ToleratedDefect,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -293,4 +294,176 @@ fn style_atom_framing_corruption_stays_fatal() {
     assert!(error.to_string().contains("ClientTextbox"), "{error}");
     assert!(slides[0].tolerance_report().is_err());
     assert!(presentation.collect_tolerance_report().is_err());
+}
+
+// ---------------------------------------------------------------------------
+// F5.11: per-shape error isolation.
+// ---------------------------------------------------------------------------
+
+/// `OutlineTextRefAtom` record type: strictly a four-byte atom.
+const OUTLINE_TEXT_REF_ATOM: u16 = 0x0F9E;
+
+/// A slide with two plain text boxes, `first` and `second`.
+fn two_textboxes() -> Vec<u8> {
+    let mut writer = Writer::new();
+    let slide = writer.add_slide().unwrap();
+    for text in ["first", "second"] {
+        writer
+            .add_rich_textbox(slide, 10, 10, 200, 40, vec![Paragraph::new(text)])
+            .unwrap();
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn style_atom_headers(bytes: &[u8]) -> Vec<usize> {
+    bytes
+        .windows(STYLE_TEXT_PROP_HEADER.len())
+        .enumerate()
+        .filter(|(_, window)| *window == STYLE_TEXT_PROP_HEADER)
+        .map(|(offset, _)| offset)
+        .collect()
+}
+
+fn open_both(bytes: &[u8]) -> [Presentation; 2] {
+    [
+        Package::from_reader(Cursor::new(bytes.to_vec()))
+            .unwrap()
+            .presentation()
+            .unwrap(),
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec())))
+            .unwrap()
+            .presentation()
+            .unwrap(),
+    ]
+}
+
+fn textbox_texts(shapes: &[ShapeEnum<'static>]) -> Vec<(u32, String)> {
+    shapes
+        .iter()
+        .map(|shape| {
+            let ShapeEnum::TextBox(textbox) = shape else {
+                panic!("expected text boxes, got {shape:?}");
+            };
+            (textbox.id(), textbox.text().to_owned())
+        })
+        .collect()
+}
+
+#[test]
+fn one_unreadable_text_box_is_dropped_and_its_sibling_kept() {
+    let control = two_textboxes();
+    let [control_presentation, _] = open_both(&control);
+    let slides = control_presentation.slides().unwrap();
+    let control_shapes = textbox_texts(slides[0].shapes().unwrap());
+    assert_eq!(
+        control_shapes
+            .iter()
+            .map(|(_, text)| text.as_str())
+            .collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert!(slides[0].tolerance_report().unwrap().is_clean());
+    assert!(
+        control_presentation
+            .collect_tolerance_report()
+            .unwrap()
+            .is_clean()
+    );
+
+    // Retype the first text box's StyleTextPropAtom as an
+    // OutlineTextRefAtom: still well framed, but not a four-byte atom, so
+    // the first shape's content is unreadable.
+    let mut bytes = control;
+    let headers = style_atom_headers(&bytes);
+    assert_eq!(headers.len(), 2);
+    bytes[headers[0] + 2..headers[0] + 4].copy_from_slice(&OUTLINE_TEXT_REF_ATOM.to_le_bytes());
+
+    for presentation in open_both(&bytes) {
+        assert!(presentation.tolerance_report().is_clean());
+        let slides = presentation.slides().unwrap();
+        let slide = &slides[0];
+        assert_eq!(
+            textbox_texts(slide.shapes().unwrap()),
+            [control_shapes[1].clone()]
+        );
+        let expected = [ToleratedDefect {
+            defect: Defect::Shape(ShapeDefect::UnreadableShape),
+            context: 0,
+            location: DefectLocation {
+                persist_id: Some(slide.persist_id()),
+                shape_id: Some(control_shapes[0].0),
+            },
+        }];
+        assert_eq!(slide.tolerance_report().unwrap().defects(), expected);
+        assert_eq!(
+            presentation.collect_tolerance_report().unwrap().defects(),
+            expected
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Corpus: conformant files repair nothing.
+// ---------------------------------------------------------------------------
+
+fn corpus_ppt_files() -> Vec<std::path::PathBuf> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+    let mut pending = vec![root];
+    let mut files = Vec::new();
+    while let Some(directory) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("ppt"))
+            {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+/// Every unencrypted `.ppt` in `test-data` opens through the default path
+/// with an empty report, open-time and per-slide/notes alike.
+#[test]
+fn corpus_presentations_report_nothing() {
+    let files = corpus_ppt_files();
+    assert!(files.len() >= 20, "test-data corpus not found");
+    let mut opened = 0;
+    for path in &files {
+        let presentation = match Package::open(path).and_then(|mut package| package.presentation())
+        {
+            Ok(presentation) => presentation,
+            // Encrypted presentations are out of scope (no password).
+            Err(error) => {
+                let message = error.to_string().to_ascii_lowercase();
+                assert!(
+                    message.contains("encrypt") || message.contains("password"),
+                    "{} failed to open: {error}",
+                    path.display()
+                );
+                continue;
+            },
+        };
+        opened += 1;
+        let report = presentation
+            .collect_tolerance_report()
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        assert!(
+            report.is_clean(),
+            "{} reported {:?}",
+            path.display(),
+            report.defects()
+        );
+    }
+    assert!(opened >= 20, "only {opened} corpus files opened");
 }

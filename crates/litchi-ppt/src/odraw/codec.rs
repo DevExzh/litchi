@@ -86,113 +86,7 @@ impl ShapeExt for Shape<'_> {
     }
 
     fn powerpoint12_shape_metadata(&self) -> Result<Option<crate::ShapeMetadata>> {
-        use crate::consts::RecordType;
-        use crate::{HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata};
-
-        let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
-            return Ok(None);
-        };
-        validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-
-        let mut metadata = ShapeMetadata::default();
-        let mut found = false;
-        let mut offset = 0usize;
-        let mut records = 0u32;
-        while offset < client_data.data().len() {
-            visit_host_record(&mut records)?;
-            let (record, consumed) =
-                crate::records::Record::parse_strict(client_data.data(), offset)?;
-            #[allow(
-                clippy::wildcard_enum_match_arm,
-                reason = "`RecordType` spans the full MS-PPT record ID space; only the four round-trip atoms carry shape metadata, every other record is skipped"
-            )]
-            match record.record_type {
-                RecordType::RoundTripHFPlaceholder12Atom => {
-                    if metadata.header_footer.is_some() {
-                        return Err(corrupted(
-                            "Shape contains duplicate RoundTripHFPlaceholder12Atom records",
-                        ));
-                    }
-                    validate_round_trip_atom(&record, "RoundTripHFPlaceholder12Atom", 1)?;
-                    metadata.header_footer = Some(match record.data[0] {
-                        7 => HeaderFooterPlaceholder::Date,
-                        8 => HeaderFooterPlaceholder::SlideNumber,
-                        9 => HeaderFooterPlaceholder::Footer,
-                        10 => HeaderFooterPlaceholder::Header,
-                        _ => {
-                            return Err(corrupted(
-                                "RoundTripHFPlaceholder12Atom has an invalid placeholder ID",
-                            ));
-                        },
-                    });
-                    found = true;
-                },
-                RecordType::RoundTripNewPlaceholderId12Atom => {
-                    if metadata.new_placeholder.is_some() {
-                        return Err(corrupted(
-                            "Shape contains duplicate RoundTripNewPlaceholderId12Atom records",
-                        ));
-                    }
-                    validate_round_trip_atom(&record, "RoundTripNewPlaceholderId12Atom", 1)?;
-                    metadata.new_placeholder = Some(match record.data[0] {
-                        25 => NewPlaceholder::VerticalObject,
-                        26 => NewPlaceholder::Picture,
-                        _ => {
-                            return Err(corrupted(
-                                "RoundTripNewPlaceholderId12Atom has an invalid placeholder ID",
-                            ));
-                        },
-                    });
-                    found = true;
-                },
-                RecordType::RoundTripShapeId12Atom => {
-                    if metadata.shape_id.is_some() {
-                        return Err(corrupted(
-                            "Shape contains duplicate RoundTripShapeId12Atom records",
-                        ));
-                    }
-                    validate_round_trip_atom(&record, "RoundTripShapeId12Atom", 4)?;
-                    metadata.shape_id = Some(u32::from_le_bytes([
-                        record.data[0],
-                        record.data[1],
-                        record.data[2],
-                        record.data[3],
-                    ]));
-                    found = true;
-                },
-                RecordType::RoundTripShapeCheckSumForCustomLayouts12Atom => {
-                    if metadata.custom_layout_checksums.is_some() {
-                        return Err(corrupted(
-                            "Shape contains duplicate RoundTripShapeCheckSumForCustomLayouts12Atom records",
-                        ));
-                    }
-                    validate_round_trip_atom(
-                        &record,
-                        "RoundTripShapeCheckSumForCustomLayouts12Atom",
-                        8,
-                    )?;
-                    metadata.custom_layout_checksums = Some(ShapeChecksums {
-                        shape: u32::from_le_bytes([
-                            record.data[0],
-                            record.data[1],
-                            record.data[2],
-                            record.data[3],
-                        ]),
-                        text: u32::from_le_bytes([
-                            record.data[4],
-                            record.data[5],
-                            record.data[6],
-                            record.data[7],
-                        ]),
-                    });
-                    found = true;
-                },
-                _ => {},
-            }
-            offset = advance(offset, consumed, "OfficeArt client-data")?;
-        }
-
-        Ok(found.then_some(metadata))
+        powerpoint12_shape_metadata(self, None)
     }
 
     fn programmable_tags_with_limits(
@@ -363,6 +257,33 @@ pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
     let trimmed = text.trim_end().len();
     text.truncate(trimmed);
     Ok((!text.is_empty()).then_some(text))
+}
+
+/// Checks the record framing of a shape's `PowerPoint` host records: the
+/// `ClientTextbox` and `ClientData` headers and the header of every child
+/// record they hold.
+///
+/// Shape-level isolation (finding F5.11) drops a shape whose *content*
+/// cannot be read; a shape failing this check is structural corruption and
+/// stays fatal for the whole drawing.
+pub(crate) fn validate_host_framing(shape: &Shape<'_>) -> Result<()> {
+    for (kind, raw_kind, name) in [
+        (
+            RecordKind::ClientTextbox,
+            CLIENT_TEXTBOX_RAW_KIND,
+            "ClientTextbox",
+        ),
+        (RecordKind::ClientData, CLIENT_DATA_RAW_KIND, "ClientData"),
+    ] {
+        let Some(record) = host_record(shape, kind)? else {
+            continue;
+        };
+        validate_host_record(&record, raw_kind, name)?;
+        for child in RawRecords::new(record.data()) {
+            child?;
+        }
+    }
+    Ok(())
 }
 
 /// Returns a shape's header-validated `PowerPoint` textbox record.
@@ -585,6 +506,158 @@ fn is_text_container(kind: u16) -> bool {
         kind,
         1000 | 1006 | 1007 | 1010 | 1016 | 2000 | 3008 | 3009 | 4080 | 4085
     )
+}
+
+/// Parses `PowerPoint` 12 shape round-trip metadata.
+///
+/// Without a report every deviation is an error. With a report (the slide
+/// and notes read path), a duplicated round-trip atom keeps its first
+/// occurrence and an undefined placeholder ID is treated as absent, each
+/// recorded as a [`crate::ShapeDefect`] (finding F5.11). Record framing and
+/// each atom's header and size stay errors either way.
+pub(crate) fn powerpoint12_shape_metadata(
+    shape: &Shape<'_>,
+    mut report: Option<&mut crate::leniency::ToleranceReport>,
+) -> Result<Option<crate::ShapeMetadata>> {
+    use crate::consts::RecordType;
+    use crate::leniency::ShapeDefect;
+    use crate::{HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata};
+
+    let Some(client_data) = host_record(shape, RecordKind::ClientData)? else {
+        return Ok(None);
+    };
+    validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
+
+    // Tolerates `defect` into the report when one is threaded, else rejects
+    // the shape with `message`.
+    let mut tolerate =
+        |defect: ShapeDefect, context: u32, message: &str| match report.as_deref_mut() {
+            Some(report) => {
+                report.record(defect, context);
+                Ok(())
+            },
+            None => Err(corrupted(message)),
+        };
+
+    let mut metadata = ShapeMetadata::default();
+    let mut found = false;
+    let mut offset = 0usize;
+    let mut records = 0u32;
+    while offset < client_data.data().len() {
+        visit_host_record(&mut records)?;
+        let (record, consumed) = crate::records::Record::parse_strict(client_data.data(), offset)?;
+        offset = advance(offset, consumed, "OfficeArt client-data")?;
+        let record_type = u32::from(record.record_type.as_u16());
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` spans the full MS-PPT record ID space; only the four round-trip atoms carry shape metadata, every other record is skipped"
+        )]
+        match record.record_type {
+            RecordType::RoundTripHFPlaceholder12Atom => {
+                if metadata.header_footer.is_some() {
+                    tolerate(
+                        ShapeDefect::DuplicateRoundTripAtom,
+                        record_type,
+                        "Shape contains duplicate RoundTripHFPlaceholder12Atom records",
+                    )?;
+                    continue;
+                }
+                validate_round_trip_atom(&record, "RoundTripHFPlaceholder12Atom", 1)?;
+                let header_footer = match record.data[0] {
+                    7 => HeaderFooterPlaceholder::Date,
+                    8 => HeaderFooterPlaceholder::SlideNumber,
+                    9 => HeaderFooterPlaceholder::Footer,
+                    10 => HeaderFooterPlaceholder::Header,
+                    id => {
+                        tolerate(
+                            ShapeDefect::UnknownRoundTripPlaceholderId,
+                            (record_type << 16) | u32::from(id),
+                            "RoundTripHFPlaceholder12Atom has an invalid placeholder ID",
+                        )?;
+                        continue;
+                    },
+                };
+                metadata.header_footer = Some(header_footer);
+                found = true;
+            },
+            RecordType::RoundTripNewPlaceholderId12Atom => {
+                if metadata.new_placeholder.is_some() {
+                    tolerate(
+                        ShapeDefect::DuplicateRoundTripAtom,
+                        record_type,
+                        "Shape contains duplicate RoundTripNewPlaceholderId12Atom records",
+                    )?;
+                    continue;
+                }
+                validate_round_trip_atom(&record, "RoundTripNewPlaceholderId12Atom", 1)?;
+                let new_placeholder = match record.data[0] {
+                    25 => NewPlaceholder::VerticalObject,
+                    26 => NewPlaceholder::Picture,
+                    id => {
+                        tolerate(
+                            ShapeDefect::UnknownRoundTripPlaceholderId,
+                            (record_type << 16) | u32::from(id),
+                            "RoundTripNewPlaceholderId12Atom has an invalid placeholder ID",
+                        )?;
+                        continue;
+                    },
+                };
+                metadata.new_placeholder = Some(new_placeholder);
+                found = true;
+            },
+            RecordType::RoundTripShapeId12Atom => {
+                if metadata.shape_id.is_some() {
+                    tolerate(
+                        ShapeDefect::DuplicateRoundTripAtom,
+                        record_type,
+                        "Shape contains duplicate RoundTripShapeId12Atom records",
+                    )?;
+                    continue;
+                }
+                validate_round_trip_atom(&record, "RoundTripShapeId12Atom", 4)?;
+                metadata.shape_id = Some(u32::from_le_bytes([
+                    record.data[0],
+                    record.data[1],
+                    record.data[2],
+                    record.data[3],
+                ]));
+                found = true;
+            },
+            RecordType::RoundTripShapeCheckSumForCustomLayouts12Atom => {
+                if metadata.custom_layout_checksums.is_some() {
+                    tolerate(
+                        ShapeDefect::DuplicateRoundTripAtom,
+                        record_type,
+                        "Shape contains duplicate RoundTripShapeCheckSumForCustomLayouts12Atom records",
+                    )?;
+                    continue;
+                }
+                validate_round_trip_atom(
+                    &record,
+                    "RoundTripShapeCheckSumForCustomLayouts12Atom",
+                    8,
+                )?;
+                metadata.custom_layout_checksums = Some(ShapeChecksums {
+                    shape: u32::from_le_bytes([
+                        record.data[0],
+                        record.data[1],
+                        record.data[2],
+                        record.data[3],
+                    ]),
+                    text: u32::from_le_bytes([
+                        record.data[4],
+                        record.data[5],
+                        record.data[6],
+                        record.data[7],
+                    ]),
+                });
+                found = true;
+            },
+            _ => {},
+        }
+    }
+
+    Ok(found.then_some(metadata))
 }
 
 fn validate_round_trip_atom(

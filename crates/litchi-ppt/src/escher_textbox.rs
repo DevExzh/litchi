@@ -81,7 +81,9 @@ impl EscherTextboxWrapper {
     ///
     /// Records [`crate::TextPropDefect`] classes repaired while the textbox's
     /// `StyleTextPropAtom` is parsed: clamped run coverage (F5.1) and masked
-    /// reserved `BulletFlags`/`PFWrapFlags` bits (F5.2). A detached
+    /// reserved `BulletFlags`/`PFWrapFlags` bits (F5.2), plus ignored
+    /// duplicate `TextRulerAtom` records
+    /// ([`crate::ShapeDefect::DuplicateTextRuler`], F5.11). A detached
     /// text-box payload knows neither its slide nor its shape, so the
     /// recorded [`crate::DefectLocation`] fields stay `None`; the slide and
     /// notes shape readers fill them in.
@@ -122,10 +124,10 @@ impl EscherTextboxWrapper {
             .next()
             .map(|record| TextRuler::parse(&record.data))
             .transpose()?;
-        if ruler_records.next().is_some() {
-            return Err(Error::Corrupted(
-                "ClientTextbox contains multiple TextRulerAtom records".to_string(),
-            ));
+        // MS-PPT 2.9.43 defines one optional ruler; POI tolerates several.
+        // Keep the first and record every ignored duplicate (F5.11).
+        for (ordinal, _) in (1u32..).zip(ruler_records) {
+            report.record(crate::leniency::ShapeDefect::DuplicateTextRuler, ordinal);
         }
         let text_interactions = Self::text_interactions_from_records(&child_records, limits)?;
         let metachars = super::text_metachar::metachars_from_records(child_records.iter())?;
@@ -373,16 +375,34 @@ mod tests {
     }
 
     #[test]
-    fn rejects_multiple_text_rulers() {
+    fn keeps_the_first_of_multiple_text_rulers_and_records_the_rest() {
         let mut data = Vec::new();
-        for _ in 0..2 {
+        for _ in 0..3 {
             data.extend_from_slice(&0u16.to_le_bytes());
             data.extend_from_slice(&4006u16.to_le_bytes());
             data.extend_from_slice(&4u32.to_le_bytes());
             data.extend_from_slice(&0u32.to_le_bytes());
         }
 
-        let error = EscherTextboxWrapper::new(data).unwrap_err();
-        assert!(error.to_string().contains("multiple TextRulerAtom"));
+        let mut report = crate::leniency::ToleranceReport::default();
+        let wrapper = EscherTextboxWrapper::new_with_report(data, &mut report).unwrap();
+        assert!(wrapper.text_ruler().is_some());
+        assert_eq!(
+            report
+                .defects()
+                .iter()
+                .map(|defect| (defect.defect, defect.context))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    crate::Defect::Shape(crate::ShapeDefect::DuplicateTextRuler),
+                    1
+                ),
+                (
+                    crate::Defect::Shape(crate::ShapeDefect::DuplicateTextRuler),
+                    2
+                ),
+            ]
+        );
     }
 }

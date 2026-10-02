@@ -1081,43 +1081,141 @@ fn new_placeholder_identity_is_inert_on_non_placeholder_shapes() {
     );
 }
 
+fn slide_with_round_trip_atoms(shape_type: u16, records: &[u8]) -> Slide<'static> {
+    static DOC_DATA: [u8; 32] = [0; 32];
+    let ppdrawing = create_test_record(
+        RecordType::PPDrawing,
+        create_round_trip_placeholder_escher_drawing(shape_type, records),
+        Vec::new(),
+    );
+    let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
+    Slide::from_slide_data(create_slide_data(slide_record, 256, &DOC_DATA), 1)
+}
+
+fn tolerated(slide: &Slide<'_>) -> Vec<(crate::Defect, u32, crate::DefectLocation)> {
+    slide
+        .tolerance_report()
+        .unwrap()
+        .defects()
+        .iter()
+        .map(|defect| (defect.defect, defect.context, defect.location))
+        .collect()
+}
+
+/// Duplicated round-trip placeholder atoms keep the first occurrence and
+/// undefined placeholder IDs read as absent; both are recorded (F5.11).
 #[test]
-fn rejects_malformed_or_duplicate_powerpoint12_placeholder_atoms() {
-    let mut truncated = record_bytes(0, 0, 0x0420, &[7]);
-    truncated[4..8].copy_from_slice(&2u32.to_le_bytes());
+fn repairs_duplicate_or_undefined_powerpoint12_placeholder_atoms() {
+    use crate::{Defect, DefectLocation, HeaderFooterPlaceholder, NewPlaceholder, ShapeDefect};
+
+    let location = DefectLocation {
+        persist_id: Some(256),
+        shape_id: Some(46),
+    };
     let duplicate_hf = [
         record_bytes(0, 0, 0x0420, &[7]),
         record_bytes(0, 0, 0x0420, &[8]),
     ]
     .concat();
+    let slide = slide_with_round_trip_atoms(202, &duplicate_hf);
+    let metadata = slide.shapes().unwrap()[0].powerpoint12_shape_metadata();
+    assert_eq!(
+        metadata.and_then(|metadata| metadata.header_footer),
+        Some(HeaderFooterPlaceholder::Date)
+    );
+    assert_eq!(
+        tolerated(&slide),
+        [(
+            Defect::Shape(ShapeDefect::DuplicateRoundTripAtom),
+            0x0420,
+            location
+        )]
+    );
+
     let duplicate_new = [
         record_bytes(0, 0, 0x0bdd, &[25]),
         record_bytes(0, 0, 0x0bdd, &[26]),
     ]
     .concat();
+    let slide = slide_with_round_trip_atoms(202, &duplicate_new);
+    assert_eq!(
+        slide.shapes().unwrap()[0]
+            .powerpoint12_shape_metadata()
+            .and_then(|metadata| metadata.new_placeholder),
+        Some(NewPlaceholder::VerticalObject)
+    );
+    assert_eq!(
+        tolerated(&slide),
+        [(
+            Defect::Shape(ShapeDefect::DuplicateRoundTripAtom),
+            0x0bdd,
+            location
+        )]
+    );
+
+    for (atom, context) in [
+        (record_bytes(0, 0, 0x0420, &[6]), 0x0420_0006),
+        (record_bytes(0, 0, 0x0420, &[11]), 0x0420_000b),
+        (record_bytes(0, 0, 0x0bdd, &[24]), 0x0bdd_0018),
+        (record_bytes(0, 0, 0x0bdd, &[27]), 0x0bdd_001b),
+    ] {
+        let slide = slide_with_round_trip_atoms(202, &atom);
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(shapes[0].powerpoint12_shape_metadata(), None);
+        assert_eq!(
+            tolerated(&slide),
+            [(
+                Defect::Shape(ShapeDefect::UnknownRoundTripPlaceholderId),
+                context,
+                location
+            )]
+        );
+    }
+
+    // The strict projection still rejects every one of them.
+    for malformed in [
+        duplicate_hf,
+        duplicate_new,
+        record_bytes(0, 0, 0x0420, &[6]),
+    ] {
+        let drawing = create_round_trip_placeholder_escher_drawing(202, &malformed);
+        let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
+        assert!(shapes[0].powerpoint12_shape_metadata().is_err());
+    }
+}
+
+/// A round-trip atom with a malformed header or size drops its shape alone
+/// (F5.11); a truncated atom breaks `ClientData` framing and stays fatal.
+#[test]
+fn isolates_malformed_powerpoint12_placeholder_atoms_per_shape() {
+    use crate::{Defect, DefectLocation, ShapeDefect};
 
     for malformed in [
         record_bytes(1, 0, 0x0420, &[7]),
         record_bytes(0, 1, 0x0420, &[7]),
         record_bytes(0, 0, 0x0420, &[]),
-        record_bytes(0, 0, 0x0420, &[6]),
-        record_bytes(0, 0, 0x0420, &[11]),
-        record_bytes(0, 0, 0x0bdd, &[24]),
-        record_bytes(0, 0, 0x0bdd, &[27]),
-        truncated,
-        duplicate_hf,
-        duplicate_new,
     ] {
-        let doc_data = vec![0u8; 32];
-        let ppdrawing = create_test_record(
-            RecordType::PPDrawing,
-            create_round_trip_placeholder_escher_drawing(202, &malformed),
-            Vec::new(),
+        let slide = slide_with_round_trip_atoms(202, &malformed);
+        assert!(slide.shapes().unwrap().is_empty());
+        assert_eq!(
+            tolerated(&slide),
+            [(
+                Defect::Shape(ShapeDefect::UnreadableShape),
+                0,
+                DefectLocation {
+                    persist_id: Some(256),
+                    shape_id: Some(46),
+                }
+            )]
         );
-        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
-        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
-        assert!(slide.shapes().is_err());
     }
+
+    let mut truncated = record_bytes(0, 0, 0x0420, &[7]);
+    truncated[4..8].copy_from_slice(&2u32.to_le_bytes());
+    let slide = slide_with_round_trip_atoms(202, &truncated);
+    assert!(slide.shapes().is_err());
+    assert!(slide.tolerance_report().is_err());
 }
 
 #[test]

@@ -84,8 +84,9 @@ impl Slide<'_> {
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());
-        for escher_shape in &escher_shapes {
-            if let Some(mut shape) = Self::convert_odraw_to_shape_enum(escher_shape, report)? {
+        for (index, escher_shape) in escher_shapes.iter().enumerate() {
+            if let Some(mut shape) = Self::convert_odraw_to_shape_enum(escher_shape, index, report)?
+            {
                 shape.mark_source_bound_recursive();
                 shapes.push(shape);
             }
@@ -100,16 +101,84 @@ impl Slide<'_> {
     ///
     /// - Direct property access (no allocations)
     /// - Pattern matching for type dispatch
+    ///
+    /// `index` is the shape's zero-based position among the drawing's
+    /// top-level shapes. A shape whose content cannot be read is dropped
+    /// (`Ok(None)`) and recorded as [`crate::ShapeDefect::UnreadableShape`];
+    /// see [`Self::convert_odraw_shape`].
     pub(crate) fn convert_odraw_to_shape_enum(
         odraw_shape: &litchi_odraw::shape::Shape<'_>,
+        index: usize,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
-        Self::convert_odraw_shape(odraw_shape, 0, report)
+        Self::convert_odraw_shape(odraw_shape, 0, index, report)
     }
 
+    /// Convert one shape and, for a group, each of its children, isolating
+    /// failures per shape (finding F5.11).
+    ///
+    /// `PowerPoint` and LibreOffice render the remaining shapes of a slide
+    /// when one is unreadable, so a content-level failure converting one
+    /// shape drops that shape alone and records
+    /// [`crate::ShapeDefect::UnreadableShape`] (context: `index`, the
+    /// shape's zero-based position among its siblings), discarding repairs
+    /// recorded for it. The shape-tree nesting bound, resource limits, and
+    /// broken framing of the shape's host records stay fatal.
     fn convert_odraw_shape(
         escher_shape: &litchi_odraw::shape::Shape<'_>,
         depth: usize,
+        index: usize,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Option<ShapeEnum<'static>>> {
+        if depth >= super::validation::MAX_SHAPE_DEPTH {
+            return Err(Error::Corrupted(
+                "OfficeArt shape tree exceeds the PPT nesting limit".to_string(),
+            ));
+        }
+
+        let checkpoint = report.checkpoint();
+        let mut converted = match Self::convert_odraw_shape_node(escher_shape, report) {
+            Ok(converted) => converted,
+            Err(error) => {
+                report.rollback(checkpoint);
+                if !super::validation::is_isolatable_shape_error(&error)
+                    || crate::odraw::validate_host_framing(escher_shape).is_err()
+                {
+                    return Err(error);
+                }
+                report.record_at(
+                    crate::leniency::ShapeDefect::UnreadableShape,
+                    u32::try_from(index).unwrap_or(u32::MAX),
+                    crate::leniency::DefectLocation {
+                        persist_id: None,
+                        shape_id: Some(escher_shape.id()),
+                    },
+                );
+                return Ok(None);
+            },
+        };
+
+        // Children are converted (and isolated) one by one, outside the
+        // group's own isolation, so a fatal error below stays fatal.
+        if let Some(ShapeEnum::Group(group)) = &mut converted
+            && escher_shape.kind() == litchi_odraw::shape::Kind::Group
+        {
+            // This follows Apache POI's approach: iterate child shapes and
+            // convert them.
+            for (child_index, child_escher) in escher_shape.children().iter().enumerate() {
+                if let Some(child_shape) =
+                    Self::convert_odraw_shape(child_escher, depth + 1, child_index, report)?
+                {
+                    group.add_decoded_child(child_shape);
+                }
+            }
+        }
+        Ok(converted)
+    }
+
+    /// Convert one shape without its group children.
+    fn convert_odraw_shape_node(
+        escher_shape: &litchi_odraw::shape::Shape<'_>,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
         use crate::shapes::{
@@ -120,15 +189,18 @@ impl Slide<'_> {
         use litchi_odraw::prop::Id;
         use litchi_odraw::shape::Kind;
 
-        if depth >= super::validation::MAX_SHAPE_DEPTH {
-            return Err(Error::Corrupted(
-                "OfficeArt shape tree exceeds the PPT nesting limit".to_string(),
-            ));
-        }
-
         let shape_id = escher_shape.id();
         let anchor = crate::odraw::anchor(escher_shape)?;
-        let powerpoint12_shape_metadata = escher_shape.powerpoint12_shape_metadata()?;
+        let metadata_start = report.defects().len();
+        let powerpoint12_shape_metadata =
+            crate::odraw::powerpoint12_shape_metadata(escher_shape, Some(report))?;
+        report.locate_from(
+            metadata_start,
+            crate::leniency::DefectLocation {
+                persist_id: None,
+                shape_id: Some(shape_id),
+            },
+        );
 
         if let Some(placeholder_info) = escher_shape.placeholder()? {
             let mut properties = shape::ShapeProperties {
@@ -285,16 +357,7 @@ impl Slide<'_> {
                 }
                 group.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
-                // Recursively parse child shapes
-                // This follows Apache POI's approach: iterate child shapes and convert them
-                for child_escher in escher_shape.children() {
-                    if let Some(child_shape) =
-                        Self::convert_odraw_shape(child_escher, depth + 1, report)?
-                    {
-                        group.add_decoded_child(child_shape);
-                    }
-                }
-
+                // Child shapes are converted by `convert_odraw_shape`.
                 Ok(Some(ShapeEnum::Group(group)))
             },
 

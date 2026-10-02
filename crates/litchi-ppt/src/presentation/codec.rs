@@ -36,12 +36,13 @@ pub(super) fn placeholder_display_from_record(
     };
     let parsed = crate::odraw::parse(&drawing.data)?;
     let mut shapes = Vec::with_capacity(parsed.len());
-    for shape in &parsed {
-        // The header/footer display-text projection applies text-style
-        // repairs (see `crate::leniency`) without enumerating them; the
+    for (index, shape) in parsed.iter().enumerate() {
+        // The header/footer display-text projection applies text-style and
+        // shape repairs (see `crate::leniency`) without enumerating them; the
         // primary slide/shape read APIs record them.
         if let Some(converted) = Slide::<'static>::convert_odraw_to_shape_enum(
             shape,
+            index,
             &mut crate::leniency::ToleranceReport::default(),
         )? {
             shapes.push(converted);

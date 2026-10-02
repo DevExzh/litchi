@@ -58,8 +58,10 @@ impl Slide<'_> {
     ///
     /// Records the [`crate::TextPropDefect`] classes repaired while shape
     /// text is parsed: clamped `StyleTextPropAtom` run coverage (F5.1) and
-    /// masked reserved `BulletFlags`/`PFWrapFlags` bits (F5.2), each located
-    /// by this slide's persist ID and the text box's shape ID.
+    /// masked reserved `BulletFlags`/`PFWrapFlags` bits (F5.2), and the
+    /// [`crate::ShapeDefect`] classes of per-shape isolation (F5.11): an
+    /// unreadable shape is dropped while its siblings are kept. Each entry is
+    /// located by this slide's persist ID and the shape's ID.
     ///
     /// The shapes and their repairs are parsed once and cached together, so
     /// every call appends the same entries, whichever accessor triggered the
