@@ -934,9 +934,12 @@ impl Transition {
     /// order.
     ///
     /// A read never fails over an attribute value outside its schema or
-    /// `PowerPoint` domain: a wheel whose spoke count `PowerPoint` cannot
-    /// play is kept verbatim as [`Kind::Raw`] and recorded as
-    /// [`crate::TransitionDefect::SpokeCount`]. An empty report means the
+    /// `PowerPoint` domain: an effect whose attribute the typed model cannot
+    /// hold (an unsupported wheel spoke count, an unknown direction token) is
+    /// kept verbatim as [`Kind::Raw`], an unparseable `p:transition`
+    /// attribute is treated as absent, and an integral time above
+    /// [`MAX_MS`] saturates; each is recorded as a
+    /// [`crate::TransitionDefect`]. An empty report means the
     /// transition conformed; a value built in code always has an empty
     /// report. The report is not part of equality.
     #[must_use]

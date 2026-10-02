@@ -184,7 +184,12 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                 if draft.is_none()
                     && is_presentationml_name(&namespace, element.name(), b"transition")
                 {
-                    draft = Some(Draft::new(parse_attributes(&element, decoder, &resolver)?));
+                    draft = Some(Draft::new(parse_attributes(
+                        &element,
+                        decoder,
+                        &resolver,
+                        &mut repairs,
+                    )?));
                     selected_depth = Some(event_depth);
                 } else if selected_depth.and_then(|value| value.checked_add(1)) == Some(event_depth)
                 {
@@ -221,7 +226,12 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                 if draft.is_none()
                     && is_presentationml_name(&namespace, element.name(), b"transition")
                 {
-                    draft = Some(Draft::new(parse_attributes(&element, decoder, &resolver)?));
+                    draft = Some(Draft::new(parse_attributes(
+                        &element,
+                        decoder,
+                        &resolver,
+                        &mut repairs,
+                    )?));
                 } else if selected_depth.and_then(|value| value.checked_add(1)) == Some(event_depth)
                 {
                     let role = classify_child(
@@ -446,13 +456,16 @@ fn classify_child(
 ) -> Result<Role> {
     let kind = match parse_kind(namespace, element, decoder) {
         Ok(kind) => kind,
-        // A wheel whose spoke count PowerPoint cannot play is kept verbatim
-        // as a raw effect, like an effect element this reader does not know
-        // (audit finding 6.5).
-        Err(Error::Invalid(_))
-            if let Some(count) = unsupported_spokes(namespace, element, decoder)? =>
-        {
-            repairs.record(TransitionDefect::SpokeCount, count);
+        // A known effect whose attribute value lies outside its domain is
+        // kept verbatim as a raw effect, like an effect element this reader
+        // does not know (audit findings 6.5 and 6.6). Every `Invalid` the
+        // effect parsers raise is such a value-domain failure; XML and
+        // resource-limit errors pass through.
+        Err(Error::Invalid(_)) => {
+            match unsupported_spokes(namespace, element, decoder)? {
+                Some(count) => repairs.record(TransitionDefect::SpokeCount, count),
+                None => repairs.record(TransitionDefect::EffectToken, 0),
+            }
             None
         },
         Err(error) => return Err(error),
@@ -488,6 +501,7 @@ fn parse_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    repairs: &mut ToleranceReport,
 ) -> Result<Transition> {
     let mut speed = Speed::Medium;
     let mut legacy_duration = None;
@@ -512,19 +526,21 @@ fn parse_attributes(
             match key.local_name().as_ref() {
                 b"spd" => {
                     reject_duplicate(&mut seen_speed, "spd")?;
-                    speed = parse_speed(value)?;
+                    speed = tolerate(parse_speed(value), repairs)?.unwrap_or(Speed::Medium);
                 },
                 b"dur" => {
                     reject_duplicate(&mut seen_legacy_duration, "dur")?;
-                    legacy_duration = Some(parse_ms(value, "transition duration")?);
+                    let digits = xsd_token_atom(value).unwrap_or("");
+                    let digits = digits.strip_suffix("ms").unwrap_or(digits);
+                    legacy_duration = tolerate_ms(digits, "transition duration", repairs)?;
                 },
                 b"advClick" => {
                     reject_duplicate(&mut seen_click, "advClick")?;
-                    click = parse_bool(value, "advClick")?;
+                    click = tolerate(parse_bool(value, "advClick"), repairs)?.unwrap_or(true);
                 },
                 b"advTm" => {
                     reject_duplicate(&mut seen_after, "advTm")?;
-                    after = Some(parse_advance_ms(value)?);
+                    after = tolerate_ms(value, "automatic-advance delay", repairs)?;
                 },
                 _ => {},
             }
@@ -532,7 +548,7 @@ fn parse_attributes(
             let (namespace, _) = resolver.resolve_attribute(key);
             if is_p14_namespace(&namespace) && key.local_name().as_ref() == b"dur" {
                 reject_duplicate(&mut seen_extended_duration, "p14:dur")?;
-                extended_duration = Some(parse_offset(value, "transition duration")?);
+                extended_duration = tolerate(parse_offset(value, "transition duration"), repairs)?;
             }
         }
     }
@@ -710,19 +726,45 @@ fn parse_speed(value: &str) -> Result<Speed> {
     }
 }
 
-fn parse_ms(value: &str, field: &str) -> Result<Ms> {
-    let value = xsd_token_atom(value).unwrap_or("");
-    let digits = value.strip_suffix("ms").unwrap_or(value);
-    parse_bounded_ms(digits, field)
+/// Treat a `p:transition` attribute whose value lies outside its domain as
+/// absent and record the repair (audit finding 6.6); other errors pass
+/// through.
+fn tolerate<T>(parsed: Result<T>, repairs: &mut ToleranceReport) -> Result<Option<T>> {
+    match parsed {
+        Ok(value) => Ok(Some(value)),
+        Err(Error::Invalid(_)) => {
+            repairs.record(TransitionDefect::AttributeToken, 0);
+            Ok(None)
+        },
+        Err(error) => Err(error),
+    }
+}
+
+/// Read an integral millisecond attribute (`advTm`, legacy `dur`).
+///
+/// A decimal count above [`super::MAX_MS`] — `advTm` is `xsd:unsignedInt`,
+/// so `2^31..2^32` is schema-valid — saturates to the maximum and is
+/// recorded as [`TransitionDefect::TimeClamped`]; a value that is not a
+/// decimal count is treated as absent and recorded as
+/// [`TransitionDefect::AttributeToken`].
+fn tolerate_ms(value: &str, field: &str, repairs: &mut ToleranceReport) -> Result<Option<Ms>> {
+    let token = xsd_token_atom(value).unwrap_or("");
+    if !token.is_empty() && token.bytes().all(|byte| byte.is_ascii_digit()) {
+        let parsed = token.parse::<u64>().unwrap_or(u64::MAX);
+        if parsed > u64::from(super::MAX_MS) {
+            repairs.record(
+                TransitionDefect::TimeClamped,
+                u32::try_from(parsed).unwrap_or(u32::MAX),
+            );
+            return Ok(Some(Ms::known(super::MAX_MS)));
+        }
+    }
+    tolerate(parse_bounded_ms(token, field), repairs)
 }
 
 fn parse_offset(value: &str, field: &str) -> Result<Offset> {
     Offset::parse(value)
         .map_err(|error| Error::Invalid(format!("invalid {field} '{value}': {error}")))
-}
-
-fn parse_advance_ms(value: &str) -> Result<Ms> {
-    parse_bounded_ms(value, "automatic-advance delay")
 }
 
 fn parse_bounded_ms(value: &str, field: &str) -> Result<Ms> {

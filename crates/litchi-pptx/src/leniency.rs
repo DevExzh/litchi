@@ -139,6 +139,24 @@
 //! edit planner still refuses to splice over a transition whose read needed
 //! a repair.
 //!
+//! # Transition token domains (audit finding 6.6)
+//!
+//! An attribute value outside its domain no longer fails the whole
+//! transition. On a known effect element (`dir`, `orient`, `pattern`, morph
+//! `option` — unknown or missing — boolean flags, preset names) the effect
+//! is kept verbatim as [`crate::transition::Kind::Raw`] and recorded as
+//! [`TransitionDefect::EffectToken`]: the crate already keeps unknown effect
+//! *elements* raw, and this extends that posture one level down without
+//! inventing a direction the producer never wrote. On `p:transition` itself
+//! an unknown `spd`, a non-boolean `advClick`, or an unparseable `advTm`,
+//! `dur`, or `p14:dur` is treated as absent (LibreOffice's attribute
+//! defaults) and recorded as [`TransitionDefect::AttributeToken`]. An
+//! integral `advTm`/`dur` above [`crate::transition::MAX_MS`] — the
+//! `2^31..2^32` range is schema-valid `xsd:unsignedInt` — saturates to that
+//! maximum and is recorded as [`TransitionDefect::TimeClamped`] with the
+//! original value. Duplicate attributes, nested markup inside typed
+//! effects, XML well-formedness, and the read limits stay hard errors.
+//!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
 
@@ -337,6 +355,39 @@ pub enum TransitionDefect {
     /// save, so the reader keeps the effect element verbatim as
     /// [`crate::transition::Kind::Raw`]. The context is the spoke count.
     SpokeCount,
+    /// A known effect element carried an attribute value outside its
+    /// enumeration or lexical domain: a `dir`/`orient` token the effect does
+    /// not define, a glitter/shred `pattern`, a morph `option` that is
+    /// unknown or missing, a non-boolean flag such as `thruBlk`, or a preset
+    /// name the reader cannot carry.
+    ///
+    /// These are schema enumerations, so the markup is non-conformant, but
+    /// LibreOffice defaults unknown tokens (`getToken(XML_dir, …)`) and
+    /// `PowerPoint` repairs them. The typed effect cannot hold the value, so
+    /// the reader keeps the element verbatim as
+    /// [`crate::transition::Kind::Raw`], exactly as it keeps an effect
+    /// element it does not know.
+    EffectToken,
+    /// An attribute of `p:transition` itself carried a value outside its
+    /// domain: an unknown `spd` token, a non-boolean `advClick`, or an
+    /// `advTm`, `dur`, or `p14:dur` that is not a time value.
+    ///
+    /// LibreOffice reads these with defaults (`getToken(XML_spd, …)`,
+    /// `getBool(XML_advClick, true)`, `getInteger(XML_advTm, -1)`). The
+    /// reader treats the attribute as absent: speed [`Speed::Medium`],
+    /// advance on click, no automatic advance, no explicit duration.
+    ///
+    /// [`Speed::Medium`]: crate::transition::Speed::Medium
+    AttributeToken,
+    /// An integral transition time (`advTm`, or the legacy unqualified
+    /// `dur`) exceeded [`crate::transition::MAX_MS`] (`i32::MAX`).
+    ///
+    /// `advTm` is `xsd:unsignedInt`, so values up to `u32::MAX` are
+    /// schema-valid even though `PowerPoint` documents the narrower range.
+    /// The reader saturates the time to [`crate::transition::MAX_MS`] — the
+    /// longest delay `PowerPoint` can play — and the context is the original
+    /// value (saturated to `u32::MAX`).
+    TimeClamped,
 }
 
 impl TransitionDefect {
@@ -347,6 +398,11 @@ impl TransitionDefect {
             Self::SpokeCount => {
                 "kept the wheel effect with an unsupported spoke count verbatim as a raw effect"
             },
+            Self::EffectToken => {
+                "kept the effect with an out-of-domain attribute value verbatim as a raw effect"
+            },
+            Self::AttributeToken => "treated the out-of-domain transition attribute as absent",
+            Self::TimeClamped => "saturated the transition time to the PowerPoint maximum",
         }
     }
 }
@@ -386,7 +442,9 @@ pub struct ToleratedDefect {
     ///   assigns to shapes);
     /// * [`Defect::Transition`] — a part holds at most one transition, so
     ///   the part locates it; the context is the offending spoke count for
-    ///   [`TransitionDefect::SpokeCount`].
+    ///   [`TransitionDefect::SpokeCount`], the original time (saturated to
+    ///   `u32::MAX`) for [`TransitionDefect::TimeClamped`], and `0`
+    ///   otherwise.
     pub context: u32,
     /// The package part the defect was found in, such as
     /// `/ppt/slides/slide3.xml`.
@@ -594,6 +652,9 @@ mod tests {
             Defect::from(ShapeDefect::PlaceholderExtensionOwner),
             Defect::from(ShapeDefect::PlaceholderTypeExtension),
             Defect::from(TransitionDefect::SpokeCount),
+            Defect::from(TransitionDefect::EffectToken),
+            Defect::from(TransitionDefect::AttributeToken),
+            Defect::from(TransitionDefect::TimeClamped),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

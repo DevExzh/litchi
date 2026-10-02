@@ -23,16 +23,32 @@ fn transition_reader_uses_the_local_powerpoint_2010_choice() {
 }
 
 #[test]
-fn transition_reader_rejects_invalid_powerpoint_2010_ripple_direction() {
+fn transition_reader_keeps_invalid_powerpoint_2010_ripple_direction_raw() {
     let invalid = std::str::from_utf8(LOCAL_P14_RIPPLE).unwrap().replacen(
         "dir=\"ld\"",
         "dir=\"not-a-direction\"",
         1,
     );
 
-    assert!(matches!(
+    // The out-of-domain token degrades the effect to a raw effect and is
+    // recorded (leniency audit finding 6.6); the transition's timing reads.
+    let transition = read(slide_xml(&invalid).as_bytes()).unwrap().unwrap();
+    assert!(matches!(transition.kind(), Kind::Raw(raw) if raw.xml().contains("not-a-direction")));
+    assert_eq!(transition.after().map(Ms::get), Some(4250));
+    assert_eq!(
+        transition
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        [litchi_pptx::Defect::Transition(
+            litchi_pptx::TransitionDefect::EffectToken
+        )]
+    );
+    assert!(!matches!(
         read(slide_xml(&invalid).as_bytes()),
-        Err(Error::Invalid(message)) if message.contains("ripple transition direction")
+        Err(Error::Invalid(_))
     ));
 }
 

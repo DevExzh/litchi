@@ -42,7 +42,7 @@ pub use writer::{write, write_to};
 )]
 mod tests {
     use super::*;
-    use crate::Error;
+    use crate::{Error, TransitionDefect};
     use std::mem::size_of;
 
     const STANDARD_COVER: &[u8] =
@@ -207,14 +207,15 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_morph_option_and_bounded_preset_name() {
-        let invalid = transition_xml(
+    fn invalid_morph_option_degrades_to_raw_and_preset_name_is_bounded() {
+        for morph in [
             r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byShape"/>"#,
-        );
-        assert!(matches!(
-            read(invalid.as_bytes()),
-            Err(Error::Invalid(message)) if message.contains("morph transition option")
-        ));
+            r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"/>"#,
+        ] {
+            let value = read(transition_xml(morph).as_bytes()).unwrap().unwrap();
+            assert!(matches!(value.kind(), Kind::Raw(raw) if raw.xml() == morph));
+            assert_eq!(repairs(&value), [(TransitionDefect::EffectToken, 0)]);
+        }
 
         let oversized = "x".repeat(MAX_PRESET_NAME_BYTES + 1);
         assert!(matches!(
@@ -372,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn p14_effects_reject_values_outside_their_schema_domains() {
+    fn p14_effects_with_values_outside_their_schema_domains_degrade_to_raw() {
         for effect in [
             r#"<p14:conveyor dir="u"/>"#,
             r#"<p14:doors dir="left"/>"#,
@@ -382,13 +383,14 @@ mod tests {
             r#"<p14:reveal dir="u"/>"#,
             r#"<p14:shred pattern="circle"/>"#,
         ] {
+            let value = read(transition_xml_with_p14(effect).as_bytes())
+                .unwrap()
+                .unwrap();
             assert!(
-                matches!(
-                    read(transition_xml_with_p14(effect).as_bytes()),
-                    Err(Error::Invalid(_))
-                ),
-                "unexpectedly accepted {effect:?}"
+                matches!(value.kind(), Kind::Raw(raw) if raw.xml() == effect),
+                "{effect:?}"
             );
+            assert_eq!(repairs(&value), [(TransitionDefect::EffectToken, 0)]);
         }
     }
 
@@ -439,7 +441,7 @@ mod tests {
             assert_eq!(
                 repaired,
                 [(
-                    crate::Defect::Transition(crate::TransitionDefect::SpokeCount),
+                    crate::Defect::Transition(TransitionDefect::SpokeCount),
                     count,
                     None
                 )]
@@ -451,36 +453,109 @@ mod tests {
             .unwrap();
         assert_eq!(typed.kind(), &Kind::Wheel(Spokes::Eight));
         assert!(typed.tolerance_report().is_clean());
-        // A spoke count that is not an unsignedInt is not a spoke-count repair.
-        assert!(read(transition_xml(r#"<p:wheel spokes="-1"/>"#).as_bytes()).is_err());
+        // A spoke count that is not an unsignedInt is an effect-token repair.
+        let negative = read(transition_xml(r#"<p:wheel spokes="-1"/>"#).as_bytes())
+            .unwrap()
+            .unwrap();
+        assert_eq!(repairs(&negative), [(TransitionDefect::EffectToken, 0)]);
         // Ill-formed XML stays fatal.
         assert!(read(transition_xml(r#"<p:wheel spokes="6">"#).as_bytes()).is_err());
     }
 
     #[test]
-    fn rejects_invalid_directions_spokes_and_timing() {
+    fn invalid_directions_degrade_and_out_of_range_times_clamp() {
         let xml = transition_xml(r#"<p:push dir="horz"/>"#);
-        assert!(matches!(read(xml.as_bytes()), Err(Error::Invalid(_))));
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert!(matches!(value.kind(), Kind::Raw(_)));
+        assert_eq!(repairs(&value), [(TransitionDefect::EffectToken, 0)]);
 
-        let xml = transition_xml(r"<p:fade/>").replacen(
-            "<p:transition>",
-            r#"<p:transition advTm="2147483648">"#,
-            1,
-        );
-        assert!(matches!(read(xml.as_bytes()), Err(Error::Invalid(_))));
+        // `advTm` is xsd:unsignedInt: 2^31..2^32 is schema-valid and
+        // saturates to the PowerPoint maximum.
+        for (lexical, context) in [
+            ("2147483648", 2_147_483_648_u32),
+            ("4294967295", u32::MAX),
+            ("99999999999", u32::MAX),
+        ] {
+            let xml = transition_xml(r"<p:fade/>").replacen(
+                "<p:transition>",
+                &format!(r#"<p:transition advTm="{lexical}" dur="{lexical}">"#),
+                1,
+            );
+            let value = read(xml.as_bytes()).unwrap().unwrap();
+            assert_eq!(value.after().map(Ms::get), Some(MAX_MS));
+            assert_eq!(value.duration().map(Ms::get), Some(MAX_MS));
+            assert_eq!(value.kind(), &Kind::Fade { black: None });
+            assert_eq!(
+                repairs(&value),
+                [
+                    (TransitionDefect::TimeClamped, context),
+                    (TransitionDefect::TimeClamped, context)
+                ]
+            );
+            assert!(write(&value).unwrap().contains(r#"advTm="2147483647""#));
+        }
     }
 
     #[test]
-    fn rejects_unit_suffix_on_integer_timed_advance() {
+    fn invalid_transition_attribute_tokens_are_treated_as_absent() {
+        let xml = transition_xml(r#"<p:cut thruBlk="1"/>"#).replacen(
+            "<p:transition>",
+            r#"<p:transition spd="warp" advClick="maybe" advTm="soon" dur="-5">"#,
+            1,
+        );
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.speed(), Speed::Medium);
+        assert!(value.click());
+        assert_eq!(value.after(), None);
+        assert_eq!(value.duration(), None);
+        assert_eq!(value.kind(), &Kind::Cut { black: Some(true) });
+        assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0); 4]);
+
+        // A conformant transition repairs nothing.
+        let xml = transition_xml(r#"<p:cut thruBlk="1"/>"#).replacen(
+            "<p:transition>",
+            r#"<p:transition spd="slow" advClick="0" advTm="10">"#,
+            1,
+        );
+        assert!(
+            read(xml.as_bytes())
+                .unwrap()
+                .unwrap()
+                .tolerance_report()
+                .is_clean()
+        );
+        // Ill-formed XML and duplicate attributes stay fatal.
+        let xml = transition_xml(r"<p:cut/>").replacen(
+            "<p:transition>",
+            r#"<p:transition spd="warp" spd="x">"#,
+            1,
+        );
+        assert!(read(xml.as_bytes()).is_err());
+    }
+
+    /// The repairs a read recorded, as `(class, context)` pairs.
+    fn repairs(value: &Transition) -> Vec<(TransitionDefect, u32)> {
+        value
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| match tolerated.defect {
+                crate::Defect::Transition(defect) => (defect, tolerated.context),
+                other => panic!("unexpected defect {other:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn unit_suffix_on_integer_timed_advance_is_treated_as_absent() {
         let xml = transition_xml(r"<p:fade/>").replacen(
             "<p:transition>",
             r#"<p:transition advTm="750ms">"#,
             1,
         );
-        assert!(matches!(
-            read(xml.as_bytes()),
-            Err(Error::Invalid(message)) if message.contains("automatic-advance delay")
-        ));
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.after(), None);
+        assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0)]);
 
         let xml = transition_xml(r"<p:fade/>").replacen(
             "<p:transition>",
@@ -525,20 +600,18 @@ mod tests {
             r#"<p:transition p14:dur="1quarter">"#,
             1,
         );
-        assert!(matches!(
-            read(invalid.as_bytes()),
-            Err(Error::Invalid(message)) if message.contains("transition duration")
-        ));
+        let value = read(invalid.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.duration_offset(), None);
+        assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0)]);
 
         let invalid = transition_xml_with_p14(r#"<p:fade/>"#).replacen(
             "<p:transition>",
             r#"<p:transition p14:dur=" 1s ">"#,
             1,
         );
-        assert!(matches!(
-            read(invalid.as_bytes()),
-            Err(Error::Invalid(message)) if message.contains("transition duration")
-        ));
+        let value = read(invalid.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.duration_offset(), None);
+        assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0)]);
     }
 
     #[test]

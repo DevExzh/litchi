@@ -598,3 +598,39 @@ fn conformant_transition_reports_nothing() {
     assert!(matches!(transition.kind(), TransitionKind::Wheel(_)));
     assert_clean(transition.tolerance_report());
 }
+
+#[test]
+fn out_of_domain_transition_tokens_and_times_are_repaired_and_recorded() {
+    let transition = first_slide_transition(deck_with_transition(
+        r#"<p:transition spd="warp" advTm="3000000000"><p:push dir="horz"/></p:transition>"#,
+    ));
+    assert_eq!(transition.speed(), litchi_pptx::transition::Speed::Medium);
+    assert_eq!(
+        transition.after().map(litchi_pptx::transition::Ms::get),
+        Some(litchi_pptx::transition::MAX_MS)
+    );
+    let TransitionKind::Raw(raw) = transition.kind() else {
+        panic!("expected a raw effect, got {:?}", transition.kind());
+    };
+    assert!(raw.xml().contains(r#"dir="horz""#));
+    assert_eq!(
+        located(transition.tolerance_report()),
+        [
+            (
+                Defect::Transition(TransitionDefect::AttributeToken),
+                0,
+                Some(SLIDE1)
+            ),
+            (
+                Defect::Transition(TransitionDefect::TimeClamped),
+                3_000_000_000,
+                Some(SLIDE1)
+            ),
+            (
+                Defect::Transition(TransitionDefect::EffectToken),
+                0,
+                Some(SLIDE1)
+            ),
+        ]
+    );
+}
