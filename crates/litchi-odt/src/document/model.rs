@@ -2,6 +2,7 @@
 
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::elements::style::StyleRegistry;
+use litchi_odf_common::leniency::ToleranceReport;
 
 /// An `OpenDocument` text document (`.odt`).
 ///
@@ -20,4 +21,6 @@ pub struct Document {
     pub(super) meta: Option<Meta>,
     /// Registry of all styles in the document.
     pub(super) style_registry: StyleRegistry,
+    /// Repairs tolerated while the package was opened.
+    pub(super) tolerance: ToleranceReport,
 }

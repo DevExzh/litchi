@@ -173,6 +173,16 @@ impl Package {
         self.inner.package()
     }
 
+    /// Everything a tolerant read repaired while this package was opened.
+    ///
+    /// An empty report means the package conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.inner.tolerance_report()
+    }
+
     /// Return the identity of the archive index retained by smart detection.
     #[doc(hidden)]
     #[must_use]

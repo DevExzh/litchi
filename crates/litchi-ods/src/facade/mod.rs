@@ -277,6 +277,16 @@ impl Spreadsheet {
         self.package.content_xml()
     }
 
+    /// Everything a tolerant read repaired while this spreadsheet was opened.
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.package.tolerance_report()
+    }
+
     /// Return worksheet names in document order.
     #[must_use]
     pub fn sheet_names(&self) -> Vec<String> {
@@ -1412,6 +1422,37 @@ mod tests {
             snapshot.prepared_index_identity(),
             spreadsheet.prepared_index_identity()
         );
+    }
+
+    /// A conforming ODS opens through every facade with a present but empty
+    /// tolerance report: nothing was tolerated, and nothing was recorded.
+    #[test]
+    fn conformant_fixture_opens_with_an_empty_tolerance_report() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/odf/corpus/calc-two-sheets.ods");
+        let bytes = std::fs::read(&path).expect("test fixture or operation should succeed");
+
+        // Owned open and the prepared-detection handoff.
+        let spreadsheet = Spreadsheet::from_bytes(bytes.clone())
+            .expect("test fixture or operation should succeed");
+        assert!(spreadsheet.tolerance_report().is_clean());
+        assert_eq!(spreadsheet.tolerance_report().total(), 0);
+        let prepared = litchi_odf_common::detect::prepared(bytes)
+            .expect("test fixture or operation should succeed");
+        let spreadsheet = Spreadsheet::from_prepared_package(prepared)
+            .expect("test fixture or operation should succeed");
+        assert!(spreadsheet.tolerance_report().is_clean());
+
+        // Path-based open and the positional source-backed facade.
+        let spreadsheet =
+            Spreadsheet::open(&path).expect("test fixture or operation should succeed");
+        assert!(spreadsheet.tolerance_report().is_clean());
+        let source = Arc::new(litchi_core::OwnedSource::new(
+            std::fs::read(&path).expect("test fixture or operation should succeed"),
+        ));
+        let source_backed = SourceBackedSpreadsheet::from_read_at(source)
+            .expect("test fixture or operation should succeed");
+        assert!(source_backed.tolerance_report().is_clean());
     }
 
     #[test]

@@ -173,6 +173,16 @@ impl Presentation {
         self.package.content_xml()
     }
 
+    /// Everything a tolerant read repaired while this presentation was opened.
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.package.tolerance_report()
+    }
+
     /// Discover embedded charts in presentation drawing order.
     ///
     /// # Errors
@@ -724,5 +734,42 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(self.package.as_bytes().to_vec())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Presentation;
+    use crate::package::SourceBackedPresentation;
+    use std::path::Path;
+    use std::sync::Arc;
+
+    /// A conforming ODP opens through every facade with a present but empty
+    /// tolerance report: nothing was tolerated, and nothing was recorded.
+    #[test]
+    fn conformant_fixture_opens_with_an_empty_tolerance_report() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/odf/odp/cellspan.odp");
+        let bytes = std::fs::read(&path).expect("test fixture must be readable");
+
+        // Owned open and the prepared-detection handoff.
+        let presentation = Presentation::from_bytes(bytes.clone()).expect("fixture must open");
+        assert!(presentation.tolerance_report().is_clean());
+        assert_eq!(presentation.tolerance_report().total(), 0);
+        let prepared =
+            litchi_odf_common::detect::prepared(bytes).expect("fixture must be detected");
+        let presentation =
+            Presentation::from_prepared_package(prepared).expect("fixture must open");
+        assert!(presentation.tolerance_report().is_clean());
+
+        // Path-based open and the positional source-backed facade.
+        let presentation = Presentation::open(&path).expect("fixture must open");
+        assert!(presentation.tolerance_report().is_clean());
+        let source = Arc::new(litchi_core::OwnedSource::new(
+            std::fs::read(&path).expect("test fixture must be readable"),
+        ));
+        let source_backed =
+            SourceBackedPresentation::from_read_at(source).expect("fixture must open");
+        assert!(source_backed.tolerance_report().is_clean());
     }
 }

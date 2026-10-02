@@ -5,6 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
+use crate::leniency::ToleranceReport;
 pub use crate::package::ArchiveLimits;
 use crate::package::{self, Archive, PreparedArchive};
 #[cfg(any(unix, windows))]
@@ -74,6 +75,7 @@ pub struct OwnedPackage {
     password: Option<Zeroizing<String>>,
     limits: SourcePackageLimits,
     strict_package: bool,
+    tolerance: ToleranceReport,
 }
 
 /// Metadata facts captured by the retained strict package index.
@@ -334,6 +336,7 @@ pub struct SourceBackedPackage {
     manifest: super::manifest::Manifest,
     mimetype: String,
     password: Option<Zeroizing<String>>,
+    tolerance: ToleranceReport,
 }
 
 impl std::fmt::Debug for SourceBackedPackage {
@@ -686,29 +689,48 @@ impl SourceBackedPackage {
             limits.archive.into_zip_limits(),
             SourceArchiveValidationPolicy::StrictPackage,
         );
+        let mut tolerance = ToleranceReport::default();
         let archive = match archive_result {
-            Ok(archive) => archive,
+            Ok(archive) => {
+                // Strict indexing proves the `mimetype` member sits at offset
+                // zero with matching local and central records. Any remaining
+                // container deviation (compression, local extra field) is one
+                // LibreOffice also reads past, so it is accepted and recorded
+                // rather than rejected.
+                ensure_source_version(source.as_ref(), source_version)?;
+                if let Some(facts) = mimetype_member_facts(&archive, |offset, header| {
+                    read_source_span_at(&source, source_version, source_length, offset, header)
+                }) {
+                    record_mimetype_deviations(&mut tolerance, facts);
+                }
+                archive
+            },
             Err(error) => {
                 let mapped = map_zip_error(error);
                 match ensure_source_version(source.as_ref(), source_version) {
                     Err(changed @ Error::SourceChanged { .. }) => return Err(changed),
                     Err(other) => return Err(other),
-                    Ok(()) => return Err(mapped),
+                    Ok(()) => {},
+                }
+                // A re-zipped package whose `mimetype` member is not the first
+                // entry fails strict indexing. Retry at the validation level
+                // the ordinary owned owner (`OwnedPackage::from_bytes`)
+                // already applies, and accept only when the member provably
+                // deviates in a tolerated way; every other strict failure
+                // keeps the original error.
+                match tolerant_source_archive(
+                    &source,
+                    source_version,
+                    source_length,
+                    limits,
+                    &mut tolerance,
+                )? {
+                    Some(archive) => archive,
+                    None => return Err(mapped),
                 }
             },
         };
 
-        ensure_source_version(source.as_ref(), source_version)?;
-        let mimetype_stored = prefer_current(
-            source.as_ref(),
-            source_version,
-            archive.is_stored("mimetype").map_err(map_zip_error),
-        )?;
-        if !mimetype_stored {
-            return Err(Error::InvalidFormat(
-                "ODF mimetype member must use ZIP Store compression".to_string(),
-            ));
-        }
         let mimetype = read_indexed_string_with_limit(
             &archive,
             "mimetype",
@@ -775,6 +797,7 @@ impl SourceBackedPackage {
             manifest,
             mimetype,
             password,
+            tolerance,
         })
     }
 
@@ -856,6 +879,16 @@ impl SourceBackedPackage {
     #[must_use]
     pub const fn limits(&self) -> SourcePackageLimits {
         self.limits
+    }
+
+    /// Everything a tolerant read repaired while this package was opened.
+    ///
+    /// An empty report means the package conformed; see
+    /// [`crate::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Return the package MIME type after checking source identity.
@@ -1108,8 +1141,9 @@ impl SourceBackedPackage {
     ///
     /// This is the explicit transition from positional lazy access to the
     /// existing mutable/serialization owner. It reads exactly the captured
-    /// source length, preserves the retained password credential, and
-    /// revalidates source identity before returning.
+    /// source length, preserves the retained password credential and the
+    /// opening [`ToleranceReport`], and revalidates source identity before
+    /// returning.
     pub fn materialize(&self) -> Result<OwnedPackage> {
         self.ensure_current()?;
         let length = usize::try_from(self.source_length).map_err(|_| {
@@ -1131,16 +1165,25 @@ impl SourceBackedPackage {
             }
         }
         self.ensure_current()?;
-        let package = prefer_current(
-            self.source.as_ref(),
-            self.source_version,
-            OwnedPackage::from_shared_bytes_with_strict_policy_and_limits(
-                Arc::new(bytes),
-                self.limits,
-            ),
-        )?;
-        let mut package = package;
+        let bytes = Arc::new(bytes);
+        let strict = OwnedPackage::from_shared_bytes_with_strict_policy_and_limits(
+            Arc::clone(&bytes),
+            self.limits,
+        );
+        // An open that tolerated a relocated `mimetype` member was indexed at
+        // the ordinary `Normalized` level; materialize at the same level so
+        // the owned package accepts exactly what this owner accepted.
+        let built = match strict {
+            Err(_error) if !self.tolerance.is_clean() => {
+                OwnedPackage::from_shared_bytes_with_limits(bytes, self.limits)
+            },
+            other => other,
+        };
+        let mut package = prefer_current(self.source.as_ref(), self.source_version, built)?;
         package.password = self.password.clone();
+        // The owned rebuild re-derives the same container facts; carry the
+        // opening report verbatim so nothing is recorded twice.
+        package.tolerance = self.tolerance.clone();
         self.ensure_current()?;
         Ok(package)
     }
@@ -1304,6 +1347,176 @@ fn ensure_source_version(source: &dyn ReadAt, expected: SourceVersion) -> Result
         return Err(Error::SourceChanged { expected, observed });
     }
     Ok(())
+}
+
+/// Size of the fixed part of a ZIP local file header.
+const LOCAL_HEADER_FIXED: usize = 30;
+
+/// Bytes of a `mimetype` member's local record inspected by the tolerant
+/// path: the fixed header followed by the eight-byte member name.
+pub(crate) const MIMETYPE_LOCAL_PREFIX: usize = LOCAL_HEADER_FIXED + b"mimetype".len();
+
+/// The container-grammar facts of the `mimetype` member that the tolerant
+/// read path accepts the way LibreOffice does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MimetypeMemberFacts {
+    /// The member's ZIP compression method (0 for Store, 8 for Deflate), on
+    /// which its local header and central record agree.
+    pub(crate) compression_method: u16,
+    /// The member's local-header offset declared by the central directory.
+    pub(crate) local_header_offset: u64,
+    /// Whether the member's local header carries an extra field.
+    pub(crate) has_local_extra_field: bool,
+}
+
+/// Gather the tolerated container facts of the `mimetype` member from an
+/// indexed archive.
+///
+/// Returns `None` when the member is absent, its local span is unbounded, its
+/// local record cannot be read, is not a local file header, or names another
+/// member, the local header and central record disagree about compression,
+/// or a relocated member sits in an archive that does not start with a local
+/// header at offset zero. None of those is a
+/// tolerated deviation, so no tolerant path engages for them.
+pub(crate) fn mimetype_member_facts<R: ZipReaderAt>(
+    archive: &SourceIndexedArchive<R>,
+    mut read_local_header: impl FnMut(u64, &mut [u8; MIMETYPE_LOCAL_PREFIX]) -> bool,
+) -> Option<MimetypeMemberFacts> {
+    let entry_id = archive.entry_id("mimetype")?;
+    let span = archive.local_span_hint(entry_id)?;
+    let stored = archive.is_stored("mimetype").ok()?;
+    let mut header = [0_u8; MIMETYPE_LOCAL_PREFIX];
+    // A relocated member is only a re-zip layout when the archive itself
+    // starts at offset zero; a prefixed (self-extracting style) archive is a
+    // different container shape that no tolerant path accepts.
+    if span.offset() != 0
+        && (!read_local_header(0, &mut header) || header.get(..4)? != b"PK\x03\x04")
+    {
+        return None;
+    }
+    if !read_local_header(span.offset(), &mut header) {
+        return None;
+    }
+    // The central record must point at a local record of the same member: a
+    // central `mimetype` entry aliasing another member's local header is a
+    // forged archive, not a relocated member.
+    if header.get(..4)? != b"PK\x03\x04"
+        || header.get(26..28)? != 8_u16.to_le_bytes()
+        || header.get(LOCAL_HEADER_FIXED..)? != b"mimetype"
+    {
+        return None;
+    }
+    let local_method = u16::from_le_bytes(header.get(8..10)?.try_into().ok()?);
+    let extra_len = u16::from_le_bytes(header.get(28..30)?.try_into().ok()?);
+    // A local header that disagrees with its central record about whether
+    // the member is compressed is structural corruption, not a tolerated
+    // re-zip layout; it is never reported as a repair.
+    if (local_method == 0) != stored {
+        return None;
+    }
+    Some(MimetypeMemberFacts {
+        compression_method: local_method,
+        local_header_offset: span.offset(),
+        has_local_extra_field: extra_len != 0,
+    })
+}
+
+/// Record each tolerated `mimetype` container deviation, in the order the
+/// [`crate::leniency::PackageDefect`] declares them.
+pub(crate) fn record_mimetype_deviations(
+    tolerance: &mut ToleranceReport,
+    facts: MimetypeMemberFacts,
+) {
+    if facts.compression_method != 0 {
+        tolerance.record(
+            crate::leniency::PackageDefect::MimetypeDeflated,
+            facts.compression_method,
+        );
+    }
+    if facts.has_local_extra_field {
+        tolerance.record(crate::leniency::PackageDefect::MimetypeExtraField, 0);
+    }
+    if facts.local_header_offset != 0 {
+        tolerance.record(crate::leniency::PackageDefect::MimetypeNotFirst, 0);
+    }
+}
+
+/// Read bytes from a positional source through the version-checking adapter,
+/// returning `false` when the read cannot complete.
+fn read_source_span_at(
+    source: &Arc<dyn ReadAt>,
+    expected: SourceVersion,
+    length: u64,
+    offset: u64,
+    output: &mut [u8],
+) -> bool {
+    let reader = SourceReader {
+        source: Arc::clone(source),
+        expected,
+        length,
+    };
+    reader.read_exact_at(output, offset).is_ok()
+}
+
+/// Retry a strictly rejected archive at the owned owner's validation level,
+/// engaging only for a proven `mimetype` container deviation.
+///
+/// The strict policy rejects a re-zipped package whose `mimetype` member is
+/// not the first entry before this owner can even inspect it. The fallback
+/// rebuilds the index under the `Normalized` policy — exactly what
+/// [`OwnedPackage::from_bytes`] accepts — and returns the rebuilt archive
+/// only when the member provably deviates in one of the ways
+/// [`record_mimetype_deviations`] tolerates. A `mimetype` member at offset
+/// zero means the strict failure was a local/central mismatch or an unrelated
+/// strict rule, neither of which is tolerated.
+fn tolerant_source_archive(
+    source: &Arc<dyn ReadAt>,
+    source_version: SourceVersion,
+    source_length: u64,
+    limits: SourcePackageLimits,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<SourceIndexedArchive<SourceReader>>> {
+    let mut probe = [0_u8; LOCAL_HEADER_FIXED + 8];
+    if read_source_span_at(source, source_version, source_length, 0, &mut probe)
+        && probe.starts_with(b"PK\x03\x04")
+    {
+        let name_len =
+            usize::from(u16::from_le_bytes(probe[26..28].try_into().map_err(
+                |_| Error::InvalidFormat("local header probe name length".to_string()),
+            )?));
+        if name_len == 8 && &probe[LOCAL_HEADER_FIXED..] == b"mimetype" {
+            return Ok(None);
+        }
+    }
+
+    let reader = SourceReader {
+        source: Arc::clone(source),
+        expected: source_version,
+        length: source_length,
+    };
+    let archive = match SourceIndexedArchive::from_reader_with_limits_and_policy(
+        reader,
+        source_length,
+        limits.archive.into_zip_limits(),
+        SourceArchiveValidationPolicy::Normalized,
+    ) {
+        Ok(archive) => archive,
+        Err(_) => return Ok(None),
+    };
+    ensure_source_version(source.as_ref(), source_version)?;
+    let Some(facts) = mimetype_member_facts(&archive, |offset, header| {
+        read_source_span_at(source, source_version, source_length, offset, header)
+    }) else {
+        return Ok(None);
+    };
+    if facts.compression_method == 0
+        && !facts.has_local_extra_field
+        && facts.local_header_offset == 0
+    {
+        return Ok(None);
+    }
+    record_mimetype_deviations(tolerance, facts);
+    Ok(Some(archive))
 }
 
 fn normalize_member_path(path: &str) -> Result<&str> {
@@ -1759,6 +1972,28 @@ impl OwnedPackage {
         }
     }
 
+    /// Build an owned package at the ordinary `Normalized` validation level,
+    /// preserving ownership of the input on rejection.
+    ///
+    /// This is the tolerant counterpart of
+    /// [`Self::from_prepared_bytes_or_recover_with_limits`] used when a
+    /// re-zipped `mimetype` member keeps strict preparation from engaging.
+    pub(crate) fn from_shared_bytes_or_recover_with_limits(
+        data: Vec<u8>,
+        limits: SourcePackageLimits,
+    ) -> std::result::Result<Self, Vec<u8>> {
+        let data = Arc::new(data);
+        match Self::from_shared_bytes_with_limits(Arc::clone(&data), limits) {
+            Ok(package) => Ok(package),
+            Err(_error) => {
+                let Some(data) = Arc::into_inner(data) else {
+                    unreachable!("failed ODF preparation must release its temporary source handle")
+                };
+                Err(data)
+            },
+        }
+    }
+
     fn from_shared_bytes_with_policy(
         data: Arc<Vec<u8>>,
         policy: soapberry_zip::office::ArchiveValidationPolicy,
@@ -1793,6 +2028,21 @@ impl OwnedPackage {
             )
             .map_err(map_owned_zip_error)?,
         );
+        // A `mimetype` member whose container deviates from the first-stored
+        // grammar (re-zipped packages) is read by name like any other member;
+        // accept it the way LibreOffice does and record the deviation.
+        let mut tolerance = ToleranceReport::default();
+        if let Some(facts) = mimetype_member_facts(&index, |offset, header| {
+            usize::try_from(offset)
+                .ok()
+                .and_then(|start| data.get(start..start.checked_add(MIMETYPE_LOCAL_PREFIX)?))
+                .is_some_and(|bytes| {
+                    header.copy_from_slice(bytes);
+                    true
+                })
+        }) {
+            record_mimetype_deviations(&mut tolerance, facts);
+        }
         Ok(Self {
             data,
             index,
@@ -1802,6 +2052,7 @@ impl OwnedPackage {
                 policy,
                 soapberry_zip::office::ArchiveValidationPolicy::StrictPackage
             ),
+            tolerance,
         })
     }
 
@@ -1877,6 +2128,7 @@ impl OwnedPackage {
             password: _,
             limits: _,
             strict_package: _,
+            tolerance: _,
         } = self;
         match Arc::try_unwrap(index) {
             Ok(index) => {
@@ -1911,6 +2163,17 @@ impl OwnedPackage {
         self.limits
     }
 
+    /// Everything a tolerant read repaired while this package was opened.
+    ///
+    /// An empty report means the package conformed; see
+    /// [`crate::leniency::ToleranceReport`]. A family facade adopting this
+    /// owner carries the report onto its own document handle.
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
+    }
+
     /// Clone the immutable archive/index handles without retaining a
     /// decryption credential. Snapshot owners use this when the credential is
     /// intentionally scoped to the opening document and must not become part
@@ -1923,6 +2186,7 @@ impl OwnedPackage {
             password: None,
             limits: self.limits,
             strict_package: self.strict_package,
+            tolerance: self.tolerance.clone(),
         }
     }
 
@@ -2880,7 +3144,7 @@ mod tests {
     }
 
     #[test]
-    fn source_backed_strict_policy_requires_offset_zero_mimetype() {
+    fn source_backed_open_tolerates_and_records_a_relocated_mimetype() {
         use std::io::Write;
 
         let mut zip_buffer = Vec::new();
@@ -2899,8 +3163,31 @@ mod tests {
             zip.finish().unwrap();
         }
 
+        // LENIENCY_AUDIT F9.1: a re-zipped package whose `mimetype` member is
+        // not the first entry opens the way LibreOffice opens it, and the
+        // relocation is recorded rather than swallowed.
         let source = CountingSource::new(zip_buffer);
-        assert!(SourceBackedPackage::from_read_at(source).is_err());
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        assert_eq!(
+            package.mimetype().unwrap(),
+            "application/vnd.oasis.opendocument.text"
+        );
+        let defects = package
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            defects,
+            [(
+                crate::leniency::Defect::Package(crate::leniency::PackageDefect::MimetypeNotFirst),
+                0
+            )]
+        );
+        // Materialization keeps the same acceptance and the same single record.
+        let owned = package.materialize().unwrap();
+        assert_eq!(owned.tolerance_report(), package.tolerance_report());
     }
 
     #[test]
@@ -3317,5 +3604,34 @@ mod tests {
         assert!(media_files.contains(&"media/animation.gif".to_string()));
         assert!(media_files.contains(&"Object/image.svg".to_string()));
         assert!(media_files.contains(&"media/diagram.png".to_string()));
+    }
+
+    /// A conforming package opens through every owner with a present but
+    /// empty tolerance report: nothing was tolerated, and nothing was
+    /// recorded.
+    #[test]
+    fn conformant_fixture_opens_with_an_empty_tolerance_report() {
+        let data = include_bytes!("../../../../test-data/odf/odt/shape-text-in-paragraph.odt");
+
+        // Owned open: the carrier exists and is empty.
+        let owned = OwnedPackage::from_bytes(data.to_vec()).unwrap();
+        assert!(owned.tolerance_report().is_clean());
+        assert_eq!(owned.tolerance_report().total(), 0);
+        assert!(owned.clone_without_password().tolerance_report().is_clean());
+
+        // Positional open: the same carrier contract.
+        let source = CountingSource::new(data.to_vec());
+        let positional = SourceBackedPackage::from_read_at(source).unwrap();
+        assert!(positional.tolerance_report().is_clean());
+
+        // Materialization carries the opening report across owners.
+        let materialized = positional.materialize().unwrap();
+        assert!(materialized.tolerance_report().is_clean());
+
+        // Smart detection retains the report on the prepared handoff.
+        let prepared = crate::detect::prepared_or_original(data.to_vec())
+            .unwrap_or_else(|_| panic!("conforming fixture must be detected"));
+        assert_eq!(prepared.format(), crate::detect::Format::Odt);
+        assert!(prepared.tolerance_report().is_clean());
     }
 }

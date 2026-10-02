@@ -185,3 +185,27 @@ fn reference_readers_reject_malformed_xml_and_duplicate_expanded_attributes() {
     assert!(parse_image_references("<d:image").is_err());
     assert!(crate::elements::field::FieldParser::parse_fields("<t:date>").is_err());
 }
+
+/// A conforming ODT opens through every facade with a present but empty
+/// tolerance report: nothing was tolerated, and nothing was recorded.
+#[test]
+fn conformant_fixture_opens_with_an_empty_tolerance_report() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/odf/odt/shape-text-in-paragraph.odt");
+    let bytes = std::fs::read(&path).unwrap();
+
+    // Owned open and the prepared-detection handoff.
+    let document = Document::from_bytes(bytes.clone()).unwrap();
+    assert!(document.tolerance_report().is_clean());
+    assert_eq!(document.tolerance_report().total(), 0);
+    let prepared = litchi_odf_common::detect::prepared(bytes).unwrap();
+    let document = Document::from_prepared_package(prepared).unwrap();
+    assert!(document.tolerance_report().is_clean());
+
+    // Path-based open and the positional source-backed facade.
+    let document = Document::open(&path).unwrap();
+    assert!(document.tolerance_report().is_clean());
+    let source = std::sync::Arc::new(litchi_core::OwnedSource::new(std::fs::read(&path).unwrap()));
+    let source_document = super::SourceBackedDocument::from_read_at(source).unwrap();
+    assert!(source_document.tolerance_report().is_clean());
+}

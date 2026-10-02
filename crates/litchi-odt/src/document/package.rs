@@ -193,6 +193,7 @@ impl Document {
     }
 
     pub(crate) fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
+        let tolerance = owned_package.tolerance_report().clone();
         let package = owned_package.package()?;
 
         // Verify this is a text document.
@@ -248,6 +249,7 @@ impl Document {
             styles,
             meta,
             style_registry,
+            tolerance,
         })
     }
 
@@ -861,6 +863,7 @@ mod tests {
     /// retained verbatim to cross-check the fused `OpenParse` open on error
     /// precedence, error messages, and the resulting document state.
     fn from_owned_package_sequential_oracle(owned_package: OwnedPackage) -> Result<Document> {
+        let tolerance = owned_package.tolerance_report().clone();
         let package = owned_package.package()?;
 
         // Verify this is a text document.
@@ -910,6 +913,7 @@ mod tests {
             styles,
             meta,
             style_registry,
+            tolerance,
         })
     }
 

@@ -3,6 +3,19 @@
 //! Detection is inert: it reads the standardized `MIME` type from a flat `XML`
 //! root or packaged `mimetype` member without constructing a document model.
 //!
+//! Detection is also document-less: its probes return a bare classification
+//! and cannot hand back a [`crate::leniency::ToleranceReport`]. The container
+//! repair for a deflated or re-zipped `mimetype` member (LENIENCY_AUDIT F9.1)
+//! therefore signals a tolerated deviation by *succeeding*: the classification
+//! itself is the signal, and the record is carried by the subsequent open.
+//! Callers that need the record open through [`prepared_or_original`] (see
+//! [`crate::core::PreparedPackage`]) or a family facade, all of which retain
+//! the opening report on the package or document handle they return. The
+//! strict offset-0 `mimetype` grammar stays the sniff fast path; the tolerant
+//! read-by-name path is its fallback. Only the container grammar is
+//! tolerated: the member's content is matched exactly, and non-ZIP input, a
+//! malformed archive, or an unknown MIME type is still unclassified.
+//!
 //! ```rust
 //! use litchi_odf_common::detect::{self, Format};
 //!
@@ -15,7 +28,7 @@
 use crate::constants;
 use crate::core::{
     ArchiveLimits, OwnedPackage, PreparedPackage, SourcePackageLimits,
-    package::{PreparedCatalogFacts, read_owned_input},
+    package::{MIMETYPE_LOCAL_PREFIX, PreparedCatalogFacts, read_owned_input},
 };
 use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
 use quick_xml::XmlVersion;
@@ -363,25 +376,26 @@ pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>>
         let Some(format) = packaged_mime_with_limits(value, limits)? else {
             return Ok(None);
         };
-        let archive =
-            soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
-        if !archive
-            .is_stored(MIMETYPE_PATH)
-            .map_err(map_detector_zip_error)?
-        {
-            return Ok(None);
-        }
+        // The central archive structure is validated here. A compressed,
+        // extra-field-carrying, or relocated `mimetype` member is a tolerated
+        // container deviation (LENIENCY_AUDIT F9.1) recorded by the
+        // subsequent open, so it no longer withholds the classification.
+        soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
         return Ok(Some(format));
     }
     flat_with_limits(value, limits)
 }
 
-/// Classify a packaged ODF candidate from its local `mimetype` entry only.
+/// Classify a packaged ODF candidate from its `mimetype` member.
 ///
-/// Unlike [`bytes`], this helper does not inspect the central directory. It is
-/// intended for an owner that will immediately run [`prepared_or_original`]
-/// and build the bounded archive index exactly once. A nonconforming local
-/// header, unknown MIME type, or non-ZIP input returns `None`.
+/// The fixed offset-0 local grammar is checked first without allocating or
+/// inspecting the central directory. A re-zipped candidate whose `mimetype`
+/// member deviates from that grammar — compressed, carrying a local extra
+/// field, or relocated — is classified by reading the member by name from the
+/// central directory, the tolerant fallback LibreOffice applies. Only the
+/// container grammar is tolerated: the member's content is validated exactly,
+/// so an unknown MIME type, a malformed archive, or non-ZIP input returns
+/// `None`.
 #[must_use]
 pub fn packaged_mime(value: &[u8]) -> Option<Format> {
     packaged_mime_with_limits(value, Limits::default())
@@ -389,11 +403,13 @@ pub fn packaged_mime(value: &[u8]) -> Option<Format> {
         .flatten()
 }
 
-/// Classify a packaged ODF candidate from its local `mimetype` entry under
+/// Classify a packaged ODF candidate from its `mimetype` member under
 /// explicit finite limits.
 pub fn packaged_mime_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
     check_input_len(value.len(), limits, "ODF detector input")?;
-    Ok(packaged_mime_bytes(value).and_then(mime))
+    Ok(packaged_mime_bytes(value)
+        .and_then(mime)
+        .or_else(|| tolerant_packaged_mime(value)))
 }
 
 /// Check whether a ZIP candidate has the reserved OPC content-types member.
@@ -649,10 +665,14 @@ pub fn packaged_has_ooxml_catalog_from_reader_with_limits<R: Read + Seek>(
 
 /// Detect a packaged ODF MIME type from a positional source.
 ///
-/// This probe reads only the fixed local header, the `mimetype` name, and its
-/// bounded stored payload.  It does not allocate or inspect the central
-/// directory, and it leaves ownership and complete package validation to the
-/// family facade.  The source identity is checked before and after the probe;
+/// The fast path reads only the fixed local header, the `mimetype` name, and
+/// its bounded stored payload, without allocating or inspecting the central
+/// directory. When that offset-0 grammar does not match, a re-zipped package
+/// whose `mimetype` member is compressed, carries a local extra field, or is
+/// not the first entry is classified by reading the member by name through
+/// the central directory under the default finite archive limits (see
+/// [`packaged_mime`]). Ownership and complete package validation stay with
+/// the family facade.  The source identity is checked before and after the probe;
 /// a source that changes while it is being read is rejected instead of being
 /// classified from a mixed snapshot.
 pub fn packaged_mime_read_at(source: &dyn ReadAt) -> Result<Option<Format>> {
@@ -689,7 +709,7 @@ pub fn packaged_mime_read_at_with_limits(
         source.read_exact_at(LOCAL_HEADER_BYTES as u64, &mut name)?;
         let Some((data_start, compressed, expected_crc)) = packaged_mime_layout(&header, &name)
         else {
-            return Ok(None);
+            return tolerant_packaged_mime_read_at(source, length, &header);
         };
 
         let data_start = u64::try_from(data_start).expect("fixed local header size fits in u64");
@@ -738,8 +758,27 @@ pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPacka
     let Some(format) = packaged_mime(&value) else {
         return Err(value);
     };
-    let package = OwnedPackage::from_prepared_bytes_or_recover(value)?;
-    if !package.is_stored(MIMETYPE_PATH).unwrap_or(false) {
+    let package = match OwnedPackage::from_prepared_bytes_or_recover(value) {
+        Ok(package) => package,
+        // Strict indexing requires the `mimetype` member at offset zero. A
+        // re-zipped package that relocated it is rebuilt at the ordinary
+        // owned validation level and adopted only when the rebuild proves and
+        // records a tolerated `mimetype` deviation; any other strict failure
+        // keeps its historical rejection.
+        Err(value) => {
+            let package = OwnedPackage::from_shared_bytes_or_recover_with_limits(
+                value,
+                SourcePackageLimits::default(),
+            )?;
+            if package.tolerance_report().is_clean() {
+                return Err(package.into_inner());
+            }
+            package
+        },
+    };
+    // A compressed `mimetype` member is tolerated only when the open recorded
+    // it; nothing about the member's container is accepted silently.
+    if !package.is_stored(MIMETYPE_PATH).unwrap_or(false) && package.tolerance_report().is_clean() {
         return Err(package.into_inner());
     }
     Ok(PreparedPackage::new(package, format))
@@ -943,6 +982,150 @@ fn map_detector_zip_error(error: soapberry_zip::Error) -> Error {
     }
 }
 
+/// Upper bound on the compressed `mimetype` payload the tolerant detector
+/// reads. A Deflate stream of at most [`MAX_MIMETYPE_BYTES`] plaintext bytes
+/// never needs more than a few bytes of framing beyond that, so anything
+/// larger is not a plausible ODF `mimetype` member.
+const MAX_TOLERANT_MIMETYPE_COMPRESSED_BYTES: u64 = 1024;
+
+/// The first-entry name every OPC producer writes. A ZIP whose offset-0 local
+/// header names this member is an OOXML candidate — the facade's OPC catalog
+/// probe gives such a package precedence anyway — so the tolerant
+/// central-directory lookup is skipped for it.
+const OOXML_CATALOG_NAME_BYTES: &[u8] = OOXML_CATALOG_NAME.as_bytes();
+
+/// Whether the offset-0 local header admits the tolerant `mimetype` lookup.
+///
+/// The header must carry the ZIP local signature and must not name the OPC
+/// content-types catalog; `name` is the local file name when the caller has
+/// it (complete-byte input) and `None` when only its length is known.
+fn tolerant_lookup_admitted(header: &[u8], name: Option<&[u8]>) -> bool {
+    if header.get(..4) != Some(ZIP_SIGNATURE) {
+        return false;
+    }
+    let Some(name_len) = little_u16(header, 26) else {
+        return false;
+    };
+    if usize::from(name_len) != OOXML_CATALOG_NAME_BYTES.len() {
+        return true;
+    }
+    name.is_none_or(|name| name != OOXML_CATALOG_NAME_BYTES)
+}
+
+/// Classify a `mimetype` member located by name through an indexed archive.
+///
+/// The member must sit behind a well-formed local header whose compression
+/// method agrees with its central record (see
+/// [`crate::core::package::mimetype_member_facts`]), and its declared sizes
+/// must be plausible for a MIME type; the payload is then inflated when
+/// compressed, CRC-verified by the archive reader, and classified exactly like
+/// a conforming member's. `Ok(None)` means the member is absent or is not a
+/// tolerated layout; `Err` carries a payload read failure for the caller's own
+/// error policy.
+fn tolerant_mime_from_index<R: soapberry_zip::ReaderAt>(
+    archive: &soapberry_zip::office::IndexedArchive<R>,
+    read_local_header: impl FnMut(u64, &mut [u8; MIMETYPE_LOCAL_PREFIX]) -> bool,
+) -> std::result::Result<Option<Format>, soapberry_zip::Error> {
+    if crate::core::package::mimetype_member_facts(archive, read_local_header).is_none() {
+        return Ok(None);
+    }
+    let Ok(metadata) = archive.metadata(MIMETYPE_PATH) else {
+        return Ok(None);
+    };
+    if metadata.uncompressed_size() > MAX_MIMETYPE_BYTES as u64
+        || metadata.compressed_size() > MAX_TOLERANT_MIMETYPE_COMPRESSED_BYTES
+    {
+        return Ok(None);
+    }
+    let data = archive.read(MIMETYPE_PATH)?;
+    Ok(mime(&data))
+}
+
+/// Classify complete bytes from a `mimetype` member that deviates from the
+/// strict offset-0 grammar (LENIENCY_AUDIT F9.1).
+///
+/// The member is located by name through the central directory under the
+/// default finite archive limits. Any archive failure — non-ZIP input, a
+/// malformed or over-limit central directory, an absent, encrypted, corrupt,
+/// or implausibly sized member, a local/central mismatch — returns `None`.
+/// Detection is document-less: the deviation is recorded by the subsequent
+/// open, not here.
+fn tolerant_packaged_mime(value: &[u8]) -> Option<Format> {
+    let header = value.get(..LOCAL_HEADER_BYTES)?;
+    let name_len = usize::from(little_u16(header, 26)?);
+    let name = value.get(LOCAL_HEADER_BYTES..LOCAL_HEADER_BYTES.checked_add(name_len)?);
+    if !tolerant_lookup_admitted(header, name) {
+        return None;
+    }
+    let length = u64::try_from(value.len()).ok()?;
+    let archive = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+        value,
+        length,
+        ArchiveLimits::default().into_zip_limits(),
+    )
+    .ok()?;
+    tolerant_mime_from_index(&archive, |offset, header| {
+        usize::try_from(offset)
+            .ok()
+            .and_then(|start| value.get(start..start.checked_add(MIMETYPE_LOCAL_PREFIX)?))
+            .is_some_and(|bytes| {
+                header.copy_from_slice(bytes);
+                true
+            })
+    })
+    .ok()
+    .flatten()
+}
+
+/// Positional counterpart of [`tolerant_packaged_mime`].
+///
+/// ZIP layout failures return `Ok(None)`; source-provider I/O failures and
+/// bounded scratch allocation failures stay typed errors so a failing source
+/// is never reclassified. The caller fences source identity around the probe.
+fn tolerant_packaged_mime_read_at(
+    source: &dyn ReadAt,
+    length: u64,
+    header: &[u8; LOCAL_HEADER_BYTES],
+) -> Result<Option<Format>> {
+    let mut catalog_name = [0_u8; OOXML_CATALOG_NAME_BYTES.len()];
+    let name = if little_u16(header, 26) == Some(OOXML_CATALOG_NAME_BYTES.len() as u16)
+        && read_at_catalog_exact(source, LOCAL_HEADER_BYTES as u64, &mut catalog_name)?
+    {
+        Some(catalog_name.as_slice())
+    } else {
+        None
+    };
+    if !tolerant_lookup_admitted(header, name) {
+        return Ok(None);
+    }
+    let archive = match soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+        ReadAtZipSource { source },
+        length,
+        ArchiveLimits::default().into_zip_limits(),
+    ) {
+        Ok(archive) => archive,
+        Err(error) => return map_catalog_probe_zip_error(error),
+    };
+    let mut header_error = None;
+    let classified =
+        tolerant_mime_from_index(&archive, |offset, local| {
+            match read_at_catalog_exact(source, offset, local) {
+                Ok(complete) => complete,
+                Err(error) => {
+                    header_error = Some(error);
+                    false
+                },
+            }
+        });
+    if let Some(error) = header_error {
+        return Err(error);
+    }
+    match classified {
+        Ok(format) => Ok(format),
+        Err(error) => map_catalog_probe_zip_error(error),
+    }
+}
+
 fn packaged_mime_bytes(value: &[u8]) -> Option<&[u8]> {
     let header = value.get(..LOCAL_HEADER_BYTES)?;
     let name = value.get(LOCAL_HEADER_BYTES..LOCAL_HEADER_BYTES + MIMETYPE_NAME.len())?;
@@ -1101,7 +1284,7 @@ fn catalog_probe_range_is_bounded(
     end <= directory_offset
 }
 
-fn map_catalog_probe_zip_error(error: soapberry_zip::Error) -> Result<Option<bool>> {
+fn map_catalog_probe_zip_error<T>(error: soapberry_zip::Error) -> Result<Option<T>> {
     match error.into_kind() {
         soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
             map_catalog_probe_io_error(error)
@@ -1113,7 +1296,7 @@ fn map_catalog_probe_zip_error(error: soapberry_zip::Error) -> Result<Option<boo
     }
 }
 
-fn map_catalog_probe_io_error(error: std::io::Error) -> Result<Option<bool>> {
+fn map_catalog_probe_io_error<T>(error: std::io::Error) -> Result<Option<T>> {
     if error
         .get_ref()
         .is_some_and(|source| source.is::<ReadAtProviderError>())

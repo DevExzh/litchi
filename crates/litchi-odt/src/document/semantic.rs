@@ -18,6 +18,16 @@ impl Document {
     crate::package::scripts::script_facade_methods!();
     crate::package::annotation::annotation_facade_methods!(Text);
 
+    /// Everything a tolerant read repaired while this document was opened.
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        &self.tolerance
+    }
+
     /// Extract all text content from the document.
     ///
     /// This method extracts plain text from all paragraphs, headings, and text elements

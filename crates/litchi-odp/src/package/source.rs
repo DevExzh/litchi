@@ -273,6 +273,16 @@ impl SourceBackedPresentation {
         ensure_current(self.source_version, self.source.version()?)
     }
 
+    /// Everything a tolerant read repaired while this presentation was opened.
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.package.tolerance_report()
+    }
+
     /// Return the source identity captured during open.
     #[must_use = "the captured source version is needed to identify this source"]
     pub fn source_version(&self) -> Result<SourceVersion> {

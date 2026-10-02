@@ -4,6 +4,7 @@ use super::{
     Content, Meta, OwnedPackage, SourcePackageLimits, Styles, package::zeroizing_password,
 };
 use super::{binding_tracker::BindingTracker, content_validation::ContentDocumentValidator};
+use crate::leniency::ToleranceReport;
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -42,6 +43,17 @@ impl PreparedPackage {
         &self.package
     }
 
+    /// Everything a tolerant read repaired while the retained package was
+    /// opened.
+    ///
+    /// A family facade adopting this prepared result carries the report onto
+    /// its own document handle; see [`crate::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        self.package.tolerance_report()
+    }
+
     /// Consume the prepared result and transfer its indexed package owner.
     #[must_use]
     pub fn into_package(self) -> OwnedPackage {
@@ -66,6 +78,7 @@ pub struct Package {
     content: Content,
     styles: Option<Styles>,
     metadata: Option<Metadata>,
+    tolerance: ToleranceReport,
 }
 
 impl Package {
@@ -399,6 +412,7 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
+        let tolerance = archive.tolerance_report().clone();
         let found = archive.mimetype()?;
         if found != mimetype {
             return Err(Error::InvalidFormat(format!(
@@ -465,6 +479,7 @@ impl Package {
             content,
             styles,
             metadata,
+            tolerance,
         })
     }
 
@@ -472,6 +487,16 @@ impl Package {
     #[must_use]
     pub fn content_xml(&self) -> &str {
         self.content.xml_content()
+    }
+
+    /// Everything a tolerant read repaired while this package was opened.
+    ///
+    /// An empty report means the package conformed; see
+    /// [`crate::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Return the optional decoded styles XML.
@@ -676,6 +701,15 @@ mod tests {
                 .is_err()
         );
         assert!(Package::from_bytes(bytes, MIMETYPE, "<office:text", "ODP").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn conforming_package_aggregates_an_empty_tolerance_report() -> TestResult {
+        let bytes = package()?;
+        let value = Package::from_bytes(bytes, MIMETYPE, "<office:presentation", "ODP")?;
+        assert!(value.tolerance_report().is_clean());
+        assert_eq!(value.tolerance_report().total(), 0);
         Ok(())
     }
 
