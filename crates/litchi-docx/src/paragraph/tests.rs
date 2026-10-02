@@ -608,6 +608,98 @@ fn run_contents_preserve_source_order_and_unknown_xml() {
 }
 
 #[test]
+fn run_contents_type_embedded_ole_objects() {
+    let run = Run::new(
+        br##"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>before</w:t><w:object><v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" filled="f" stroked="f"/><v:shape id="_x0000_i1025" type="#_x0000_t75" alt="equation one" style="width:16.7pt;height:14pt" o:ole=""><v:imagedata r:id="rId7" o:title="equation title"/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1468075725" r:id="rId8"/></w:object></w:r>"##
+            .to_vec(),
+    );
+
+    let contents = run.contents().unwrap();
+    assert_eq!(contents.len(), 2);
+    assert!(matches!(&contents[0], RunContent::Text(text) if text == "before"));
+    let RunContent::EmbeddedObject(object) = &contents[1] else {
+        panic!("expected a typed embedded object");
+    };
+    assert_eq!(object.prog_id(), Some("Equation.DSMT4"));
+    assert_eq!(object.object_type(), Some("Embed"));
+    assert_eq!(object.draw_aspect(), Some("Content"));
+    assert_eq!(object.ole_r_id(), Some("rId8"));
+    let preview = object.preview_image().expect("preview image");
+    assert_eq!(preview.r_embed(), "rId7");
+    assert_eq!(preview.description(), "equation one");
+    assert_eq!(preview.name(), "equation title");
+}
+
+#[test]
+fn run_contents_keep_unmodeled_objects_opaque() {
+    let run = Run::new(
+        br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:object><v:shape id="plain"/></w:object></w:r>"#
+            .to_vec(),
+    );
+
+    let contents = run.contents().unwrap();
+    assert_eq!(contents.len(), 1);
+    assert!(matches!(
+        &contents[0],
+        RunContent::Unknown(unknown)
+            if unknown.xml_bytes() == br#"<w:object><v:shape id="plain"/></w:object>"#
+    ));
+}
+
+#[test]
+fn run_contents_type_floating_drawing_images() {
+    let run = Run::new(
+        br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:drawing><wp:anchor simplePos="0" behindDoc="0"><wp:extent cx="304800" cy="342900"/><wp:docPr id="1" name="logo"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId5"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>"#
+            .to_vec(),
+    );
+
+    let contents = run.contents().unwrap();
+    assert_eq!(contents.len(), 1);
+    assert!(matches!(
+        &contents[0],
+        RunContent::Image(image)
+            if image.r_embed() == "rId5" && image.width_emu() == 304800 && image.name() == "logo"
+    ));
+}
+
+#[test]
+fn inlines_type_bookmark_boundaries() {
+    let paragraph = Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:bookmarkStart w:id="0" w:name="_GoBack"></w:bookmarkStart><w:r><w:t>text</w:t></w:r><w:bookmarkEnd w:id="0"/></w:p>"#
+            .to_vec(),
+    );
+
+    let inlines = paragraph.inlines().unwrap();
+    assert_eq!(inlines.len(), 3);
+    assert!(matches!(
+        &inlines[0],
+        Inline::BookmarkStart(bookmark) if bookmark.id() == 0 && bookmark.name() == "_GoBack"
+    ));
+    assert!(matches!(&inlines[1], Inline::Run(run) if run.text().unwrap() == "text"));
+    assert!(matches!(inlines[2], Inline::BookmarkEnd(0)));
+}
+
+#[test]
+fn inlines_keep_bookmarks_without_ids_opaque() {
+    let paragraph = Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:bookmarkStart w:name="lonely"/><w:bookmarkEnd/></w:p>"#
+            .to_vec(),
+    );
+
+    let inlines = paragraph.inlines().unwrap();
+    assert_eq!(inlines.len(), 2);
+    assert!(matches!(
+        &inlines[0],
+        Inline::Unknown(value)
+            if value.xml_bytes() == br#"<w:bookmarkStart w:name="lonely"/>"#
+    ));
+    assert!(matches!(
+        &inlines[1],
+        Inline::Unknown(value) if value.xml_bytes() == br#"<w:bookmarkEnd/>"#
+    ));
+}
+
+#[test]
 fn relationship_projection_groups_hyperlink_runs_without_exposing_rids() {
     let paragraph = Paragraph::new(
         br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>before</w:t></w:r><w:hyperlink w:anchor="section" w:tooltip="jump" w:tgtFrame="_self" w:docLocation="part"><w:r><w:t>one</w:t></w:r><w:r><w:tab/><w:t>two</w:t></w:r></w:hyperlink><w:bookmarkStart w:id="1" w:name="section"/></w:p>"#
@@ -635,7 +727,10 @@ fn relationship_projection_groups_hyperlink_runs_without_exposing_rids() {
         hyperlink.runs()[1].contents().unwrap().as_slice(),
         [RunContent::Tab, RunContent::Text(text)] if text == "two"
     ));
-    assert!(matches!(resolved[2], Inline::Unknown(_)));
+    assert!(matches!(
+        &resolved[2],
+        Inline::BookmarkStart(bookmark) if bookmark.id() == 1 && bookmark.name() == "section"
+    ));
 }
 
 /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a tag

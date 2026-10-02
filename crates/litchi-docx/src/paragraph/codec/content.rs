@@ -70,10 +70,12 @@ impl Paragraph {
             .collect()
     }
 
-    /// Extract all inline images from this paragraph.
+    /// Extract all inline and floating images from this paragraph.
     ///
-    /// Returns a vector of `InlineImage` objects found in `<w:drawing>` elements
-    /// within this paragraph.
+    /// Returns a vector of `InlineImage` objects found in `<w:drawing>`
+    /// elements within this paragraph, covering both `<wp:inline>` pictures
+    /// and floating `<wp:anchor>` pictures. Floating placement metadata is
+    /// not retained.
     ///
     /// # Example
     ///

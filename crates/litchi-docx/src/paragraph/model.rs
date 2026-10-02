@@ -1,6 +1,7 @@
 //! Semantic `WordprocessingML` paragraph and run values.
 
 use crate::UnderlineStyle;
+use crate::bookmark::Bookmark;
 use crate::color::Theme;
 use crate::document::{ManagedAdmission, ManagedNamespaceAdmission, ManagedParserAdmission};
 use crate::error::{Error, Result};
@@ -8,6 +9,7 @@ use crate::font::OpenType;
 use crate::hyperlink::Hyperlink;
 use crate::image::InlineImage;
 use crate::namespace::NamespaceBindings;
+use crate::object::EmbeddedObject;
 use crate::run_effects::Effects;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{VerticalPosition, XmlSlice};
@@ -455,6 +457,11 @@ pub enum Inline {
     Run(Box<Run>),
     /// A relationship-resolved hyperlink and its ordered run children.
     Hyperlink(Box<InlineHyperlink>),
+    /// A bookmark start boundary (`<w:bookmarkStart>`).
+    BookmarkStart(Bookmark),
+    /// A bookmark end boundary (`<w:bookmarkEnd>`) by non-negative bookmark
+    /// identifier.
+    BookmarkEnd(u32),
     /// A supported or future paragraph child retained byte-for-byte.
     Unknown(Box<OpaqueInline>),
 }
@@ -923,8 +930,10 @@ pub enum RunContent {
     NoBreakHyphen,
     /// A discretionary soft hyphen (`<w:softHyphen>`).
     SoftHyphen,
-    /// A relationship-backed inline image.
+    /// A relationship-backed inline or floating image (`<w:drawing>`).
     Image(Box<InlineImage>),
+    /// An OLE embedded object (`<w:object>`) with its VML preview image.
+    EmbeddedObject(Box<EmbeddedObject>),
     /// A footnote reference by non-negative Word note identifier.
     FootnoteReference(u32),
     /// An endnote reference by non-negative Word note identifier.

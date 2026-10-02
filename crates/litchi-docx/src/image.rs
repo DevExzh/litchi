@@ -231,10 +231,12 @@ impl InlineImage {
     }
 }
 
-/// Parse inline images from paragraph XML.
+/// Parse inline and floating images from paragraph XML.
 ///
-/// Extracts all `<w:drawing>` elements containing `<wp:inline>` images
-/// from the paragraph XML.
+/// Extracts all `<w:drawing>` elements containing `<wp:inline>` or floating
+/// `<wp:anchor>` pictures from the paragraph XML. Placement is not retained:
+/// an [`InlineImage`] carries no floating position, so anchored pictures
+/// surface exactly like inline ones.
 ///
 /// # Arguments
 ///
@@ -274,7 +276,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
 
     // State tracking for parsing
     let mut in_drawing = false;
-    let mut in_inline = false;
+    let mut in_image = false;
     let mut in_blip_fill = false;
 
     // Image attributes being built
@@ -294,8 +296,8 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                     b"drawing" => {
                         in_drawing = true;
                     },
-                    b"inline" if in_drawing => {
-                        in_inline = true;
+                    b"inline" | b"anchor" if in_drawing => {
+                        in_image = true;
                         // Reset state for new image
                         width_emu = 914_400;
                         height_emu = 914_400;
@@ -303,7 +305,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                         name.clear();
                         r_embed.clear();
                     },
-                    b"extent" if in_inline => {
+                    b"extent" if in_image => {
                         // Parse width and height from extent element
                         // <wp:extent cx="914_400" cy="914_400"/>
                         for attr in first_wins(&e).flatten() {
@@ -322,7 +324,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                             }
                         }
                     },
-                    b"docPr" if in_inline => {
+                    b"docPr" if in_image => {
                         // Parse name and description from docPr element
                         // <wp:docPr id="1" name="Picture" descr="Description"/>
                         for attr in first_wins(&e).flatten() {
@@ -341,7 +343,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                             }
                         }
                     },
-                    b"blipFill" if in_inline => {
+                    b"blipFill" if in_image => {
                         in_blip_fill = true;
                     },
                     b"blip" if in_blip_fill => {
@@ -368,9 +370,9 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                     b"drawing" => {
                         in_drawing = false;
                     },
-                    b"inline" if in_inline => {
-                        // Finished parsing an inline image
-                        in_inline = false;
+                    b"inline" | b"anchor" if in_image => {
+                        // Finished parsing an inline or floating image
+                        in_image = false;
 
                         // Only add if we found a valid r:embed
                         if !r_embed.is_empty() {
@@ -458,6 +460,40 @@ mod tests {
         assert_eq!(img.height_emu(), 2000000);
         assert_eq!(img.name(), "MyImage");
         assert_eq!(img.description(), "Test description");
+    }
+
+    #[test]
+    fn test_parse_inline_images_floating_anchor() {
+        let xml = br#"<w:p>
+            <w:r>
+                <w:drawing>
+                    <wp:anchor simplePos="0" relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">
+                        <wp:positionH relativeFrom="page"><wp:posOffset>11430000</wp:posOffset></wp:positionH>
+                        <wp:extent cx="304800" cy="342900"/>
+                        <wp:docPr id="101029" name="logo"/>
+                        <a:graphic>
+                            <a:graphicData>
+                                <pic:pic>
+                                    <pic:blipFill>
+                                        <a:blip r:embed="rId5"/>
+                                    </pic:blipFill>
+                                </pic:pic>
+                            </a:graphicData>
+                        </a:graphic>
+                    </wp:anchor>
+                </w:drawing>
+            </w:r>
+        </w:p>"#;
+
+        let images = parse_inline_images(xml).unwrap();
+        assert_eq!(images.len(), 1);
+
+        let img = &images[0];
+        assert_eq!(img.r_embed(), "rId5");
+        assert_eq!(img.width_emu(), 304800);
+        assert_eq!(img.height_emu(), 342900);
+        assert_eq!(img.name(), "logo");
+        assert!(img.description().is_empty());
     }
 
     #[test]

@@ -35,6 +35,7 @@ pub mod math;
 pub mod modern_comments;
 mod namespace;
 pub mod numbering;
+pub mod object;
 pub mod package;
 pub mod paragraph;
 pub mod parts;

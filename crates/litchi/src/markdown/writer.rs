@@ -889,6 +889,12 @@ impl MarkdownWriter {
                     for image in images {
                         self.buffer.push_str("![");
                         self.write_literal(&image.alt);
+                        if image.data_uri.is_empty() {
+                            // An embedded object whose preview could not be
+                            // resolved degrades to its alt-text placeholder.
+                            self.buffer.push(']');
+                            continue;
+                        }
                         self.buffer.push_str("](<");
                         self.buffer.push_str(&image.data_uri);
                         self.buffer.push('>');

@@ -228,6 +228,10 @@ fn project_paragraph(
                     title: hyperlink.link().tooltip().map(str::to_owned),
                 });
             },
+            litchi_docx::Inline::BookmarkStart(_) | litchi_docx::Inline::BookmarkEnd(_) => {
+                // Bookmark boundaries are invisible anchors with no Markdown
+                // representation; dropping them loses no content.
+            },
             litchi_docx::Inline::Unknown(_) => {
                 return Err(Error::Unsupported(
                     "Markdown export cannot preserve an unmodeled DOCX paragraph child".to_owned(),
@@ -296,6 +300,44 @@ fn project_run(
                     title: (!image.name().is_empty()).then(|| image.name().to_owned()),
                     data_uri,
                 });
+            },
+            litchi_docx::RunContent::EmbeddedObject(object) => {
+                let preview = object.preview_image();
+                let resolved = preview.and_then(|preview| {
+                    preview
+                        .data(opc, relationships)
+                        .and_then(|bytes| {
+                            preview
+                                .format(opc, relationships)
+                                .map(|format| (bytes, format))
+                        })
+                        .ok()
+                        .map(|(bytes, format)| {
+                            let mut data_uri = String::from("data:");
+                            data_uri.push_str(format.mime_type());
+                            data_uri.push_str(";base64,");
+                            BASE64.encode_string(&bytes, &mut data_uri);
+                            EmbeddedImage {
+                                alt: preview.description().to_owned(),
+                                title: (!preview.name().is_empty())
+                                    .then(|| preview.name().to_owned()),
+                                data_uri,
+                            }
+                        })
+                });
+                // An object whose preview cannot be resolved degrades to an
+                // alt-text placeholder rather than failing the export.
+                images.push(resolved.unwrap_or_else(|| {
+                    EmbeddedImage {
+                        alt: preview
+                            .map(|preview| preview.description().to_owned())
+                            .filter(|alt| !alt.is_empty())
+                            .or_else(|| object.prog_id().map(str::to_owned))
+                            .unwrap_or_default(),
+                        title: None,
+                        data_uri: String::new(),
+                    }
+                }));
             },
             litchi_docx::RunContent::FootnoteReference(id) => {
                 set_note(&mut note, NoteKey::Footnote(id))?;
@@ -402,6 +444,7 @@ pub(crate) fn requires_package_context(paragraph: &litchi_docx::Paragraph) -> Re
                     matches!(
                         content,
                         litchi_docx::RunContent::Image(_)
+                            | litchi_docx::RunContent::EmbeddedObject(_)
                             | litchi_docx::RunContent::FootnoteReference(_)
                             | litchi_docx::RunContent::EndnoteReference(_)
                     )

@@ -8,13 +8,14 @@ use litchi::{
 };
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
-const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/><Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/></Types>"#;
+const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.oleObject"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/><Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/></Types>"#;
 const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
-const DOCUMENT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdLink" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.test/a%20b" TargetMode="External"/><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/p.png"/><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/><Relationship Id="rIdEndnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/></Relationships>"#;
+const DOCUMENT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdLink" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.test/a%20b" TargetMode="External"/><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/p.png"/><Relationship Id="rIdOle" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" Target="embeddings/oleObject1.bin"/><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/><Relationship Id="rIdEndnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/></Relationships>"#;
 const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
 const FOOTNOTES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:id="1"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>note &amp; *body*</w:t></w:r></w:p></w:footnote></w:footnotes>"#;
 const ENDNOTES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnote w:id="2"><w:p><w:r><w:endnoteRef/></w:r><w:r><w:t>end note</w:t></w:r></w:p></w:endnote></w:endnotes>"#;
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n";
+const OLE_PAYLOAD: &[u8] = b"ole payload";
 
 fn docx(document_xml: &str) -> Vec<u8> {
     let cursor = Cursor::new(Vec::new());
@@ -29,6 +30,7 @@ fn docx(document_xml: &str) -> Vec<u8> {
         ("word/footnotes.xml", FOOTNOTES.as_bytes()),
         ("word/endnotes.xml", ENDNOTES.as_bytes()),
         ("word/media/p.png", PNG),
+        ("word/embeddings/oleObject1.bin", OLE_PAYLOAD),
     ] {
         archive.start_file(name, options).unwrap();
         archive.write_all(contents).unwrap();
@@ -142,4 +144,41 @@ fn mixed_text_and_drawing_run_is_refused() {
         document.to_markdown(),
         Err(litchi_core::Error::Unsupported(message)) if message.contains("interleaved DOCX text and embedded semantics")
     ));
+}
+
+#[test]
+fn embedded_ole_object_projects_its_preview_image() {
+    let document_xml = r##"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t xml:space="preserve">Solve </w:t></w:r><w:r><w:object><v:shape id="_x0000_i1025" type="#_x0000_t75" alt="equation" style="width:16.7pt;height:14pt" o:ole=""><v:imagedata r:id="rIdImage" o:title="equation"/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1468075725" r:id="rIdOle"/></w:object></w:r><w:r><w:t xml:space="preserve"> now</w:t></w:r></w:p></w:body></w:document>"##;
+    let document = Document::from_bytes(docx(document_xml)).unwrap();
+    assert_eq!(
+        document.to_markdown().unwrap(),
+        "Solve ![equation](<data:image/png;base64,iVBORw0KGgo=> \"equation\") now\n\n"
+    );
+}
+
+#[test]
+fn embedded_ole_object_with_unresolvable_preview_degrades_to_alt_text() {
+    let document_xml = r##"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t xml:space="preserve">Value: </w:t></w:r><w:r><w:object><v:shape id="_x0000_i1025" type="#_x0000_t75" alt="equation preview" style="width:16.7pt;height:14pt" o:ole=""><v:imagedata r:id="rIdMissing" o:title=""/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1468075725" r:id="rIdOle"/></w:object></w:r></w:p></w:body></w:document>"##;
+    let document = Document::from_bytes(docx(document_xml)).unwrap();
+    assert_eq!(
+        document.to_markdown().unwrap(),
+        "Value: ![equation preview]\n\n"
+    );
+}
+
+#[test]
+fn floating_drawing_projects_as_image() {
+    let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body><w:p><w:r><w:drawing><wp:anchor simplePos="0" relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:positionH relativeFrom="page"><wp:posOffset>11430000</wp:posOffset></wp:positionH><wp:extent cx="1" cy="1"/><wp:docPr id="1" name="floater"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rIdImage"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p></w:body></w:document>"#;
+    let document = Document::from_bytes(docx(document_xml)).unwrap();
+    assert_eq!(
+        document.to_markdown().unwrap(),
+        "![](<data:image/png;base64,iVBORw0KGgo=> \"floater\")\n\n"
+    );
+}
+
+#[test]
+fn bookmark_boundaries_are_invisible_to_markdown() {
+    let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:bookmarkStart w:id="0" w:name="_GoBack"/><w:r><w:t>kept</w:t></w:r><w:bookmarkEnd w:id="0"/></w:p></w:body></w:document>"#;
+    let document = Document::from_bytes(docx(document_xml)).unwrap();
+    assert_eq!(document.to_markdown().unwrap(), "kept\n\n");
 }

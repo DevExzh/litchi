@@ -6,6 +6,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
 use crate::image::parse_inline_images;
+use crate::object::parse_embedded_object;
 
 use super::super::model::{OpaqueRunContent, Run, RunContent, XmlRef};
 use super::text::extract_word_text;
@@ -23,6 +24,7 @@ enum Kind {
     NoBreakHyphen,
     SoftHyphen,
     Drawing,
+    Object,
     FootnoteReference,
     EndnoteReference,
     FootnoteMark,
@@ -34,8 +36,8 @@ impl Run {
     /// Return every direct run child in source order.
     ///
     /// Run properties are metadata and are not included. Common textual
-    /// controls, drawings, and note references have typed values; every other
-    /// child remains available as exact inert XML through
+    /// controls, drawings, embedded objects, and note references have typed
+    /// values; every other child remains available as exact inert XML through
     /// [`RunContent::Unknown`].
     ///
     /// # Errors
@@ -224,6 +226,7 @@ fn classify(
         (b"noBreakHyphen".as_slice(), Kind::NoBreakHyphen),
         (b"softHyphen".as_slice(), Kind::SoftHyphen),
         (b"drawing".as_slice(), Kind::Drawing),
+        (b"object".as_slice(), Kind::Object),
         (b"footnoteReference".as_slice(), Kind::FootnoteReference),
         (b"endnoteReference".as_slice(), Kind::EndnoteReference),
         (b"footnoteRef".as_slice(), Kind::FootnoteMark),
@@ -289,6 +292,10 @@ fn push_content(
                         .map(|image| RunContent::Image(Box::new(image))),
                 );
             }
+        },
+        Kind::Object => match parse_embedded_object(raw)? {
+            Some(object) => contents.push(RunContent::EmbeddedObject(Box::new(object))),
+            None => push_unknown(contents, &range),
         },
         Kind::FootnoteReference => contents.push(RunContent::FootnoteReference(note_id(
             raw,

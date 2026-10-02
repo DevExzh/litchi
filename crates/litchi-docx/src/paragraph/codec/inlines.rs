@@ -1,9 +1,11 @@
 //! Lossless direct paragraph-child traversal.
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
+use crate::bookmark::Bookmark;
 use crate::error::{Error, Result};
 
 use super::super::model::{Inline, OpaqueInline, Paragraph, Run, XmlRef};
@@ -12,12 +14,46 @@ use super::xml::is_fragment_word_name;
 const MAX_INLINE_DEPTH: usize = 128;
 const MAX_INLINE_NODES: usize = 1_000_000;
 
+#[derive(Clone, Copy)]
+enum InlineKind {
+    Run,
+    Hyperlink,
+    BookmarkStart,
+    BookmarkEnd,
+    Unknown,
+}
+
+#[allow(
+    clippy::option_option,
+    clippy::ref_option,
+    reason = "three states distinguish unobserved, unprefixed, and prefixed XML fragments"
+)]
+fn classify(
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> InlineKind {
+    for (local, kind) in [
+        (b"r".as_slice(), InlineKind::Run),
+        (b"hyperlink".as_slice(), InlineKind::Hyperlink),
+        (b"bookmarkStart".as_slice(), InlineKind::BookmarkStart),
+        (b"bookmarkEnd".as_slice(), InlineKind::BookmarkEnd),
+    ] {
+        if is_fragment_word_name(namespace, name, local, fragment_prefix) {
+            return kind;
+        }
+    }
+    InlineKind::Unknown
+}
+
 impl Paragraph {
     /// Return every direct paragraph child in source order.
     ///
     /// Paragraph properties are metadata and are not included. Direct
-    /// `WordprocessingML` runs become [`Inline::Run`]; every other child remains
-    /// available as [`Inline::Unknown`] with exact inert XML bytes.
+    /// `WordprocessingML` runs become [`Inline::Run`] and bookmark boundaries
+    /// become [`Inline::BookmarkStart`] and [`Inline::BookmarkEnd`]; every
+    /// other child remains available as [`Inline::Unknown`] with exact inert
+    /// XML bytes.
     ///
     /// # Errors
     ///
@@ -31,7 +67,7 @@ impl Paragraph {
         let origin = ReaderOrigin::of(xml);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut paragraph_depth = None;
-        let mut capture = None::<(bool, bool, usize, usize)>;
+        let mut capture = None::<(InlineKind, usize, usize)>;
         let mut inlines = Vec::new();
         let mut saw_paragraph = false;
         let mut depth = 0usize;
@@ -97,19 +133,11 @@ impl Paragraph {
                             &fragment_prefix,
                         )
                     {
-                        let is_run = is_fragment_word_name(
-                            &namespace,
-                            element.name(),
-                            b"r",
-                            &fragment_prefix,
-                        );
-                        let is_hyperlink = is_fragment_word_name(
-                            &namespace,
-                            element.name(),
-                            b"hyperlink",
-                            &fragment_prefix,
-                        );
-                        capture = Some((is_run, is_hyperlink, event_start, depth));
+                        capture = Some((
+                            classify(&namespace, element.name(), &fragment_prefix),
+                            event_start,
+                            depth,
+                        ));
                     }
                 },
                 Event::Empty(element) => {
@@ -140,40 +168,20 @@ impl Paragraph {
                             &fragment_prefix,
                         )
                     {
-                        let is_run = is_fragment_word_name(
-                            &namespace,
-                            element.name(),
-                            b"r",
-                            &fragment_prefix,
-                        );
-                        let is_hyperlink = is_fragment_word_name(
-                            &namespace,
-                            element.name(),
-                            b"hyperlink",
-                            &fragment_prefix,
-                        );
                         push_inline(
                             &mut inlines,
                             &source,
-                            is_run,
-                            is_hyperlink,
+                            classify(&namespace, element.name(), &fragment_prefix),
                             event_start,
                             event_end,
                         )?;
                     }
                 },
                 Event::End(element) => {
-                    if let Some((is_run, is_hyperlink, start, capture_depth)) = capture
+                    if let Some((kind, start, capture_depth)) = capture
                         && depth == capture_depth
                     {
-                        push_inline(
-                            &mut inlines,
-                            &source,
-                            is_run,
-                            is_hyperlink,
-                            start,
-                            event_end,
-                        )?;
+                        push_inline(&mut inlines, &source, kind, start, event_end)?;
                         capture = None;
                     }
                     if paragraph_depth == Some(depth)
@@ -212,8 +220,7 @@ impl Paragraph {
 fn push_inline(
     inlines: &mut Vec<Inline>,
     source: &XmlRef,
-    is_run: bool,
-    is_hyperlink: bool,
+    kind: InlineKind,
     start: usize,
     end: usize,
 ) -> Result<()> {
@@ -228,10 +235,57 @@ fn push_inline(
     let range = source.subrange(relative_start, length).ok_or_else(|| {
         Error::InvalidFormat("Word inline absolute offset exceeds source range".into())
     })?;
-    inlines.push(if is_run {
-        Inline::Run(Box::new(Run::from_xml_ref(range)))
-    } else {
-        Inline::Unknown(Box::new(OpaqueInline::from_xml_ref(range, is_hyperlink)))
-    });
+    match kind {
+        InlineKind::Run => inlines.push(Inline::Run(Box::new(Run::from_xml_ref(range)))),
+        InlineKind::Hyperlink => inlines.push(Inline::Unknown(Box::new(
+            OpaqueInline::from_xml_ref(range, true),
+        ))),
+        InlineKind::BookmarkStart => match parse_bookmark(range.bytes()) {
+            Some(bookmark) => inlines.push(Inline::BookmarkStart(bookmark)),
+            None => push_unknown(inlines, range),
+        },
+        InlineKind::BookmarkEnd => match parse_bookmark(range.bytes()) {
+            Some(bookmark) => inlines.push(Inline::BookmarkEnd(bookmark.id())),
+            None => push_unknown(inlines, range),
+        },
+        InlineKind::Unknown => push_unknown(inlines, range),
+    }
     Ok(())
+}
+
+fn push_unknown(inlines: &mut Vec<Inline>, source: XmlRef) {
+    inlines.push(Inline::Unknown(Box::new(OpaqueInline::from_xml_ref(
+        source, false,
+    ))));
+}
+
+/// Read the `w:id` and `w:name` of one bookmark boundary fragment.
+///
+/// Returns `None` when the boundary has no non-negative identifier, leaving
+/// the element to be retained as inert XML.
+fn parse_bookmark(raw: &[u8]) -> Option<Bookmark> {
+    let mut reader = NsReader::from_reader(raw);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e) | Event::Empty(e)) => {
+                let mut id = None;
+                let mut name = String::new();
+                for attr in first_wins(&e).flatten() {
+                    match attr.key.local_name().as_ref() {
+                        b"id" => {
+                            id = atoi_simd::parse::<u32, false, false>(&attr.value).ok();
+                        },
+                        b"name" => {
+                            name = String::from_utf8_lossy(&attr.value).into_owned();
+                        },
+                        _ => {},
+                    }
+                }
+                return id.map(|id| Bookmark::new(id, name));
+            },
+            Ok(Event::Eof) => return None,
+            Err(_) => return None,
+            _ => {},
+        }
+    }
 }
