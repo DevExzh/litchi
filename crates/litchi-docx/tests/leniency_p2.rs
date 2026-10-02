@@ -609,3 +609,125 @@ fn empty_header_relationship_id_stays_fatal() {
             .is_err()
     );
 }
+
+// ---------------------------------------------------------------------------
+// F2.6 follow-up — style-level `w:numPr` without `w:numId`
+// ---------------------------------------------------------------------------
+
+/// `ComplexNumberedLists.docx` with numbering on the `ListParagraph` style,
+/// a `ListDeep` style based on it whose `w:numPr` carries only `w:ilvl`, and
+/// the "2-a" paragraph styled `ListDeep` without direct numbering.
+fn ilvl_only_style_fixture(deep_num_pr: &str) -> Vec<u8> {
+    let bytes = patch(
+        &fixture(LISTS),
+        "word/styles.xml",
+        LIST_PARAGRAPH_PPR,
+        r#"<w:pPr><w:numPr><w:numId w:val="1"/></w:numPr><w:ind w:left="720"/><w:contextualSpacing/></w:pPr>"#,
+    );
+    let bytes = patch(
+        &bytes,
+        "word/styles.xml",
+        "</w:styles>",
+        &format!(
+            r#"<w:style w:type="paragraph" w:styleId="ListDeep"><w:name w:val="List Deep"/><w:basedOn w:val="ListParagraph"/><w:pPr>{deep_num_pr}</w:pPr></w:style></w:styles>"#
+        ),
+    );
+    patch(
+        &bytes,
+        "word/document.xml",
+        r#"<w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>2-a"#,
+        r#"<w:pPr><w:pStyle w:val="ListDeep"/></w:pPr><w:r><w:t>2-a"#,
+    )
+}
+
+#[test]
+fn ilvl_only_style_numbering_is_inherited_and_recorded() {
+    let bytes = ilvl_only_style_fixture(r#"<w:numPr><w:ilvl w:val="2"/></w:numPr>"#);
+    let styles_xml = visible(&member(&bytes, "word/styles.xml"));
+    let deep = styles_xml.find(r#"w:styleId="ListDeep""#).expect("style");
+    let num_pr = (styles_xml[deep..].find("<w:numPr>").expect("numPr") + deep) as u64;
+    let expected = [(Defect::Style(StyleDefect::NumPrMissingNumId), num_pr)];
+
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let mut styles = document.styles().expect("styles");
+    let style = styles
+        .get_by_id("ListDeep")
+        .expect("style table no longer fails")
+        .expect("style");
+    assert_eq!(style.numbering(), None);
+    let resolved = styles
+        .resolved_numbering("ListDeep")
+        .expect("resolves")
+        .expect("inherited numbering");
+    assert_eq!((resolved.num_id, resolved.level), (1, 2));
+    assert_eq!(
+        defects(styles.tolerance_report().expect("report")),
+        expected
+    );
+
+    let items = document.list_items().expect("list items resolve");
+    let item = items
+        .iter()
+        .find(|item| item.text == "2-a")
+        .expect("2-a numbered through its style");
+    assert_eq!((item.numbering.num_id, item.numbering.level), (1, 2));
+    assert_eq!(defects(&document.tolerance_report()), expected);
+
+    // The source-backed package's owned materialization reports the same.
+    let owned = open_source_backed(&bytes)
+        .to_owned_package()
+        .expect("owned");
+    let owned_document = owned.document().expect("document");
+    owned_document.list_items().expect("list items");
+    assert_eq!(defects(&owned_document.tolerance_report()), expected);
+}
+
+#[test]
+fn empty_style_num_pr_inherits_and_is_recorded() {
+    let bytes = ilvl_only_style_fixture("<w:numPr/>");
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let items = document.list_items().expect("list items resolve");
+    let item = items
+        .iter()
+        .find(|item| item.text == "2-a")
+        .expect("2-a numbered through its style");
+    assert_eq!((item.numbering.num_id, item.numbering.level), (1, 0));
+    assert_eq!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        [Defect::Style(StyleDefect::NumPrMissingNumId)]
+    );
+}
+
+#[test]
+fn complete_style_num_pr_records_nothing() {
+    let bytes =
+        ilvl_only_style_fixture(r#"<w:numPr><w:ilvl w:val="2"/><w:numId w:val="1"/></w:numPr>"#);
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let items = document.list_items().expect("list items resolve");
+    let item = items
+        .iter()
+        .find(|item| item.text == "2-a")
+        .expect("2-a numbered through its style");
+    assert_eq!(item.numbering.level, 2);
+    assert!(document.tolerance_report().is_clean());
+}
+
+#[test]
+fn nested_style_num_pr_stays_fatal() {
+    let bytes = ilvl_only_style_fixture("<w:numPr><w:numPr/></w:numPr>");
+    let package = open(&bytes);
+    let mut styles = package
+        .document()
+        .expect("document")
+        .styles()
+        .expect("styles");
+    assert!(styles.len().is_err());
+}

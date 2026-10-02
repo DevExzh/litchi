@@ -299,30 +299,7 @@ impl<'a> Styles<'a> {
     pub fn resolved_numbering(&mut self, style_id: &str) -> Result<Option<Paragraph>> {
         self.ensure_styles_loaded()?;
         let styles = self.style_list.as_ref().expect("styles loaded");
-        let mut current = style_id;
-        let mut visited = HashSet::new();
-        loop {
-            if !visited.insert(current.to_owned()) {
-                return Err(Error::InvalidFormat(format!(
-                    "style basedOn cycle at '{current}'"
-                )));
-            }
-            if visited.len() > styles.len().saturating_add(1) {
-                return Err(Error::InvalidFormat(
-                    "style inheritance exceeds the style table".to_owned(),
-                ));
-            }
-            let Some(style) = styles.iter().find(|style| style.style_id == current) else {
-                return Ok(None);
-            };
-            if let Some(numbering) = style.numbering {
-                return Ok(Some(numbering));
-            }
-            let Some(parent) = style.based_on.as_deref() else {
-                return Ok(None);
-            };
-            current = parent;
-        }
+        resolve_numbering(styles, style_id)
     }
 
     /// Ensure styles are loaded from XML.
@@ -341,6 +318,7 @@ impl<'a> Styles<'a> {
         let mut in_num_pr = false;
         let mut pending_num_id = None;
         let mut pending_level = None;
+        let mut num_pr_offset = 0u64;
         let mut tolerance = crate::leniency::ToleranceReport::default();
 
         loop {
@@ -425,10 +403,19 @@ impl<'a> Styles<'a> {
                     in_num_pr = true;
                     pending_num_id = None;
                     pending_level = None;
+                    num_pr_offset = end.saturating_sub(e.len() as u64 + 2);
                 },
                 Ok(Event::Empty(e)) if current_style.is_some() => {
                     let builder = current_style.as_mut().unwrap();
                     match e.local_name().as_ref() {
+                        // An empty `w:numPr` names no numbering instance: the
+                        // style inherits its numbering, as above.
+                        b"numPr" if in_ppr && !in_num_pr => {
+                            tolerance.record(
+                                crate::leniency::StyleDefect::NumPrMissingNumId,
+                                end.saturating_sub(e.len() as u64 + 3),
+                            );
+                        },
                         b"numId" if in_num_pr => {
                             if pending_num_id.is_some() {
                                 return Err(Error::InvalidFormat(
@@ -541,13 +528,22 @@ impl<'a> Styles<'a> {
                     }
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"numPr" && in_num_pr => {
-                    let num_id = pending_num_id.take().ok_or_else(|| {
-                        Error::InvalidFormat("style numPr is missing numId".to_owned())
-                    })?;
-                    current_style.as_mut().expect("style checked").numbering = Some(Paragraph {
-                        num_id,
-                        level: pending_level.take().unwrap_or(0),
-                    });
+                    let builder = current_style.as_mut().expect("style checked");
+                    if let Some(num_id) = pending_num_id.take() {
+                        builder.numbering = Some(Paragraph {
+                            num_id,
+                            level: pending_level.take().unwrap_or(0),
+                        });
+                    } else {
+                        // `CT_NumPr` makes `w:numId` optional: the style
+                        // inherits its numbering along `basedOn`, with any
+                        // `w:ilvl` as a level override (LENIENCY_AUDIT 2.6).
+                        builder.level_override = pending_level.take();
+                        tolerance.record(
+                            crate::leniency::StyleDefect::NumPrMissingNumId,
+                            num_pr_offset,
+                        );
+                    }
                     in_num_pr = false;
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"pPr" && in_ppr => {
@@ -569,6 +565,7 @@ impl<'a> Styles<'a> {
                             is_custom: builder.is_custom,
                             based_on: builder.based_on,
                             numbering: builder.numbering,
+                            level_override: builder.level_override,
                             outline: builder.outline,
                             priority: builder.priority,
                             is_quick_style: builder.is_quick_style,
@@ -586,6 +583,46 @@ impl<'a> Styles<'a> {
         self.style_list = Some(styles);
         self.tolerance = tolerance;
         Ok(())
+    }
+}
+
+/// Resolve a style's numbering through a bounded, cycle-checked `basedOn`
+/// walk.
+///
+/// The nearest style with a `w:numId` supplies the numbering. A style whose
+/// `w:numPr` has no `w:numId` ([`crate::leniency::StyleDefect::NumPrMissingNumId`])
+/// inherits it, and its `w:ilvl`, if any, overrides the inherited level; the
+/// nearest override wins, as Word resolves style properties one by one along
+/// `basedOn`.
+pub(crate) fn resolve_numbering(styles: &[Style], style_id: &str) -> Result<Option<Paragraph>> {
+    let mut current = style_id;
+    let mut visited = HashSet::new();
+    let mut level_override = None;
+    loop {
+        if !visited.insert(current.to_owned()) {
+            return Err(Error::InvalidFormat(format!(
+                "style basedOn cycle at '{current}'"
+            )));
+        }
+        if visited.len() > styles.len().saturating_add(1) {
+            return Err(Error::InvalidFormat(
+                "style inheritance exceeds the style table".to_owned(),
+            ));
+        }
+        let Some(style) = styles.iter().find(|style| style.style_id == current) else {
+            return Ok(None);
+        };
+        if let Some(mut numbering) = style.numbering {
+            if let Some(level) = level_override {
+                numbering.level = level;
+            }
+            return Ok(Some(numbering));
+        }
+        level_override = level_override.or(style.level_override);
+        let Some(parent) = style.based_on.as_deref() else {
+            return Ok(None);
+        };
+        current = parent;
     }
 }
 
@@ -616,6 +653,7 @@ struct StyleBuilder {
     is_custom: bool,
     based_on: Option<String>,
     numbering: Option<Paragraph>,
+    level_override: Option<u8>,
     outline: Option<Outline>,
     /// Whether an `w:outlineLvl` was seen (a body-text or ignored value
     /// leaves `outline` unset).
@@ -648,6 +686,9 @@ pub struct Style {
     /// ID of the style this is based on
     based_on: Option<String>,
     numbering: Option<Paragraph>,
+    /// The `w:ilvl` of a `w:numPr` without `w:numId`, which overrides the
+    /// level of the numbering the style inherits.
+    level_override: Option<u8>,
     outline: Option<Outline>,
     /// UI priority for display ordering
     priority: Option<i32>,

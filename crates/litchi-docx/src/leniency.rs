@@ -53,7 +53,7 @@
 //!   and the list resolvers ([`Document::list_items`](crate::Document::list_items)
 //!   and friends) record [`NumberingDefect`]; the
 //!   [`numbering::Collection`](crate::numbering::Collection) carries its own.
-//! - 2.9 — the list resolvers record [`NumberingDefect::LevelOutOfRange`]
+//! - 2.6 (style level), 2.9 — the list resolvers record [`NumberingDefect::LevelOutOfRange`]
 //!   for a paragraph `w:ilvl` above 8 and merge the [`StyleDefect`]s of the
 //!   [`Styles`](crate::styles::Styles) they load, which carries its own.
 //! - 2.10 — [`Document::drawing_objects`](crate::Document::drawing_objects)
@@ -372,6 +372,14 @@ pub enum StyleDefect {
     /// A style's `w:outlineLvl` exceeds 9 (0–8 are heading levels, 9 is body
     /// text). Word ignores such a value, so the style has no outline level.
     OutlineLevelOutOfRange,
+    /// A style's `w:numPr` has no `w:numId` — typically only a `w:ilvl`.
+    /// `CT_NumPr` makes both children optional; Word resolves the numbering
+    /// along `basedOn` and applies the `w:ilvl` as a level override. The
+    /// style's own [`Style::numbering`](crate::styles::Style::numbering) is
+    /// `None` and `resolved_numbering` applies the override to the inherited
+    /// numbering (the style-level counterpart of
+    /// [`NumberingDefect::NumPrMissingNumId`]).
+    NumPrMissingNumId,
 }
 
 impl StyleDefect {
@@ -381,6 +389,9 @@ impl StyleDefect {
         match self {
             Self::LevelOutOfRange => "clamped the style's list level to 8",
             Self::OutlineLevelOutOfRange => "ignored the out-of-range outline level",
+            Self::NumPrMissingNumId => {
+                "inherited the style's numbering along basedOn, applying the level override"
+            },
         }
     }
 }
@@ -1008,6 +1019,7 @@ mod tests {
             Defect::from(RevisionDefect::NonIntegerId),
             Defect::from(StyleDefect::LevelOutOfRange),
             Defect::from(StyleDefect::OutlineLevelOutOfRange),
+            Defect::from(StyleDefect::NumPrMissingNumId),
             Defect::from(DrawingDefect::UnknownPreset),
             Defect::from(DrawingDefect::MissingPreset),
             Defect::from(FieldDefect::MissingInstruction),

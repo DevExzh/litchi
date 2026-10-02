@@ -258,30 +258,7 @@ impl StyleDefinitions {
         &self,
         style_id: &str,
     ) -> Result<Option<crate::numbering::Paragraph>> {
-        let mut current = style_id;
-        let mut visited = HashSet::new();
-        loop {
-            if !visited.insert(current.to_owned()) {
-                return Err(Error::InvalidFormat(format!(
-                    "style basedOn cycle at '{current}'"
-                )));
-            }
-            if visited.len() > self.styles.len().saturating_add(1) {
-                return Err(Error::InvalidFormat(
-                    "style inheritance exceeds the style table".to_owned(),
-                ));
-            }
-            let Some(style) = self.get_by_id(current) else {
-                return Ok(None);
-            };
-            if let Some(numbering) = style.numbering() {
-                return Ok(Some(numbering));
-            }
-            let Some(parent) = style.based_on() else {
-                return Ok(None);
-            };
-            current = parent;
-        }
+        crate::styles::resolve_numbering(&self.styles, style_id)
     }
 }
 
