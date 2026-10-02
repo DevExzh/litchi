@@ -1082,7 +1082,8 @@ text-run/style parsing) is strict-to-fatal.
   semantics already at directory.rs:31), record each; stop dropping the whole holder on
   one bad entry.
 ### 5.8 `CurrentUserAtom` fixed-field validation far exceeds POI and LibreOffice — P2 (username length P1)
-> **Status: PARTIALLY FIXED (2026-10-02)** — a username length > 255 or truncated reads as no username (POI), recorded as `PersistDefect::CurrentUserNameLength`; other fixed-field checks unchanged.
+> **Status: FIXED (2026-10-02)** — a username length > 255 or truncated reads as no username (POI), recorded as `PersistDefect::CurrentUserNameLength`; Current User recVer/recInstance and `size`
+> are read past and recorded (`CurrentUserHeader`, `CurrentUserSize`); only the record type and header-token checks stay hard.
 - **Location**: `crates/litchi-ppt/src/current_user.rs:103` (recVer/recInstance/recType),
   :110 (fixed size != 20), :117-125 ("Invalid CurrentUser header token"), :128-132
   ("Invalid CurrentUser username length"); reached from the open path at
@@ -1113,6 +1114,8 @@ text-run/style parsing) is strict-to-fatal.
   chain at the repeated offset and keep the mappings collected so far — merging is
   newest-first, so live objects are already covered in practice.
 ### 5.10 Duplicate/versioned `SlideListWithTextContainer` and text-record cross-checks are file-fatal — P2 (confidence: high on code; low-medium frequency)
+> **Status: FIXED (2026-10-02)** — the slide-list version gate is recorded (`SlideListVersion`), a duplicate instance-0 list is ignored first-wins as in POI (`DuplicateSlideList`), and an unreadable slide's
+> slide-list text degrades to empty interactions/outline refs (`UnreadableSlideListText`). Container (cfb) and property-set repairs now reach the doc/xls/ppt document reports.
 - **Location**: `crates/litchi-ppt/src/slide/directory.rs:168` (container version !=
   0x0f), :175 ("duplicate presentation SlideListWithTextContainer"), :275 ("text records
   reference unknown slideId"), :280-281 (interaction parse errors propagate out of
