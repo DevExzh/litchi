@@ -470,3 +470,80 @@ fn inventory_uses_original_namespace_aliases_and_ignores_nested_story_paragraphs
     );
     assert!(inventory.sections()[1].paragraphs().is_empty());
 }
+
+/// Leniency F2.7: a column model Word lays out despite schema deviations is
+/// repaired per section and recorded with offsets into the section XML.
+#[test]
+fn column_model_deviations_are_repaired_and_recorded() {
+    use crate::leniency::{Defect, SectionDefect};
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let defects = |section: &mut Section| {
+        section
+            .tolerance_report()
+            .unwrap()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>()
+    };
+
+    let xml = format!(
+        r#"<w:sectPr xmlns:w="{W}"><w:cols w:equalWidth="0" w:num="3"><w:col w:space="720"/><w:col w:w="4000"/></w:cols></w:sectPr>"#
+    );
+    let mut section = Section::from_xml_bytes(xml.clone().into_bytes()).unwrap();
+    let columns = section.columns().unwrap().unwrap();
+    assert_eq!(columns.columns[0].width, Emu(0));
+    assert_eq!(columns.columns[0].space, Some(Emu::from_twips(720)));
+    assert_eq!(columns.count, 2);
+    let cols = xml.find("<w:cols").unwrap() as u64;
+    let col = xml.find("<w:col w:space").unwrap() as u64;
+    assert_eq!(
+        defects(&mut section),
+        [
+            (Defect::Section(SectionDefect::ColumnWidthMissing), col),
+            (Defect::Section(SectionDefect::ColumnCountMismatch), cols),
+        ]
+    );
+    // An unmodified repaired section still round-trips its authored bytes.
+    assert_eq!(section.to_xml_bytes().unwrap(), xml.as_bytes());
+
+    for (num, expected) in [("0", 1), ("60", 45), ("two", 1)] {
+        let xml = format!(r#"<w:sectPr xmlns:w="{W}"><w:cols w:num="{num}"/></w:sectPr>"#);
+        let cols = xml.find("<w:cols").unwrap() as u64;
+        let mut section = Section::from_xml_bytes(xml.into_bytes()).unwrap();
+        assert_eq!(section.columns().unwrap().unwrap().count, expected);
+        assert_eq!(
+            defects(&mut section),
+            [(Defect::Section(SectionDefect::ColumnCountOutOfRange), cols)]
+        );
+    }
+
+    // Unequal columns without any w:col fall back to equal widths.
+    let xml = format!(r#"<w:sectPr xmlns:w="{W}"><w:cols w:equalWidth="0" w:num="2"/></w:sectPr>"#);
+    let mut section = Section::from_xml_bytes(xml.into_bytes()).unwrap();
+    let columns = section.columns().unwrap().unwrap();
+    assert!(columns.equal_width);
+    assert_eq!(columns.count, 2);
+
+    // Conformant columns record nothing; out-of-domain measurements and
+    // writes stay strict.
+    let mut conformant = Section::from_xml_bytes(
+        format!(r#"<w:sectPr xmlns:w="{W}"><w:cols w:num="2" w:space="720"/></w:sectPr>"#)
+            .into_bytes(),
+    )
+    .unwrap();
+    assert!(conformant.tolerance_report().unwrap().is_clean());
+    let mut huge = Section::from_xml_bytes(
+        format!(r#"<w:sectPr xmlns:w="{W}"><w:cols w:space="99999999"/></w:sectPr>"#).into_bytes(),
+    )
+    .unwrap();
+    assert!(huge.columns().is_err());
+    assert!(
+        conformant
+            .set_columns(Some(Columns {
+                count: 0,
+                ..Columns::default()
+            }))
+            .is_err()
+    );
+}

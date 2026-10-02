@@ -600,7 +600,23 @@ impl Section {
         Ok(self.snapshot_mut()?.state.start)
     }
 
+    /// Everything repaired while this section's properties were decoded, in
+    /// discovery order; see [`crate::leniency::SectionDefect`]. Contexts are
+    /// byte offsets within [`Self::xml_bytes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the section properties cannot be decoded.
+    pub fn tolerance_report(&mut self) -> Result<crate::leniency::ToleranceReport> {
+        Ok(self.snapshot_mut()?.tolerance.clone())
+    }
+
     /// Return local columns, if a `w:cols` child exists.
+    ///
+    /// A column model Word lays out despite schema deviations (a `w:col`
+    /// without `w:w`, an out-of-range `w:num`, or unequal columns that
+    /// disagree with `w:num`) is repaired and recorded in
+    /// [`Self::tolerance_report`] instead of failing.
     ///
     /// # Errors
     ///

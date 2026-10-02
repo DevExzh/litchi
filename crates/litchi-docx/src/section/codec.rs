@@ -42,6 +42,7 @@ use super::model::{
 };
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
+use crate::leniency::{SectionDefect, ToleranceReport};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::coordinate::{Coordinate, Unit};
@@ -61,6 +62,9 @@ pub(crate) struct Snapshot {
     pub(crate) raw: Raw,
     pub(crate) state: State,
     dirty: Dirty,
+    /// Repairs applied while decoding `raw`, with contexts relative to the
+    /// section XML. See [`SectionDefect`].
+    pub(crate) tolerance: ToleranceReport,
 }
 
 impl Snapshot {
@@ -135,11 +139,13 @@ pub(crate) fn validate(xml: &[u8]) -> Result<()> {
 /// semantic state.
 pub(crate) fn decode(xml: &[u8]) -> Result<Snapshot> {
     let raw = parse_raw(xml)?;
-    let state = decode_state(&raw)?;
+    let mut tolerance = ToleranceReport::default();
+    let state = decode_state(&raw, &mut tolerance)?;
     Ok(Snapshot {
         raw,
         state,
         dirty: Dirty::default(),
+        tolerance,
     })
 }
 
@@ -966,11 +972,18 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
     })
 }
 
-fn decode_state(raw: &Raw) -> Result<State> {
+fn decode_state(raw: &Raw, tolerance: &mut ToleranceReport) -> Result<State> {
     let mut state = State::default();
     let mut seen = [false; 21];
     let mut last_rank = None;
+    // `Raw` is lossless: the section XML is the prefix, the root start tag,
+    // and the children in order, so each child's offset is the running sum.
+    let mut offset = raw.prefix.len().saturating_add(raw.root_open.len());
     for node in &raw.children {
+        let child_offset = offset;
+        offset = offset.saturating_add(match node {
+            Node::Element { raw, .. } | Node::Raw(raw) => raw.len(),
+        });
         let Node::Element {
             local_name,
             raw: child,
@@ -1020,7 +1033,7 @@ fn decode_state(raw: &Raw) -> Result<State> {
                 if state.columns.is_some() {
                     return Err(Error::InvalidFormat("duplicate section columns".into()));
                 }
-                state.columns = Some(parse_columns(raw, child)?);
+                state.columns = Some(parse_columns(raw, child, child_offset, tolerance)?);
             },
             "headerReference" => state.headers.push(parse_reference(raw, child)?),
             "footerReference" => state.footers.push(parse_reference(raw, child)?),
@@ -1102,34 +1115,72 @@ fn parse_margins(raw: &Raw, xml: &[u8]) -> Result<Margins> {
     })
 }
 
-fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
+/// Decode `w:cols`, degrading the column model the way Word and LibreOffice
+/// lay it out instead of failing the section (see [`SectionDefect`]).
+/// `offset` is the byte offset of the `w:cols` start tag in the section XML.
+fn parse_columns(
+    raw: &Raw,
+    xml: &[u8],
+    offset: usize,
+    tolerance: &mut ToleranceReport,
+) -> Result<Columns> {
     let attrs = attributes(raw, xml, AttributeFamily::Word)?;
+    let cols_context = offset as u64;
+    let count = match attr(&attrs, "num") {
+        None => 1,
+        // ST_DecimalNumber has no 1..=45 bound; Word lays out at most 45
+        // columns and at least one.
+        Some(value) => match value.trim().parse::<i64>() {
+            Ok(count @ 1..=45) => count as u16,
+            Ok(count) => {
+                tolerance.record(SectionDefect::ColumnCountOutOfRange, cols_context);
+                count.clamp(1, 45) as u16
+            },
+            Err(_) => {
+                tolerance.record(SectionDefect::ColumnCountOutOfRange, cols_context);
+                1
+            },
+        },
+    };
     let mut columns = Columns {
         equal_width: attr(&attrs, "equalWidth")
             .is_none_or(|value| value != "0" && value != "false"),
-        count: attr(&attrs, "num")
-            .map(|value| {
-                value.parse::<u16>().map_err(|_source_error| {
-                    Error::InvalidFormat("invalid section column count".into())
-                })
-            })
-            .transpose()?
-            .unwrap_or(1),
+        count,
         space: parse_attr_measurement(&attrs, "space", false, false)?,
         separator: attr(&attrs, "sep").is_some_and(|value| value == "1" || value == "true"),
         columns: Vec::new(),
     };
-    for (name, child) in direct_children(xml)? {
+    for (name, child, child_offset) in direct_children(xml)? {
         if name != "col" {
             continue;
         }
         let attrs = attributes(raw, &child, AttributeFamily::Word)?;
-        let width = parse_attr_measurement(&attrs, "w", false, false)?
-            .ok_or_else(|| Error::InvalidFormat("section column omits required width".into()))?;
+        // CT_Col declares `w` optional; LibreOffice's SectionColumnHandler
+        // starts every column at width 0 and keeps it when `w` is absent.
+        let width = match parse_attr_measurement(&attrs, "w", false, false)? {
+            Some(width) => width,
+            None => {
+                tolerance.record(
+                    SectionDefect::ColumnWidthMissing,
+                    offset.saturating_add(child_offset) as u64,
+                );
+                Emu(0)
+            },
+        };
         columns.columns.push(Column {
             width,
             space: parse_attr_measurement(&attrs, "space", false, false)?,
         });
+    }
+    if !columns.equal_width && usize::from(columns.count) != columns.columns.len() {
+        // Unequal columns whose `w:col` list disagrees with `w:num`: the
+        // explicit columns define the layout when there are 1..=45 of them,
+        // otherwise the section falls back to equal-width columns.
+        tolerance.record(SectionDefect::ColumnCountMismatch, cols_context);
+        match u16::try_from(columns.columns.len()) {
+            Ok(count @ 1..=45) => columns.count = count,
+            _ => columns.equal_width = true,
+        }
     }
     validate_columns(&columns)?;
     Ok(columns)
@@ -1278,7 +1329,9 @@ pub(crate) fn parse_universal_twips(value: &str, description: &str) -> Result<i6
     Ok(twips as i64)
 }
 
-fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
+/// The root's direct child elements: local name, raw bytes, and the byte
+/// offset of the child within `xml`.
+fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>, usize)>> {
     let mut reader = Reader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -1327,6 +1380,7 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
                     output.push((
                         String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
                         raw.to_vec(),
+                        event_start,
                     ));
                 }
             },
@@ -1343,7 +1397,7 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
                             "section child XML range is outside the fragment".into(),
                         )
                     })?;
-                    output.push((name, raw.to_vec()));
+                    output.push((name, raw.to_vec(), start));
                 }
             },
             Event::Eof => break,

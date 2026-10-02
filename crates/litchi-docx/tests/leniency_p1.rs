@@ -540,3 +540,65 @@ fn complete_numpr_records_nothing() {
     assert_eq!(document.list_items().expect("list items").len(), 1);
     assert!(document.tolerance_report().is_clean());
 }
+
+// ---------------------------------------------------------------------------
+// F2.7 — section column without w:w / column-model validation
+// ---------------------------------------------------------------------------
+
+#[test]
+fn sparse_section_columns_are_repaired_and_recorded_in_the_inventory() {
+    use litchi_docx::SectionDefect;
+    let document = format!(
+        r#"<?xml version="1.0"?><w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:cols w:num="2" w:equalWidth="0"><w:col w:space="720"/><w:col w:w="4000"/></w:cols></w:sectPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr><w:cols w:num="99"/></w:sectPr></w:body></w:document>"#
+    );
+    let missing_width = offset_of(&document, r#"<w:col w:space="720"/>"#);
+    let out_of_range = offset_of(&document, r#"<w:cols w:num="99"/>"#);
+    let package = open(&package_bytes(&document, &[]));
+    let opened = package.document().expect("document");
+
+    let inventory = opened
+        .section_inventory()
+        .expect("a sparse w:col no longer kills the section inventory");
+    assert_eq!(inventory.sections().len(), 2);
+    let first = inventory.sections()[0].columns().expect("first columns");
+    assert_eq!(first.columns[0].width, litchi_docx::Emu(0));
+    assert_eq!(inventory.sections()[1].columns().expect("final").count, 45);
+    let recorded = [
+        ToleratedDefect {
+            defect: Defect::Section(SectionDefect::ColumnWidthMissing),
+            context: missing_width,
+        },
+        ToleratedDefect {
+            defect: Defect::Section(SectionDefect::ColumnCountOutOfRange),
+            context: out_of_range,
+        },
+    ];
+    assert_eq!(inventory.tolerance_report().defects(), &recorded);
+    assert_eq!(opened.tolerance_report().defects(), &recorded);
+
+    // The section model reports the same repairs per section.
+    let mut sections = opened.sections().expect("sections");
+    let section = sections.get_mut(0).expect("first section");
+    assert_eq!(
+        section
+            .columns()
+            .expect("columns")
+            .expect("present")
+            .columns[0]
+            .width,
+        litchi_docx::Emu(0)
+    );
+    assert_eq!(section.tolerance_report().expect("report").total(), 1);
+}
+
+#[test]
+fn conformant_section_columns_record_nothing() {
+    let document = format!(
+        r#"<?xml version="1.0"?><w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>one</w:t></w:r></w:p><w:sectPr><w:cols w:num="2" w:equalWidth="0"><w:col w:w="4000" w:space="720"/><w:col w:w="4000"/></w:cols></w:sectPr></w:body></w:document>"#
+    );
+    let package = open(&package_bytes(&document, &[]));
+    let opened = package.document().expect("document");
+    let inventory = opened.section_inventory().expect("inventory");
+    assert!(inventory.tolerance_report().is_clean());
+    assert!(opened.tolerance_report().is_clean());
+}

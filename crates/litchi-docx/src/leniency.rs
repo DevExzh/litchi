@@ -332,6 +332,53 @@ impl RevisionDefect {
     }
 }
 
+/// The class of section-layout (`w:sectPr`) defect the reader repairs the
+/// way Word and LibreOffice lay it out.
+///
+/// This enumeration is closed by design. Each repair degrades only the
+/// column model of one section instead of failing that section's semantic
+/// decode — and with it [`Section::columns`](crate::Section::columns), the
+/// section inventory, and the layout snapshot. Each is recorded on the
+/// decoded section ([`Section::tolerance_report`](crate::Section::tolerance_report),
+/// context: byte offset within that section's `w:sectPr` XML) and on the
+/// section inventory ([`section::Inventory::tolerance_report`](crate::section::Inventory::tolerance_report),
+/// context: byte offset within the visible main-document XML), which
+/// [`Document::section_inventory`](crate::Document::section_inventory) merges
+/// into the document-level report. Out-of-domain measurements and the
+/// section resource limits stay hard errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SectionDefect {
+    /// A `w:col` has no `w:w`. ECMA-376 `CT_Col` declares the width
+    /// optional; LibreOffice's `SectionColumnHandler` starts each column at
+    /// width 0 and keeps it, and Word computes the layout. The column is kept
+    /// with width 0.
+    ColumnWidthMissing,
+    /// `w:cols/@w:num` is not an integer in `1..=45` (`ST_DecimalNumber` has
+    /// no bound, but Word lays out 1 to 45 columns). The count is clamped to
+    /// that range, or 1 when it is not a number.
+    ColumnCountOutOfRange,
+    /// Unequal-width columns whose `w:col` list does not match `w:num`. The
+    /// explicit columns define the layout (their count replaces `w:num`) when
+    /// there are 1 to 45 of them; otherwise the section uses equal-width
+    /// columns.
+    ColumnCountMismatch,
+}
+
+impl SectionDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ColumnWidthMissing => "kept the column with width 0",
+            Self::ColumnCountOutOfRange => "clamped the column count to 1..=45",
+            Self::ColumnCountMismatch => {
+                "took the column count from the explicit columns (or used equal widths)"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -349,6 +396,8 @@ pub enum Defect {
     Numbering(NumberingDefect),
     /// A tracked-revision metadata defect repaired the way Word repairs it.
     Revision(RevisionDefect),
+    /// A section column-model defect repaired the way Word lays it out.
+    Section(SectionDefect),
 }
 
 impl Defect {
@@ -360,6 +409,7 @@ impl Defect {
             Self::Settings(defect) => defect.repair(),
             Self::Numbering(defect) => defect.repair(),
             Self::Revision(defect) => defect.repair(),
+            Self::Section(defect) => defect.repair(),
         }
     }
 }
@@ -385,6 +435,12 @@ impl From<NumberingDefect> for Defect {
 impl From<RevisionDefect> for Defect {
     fn from(defect: RevisionDefect) -> Self {
         Self::Revision(defect)
+    }
+}
+
+impl From<SectionDefect> for Defect {
+    fn from(defect: SectionDefect) -> Self {
+        Self::Section(defect)
     }
 }
 
@@ -457,8 +513,14 @@ impl ToleranceReport {
     /// The stored-entry bound applies to the merged report as a whole; entries
     /// that no longer fit join the unrecorded count.
     pub(crate) fn append(&mut self, other: &ToleranceReport) {
+        self.append_mapped(other, |context| context);
+    }
+
+    /// Merge another report whose contexts are relative to a different
+    /// origin, translating each context with `map`.
+    pub(crate) fn append_mapped(&mut self, other: &ToleranceReport, map: impl Fn(u64) -> u64) {
         for tolerated in other.defects() {
-            self.record(tolerated.defect, tolerated.context);
+            self.record(tolerated.defect, map(tolerated.context));
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
     }
@@ -571,6 +633,9 @@ mod tests {
             Defect::from(RevisionDefect::InvalidDate),
             Defect::from(RevisionDefect::InvalidDateUtc),
             Defect::from(RevisionDefect::NonIntegerId),
+            Defect::from(SectionDefect::ColumnWidthMissing),
+            Defect::from(SectionDefect::ColumnCountOutOfRange),
+            Defect::from(SectionDefect::ColumnCountMismatch),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

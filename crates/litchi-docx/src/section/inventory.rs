@@ -304,6 +304,7 @@ pub struct Inventory {
     sections: Arc<[Descriptor]>,
     paragraph_count: usize,
     sources: Arc<[Option<SourceSpan>]>,
+    tolerance: Arc<crate::leniency::ToleranceReport>,
 }
 
 /// The private source range for one locally authored main-story `w:sectPr`.
@@ -338,6 +339,14 @@ impl Inventory {
     /// Parse a main-document XML payload with caller-provided limits.
     pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Self> {
         parse_inventory(xml, limits)
+    }
+
+    /// Everything repaired while the sections were decoded, in discovery
+    /// order; see [`crate::leniency::SectionDefect`]. Contexts are byte
+    /// offsets within the main-document XML the inventory was parsed from.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
     }
 
     /// Logical sections in source order.
@@ -627,6 +636,7 @@ struct ScanState {
     next_section_start: usize,
     reference_bytes: usize,
     body_final: bool,
+    tolerance: crate::leniency::ToleranceReport,
 }
 
 fn parse_inventory(xml: &[u8], limits: &Limits) -> Result<Inventory> {
@@ -673,6 +683,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
         next_section_start: 0,
         reference_bytes: 0,
         body_final: false,
+        tolerance: crate::leniency::ToleranceReport::default(),
     };
 
     loop {
@@ -888,6 +899,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
         sections: Arc::from(state.sections.into_boxed_slice()),
         paragraph_count: state.paragraphs,
         sources: Arc::from(state.sources.into_boxed_slice()),
+        tolerance: Arc::new(state.tolerance),
     })
 }
 
@@ -1131,8 +1143,17 @@ fn append_section(
     let relationship_bindings = capture.relationship_bindings.clone();
     let namespace_bindings = capture.root_namespace_bindings.clone();
     let fragment = self_contained_fragment(source, &namespace_bindings, limits.max_section_bytes)?;
+    // The fragment only gains namespace declarations inside its root start
+    // tag, so every child sits `inserted` bytes later than in the source.
+    let inserted = fragment.len().saturating_sub(source.len()) as u64;
     let mut section = Section::from_xml_bytes(fragment)?;
     let semantic = section.local_state()?;
+    let section_start = capture.start as u64;
+    state
+        .tolerance
+        .append_mapped(&section.tolerance_report()?, |context| {
+            section_start.saturating_add(context.saturating_sub(inserted))
+        });
     let added_reference_bytes = semantic
         .headers
         .iter()

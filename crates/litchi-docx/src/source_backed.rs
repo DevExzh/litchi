@@ -974,6 +974,15 @@ impl Package {
             .into());
         }
         self.package.check_execution()?;
+        if let Ok(snapshot) = &snapshot {
+            let repaired = snapshot.inventory().tolerance_report();
+            if !repaired.is_clean() {
+                self.tolerance
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .append(repaired);
+            }
+        }
         snapshot
     }
 
@@ -3106,14 +3115,26 @@ impl Document {
     /// its clones) was read, in discovery order.
     ///
     /// Tracked-revision repairs ([`crate::leniency::RevisionDefect`]) from
-    /// [`Self::revisions`] are recorded here; an empty report means every
-    /// read conformed.
+    /// [`Self::revisions`] and section column-model repairs
+    /// ([`crate::leniency::SectionDefect`]) from the section inventory are
+    /// recorded here; an empty report means every read conformed.
     #[must_use]
     pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
         self.tolerance
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
+    }
+
+    /// Merge one read's repairs into this view's report.
+    fn merge_tolerance(&self, repaired: &crate::leniency::ToleranceReport) {
+        if repaired.is_clean() {
+            return;
+        }
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .append(repaired);
     }
 
     /// Borrow the bounded paragraph offsets for this pinned view.
@@ -3216,12 +3237,7 @@ impl Document {
             limits,
             &mut repaired,
         );
-        if !repaired.is_clean() {
-            self.tolerance
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .append(&repaired);
-        }
+        self.merge_tolerance(&repaired);
         self.check_execution()?;
         result
     }
@@ -3355,6 +3371,7 @@ impl Document {
         self.check_execution()?;
         ensure_source_section_inventory_xml(self.xml.as_bytes(), limits)?;
         let inventory = crate::section::Inventory::parse_with_limits(self.xml.as_bytes(), limits)?;
+        self.merge_tolerance(inventory.tolerance_report());
         self.check_execution()?;
         Ok(inventory)
     }
@@ -3376,6 +3393,7 @@ impl Document {
             self.source_version,
             limits,
         )?;
+        self.merge_tolerance(snapshot.inventory().tolerance_report());
         self.check_execution()?;
         Ok(snapshot)
     }

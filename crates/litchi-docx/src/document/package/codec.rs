@@ -61,11 +61,17 @@ impl<'a> Document<'a> {
     }
 
     /// Capture the section inventory with caller-provided semantic limits.
+    ///
+    /// Column-model repairs ([`crate::leniency::SectionDefect`]) carried by
+    /// the inventory are merged into [`Document::tolerance_report`].
     pub fn section_inventory_with_limits(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Inventory> {
-        crate::section::Inventory::parse_with_limits(self.part.xml_bytes(), limits)
+        let inventory =
+            crate::section::Inventory::parse_with_limits(self.part.xml_bytes(), limits)?;
+        self.merge_tolerance(inventory.tolerance_report());
+        Ok(inventory)
     }
 
     /// Get the document styles.
