@@ -158,10 +158,11 @@ impl Presentation {
     /// presentation, in discovery order.
     ///
     /// This is the open-time aggregate: the record tree, `UserEdit`/persist
-    /// chain, and slide directory are parsed at open, and none of them repairs
-    /// anything yet, so the report is clean for every presentation that
-    /// opens. Text-style repairs ([`crate::TextPropDefect`]) fire while shapes
-    /// are lazily parsed; they are reported per slide by
+    /// chain, and slide directory are parsed at open, and the slide-list
+    /// repairs ([`crate::SlideListDefect`]) made there are listed here.
+    /// Text-style and shape repairs ([`crate::TextPropDefect`],
+    /// [`crate::ShapeDefect`]) fire while shapes are lazily parsed; they are
+    /// reported per slide by
     /// [`Slide::tolerance_report`] and for the whole presentation by
     /// [`Self::collect_tolerance_report`].
     #[must_use]

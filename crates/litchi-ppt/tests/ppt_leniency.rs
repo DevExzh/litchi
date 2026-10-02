@@ -20,8 +20,8 @@ use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
 use litchi_ppt::writer::Writer;
 use litchi_ppt::writer::text_format::Paragraph;
 use litchi_ppt::{
-    Defect, DefectLocation, Package, Presentation, Shape as _, ShapeDefect, SourceBackedPackage,
-    TextPropDefect, ToleranceReport, ToleratedDefect,
+    Defect, DefectLocation, Package, Presentation, Shape as _, ShapeDefect, SlideListDefect,
+    SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -147,7 +147,7 @@ struct Read {
 }
 
 fn read(presentation: &Presentation) -> Read {
-    // Open-time parses repair nothing in this crate yet.
+    // The text-box fixtures carry no open-time defect.
     assert!(presentation.tolerance_report().is_clean());
 
     let slides = presentation.slides().unwrap();
@@ -663,4 +663,202 @@ fn corpus_presentations_report_nothing() {
         );
     }
     assert!(opened >= 20, "only {opened} corpus files opened");
+}
+
+// ---------------------------------------------------------------------------
+// Open-time slide-list and persist-chain repairs (F5.4-F5.7).
+// ---------------------------------------------------------------------------
+
+/// `SlidePersistAtom` record header: version/instance 0, type 1011, 20 bytes.
+const SLIDE_PERSIST_ATOM_HEADER: [u8; 8] = [0x00, 0x00, 0xF3, 0x03, 0x14, 0, 0, 0];
+
+/// A writer-built deck of `count` titled slides with the persist and slide
+/// IDs the control reads back.
+struct Deck {
+    bytes: Vec<u8>,
+    /// `(persist_id, slide_id)` per slide, in presentation order.
+    slides: Vec<(u32, u32)>,
+}
+
+impl Deck {
+    fn new(count: usize) -> Self {
+        let mut writer = Writer::new();
+        for index in 0..count {
+            let slide = writer.add_slide().unwrap();
+            writer
+                .add_rich_textbox(
+                    slide,
+                    10,
+                    10,
+                    200,
+                    40,
+                    vec![Paragraph::new(format!("slide {index}"))],
+                )
+                .unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let bytes = output.into_inner();
+        let mut slides = Vec::new();
+        for presentation in open_both(&bytes) {
+            assert!(presentation.tolerance_report().is_clean());
+            assert!(presentation.collect_tolerance_report().unwrap().is_clean());
+            slides = presentation
+                .slides()
+                .unwrap()
+                .iter()
+                .map(|slide| (slide.persist_id(), slide.slide_id()))
+                .collect();
+        }
+        assert_eq!(slides.len(), count);
+        Self { bytes, slides }
+    }
+
+    /// Payload offset of the presentation `SlidePersistAtom` of `slide`.
+    fn slide_persist_atom(&self, slide: usize) -> usize {
+        let (persist_id, slide_id) = self.slides[slide];
+        let offsets: Vec<usize> = self
+            .bytes
+            .windows(SLIDE_PERSIST_ATOM_HEADER.len() + 16)
+            .enumerate()
+            .filter(|(_, window)| {
+                window.starts_with(&SLIDE_PERSIST_ATOM_HEADER)
+                    && window[8..12] == persist_id.to_le_bytes()
+                    && window[20..24] == slide_id.to_le_bytes()
+            })
+            .map(|(offset, _)| offset + SLIDE_PERSIST_ATOM_HEADER.len())
+            .collect();
+        assert_eq!(offsets.len(), 1, "SlidePersistAtom of slide {slide}");
+        offsets[0]
+    }
+
+    fn patch_u32(mut self, at: usize, value: u32) -> Self {
+        self.bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
+        self
+    }
+
+    fn patch_u16(mut self, at: usize, value: u16) -> Self {
+        self.bytes[at..at + 2].copy_from_slice(&value.to_le_bytes());
+        self
+    }
+
+    /// Open through both default paths; each must open, list
+    /// `expected_slides` (indexes into the control's slides), and report
+    /// exactly `expected` at open time.
+    fn assert_opens(&self, expected_slides: &[usize], expected: &[ToleratedDefect]) {
+        for presentation in open_both(&self.bytes) {
+            let slides: Vec<_> = presentation
+                .slides()
+                .unwrap()
+                .iter()
+                .map(|slide| (slide.persist_id(), slide.slide_id()))
+                .collect();
+            let wanted: Vec<_> = expected_slides
+                .iter()
+                .map(|&index| self.slides[index])
+                .collect();
+            assert_eq!(slides, wanted);
+            assert_eq!(presentation.tolerance_report().defects(), expected);
+            assert_eq!(presentation.tolerance_report().unrecorded(), 0);
+            // Reading every remaining slide repairs nothing further.
+            assert_eq!(
+                presentation.collect_tolerance_report().unwrap().defects(),
+                expected
+            );
+        }
+    }
+}
+
+fn open_time(defect: impl Into<Defect>, context: u32, persist_id: Option<u32>) -> ToleratedDefect {
+    ToleratedDefect {
+        defect: defect.into(),
+        context,
+        location: DefectLocation {
+            persist_id,
+            shape_id: None,
+        },
+    }
+}
+
+#[test]
+fn duplicate_slide_id_keeps_the_first_entry_and_is_recorded() {
+    let deck = Deck::new(3);
+    let (_, first_slide) = deck.slides[0];
+    let (second_persist, _) = deck.slides[1];
+    let at = deck.slide_persist_atom(1);
+    let deck = deck.patch_u32(at + 12, first_slide);
+    deck.assert_opens(
+        &[0, 2],
+        &[open_time(
+            SlideListDefect::DuplicateSlideId,
+            first_slide,
+            Some(second_persist),
+        )],
+    );
+}
+
+#[test]
+fn duplicate_slide_persist_ref_keeps_the_first_entry_and_is_recorded() {
+    let deck = Deck::new(3);
+    let (first_persist, _) = deck.slides[0];
+    let (_, third_slide) = deck.slides[2];
+    let at = deck.slide_persist_atom(2);
+    let deck = deck.patch_u32(at, first_persist);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(
+            SlideListDefect::DuplicateSlidePersistRef,
+            third_slide,
+            Some(first_persist),
+        )],
+    );
+}
+
+#[test]
+fn null_slide_id_drops_the_entry_and_is_recorded() {
+    let deck = Deck::new(2);
+    let (persist_id, _) = deck.slides[0];
+    let at = deck.slide_persist_atom(0);
+    let deck = deck.patch_u32(at + 12, 0);
+    deck.assert_opens(
+        &[1],
+        &[open_time(
+            SlideListDefect::NullSlideReference,
+            0,
+            Some(persist_id),
+        )],
+    );
+}
+
+#[test]
+fn excessive_text_placeholder_count_is_clamped_and_recorded() {
+    let deck = Deck::new(2);
+    let (persist_id, _) = deck.slides[1];
+    let at = deck.slide_persist_atom(1);
+    let deck = deck.patch_u32(at + 8, 12);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(
+            SlideListDefect::TextPlaceholderCount,
+            12,
+            Some(persist_id),
+        )],
+    );
+}
+
+#[test]
+fn nonconforming_slide_persist_atom_header_is_read_by_offset_and_recorded() {
+    let deck = Deck::new(2);
+    let (persist_id, _) = deck.slides[0];
+    let at = deck.slide_persist_atom(0);
+    // recInstance 2 on the first slide's atom.
+    let deck = deck.patch_u16(at - 8, 0x0020);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(
+            SlideListDefect::SlidePersistAtomHeader,
+            20,
+            Some(persist_id),
+        )],
+    );
 }

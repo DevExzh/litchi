@@ -60,6 +60,12 @@
 //!   duplicated `TextRulerAtom` or round-trip shape atom keeps its first
 //!   occurrence, and an undefined round-trip placeholder ID reads as absent.
 //!   A shape whose host-record framing is broken still fails the slide.
+//! - **F5.4** ([`SlideListDefect`]) — the slide directory degrades per
+//!   entry instead of failing the open: a nonconforming `SlidePersistAtom`
+//!   header is read by field offset (POI/LibreOffice), a truncated atom or a
+//!   null `persistIdRef`/`slideId` drops that entry, a repeated `slideId` or
+//!   `persistIdRef` keeps the first entry, and `cTexts` above 8 clamps to 8.
+//!   These are open-time repairs.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
@@ -80,10 +86,10 @@
 //!   triggered the parse.
 //! - `shapes_with_report` appends that cached report to a caller-owned one,
 //!   on every call, so one report can be threaded across many slides.
-//! - [`crate::Presentation::tolerance_report`] is the open-time aggregate.
-//!   No open-time parse repairs anything yet (the record tree, persist chain,
-//!   and slide directory take `&mut ToleranceReport` when findings
-//!   F5.4–F5.10 land), so it is clean for every presentation that opens.
+//! - [`crate::Presentation::tolerance_report`] is the open-time aggregate:
+//!   the repairs made while the slide directory was built
+//!   ([`SlideListDefect`]). The open path threads one `&mut ToleranceReport`
+//!   through each open-time parse that repairs anything.
 //! - [`crate::Presentation::collect_tolerance_report`] returns the open-time
 //!   aggregate plus the repairs of every slide's and notes page's shapes —
 //!   the one-call answer to "what did the reader change about this file?".
@@ -311,11 +317,87 @@ impl ShapeDefect {
     }
 }
 
+/// The class of presentation slide-list defect the reader repairs the way
+/// LibreOffice and POI repair it (findings F5.4 and F5.5).
+///
+/// These repairs happen while the presentation is opened, so they are
+/// recorded in [`crate::Presentation::tolerance_report`]. Each entry's
+/// [`DefectLocation::persist_id`] is the offending `SlidePersistAtom`'s
+/// `persistIdRef` (when it could be read); the context is documented per
+/// variant. Every repair is applied under every [`Leniency`] variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SlideListDefect {
+    /// A presentation `SlidePersistAtom`'s record header deviated from
+    /// recVer 0 / recInstance 0 / recLen 0x14, but the atom still holds the
+    /// four fields the reader uses; they are read by offset, as POI
+    /// (`SlidePersistAtom.java`) and LibreOffice (`svdfppt.cxx`) read them
+    /// (finding F5.4). The context is the atom's payload length.
+    SlidePersistAtomHeader,
+    /// A presentation `SlidePersistAtom` was too short to hold
+    /// `persistIdRef`, `cTexts`, and `slideId`; the entry and its text
+    /// records are dropped (finding F5.4). The context is the atom's payload
+    /// length.
+    TruncatedSlidePersistAtom,
+    /// A presentation `SlidePersistAtom` had a null `persistIdRef` or
+    /// `slideId`; the entry and its text records are dropped, as LibreOffice
+    /// skips entries whose persist reference is unusable (finding F5.4). The
+    /// context is the `slideId`.
+    NullSlideReference,
+    /// A presentation `SlidePersistAtom`'s `cTexts` exceeded 8; it is clamped
+    /// to 8 and the slide kept (finding F5.4). POI and LibreOffice never
+    /// consult the count. The context is the raw `cTexts`.
+    TextPlaceholderCount,
+    /// A presentation `SlidePersistAtom` repeated an earlier entry's
+    /// `slideId`; the first entry wins and the duplicate is dropped with its
+    /// text records (finding F5.4). The context is the `slideId`.
+    DuplicateSlideId,
+    /// A presentation `SlidePersistAtom` repeated an earlier entry's
+    /// `persistIdRef`; the first entry wins and the duplicate is dropped
+    /// with its text records (finding F5.4). The context is the `slideId`.
+    DuplicateSlidePersistRef,
+    /// A presentation `SlidePersistAtom` referenced a persist ID that the
+    /// live persist directory does not map, or that maps outside the
+    /// document stream or to a record other than a `SlideContainer`; the
+    /// slide is skipped, as LibreOffice skips it (`svdfppt.cxx`) (finding
+    /// F5.5). Incrementally saved files carry such stale references. The
+    /// context is the `slideId`.
+    StaleSlidePersistRef,
+}
+
+impl SlideListDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::SlidePersistAtomHeader => {
+                "read a SlidePersistAtom with a nonconforming record header by field offset"
+            },
+            Self::TruncatedSlidePersistAtom => {
+                "dropped a truncated SlidePersistAtom and its slide-list text"
+            },
+            Self::NullSlideReference => {
+                "dropped a slide-list entry with a null persistIdRef or slideId"
+            },
+            Self::TextPlaceholderCount => "clamped a SlidePersistAtom cTexts above 8 to 8",
+            Self::DuplicateSlideId => {
+                "kept the first slide-list entry for a repeated slideId and dropped the duplicate"
+            },
+            Self::DuplicateSlidePersistRef => {
+                "kept the first slide-list entry for a repeated persistIdRef and dropped the duplicate"
+            },
+            Self::StaleSlidePersistRef => {
+                "skipped a slide whose persist reference does not resolve to a SlideContainer"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a presentation was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of
-/// what a read may change about a presentation. [`Defect::TextProp`] and
-/// [`Defect::Shape`] classes are repaired under every [`Leniency`] variant; opt-in classes join this
+/// what a read may change about a presentation. Every class listed today is
+/// repaired under every [`Leniency`] variant; opt-in classes join this
 /// enumeration together with the [`Leniency`] variants that gate them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -324,6 +406,9 @@ pub enum Defect {
     TextProp(TextPropDefect),
     /// An `OfficeArt` shape defect repaired the way `PowerPoint` repairs it.
     Shape(ShapeDefect),
+    /// A slide-list defect repaired at open time the way LibreOffice
+    /// repairs it.
+    SlideList(SlideListDefect),
 }
 
 impl Defect {
@@ -333,6 +418,7 @@ impl Defect {
         match self {
             Self::TextProp(defect) => defect.repair(),
             Self::Shape(defect) => defect.repair(),
+            Self::SlideList(defect) => defect.repair(),
         }
     }
 }
@@ -340,6 +426,12 @@ impl Defect {
 impl From<TextPropDefect> for Defect {
     fn from(defect: TextPropDefect) -> Self {
         Self::TextProp(defect)
+    }
+}
+
+impl From<SlideListDefect> for Defect {
+    fn from(defect: SlideListDefect) -> Self {
+        Self::SlideList(defect)
     }
 }
 
@@ -671,6 +763,13 @@ mod tests {
             Defect::from(TextPropDefect::UnknownTabType),
             Defect::from(TextPropDefect::IndentLevelOutOfRange),
             Defect::from(TextPropDefect::InvalidColorIndex),
+            Defect::from(SlideListDefect::SlidePersistAtomHeader),
+            Defect::from(SlideListDefect::TruncatedSlidePersistAtom),
+            Defect::from(SlideListDefect::NullSlideReference),
+            Defect::from(SlideListDefect::TextPlaceholderCount),
+            Defect::from(SlideListDefect::DuplicateSlideId),
+            Defect::from(SlideListDefect::DuplicateSlidePersistRef),
+            Defect::from(SlideListDefect::StaleSlidePersistRef),
             Defect::from(ShapeDefect::UnreadableShape),
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),

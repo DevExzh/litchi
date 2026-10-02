@@ -91,10 +91,8 @@ impl Presentation {
         // anyway, so the record tree borrows its payloads from it.
         //
         // `tolerance` is the open-time aggregation point for repaired
-        // non-structural defects (see `crate::leniency`): the record-tree,
-        // persist-mapping, and slide-directory parses below take
-        // `&mut tolerance` when their leniency-roadmap findings land.
-        let tolerance = crate::leniency::ToleranceReport::default();
+        // non-structural defects (see `crate::leniency`).
+        let mut tolerance = crate::leniency::ToleranceReport::default();
         let powerpoint_document = Arc::new(powerpoint_document);
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]
@@ -136,6 +134,7 @@ impl Presentation {
             current_user_bytes,
             &persist_mapping,
             record_limits,
+            &mut tolerance,
         )?;
 
         // Try to read Pictures stream for image extraction
@@ -249,10 +248,8 @@ impl Presentation {
         }
 
         // `tolerance` is the open-time aggregation point for repaired
-        // non-structural defects (see `crate::leniency`): the record-tree,
-        // persist-mapping, and slide-directory parses below take
-        // `&mut tolerance` when their leniency-roadmap findings land.
-        let tolerance = crate::leniency::ToleranceReport::default();
+        // non-structural defects (see `crate::leniency`).
+        let mut tolerance = crate::leniency::ToleranceReport::default();
         let powerpoint_document = Arc::new(powerpoint_document);
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]
@@ -294,6 +291,7 @@ impl Presentation {
             current_user_bytes,
             &persist_mapping,
             record_limits,
+            &mut tolerance,
         )?;
 
         #[cfg(feature = "encryption")]

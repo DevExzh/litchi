@@ -264,7 +264,8 @@ pub use hyperlink::{
 };
 pub use kinsoku::{BaseKinsokuSettings, Kinsoku, KinsokuLanguage, KinsokuLevel, KinsokuSettings9};
 pub use leniency::{
-    Defect, DefectLocation, Leniency, ShapeDefect, TextPropDefect, ToleranceReport, ToleratedDefect,
+    Defect, DefectLocation, Leniency, ShapeDefect, SlideListDefect, TextPropDefect,
+    ToleranceReport, ToleratedDefect,
 };
 pub use main_master::{
     ContentMasterInfo, MainMasterMetadata12, MainMasterTextStyles, MainMasterTextStylesSource,

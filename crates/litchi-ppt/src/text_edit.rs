@@ -1400,11 +1400,14 @@ fn resolve_source_target_owned(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mapping = crate::embedded::object::Editor::inspect_live_mapping(&document, &current_user)?;
+    // The edit path resolves slides exactly as the read path does, applying
+    // the same slide-list repairs without enumerating them.
     let directory = crate::slide::SlideDirectory::build_with_limits(
         &document,
         &current_user,
         &mapping,
         limits,
+        &mut crate::leniency::ToleranceReport::default(),
     )?;
     // The writer emits a valid no-macro VBAInfo sentinel in the live
     // DocumentContainer. Inspect only this structural record tree; do not

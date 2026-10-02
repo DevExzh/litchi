@@ -2,6 +2,7 @@
 
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
+use crate::leniency::{DefectLocation, SlideListDefect, ToleranceReport};
 use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
 use crate::records::Record;
@@ -88,14 +89,18 @@ impl SlideDirectory {
             current_user_data,
             persist_mapping,
             RecordLimits::default(),
+            &mut ToleranceReport::default(),
         )
     }
 
+    /// Build the directory, repairing non-structural slide-list defects
+    /// into `report` (findings F5.4 and F5.5; see [`SlideListDefect`]).
     pub(crate) fn build_with_limits(
         document_data: &[u8],
         current_user_data: &[u8],
         persist_mapping: &PersistMapping,
         limits: RecordLimits,
+        report: &mut ToleranceReport,
     ) -> Result<Self> {
         if document_data.len() > limits.max_input_bytes {
             return Err(Error::ResourceLimit(format!(
@@ -190,9 +195,16 @@ impl SlideDirectory {
             by_persist_id
                 .try_reserve(slide_list_container.children.len())
                 .map_err(|_err| Error::AllocationFailed("PPT slide persist index"))?;
+            // The entry index each SlidePersistAtom produced, in order;
+            // `None` for a dropped entry, whose text records are skipped.
+            let mut atom_entries: Vec<Option<usize>> = Vec::new();
+            atom_entries
+                .try_reserve(slide_list_container.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT slide directory"))?;
+            let mut current = None;
             for child in &slide_list_container.children {
                 if child.record_type != RecordType::SlidePersistAtom {
-                    if let Some(entry) = entries.last_mut()
+                    if let Some(entry) = current.and_then(|index: usize| entries.get_mut(index))
                         && let Ok(value) = child.extract_text()
                         && !value.is_empty()
                     {
@@ -203,79 +215,30 @@ impl SlideDirectory {
                     }
                     continue;
                 }
-                if child.version != 0
-                    || child.instance != 0
-                    || child.data.len() != SLIDE_PERSIST_ATOM_SIZE
-                {
-                    return Err(Error::Corrupted(format!(
-                        "invalid SlidePersistAtom header or length: version={}, instance={}, length={}",
-                        child.version,
-                        child.instance,
-                        child.data.len()
-                    )));
-                }
-                let persist_id = read_u32(&child.data, 0, "SlidePersistAtom.persistIdRef")?;
-                let flags = read_u32(&child.data, 4, "SlidePersistAtom flags")?;
-                let text_placeholder_count = read_u32(&child.data, 8, "SlidePersistAtom.cTexts")?;
-                let slide_id = read_u32(&child.data, 12, "SlidePersistAtom.slideId")?;
-                if persist_id == 0 || slide_id == 0 {
-                    return Err(Error::Corrupted(
-                        "SlidePersistAtom has a null persistIdRef or slideId".to_string(),
-                    ));
-                }
-                if text_placeholder_count > 8 {
-                    return Err(Error::Corrupted(format!(
-                        "SlidePersistAtom cTexts exceeds 8: {text_placeholder_count}"
-                    )));
-                }
-                if by_slide_id.contains_key(&slide_id) {
-                    return Err(Error::Corrupted(format!(
-                        "duplicate presentation slideId {slide_id}"
-                    )));
-                }
-                if by_persist_id.contains_key(&persist_id) {
-                    return Err(Error::Corrupted(format!(
-                        "duplicate presentation persistIdRef {persist_id}"
-                    )));
-                }
-                let slide_offset = persist_mapping.get_offset(persist_id).ok_or_else(|| {
-                    Error::Corrupted(format!(
-                        "slide persist ID {persist_id} has no directory entry"
-                    ))
-                })?;
-                let slide_offset_usize = usize::try_from(slide_offset).map_err(|_err| {
-                    Error::Corrupted("slide persist offset does not fit usize".to_string())
-                })?;
-                let slide_header =
-                    read_header(document_data, slide_offset_usize, "SlideContainer")?;
-                if slide_header.record_type != SLIDE_CONTAINER
-                    || slide_header.version != 0x0f
-                    || slide_header.instance != 0
-                {
-                    return Err(Error::Corrupted(format!(
-                        "persist ID {persist_id} does not resolve to a SlideContainer"
-                    )));
-                }
-                let index = entries.len();
-                entries.push(SlideDirectoryEntry {
-                    persist_id,
-                    slide_id,
-                    flags,
-                    text_placeholder_count,
-                    list_text: String::new(),
-                    outline_text_interactions: Vec::new(),
-                    outline_text_refs: Vec::new(),
+                current = directory_entry(
+                    child,
+                    document_data,
+                    persist_mapping,
+                    &by_slide_id,
+                    &by_persist_id,
+                    report,
+                )?
+                .map(|entry| {
+                    let index = entries.len();
+                    by_slide_id.insert(entry.slide_id, index);
+                    by_persist_id.insert(entry.persist_id, index);
+                    entries.push(entry);
+                    index
                 });
-                by_slide_id.insert(slide_id, index);
-                by_persist_id.insert(persist_id, index);
+                atom_entries.push(current);
             }
-            for set in slide_list_container.group_into_slide_atoms_sets() {
-                let slide_id =
-                    read_u32(&set.slide_persist_atom.data, 12, "SlidePersistAtom.slideId")?;
-                let Some(&index) = by_slide_id.get(&slide_id) else {
-                    return Err(Error::Corrupted(format!(
-                        "text records reference unknown slideId {slide_id}"
-                    )));
+            for (set, index) in slide_list_container
+                .group_into_slide_atoms_sets()
+                .into_iter()
+                .zip(atom_entries)
+            {
+                let Some(index) = index else {
+                    continue;
                 };
                 entries[index].outline_text_interactions = set.text_interactions()?;
                 entries[index].outline_text_refs = set.outline_text_refs()?;
@@ -339,6 +302,114 @@ impl SlideDirectory {
             by_persist_id: HashMap::new(),
         }
     }
+}
+
+/// Decode one presentation `SlidePersistAtom` into a directory entry,
+/// repairing non-structural defects into `report`.
+///
+/// Returns `Ok(None)` for an entry that is dropped (findings F5.4 and F5.5);
+/// a slide record whose own framing overruns the document stream stays an
+/// error.
+fn directory_entry(
+    atom: &Record,
+    document_data: &[u8],
+    persist_mapping: &PersistMapping,
+    by_slide_id: &HashMap<u32, usize>,
+    by_persist_id: &HashMap<u32, usize>,
+    report: &mut ToleranceReport,
+) -> Result<Option<SlideDirectoryEntry>> {
+    let length = u32::try_from(atom.data.len()).unwrap_or(u32::MAX);
+    // POI and LibreOffice read the fields by offset without validating the
+    // header; persistIdRef, flags, cTexts, and slideId need 16 bytes.
+    if atom.data.len() < 16 {
+        report.record(SlideListDefect::TruncatedSlidePersistAtom, length);
+        return Ok(None);
+    }
+    let persist_id = read_u32(&atom.data, 0, "SlidePersistAtom.persistIdRef")?;
+    let flags = read_u32(&atom.data, 4, "SlidePersistAtom flags")?;
+    let text_placeholder_count = read_u32(&atom.data, 8, "SlidePersistAtom.cTexts")?;
+    let slide_id = read_u32(&atom.data, 12, "SlidePersistAtom.slideId")?;
+    let location = DefectLocation {
+        persist_id: (persist_id != 0).then_some(persist_id),
+        shape_id: None,
+    };
+    if atom.version != 0 || atom.instance != 0 || atom.data.len() != SLIDE_PERSIST_ATOM_SIZE {
+        report.record_at(SlideListDefect::SlidePersistAtomHeader, length, location);
+    }
+    if persist_id == 0 || slide_id == 0 {
+        report.record_at(SlideListDefect::NullSlideReference, slide_id, location);
+        return Ok(None);
+    }
+    if by_slide_id.contains_key(&slide_id) {
+        report.record_at(SlideListDefect::DuplicateSlideId, slide_id, location);
+        return Ok(None);
+    }
+    if by_persist_id.contains_key(&persist_id) {
+        report.record_at(
+            SlideListDefect::DuplicateSlidePersistRef,
+            slide_id,
+            location,
+        );
+        return Ok(None);
+    }
+    if !resolves_to_slide(document_data, persist_mapping, persist_id)? {
+        return Err(Error::Corrupted(format!(
+            "persist ID {persist_id} does not resolve to a SlideContainer"
+        )));
+    }
+    let text_placeholder_count = if text_placeholder_count > 8 {
+        report.record_at(
+            SlideListDefect::TextPlaceholderCount,
+            text_placeholder_count,
+            location,
+        );
+        8
+    } else {
+        text_placeholder_count
+    };
+    Ok(Some(SlideDirectoryEntry {
+        persist_id,
+        slide_id,
+        flags,
+        text_placeholder_count,
+        list_text: String::new(),
+        outline_text_interactions: Vec::new(),
+        outline_text_refs: Vec::new(),
+    }))
+}
+
+/// Whether `persist_id` maps to a `SlideContainer` header inside the
+/// document stream.
+///
+/// A persist ID the live directory does not map, an offset whose record
+/// header lies outside the stream, or a header of another record type is a
+/// stale reference LibreOffice skips (finding F5.5). A `SlideContainer`
+/// header whose length overruns the stream is broken framing and stays an
+/// error.
+fn resolves_to_slide(
+    document_data: &[u8],
+    persist_mapping: &PersistMapping,
+    persist_id: u32,
+) -> Result<bool> {
+    let Some(offset) = persist_mapping
+        .get_offset(persist_id)
+        .and_then(|offset| usize::try_from(offset).ok())
+    else {
+        return Ok(false);
+    };
+    let Some(header) = offset
+        .checked_add(8)
+        .and_then(|end| document_data.get(offset..end))
+    else {
+        return Ok(false);
+    };
+    let version_instance = u16::from_le_bytes([header[0], header[1]]);
+    let record_type = u16::from_le_bytes([header[2], header[3]]);
+    if record_type != SLIDE_CONTAINER || version_instance != 0x000f {
+        return Ok(false);
+    }
+    read_header(document_data, offset, "SlideContainer")?;
+    Ok(true)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -495,15 +566,160 @@ mod tests {
         assert!(directory.get_by_persist_id(8).is_none());
     }
 
+    fn build_reporting(
+        stream: &[u8],
+        current_user: &[u8],
+        mapping: &PersistMapping,
+    ) -> (SlideDirectory, Vec<(crate::Defect, u32, Option<u32>)>) {
+        let mut report = ToleranceReport::default();
+        let directory = SlideDirectory::build_with_limits(
+            stream,
+            current_user,
+            mapping,
+            RecordLimits::default(),
+            &mut report,
+        )
+        .unwrap();
+        let defects = report
+            .defects()
+            .iter()
+            .map(|defect| (defect.defect, defect.context, defect.location.persist_id))
+            .collect();
+        (directory, defects)
+    }
+
+    fn persist_ids(directory: &SlideDirectory) -> Vec<u32> {
+        directory
+            .entries()
+            .iter()
+            .map(SlideDirectoryEntry::persist_id)
+            .collect()
+    }
+
+    /// One bad slide-list entry is dropped (or repaired) and recorded; the
+    /// rest of the directory still builds (F5.4).
     #[test]
-    fn rejects_duplicate_malformed_and_wrong_type_entries() {
+    fn repairs_duplicate_and_malformed_entries_per_entry() {
+        use crate::Defect;
+
         let (stream, current_user, mapping) =
-            synthetic_directory(&[(3, 256, 0), (4, 256, 0)], false);
-        assert!(SlideDirectory::build(&stream, &current_user, &mapping).is_err());
+            synthetic_directory(&[(3, 256, 0), (4, 256, 0), (5, 257, 0)], false);
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(persist_ids(&directory), [3, 5]);
+        assert_eq!(
+            defects,
+            [(
+                Defect::SlideList(SlideListDefect::DuplicateSlideId),
+                256,
+                Some(4)
+            )]
+        );
 
-        let (dup_stream, dup_user, dup_mapping) = synthetic_directory(&[(3, 256, 9)], false);
-        assert!(SlideDirectory::build(&dup_stream, &dup_user, &dup_mapping).is_err());
+        let (stream, current_user, mapping) =
+            synthetic_directory(&[(3, 256, 0), (3, 257, 0)], false);
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(persist_ids(&directory), [3]);
+        assert_eq!(
+            defects,
+            [(
+                Defect::SlideList(SlideListDefect::DuplicateSlidePersistRef),
+                257,
+                Some(3)
+            )]
+        );
 
+        let (stream, current_user, mapping) = synthetic_directory(&[(3, 256, 9)], false);
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(directory.entries()[0].text_placeholder_count(), 8);
+        assert_eq!(
+            defects,
+            [(
+                Defect::SlideList(SlideListDefect::TextPlaceholderCount),
+                9,
+                Some(3)
+            )]
+        );
+
+        let (stream, current_user, mapping) = synthetic_directory(&[(3, 0, 0), (4, 300, 0)], false);
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(persist_ids(&directory), [4]);
+        assert_eq!(
+            defects,
+            [(
+                Defect::SlideList(SlideListDefect::NullSlideReference),
+                0,
+                Some(3)
+            )]
+        );
+
+        // The conformant control repairs nothing.
+        let (stream, current_user, mapping) =
+            synthetic_directory(&[(3, 256, 8), (4, 257, 0)], false);
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(persist_ids(&directory), [3, 4]);
+        assert!(defects.is_empty());
+    }
+
+    /// A nonconforming SlidePersistAtom header is read by field offset when
+    /// the fields are present and dropped when they are not (F5.4).
+    #[test]
+    fn reads_nonconforming_slide_persist_atoms_by_offset() {
+        use crate::Defect;
+
+        let slide_list_data = [
+            // recInstance 1, 24-byte payload: read by offset.
+            record(0, 1, 0x03f3, &{
+                let mut data = slide_persist(3, 256, 0)[8..].to_vec();
+                data.extend_from_slice(&[0; 4]);
+                data
+            }),
+            // 12-byte payload: no slideId, dropped.
+            record(0, 0, 0x03f3, &slide_persist(4, 257, 0)[8..20]),
+            slide_persist(5, 258, 0),
+        ]
+        .concat();
+        let slide_list = record(0x0f, 0, 0x0ff0, &slide_list_data);
+        let mut stream = record(0x0f, 0, 0x03e8, &slide_list);
+        let mut mapping = PersistMapping::new();
+        mapping.add_mapping(1, 0);
+        for persist_id in [3, 4, 5] {
+            mapping.add_mapping(persist_id, u32::try_from(stream.len()).unwrap());
+            stream.extend_from_slice(&record(0x0f, 0, 0x03ee, &[]));
+        }
+        let edit_offset = u32::try_from(stream.len()).unwrap();
+        let mut edit = vec![0u8; 28];
+        edit[16..20].copy_from_slice(&1u32.to_le_bytes());
+        stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
+
+        let (directory, defects) = build_reporting(&stream, &current_user(edit_offset), &mapping);
+        assert_eq!(persist_ids(&directory), [3, 5]);
+        assert_eq!(
+            directory
+                .entries()
+                .iter()
+                .map(SlideDirectoryEntry::slide_id)
+                .collect::<Vec<_>>(),
+            [256, 258]
+        );
+        assert_eq!(
+            defects,
+            [
+                (
+                    Defect::SlideList(SlideListDefect::SlidePersistAtomHeader),
+                    24,
+                    Some(3)
+                ),
+                (
+                    Defect::SlideList(SlideListDefect::TruncatedSlidePersistAtom),
+                    12,
+                    None
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_entries_that_do_not_resolve_to_a_slide() {
         let (zero_stream, zero_user, mut zero_mapping) = synthetic_directory(&[(3, 256, 0)], false);
         zero_mapping.add_mapping(3, 0);
         assert!(SlideDirectory::build(&zero_stream, &zero_user, &zero_mapping).is_err());
