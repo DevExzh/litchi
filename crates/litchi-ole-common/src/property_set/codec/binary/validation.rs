@@ -18,7 +18,7 @@ use super::wire::{
     read_u16, read_u32, reserve_bytes,
 };
 use super::{Repairs, parse_typed_property, parse_typed_property_for_property};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{StringDefect, ToleranceReport};
 use litchi_cfb::OleError;
 use litchi_cfb::consts::VT_I2;
 use std::collections::HashMap;
@@ -591,8 +591,21 @@ fn parse_section(
             let Value::I2(signed) = value else {
                 return Err(invalid("PID 1 must contain a VT_I2 codepage"));
             };
-            let codepage = CodePage::try_from(u16::from_ne_bytes(signed.to_ne_bytes()))?;
-            (Some(codepage), Some(Value::I2(signed)))
+            let page = u16::from_ne_bytes(signed.to_ne_bytes());
+            match CodePage::new(page) {
+                Some(codepage) => (Some(codepage), Some(Value::I2(signed))),
+                None => {
+                    // MS-OLEPS 2.18 allows any Windows code page here, and
+                    // Java/Linux producers write e.g. 28591 for Latin-1.
+                    // Like LibreOffice (SfxOleTextEncoding::SetCodePage keeps
+                    // its default on an unknown page), decode with the
+                    // default used when PID 1 is absent, Windows-1252; the
+                    // unrepresentable PID 1 is dropped from the model and
+                    // the fallback recorded (leniency audit F7.9).
+                    tolerance.record(StringDefect::UnsupportedCodePage, u32::from(page));
+                    (None, None)
+                },
+            }
         },
         None => (None, None),
     };
@@ -639,7 +652,13 @@ fn parse_section(
         properties.insert(*identifier, value);
     }
     let mut property_order = try_vec_with_capacity(descriptors.len(), "property order")?;
-    property_order.extend(descriptors.iter().map(|(_, identifier)| *identifier));
+    property_order.extend(
+        descriptors
+            .iter()
+            .map(|(_, identifier)| *identifier)
+            // A PID 1 dropped by the code-page fallback has no value.
+            .filter(|identifier| *identifier != PID_CODEPAGE || codepage.is_some()),
+    );
     let section = Section {
         format_identifier,
         codepage,

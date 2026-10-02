@@ -105,9 +105,11 @@ pub enum StringDefect {
     MissingTerminator,
     /// PID 1 named a code page outside the supported table (F7.9).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation. The
-    /// repair falls back to Windows-1252, the default when PID 1 is absent.
-    /// The context is the stored code-page identifier.
+    /// The section's strings are decoded as Windows-1252, the default when
+    /// PID 1 is absent (LibreOffice likewise keeps its default encoding for
+    /// an unknown page). The unrepresentable PID 1 is dropped from the
+    /// parsed section, so the property-set editor refuses to rewrite such a
+    /// stream. The context is the stored code-page identifier.
     UnsupportedCodePage,
 }
 

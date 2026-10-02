@@ -173,3 +173,36 @@ fn malformed_mbcs_and_utf16_strings_decode_lossily_and_are_recorded() {
         .update(Binding::SummaryInformation, |_| Ok(()))
         .unwrap();
 }
+
+// --- F7.9: PID 1 code page outside the supported table ---
+
+#[test]
+fn unsupported_codepage_falls_back_to_windows_1252_and_is_recorded() {
+    let clean = summary_stream(&[codepage_property(1252), (PID_TITLE, lpstr(b"Caf\xe9\0"))]);
+    let parsed = Stream::parse(&clean).unwrap();
+    assert!(parsed.tolerance_report().is_clean());
+
+    for page in [28591u16, 20127, 437] {
+        let faulted = summary_stream(&[codepage_property(page), (PID_TITLE, lpstr(b"Caf\xe9\0"))]);
+        let parsed = Stream::parse(&faulted).unwrap();
+        assert_eq!(
+            recorded(parsed.tolerance_report()),
+            [(StringDefect::UnsupportedCodePage.into(), u32::from(page))],
+            "code page {page}"
+        );
+        let section = section_of(&parsed);
+        assert_eq!(section.page(), None);
+        assert_eq!(section.property(1), None);
+        assert_eq!(
+            section.property(PID_TITLE),
+            Some(&Value::Lpstr("Caf\u{e9}".into()))
+        );
+
+        let mut editor = Editor::new(compound_file(&faulted)).unwrap();
+        assert!(
+            editor
+                .update(Binding::SummaryInformation, |_| Ok(()))
+                .is_err()
+        );
+    }
+}
