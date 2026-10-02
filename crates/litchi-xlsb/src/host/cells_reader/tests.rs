@@ -50,7 +50,8 @@ fn propagates_opaque_formula_status_through_cells_reader() {
     let expected_rgce = formula.rgce.clone();
     let context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
-    let mut reader = CellsReader::new(iter, &[], &context, 1).unwrap();
+    let mut reader =
+        CellsReader::new(iter, &[], &context, 1, crate::leniency::Leniency::Strict).unwrap();
 
     let cell = reader.next_cell().unwrap().unwrap();
     assert_eq!(
@@ -69,7 +70,8 @@ fn propagates_missing_group_definition_as_structural_error() {
     let formula = ParsedFormula::exp(0, 0).unwrap();
     let context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
-    let mut reader = CellsReader::new(iter, &[], &context, 1).unwrap();
+    let mut reader =
+        CellsReader::new(iter, &[], &context, 1, crate::leniency::Leniency::Strict).unwrap();
 
     assert!(matches!(reader.next_cell(), Err(Error::InvalidFormula(_))));
 }
@@ -181,7 +183,14 @@ fn parses_iso_sheet_protection_metadata_and_matching_flags() {
     writer.write_record(kind::END_SHEET, &[]).unwrap();
     let formula_context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(worksheet));
-    let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &formula_context,
+        1,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
     assert!(reader.next_cell().unwrap().is_none());
     assert_eq!(reader.sheet_protection.unwrap(), protection);
     assert_eq!(reader.strong_sheet_protection.unwrap(), strong);
@@ -192,7 +201,14 @@ fn reads_inline_rich_string_cells() {
     let bytes = rich_string_worksheet();
     let formula_context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(bytes));
-    let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &formula_context,
+        1,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
 
     let cell = reader.next_cell().unwrap().unwrap();
     assert_eq!(cell.row(), 4);
@@ -246,7 +262,14 @@ fn rejects_a_validation_collection_with_a_mismatched_count() {
 
     let formula_context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(worksheet));
-    let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &formula_context,
+        1,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
     assert!(matches!(
         reader.next_cell(),
         Err(Error::Unrecognized { .. })
@@ -272,7 +295,14 @@ fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
 
     let formula_context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(worksheet));
-    let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &formula_context,
+        1,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
     assert!(matches!(
         reader.next_cell(),
         Err(Error::Unrecognized { .. })
@@ -400,7 +430,14 @@ fn reads_office_2013_conditional_formatting_visualizations() {
 
     let formula_context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(worksheet));
-    let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &formula_context,
+        1,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
     assert!(reader.next_cell().unwrap().is_none());
     let parsed = &reader.conditional_formattings[0];
     assert_eq!(parsed.record_kind, RecordKind::Extension14);
@@ -453,6 +490,13 @@ fn rejects_incomplete_color_scale_collection() {
 
     let formula_context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(worksheet));
-    let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &formula_context,
+        1,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
     assert!(reader.next_cell().is_err());
 }

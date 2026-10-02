@@ -66,6 +66,7 @@ fn empty_workbook() -> Workbook {
         drawing_load_policy: super::model::DrawingLoadPolicy::Eager,
         connections: None,
         tolerance: crate::leniency::ToleranceReport::default(),
+        leniency: crate::leniency::Leniency::Strict,
     }
 }
 
@@ -254,6 +255,7 @@ fn parse_external_link_with_relationship_type(
         drawing_load_policy: super::model::DrawingLoadPolicy::Eager,
         connections: None,
         tolerance: crate::leniency::ToleranceReport::default(),
+        leniency: crate::leniency::Leniency::Strict,
     };
     let mut budget = ExternalLinkLimits::default().budget();
     workbook.load_external_book_with_budget(&uri, &mut budget)
@@ -1195,6 +1197,7 @@ fn reads_external_book_metadata_from_local_fixture() {
         drawing_load_policy: super::model::DrawingLoadPolicy::Eager,
         connections: None,
         tolerance: crate::leniency::ToleranceReport::default(),
+        leniency: crate::leniency::Leniency::Strict,
     };
     let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
     let mut budget = ExternalLinkLimits::default().budget();
@@ -1603,6 +1606,7 @@ fn workbook_projection(workbook: &Workbook) -> String {
         drawing_load_policy,
         connections,
         tolerance,
+        leniency,
     } = workbook;
     let package = package_digest(package).join("\n  ");
     let styles = styles_projection(styles);
@@ -1615,7 +1619,7 @@ fn workbook_projection(workbook: &Workbook) -> String {
          pivot_cache_definitions={pivot_cache_definitions:?}\n\
          structured_tables={structured_tables:?}\nchart_sheets={chart_sheets:?}\n\
          sheet_drawings={sheet_drawings:?}\ndrawing_load_policy={drawing_load_policy:?}\n\
-         connections={connections:?}\ntolerance={tolerance:?}"
+         connections={connections:?}\ntolerance={tolerance:?}\nleniency={leniency:?}"
     )
 }
 

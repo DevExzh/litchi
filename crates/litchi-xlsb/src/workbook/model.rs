@@ -54,6 +54,8 @@ pub struct Workbook {
     pub(super) connections: Option<crate::package::connections::Connections>,
     /// Repairs applied while the workbook-scope parts were parsed at open.
     pub(super) tolerance: crate::leniency::ToleranceReport,
+    /// Opt-in repair policy applied to lazily parsed worksheet content.
+    pub(super) leniency: crate::leniency::Leniency,
 }
 
 impl std::fmt::Debug for Workbook {
@@ -81,6 +83,12 @@ impl Workbook {
     #[must_use]
     pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
         &self.tolerance
+    }
+
+    /// The [`Leniency`](crate::Leniency) this workbook was opened with.
+    #[must_use]
+    pub const fn leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
     }
 
     /// Consume the workbook and keep only its open-time repair report.

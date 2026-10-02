@@ -18,7 +18,7 @@ use once_cell::sync::OnceCell;
 
 use super::model::Workbook;
 use crate::external_link::{ExternalLinkLimits, Link};
-use crate::leniency::{Tolerance, ToleranceReport};
+use crate::leniency::{Leniency, Tolerance, ToleranceReport};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Definition, ExternalBook};
 use crate::package::shared_strings::SharedString;
@@ -99,6 +99,8 @@ struct SourceInner {
     /// Workbook-scope repairs: the workbook stream at open, then each lazily
     /// parsed workbook-scope part once its semantic cache is initialized.
     tolerance: Mutex<ToleranceReport>,
+    /// Opt-in repair policy applied to lazily read worksheet content.
+    leniency: Leniency,
 }
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
@@ -173,7 +175,7 @@ impl SourceBackedIndexedWorksheet {
                     payload,
                     self.limits.raw,
                     row,
-                    &mut Tolerance::recording(&mut report),
+                    &mut Tolerance::recording_with(&mut report, self.inner.leniency),
                 )?;
                 // Every lookup that performs a repair records it.
                 self.inner.lock_tolerance().append(&report);
@@ -412,10 +414,51 @@ impl SourceBackedWorkbook {
         )
     }
 
+    /// Open an XLSB package from a sequential reader with the default bounded
+    /// policies under an explicit [`Leniency`].
+    ///
+    /// The Excel-compatible repairs are applied under every variant; see
+    /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
+    /// repairs non-normal cached numbers read by worksheet materialization
+    /// (recorded on the [`Worksheet`]) and by indexed lookups (recorded in
+    /// [`Self::tolerance_report`]).
+    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
+        Self::from_source_backed_package_with_leniency(
+            SourceBackedPackage::from_reader_with_limits(reader, ReadLimits::default())?,
+            leniency,
+        )
+    }
+
+    /// Open with the default bounded OPC read and cache policies under an
+    /// explicit [`Leniency`]; see [`Self::from_reader_with_leniency`].
+    pub fn from_read_at_with_leniency(source: Arc<dyn ReadAt>, leniency: Leniency) -> Result<Self> {
+        Self::from_source_backed_package_with_leniency(
+            SourceBackedPackage::from_read_at(source)?,
+            leniency,
+        )
+    }
+
+    /// Build a lazy XLSB catalog under an explicit [`Leniency`]; see
+    /// [`Self::from_reader_with_leniency`].
+    pub fn from_source_backed_package_with_leniency(
+        package: SourceBackedPackage,
+        leniency: Leniency,
+    ) -> Result<Self> {
+        Self::build(package, ExternalLinkLimits::default(), leniency)
+    }
+
     /// Build a lazy XLSB catalog with explicit external-link semantic limits.
     pub fn from_source_backed_package_with_external_link_limits(
         package: SourceBackedPackage,
         external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::build(package, external_link_limits, Leniency::Strict)
+    }
+
+    fn build(
+        package: SourceBackedPackage,
+        external_link_limits: ExternalLinkLimits,
+        leniency: Leniency,
     ) -> Result<Self> {
         let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
@@ -671,6 +714,7 @@ impl SourceBackedWorkbook {
                 tables: SemanticCache::new(),
                 external_books: SemanticCache::new(),
                 tolerance: Mutex::new(tolerance),
+                leniency,
             }),
         })
     }
@@ -1225,6 +1269,7 @@ impl SourceBackedWorksheet {
             &formula_context,
             metadata.workbook_position,
             styles.cell_xfs.len(),
+            self.inner.leniency,
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
             worksheet_data.as_bytes(),

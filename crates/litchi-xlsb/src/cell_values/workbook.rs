@@ -36,9 +36,19 @@ pub fn read_with_limits(
     worksheet: &PackURI,
     limits: Limits,
 ) -> Result<Snapshot> {
+    read_with_limits_and_leniency(package, worksheet, limits, crate::Leniency::Strict)
+}
+
+/// Read editable cell values under an explicit [`crate::Leniency`].
+pub(crate) fn read_with_limits_and_leniency(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    limits: Limits,
+    leniency: crate::Leniency,
+) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
-    super::worksheet::read_with_limits(part.blob(), limits)
+    super::worksheet::read_with_limits_and_leniency(part.blob(), limits, leniency)
 }
 
 /// Apply one source-checked cell-value commit atomically to an OPC package.

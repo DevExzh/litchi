@@ -77,6 +77,7 @@ impl Workbook {
             &self.formula_context,
             catalog_position,
             self.styles.cell_xfs.len(),
+            self.leniency,
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
         worksheet.set_slicers(
@@ -203,6 +204,7 @@ impl Workbook {
         formula_context: &Context,
         sheet_index: usize,
         cell_xf_count: usize,
+        leniency: crate::leniency::Leniency,
     ) -> Result<Worksheet> {
         let mut worksheet = Worksheet::new(name);
         let iter = crate::package::records::Stream::new(cursor);
@@ -212,6 +214,7 @@ impl Workbook {
             shared_strings,
             &formula_context,
             cell_xf_count,
+            leniency,
         )?;
 
         // Read all cells

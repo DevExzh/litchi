@@ -5,7 +5,7 @@
 
 //! Source-bound worksheet-cell snapshots and structural edits.
 
-use crate::leniency::{ReservedFieldDefect, Tolerance, ToleranceReport};
+use crate::leniency::{CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport};
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
 use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
@@ -580,6 +580,7 @@ pub struct Snapshot {
     entries: Vec<Entry>,
     limits: Limits,
     tolerance: ToleranceReport,
+    leniency: Leniency,
 }
 
 impl Snapshot {
@@ -653,6 +654,7 @@ impl Snapshot {
             inserted: BTreeMap::new(),
             removed: BTreeSet::new(),
             limits: self.limits,
+            leniency: self.leniency,
         }
     }
 
@@ -723,6 +725,7 @@ pub struct Edit {
     inserted: BTreeMap<Reference, StoredCell>,
     removed: BTreeSet<Reference>,
     limits: Limits,
+    leniency: Leniency,
 }
 
 impl Edit {
@@ -1077,7 +1080,7 @@ impl Edit {
         } else {
             Arc::clone(&self.source)
         };
-        let snapshot = read_shared(Arc::clone(&after), self.limits)?;
+        let snapshot = read_shared(Arc::clone(&after), self.limits, self.leniency)?;
         let changes = semantic_changes(&self.entries, &self.inserted, &self.removed, &snapshot)?;
         Ok(Commit {
             snapshot,
@@ -1571,11 +1574,21 @@ pub(super) fn read(data: &[u8]) -> Result<Snapshot> {
 }
 
 /// Read one complete worksheet stream with an explicit finite policy.
+#[cfg(test)]
 pub(super) fn read_with_limits(data: &[u8], limits: Limits) -> Result<Snapshot> {
-    read_shared(Arc::from(data), limits)
+    read_shared(Arc::from(data), limits, Leniency::Strict)
 }
 
-fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
+/// Read one complete worksheet stream under an explicit [`Leniency`].
+pub(super) fn read_with_limits_and_leniency(
+    data: &[u8],
+    limits: Limits,
+    leniency: Leniency,
+) -> Result<Snapshot> {
+    read_shared(Arc::from(data), limits, leniency)
+}
+
+fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<Snapshot> {
     limits.validate()?;
     if source.len() > limits.source_bytes {
         return Err(Error::InvalidLength {
@@ -1648,8 +1661,12 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
                         cell_kind_name(cell_kind)
                     ))
                 })?;
-                let entry =
-                    parse_entry(&record, row, limits, Tolerance::recording(&mut tolerance))?;
+                let entry = parse_entry(
+                    &record,
+                    row,
+                    limits,
+                    Tolerance::recording_with(&mut tolerance, leniency),
+                )?;
                 entries
                     .try_reserve(1)
                     .map_err(|allocation_error| Error::Allocation {
@@ -1671,6 +1688,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
         entries,
         limits,
         tolerance,
+        leniency,
     })
 }
 
@@ -1751,8 +1769,13 @@ fn parse_value(
         kind::CELL_REAL => {
             require_exact(payload, 16)?;
             let value = binary::read_f64_le_at(payload, 8)?;
-            validate_xnum(value, "BrtCellReal")?;
-            Ok((Value::Number(value), None))
+            let value = match tolerance
+                .cached_number(value, kind_value, row, || xnum_error("BrtCellReal"))?
+            {
+                CachedNumber::Number(value) => Value::Number(value),
+                CachedNumber::NumError => Value::Error(CellError::Number),
+            };
+            Ok((value, None))
         },
         kind::CELL_ST => parse_string_value(kind_value, payload, limits, false, row, tolerance),
         kind::CELL_ISST => {
@@ -1770,9 +1793,14 @@ fn parse_value(
         kind::FMLA_NUM => {
             require_at_least(payload, 26)?;
             let value = binary::read_f64_le_at(payload, 8)?;
-            validate_xnum(value, "BrtFmlaNum cache")?;
+            let value = match tolerance
+                .cached_number(value, kind_value, row, || xnum_error("BrtFmlaNum cache"))?
+            {
+                CachedNumber::Number(value) => Value::FormulaNumberCache(value),
+                CachedNumber::NumError => Value::FormulaErrorCache(CellError::Number),
+            };
             Ok((
-                Value::FormulaNumberCache(value),
+                value,
                 Some(parse_formula(kind_value, payload, 16, row, tolerance)?),
             ))
         },
@@ -2035,10 +2063,14 @@ fn validate_xnum(value: f64, context: &'static str) -> Result<()> {
     if value.is_normal() || positive_zero {
         Ok(())
     } else {
-        Err(Error::UnsupportedFeature(format!(
-            "{context} must be a finite normalized IEEE-754 value or positive zero"
-        )))
+        Err(xnum_error(context))
     }
+}
+
+fn xnum_error(context: &'static str) -> Error {
+    Error::UnsupportedFeature(format!(
+        "{context} must be a finite normalized IEEE-754 value or positive zero"
+    ))
 }
 
 #[allow(
@@ -2668,8 +2700,8 @@ fn semantic_changes(
 }
 
 fn patch_from_images(before: Arc<[u8]>, after: Arc<[u8]>, limits: Limits) -> Result<Patch> {
-    let before_snapshot = read_shared(Arc::clone(&before), limits)?;
-    let after_snapshot = read_shared(Arc::clone(&after), limits)?;
+    let before_snapshot = read_shared(Arc::clone(&before), limits, Leniency::Strict)?;
+    let after_snapshot = read_shared(Arc::clone(&after), limits, Leniency::Strict)?;
     let changes = snapshot_changes(&before_snapshot, &after_snapshot)?;
     Ok(Patch {
         before,
@@ -2774,7 +2806,7 @@ fn merge_patch_changes(left: &Patch, right: &Patch) -> Result<MergeOutcome> {
             conflicts,
         });
     }
-    let base = read_shared(Arc::clone(&left.before), left.limits)?;
+    let base = read_shared(Arc::clone(&left.before), left.limits, Leniency::Strict)?;
     let mut edit = base.edit();
     for (reference, destination) in destinations {
         match destination {

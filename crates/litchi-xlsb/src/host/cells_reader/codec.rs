@@ -8,7 +8,7 @@
 use super::model::{CellsReader, Dimensions, ParsedFormulaCell};
 use crate::conditional_formatting::{Formatting, parse_classic_header};
 use crate::hyperlinks::Hyperlink;
-use crate::leniency::{ReservedFieldDefect, Tolerance, ToleranceReport};
+use crate::leniency::{CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport};
 use crate::merged_cells::MergedCell;
 use crate::package::cell::{Cell, CellHeader};
 use crate::package::data_validation::parse_collection_settings;
@@ -42,6 +42,7 @@ where
         shared_strings: &'a [SharedString],
         formula_context: &'a Context,
         cell_xf_count: usize,
+        leniency: Leniency,
     ) -> Result<Self> {
         let mut buf = Vec::with_capacity(1024);
 
@@ -115,6 +116,7 @@ where
             views,
             saw_web_extension_collection: false,
             tolerance,
+            leniency,
         })
     }
 
@@ -227,10 +229,11 @@ where
                     if self.buf.len() >= 16 => {
                         let header = required_cell_header(cell_header)?;
                         let value = binary::read_f64_le_at(&self.buf, 8)?;
+                        let value = self.cached_number(typ, value)?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
-                            CellValue::Float(value),
+                            value,
                         )));
                     },
                 kind::CELL_ST
@@ -305,8 +308,8 @@ where
                     }
                     let header = required_cell_header(cell_header)?;
                     let num_value = binary::read_f64_le_at(&self.buf, 8)?;
-                    let parsed =
-                        self.parse_formula_cell(typ, header, CellValue::Float(num_value), 16)?;
+                    let cached = self.cached_number(typ, num_value)?;
+                    let parsed = self.parse_formula_cell(typ, header, cached, 16)?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 kind::FMLA_BOOL => {
@@ -357,6 +360,26 @@ where
                 },
             }
         }
+    }
+
+    /// The value a cached `Xnum` reads as. This reader has always passed
+    /// cached numbers through verbatim; under
+    /// [`Leniency::TolerateCachedNumbers`] a non-normal value is instead
+    /// repaired the way Excel displays it and recorded.
+    fn cached_number(&mut self, record_type: Kind, value: f64) -> Result<CellValue> {
+        if !self.leniency.tolerates_cached_numbers() {
+            return Ok(CellValue::Float(value));
+        }
+        let row = self.current_row;
+        let mut tolerance = Tolerance::recording_with(&mut self.tolerance, self.leniency);
+        Ok(
+            match tolerance.cached_number(value, record_type, row, || {
+                Error::InvalidFormat("non-normal cached number".to_string())
+            })? {
+                CachedNumber::Number(value) => CellValue::Float(value),
+                CachedNumber::NumError => CellValue::Error("#NUM!".to_string()),
+            },
+        )
     }
 
     fn parse_formula_cell(

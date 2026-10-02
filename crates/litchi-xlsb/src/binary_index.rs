@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
+use crate::leniency::CachedNumber;
 use crate::package::error::{Error, Result};
 use crate::raw::{self, kind};
 
@@ -1058,8 +1059,14 @@ pub(crate) fn decode_cached_value(
                     .try_into()
                     .map_err(|_error| invalid("BrtCellReal value conversion"))?,
             );
-            validate_cached_number(value)?;
-            Ok(crate::cell_values::Value::Number(value))
+            Ok(
+                match tolerance.cached_number(value, kind_value, row, cached_number_error)? {
+                    CachedNumber::Number(value) => crate::cell_values::Value::Number(value),
+                    CachedNumber::NumError => {
+                        crate::cell_values::Value::Error(crate::cell_values::CellError::Number)
+                    },
+                },
+            )
         },
         kind::CELL_ST => {
             let mut cursor =
@@ -1098,8 +1105,16 @@ pub(crate) fn decode_cached_value(
                     .try_into()
                     .map_err(|_error| invalid("BrtFmlaNum value conversion"))?,
             );
-            validate_cached_number(value)?;
-            Ok(crate::cell_values::Value::FormulaNumberCache(value))
+            Ok(
+                match tolerance.cached_number(value, kind_value, row, cached_number_error)? {
+                    CachedNumber::Number(value) => {
+                        crate::cell_values::Value::FormulaNumberCache(value)
+                    },
+                    CachedNumber::NumError => crate::cell_values::Value::FormulaErrorCache(
+                        crate::cell_values::CellError::Number,
+                    ),
+                },
+            )
         },
         kind::FMLA_BOOL => {
             require_cached_at_least(payload, 19)?;
@@ -1143,6 +1158,10 @@ fn read_cached_bool(value: u8) -> Result<bool> {
         1 => Ok(true),
         _ => Err(invalid("cell Boolean value is neither zero nor one")),
     }
+}
+
+fn cached_number_error() -> Error {
+    invalid("Xnum requires a normalized number or positive zero")
 }
 
 fn validate_cached_number(value: f64) -> Result<()> {

@@ -28,14 +28,17 @@
 //! ([`SourceBackedIndexedWorksheet::cached_value`](crate::SourceBackedIndexedWorksheet::cached_value)).
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
-//! variants. None exists yet: the [`CachedNumberDefect`] class (MS-XLSB
-//! 2.5.153 `Xnum` caches that are NaN, infinite, denormalized, or negative
-//! zero) is enumerated so the contract is complete, and will be repaired only
-//! under a dedicated opt-in variant because a NaN cache has no unambiguous
-//! ground truth. Likewise [`ValueEncodingDefect`] enumerates the value-domain
-//! repairs (Boolean bytes, `BErr` codes, UTF-16, data-validation enums) that a
-//! later iteration will apply. A class whose repair has not landed is never
-//! recorded; the corresponding input is still a hard error.
+//! variants. [`Leniency::TolerateCachedNumbers`] repairs the
+//! [`CachedNumberDefect`] class (MS-XLSB 2.5.153 `Xnum` caches that are NaN,
+//! infinite, denormalized, or negative zero, audit finding F3.10): a NaN cache
+//! has no unambiguous ground truth, so the repair is never applied by
+//! default. Select it with [`Workbook::new_with_leniency`](crate::Workbook::new_with_leniency),
+//! [`Workbook::from_opc_package_with_leniency`](crate::Workbook::from_opc_package_with_leniency),
+//! or [`SourceBackedWorkbook::from_reader_with_leniency`](crate::SourceBackedWorkbook::from_reader_with_leniency).
+//! [`ValueEncodingDefect`] enumerates the value-domain repairs (Boolean
+//! bytes, `BErr` codes, UTF-16, data-validation enums). A class whose repair
+//! has not landed is never recorded; the corresponding input is still a hard
+//! error.
 //!
 //! **Structural corruption and security limits stay hard errors** under every
 //! variant: BIFF12 record framing (header varints, declared lengths, truncated
@@ -103,6 +106,27 @@ pub enum Leniency {
     /// is a hard error.
     #[default]
     Strict,
+    /// Also repair and record the cached-number defects listed by
+    /// [`CachedNumberDefect`] (audit finding F3.10).
+    ///
+    /// MS-XLSB 2.5.153 makes a finite, normalized `Xnum` a producer
+    /// obligation, but add-ins and RTD feeds cache NaN and infinities and
+    /// third-party writers serialize `f64` verbatim; Excel opens such files.
+    /// A NaN or infinite cache has no unambiguous ground truth, so this
+    /// repair is opt-in: the affected cell reads as the `#NUM!` error Excel
+    /// and LibreOffice display for a number they cannot represent, and a
+    /// denormalized or negative-zero cache reads as `0`, the value Excel
+    /// flushes it to. Every other cell keeps its value.
+    TolerateCachedNumbers,
+}
+
+impl Leniency {
+    /// Whether non-normal cached numbers are repaired rather than rejected.
+    #[inline]
+    #[must_use]
+    pub const fn tolerates_cached_numbers(self) -> bool {
+        matches!(self, Self::TolerateCachedNumbers)
+    }
 }
 
 /// A reserved or undefined bit field that carried a nonzero value.
@@ -236,29 +260,43 @@ impl LayoutDefect {
 
 /// A cached `Xnum` value outside the domain MS-XLSB 2.5.153 allows.
 ///
-/// Audit finding F3.10. This class is enumerated to complete the contract but
-/// is **not yet repaired**: such a value is still a hard error under every
-/// current [`Leniency`] variant, and will be repaired only behind a dedicated
-/// opt-in variant because a NaN or infinite cache has no unambiguous ground
-/// truth.
+/// Audit finding F3.10. These repairs are **opt-in**: they are applied only
+/// under [`Leniency::TolerateCachedNumbers`]; under [`Leniency::Strict`] the
+/// cell-value snapshot and the binary-index lookup reject such a value as
+/// before, while materialized worksheets keep passing the stored `f64`
+/// through verbatim as they always have. Under the opt-in all three read
+/// the documented substitute and record it. The recorded [`ToleratedDefect::observed`] value is the upper 32
+/// bits of the IEEE-754 bit pattern (sign, exponent, and high mantissa), and
+/// the location is the cell's zero-based row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum CachedNumberDefect {
-    /// A cell value or formula cache was NaN, infinite, denormalized, or
-    /// negative zero. The planned repair degrades that single cell.
-    NonNormalNumber,
+    /// A cell value or formula cache was NaN or infinite. The cell reads as
+    /// the `#NUM!` error (a formula keeps its formula with a `#NUM!` cache).
+    NonFinite,
+    /// A cell value or formula cache was denormalized or negative zero. The
+    /// cell reads as `0`.
+    Denormalized,
 }
 
 impl CachedNumberDefect {
-    /// A short, stable description of what the repair does.
+    /// A short, stable description of what the repair did.
     #[must_use]
     pub const fn repair(self) -> &'static str {
         match self {
-            Self::NonNormalNumber => {
-                "degraded a cell whose cached number is NaN, infinite, denormalized, or negative zero"
-            },
+            Self::NonFinite => "read a NaN or infinite cached number as the #NUM! error",
+            Self::Denormalized => "read a denormalized or negative-zero cached number as 0",
         }
     }
+}
+
+/// The value a cached number reads as after [`Tolerance::cached_number`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum CachedNumber {
+    /// A conformant number, or a denormalized one flushed to `0`.
+    Number(f64),
+    /// A NaN or infinite cache, read as `#NUM!`.
+    NumError,
 }
 
 /// A value-domain defect in an individual value (audit finding F3.12).
@@ -527,18 +565,29 @@ impl ToleranceReport {
 #[derive(Debug)]
 pub(crate) struct Tolerance<'a> {
     report: Option<&'a mut ToleranceReport>,
+    leniency: Leniency,
 }
 
 impl<'a> Tolerance<'a> {
     /// A channel that refuses every defect with the parser's original error.
     pub(crate) const fn refusing() -> Self {
-        Self { report: None }
+        Self {
+            report: None,
+            leniency: Leniency::Strict,
+        }
     }
 
-    /// A channel that repairs and records into `report`.
+    /// A channel that applies the default repairs and records into `report`.
     pub(crate) fn recording(report: &'a mut ToleranceReport) -> Self {
+        Self::recording_with(report, Leniency::Strict)
+    }
+
+    /// A channel that applies the default repairs plus the opt-in repairs
+    /// `leniency` selects, recording into `report`.
+    pub(crate) fn recording_with(report: &'a mut ToleranceReport, leniency: Leniency) -> Self {
         Self {
             report: Some(report),
+            leniency,
         }
     }
 
@@ -546,6 +595,36 @@ impl<'a> Tolerance<'a> {
     pub(crate) fn reborrow(&mut self) -> Tolerance<'_> {
         Tolerance {
             report: self.report.as_deref_mut(),
+            leniency: self.leniency,
+        }
+    }
+
+    /// Read a cached `Xnum`, applying the opt-in [`CachedNumberDefect`]
+    /// repair under [`Leniency::TolerateCachedNumbers`] and refusing a
+    /// non-normal value with `on_refusal()` otherwise.
+    pub(crate) fn cached_number<E>(
+        &mut self,
+        value: f64,
+        record_type: crate::raw::Kind,
+        row: u32,
+        on_refusal: impl FnOnce() -> E,
+    ) -> Result<CachedNumber, E> {
+        if value.is_normal() || value.to_bits() == 0 {
+            return Ok(CachedNumber::Number(value));
+        }
+        let Some(report) = self.report.as_deref_mut() else {
+            return Err(on_refusal());
+        };
+        if !self.leniency.tolerates_cached_numbers() {
+            return Err(on_refusal());
+        }
+        let observed = u32::try_from(value.to_bits() >> 32).unwrap_or(u32::MAX);
+        if value.is_finite() {
+            report.record(CachedNumberDefect::Denormalized, record_type, row, observed);
+            Ok(CachedNumber::Number(0.0))
+        } else {
+            report.record(CachedNumberDefect::NonFinite, record_type, row, observed);
+            Ok(CachedNumber::NumError)
         }
     }
 
@@ -795,6 +874,42 @@ mod tests {
     }
 
     #[test]
+    fn cached_numbers_are_repaired_only_under_the_opt_in() {
+        let mut report = ToleranceReport::default();
+        for value in [1.5, 0.0, -2.0e300] {
+            let mut tolerance = Tolerance::refusing();
+            assert_eq!(
+                tolerance.cached_number(value, kind::CELL_REAL, 0, || "strict"),
+                Ok(CachedNumber::Number(value))
+            );
+        }
+        assert_eq!(
+            Tolerance::recording(&mut report)
+                .cached_number(f64::NAN, kind::CELL_REAL, 0, || { "strict" }),
+            Err("strict")
+        );
+        assert!(report.is_clean());
+
+        let mut tolerance = Tolerance::recording_with(&mut report, Leniency::TolerateCachedNumbers);
+        assert_eq!(
+            tolerance.cached_number(f64::INFINITY, kind::CELL_REAL, 7, || "strict"),
+            Ok(CachedNumber::NumError)
+        );
+        assert_eq!(
+            tolerance
+                .reborrow()
+                .cached_number(-0.0, kind::FMLA_NUM, 8, || "strict"),
+            Ok(CachedNumber::Number(0.0))
+        );
+        assert_eq!(report.count(CachedNumberDefect::NonFinite), 1);
+        assert_eq!(report.count(CachedNumberDefect::Denormalized), 1);
+        assert_eq!(report.defects()[0].observed(), 0x7FF0_0000);
+        assert_eq!(report.defects()[1].observed(), 0x8000_0000);
+        assert!(Leniency::TolerateCachedNumbers.tolerates_cached_numbers());
+        assert!(!Leniency::Strict.tolerates_cached_numbers());
+    }
+
+    #[test]
     fn every_defect_class_describes_its_repair() {
         let defects = [
             Defect::from(ReservedFieldDefect::CellFlags),
@@ -810,7 +925,8 @@ mod tests {
             Defect::from(LayoutDefect::BorderStyle),
             Defect::from(LayoutDefect::NumberFormatId),
             Defect::from(LayoutDefect::NumberFormatCodeLength),
-            Defect::from(CachedNumberDefect::NonNormalNumber),
+            Defect::from(CachedNumberDefect::NonFinite),
+            Defect::from(CachedNumberDefect::Denormalized),
             Defect::from(ValueEncodingDefect::BooleanByte),
             Defect::from(ValueEncodingDefect::ErrorCode),
             Defect::from(ValueEncodingDefect::Utf16),

@@ -5,7 +5,7 @@ use crate::calc::Props;
 use crate::cell_values;
 use crate::cell_watches;
 use crate::external_link::{Budget, ExternalLinkLimits};
-use crate::leniency::{Tolerance, ToleranceReport};
+use crate::leniency::{Leniency, Tolerance, ToleranceReport};
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
@@ -296,11 +296,13 @@ impl Workbook {
     /// Reparse an owned candidate while retaining this workbook's typed
     /// drawing projection boundary.
     pub(crate) fn reparse_candidate(&self, package: OpcPackage) -> Result<Self> {
-        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             self.external_link_limits,
             self.drawing_load_policy,
-        )
+        )?;
+        workbook.leniency = self.leniency;
+        Ok(workbook)
     }
 
     /// Reparse bytes after a caller has already selected the projection
@@ -362,7 +364,12 @@ impl Workbook {
         limits: cell_values::Limits,
     ) -> Result<cell_values::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_values::workbook::read_with_limits(&self.package, &uri, limits)
+        cell_values::workbook::read_with_limits_and_leniency(
+            &self.package,
+            &uri,
+            limits,
+            self.leniency,
+        )
     }
 
     /// Start a detached, source-checked structural cell edit.
@@ -1129,6 +1136,28 @@ impl Workbook {
         Self::from_opc_package_with_external_link_limits(package, ExternalLinkLimits::default())
     }
 
+    /// Read an XLSB workbook with the default bounded OPC limits under an
+    /// explicit [`Leniency`].
+    ///
+    /// The Excel-compatible repairs are applied under every variant; see
+    /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
+    /// repairs non-normal cached numbers in materialized worksheets and
+    /// cell-value snapshots, recording each repair in the report of the
+    /// object that read the cell.
+    pub fn new_with_leniency<R: Read + Seek>(reader: R, leniency: Leniency) -> Result<Self> {
+        let mut workbook = Self::new(reader)?;
+        workbook.leniency = leniency;
+        Ok(workbook)
+    }
+
+    /// Create an XLSB workbook from an already-parsed OPC package under an
+    /// explicit [`Leniency`]; see [`Self::new_with_leniency`].
+    pub fn from_opc_package_with_leniency(package: OpcPackage, leniency: Leniency) -> Result<Self> {
+        let mut workbook = Self::from_opc_package(package)?;
+        workbook.leniency = leniency;
+        Ok(workbook)
+    }
+
     /// Create an XLSB workbook from an already-parsed OPC package using
     /// explicit external-link resource limits.
     pub fn from_opc_package_with_external_link_limits(
@@ -1168,6 +1197,7 @@ impl Workbook {
             drawing_load_policy,
             connections: None,
             tolerance: ToleranceReport::default(),
+            leniency: Leniency::Strict,
         };
 
         workbook.load_workbook_info(
