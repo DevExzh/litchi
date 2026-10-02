@@ -1,7 +1,7 @@
 //! Core document properties shared by every OOXML host.
 //!
 //! [`Props`] is the concise, owned semantic value. Package operations are
-//! deliberately separate: [`read`] distinguishes an absent part from a present
+//! deliberately separate: [`read_with_report`] distinguishes an absent part from a present
 //! but empty properties document, [`write()`] consumes a value, and [`clear`]
 //! removes the validated package graph idempotently.
 
@@ -11,7 +11,7 @@ mod read;
 pub mod time;
 mod write;
 
-pub use read::{read, read_source_backed, read_source_backed_with_report, read_with_report};
+pub use read::{read_source_backed_with_report, read_with_report};
 pub use write::{clear, write};
 
 use crate::Result;

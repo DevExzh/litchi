@@ -3,6 +3,14 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 
+/// Read core properties, asserting the conformant fixtures need no repair.
+fn read_clean(package: &OpcPackage) -> litchi_ooxml_common::Result<Option<Props>> {
+    let mut report = litchi_ooxml_common::leniency::ToleranceReport::default();
+    let props = properties::read_with_report(package, &mut report)?;
+    assert!(report.is_clean(), "{report:?}");
+    Ok(props)
+}
+
 const STRICT_REL: &str =
     "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties";
 const STRICT_NS: &str = "http://purl.oclc.org/ooxml/package/metadata/core-properties";
@@ -27,11 +35,7 @@ fn strict_package() -> (OpcPackage, Vec<u8>) {
 fn strict_core_properties_preserve_the_selected_graph() {
     let (mut package, _) = strict_package();
     assert_eq!(
-        properties::read(&package)
-            .unwrap()
-            .unwrap()
-            .title
-            .as_deref(),
+        read_clean(&package).unwrap().unwrap().title.as_deref(),
         Some("Original")
     );
 
@@ -56,7 +60,7 @@ fn strict_core_properties_preserve_the_selected_graph() {
     );
 
     assert!(properties::clear(&mut package).unwrap());
-    assert!(properties::read(&package).unwrap().is_none());
+    assert!(read_clean(&package).unwrap().is_none());
     assert!(
         !package
             .iter_parts()
@@ -67,15 +71,11 @@ fn strict_core_properties_preserve_the_selected_graph() {
 #[test]
 fn absent_core_properties_are_idempotent() {
     let mut package = OpcPackage::new();
-    assert!(properties::read(&package).unwrap().is_none());
+    assert!(read_clean(&package).unwrap().is_none());
     assert!(!properties::clear(&mut package).unwrap());
     assert!(properties::write(&mut package, Props::new().title("Created")).unwrap());
     assert_eq!(
-        properties::read(&package)
-            .unwrap()
-            .unwrap()
-            .title
-            .as_deref(),
+        read_clean(&package).unwrap().unwrap().title.as_deref(),
         Some("Created")
     );
 }

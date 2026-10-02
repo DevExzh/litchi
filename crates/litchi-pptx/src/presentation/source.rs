@@ -1207,27 +1207,24 @@ impl SourceBackedPresentation {
     }
 
     /// Read the relationship-selected OOXML core properties without reading
-    /// any slide or media payload.
+    /// any slide or media payload, appending every core-properties repair the
+    /// read applied to `tolerance` as [`crate::Defect::Properties`].
     ///
     /// A missing core-properties relationship returns `None`; a present but
     /// empty properties part returns `Some(Props::new())`. The source version
     /// and caller execution policy are checked before and after the selected
     /// metadata payload read.
-    pub fn properties(&self) -> Result<Option<litchi_ooxml_common::Props>> {
-        self.properties_with_tolerance(&mut crate::leniency::ToleranceReport::default())
-    }
-
-    /// [`Self::properties`], appending every core-properties repair the read
-    /// applied to `tolerance` as [`crate::Defect::Properties`].
     ///
     /// Opening a source-backed presentation reads only the presentation
     /// root, so the core-properties repairs are not part of
     /// [`Self::tolerance_report`]; this is where a caller collects them.
-    /// See [`crate::leniency`].
+    /// There is deliberately no report-less variant: repaired properties
+    /// cannot be obtained without their report. See [`crate::leniency`].
     ///
     /// # Errors
     ///
-    /// Returns the errors [`Self::properties`] returns.
+    /// Returns a typed OPC cancellation or source-change error, or the core
+    /// properties reader's error for a part it rejects.
     pub fn properties_with_tolerance(
         &self,
         tolerance: &mut crate::leniency::ToleranceReport,
@@ -5627,7 +5624,12 @@ mod tests {
         assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);
         assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
 
-        let properties = presentation.properties().unwrap().unwrap();
+        let mut tolerance = crate::leniency::ToleranceReport::default();
+        let properties = presentation
+            .properties_with_tolerance(&mut tolerance)
+            .unwrap()
+            .unwrap();
+        assert!(tolerance.is_clean(), "{tolerance:?}");
         assert_eq!(properties.title.as_deref(), Some("source-backed core"));
         assert!(source.core_payload_reads.load(Ordering::SeqCst) > 0);
         assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);

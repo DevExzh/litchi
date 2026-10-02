@@ -575,6 +575,13 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
 mod tests {
     use super::*;
     use crate::properties::{STRICT_CORE_PROPERTIES_RELATIONSHIP, Slot, read};
+
+    fn read_props(package: &OpcPackage) -> Result<Option<Props>> {
+        crate::properties::read_with_report(
+            package,
+            &mut crate::leniency::ToleranceReport::default(),
+        )
+    }
     use litchi_opc::part::Part;
 
     fn package_with_core(path: &str, relationship_type: &str, xml: Vec<u8>) -> OpcPackage {
@@ -605,7 +612,7 @@ mod tests {
 
         assert!(write(&mut package, Props::new().title("After")).unwrap());
         assert_eq!(
-            read(&package).unwrap().unwrap().title.as_deref(),
+            read_props(&package).unwrap().unwrap().title.as_deref(),
             Some("After")
         );
         let relationship = package.rels().get(&relationship_id).unwrap();
@@ -618,7 +625,7 @@ mod tests {
 
         assert!(clear(&mut package).unwrap());
         assert!(!clear(&mut package).unwrap());
-        assert!(read(&package).unwrap().is_none());
+        assert!(read_props(&package).unwrap().is_none());
     }
 
     #[test]
@@ -685,13 +692,13 @@ mod tests {
     #[test]
     fn distinguishes_present_empty_from_absence() {
         let absent = OpcPackage::new();
-        assert!(read(&absent).unwrap().is_none());
+        assert!(read_props(&absent).unwrap().is_none());
 
         let xml = encode(&Props::new(), Dialect::Transitional)
             .unwrap()
             .into_bytes();
         let present = package_with_core("/docProps/core.xml", rt::CORE_PROPERTIES, xml);
-        assert_eq!(read(&present).unwrap(), Some(Props::new()));
+        assert_eq!(read_props(&present).unwrap(), Some(Props::new()));
     }
 
     #[test]
@@ -825,7 +832,7 @@ mod tests {
 
         assert!(clear(&mut package).unwrap());
         assert!(!package.is_signed());
-        assert!(read(&package).unwrap().is_none());
+        assert!(read_props(&package).unwrap().is_none());
     }
 
     #[test]
@@ -841,12 +848,12 @@ mod tests {
         package.add_part(Box::new(source));
 
         assert_eq!(
-            read(&package).unwrap().unwrap().title.as_deref(),
+            read_props(&package).unwrap().unwrap().title.as_deref(),
             Some("Before")
         );
         assert!(write(&mut package, Props::new().title("After")).unwrap());
         assert_eq!(
-            read(&package).unwrap().unwrap().title.as_deref(),
+            read_props(&package).unwrap().unwrap().title.as_deref(),
             Some("After")
         );
 

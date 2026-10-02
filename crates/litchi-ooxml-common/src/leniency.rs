@@ -28,8 +28,8 @@
 //! * Core properties: [`properties::read_with_report`](crate::properties::read_with_report)
 //!   and [`properties::read_source_backed_with_report`](crate::properties::read_source_backed_with_report)
 //!   append into a caller's report; the host [`Slot`](crate::properties::Slot)
-//!   keeps the report of its load. The plain `read` functions apply the same
-//!   repairs for callers that do not collect a report.
+//!   keeps the report of its load. There is no report-less core-properties
+//!   reader: repaired properties cannot be obtained without their report.
 //! * Custom properties: a read [`custom::Props`](crate::custom::Props)
 //!   carries its own report ([`custom::Props::tolerance_report`](crate::custom::Props::tolerance_report)).
 //!
@@ -154,9 +154,7 @@ impl CorePropertiesDefect {
                 "read no core properties: the relationship target does not exist"
             },
             Self::DuplicatePart => "ignored an extra core-properties part",
-            Self::MisplacedRelationship => {
-                "ignored a core-properties relationship owned by a part"
-            },
+            Self::MisplacedRelationship => "ignored a core-properties relationship owned by a part",
         }
     }
 }

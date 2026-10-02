@@ -68,29 +68,23 @@ impl CoreProperty {
     }
 }
 
-/// Extract relationship-selected core metadata from an OOXML package.
+/// Extract relationship-selected core metadata from an OOXML package,
+/// appending every reference-compatible repair to `report`.
 ///
 /// Absence is valid and remains distinguishable from a present empty document.
 /// Producer-rule deviations in the part body (OPC M4.3-M4.5, duplicates,
-/// unknown elements, invalid dates, non-UTF-8 bytes, a dialect mismatch) are
-/// repaired per property as [`crate::leniency`] documents; use
-/// [`read_with_report`] to enumerate them. Ill-formed XML, the Markup
-/// Compatibility namespace (M4.2), and limits still fail.
+/// unknown elements, invalid dates, non-UTF-8 bytes, a dialect mismatch) and
+/// in the relationship graph are repaired per property as
+/// [`crate::leniency`] documents, and each repair is recorded in `report`: a
+/// conformant package appends nothing. There is deliberately no report-less
+/// variant — repaired properties cannot be obtained without their report
+/// (the tolerance contract). Ill-formed XML, the Markup Compatibility
+/// namespace (M4.2), and limits still fail.
+///
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn read(package: &OpcPackage) -> Result<Option<Props>> {
-    read_with_report(package, &mut ToleranceReport::default())
-}
-
-/// [`read`], appending every reference-compatible repair to `report`.
-///
-/// See [`crate::leniency`]: a conformant package appends nothing.
-///
-/// # Errors
-///
-/// Returns the errors [`read`] returns.
 pub fn read_with_report(
     package: &OpcPackage,
     report: &mut ToleranceReport,
@@ -169,29 +163,20 @@ impl Recorder<'_> {
 }
 
 /// Extract relationship-selected core metadata from a source-backed OPC
-/// package.
+/// package, appending every reference-compatible repair to `report`.
 ///
 /// The catalog and relationship graph remain metadata-only until the
 /// relationship-selected core-properties part is read. This is the
-/// positional equivalent of [`read`]: it applies the same graph and
-/// dialect checks, while retaining the source package's version and
-/// execution-policy checks around the selected payload read.
+/// positional equivalent of [`read_with_report`]: it applies the same graph
+/// and dialect repairs (recording them), while retaining the source
+/// package's version and execution-policy checks around the selected payload
+/// read.
 ///
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a
 /// configured bound, the source changes, execution is cancelled, or an
 /// underlying source/package operation fails.
-pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>> {
-    read_source_backed_with_report(package, &mut ToleranceReport::default())
-}
-
-/// [`read_source_backed`], appending every reference-compatible repair to
-/// `report`.
-///
-/// # Errors
-///
-/// Returns the errors [`read_source_backed`] returns.
 pub fn read_source_backed_with_report(
     package: &SourceBackedPackage,
     report: &mut ToleranceReport,
@@ -213,7 +198,8 @@ pub fn read_source_backed_with_report(
     Ok(Some(props))
 }
 
-/// Decode core-properties XML strictly: every deviation [`read`] repairs is
+/// Decode core-properties XML strictly: every deviation [`read_with_report`]
+/// repairs is
 /// an error here.
 ///
 /// The writer uses this before replacing a payload, so content the typed
@@ -878,6 +864,14 @@ fn bound_namespace<'a>(namespace: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read(package: &OpcPackage) -> Result<Option<Props>> {
+        read_with_report(package, &mut ToleranceReport::default())
+    }
+
+    fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>> {
+        read_source_backed_with_report(package, &mut ToleranceReport::default())
+    }
     use crate::Props;
     use crate::properties::STRICT_CORE_PROPERTIES_RELATIONSHIP;
     use chrono::{DateTime, Utc};
@@ -1013,7 +1007,11 @@ mod tests {
         // LENIENCY_AUDIT 8.2: both readers repair a dangling relationship the
         // same way and record the same defect.
         let mut eager_report = ToleranceReport::default();
-        assert!(read_with_report(&dangling, &mut eager_report).unwrap().is_none());
+        assert!(
+            read_with_report(&dangling, &mut eager_report)
+                .unwrap()
+                .is_none()
+        );
         let source = source_package(&dangling);
         let mut source_report = ToleranceReport::default();
         assert!(
@@ -1074,8 +1072,14 @@ mod tests {
         let mut report = ToleranceReport::default();
         assert!(read_with_report(&orphan, &mut report).unwrap().is_none());
         assert_eq!(
-            report.iter().map(|t| (t.defect(), t.part())).collect::<Vec<_>>(),
-            vec![(CorePropertiesDefect::OrphanedPart.into(), "/docProps/core.xml")]
+            report
+                .iter()
+                .map(|t| (t.defect(), t.part()))
+                .collect::<Vec<_>>(),
+            vec![(
+                CorePropertiesDefect::OrphanedPart.into(),
+                "/docProps/core.xml"
+            )]
         );
         assert!(read(&orphan).unwrap().is_none());
 
@@ -1225,7 +1229,10 @@ mod tests {
                 (CorePropertiesDefect::DuplicateProperty, item("title")),
                 (CorePropertiesDefect::UnknownElement, item("cp:contentType")),
                 (CorePropertiesDefect::UnknownElement, item("x:ext")),
-                (CorePropertiesDefect::UnknownElement, item("dcterms:abstract")),
+                (
+                    CorePropertiesDefect::UnknownElement,
+                    item("dcterms:abstract")
+                ),
                 (CorePropertiesDefect::UnknownElement, item("x:empty")),
                 (CorePropertiesDefect::InvalidValue, item("lastPrinted")),
             ]
@@ -1252,12 +1259,18 @@ mod tests {
             props.modified.as_ref().map(time::W3c::as_str),
             Some("2026-01-03")
         );
-        assert_eq!(props.keywords.as_ref().map(Keywords::joined).as_deref(), Some("k"));
+        assert_eq!(
+            props.keywords.as_ref().map(Keywords::joined).as_deref(),
+            Some("k")
+        );
         let item = |name: &str| Some(name.to_owned());
         assert_eq!(
             recorded,
             vec![
-                (CorePropertiesDefect::UnexpectedAttribute, item("coreProperties")),
+                (
+                    CorePropertiesDefect::UnexpectedAttribute,
+                    item("coreProperties")
+                ),
                 (CorePropertiesDefect::UnexpectedAttribute, item("subject")),
                 (CorePropertiesDefect::MissingDateType, item("created")),
                 (CorePropertiesDefect::UnexpectedAttribute, item("modified")),
@@ -1285,13 +1298,15 @@ mod tests {
         assert_eq!(report.defects()[0].part(), "/docProps/core.xml");
 
         let strict_xml = br#"<cp:coreProperties xmlns:cp="http://purl.oclc.org/ooxml/package/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>T</dc:title></cp:coreProperties>"#;
-        let package =
-            package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, strict_xml);
+        let package = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, strict_xml);
         let mut report = ToleranceReport::default();
         let props = read_with_report(&package, &mut report).unwrap().unwrap();
         assert_eq!(props.title.as_deref(), Some("T"));
         assert_eq!(
-            report.iter().map(|t| (t.defect(), t.value())).collect::<Vec<_>>(),
+            report
+                .iter()
+                .map(|t| (t.defect(), t.value()))
+                .collect::<Vec<_>>(),
             vec![(
                 CorePropertiesDefect::DialectMismatch.into(),
                 Some(rt::CORE_PROPERTIES)
