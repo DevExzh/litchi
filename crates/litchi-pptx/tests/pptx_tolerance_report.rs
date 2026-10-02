@@ -817,3 +817,115 @@ fn unparseable_shape_id_and_placeholder_index_degrade_and_are_recorded() {
         ]
     );
 }
+
+// ---------------------------------------------------------------------------
+// Packaging and metadata reports folded into the open-time report.
+// ---------------------------------------------------------------------------
+
+/// `shapes.pptx` with archive member `name` rewritten by `edit`, every other
+/// member copied byte for byte in its original order.
+fn shapes_with_member(name: &str, edit: impl FnOnce(&str) -> String) -> Vec<u8> {
+    use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+    let reader = ArchiveReader::new(SHAPES).unwrap();
+    let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
+    let mut edit = Some(edit);
+    let mut writer = StreamingArchiveWriter::new();
+    for member in names {
+        let mut bytes = reader.read(&member).unwrap();
+        if member == name {
+            let original = String::from_utf8(bytes).unwrap();
+            let patched = (edit.take().unwrap())(&original);
+            assert_ne!(
+                patched, original,
+                "fixture patch point is missing in {name}"
+            );
+            bytes = patched.into_bytes();
+        }
+        writer.write_stored(&member, &bytes).unwrap();
+    }
+    assert!(edit.is_none(), "archive member {name} is missing");
+    writer.finish_to_bytes().unwrap()
+}
+
+#[test]
+fn packaging_repairs_are_folded_into_the_open_report() {
+    let deck = shapes_with_member("ppt/_rels/presentation.xml.rels", |xml| {
+        xml.replace(
+            "</Relationships>",
+            r#"<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide6.xml"/></Relationships>"#,
+        )
+    });
+    let duplicate = Defect::Package(litchi_opc::leniency::Defect::Relationship(
+        litchi_opc::leniency::RelationshipDefect::DuplicateId,
+    ));
+
+    let package = Package::from_vec(deck.clone()).unwrap();
+    let report = package.tolerance_report();
+    assert_eq!(report.defects().len(), 1, "{report:?}");
+    let tolerated = &report.defects()[0];
+    assert_eq!(tolerated.defect, duplicate);
+    assert_eq!(tolerated.part(), Some("/ppt/presentation.xml"));
+    assert_eq!(tolerated.item(), Some("rId2"));
+    assert_eq!(tolerated.value(), Some("slides/slide6.xml"));
+    assert!(!tolerated.defect.repair().is_empty());
+    // The package still opens and lists its slides through the kept rId2.
+    assert_eq!(package.presentation().unwrap().slides().unwrap().len(), 6);
+
+    let source = SourceBackedPresentation::from_read_at(std::sync::Arc::new(
+        litchi_core::source::OwnedSource::new(deck),
+    ))
+    .unwrap();
+    assert_eq!(source.tolerance_report().defects(), report.defects());
+}
+
+#[test]
+fn core_properties_repairs_are_folded_into_the_open_report() {
+    let deck = shapes_with_member("docProps/core.xml", |xml| {
+        xml.replace(
+            "<dc:creator>",
+            "<dc:title>Second title</dc:title><dc:creator>",
+        )
+    });
+    let duplicate = Defect::Properties(litchi_ooxml_common::leniency::Defect::CoreProperties(
+        litchi_ooxml_common::leniency::CorePropertiesDefect::DuplicateProperty,
+    ));
+
+    let package = Package::from_vec(deck.clone()).unwrap();
+    let defects = package.tolerance_report().defects();
+    assert_eq!(defects.len(), 1, "{defects:?}");
+    assert_eq!(defects[0].defect, duplicate);
+    assert_eq!(defects[0].part(), Some("/docProps/core.xml"));
+
+    // Source-backed open reads only the presentation root; the metadata
+    // read is where its report is collected.
+    let source = SourceBackedPresentation::from_read_at(std::sync::Arc::new(
+        litchi_core::source::OwnedSource::new(deck),
+    ))
+    .unwrap();
+    assert_clean(source.tolerance_report());
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let properties = source
+        .properties_with_tolerance(&mut report)
+        .unwrap()
+        .unwrap();
+    assert_eq!(properties.title.as_deref(), Some("PowerPoint Presentation"));
+    assert_eq!(report.defects().len(), 1);
+    assert_eq!(report.defects()[0].defect, duplicate);
+
+    // The conformant fixture folds nothing.
+    let source = SourceBackedPresentation::from_read_at(std::sync::Arc::new(
+        litchi_core::source::OwnedSource::new(SHAPES.to_vec()),
+    ))
+    .unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    source.properties_with_tolerance(&mut report).unwrap();
+    assert_clean(&report);
+}
+
+#[test]
+fn ill_formed_package_manifests_stay_fatal() {
+    let deck = shapes_with_member("ppt/_rels/presentation.xml.rels", |xml| {
+        xml.replacen("<Relationship ", "<Relationship<", 1)
+    });
+    assert!(Package::from_vec(deck).is_err());
+}

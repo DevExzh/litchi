@@ -40,6 +40,19 @@
 //!   presentation part name. For [`crate::Package`] the open-time catalog
 //!   read is advisory: a slide list it cannot read stays the lazy
 //!   accessors' error, exactly as before.
+//! * The packaging and metadata reports of the lower layers are folded in
+//!   rather than kept alongside. The OPC report (`litchi_opc`'s
+//!   relationship and content-type repairs, audit findings 8.5–8.9) leads
+//!   both open-time reports as [`Defect::Package`]. [`crate::Package`] also
+//!   reads the core and custom properties at open — advisorily, a part they
+//!   reject stays its accessor's error — and appends their repairs
+//!   (`litchi_ooxml_common`, findings 8.1–8.4) as [`Defect::Properties`].
+//!   [`crate::SourceBackedPresentation`] reads only the presentation root at
+//!   open, so its core-properties repairs are collected by
+//!   [`crate::SourceBackedPresentation::properties_with_tolerance`]. A folded
+//!   entry keeps its lower-level location: [`ToleratedDefect::part`] plus the
+//!   [`ToleratedDefect::item`] and [`ToleratedDefect::value`] strings, and
+//!   the lower report's unrecorded count carries over.
 //! * A lazy parse carries the repairs it performed itself, the way
 //!   `PapBinTable::tolerance_report` lets litchi-doc aggregate part reports
 //!   after the fact. [`crate::Slide::animations`] (and the free
@@ -301,6 +314,14 @@ pub enum Defect {
     Presentation(PresentationDefect),
     /// An XML-markup defect skipped by the reader.
     Markup(MarkupDefect),
+    /// An OPC packaging defect (relationship or content-types manifest)
+    /// repaired by `litchi_opc` while the package was opened, folded into
+    /// the presentation's open-time report.
+    Package(litchi_opc::leniency::Defect),
+    /// A core- or custom-properties defect repaired by
+    /// `litchi_ooxml_common` while the document metadata was read, folded
+    /// into the presentation's report.
+    Properties(litchi_ooxml_common::leniency::Defect),
 }
 
 impl Defect {
@@ -313,6 +334,8 @@ impl Defect {
             Self::Transition(defect) => defect.repair(),
             Self::Presentation(defect) => defect.repair(),
             Self::Markup(defect) => defect.repair(),
+            Self::Package(defect) => defect.repair(),
+            Self::Properties(defect) => defect.repair(),
         }
     }
 }
@@ -551,6 +574,18 @@ impl MarkupDefect {
     }
 }
 
+impl From<litchi_opc::leniency::Defect> for Defect {
+    fn from(defect: litchi_opc::leniency::Defect) -> Self {
+        Self::Package(defect)
+    }
+}
+
+impl From<litchi_ooxml_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ooxml_common::leniency::Defect) -> Self {
+        Self::Properties(defect)
+    }
+}
+
 impl From<MarkupDefect> for Defect {
     fn from(defect: MarkupDefect) -> Self {
         Self::Markup(defect)
@@ -604,7 +639,10 @@ pub struct ToleratedDefect {
     /// * [`Defect::Presentation`] — the slide ID (`p:sldId@id`) of the
     ///   skipped slide-list entry, or `0` for
     ///   [`PresentationDefect::SlideListContent`];
-    /// * [`Defect::Markup`] — `0`; the part locates it.
+    /// * [`Defect::Markup`] — `0`; the part locates it;
+    /// * [`Defect::Package`] and [`Defect::Properties`] — `0`; the folded
+    ///   defect is located by [`Self::part()`], [`Self::item()`], and
+    ///   [`Self::value()`], carried over from the lower-level report.
     pub context: u32,
     /// The package part the defect was found in, such as
     /// `/ppt/slides/slide3.xml`.
@@ -614,6 +652,17 @@ pub struct ToleratedDefect {
     /// bare slide XML ([`crate::animations::Sequence::parse_slide_xml`]) has
     /// no part to name, so it leaves this `None`.
     pub part: Option<Arc<str>>,
+    /// The keyed item within the part, for defects folded from a lower-level
+    /// report: a relationship `Id`, a content-type extension or part name,
+    /// or a property name (see `litchi_opc::leniency::ToleratedDefect::item`
+    /// and `litchi_ooxml_common::leniency::ToleratedDefect::item`). `None`
+    /// for this crate's own defect classes, which locate themselves through
+    /// [`Self::context`].
+    pub item: Option<Box<str>>,
+    /// The raw value a folded lower-level repair replaced or discarded, as
+    /// documented on the folded defect variant. `None` for this crate's own
+    /// defect classes.
+    pub value: Option<Box<str>>,
 }
 
 impl ToleratedDefect {
@@ -622,6 +671,21 @@ impl ToleratedDefect {
     #[must_use]
     pub fn part(&self) -> Option<&str> {
         self.part.as_deref()
+    }
+
+    /// The keyed item a folded lower-level defect concerns (a relationship
+    /// `Id`, content-type key, or property name), if any.
+    #[inline]
+    #[must_use]
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// The raw value a folded lower-level repair replaced or discarded.
+    #[inline]
+    #[must_use]
+    pub fn value(&self) -> Option<&str> {
+        self.value.as_deref()
     }
 }
 
@@ -677,7 +741,42 @@ impl ToleranceReport {
             defect: defect.into(),
             context,
             part: None,
+            item: None,
+            value: None,
         });
+    }
+
+    /// Fold an OPC packaging report into this one, keeping its discovery
+    /// order, locations, and unrecorded count.
+    pub(crate) fn append_package(&mut self, package: &litchi_opc::leniency::ToleranceReport) {
+        for tolerated in package.defects() {
+            self.push(ToleratedDefect {
+                defect: Defect::Package(tolerated.defect()),
+                context: 0,
+                part: Some(Arc::from(tolerated.part())),
+                item: tolerated.item().map(Box::from),
+                value: tolerated.value().map(Box::from),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(package.unrecorded());
+    }
+
+    /// Fold a core- or custom-properties report into this one, keeping its
+    /// discovery order, locations, and unrecorded count.
+    pub(crate) fn append_properties(
+        &mut self,
+        properties: &litchi_ooxml_common::leniency::ToleranceReport,
+    ) {
+        for tolerated in properties.defects() {
+            self.push(ToleratedDefect {
+                defect: Defect::Properties(tolerated.defect()),
+                context: 0,
+                part: Some(Arc::from(tolerated.part())),
+                item: tolerated.item().map(Box::from),
+                value: tolerated.value().map(Box::from),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(properties.unrecorded());
     }
 
     fn push(&mut self, tolerated: ToleratedDefect) {
@@ -795,6 +894,8 @@ mod tests {
                 defect: Defect::Timing(TimingDefect::DuplicateShapeId),
                 context: 7,
                 part: None,
+                item: None,
+                value: None,
             }
         );
 
@@ -822,6 +923,12 @@ mod tests {
             Defect::from(PresentationDefect::DuplicateSlideTarget),
             Defect::from(PresentationDefect::SlideListContent),
             Defect::from(MarkupDefect::ProcessingInstruction),
+            Defect::from(litchi_opc::leniency::Defect::Relationship(
+                litchi_opc::leniency::RelationshipDefect::DuplicateId,
+            )),
+            Defect::from(litchi_ooxml_common::leniency::Defect::CoreProperties(
+                litchi_ooxml_common::leniency::CorePropertiesDefect::DuplicateProperty,
+            )),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

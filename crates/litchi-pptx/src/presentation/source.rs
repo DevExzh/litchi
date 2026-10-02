@@ -116,7 +116,8 @@ pub(super) struct SourceInner {
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     pub(super) limits: ReadLimits,
     /// Every non-structural defect repaired while the source was opened, in
-    /// discovery order: the slide-list repairs of audit finding 6.7. Repairs a
+    /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
+    /// then the slide-list repairs of audit finding 6.7. Repairs a
     /// deferred slide read performs surface at that read's own entry point.
     /// See [`crate::leniency`].
     pub(super) tolerance: crate::leniency::ToleranceReport,
@@ -1152,6 +1153,9 @@ impl SourceBackedPresentation {
     ) -> Result<Self> {
         package.check_execution()?;
         let mut tolerance = crate::leniency::ToleranceReport::default();
+        // OPC manifest repairs (audit findings 8.5-8.9) were applied while
+        // the deferred package was opened; they come first.
+        tolerance.append_package(package.tolerance_report());
         let catalog = source_catalog(&package, Some(&mut tolerance))?;
         package.check_execution()?;
 
@@ -1210,10 +1214,33 @@ impl SourceBackedPresentation {
     /// and caller execution policy are checked before and after the selected
     /// metadata payload read.
     pub fn properties(&self) -> Result<Option<litchi_ooxml_common::Props>> {
+        self.properties_with_tolerance(&mut crate::leniency::ToleranceReport::default())
+    }
+
+    /// [`Self::properties`], appending every core-properties repair the read
+    /// applied to `tolerance` as [`crate::Defect::Properties`].
+    ///
+    /// Opening a source-backed presentation reads only the presentation
+    /// root, so the core-properties repairs are not part of
+    /// [`Self::tolerance_report`]; this is where a caller collects them.
+    /// See [`crate::leniency`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors [`Self::properties`] returns.
+    pub fn properties_with_tolerance(
+        &self,
+        tolerance: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Option<litchi_ooxml_common::Props>> {
         self.inner.package.check_execution()?;
-        let properties = litchi_ooxml_common::properties::read_source_backed(&self.inner.package)?;
+        let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
+        let properties = litchi_ooxml_common::properties::read_source_backed_with_report(
+            &self.inner.package,
+            &mut repairs,
+        )?;
         self.inner.package.check_execution()?;
         self.inner.package.source_version()?;
+        tolerance.append_properties(&repairs);
         Ok(properties)
     }
 

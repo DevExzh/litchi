@@ -17,7 +17,10 @@ pub struct Package {
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
     /// Every non-structural defect repaired while the package was opened, in
-    /// discovery order: the slide-list repairs of audit finding 6.7. Repairs a
+    /// discovery order: the OPC manifest repairs folded from
+    /// `litchi_opc` ([`crate::Defect::Package`]), the slide-list repairs of
+    /// audit finding 6.7, then the core- and custom-properties repairs folded
+    /// from `litchi_ooxml_common` ([`crate::Defect::Properties`]). Repairs a
     /// lazy slide parse performs surface at that parse's own entry point.
     /// See [`crate::leniency`].
     pub(crate) tolerance: crate::leniency::ToleranceReport,

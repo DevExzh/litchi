@@ -9,6 +9,7 @@ use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackageWriter};
 
 use super::Package;
+use crate::custom::{Host, Props};
 use crate::parts::PresentationPart;
 use crate::resources;
 use crate::writer::MutablePresentation;
@@ -274,7 +275,20 @@ impl Package {
         // list the catalog reader rejects stays the lazy accessors' error, as
         // before: opening never parsed the slide list to fail on it.
         let mut tolerance = crate::leniency::ToleranceReport::default();
+        // OPC manifest repairs (audit findings 8.5-8.9) come first: they were
+        // applied before any PresentationML part could be read.
+        tolerance.append_package(opc.tolerance_report());
         let _deferred_catalog_error = presentation.slide_references_with_tolerance(&mut tolerance);
+        // The document metadata reads are advisory at open, like the slide
+        // list: a properties part they reject stays its accessor's error,
+        // and opening never failed on it before.
+        let mut properties = litchi_ooxml_common::leniency::ToleranceReport::default();
+        let _deferred_core_error =
+            litchi_ooxml_common::properties::read_with_report(&opc, &mut properties);
+        tolerance.append_properties(&properties);
+        if let Ok(custom) = Props::read_for(&opc, Host::PowerPoint) {
+            tolerance.append_properties(custom.tolerance_report());
+        }
         Ok(Self {
             opc,
             mutable_pres: None,
