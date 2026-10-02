@@ -36,6 +36,7 @@ pub mod selected_worksheet {
     };
 }
 
+pub(crate) use catalog::parse_catalog_repairing;
 pub use catalog::{parse_catalog, parse_catalog_with_mce, parse_sheet};
 
 /// Parse only the direct worksheet-grid defaults from one `WorksheetPart`.

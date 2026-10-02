@@ -359,3 +359,46 @@ fn orphaned_shared_formula_member_keeps_its_cached_value() {
         )]
     );
 }
+
+/// Finding 4.7: a stale `activeTab` falls back to the first sheet and a
+/// defined name scoped to a missing sheet is dropped; both are recorded at
+/// open.
+#[test]
+fn stale_active_tab_and_local_sheet_id_are_repaired_at_open() {
+    use litchi_xlsx::CatalogDefect;
+
+    let bytes = patched(&[("xl/workbook.xml", &|text: &str| {
+        replace(r#"activeTab="1""#, r#"activeTab="9""#)(text).replacen(
+                "</sheets>",
+                r#"</sheets><definedNames><definedName name="Stale" localSheetId="5">Flags!$A$1</definedName><definedName name="Kept" localSheetId="1">Tests!$A$1</definedName></definedNames>"#,
+                1,
+            )
+    })]);
+    let report = both_reports(&bytes);
+    assert_eq!(
+        worksheet_entries(&report),
+        [
+            (
+                Defect::Catalog(CatalogDefect::ActiveTabOutOfRange),
+                None,
+                ToleranceLocation::Workbook
+            ),
+            (
+                Defect::Catalog(CatalogDefect::LocalSheetIdOutOfRange),
+                None,
+                ToleranceLocation::DefinedName(0)
+            ),
+        ]
+    );
+
+    let workbook = Workbook::from_slice(&bytes).unwrap();
+    assert_eq!(workbook.active_sheet().unwrap().name(), "Flags");
+    let names = workbook
+        .defined_names()
+        .iter()
+        .map(|name| name.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["Kept"]);
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+    assert_eq!(source.active_sheet().unwrap().name(), "Flags");
+}

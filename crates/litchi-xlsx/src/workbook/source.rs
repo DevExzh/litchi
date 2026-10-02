@@ -453,8 +453,13 @@ impl SourceBackedWorkbook {
                 workbook.content_type()
             ))
         })?;
+        // The packaging repairs come first (they were made before the
+        // workbook part could be read), then the open-time catalog sites
+        // (findings 4.7/4.8); see `crate::leniency`.
+        let mut tolerance = ToleranceReport::default();
+        tolerance.append_package(package.tolerance_report());
         let catalog_bytes = workbook.data()?;
-        let catalog = raw::parse_catalog(catalog_bytes.as_bytes())?;
+        let catalog = raw::parse_catalog_repairing(catalog_bytes.as_bytes(), &mut tolerance)?;
         check_execution(execution.as_ref())?;
         let sheet_parts = validate_sheet_graph(&package, &workbook, &catalog.sheets)?;
         check_execution(execution.as_ref())?;
@@ -462,11 +467,6 @@ impl SourceBackedWorkbook {
         let styles_uri = validate_styles(&package, &workbook)?;
         check_execution(execution.as_ref())?;
 
-        // The packaging repairs come first (they were made before the
-        // workbook part could be read), then the open-time catalog sites
-        // (findings 4.7/4.8); see `crate::leniency`.
-        let mut tolerance = ToleranceReport::default();
-        tolerance.append_package(package.tolerance_report());
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
         let mut sheets = Vec::new();
         sheets

@@ -106,6 +106,11 @@
 //!   after the open-time entries, with no sheet. The bounded selected
 //!   dependency scan reports such a table as irregular and the read falls
 //!   back to the repairing parse.
+//! * finding 4.7 — the open-time catalog parse (`raw/catalog.rs`) records
+//!   [`CatalogDefect::ActiveTabOutOfRange`] and
+//!   [`CatalogDefect::LocalSheetIdOutOfRange`]. The standalone
+//!   `raw::parse_catalog` and the feature snapshots that re-read the
+//!   catalog for editing keep the historical errors.
 //! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
 //!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
 //! * finding 4.3 — cell materialization records
@@ -320,16 +325,23 @@ impl WorksheetDefect {
 
 /// A workbook-catalog (`xl/workbook.xml`) defect.
 ///
-/// Every variant is a *roadmap contract* (audit findings 4.7 and 4.8): no
-/// read produces it yet.
+/// The finding 4.7 variants are live and recorded when a workbook handle is
+/// opened; [`CatalogDefect::SheetNameRules`] (finding 4.8) is a *roadmap
+/// contract*.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum CatalogDefect {
     /// `workbookView/@activeTab` names a sheet past the catalog (finding
-    /// 4.7). The active tab is clamped to the last sheet.
+    /// 4.7). ECMA-376 types it as an unconstrained `unsignedInt` and it goes
+    /// stale when other tools delete sheets. The active tab falls back to
+    /// the first sheet — LibreOffice's reading, and the value an absent
+    /// `activeTab` means. Located at [`Location::Workbook`].
     ActiveTabOutOfRange,
     /// A `definedName/@localSheetId` names a sheet past the catalog (finding
-    /// 4.7). The name is demoted to workbook-global scope.
+    /// 4.7). A scope naming no sheet cannot be resolved; the name is dropped,
+    /// as LibreOffice drops it, rather than promoted to a workbook-global
+    /// name that could shadow another. Located at [`Location::DefinedName`],
+    /// the name's zero-based position among the catalog's defined names.
     LocalSheetIdOutOfRange,
     /// A sheet name violates Excel's authoring rules — over 31 characters,
     /// a reserved character, or a leading/trailing apostrophe (finding 4.8).
@@ -344,9 +356,9 @@ impl CatalogDefect {
     #[must_use]
     pub const fn repair(self) -> &'static str {
         match self {
-            Self::ActiveTabOutOfRange => "clamped the active tab to the last sheet",
+            Self::ActiveTabOutOfRange => "reset the out-of-range active tab to the first sheet",
             Self::LocalSheetIdOutOfRange => {
-                "demoted the sheet-scoped defined name to workbook scope"
+                "dropped the defined name scoped to a sheet the workbook does not have"
             },
             Self::SheetNameRules => "retained the non-conforming sheet name verbatim",
         }

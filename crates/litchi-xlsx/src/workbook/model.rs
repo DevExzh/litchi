@@ -605,6 +605,11 @@ impl Workbook {
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
+        // The packaging repairs come first (they were made before the
+        // workbook part could be read), then the open-time catalog sites
+        // (findings 4.7/4.8); see `crate::leniency`.
+        let mut tolerance = ToleranceReport::default();
+        tolerance.append_package(package.tolerance_report());
         let (workbook_uri, flavor, catalog, sheet_parts, shared_strings_uri, styles_uri) = {
             let workbook = package.main_document_part()?;
             let flavor = codec::flavor(workbook.content_type()).ok_or_else(|| {
@@ -614,7 +619,7 @@ impl Workbook {
                     workbook.content_type()
                 ))
             })?;
-            let catalog = raw::parse_catalog(workbook.blob())?;
+            let catalog = raw::parse_catalog_repairing(workbook.blob(), &mut tolerance)?;
             let sheet_parts = package::validate_sheet_graph(&package, workbook, &catalog.sheets)?;
             let shared_strings_uri = package::validate_shared_strings(&package, workbook)?;
             let styles_uri = package::validate_styles(&package, workbook)?;
@@ -628,11 +633,6 @@ impl Workbook {
             )
         };
 
-        // The packaging repairs come first (they were made before the
-        // workbook part could be read), then the open-time catalog sites
-        // (findings 4.7/4.8); see `crate::leniency`.
-        let mut tolerance = ToleranceReport::default();
-        tolerance.append_package(package.tolerance_report());
         let active_sheet = if catalog.sheets.is_empty() {
             None
         } else {

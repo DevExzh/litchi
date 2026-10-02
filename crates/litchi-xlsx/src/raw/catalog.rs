@@ -10,6 +10,7 @@ use quick_xml::reader::NsReader;
 
 use super::{Catalog, DefinedName, PivotCache, Sheet, Visibility};
 use crate::error::{Result, invalid};
+use crate::leniency::{CatalogDefect, Location, ToleranceReport};
 use crate::raw::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
@@ -60,6 +61,9 @@ struct WorkbookInfo {
     pivot_caches: Vec<PivotCache>,
     external_reference_ids: Vec<String>,
     external_reference_id_set: HashSet<String>,
+    /// Repairs made so far; `None` refuses every cataloged defect with its
+    /// historical error (see `crate::leniency`).
+    tolerance: Option<ToleranceReport>,
 }
 
 impl WorkbookInfo {
@@ -86,12 +90,18 @@ impl WorkbookInfo {
             pivot_caches: Vec::new(),
             external_reference_ids: Vec::new(),
             external_reference_id_set: HashSet::new(),
+            tolerance: None,
         }
     }
 
     fn parse(content: &[u8]) -> Result<Self> {
         let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
-        Self::parse_processed(processed.as_ref())
+        Self::parse_processed(processed.as_ref(), None)
+    }
+
+    fn parse_repairing(content: &[u8]) -> Result<Self> {
+        let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
+        Self::parse_processed(processed.as_ref(), Some(ToleranceReport::default()))
     }
 
     fn parse_with_mce(
@@ -101,14 +111,15 @@ impl WorkbookInfo {
     ) -> Result<Self> {
         let processed =
             litchi_ooxml_common::mce::process_markup_compatibility(content, capabilities, limits)?;
-        Self::parse_processed(processed.xml.as_ref())
+        Self::parse_processed(processed.xml.as_ref(), None)
     }
 
-    fn parse_processed(content: &[u8]) -> Result<Self> {
+    fn parse_processed(content: &[u8], tolerance: Option<ToleranceReport>) -> Result<Self> {
         let content = std::str::from_utf8(content)
             .map_err(|error| invalid(format!("workbook XML is not UTF-8: {error}")))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut info = Self::new();
+        info.tolerance = tolerance;
         let mut stack = Vec::new();
         let mut closed_root = false;
 
@@ -203,21 +214,43 @@ impl WorkbookInfo {
             && active_tab >= info.sheets.len()
             && !info.sheets.is_empty()
         {
-            return Err(invalid(format!(
+            let error = invalid(format!(
                 "workbook activeTab {active_tab} exceeds the {} available sheets",
                 info.sheets.len()
-            )));
+            ));
+            // `activeTab` is an unconstrained unsignedInt (ECMA-376 §18.2.30)
+            // that goes stale when other tools delete sheets. LibreOffice
+            // falls back to the first sheet (audit finding 4.7).
+            let tolerance = info.tolerance.as_mut().ok_or(error)?;
+            tolerance.record(CatalogDefect::ActiveTabOutOfRange, Location::Workbook);
+            info.active_tab = Some(0);
         }
-        for defined_name in &info.defined_names {
+        let sheet_count = info.sheets.len();
+        let mut position = 0u32;
+        let mut kept = Vec::new();
+        kept.try_reserve_exact(info.defined_names.len())
+            .map_err(|source| crate::error::allocation("workbook defined names", source))?;
+        for defined_name in std::mem::take(&mut info.defined_names) {
             if let Some(local_sheet_id) = defined_name.local_sheet_id
-                && usize::try_from(local_sheet_id).map_or(true, |index| index >= info.sheets.len())
+                && usize::try_from(local_sheet_id).map_or(true, |index| index >= sheet_count)
             {
-                return Err(invalid(format!(
+                let error = invalid(format!(
                     "defined name '{}' has out-of-range localSheetId {local_sheet_id}",
                     defined_name.name
-                )));
+                ));
+                // A scope naming no sheet cannot be resolved; LibreOffice
+                // drops such a name (audit finding 4.7).
+                let tolerance = info.tolerance.as_mut().ok_or(error)?;
+                tolerance.record(
+                    CatalogDefect::LocalSheetIdOutOfRange,
+                    Location::DefinedName(position),
+                );
+            } else {
+                kept.push(defined_name);
             }
+            position = position.saturating_add(1);
         }
+        info.defined_names = kept;
         if info.seen_external_references && info.external_reference_ids.is_empty() {
             return Err(invalid("workbook externalReferences cannot be empty"));
         }
@@ -532,6 +565,26 @@ impl WorkbookInfo {
 /// Parse and validate the workbook-level catalog from `workbook.xml` bytes.
 pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
     WorkbookInfo::parse(content).map(|info| Catalog {
+        sheets: info.sheets,
+        active_sheet_index: info.active_tab.unwrap_or(0),
+        uses_1904_date_system: info.uses_1904_date_system,
+        defined_names: info.defined_names,
+        pivot_caches: info.pivot_caches,
+        external_reference_ids: info.external_reference_ids,
+    })
+}
+
+/// Parse the workbook catalog for a read facade, repairing cataloged defects
+/// and appending each repair to `tolerance` (see `crate::leniency`).
+pub(crate) fn parse_catalog_repairing(
+    content: &[u8],
+    tolerance: &mut ToleranceReport,
+) -> Result<Catalog> {
+    let mut info = WorkbookInfo::parse_repairing(content)?;
+    if let Some(report) = info.tolerance.take() {
+        tolerance.append(&report);
+    }
+    Ok(Catalog {
         sheets: info.sheets,
         active_sheet_index: info.active_tab.unwrap_or(0),
         uses_1904_date_system: info.uses_1904_date_system,
