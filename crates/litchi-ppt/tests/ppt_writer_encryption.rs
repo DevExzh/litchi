@@ -68,12 +68,14 @@ fn assert_round_trip(profile: EncryptionProfile, password: &str, picture: bool) 
     assert!(matches!(
         package.presentation_with_options(OpenOptions {
             password: Some("wrong"),
+            ..Default::default()
         }),
         Err(Error::InvalidPassword)
     ));
     let presentation = package
         .presentation_with_options(OpenOptions {
             password: Some(password),
+            ..Default::default()
         })
         .unwrap();
     assert!(presentation.text().unwrap().contains("Encrypted 文本"));

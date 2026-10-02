@@ -127,6 +127,7 @@ impl Presentation {
             crate::embedded::object::Editor::inspect_live_mapping_at(
                 &powerpoint_document,
                 head_user_edit,
+                options.leniency,
                 &mut tolerance,
             )?
         };
@@ -134,6 +135,7 @@ impl Presentation {
         let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping_at(
             &powerpoint_document,
             head_user_edit,
+            options.leniency,
             &mut tolerance,
         )?;
         let slide_directory = SlideDirectory::build_from_head(
@@ -291,6 +293,7 @@ impl Presentation {
             crate::embedded::object::Editor::inspect_live_mapping_at(
                 &powerpoint_document,
                 head_user_edit,
+                options.leniency,
                 &mut tolerance,
             )?
         };
@@ -298,6 +301,7 @@ impl Presentation {
         let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping_at(
             &powerpoint_document,
             head_user_edit,
+            options.leniency,
             &mut tolerance,
         )?;
         let slide_directory = SlideDirectory::build_from_head(

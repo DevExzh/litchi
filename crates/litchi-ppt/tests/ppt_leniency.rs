@@ -1219,3 +1219,64 @@ fn nonconforming_user_edit_length_is_read_and_recorded() {
     };
     assert_eq!(textbox.text(), "slide 1");
 }
+
+// ---------------------------------------------------------------------------
+// F5.9 (opt-in): cyclic UserEdit chain.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
+    use litchi_ppt::{Leniency, OpenOptions, UserEditChainDefect};
+
+    let edited = EditedDeck::new();
+    let live = edited.deck.current_edit_offset();
+    // The older UserEditAtom's offsetLastEdit (payload word 2, zero in the
+    // control) points back at the newer one: a cycle.
+    let older = record_headers(&edited.deck.bytes, 0x0FF5)[0] + 8;
+    let mut bytes = edited.deck.bytes.clone();
+    bytes[older + 8..older + 12].copy_from_slice(&live.to_le_bytes());
+
+    for error in [
+        Package::from_reader(Cursor::new(bytes.clone()))
+            .and_then(|mut package| package.presentation())
+            .err(),
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
+            .and_then(|package| package.presentation())
+            .err(),
+    ] {
+        let error = error.expect("a cyclic chain stays fatal under Leniency::Strict");
+        assert!(error.to_string().contains("cyclic"), "{error}");
+    }
+
+    let options = OpenOptions::default().with_leniency(Leniency::TolerateUserEditChainDefects);
+    for presentation in [
+        Package::from_reader(Cursor::new(bytes.clone()))
+            .unwrap()
+            .presentation_with_options(options)
+            .unwrap(),
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
+            .unwrap()
+            .presentation_with_options(options)
+            .unwrap(),
+    ] {
+        assert_eq!(
+            presentation.tolerance_report().defects(),
+            [open_time(UserEditChainDefect::Cycle, live, None)]
+        );
+        let slides = presentation.slides().unwrap();
+        assert_eq!(slides.len(), 2);
+        let shapes = slides[1].shapes().unwrap();
+        let ShapeEnum::TextBox(textbox) = &shapes[0] else {
+            panic!("expected a text box");
+        };
+        // The newest edit is kept.
+        assert_eq!(textbox.text(), "edited");
+    }
+
+    // The opted-in control (no cycle) repairs nothing.
+    let control = Package::from_reader(Cursor::new(edited.deck.bytes.clone()))
+        .unwrap()
+        .presentation_with_options(options)
+        .unwrap();
+    assert!(control.tolerance_report().is_clean());
+}

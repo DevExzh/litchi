@@ -102,6 +102,7 @@ impl Snapshot {
         let presentation = package.presentation_with_options_and_limits(
             crate::OpenOptions {
                 password: options.password,
+                ..Default::default()
             },
             options.limits.fonts.records,
         )?;

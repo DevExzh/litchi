@@ -169,6 +169,7 @@ fn project_remains_available_after_presentation_decryption() {
     let presentation = package
         .presentation_with_options(OpenOptions {
             password: Some("secret"),
+            ..Default::default()
         })
         .unwrap();
     let read_project = presentation.vba().unwrap().unwrap();

@@ -758,6 +758,7 @@ mod tests {
         assert!(matches!(
             package.presentation_with_options(OpenOptions {
                 password: Some("wrong"),
+                ..Default::default()
             }),
             Err(Error::InvalidPassword)
         ));
@@ -774,6 +775,7 @@ mod tests {
             let presentation = package
                 .presentation_with_options(OpenOptions {
                     password: Some("hello"),
+                    ..Default::default()
                 })
                 .unwrap();
             assert!(presentation.slide_count() > 0, "fixture {name}");
@@ -786,6 +788,7 @@ mod tests {
         let presentation = package
             .presentation_with_options(OpenOptions {
                 password: Some("crypto"),
+                ..Default::default()
             })
             .unwrap();
         assert!(presentation.text().unwrap().contains("Dominic Salemno"));

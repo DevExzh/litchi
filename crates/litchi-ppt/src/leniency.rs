@@ -17,10 +17,11 @@
 //! variant.
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
-//! [`Leniency`] variants. No repair currently requires opting in; the first
-//! candidate on the roadmap is breaking a cyclic `UserEdit` chain (finding
-//! F5.9 in `docs/LENIENCY_AUDIT.md`), and the [`Leniency`] variant and
-//! open-options plumbing for it land with that finding.
+//! [`Leniency`] variants, selected through
+//! [`crate::OpenOptions::leniency`]. The one opt-in class today is breaking
+//! a cyclic `UserEdit` chain ([`UserEditChainDefect`], finding F5.9 in
+//! `docs/LENIENCY_AUDIT.md`) under
+//! [`Leniency::TolerateUserEditChainDefects`].
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` and
 //! `crates/litchi-xls/src/leniency.rs` provide for the other legacy readers
@@ -98,6 +99,10 @@
 //!   `UserEditAtom` may carry any payload of at least 28 bytes, as the
 //!   mid-chain walk already allowed; `encryptSessionPersistIdRef` is
 //!   consulted only when 32 bytes are present.
+//! - **F5.9** (opt-in, [`UserEditChainDefect::Cycle`]) — under
+//!   [`Leniency::TolerateUserEditChainDefects`] a `UserEdit` chain that
+//!   revisits an edit offset is cut at the repeat, keeping the newer
+//!   mappings; under [`Leniency::Strict`] it stays an error.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
@@ -152,8 +157,8 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 /// and recorded under every variant, including [`Leniency::Strict`].
 ///
 /// The enumeration is non-exhaustive because opt-in variants arrive with the
-/// roadmap findings that need them (the first candidate is F5.9); new
-/// variants are never a breaking change for callers.
+/// roadmap findings that need them; new variants are never a breaking
+/// change for callers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum Leniency {
@@ -163,6 +168,52 @@ pub enum Leniency {
     /// repairs are still applied and recorded in the [`ToleranceReport`].
     #[default]
     Strict,
+    /// Also repair and record the `UserEdit`-chain defects listed by
+    /// [`UserEditChainDefect`] (finding F5.9).
+    TolerateUserEditChainDefects,
+}
+
+impl Leniency {
+    /// Whether [`UserEditChainDefect`] classes are repaired rather than
+    /// rejected.
+    #[inline]
+    #[must_use]
+    pub const fn tolerates_user_edit_chain_defects(self) -> bool {
+        matches!(self, Self::TolerateUserEditChainDefects)
+    }
+}
+
+/// The class of `UserEdit`-chain defect an opted-in read may repair
+/// (finding F5.9).
+///
+/// This enumeration is closed by design: it is the exhaustive contract of
+/// what [`Leniency::TolerateUserEditChainDefects`] may change about a
+/// presentation. Under [`Leniency::Strict`] each class stays a hard error,
+/// because the repair involves a judgment call: which part of a corrupt
+/// chain is trustworthy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum UserEditChainDefect {
+    /// The `UserEdit` chain revisits an edit offset (MS-PPT 2.3.3 requires
+    /// `offsetLastEdit` to strictly decrease). The walk stops at the
+    /// repeated offset and keeps the persist mappings collected so far —
+    /// merged newest first, so the live objects are already covered —
+    /// as LibreOffice terminates its walk (`svdfppt.cxx`) and POI repairs
+    /// the chain (`HSLFSlideShowImpl.java`). The context is the repeated
+    /// edit offset. The 4096-edit chain bound stays an error.
+    Cycle,
+}
+
+impl UserEditChainDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Cycle => {
+                "stopped the UserEdit chain walk at a repeated edit offset and kept the newer persist mappings"
+            },
+        }
+    }
 }
 
 /// The class of text-property defect the reader repairs the way `PowerPoint`
@@ -512,8 +563,8 @@ impl PersistDefect {
 /// One class of defect repaired while a presentation was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of
-/// what a read may change about a presentation. Every class listed today is
-/// repaired under every [`Leniency`] variant; opt-in classes join this
+/// what a read may change about a presentation. Every class except
+/// [`Defect::UserEditChain`] is repaired under every [`Leniency`] variant; opt-in classes join this
 /// enumeration together with the [`Leniency`] variants that gate them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -528,6 +579,9 @@ pub enum Defect {
     /// A `UserEdit`/persist-chain defect repaired at open time the way
     /// LibreOffice repairs it.
     Persist(PersistDefect),
+    /// A `UserEdit`-chain defect repaired only under
+    /// [`Leniency::TolerateUserEditChainDefects`].
+    UserEditChain(UserEditChainDefect),
 }
 
 impl Defect {
@@ -539,6 +593,7 @@ impl Defect {
             Self::Shape(defect) => defect.repair(),
             Self::SlideList(defect) => defect.repair(),
             Self::Persist(defect) => defect.repair(),
+            Self::UserEditChain(defect) => defect.repair(),
         }
     }
 }
@@ -546,6 +601,12 @@ impl Defect {
 impl From<TextPropDefect> for Defect {
     fn from(defect: TextPropDefect) -> Self {
         Self::TextProp(defect)
+    }
+}
+
+impl From<UserEditChainDefect> for Defect {
+    fn from(defect: UserEditChainDefect) -> Self {
+        Self::UserEditChain(defect)
     }
 }
 
@@ -732,6 +793,9 @@ mod tests {
     #[test]
     fn strict_is_the_default() {
         assert_eq!(Leniency::default(), Leniency::Strict);
+        assert!(!Leniency::Strict.tolerates_user_edit_chain_defects());
+        assert!(Leniency::TolerateUserEditChainDefects.tolerates_user_edit_chain_defects());
+        assert_eq!(crate::OpenOptions::default().leniency, Leniency::Strict);
     }
 
     #[test]
@@ -903,6 +967,7 @@ mod tests {
             Defect::from(PersistDefect::PersistDirectoryRecordType),
             Defect::from(PersistDefect::ZeroCountPersistRun),
             Defect::from(PersistDefect::DuplicatePersistId),
+            Defect::from(UserEditChainDefect::Cycle),
             Defect::from(ShapeDefect::UnreadableShape),
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),

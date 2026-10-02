@@ -121,6 +121,30 @@ mod limit_tests {
 pub struct OpenOptions<'a> {
     /// Password used for password-to-open encryption.
     pub password: Option<&'a str>,
+    /// How opt-in repairs are treated.
+    ///
+    /// Defaults to [`crate::Leniency::Strict`], under which those defects
+    /// remain hard errors. The `PowerPoint`-compatible repairs are applied
+    /// under every variant and recorded in
+    /// [`crate::Presentation::tolerance_report`]; this field does not gate
+    /// them.
+    pub leniency: crate::leniency::Leniency,
+}
+
+impl<'a> OpenOptions<'a> {
+    /// Supply a password-to-open credential.
+    #[must_use]
+    pub const fn with_password(mut self, password: &'a str) -> Self {
+        self.password = Some(password);
+        self
+    }
+
+    /// Set the opt-in repair policy.
+    #[must_use]
+    pub const fn with_leniency(mut self, leniency: crate::leniency::Leniency) -> Self {
+        self.leniency = leniency;
+        self
+    }
 }
 
 /// Password-to-open encryption schemes identified in a PPT file.

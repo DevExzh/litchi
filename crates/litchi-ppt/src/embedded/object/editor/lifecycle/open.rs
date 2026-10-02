@@ -47,18 +47,22 @@ pub(crate) fn inspect_live_mapping(
     inspect_live_mapping_at(
         document,
         rewrite::u32_at(current_user, 16)?,
+        crate::leniency::Leniency::Strict,
         &mut crate::leniency::ToleranceReport::default(),
     )
 }
 
 /// Read the live persist mapping, repairing persist-directory defects into
-/// `report` (finding F5.7).
+/// `report` (finding F5.7) and, when `leniency` opts in, breaking a cyclic
+/// `UserEdit` chain (finding F5.9).
 pub(crate) fn inspect_live_mapping_at(
     document: &[u8],
     current_edit_offset: u32,
+    leniency: crate::leniency::Leniency,
     report: &mut crate::leniency::ToleranceReport,
 ) -> Result<crate::persist::PersistMapping> {
-    let (mappings, _) = mapping::read_reporting(document, current_edit_offset, Some(report))?;
+    let (mappings, _) =
+        mapping::read_reporting(document, current_edit_offset, Some(report), leniency)?;
     let mut result = crate::persist::PersistMapping::new();
     for (persist_id, offset) in mappings {
         result.add_mapping(persist_id, offset);
