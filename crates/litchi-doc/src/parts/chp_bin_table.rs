@@ -1,4 +1,6 @@
 use super::chp::CharacterProperties;
+use super::fkp::ChpxFkp;
+use super::piece_table::PieceTable;
 /// `CHPBinTable` (Character Property Bin Table) parser.
 ///
 /// Based on Apache POI's `CHPBinTable` class.
@@ -10,8 +12,7 @@ use super::chp::CharacterProperties;
 /// - org.apache.poi.hwpf.model.CHPBinTable
 /// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
 /// - [MS-DOC] 2.8.5 `PlcfBteChpx`
-use super::fkp::ChpxFkp;
-use super::piece_table::PieceTable;
+use crate::leniency::{ChpDefect, ToleranceReport};
 use litchi_core::binary::read_u32_le;
 
 /// A character run with properties.
@@ -36,6 +37,8 @@ pub struct CharacterRun {
 pub struct ChpBinTable {
     /// All character runs extracted from FKP pages
     runs: Vec<CharacterRun>,
+    /// Word-compatible repairs applied while the runs were parsed.
+    tolerance: ToleranceReport,
 }
 
 impl ChpBinTable {
@@ -78,6 +81,7 @@ impl ChpBinTable {
         // Pre-allocate: estimate ~10 runs per FKP page (conservative estimate)
         let estimated_runs = n.saturating_mul(10);
         let mut all_runs = Vec::with_capacity(estimated_runs);
+        let mut tolerance = ToleranceReport::default();
 
         // Parse each BTE entry
         for i in 0..n {
@@ -124,7 +128,7 @@ impl ChpBinTable {
                             .map(super::piece_table::TextPiece::property_modifier)
                             .unwrap_or_default();
                         let (properties, direct_grpprl) =
-                            Self::parse_chpx(&entry.grpprl, piece_modifier);
+                            Self::parse_chpx(&entry.grpprl, piece_modifier, i, &mut tolerance);
                         all_runs.push(CharacterRun {
                             start_cp,
                             end_cp,
@@ -166,7 +170,10 @@ impl ChpBinTable {
             true
         });
 
-        Some(Self { runs: all_runs })
+        Some(Self {
+            runs: all_runs,
+            tolerance,
+        })
     }
 
     /// Parse CHPX data (grpprl) into `CharacterProperties`.
@@ -174,7 +181,16 @@ impl ChpBinTable {
     /// Delegates to `CharacterProperties::from_sprm` for consistent behavior
     /// with the full SPRM parser (handles `is_spec`, `is_obj`, `is_data` flags correctly).
     #[inline]
-    fn parse_chpx(grpprl: &[u8], piece_modifier: &[u8]) -> (CharacterProperties, Vec<u8>) {
+    ///
+    /// A run whose grpprl cannot be decoded reads with default character
+    /// properties and records [`ChpDefect::Run`] against its bin-table page;
+    /// operand repairs inside a run are recorded only when the run is kept.
+    fn parse_chpx(
+        grpprl: &[u8],
+        piece_modifier: &[u8],
+        page_index: usize,
+        tolerance: &mut ToleranceReport,
+    ) -> (CharacterProperties, Vec<u8>) {
         if grpprl.is_empty() && piece_modifier.is_empty() {
             return (CharacterProperties::default(), Vec::new());
         }
@@ -183,8 +199,27 @@ impl ChpBinTable {
 
         // Use the complete SPRM parser from CharacterProperties
         // This ensures all flags (is_spec, is_obj, is_data, etc.) are set correctly
-        let properties = CharacterProperties::from_sprm(&direct).unwrap_or_default();
+        let mut run_repairs = ToleranceReport::default();
+        let properties = match CharacterProperties::from_sprm_recording(&direct, &mut run_repairs) {
+            Ok(properties) => {
+                tolerance.append(&run_repairs);
+                properties
+            },
+            Err(_) => {
+                tolerance.record(
+                    ChpDefect::Run,
+                    u16::try_from(page_index).unwrap_or(u16::MAX),
+                );
+                CharacterProperties::default()
+            },
+        };
         (properties, direct)
+    }
+
+    /// Word-compatible repairs applied while the CHPX runs were parsed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Get all character runs.
@@ -225,6 +260,7 @@ mod tests {
                     direct_grpprl: Vec::new(),
                 })
                 .collect(),
+            tolerance: crate::leniency::ToleranceReport::default(),
         }
     }
 

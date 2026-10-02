@@ -6,6 +6,7 @@ use super::{
     CharacterShadingPattern, DisplayFieldRevisionProperties, HighlightColor, HresiOperand,
     HyphenationMode, TextEffect, UnderlineStyle, VerticalPosition,
 };
+use crate::leniency::{ChpDefect, ToleranceReport};
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::{SPRM_C_CNF, get_sprm_operation, get_sprm_type};
 
@@ -21,34 +22,38 @@ impl HyphenationMode {
         }
     }
 
-    fn from_raw(value: u8) -> Result<Self> {
-        match value {
-            1 => Ok(Self::Normal),
-            2 => Ok(Self::AddBefore),
-            3 => Ok(Self::ChangeBefore),
-            4 => Ok(Self::DeleteBefore),
-            5 => Ok(Self::ChangeAfter),
-            6 => Ok(Self::DeleteAndChange),
-            _ => Err(PackageError::Corrupted(format!(
-                "sprmCHresi has invalid Hres mode {value}"
-            ))),
-        }
+    const fn from_raw(value: u8) -> Option<Self> {
+        Some(match value {
+            1 => Self::Normal,
+            2 => Self::AddBefore,
+            3 => Self::ChangeBefore,
+            4 => Self::DeleteBefore,
+            5 => Self::ChangeAfter,
+            6 => Self::DeleteAndChange,
+            _ => return None,
+        })
     }
 }
 
 impl HresiOperand {
-    fn from_bytes(mode: u8, replacement_character: u8) -> Result<Self> {
-        let mode = HyphenationMode::from_raw(mode)?;
-        if mode == HyphenationMode::Normal {
-            if replacement_character != 0 {
-                return Err(PackageError::Corrupted(
-                    "normal sprmCHresi requires ChHres 0x00".to_string(),
-                ));
-            }
-            Ok(Self::normal())
-        } else {
-            Self::with_character(mode, replacement_character)
-        }
+    /// Decode an `HresiOperand`. An undefined Hres mode, a replacement
+    /// character on a normal operand, or a non-printable replacement
+    /// character reads as normal hyphenation and is recorded.
+    fn from_bytes(
+        mode: u8,
+        replacement_character: u8,
+        opcode: u16,
+        tolerance: &mut ToleranceReport,
+    ) -> Self {
+        let decoded = match HyphenationMode::from_raw(mode) {
+            Some(HyphenationMode::Normal) if replacement_character == 0 => Some(Self::normal()),
+            Some(HyphenationMode::Normal) | None => None,
+            Some(mode) => Self::with_character(mode, replacement_character).ok(),
+        };
+        decoded.unwrap_or_else(|| {
+            tolerance.record(ChpDefect::Hyphenation, opcode);
+            Self::normal()
+        })
     }
 
     pub(crate) fn bytes(self) -> [u8; 2] {
@@ -104,6 +109,15 @@ impl CharacterProperties {
     ///
     /// * `grpprl` - Group of SPRMs (property modifications)
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
+        Self::from_sprm_recording(grpprl, &mut ToleranceReport::default())
+    }
+
+    /// [`Self::from_sprm`], recording the Word-compatible operand repairs
+    /// [`ChpDefect`] lists into `tolerance`.
+    pub(crate) fn from_sprm_recording(
+        grpprl: &[u8],
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Self> {
         let mut chp = Self::default();
         let sprms = parse_sprms(grpprl)?;
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
@@ -115,7 +129,7 @@ impl CharacterProperties {
 
         for sprm in &sprms {
             if get_sprm_type(sprm.opcode) == 2 {
-                Self::apply_sprm(&mut chp, sprm)?;
+                Self::apply_sprm(&mut chp, sprm, tolerance)?;
             }
         }
 
@@ -130,18 +144,34 @@ impl CharacterProperties {
     ///
     /// * `chp` - The character properties to modify
     /// * `sprm` - The SPRM operation to apply
-    pub(crate) fn apply_sprm(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
+    ///
+    /// Operand repairs (see [`ChpDefect`]) are recorded into `tolerance`.
+    pub(crate) fn apply_sprm(
+        chp: &mut CharacterProperties,
+        sprm: &Sprm,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<()> {
         // Extract operation code (bits 0-8 of opcode)
         let operation = get_sprm_operation(sprm.opcode);
 
         match operation {
             // Operation 0x00: sprmCFRMarkDel - Mark deleted revision
             0x00 => {
-                chp.is_revision_deleted = Some(Self::revision_flag(sprm, "sprmCFRMarkDel")?);
+                chp.is_revision_deleted = Some(Self::revision_flag(
+                    sprm,
+                    "sprmCFRMarkDel",
+                    chp.is_revision_deleted,
+                    tolerance,
+                )?);
             },
             // Operation 0x01: sprmCFRMark - Mark revision
             0x01 => {
-                chp.is_revision_inserted = Some(Self::revision_flag(sprm, "sprmCFRMark")?);
+                chp.is_revision_inserted = Some(Self::revision_flag(
+                    sprm,
+                    "sprmCFRMark",
+                    chp.is_revision_inserted,
+                    tolerance,
+                )?);
             },
             // Operation 0x02: sprmCFFldVanish - Field vanish flag
             0x02 => {
@@ -174,7 +204,7 @@ impl CharacterProperties {
             },
             // Operation 0x07: sprmCIdslRMark - Revision edit reason.
             0x07 => {
-                chp.revision_id = Some(Self::revision_reason(sprm, "sprmCIdslRMark")?);
+                chp.revision_id = Self::revision_reason(sprm, "sprmCIdslRMark", tolerance)?;
             },
             // Operation 0x08: sprmCChs - Complex character set
             0x08 => {
@@ -494,7 +524,12 @@ impl CharacterProperties {
                 let operand = sprm.operand_word().ok_or_else(|| {
                     PackageError::Corrupted("sprmCHresi is missing its HresiOperand".to_string())
                 })?;
-                chp.hyphenation = HresiOperand::from_bytes(operand as u8, (operand >> 8) as u8)?;
+                chp.hyphenation = HresiOperand::from_bytes(
+                    operand as u8,
+                    (operand >> 8) as u8,
+                    sprm.opcode,
+                    tolerance,
+                );
             },
             // Operation 0x4F: sprmCRgFtc0 - Font for ASCII
             0x4F => {
@@ -546,7 +581,7 @@ impl CharacterProperties {
                 }
             },
             // Operations 0x57 and 0x89: sprmCPropRMark90 / sprmCPropRMark.
-            0x57 | 0x89 => Self::apply_property_revision(chp, sprm)?,
+            0x57 | 0x89 => Self::apply_property_revision(chp, sprm, tolerance)?,
             // Operation 0x58: sprmCFEmboss - Emboss
             0x58 => {
                 if let Some(val) = sprm.operand_byte() {
@@ -629,7 +664,7 @@ impl CharacterProperties {
             },
             // Operation 0x83: sprmCWall - Preserve pre-revision character properties.
             0x83 => {
-                let enabled = Self::strict_bool8(sprm, "sprmCWall")?;
+                let enabled = Self::strict_bool8(sprm, "sprmCWall", tolerance)?;
                 chp.preserved_properties_for_revision = if enabled {
                     let mut previous = chp.clone();
                     previous.properties_preserved_for_revision = false;
@@ -643,7 +678,7 @@ impl CharacterProperties {
             // Operation 0x85: sprmCCnf - Conditional table-style character formatting.
             0x85 => chp
                 .conditional_formats
-                .push(Self::parse_conditional_formatting(sprm)?),
+                .push(Self::parse_conditional_formatting(sprm, tolerance)?),
             // Remaining border, shading, and revision SPRMs.
             0x63 => {
                 chp.deletion_author_index = Some(Self::revision_author(sprm, "sprmCIbstRMarkDel")?);
@@ -654,7 +689,8 @@ impl CharacterProperties {
                 })?);
             },
             0x67 => {
-                chp.deletion_revision_id = Some(Self::revision_reason(sprm, "sprmCIdslRMarkDel")?);
+                chp.deletion_revision_id =
+                    Self::revision_reason(sprm, "sprmCIdslRMarkDel", tolerance)?;
             },
             0x5B | 0x68..=0x6C => {
                 // Retained for future structured border/revision metadata.
@@ -667,27 +703,38 @@ impl CharacterProperties {
         Ok(())
     }
 
-    fn revision_flag(sprm: &Sprm, name: &str) -> Result<bool> {
+    /// Read a Boolean8 revision flag. A byte other than 0/1 is decoded with
+    /// the CHP toggle semantics ([`Self::get_toggle_value`]: 0x80 keeps the
+    /// current value, 0x81 inverts it, anything else reads as false) and
+    /// recorded; a missing operand is framing and stays fatal.
+    fn revision_flag(
+        sprm: &Sprm,
+        name: &str,
+        current: Option<bool>,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<bool> {
         match sprm.operand_byte() {
             Some(0) => Ok(false),
             Some(1) => Ok(true),
-            _ => Err(PackageError::Corrupted(format!(
+            Some(value) => {
+                tolerance.record(ChpDefect::Boolean, sprm.opcode);
+                Ok(Self::get_toggle_value(value, current))
+            },
+            None => Err(PackageError::Corrupted(format!(
                 "{name} must contain a Boolean8 value"
             ))),
         }
     }
 
-    fn strict_bool8(sprm: &Sprm, name: &str) -> Result<bool> {
-        match sprm.operand_byte() {
-            Some(0) => Ok(false),
-            Some(1) => Ok(true),
-            _ => Err(PackageError::Corrupted(format!(
-                "{name} must contain a Boolean8 value"
-            ))),
-        }
+    /// [`Self::revision_flag`] for a Boolean8 with no prior value.
+    fn strict_bool8(sprm: &Sprm, name: &str, tolerance: &mut ToleranceReport) -> Result<bool> {
+        Self::revision_flag(sprm, name, None, tolerance)
     }
 
-    fn parse_conditional_formatting(sprm: &Sprm) -> Result<CharacterConditionalFormatting> {
+    fn parse_conditional_formatting(
+        sprm: &Sprm,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<CharacterConditionalFormatting> {
         let operand = sprm.operand_bytes();
         if operand.len() < 2 {
             return Err(PackageError::Corrupted(
@@ -721,7 +768,7 @@ impl CharacterProperties {
                 "sprmCCnf can contain only character SPRMs".to_string(),
             ));
         }
-        let properties = Box::new(Self::from_sprm(&raw_grpprl)?);
+        let properties = Box::new(Self::from_sprm_recording(&raw_grpprl, tolerance)?);
         Ok(CharacterConditionalFormatting {
             condition,
             properties,
@@ -737,19 +784,28 @@ impl CharacterProperties {
             .map_err(|_| PackageError::Corrupted(format!("{name} author index is negative")))
     }
 
-    fn revision_reason(sprm: &Sprm, name: &str) -> Result<u16> {
+    /// Read a revision-reason code. An undefined code reads as unset and is
+    /// recorded; a missing operand is framing and stays fatal.
+    fn revision_reason(
+        sprm: &Sprm,
+        name: &str,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Option<u16>> {
         let value = sprm
             .operand_word()
             .ok_or_else(|| PackageError::Corrupted(format!("{name} is missing its reason code")))?;
         if value > super::super::super::revision::RevisionReason::MAX_VALUE {
-            return Err(PackageError::Corrupted(format!(
-                "{name} contains an undefined reason code"
-            )));
+            tolerance.record(ChpDefect::RevisionReason, sprm.opcode);
+            return Ok(None);
         }
-        Ok(value)
+        Ok(Some(value))
     }
 
-    fn apply_property_revision(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
+    fn apply_property_revision(
+        chp: &mut CharacterProperties,
+        sprm: &Sprm,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 7 {
             return Err(PackageError::Corrupted(
@@ -759,10 +815,9 @@ impl CharacterProperties {
         chp.has_formatting_revision = Some(match operand[0] {
             0 => false,
             1 => true,
-            _ => {
-                return Err(PackageError::Corrupted(
-                    "sprmCPropRMark must begin with a Boolean8 value".to_string(),
-                ));
+            value => {
+                tolerance.record(ChpDefect::Boolean, sprm.opcode);
+                Self::get_toggle_value(value, chp.has_formatting_revision)
             },
         });
         let author = i16::from_le_bytes([operand[1], operand[2]]);

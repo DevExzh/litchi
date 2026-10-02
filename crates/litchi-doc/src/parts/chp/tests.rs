@@ -1,6 +1,23 @@
 use super::super::tap::TableStyleCondition;
 use super::*;
+use crate::leniency::{ChpDefect, Defect, ToleranceReport};
 use crate::sprm_operations::*;
+
+/// Parse a grpprl and return the properties with the recorded CHP repairs.
+fn parse_recorded(grpprl: &[u8]) -> (CharacterProperties, Vec<(ChpDefect, u32)>) {
+    let mut tolerance = ToleranceReport::default();
+    let properties = CharacterProperties::from_sprm_recording(grpprl, &mut tolerance)
+        .expect("operand defects are repaired, not fatal");
+    let defects = tolerance
+        .defects()
+        .iter()
+        .map(|tolerated| match tolerated.defect {
+            Defect::Chp(defect) => (defect, tolerated.context),
+            other => panic!("unexpected defect {other:?}"),
+        })
+        .collect();
+    (properties, defects)
+}
 
 #[test]
 fn parses_insertion_and_deletion_revision_sprms() {
@@ -41,9 +58,28 @@ fn parses_insertion_and_deletion_revision_sprms() {
     malformed.extend_from_slice(&(-1i16).to_le_bytes());
     assert!(CharacterProperties::from_sprm(&malformed).is_err());
 
+    // An undefined reason code reads as unset and is recorded.
     let mut undefined_reason = SPRM_C_IDSL_RMARK.to_le_bytes().to_vec();
     undefined_reason.extend_from_slice(&0x002Cu16.to_le_bytes());
-    assert!(CharacterProperties::from_sprm(&undefined_reason).is_err());
+    let (properties, defects) = parse_recorded(&undefined_reason);
+    assert_eq!(properties.revision_id, None);
+    assert_eq!(
+        defects,
+        [(ChpDefect::RevisionReason, u32::from(SPRM_C_IDSL_RMARK))]
+    );
+
+    // A Boolean8 revision flag outside {0, 1} uses CHP toggle semantics.
+    for (value, expected) in [(0x81u8, Some(false)), (0x80, Some(true)), (2, Some(false))] {
+        let mut grpprl = SPRM_C_F_RMARK.to_le_bytes().to_vec();
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_C_F_RMARK.to_le_bytes());
+        grpprl.push(value);
+        let (properties, defects) = parse_recorded(&grpprl);
+        assert_eq!(properties.is_revision_inserted, expected, "{value:#04x}");
+        assert_eq!(defects, [(ChpDefect::Boolean, u32::from(SPRM_C_F_RMARK))]);
+    }
+    let (_, defects) = parse_recorded(&grpprl);
+    assert!(defects.is_empty(), "a conforming grpprl records nothing");
 }
 
 #[test]
@@ -62,11 +98,17 @@ fn parses_both_character_formatting_revision_sprms_strictly() {
         assert_eq!(properties.formatting_revision_timestamp, Some(timestamp));
     }
 
-    for operand in [
-        vec![2, 0, 0, 0, 0, 0, 0],
-        vec![1, 0xFF, 0xFF, 0, 0, 0, 0],
-        vec![1, 0, 0, 0, 0, 0],
-    ] {
+    let mut toggled = SPRM_C_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
+    toggled.push(7);
+    toggled.extend_from_slice(&[0x81, 0, 0, 0, 0, 0, 0]);
+    let (properties, defects) = parse_recorded(&toggled);
+    assert_eq!(properties.has_formatting_revision, Some(true));
+    assert_eq!(
+        defects,
+        [(ChpDefect::Boolean, u32::from(SPRM_C_PROP_RMARK_CURRENT))]
+    );
+
+    for operand in [vec![1, 0xFF, 0xFF, 0, 0, 0, 0], vec![1, 0, 0, 0, 0, 0]] {
         let mut grpprl = SPRM_C_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
         grpprl.push(operand.len() as u8);
         grpprl.extend_from_slice(&operand);
@@ -143,8 +185,12 @@ fn preserves_ordered_character_revision_state() {
     assert!(!properties.properties_preserved_for_revision);
     assert!(properties.preserved_properties_for_revision.is_none());
 
-    let invalid = [SPRM_C_WALL.to_le_bytes().as_slice(), &[2]].concat();
-    assert!(CharacterProperties::from_sprm(&invalid).is_err());
+    let toggled = [SPRM_C_WALL.to_le_bytes().as_slice(), &[2]].concat();
+    let (properties, defects) = parse_recorded(&toggled);
+    assert!(!properties.properties_preserved_for_revision);
+    assert_eq!(defects, [(ChpDefect::Boolean, u32::from(SPRM_C_WALL))]);
+    let truncated = SPRM_C_WALL.to_le_bytes();
+    assert!(CharacterProperties::from_sprm(&truncated).is_err());
 }
 
 #[test]
@@ -433,17 +479,22 @@ mod chpx_position_hresi_effect_tests {
             assert!(HresiOperand::with_character(HyphenationMode::AddBefore, byte).is_err());
         }
 
-        for (opcode, operand) in [
-            (SPRM_C_HPS_POS, 3169i16.to_le_bytes()),
-            (SPRM_C_HRESI, [0, 0]),
-            (SPRM_C_HRESI, [7, b'A']),
-            (SPRM_C_HRESI, [1, b'A']),
-            (SPRM_C_HRESI, [2, 0]),
-        ] {
+        let mut grpprl = Vec::new();
+        append(&mut grpprl, SPRM_C_HPS_POS, &3169i16.to_le_bytes());
+        assert!(CharacterProperties::from_sprm(&grpprl).is_err());
+
+        // An undefined or inconsistent HresiOperand reads as normal
+        // hyphenation and is recorded.
+        for operand in [[0, 0], [7, b'A'], [1, b'A'], [2, 0]] {
             let mut grpprl = Vec::new();
-            append(&mut grpprl, opcode, &operand);
-            assert!(CharacterProperties::from_sprm(&grpprl).is_err());
+            append(&mut grpprl, SPRM_C_HRESI, &operand);
+            let (properties, defects) = parse_recorded(&grpprl);
+            assert_eq!(properties.hyphenation, HresiOperand::normal());
+            assert_eq!(defects, [(ChpDefect::Hyphenation, u32::from(SPRM_C_HRESI))]);
         }
+        let mut grpprl = Vec::new();
+        append(&mut grpprl, SPRM_C_HRESI, &[2, b'A']);
+        assert!(parse_recorded(&grpprl).1.is_empty());
         let mut grpprl = Vec::new();
         append(&mut grpprl, SPRM_C_SFXT_TEXT, &[7]);
         assert!(CharacterProperties::from_sprm(&grpprl).is_err());

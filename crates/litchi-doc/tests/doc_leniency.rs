@@ -696,9 +696,10 @@ fn unused_tc80_encodings_are_repaired_per_cell() {
     );
 }
 
-/// The `WordDocument` offset of the first `PapxFkp` page named by
-/// `PlcfBtePapx` (FIB pointer 13), plus that pointer's table-stream offset.
-fn first_papx_page(bytes: &[u8]) -> (usize, usize) {
+/// The `WordDocument` offset of the first FKP page named by the bin table at
+/// FIB pointer `index` (12 = `PlcfBteChpx`, 13 = `PlcfBtePapx`), plus that
+/// pointer's table-stream offset.
+fn first_bin_table_page(bytes: &[u8], index: usize) -> (usize, usize) {
     let package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
         .expect("fixture package");
     let word = package
@@ -712,7 +713,7 @@ fn first_papx_page(bytes: &[u8]) -> (usize, usize) {
     let table = package
         .stream(&[table_name.to_string()])
         .expect("table stream");
-    let bte = table_pointer(word, 13);
+    let bte = table_pointer(word, index);
     // One page: two FCs, then the page number.
     let pn = u32::from_le_bytes(table[bte + 8..bte + 12].try_into().unwrap());
     (usize::try_from(pn).unwrap() * 512, bte)
@@ -727,7 +728,7 @@ fn a_malformed_papx_run_reads_with_default_properties() {
     let original = open_degraded(clean.clone());
     assert!(original.tolerance_report().is_clean());
 
-    let (page, _) = first_papx_page(&clean);
+    let (page, _) = first_bin_table_page(&clean, 13);
     let bytes = edit_word_stream(&clean, |word| {
         let page = &mut word[page..page + 512];
         assert_eq!(page[511], 1, "the fixture page holds one run");
@@ -991,5 +992,37 @@ fn a_wrong_plrsid_reserved_marker_is_ignored_and_recorded() {
             .any(|tolerated| tolerated.defect == rsid_defect && tolerated.context == 0xBEEF),
         "{:?}",
         document.tolerance_report().defects()
+    );
+}
+
+/// MS-DOC 2.9.27's Boolean8 domain is enforced by writers, but readers treat
+/// the byte as a CHP toggle (POI `getCHPFlag`): a CHPX carrying
+/// `sprmCFRMark` 0x02 keeps its run's other properties and records the
+/// repair instead of silently dropping every property of the run.
+#[test]
+fn a_non_boolean_chp_revision_flag_is_repaired_and_recorded() {
+    let clean = writer_document(|_| {});
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+
+    // PlcfBteChpx (FIB pointer 12) names one page; re-point its first run
+    // at a CHPX holding sprmCFRMark (0x0801) = 2 and sprmCFBold = 1.
+    let (page, _) = first_bin_table_page(&clean, 12);
+    let chpx = 400usize;
+    let bytes = edit_word_stream(&clean, |word| {
+        let page = &mut word[page..page + 512];
+        let crun = usize::from(page[511]);
+        assert!(crun >= 1, "the fixture page holds a run");
+        page[(crun + 1) * 4] = u8::try_from(chpx / 2).unwrap();
+        page[chpx..chpx + 7].copy_from_slice(&[6, 0x01, 0x08, 0x02, 0x35, 0x08, 0x01]);
+    });
+    let document = open_degraded(bytes);
+    assert!(document.text().unwrap().contains("Body text"));
+    assert_eq!(
+        document.tolerance_report().defects(),
+        &[litchi_doc::ToleratedDefect {
+            defect: Defect::Chp(litchi_doc::ChpDefect::Boolean),
+            context: 0x0801,
+        }]
     );
 }

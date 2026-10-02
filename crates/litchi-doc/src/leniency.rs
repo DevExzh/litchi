@@ -748,6 +748,52 @@ impl RsidDefect {
     }
 }
 
+/// The class of character-property (`CHP`) operand defect the reader repairs
+/// the way Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// CHP repairs a read applies under every [`Leniency`] variant, including
+/// [`Leniency::Strict`], consistently on the CHPX bin-table, stylesheet, and
+/// paragraph-extractor paths. Operand framing (a missing or truncated
+/// operand) stays a hard error for the grpprl. The recorded
+/// [`ToleratedDefect::context`] is the SPRM opcode, except for
+/// [`Self::Run`], whose context is the `PlcfBteChpx` page index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ChpDefect {
+    /// A Boolean8 operand (`sprmCFRMarkDel`, `sprmCFRMark`, `sprmCWall`, or
+    /// the `sprmCPropRMark` flag) was neither 0 nor 1.
+    ///
+    /// MS-DOC 2.9.27 says "MUST be 0 or 1", but the ecosystem treats the byte
+    /// as a CHP toggle (POI `getCHPFlag`): 0x80 keeps the current value,
+    /// 0x81 inverts it, and any other byte reads as false.
+    Boolean,
+    /// `sprmCHresi` carried an undefined Hres mode, a replacement character
+    /// on a normal operand, or a non-printable replacement character. The
+    /// run reads with normal hyphenation.
+    Hyphenation,
+    /// `sprmCIdslRMark`/`sprmCIdslRMarkDel` carried an undefined revision
+    /// reason code. The reason reads as unset.
+    RevisionReason,
+    /// A CHPX run's grpprl could not be decoded at all. The run reads with
+    /// default character properties, as it did before this defect was
+    /// recorded; the other runs are unaffected.
+    Run,
+}
+
+impl ChpDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Boolean => "decoded the non-0/1 Boolean8 with CHP toggle semantics",
+            Self::Hyphenation => "read the undefined hyphenation operand as normal hyphenation",
+            Self::RevisionReason => "left the undefined revision reason unset",
+            Self::Run => "read the undecodable CHPX run with default character properties",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -790,6 +836,9 @@ pub enum Defect {
     /// A revision-save identifier table (`PLRSID`) defect repaired the way
     /// Word repairs it.
     Rsid(RsidDefect),
+    /// A character-property (`CHP`) operand defect repaired the way Word
+    /// repairs it.
+    Chp(ChpDefect),
 }
 
 impl Defect {
@@ -810,6 +859,7 @@ impl Defect {
             Self::Piece(defect) => defect.repair(),
             Self::Container(defect) => defect.repair(),
             Self::Rsid(defect) => defect.repair(),
+            Self::Chp(defect) => defect.repair(),
         }
     }
 }
@@ -880,6 +930,12 @@ impl From<PieceDefect> for Defect {
     }
 }
 
+impl From<ChpDefect> for Defect {
+    fn from(defect: ChpDefect) -> Self {
+        Self::Chp(defect)
+    }
+}
+
 impl From<RsidDefect> for Defect {
     fn from(defect: RsidDefect) -> Self {
         Self::Rsid(defect)
@@ -911,7 +967,9 @@ pub struct ToleratedDefect {
     /// a [`Defect::Piece`], and the compound-file context (a directory SID,
     /// sector index, or header field value — see
     /// [`litchi_cfb::ToleratedDefect::context`]) for a [`Defect::Container`],
-    /// and the stored `reserved1` value for a [`Defect::Rsid`].
+    /// the stored `reserved1` value for a [`Defect::Rsid`], and the SPRM
+    /// opcode (the `PlcfBteChpx` page index for [`ChpDefect::Run`]) for a
+    /// [`Defect::Chp`].
     ///
     /// The field is 32 bits wide so container contexts are carried exactly;
     /// every DOC-level context fits in 16 bits.
@@ -1142,6 +1200,10 @@ mod tests {
             Defect::from(SectionDefect::Boolean),
             Defect::from(PieceDefect::PropertyModifier),
             Defect::from(RsidDefect::ReservedMarker),
+            Defect::from(ChpDefect::Boolean),
+            Defect::from(ChpDefect::Hyphenation),
+            Defect::from(ChpDefect::RevisionReason),
+            Defect::from(ChpDefect::Run),
             Defect::from(litchi_cfb::Defect::Allocation(
                 litchi_cfb::AllocationDefect::ChainLongerThanSize,
             )),

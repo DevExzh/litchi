@@ -147,6 +147,23 @@ impl StyleSheet {
         }
 
         validate_styles(&styles, leniency, &mut tolerance)?;
+        // Record the Word-compatible CHP operand repairs each style's
+        // character UPX needs, so they reach the report at open even though
+        // the UPXs themselves are resolved lazily. A UPX that cannot be
+        // decoded at all is left to the lazy resolution, exactly as before.
+        for style in styles.iter().flatten() {
+            if let Some(character) = style.character_properties() {
+                let mut repairs = ToleranceReport::default();
+                if crate::parts::chp::CharacterProperties::from_sprm_recording(
+                    character,
+                    &mut repairs,
+                )
+                .is_ok()
+                {
+                    tolerance.append(&repairs);
+                }
+            }
+        }
         Ok(Self {
             header,
             styles,

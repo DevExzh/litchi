@@ -393,13 +393,16 @@ impl Document {
 
         // Everything repaired while the document was opened, in discovery
         // order: the container repairs and the optional auxiliary tables
-        // above first, then the stylesheet's repairs, then the piece-table
-        // and PAPX bin-table repairs, then the
+        // above first, then the stylesheet's repairs, then the piece-table,
+        // CHPX, and PAPX bin-table repairs, then the
         // attached glossary's own stylesheet and PAPX repairs.
         if let Some(parsed) = &stylesheet {
             tolerance.append(parsed.tolerance_report());
         }
         if let Some(table) = &piece_table {
+            tolerance.append(table.tolerance_report());
+        }
+        if let Some(table) = &chp_bin_table {
             tolerance.append(table.tolerance_report());
         }
         if let Some(table) = &pap_bin_table {

@@ -638,9 +638,14 @@ pub(crate) fn cascade_character_properties_with_table(
     if stylesheet.is_none() && table_style_chpx.is_empty() && paragraph_style_chpx.is_empty() {
         return Ok(direct_properties.clone());
     }
+    // These style and CHPX bytes were already decoded at open by the
+    // stylesheet and CHPX bin-table parses, which recorded any operand
+    // repair in the document report; this lazy cascade applies the same
+    // repairs without recording them a second time.
+    let mut repairs = crate::leniency::ToleranceReport::default();
     let mut paragraph_baseline = CharacterProperties::from_sprm(table_style_chpx)?;
     for sprm in parse_sprms(paragraph_style_chpx)? {
-        CharacterProperties::apply_sprm(&mut paragraph_baseline, &sprm)?;
+        CharacterProperties::apply_sprm(&mut paragraph_baseline, &sprm, &mut repairs)?;
     }
     let mut current = paragraph_baseline.clone();
     let sprms = parse_sprms(direct_grpprl)?;
@@ -667,13 +672,13 @@ pub(crate) fn cascade_character_properties_with_table(
                 .unwrap_or_default();
             let mut styled = paragraph_baseline.clone();
             for style_sprm in parse_sprms(&style_chpx)? {
-                CharacterProperties::apply_sprm(&mut styled, &style_sprm)?;
+                CharacterProperties::apply_sprm(&mut styled, &style_sprm, &mut repairs)?;
             }
             styled.style_index = Some(requested);
             preserve_character_style_state(&current, &mut styled);
             current = styled;
         } else {
-            CharacterProperties::apply_sprm(&mut current, sprm)?;
+            CharacterProperties::apply_sprm(&mut current, sprm, &mut repairs)?;
         }
     }
     Ok(current)

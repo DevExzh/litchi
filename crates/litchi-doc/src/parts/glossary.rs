@@ -221,6 +221,9 @@ impl AttachedGlossary {
             report.append(stylesheet.tolerance_report());
         }
         report.append(&self.piece_tolerance);
+        if let Some(table) = &self.chp_bin_table {
+            report.append(table.tolerance_report());
+        }
         if let Some(table) = &self.pap_bin_table {
             report.append(table.tolerance_report());
         }
