@@ -1,4 +1,5 @@
-//! Strict OPC core-properties metadata extraction.
+//! OPC core-properties metadata extraction: tolerant reads (LENIENCY_AUDIT
+//! 8.1), strict decoding for the writer.
 
 use super::{
     CORE_PROPERTIES_NAMESPACE, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS,
@@ -6,7 +7,7 @@ use super::{
     keyword::{self, Item},
     time,
 };
-use crate::leniency::ToleranceReport;
+use crate::leniency::{CorePropertiesDefect, ToleranceReport};
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, SourceBackedPackage};
 
@@ -70,7 +71,11 @@ impl CoreProperty {
 /// Extract relationship-selected core metadata from an OOXML package.
 ///
 /// Absence is valid and remains distinguishable from a present empty document.
-/// A present relationship or part that violates OPC M4.1-M4.5 fails closed.
+/// Producer-rule deviations in the part body (OPC M4.3-M4.5, duplicates,
+/// unknown elements, invalid dates, non-UTF-8 bytes, a dialect mismatch) are
+/// repaired per property as [`crate::leniency`] documents; use
+/// [`read_with_report`] to enumerate them. Ill-formed XML, the Markup
+/// Compatibility namespace (M4.2), and limits still fail.
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -90,21 +95,77 @@ pub fn read_with_report(
     package: &OpcPackage,
     report: &mut ToleranceReport,
 ) -> Result<Option<Props>> {
-    let _ = &report;
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
         return Ok(None);
     };
     let core_part = package.get_part(&part_name)?;
-    let xml = std::str::from_utf8(core_part.blob())
-        .map_err(|error| Error::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
-    let (props, dialect) = decode(xml)?;
-    if Some(dialect) != graph.dialect {
-        return Err(Error::Invalid(
-            "core-properties XML namespace does not match its relationship dialect".to_owned(),
-        ));
+    decode_selected(core_part.blob(), part_name.as_str(), graph.dialect, report).map(Some)
+}
+
+/// Decode the relationship-selected core-properties payload, repairing and
+/// recording a non-UTF-8 payload and a dialect mismatch (LENIENCY_AUDIT 8.1).
+fn decode_selected(
+    bytes: &[u8],
+    part: &str,
+    relationship_dialect: Option<Dialect>,
+    report: &mut ToleranceReport,
+) -> Result<Props> {
+    let mut recorder = Recorder {
+        report,
+        part,
+        strict: false,
+    };
+    let xml = match std::str::from_utf8(bytes) {
+        Ok(xml) => std::borrow::Cow::Borrowed(xml),
+        Err(_) => {
+            recorder.record(CorePropertiesDefect::NonUtf8, None, None)?;
+            String::from_utf8_lossy(bytes)
+        },
+    };
+    let (props, dialect) = decode_reporting(&xml, &mut recorder)?;
+    if let Some(relationship_dialect) = relationship_dialect
+        && relationship_dialect != dialect
+    {
+        recorder.record(
+            CorePropertiesDefect::DialectMismatch,
+            None,
+            Some(match relationship_dialect {
+                Dialect::Strict => super::STRICT_CORE_PROPERTIES_RELATIONSHIP,
+                Dialect::Transitional => litchi_opc::constants::relationship_type::CORE_PROPERTIES,
+            }),
+        )?;
     }
-    Ok(Some(props))
+    Ok(props)
+}
+
+/// Where core-properties repairs are recorded, and for which part.
+///
+/// A strict recorder refuses instead of repairing: the writer uses it so
+/// content the typed model cannot carry is never silently overwritten.
+struct Recorder<'a> {
+    report: &'a mut ToleranceReport,
+    part: &'a str,
+    strict: bool,
+}
+
+impl Recorder<'_> {
+    fn record(
+        &mut self,
+        defect: CorePropertiesDefect,
+        item: Option<&str>,
+        value: Option<&str>,
+    ) -> Result<()> {
+        if self.strict {
+            return Err(Error::Invalid(format!(
+                "non-conformant core properties ({}): {}",
+                item.unwrap_or("part"),
+                defect.repair()
+            )));
+        }
+        self.report.record(defect, self.part, item, value);
+        Ok(())
+    }
 }
 
 /// Extract relationship-selected core metadata from a source-backed OPC
@@ -112,7 +173,7 @@ pub fn read_with_report(
 ///
 /// The catalog and relationship graph remain metadata-only until the
 /// relationship-selected core-properties part is read. This is the
-/// positional equivalent of [`read`]: it applies the same strict graph and
+/// positional equivalent of [`read`]: it applies the same graph and
 /// dialect checks, while retaining the source package's version and
 /// execution-policy checks around the selected payload read.
 ///
@@ -135,7 +196,6 @@ pub fn read_source_backed_with_report(
     package: &SourceBackedPackage,
     report: &mut ToleranceReport,
 ) -> Result<Option<Props>> {
-    let _ = &report;
     package.check_execution()?;
     package.source_version()?;
     let graph = graph::inspect_source(package)?;
@@ -147,20 +207,41 @@ pub fn read_source_backed_with_report(
     let core_part = package.part(&part_name)?;
     let data = core_part.data()?;
     package.check_execution()?;
-    let xml = std::str::from_utf8(data.as_bytes())
-        .map_err(|error| Error::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
-    let (props, dialect) = decode(xml)?;
-    if Some(dialect) != graph.dialect {
-        return Err(Error::Invalid(
-            "core-properties XML namespace does not match its relationship dialect".to_owned(),
-        ));
-    }
+    let props = decode_selected(data.as_bytes(), part_name.as_str(), graph.dialect, report)?;
     package.check_execution()?;
     package.source_version()?;
     Ok(Some(props))
 }
 
+/// Decode core-properties XML strictly: every deviation [`read`] repairs is
+/// an error here.
+///
+/// The writer uses this before replacing a payload, so content the typed
+/// model cannot carry (an unknown element, a duplicate) is never silently
+/// discarded by a write.
 pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
+    let mut report = ToleranceReport::default();
+    decode_reporting(
+        xml,
+        &mut Recorder {
+            report: &mut report,
+            part: "",
+            strict: true,
+        },
+    )
+}
+
+/// Decode core-properties XML, repairing the producer-rule deviations of
+/// LENIENCY_AUDIT 8.1 and recording each into `recorder`.
+///
+/// Word and LibreOffice look properties up one by one and ignore what they do
+/// not understand, so a deviation costs at most the deviating property:
+/// unknown elements and duplicate properties are skipped, unexpected
+/// attributes ignored, a missing W3CDTF `xsi:type` accepted, and an
+/// unparseable date dropped. XML well-formedness, the document element, DTDs,
+/// the Markup Compatibility namespace (OPC M4.2), keyword structure, and the
+/// byte/event/text limits stay hard errors.
+fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Props, Dialect)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
             resource: "core-properties XML bytes",
@@ -176,6 +257,9 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
     let mut root_closed = false;
     let mut active: Option<Active> = None;
     let mut events = 0usize;
+    // Depth of a skipped unknown or duplicate property subtree; 0 when not
+    // skipping. Bounded by the event limit.
+    let mut skip_depth = 0usize;
 
     loop {
         events = events.checked_add(1).ok_or(Error::Limit {
@@ -198,9 +282,25 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
         let event = event.into_owned();
         reject_markup_compatibility(namespace)?;
 
+        if skip_depth > 0 {
+            match event {
+                Event::Start(_) => skip_depth = skip_depth.saturating_add(1),
+                Event::End(_) => skip_depth -= 1,
+                Event::DocType(_) => {
+                    return Err(Error::Invalid(
+                        "DTD is not allowed in core properties".to_string(),
+                    ));
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+            buffer.clear();
+            continue;
+        }
+
         match event {
             Event::Start(element) if root_namespace.is_none() => {
-                validate_root(namespace, &element, &reader)?;
+                validate_root(namespace, &element, &reader, recorder)?;
                 root_namespace = Some(
                     namespace
                         .ok_or_else(|| Error::Invalid("coreProperties has no namespace".into()))?
@@ -208,7 +308,7 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
                 );
             },
             Event::Empty(element) if root_namespace.is_none() => {
-                validate_root(namespace, &element, &reader)?;
+                validate_root(namespace, &element, &reader, recorder)?;
                 root_namespace = Some(
                     namespace
                         .ok_or_else(|| Error::Invalid("coreProperties has no namespace".into()))?
@@ -217,33 +317,40 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
                 root_closed = true;
             },
             Event::Start(element) if !root_closed && active.is_none() => {
-                let property = parse_property(namespace, element.local_name().as_ref())?;
-                mark_seen(&mut seen, property)?;
+                let Some(property) = admit_property(namespace, &element, &mut seen, recorder)?
+                else {
+                    skip_depth = 1;
+                    buffer.clear();
+                    continue;
+                };
                 active = Some(if property == CoreProperty::Keywords {
                     Active::Keywords {
                         value: Keywords {
-                            lang: keyword_lang(&reader, &element)?,
+                            lang: keyword_lang(&reader, &element, recorder)?,
                             items: Vec::new(),
                         },
                         child: None,
                         bytes: 0,
                     }
                 } else {
-                    validate_property_attributes(&reader, &element, property)?;
+                    validate_property_attributes(&reader, &element, property, recorder)?;
                     Active::Text(property, String::new())
                 });
             },
             Event::Empty(element) if !root_closed && active.is_none() => {
-                let property = parse_property(namespace, element.local_name().as_ref())?;
-                mark_seen(&mut seen, property)?;
+                let Some(property) = admit_property(namespace, &element, &mut seen, recorder)?
+                else {
+                    buffer.clear();
+                    continue;
+                };
                 if property == CoreProperty::Keywords {
                     props.keywords = Some(Keywords {
-                        lang: keyword_lang(&reader, &element)?,
+                        lang: keyword_lang(&reader, &element, recorder)?,
                         items: Vec::new(),
                     });
                 } else {
-                    validate_property_attributes(&reader, &element, property)?;
-                    apply_property(&mut props, property, String::new())?;
+                    validate_property_attributes(&reader, &element, property, recorder)?;
+                    apply_property(&mut props, property, String::new(), recorder)?;
                 }
             },
             Event::Start(element) if active.is_some() => {
@@ -254,6 +361,7 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
                     &reader,
                     &element,
                     false,
+                    recorder,
                 )?;
             },
             Event::Empty(element) if active.is_some() => {
@@ -264,6 +372,7 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
                     &reader,
                     &element,
                     true,
+                    recorder,
                 )?;
             },
             Event::Start(_) | Event::Empty(_) => {
@@ -295,6 +404,7 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
                     root_namespace.as_deref(),
                     &element,
                     &mut props,
+                    recorder,
                 )?;
             },
             Event::End(element) if !root_closed => {
@@ -343,6 +453,7 @@ fn validate_root(
     namespace: Option<&[u8]>,
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
+    recorder: &mut Recorder<'_>,
 ) -> Result<()> {
     if element.local_name().as_ref() != b"coreProperties"
         || !matches!(
@@ -354,10 +465,37 @@ fn validate_root(
             "expected coreProperties in the OPC core-properties namespace".to_string(),
         ));
     }
-    validate_attributes(reader, element, None)
+    validate_attributes(reader, element, None, recorder)
 }
 
-fn parse_property(namespace: Option<&[u8]>, local: &[u8]) -> Result<CoreProperty> {
+/// Admit a property start tag: `None` (recorded) when the element is not a
+/// known core property or repeats one, so the caller skips its subtree.
+fn admit_property(
+    namespace: Option<&[u8]>,
+    element: &BytesStart<'_>,
+    seen: &mut [bool; CoreProperty::COUNT],
+    recorder: &mut Recorder<'_>,
+) -> Result<Option<CoreProperty>> {
+    let Some(property) = parse_property(namespace, element.local_name().as_ref()) else {
+        recorder.record(
+            CorePropertiesDefect::UnknownElement,
+            Some(&String::from_utf8_lossy(element.name().as_ref())),
+            None,
+        )?;
+        return Ok(None);
+    };
+    if std::mem::replace(&mut seen[property.index()], true) {
+        recorder.record(
+            CorePropertiesDefect::DuplicateProperty,
+            Some(property_str(property)),
+            None,
+        )?;
+        return Ok(None);
+    }
+    Ok(Some(property))
+}
+
+fn parse_property(namespace: Option<&[u8]>, local: &[u8]) -> Option<CoreProperty> {
     let property = match (namespace, local) {
         (Some(DUBLIN_CORE_NAMESPACE), b"title") => CoreProperty::Title,
         (Some(DUBLIN_CORE_NAMESPACE), b"subject") => CoreProperty::Subject,
@@ -388,32 +526,26 @@ fn parse_property(namespace: Option<&[u8]>, local: &[u8]) -> Result<CoreProperty
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"lastPrinted") => {
             CoreProperty::LastPrinted
         },
-        (Some(DUBLIN_CORE_TERMS_NAMESPACE), _) => {
-            return Err(Error::Invalid(
-                "OPC M4.3 permits only dcterms:created and dcterms:modified".to_string(),
-            ));
-        },
-        _ => {
-            return Err(Error::Invalid(format!(
-                "unexpected core property element '{}'",
-                String::from_utf8_lossy(local)
-            )));
-        },
+        // OPC M4.3 permits only dcterms:created and dcterms:modified; any
+        // other term, like any unknown element, is skipped by the caller.
+        _ => return None,
     };
-    Ok(property)
+    Some(property)
 }
 
 fn validate_property_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     property: CoreProperty,
+    recorder: &mut Recorder<'_>,
 ) -> Result<()> {
-    validate_attributes(reader, element, Some(property))
+    validate_attributes(reader, element, Some(property), recorder)
 }
 
 fn keyword_lang(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
+    recorder: &mut Recorder<'_>,
 ) -> Result<Option<keyword::Lang>> {
     let mut language = None;
     for attribute in element.checked_attributes() {
@@ -443,10 +575,11 @@ fn keyword_lang(
             language = Some(keyword::Lang::new(value.into_owned())?);
             continue;
         }
-        return Err(Error::Invalid(format!(
-            "attribute '{}' is not allowed on keywords",
-            String::from_utf8_lossy(raw_key)
-        )));
+        recorder.record(
+            CorePropertiesDefect::UnexpectedAttribute,
+            Some(&String::from_utf8_lossy(element.local_name().as_ref())),
+            Some(&String::from_utf8_lossy(raw_key)),
+        )?;
     }
     Ok(language)
 }
@@ -458,6 +591,7 @@ fn start_keyword_value(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     empty: bool,
+    recorder: &mut Recorder<'_>,
 ) -> Result<()> {
     let Some(Active::Keywords {
         value,
@@ -476,7 +610,7 @@ fn start_keyword_value(
     }
     let child_value = keyword::Value {
         text: String::new(),
-        lang: keyword_lang(reader, element)?,
+        lang: keyword_lang(reader, element, recorder)?,
     };
     if empty {
         value.items.push(Item::Value(child_value));
@@ -492,6 +626,7 @@ fn close_active(
     root_namespace: Option<&[u8]>,
     element: &BytesEnd<'_>,
     props: &mut Props,
+    recorder: &mut Recorder<'_>,
 ) -> Result<()> {
     if matches!(active, Some(Active::Keywords { child: Some(_), .. })) {
         if namespace != root_namespace || element.local_name().as_ref() != b"value" {
@@ -514,12 +649,12 @@ fn close_active(
         .ok_or_else(|| Error::Invalid("core property has no active state".to_owned()))?;
     match finished {
         Active::Text(property, value) => {
-            if parse_property(namespace, element.local_name().as_ref())? != property {
+            if parse_property(namespace, element.local_name().as_ref()) != Some(property) {
                 return Err(Error::Invalid(
                     "malformed core property element nesting".to_owned(),
                 ));
             }
-            apply_property(props, property, value)
+            apply_property(props, property, value, recorder)
         },
         Active::Keywords {
             value,
@@ -544,8 +679,19 @@ fn validate_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     property: Option<CoreProperty>,
+    recorder: &mut Recorder<'_>,
 ) -> Result<()> {
+    let owner = property.map_or("coreProperties", property_str);
     let mut has_w3cdtf = false;
+    // Every attribute OPC M4.4/M4.5 or the schema rejects is a producer-rule
+    // deviation: ignored and recorded (LENIENCY_AUDIT 8.1).
+    let unexpected = |recorder: &mut Recorder<'_>, raw_key: &[u8]| {
+        recorder.record(
+            CorePropertiesDefect::UnexpectedAttribute,
+            Some(owner),
+            Some(&String::from_utf8_lossy(raw_key)),
+        )
+    };
     for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| Error::Xml(format!("invalid core property attribute: {error}")))?;
@@ -564,44 +710,27 @@ fn validate_attributes(
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = bound_namespace(&namespace);
         reject_markup_compatibility(namespace)?;
-        if namespace == Some(XML_NAMESPACE) && local.as_ref() == b"lang" {
-            return Err(Error::Invalid(
-                "OPC M4.4 forbids xml:lang in core properties".to_string(),
-            ));
-        }
         if namespace == Some(XSI_NAMESPACE) && local.as_ref() == b"type" {
-            let Some(property) = property else {
-                return Err(Error::Invalid(
-                    "OPC M4.5 forbids xsi:type on coreProperties".to_string(),
-                ));
-            };
-            if !property.requires_w3cdtf() || has_w3cdtf {
-                return Err(Error::Invalid(
-                    "OPC M4.5 permits one xsi:type only on created or modified".to_string(),
-                ));
-            }
             let (value_namespace, value_local) =
                 reader.resolver().resolve_element(QName(value.as_bytes()));
-            if value.as_ref() != "dcterms:W3CDTF"
-                || bound_namespace(&value_namespace) != Some(DUBLIN_CORE_TERMS_NAMESPACE)
-                || value_local.as_ref() != b"W3CDTF"
-            {
-                return Err(Error::Invalid(
-                    "OPC M4.5 requires xsi:type=\"dcterms:W3CDTF\"".to_string(),
-                ));
+            let permitted = property.is_some_and(CoreProperty::requires_w3cdtf)
+                && !has_w3cdtf
+                && value.as_ref() == "dcterms:W3CDTF"
+                && bound_namespace(&value_namespace) == Some(DUBLIN_CORE_TERMS_NAMESPACE)
+                && value_local.as_ref() == b"W3CDTF";
+            if !permitted {
+                unexpected(recorder, raw_key)?;
             }
+            // A misspelled type still declares one; the date is read as
+            // W3CDTF either way, so only the attribute is recorded.
             has_w3cdtf = true;
             continue;
         }
-        return Err(Error::Invalid(format!(
-            "attribute '{}' is not allowed on core properties",
-            String::from_utf8_lossy(raw_key)
-        )));
+        // OPC M4.4 forbids xml:lang; it and any other attribute are ignored.
+        unexpected(recorder, raw_key)?;
     }
     if property.is_some_and(CoreProperty::requires_w3cdtf) && !has_w3cdtf {
-        return Err(Error::Invalid(
-            "OPC M4.5 requires xsi:type on created and modified".to_string(),
-        ));
+        recorder.record(CorePropertiesDefect::MissingDateType, Some(owner), None)?;
     }
     Ok(())
 }
@@ -611,16 +740,6 @@ fn reject_markup_compatibility(namespace: Option<&[u8]>) -> Result<()> {
         return Err(Error::Invalid(
             "OPC M4.2 forbids the Markup Compatibility namespace".to_string(),
         ));
-    }
-    Ok(())
-}
-
-fn mark_seen(seen: &mut [bool; CoreProperty::COUNT], property: CoreProperty) -> Result<()> {
-    if std::mem::replace(&mut seen[property.index()], true) {
-        return Err(Error::Invalid(format!(
-            "duplicate core property '{}'",
-            String::from_utf8_lossy(property_name(property))
-        )));
     }
     Ok(())
 }
@@ -680,7 +799,12 @@ fn append_bounded(text: &mut String, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn apply_property(props: &mut Props, property: CoreProperty, value: String) -> Result<()> {
+fn apply_property(
+    props: &mut Props,
+    property: CoreProperty,
+    value: String,
+    recorder: &mut Recorder<'_>,
+) -> Result<()> {
     match property {
         CoreProperty::Title => props.title = Some(value),
         CoreProperty::Subject => props.subject = Some(value),
@@ -698,11 +822,30 @@ fn apply_property(props: &mut Props, property: CoreProperty, value: String) -> R
         CoreProperty::Category => props.category = Some(value),
         CoreProperty::ContentStatus => props.content_status = Some(value),
         CoreProperty::Version => props.version = Some(value),
-        CoreProperty::Created => props.created = Some(time::W3c::new(value)?),
-        CoreProperty::Modified => props.modified = Some(time::W3c::new(value)?),
-        CoreProperty::LastPrinted => props.last_printed = Some(time::DateTime::new(value)?),
+        // An unparseable date costs only that property (LENIENCY_AUDIT 8.1).
+        CoreProperty::Created | CoreProperty::Modified => match time::W3c::new(value.clone()) {
+            Ok(parsed) if property == CoreProperty::Created => props.created = Some(parsed),
+            Ok(parsed) => props.modified = Some(parsed),
+            Err(_) => recorder.record(
+                CorePropertiesDefect::InvalidValue,
+                Some(property_str(property)),
+                Some(&value),
+            )?,
+        },
+        CoreProperty::LastPrinted => match time::DateTime::new(value.clone()) {
+            Ok(parsed) => props.last_printed = Some(parsed),
+            Err(_) => recorder.record(
+                CorePropertiesDefect::InvalidValue,
+                Some(property_str(property)),
+                Some(&value),
+            )?,
+        },
     }
     Ok(())
+}
+
+fn property_str(property: CoreProperty) -> &'static str {
+    std::str::from_utf8(property_name(property)).unwrap_or("property")
 }
 
 fn property_name(property: CoreProperty) -> &'static [u8] {
@@ -943,18 +1086,133 @@ mod tests {
         );
     }
 
+    /// Decode `xml`, returning the properties and the recorded repairs as
+    /// `(defect, item)` pairs.
+    fn decode_recorded(xml: &str) -> (Props, Vec<(CorePropertiesDefect, Option<String>)>) {
+        let mut report = ToleranceReport::default();
+        let (props, _) = decode_reporting(
+            xml,
+            &mut Recorder {
+                report: &mut report,
+                part: "/docProps/core.xml",
+                strict: false,
+            },
+        )
+        .unwrap();
+        let recorded = report
+            .iter()
+            .map(|tolerated| {
+                let crate::leniency::Defect::CoreProperties(defect) = tolerated.defect() else {
+                    panic!("unexpected defect family");
+                };
+                assert_eq!(tolerated.part(), "/docProps/core.xml");
+                (defect, tolerated.item().map(str::to_owned))
+            })
+            .collect();
+        (props, recorded)
+    }
+
     #[test]
-    fn rejects_wrong_root_duplicates_invalid_values_dtd_and_entities() {
+    fn rejects_wrong_root_dtd_and_entities() {
         assert!(decode("<props/>").is_err());
-        let duplicate = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>A</dc:title><dc:title>B</dc:title></cp:coreProperties>"#;
-        assert!(decode(duplicate).is_err());
-        let non_schema = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:contentType>text/plain</cp:contentType></cp:coreProperties>"#;
-        assert!(decode(non_schema).is_err());
-        let bad_last_printed = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:lastPrinted>2026-08-03</cp:lastPrinted></cp:coreProperties>"#;
-        assert!(decode(bad_last_printed).is_err());
         assert!(decode("<!DOCTYPE x><x/>").is_err());
         let package = poi_package("CorePropertiesHasEntities.ooxml");
         assert!(read(&package).is_err());
+    }
+
+    /// LENIENCY_AUDIT 8.1: duplicates keep the first value, unknown elements
+    /// (including other dcterms terms) are skipped with their subtree, and an
+    /// unparseable date drops only that property — each recorded.
+    #[test]
+    fn duplicates_unknown_elements_and_invalid_dates_degrade_per_property() {
+        let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:x="urn:x"><dc:title>A</dc:title><dc:title>B<x:b/></dc:title><cp:contentType>text/plain</cp:contentType><x:ext><x:deep><dc:title>C</dc:title></x:deep></x:ext><dcterms:abstract>s</dcterms:abstract><x:empty/><cp:lastPrinted>2026-08-03</cp:lastPrinted><dc:creator>Me</dc:creator></cp:coreProperties>"#;
+        let (props, recorded) = decode_recorded(xml);
+        assert_eq!(props.title.as_deref(), Some("A"));
+        assert_eq!(props.creator.as_deref(), Some("Me"));
+        assert!(props.last_printed.is_none());
+        let item = |name: &str| Some(name.to_owned());
+        assert_eq!(
+            recorded,
+            vec![
+                (CorePropertiesDefect::DuplicateProperty, item("title")),
+                (CorePropertiesDefect::UnknownElement, item("cp:contentType")),
+                (CorePropertiesDefect::UnknownElement, item("x:ext")),
+                (CorePropertiesDefect::UnknownElement, item("dcterms:abstract")),
+                (CorePropertiesDefect::UnknownElement, item("x:empty")),
+                (CorePropertiesDefect::InvalidValue, item("lastPrinted")),
+            ]
+        );
+
+        let conformant = Props::new().title("A").creator("Me").xml().unwrap();
+        assert!(decode_recorded(&conformant).1.is_empty());
+    }
+
+    /// LENIENCY_AUDIT 8.1: OPC M4.4/M4.5 attribute rules are producer rules —
+    /// a missing W3CDTF type is accepted, and `xml:lang`, misplaced or
+    /// misspelled `xsi:type`, and foreign attributes are ignored; recorded.
+    #[test]
+    fn attribute_deviations_are_ignored_and_recorded() {
+        let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:x="urn:x" x:root="1"><dc:subject xml:lang="en">S</dc:subject><dcterms:created>2026-01-02T03:04:05Z</dcterms:created><dcterms:modified xsi:type="dcterms:Other">2026-01-03</dcterms:modified><dc:title xsi:type="dcterms:W3CDTF">T</dc:title><cp:keywords x:k="1">k</cp:keywords></cp:coreProperties>"#;
+        let (props, recorded) = decode_recorded(xml);
+        assert_eq!(props.subject.as_deref(), Some("S"));
+        assert_eq!(props.title.as_deref(), Some("T"));
+        assert_eq!(
+            props.created.as_ref().map(time::W3c::as_str),
+            Some("2026-01-02T03:04:05Z")
+        );
+        assert_eq!(
+            props.modified.as_ref().map(time::W3c::as_str),
+            Some("2026-01-03")
+        );
+        assert_eq!(props.keywords.as_ref().map(Keywords::joined).as_deref(), Some("k"));
+        let item = |name: &str| Some(name.to_owned());
+        assert_eq!(
+            recorded,
+            vec![
+                (CorePropertiesDefect::UnexpectedAttribute, item("coreProperties")),
+                (CorePropertiesDefect::UnexpectedAttribute, item("subject")),
+                (CorePropertiesDefect::MissingDateType, item("created")),
+                (CorePropertiesDefect::UnexpectedAttribute, item("modified")),
+                (CorePropertiesDefect::UnexpectedAttribute, item("title")),
+                (CorePropertiesDefect::UnexpectedAttribute, item("keywords")),
+            ]
+        );
+    }
+
+    /// LENIENCY_AUDIT 8.1: a non-UTF-8 payload is decoded lossily and a
+    /// dialect mismatch is accepted; both are recorded on the read path.
+    #[test]
+    fn non_utf8_payloads_and_dialect_mismatches_are_recorded() {
+        let mut latin1 = br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Jos"#.to_vec();
+        latin1.push(0xe9);
+        latin1.extend_from_slice(b"</dc:creator></cp:coreProperties>");
+        let package = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, &latin1);
+        let mut report = ToleranceReport::default();
+        let props = read_with_report(&package, &mut report).unwrap().unwrap();
+        assert_eq!(props.creator.as_deref(), Some("Jos\u{fffd}"));
+        assert_eq!(
+            report.iter().map(|t| t.defect()).collect::<Vec<_>>(),
+            vec![CorePropertiesDefect::NonUtf8.into()]
+        );
+        assert_eq!(report.defects()[0].part(), "/docProps/core.xml");
+
+        let strict_xml = br#"<cp:coreProperties xmlns:cp="http://purl.oclc.org/ooxml/package/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>T</dc:title></cp:coreProperties>"#;
+        let package =
+            package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, strict_xml);
+        let mut report = ToleranceReport::default();
+        let props = read_with_report(&package, &mut report).unwrap().unwrap();
+        assert_eq!(props.title.as_deref(), Some("T"));
+        assert_eq!(
+            report.iter().map(|t| (t.defect(), t.value())).collect::<Vec<_>>(),
+            vec![(
+                CorePropertiesDefect::DialectMismatch.into(),
+                Some(rt::CORE_PROPERTIES)
+            )]
+        );
+        let source = source_package(&package);
+        let mut source_report = ToleranceReport::default();
+        read_source_backed_with_report(&source, &mut source_report).unwrap();
+        assert_eq!(source_report, report);
     }
 
     #[test]
@@ -995,8 +1253,6 @@ mod tests {
         assert!(decode(nested).is_err());
         let wrong_child = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:x="urn:test"><cp:keywords><x:value>x</x:value></cp:keywords></cp:coreProperties>"#;
         assert!(decode(wrong_child).is_err());
-        let illegal_language = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:subject xml:lang="en">x</dc:subject></cp:coreProperties>"#;
-        assert!(decode(illegal_language).is_err());
     }
 
     #[test]
@@ -1013,8 +1269,18 @@ mod tests {
             Some("2026-08-03T04:05:06")
         );
 
+        // A prefix alias is not the literal `dcterms:W3CDTF`: recorded, and the
+        // date is still read.
         let alias = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:t="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dcterms:created xsi:type="t:W3CDTF">2026</dcterms:created></cp:coreProperties>"#;
-        assert!(decode(alias).is_err());
+        let (props, recorded) = decode_recorded(alias);
+        assert_eq!(props.created.as_ref().map(time::W3c::as_str), Some("2026"));
+        assert_eq!(
+            recorded,
+            vec![(
+                CorePropertiesDefect::UnexpectedAttribute,
+                Some("created".to_owned())
+            )]
+        );
     }
 
     #[test]
@@ -1055,15 +1321,49 @@ mod tests {
             Some("2007-06-20T07:59:00-13:00")
         );
 
-        for name in [
-            "OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx",
-            "OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx",
-            "OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx",
-            "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
-            "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx",
+        // OPC M4.2 (Markup Compatibility) stays a hard error.
+        assert!(
+            read(&poi_package(
+                "OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx"
+            ))
+            .is_err()
+        );
+        // LENIENCY_AUDIT 8.1: POI's M4.3-M4.5 failure fixtures are producer
+        // deviations Word and LibreOffice open; each is repaired and recorded.
+        for (name, expected) in [
+            (
+                "OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx",
+                CorePropertiesDefect::UnknownElement,
+            ),
+            (
+                "OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx",
+                CorePropertiesDefect::UnexpectedAttribute,
+            ),
+            (
+                "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
+                CorePropertiesDefect::MissingDateType,
+            ),
+            (
+                "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx",
+                CorePropertiesDefect::UnexpectedAttribute,
+            ),
         ] {
-            assert!(read(&poi_package(name)).is_err(), "accepted {name}");
+            let mut report = ToleranceReport::default();
+            let props = read_with_report(&poi_package(name), &mut report)
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+            assert!(props.is_some(), "{name}");
+            assert!(
+                report.iter().any(|t| t.defect() == expected.into()),
+                "{name}: {report:?}"
+            );
         }
+        let mut report = ToleranceReport::default();
+        read_with_report(
+            &poi_package("OPCCompliance_CoreProperties_SUCCESS.docx"),
+            &mut report,
+        )
+        .unwrap();
+        assert!(report.is_clean(), "{report:?}");
     }
 
     #[test]

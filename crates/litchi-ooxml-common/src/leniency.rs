@@ -41,7 +41,7 @@
 //!
 //! The carriers are in place; the defect classes are the contract for
 //! findings 8.1–8.4 of `docs/LENIENCY_AUDIT.md`. Recording sites land finding
-//! by finding: none yet.
+//! by finding: 8.1 (core-properties body).
 
 use std::fmt;
 
@@ -357,7 +357,6 @@ impl ToleranceReport {
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
-    #[allow(dead_code, reason = "the first recording site lands with finding 8.1")]
     pub(crate) fn record(
         &mut self,
         defect: impl Into<Defect>,
