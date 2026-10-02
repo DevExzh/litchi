@@ -394,7 +394,7 @@ impl Document {
                 }
             },
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 let document = package.document().map_err(crate::map_ooxml_error)?;
                 validate_docx_markdown_blocks(document.blocks().map_err(crate::map_ooxml_error)?)?;
             },
@@ -480,7 +480,7 @@ impl Document {
     )]
     pub(crate) fn markdown_docx_document(&self) -> Result<Option<crate::docx::Document<'_>>> {
         match &self.inner {
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 package.document().map(Some).map_err(crate::map_ooxml_error)
             },
             #[cfg(feature = "docx")]
@@ -622,7 +622,7 @@ impl Document {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(document, _) => crate::markdown::resolve_doc_lists(document),
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 let document = package.document().map_err(crate::map_ooxml_error)?;
                 crate::markdown::resolve_docx_lists(&document)
             },
@@ -999,6 +999,9 @@ impl Document {
                 // linear text pass here; filesystem source opens keep this
                 // work deferred until their first query.
                 document.text().map_err(crate::map_ooxml_error)?;
+                // The document's report now holds the packaging, metadata,
+                // and main-story repairs of this open.
+                let tolerance = Box::new(document.tolerance_report());
 
                 // Move a clone of the already validated semantic cache across the facade seam.
                 let metadata = package
@@ -1008,7 +1011,7 @@ impl Document {
                     .unwrap_or_default();
 
                 Ok(Self {
-                    inner: DocumentImpl::Docx(package, metadata),
+                    inner: DocumentImpl::Docx(package, metadata, tolerance),
                 })
             },
             #[cfg(feature = "pages")]
@@ -1101,7 +1104,7 @@ impl Document {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => doc.text().map_err(Error::from),
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => package
+            DocumentImpl::Docx(package, ..) => package
                 .document()
                 .and_then(|document| document.text())
                 .map_err(crate::map_ooxml_error),
@@ -1151,7 +1154,7 @@ impl Document {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => doc.paragraph_count().map_err(Error::from),
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => package
+            DocumentImpl::Docx(package, ..) => package
                 .document()
                 .and_then(|document| document.paragraph_count())
                 .map_err(crate::map_ooxml_error),
@@ -1206,7 +1209,7 @@ impl Document {
         limits: &crate::docx::section::Limits,
     ) -> Result<crate::docx::section::Inventory> {
         match &self.inner {
-            DocumentImpl::Docx(package, _) => package
+            DocumentImpl::Docx(package, ..) => package
                 .document()
                 .and_then(|document| document.section_inventory_with_limits(limits))
                 .map_err(crate::map_ooxml_error),
@@ -1246,7 +1249,7 @@ impl Document {
                     .transpose()
             },
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 let paragraph = package
                     .document()
                     .and_then(|document| document.paragraph(index))
@@ -1325,7 +1328,7 @@ impl Document {
                 .nth(index)
                 .map(Paragraph::Doc)),
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 let paragraph = package
                     .document()
                     .and_then(|document| document.paragraph(index))
@@ -1397,7 +1400,7 @@ impl Document {
                 Ok(paras.into_iter().map(Paragraph::Doc).collect())
             },
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 let paras = package
                     .document()
                     .and_then(|document| document.paragraphs())
@@ -1505,7 +1508,7 @@ impl Document {
                     .collect())
             },
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 let tables = package
                     .document()
                     .and_then(|document| document.tables())
@@ -1624,7 +1627,7 @@ impl Document {
                     .collect())
             },
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(package, _) => {
+            DocumentImpl::Docx(package, ..) => {
                 use super::DocumentElement;
                 use crate::docx::Element;
                 let raw = package
@@ -1871,7 +1874,7 @@ impl Document {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
             #[cfg(feature = "docx")]
-            DocumentImpl::Docx(_, metadata) => Ok(metadata.clone()),
+            DocumentImpl::Docx(_, metadata, _) => Ok(metadata.clone()),
             #[cfg(feature = "docx")]
             DocumentImpl::DocxSource(package, _) => {
                 let result = package.metadata().map_err(Self::map_source_docx_error);
@@ -1889,6 +1892,72 @@ impl Document {
             DocumentImpl::OdtSource(doc) => {
                 let result = doc.metadata();
                 Self::finish_source_odt_result(doc, result)
+            },
+        }
+    }
+
+    /// Everything the reader repaired while this document was read, as the
+    /// owning format crate recorded it.
+    ///
+    /// An empty report ([`ToleranceReport::is_clean`](crate::ToleranceReport::is_clean))
+    /// means the document conformed; see [`crate::ToleranceReport`]. What
+    /// each format covers:
+    ///
+    /// * `.doc` — the open: container, FIB-pointed tables, stylesheet,
+    ///   property runs, and the `SummaryInformation` /
+    ///   `DocumentSummaryInformation` metadata streams.
+    /// * `.docx` (byte opens) — packaging, core- and custom-properties, and
+    ///   the main story's open-time text pass. Repairs specific to later
+    ///   element or table projections are reported by
+    ///   [`litchi_docx::Document::tolerance_report`] on a document obtained
+    ///   from the package.
+    /// * `.docx` (filesystem opens, deferred part payloads) — packaging and
+    ///   core properties (read now if [`Self::metadata`] has not read them
+    ///   yet; recorded once), plus the repairs of every deferred read
+    ///   performed so far.
+    /// * `.rtf`, `.odt` — the whole parse, performed at open.
+    /// * `.pages` — [`ToleranceReport::Untracked`](crate::ToleranceReport::Untracked).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a filesystem-backed `.docx` source changed or
+    /// its core-properties part cannot be read.
+    pub fn tolerance_report(&self) -> Result<crate::ToleranceReport> {
+        match &self.inner {
+            #[cfg(feature = "doc")]
+            DocumentImpl::Doc(doc, _) => {
+                Ok(crate::ToleranceReport::Doc(doc.tolerance_report().clone()))
+            },
+            #[cfg(feature = "docx")]
+            DocumentImpl::Docx(_, _, report) => {
+                Ok(crate::ToleranceReport::Docx(report.as_ref().clone()))
+            },
+            #[cfg(feature = "docx")]
+            DocumentImpl::DocxSource(package, _) => {
+                // Core-properties repairs join the source package's report
+                // when the metadata is first read; read it so they are part
+                // of this report whether or not the caller asked for it.
+                let result = package
+                    .metadata()
+                    .map(|_| crate::ToleranceReport::Docx(package.tolerance_report()))
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(package, result)
+            },
+            #[cfg(feature = "pages")]
+            DocumentImpl::Pages(_) => Ok(crate::ToleranceReport::Untracked(
+                litchi_core::detection::FileFormat::Pages,
+            )),
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(doc) => {
+                Ok(crate::ToleranceReport::Rtf(doc.tolerance_report().clone()))
+            },
+            #[cfg(feature = "odt")]
+            DocumentImpl::Odt(doc) => {
+                Ok(crate::ToleranceReport::Odt(doc.tolerance_report().clone()))
+            },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                Ok(crate::ToleranceReport::Odt(doc.tolerance_report().clone()))
             },
         }
     }
@@ -2345,7 +2414,7 @@ mod tests {
             .expect("open eager DOCX oracle");
 
         assert!(matches!(&source.inner, DocumentImpl::DocxSource(_, _)));
-        assert!(matches!(&eager.inner, DocumentImpl::Docx(_, _)));
+        assert!(matches!(&eager.inner, DocumentImpl::Docx(..)));
         let cold_loads_before = match &source.inner {
             DocumentImpl::DocxSource(package, _) => package.cache_diagnostics().cold_loads,
             _ => unreachable!("filesystem DOCX must retain source owner"),

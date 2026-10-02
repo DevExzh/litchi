@@ -82,7 +82,7 @@ pub mod text;
     feature = "ods",
     feature = "numbers"
 ))]
-mod workbook;
+pub(crate) mod workbook;
 #[cfg(any(
     feature = "xls",
     feature = "xlsx",

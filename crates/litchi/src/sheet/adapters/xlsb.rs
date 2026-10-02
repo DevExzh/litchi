@@ -98,6 +98,16 @@ impl Workbook {
             .map_err(boxed_xlsb_error)
     }
 
+    /// The workbook-scope repairs so far, followed by those of every
+    /// worksheet this adapter has materialized, in catalog order.
+    pub(crate) fn tolerance_report(&self) -> xlsb::ToleranceReport {
+        let mut report = self.workbook.tolerance_report();
+        for worksheet in self.worksheets.iter().filter_map(OnceLock::get) {
+            report.append(worksheet.tolerance_report());
+        }
+        report
+    }
+
     fn materialize<'a, T>(
         &'a self,
         handle: &SourceBackedWorksheet<'a>,

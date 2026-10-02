@@ -913,10 +913,17 @@ impl Presentation {
             #[cfg(feature = "pptx")]
             DetectedFormat::Pptx(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let cached_metadata = crate::ooxml_common::properties::read(&opc_package)
-                    .map_err(crate::map_ooxml_error)?
-                    .map(litchi_core::Metadata::from)
-                    .filter(|metadata| metadata.has_data());
+                // `Package::from_opc_package` reads the same core properties
+                // at open and folds their repairs into the package report
+                // that `tolerance_report` returns, so this projection's
+                // identical repairs are already recorded there.
+                let cached_metadata = crate::ooxml_common::properties::read_with_report(
+                    &opc_package,
+                    &mut crate::ooxml_common::leniency::ToleranceReport::default(),
+                )
+                .map_err(crate::map_ooxml_error)?
+                .map(litchi_core::Metadata::from)
+                .filter(|metadata| metadata.has_data());
                 let package = Box::new(
                     crate::pptx::Package::from_opc_package(opc_package)
                         .map_err(crate::map_ooxml_error)?,
@@ -1472,8 +1479,10 @@ impl Presentation {
         if let PresentationImpl::PptxSource(presentation) = &self.inner {
             // Do not publish a failed read into the OnceLock: a caller can
             // retry after a transient source/version or XML failure.
+            // `Presentation::tolerance_report` collects these repairs with
+            // the same read, so this projection's report is not kept.
             let metadata = presentation
-                .properties()
+                .properties_with_tolerance(&mut crate::pptx::ToleranceReport::default())
                 .map_err(crate::map_ooxml_error)?
                 .map(litchi_core::Metadata::from)
                 .filter(litchi_core::Metadata::has_data);
@@ -1482,6 +1491,77 @@ impl Presentation {
         }
 
         Ok(None)
+    }
+
+    /// Everything the reader repaired while this presentation was read, as
+    /// the owning format crate recorded it.
+    ///
+    /// An empty report ([`ToleranceReport::is_clean`](crate::ToleranceReport::is_clean))
+    /// means the presentation conformed; see [`crate::ToleranceReport`].
+    /// Slides parse lazily in every format, so this call performs the slide
+    /// reads whose repairs it lists. What each format covers:
+    ///
+    /// * `.ppt` — [`litchi_ppt::Presentation::collect_tolerance_report`]: the
+    ///   open (container, edit chain, slide directory, metadata streams), then
+    ///   every main master's, slide's and notes page's shapes, which this
+    ///   call parses.
+    /// * `.pptx` — the package's open-time report (packaging, slide list,
+    ///   core/custom/presentation properties; for filesystem opens, the core
+    ///   properties are read by this call), then the text extraction of
+    ///   every slide, which this call performs. Repairs of other lazily
+    ///   parsed slide parts (animations, transitions, charts, comments) are
+    ///   reported by the `litchi_pptx` accessors that parse them.
+    /// * `.odp` — the package and the slide scan (run once, on first use).
+    /// * `.key` — [`ToleranceReport::Untracked`](crate::ToleranceReport::Untracked).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a slide, notes page, or shape tree cannot be
+    /// parsed, or when a filesystem-backed source changed.
+    pub fn tolerance_report(&self) -> Result<crate::ToleranceReport> {
+        match &self.inner {
+            #[cfg(feature = "ppt")]
+            PresentationImpl::Ppt(pres) => pres
+                .collect_tolerance_report()
+                .map(crate::ToleranceReport::Ppt)
+                .map_err(Error::from),
+            #[cfg(feature = "pptx")]
+            PresentationImpl::Pptx(package) => {
+                let mut report = package.tolerance_report().clone();
+                let pres = package.presentation().map_err(crate::map_ooxml_error)?;
+                for slide in pres.slides().map_err(crate::map_ooxml_error)? {
+                    slide
+                        .text_with_tolerance(&mut report)
+                        .map_err(crate::map_ooxml_error)?;
+                }
+                Ok(crate::ToleranceReport::Pptx(report))
+            },
+            #[cfg(feature = "pptx")]
+            PresentationImpl::PptxSource(presentation) => {
+                let mut report = presentation.tolerance_report().clone();
+                presentation
+                    .properties_with_tolerance(&mut report)
+                    .map_err(crate::map_ooxml_error)?;
+                for slide in presentation.slides() {
+                    slide
+                        .text_with_tolerance(&mut report)
+                        .map_err(crate::map_ooxml_error)?;
+                }
+                Ok(crate::ToleranceReport::Pptx(report))
+            },
+            #[cfg(feature = "keynote")]
+            PresentationImpl::Keynote(_) => Ok(crate::ToleranceReport::Untracked(
+                litchi_core::detection::FileFormat::Keynote,
+            )),
+            #[cfg(feature = "odp")]
+            PresentationImpl::Odp(pres) => {
+                Ok(crate::ToleranceReport::Odp(pres.tolerance_report().clone()))
+            },
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(pres) => {
+                Ok(crate::ToleranceReport::Odp(pres.tolerance_report().clone()))
+            },
+        }
     }
 
     /// Fast text extraction for markdown conversion (internal use).

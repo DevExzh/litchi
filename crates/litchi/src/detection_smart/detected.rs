@@ -757,6 +757,7 @@ pub(crate) enum WorkbookSourcePathDetection {
     Xlsx {
         workbook: crate::xlsx::SourceBackedWorkbook,
         metadata: litchi_core::Metadata,
+        metadata_repairs: crate::sheet::workbook::MetadataRepairs,
     },
     /// A validated, source-retaining XLSB owner and its source-backed core
     /// properties projection.
@@ -764,6 +765,7 @@ pub(crate) enum WorkbookSourcePathDetection {
     Xlsb {
         workbook: crate::xlsb::SourceBackedWorkbook,
         metadata: litchi_core::Metadata,
+        metadata_repairs: crate::sheet::workbook::MetadataRepairs,
     },
     /// A validated, source-retaining ODS owner.
     #[cfg(feature = "ods")]
@@ -981,9 +983,8 @@ pub(crate) fn detect_workbook_source_path_with_limits(
 
             #[cfg(feature = "xlsx")]
             if format == litchi_core::detection::FileFormat::Xlsx {
-                let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
-                    .map(litchi_core::Metadata::from)
-                    .unwrap_or_default();
+                let (metadata, metadata_repairs) =
+                    crate::sheet::workbook::read_source_backed_metadata(&package)?;
                 let workbook =
                     crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)?;
                 let owner_version = workbook.source_version()?;
@@ -993,14 +994,17 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                         observed: owner_version,
                     }));
                 }
-                return Ok(WorkbookSourcePathDetection::Xlsx { workbook, metadata });
+                return Ok(WorkbookSourcePathDetection::Xlsx {
+                    workbook,
+                    metadata,
+                    metadata_repairs,
+                });
             }
 
             #[cfg(feature = "xlsb")]
             if format == litchi_core::detection::FileFormat::Xlsb {
-                let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
-                    .map(litchi_core::Metadata::from)
-                    .unwrap_or_default();
+                let (metadata, metadata_repairs) =
+                    crate::sheet::workbook::read_source_backed_metadata(&package)?;
                 let workbook =
                     crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)?;
                 let owner_version = workbook.source_version()?;
@@ -1010,7 +1014,11 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                         observed: owner_version,
                     }));
                 }
-                return Ok(WorkbookSourcePathDetection::Xlsb { workbook, metadata });
+                return Ok(WorkbookSourcePathDetection::Xlsb {
+                    workbook,
+                    metadata,
+                    metadata_repairs,
+                });
             }
 
             let enabled = match format {

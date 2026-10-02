@@ -200,6 +200,31 @@ fn xls_metadata_error_is_soft(error: &litchi_cfb::OleError) -> bool {
     )
 }
 
+/// Core-properties repairs of an OOXML workbook's metadata read, folded into
+/// the format report by [`Workbook::tolerance_report`].
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+pub(crate) type MetadataRepairs = crate::ooxml_common::leniency::ToleranceReport;
+
+/// Without an OOXML workbook format no metadata read records repairs.
+#[cfg(not(any(feature = "xlsx", feature = "xlsb")))]
+#[derive(Debug, Default)]
+pub(crate) struct MetadataRepairs {
+    _none: (),
+}
+
+/// Read an OOXML workbook's core properties with their repairs.
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn read_source_backed_metadata(
+    package: &crate::opc::SourceBackedPackage,
+) -> crate::ooxml_common::Result<(Metadata, MetadataRepairs)> {
+    let mut repairs = MetadataRepairs::default();
+    let metadata =
+        crate::ooxml_common::properties::read_source_backed_with_report(package, &mut repairs)?
+            .map(Metadata::from)
+            .unwrap_or_default();
+    Ok((metadata, repairs))
+}
+
 /// A unified workbook interface for supported spreadsheet formats.
 ///
 /// The selected format is detected from the file signature. Filesystem XLS
@@ -241,6 +266,13 @@ pub struct Workbook {
     inner: WorkbookImpl,
     /// Cached metadata extracted during workbook initialization
     cached_metadata: Metadata,
+    /// Repairs the facade's own metadata read applied (OOXML core
+    /// properties); folded into [`Self::tolerance_report`].
+    #[cfg_attr(
+        not(any(feature = "xlsx", feature = "xlsb")),
+        allow(dead_code, reason = "only OOXML workbooks read metadata with repairs")
+    )]
+    metadata_repairs: MetadataRepairs,
 }
 
 impl Workbook {
@@ -267,28 +299,26 @@ impl Workbook {
         #[cfg(feature = "xlsx")]
         if detected == litchi_core::detection::FileFormat::Xlsx {
             let package = prepared.into_package()?;
-            let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
-                .map(Metadata::from)
-                .unwrap_or_default();
+            let (metadata, metadata_repairs) = read_source_backed_metadata(&package)?;
             let workbook = crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)?;
             return Ok(Self {
                 inner: WorkbookImpl::Xlsx(super::adapters::Workbook::from_source_backed(workbook)),
                 cached_metadata: metadata,
+                metadata_repairs,
             });
         }
 
         #[cfg(feature = "xlsb")]
         if detected == litchi_core::detection::FileFormat::Xlsb {
             let package = prepared.into_package()?;
-            let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
-                .map(Metadata::from)
-                .unwrap_or_default();
+            let (metadata, metadata_repairs) = read_source_backed_metadata(&package)?;
             let workbook = crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)?;
             return Ok(Self {
                 inner: WorkbookImpl::XlsbSource(super::adapters::XlsbWorkbook::from_source_backed(
                     workbook,
                 )?),
                 cached_metadata: metadata,
+                metadata_repairs,
             });
         }
 
@@ -318,21 +348,25 @@ impl Workbook {
                 crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsx {
                     workbook,
                     metadata,
+                    metadata_repairs,
                 } => Ok(Self {
                     inner: WorkbookImpl::Xlsx(super::adapters::Workbook::from_source_backed(
                         workbook,
                     )),
                     cached_metadata: metadata,
+                    metadata_repairs,
                 }),
                 #[cfg(feature = "xlsb")]
                 crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
                     workbook,
                     metadata,
+                    metadata_repairs,
                 } => Ok(Self {
                     inner: WorkbookImpl::XlsbSource(
                         super::adapters::XlsbWorkbook::from_source_backed(workbook)?,
                     ),
                     cached_metadata: metadata,
+                    metadata_repairs,
                 }),
                 #[cfg(feature = "ods")]
                 crate::detection_smart::detected::WorkbookSourcePathDetection::Ods(ods) => {
@@ -340,6 +374,7 @@ impl Workbook {
                     Ok(Self {
                         inner: WorkbookImpl::OdsSource(*ods),
                         cached_metadata: metadata,
+                        metadata_repairs: MetadataRepairs::default(),
                     })
                 },
                 #[cfg(feature = "xls")]
@@ -349,6 +384,7 @@ impl Workbook {
                 } => Ok(Self {
                     inner: WorkbookImpl::XlsSource(XlsSource::new(workbook, cfb)),
                     cached_metadata: Metadata::default(),
+                    metadata_repairs: MetadataRepairs::default(),
                 }),
                 crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(
                     detected,
@@ -414,6 +450,7 @@ impl Workbook {
                 return Ok(Self {
                     inner: WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
                     cached_metadata: metadata,
+                    metadata_repairs: MetadataRepairs::default(),
                 });
             },
             Ok(Err(bytes)) => bytes,
@@ -433,6 +470,7 @@ impl Workbook {
                 return Ok(Self {
                     inner: WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
                     cached_metadata: metadata,
+                    metadata_repairs: MetadataRepairs::default(),
                 });
             },
             Err(bytes) => bytes,
@@ -445,10 +483,8 @@ impl Workbook {
             },
             #[cfg(feature = "xlsb")]
             crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsb(package) => {
-                let metadata = crate::ooxml_common::properties::read_source_backed(&package)
-                    .map_err(crate::map_ooxml_error)?
-                    .map(litchi_core::Metadata::from)
-                    .unwrap_or_default();
+                let (metadata, metadata_repairs) =
+                    read_source_backed_metadata(&package).map_err(crate::map_ooxml_error)?;
                 let workbook =
                     crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)
                         .map_err(crate::map_ooxml_error)?;
@@ -456,14 +492,13 @@ impl Workbook {
                 return Ok(Self {
                     inner: WorkbookImpl::XlsbSource(adapter),
                     cached_metadata: metadata,
+                    metadata_repairs,
                 });
             },
             #[cfg(feature = "xlsx")]
             crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsx(package) => {
-                let metadata = crate::ooxml_common::properties::read_source_backed(&package)
-                    .map_err(crate::map_ooxml_error)?
-                    .map(litchi_core::Metadata::from)
-                    .unwrap_or_default();
+                let (metadata, metadata_repairs) =
+                    read_source_backed_metadata(&package).map_err(crate::map_ooxml_error)?;
                 let workbook =
                     crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)
                         .map_err(crate::map_ooxml_error)?;
@@ -472,6 +507,7 @@ impl Workbook {
                         workbook,
                     )),
                     cached_metadata: metadata,
+                    metadata_repairs,
                 });
             },
             crate::detection_smart::detected::WorkbookSourceBytesDetection::Fallback(bytes) => {
@@ -488,6 +524,11 @@ impl Workbook {
         })?;
 
         // Open with appropriate implementation and extract metadata
+        #[cfg_attr(
+            not(any(feature = "xlsx", feature = "xlsb")),
+            allow(unused_mut, reason = "only OOXML workbooks read metadata with repairs")
+        )]
+        let mut metadata_repairs = MetadataRepairs::default();
         let (inner, metadata) = match detected {
             #[cfg(feature = "numbers")]
             DetectedFormat::Numbers(data) => {
@@ -519,10 +560,13 @@ impl Workbook {
             #[cfg(feature = "xlsx")]
             DetectedFormat::Xlsx(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let metadata = crate::ooxml_common::properties::read(&opc_package)
-                    .map_err(crate::map_ooxml_error)?
-                    .map(litchi_core::Metadata::from)
-                    .unwrap_or_default();
+                let metadata = crate::ooxml_common::properties::read_with_report(
+                    &opc_package,
+                    &mut metadata_repairs,
+                )
+                .map_err(crate::map_ooxml_error)?
+                .map(litchi_core::Metadata::from)
+                .unwrap_or_default();
                 let xlsx = crate::xlsx::Package::from_opc(opc_package)
                     .map_err(crate::map_ooxml_error)?
                     .into_workbook()
@@ -536,10 +580,13 @@ impl Workbook {
             #[cfg(feature = "xlsb")]
             DetectedFormat::Xlsb(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let metadata = crate::ooxml_common::properties::read(&opc_package)
-                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?
-                    .map(litchi_core::Metadata::from)
-                    .unwrap_or_default();
+                let metadata = crate::ooxml_common::properties::read_with_report(
+                    &opc_package,
+                    &mut metadata_repairs,
+                )
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?
+                .map(litchi_core::Metadata::from)
+                .unwrap_or_default();
 
                 // Create XLSB workbook directly from the parsed OPC package
                 let xlsb = crate::xlsb::Package::from_opc(opc_package)
@@ -584,6 +631,7 @@ impl Workbook {
         Ok(Self {
             inner,
             cached_metadata: metadata,
+            metadata_repairs,
         })
     }
 
@@ -840,6 +888,100 @@ impl Workbook {
         }
     }
 
+    /// Everything the reader repaired while this workbook was read, as the
+    /// owning format crate recorded it.
+    ///
+    /// An empty report ([`ToleranceReport::is_clean`](crate::ToleranceReport::is_clean))
+    /// means the workbook conformed; see [`crate::ToleranceReport`]. The
+    /// core-properties repairs of the metadata this facade read at open
+    /// appear as the format's `Defect::Properties` entries (`.xlsx`,
+    /// `.xlsb`); the legacy metadata streams' repairs as
+    /// `Defect::PropertySet` entries (`.xls`). What each format covers:
+    ///
+    /// * `.xlsx` — the open (package, workbook part, styles, theme), the
+    ///   shared strings once read, and every worksheet whose cells have been
+    ///   parsed so far: worksheets parse lazily, so a worksheet not yet read
+    ///   contributes once it is.
+    /// * `.xlsb` (filesystem and byte opens) — the workbook-scope repairs so
+    ///   far (the styles part joins once a worksheet first needs it), then
+    ///   every worksheet this workbook has materialized so far.
+    /// * `.xlsb` (eager owner) — the open, then every worksheet, which this
+    ///   call materializes.
+    /// * `.xls` — the globals parse, the metadata streams, and the worksheet
+    ///   scans performed so far.
+    /// * `.ods` — the whole parse, performed at open.
+    /// * `.numbers` — [`ToleranceReport::Untracked`](crate::ToleranceReport::Untracked).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a source-backed workbook's source changed, or
+    /// when an eager `.xlsb` worksheet cannot be materialized.
+    pub fn tolerance_report(&self) -> Result<crate::ToleranceReport> {
+        #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+        let metadata_repairs = &self.metadata_repairs;
+        match &self.inner {
+            #[cfg(feature = "numbers")]
+            WorkbookImpl::Numbers(_) => Ok(crate::ToleranceReport::Untracked(
+                litchi_core::detection::FileFormat::Numbers,
+            )),
+            #[cfg(feature = "xlsx")]
+            WorkbookImpl::Xlsx(workbook) => {
+                workbook.ensure_source_current()?;
+                let mut report = workbook.tolerance_report();
+                report.append_properties(metadata_repairs);
+                Ok(crate::ToleranceReport::Xlsx(report))
+            },
+            #[cfg(feature = "xlsb")]
+            WorkbookImpl::Xlsb(workbook) => {
+                let mut report = workbook.tolerance_report().clone();
+                report.append_properties(metadata_repairs);
+                for index in 0..workbook.worksheet_count() {
+                    let worksheet = workbook.worksheet(index).map_err(crate::map_ooxml_error)?;
+                    report.append(worksheet.tolerance_report());
+                }
+                Ok(crate::ToleranceReport::Xlsb(report))
+            },
+            #[cfg(feature = "xlsb")]
+            WorkbookImpl::XlsbSource(workbook) => {
+                workbook.ensure_source_current()?;
+                let mut report = workbook.tolerance_report();
+                report.append_properties(metadata_repairs);
+                Ok(crate::ToleranceReport::Xlsb(report))
+            },
+            #[cfg(feature = "xls")]
+            WorkbookImpl::XlsFile(workbook) => Ok(crate::ToleranceReport::Xls(
+                workbook.tolerance_report().clone(),
+            )),
+            #[cfg(feature = "xls")]
+            WorkbookImpl::XlsMem(workbook) => Ok(crate::ToleranceReport::Xls(
+                workbook.tolerance_report().clone(),
+            )),
+            #[cfg(feature = "ods")]
+            WorkbookImpl::Ods(spreadsheet) => Ok(crate::ToleranceReport::Ods(
+                spreadsheet.borrow().tolerance_report().clone(),
+            )),
+            #[cfg(all(feature = "ods", any(unix, windows)))]
+            WorkbookImpl::OdsSource(spreadsheet) => Ok(crate::ToleranceReport::Ods(
+                spreadsheet.tolerance_report().clone(),
+            )),
+            #[cfg(all(feature = "xls", any(unix, windows)))]
+            WorkbookImpl::XlsSource(source) => {
+                source.ensure_current()?;
+                // The source owner never reads the metadata streams; this
+                // facade does (`Self::metadata`), so their repairs are
+                // folded in here, as the eager owner records them at open.
+                let mut report = source.workbook.tolerance_report();
+                report.append_property_sets(|path| source.cfb.property_set_stream(path));
+                source.ensure_current()?;
+                Ok(crate::ToleranceReport::Xls(report))
+            },
+            #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
+            WorkbookImpl::Other => Err(Box::new(Error::Unsupported(
+                "Unsupported workbook type in this build".to_string(),
+            )) as Box<dyn std::error::Error + Send + Sync>),
+        }
+    }
+
     /// Get metadata from the workbook.
     ///
     /// Returns the cached metadata that was extracted during workbook initialization.
@@ -891,13 +1033,14 @@ impl Workbook {
 
 #[cfg(all(test, feature = "xlsx"))]
 mod selected_sheet_runtime_tests {
-    use super::{Workbook, WorkbookImpl};
+    use super::{MetadataRepairs, Workbook, WorkbookImpl};
 
     #[test]
     fn non_xlsx_runtime_variant_is_explicitly_unsupported() {
         let workbook = Workbook {
             inner: WorkbookImpl::Other,
             cached_metadata: litchi_core::Metadata::default(),
+            metadata_repairs: MetadataRepairs::default(),
         };
         let error = workbook.sheet("Sheet1").unwrap_err();
         assert!(matches!(

@@ -34,8 +34,15 @@ pub(super) enum DocumentImpl {
     #[cfg(feature = "doc")]
     Doc(doc::Document, litchi_core::Metadata),
     /// Modern .docx format
+    ///
+    /// The report is the main document's, taken after the open-time text
+    /// pass: packaging, core/custom-properties, and main-story repairs.
     #[cfg(feature = "docx")]
-    Docx(Box<crate::docx::Package>, litchi_core::Metadata),
+    Docx(
+        Box<crate::docx::Package>,
+        litchi_core::Metadata,
+        Box<crate::docx::ToleranceReport>,
+    ),
     /// Source-backed modern .docx with deferred part payloads.
     #[cfg(feature = "docx")]
     DocxSource(crate::docx::source_backed::Package, DocxSourceCache),

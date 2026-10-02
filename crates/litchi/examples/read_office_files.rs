@@ -95,9 +95,13 @@ fn print_props(prefix: &str, props: Option<&litchi::ooxml_common::Props>) {
 }
 
 fn print_pptx_props(prefix: &str, package: &PptxPackage) -> Result<(), Box<dyn std::error::Error>> {
-    let props = litchi::ooxml_common::properties::read(package.opc()?)
+    let mut repairs = litchi::ooxml_common::leniency::ToleranceReport::default();
+    let props = litchi::ooxml_common::properties::read_with_report(package.opc()?, &mut repairs)
         .map_err(|error| format!("could not read PPTX core properties: {error}"))?;
     print_props(prefix, props.as_ref());
+    for repair in &repairs {
+        println!("{prefix}Repaired: {}", repair.defect());
+    }
     Ok(())
 }
 

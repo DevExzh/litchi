@@ -64,7 +64,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
     package.save(&authored)?;
 
     let package = pptx::Package::open(&authored)?;
-    if properties::read(package.opc()?)?.is_none() {
+    if read_clean(package.opc()?)?.is_none() {
         return Err("PPTX core properties were not published".into());
     }
     let mut graph = package.opc()?.clone();
@@ -86,7 +86,7 @@ fn create_xlsx(directory: &Path) -> Result<()> {
     package.save(&authored)?;
 
     let graph = OpcPackage::open(&authored)?;
-    if properties::read(&graph)?.is_none() {
+    if read_clean(&graph)?.is_none() {
         return Err("XLSX core properties were not published".into());
     }
     let mut graph = OpcPackage::open(&authored)?;
@@ -94,6 +94,17 @@ fn create_xlsx(directory: &Path) -> Result<()> {
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&cleared)?;
     Ok(())
+}
+
+/// Read core properties the example just authored; a freshly written part
+/// needs no repair.
+fn read_clean(package: &OpcPackage) -> Result<Option<Props>> {
+    let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
+    let props = properties::read_with_report(package, &mut repairs)?;
+    if !repairs.is_clean() {
+        return Err(format!("authored core properties needed repairs: {repairs:?}").into());
+    }
+    Ok(props)
 }
 
 fn smoke_props(host: &str) -> Props {

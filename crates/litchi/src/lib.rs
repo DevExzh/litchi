@@ -268,6 +268,27 @@ pub use metadata_ext::MetadataYaml;
 ))]
 pub mod document;
 
+/// Format-neutral repair reports of the unified facades
+///
+/// See [`ToleranceReport`] and the facades' `tolerance_report()` methods.
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "rtf",
+    feature = "odt",
+    feature = "pages",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "odp",
+    feature = "keynote",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "numbers"
+))]
+pub mod tolerance;
+
 /// Image processing and conversion module
 ///
 /// Provides functionality to parse and convert Office Drawing formats
@@ -398,8 +419,8 @@ pub mod ooxml_common {
     #[cfg(feature = "vba-inspection")]
     pub use litchi_ooxml_common::vba;
     pub use litchi_ooxml_common::{
-        Error, Keywords, Props, Result, XmlError, custom, custom_xml, embedded, external_link, mce,
-        properties, relationships, ribbon, spreadsheet_xml_maps, web, xml, xml_name,
+        Error, Keywords, Props, Result, XmlError, custom, custom_xml, embedded, external_link,
+        leniency, mce, properties, relationships, ribbon, spreadsheet_xml_maps, web, xml, xml_name,
     };
 }
 
@@ -734,6 +755,24 @@ pub use presentation::SlideDescriptor;
     feature = "numbers"
 ))]
 pub use sheet::Workbook;
+
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "rtf",
+    feature = "odt",
+    feature = "pages",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "odp",
+    feature = "keynote",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "numbers"
+))]
+pub use tolerance::ToleranceReport;
 
 // Re-export commonly used types
 pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};

@@ -120,6 +120,15 @@ impl Workbook {
         }
     }
 
+    /// The workbook's repairs so far: the open-time report plus every
+    /// worksheet whose cells have been parsed.
+    pub(crate) fn tolerance_report(&self) -> xlsx::ToleranceReport {
+        match &self.workbook {
+            WorkbookModel::Owned(workbook) => workbook.tolerance_report(),
+            WorkbookModel::Source(workbook) => workbook.tolerance_report(),
+        }
+    }
+
     pub(crate) fn ensure_source_current(&self) -> SheetResult<()> {
         match &self.workbook {
             WorkbookModel::Owned(_) => Ok(()),
