@@ -12,4 +12,4 @@ pub use model::{
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties,
 };
-pub use package::load_from_package;
+pub use package::{load_from_package, load_from_package_with_tolerance};

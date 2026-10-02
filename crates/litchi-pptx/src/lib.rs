@@ -150,7 +150,7 @@ pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 pub use leniency::{
     ChartDefect, CommentDefect, Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect,
-    TimingDefect, ToleranceReport, ToleratedDefect, TransitionDefect,
+    TimingDefect, ToleranceReport, ToleratedDefect, TransitionDefect, ViewDefect,
 };
 #[cfg(feature = "encryption")]
 pub use litchi_crypto::ooxml as encryption;
@@ -211,6 +211,7 @@ pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties, load_from_package as load_view_properties,
+    load_from_package_with_tolerance as load_view_properties_with_tolerance,
 };
 pub use writer::{
     MutablePresentation, MutableShape, MutableSlide, StreamingPresentationLimits,

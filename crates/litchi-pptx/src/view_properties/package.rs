@@ -1,6 +1,7 @@
 //! Presentation package relationship loading for view properties.
 
 use super::model::ViewProperties;
+use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -10,10 +11,26 @@ const CT: &str = "application/vnd.openxmlformats-officedocument.presentationml.v
 
 /// Loads the presentation view-properties part through its package relationship.
 ///
+/// The part is read with the repairs of [`ViewProperties::parse`]; use
+/// [`load_from_package_with_tolerance`] to collect them.
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>> {
+    load_from_package_with_tolerance(package, &mut ToleranceReport::default())
+}
+
+/// [`load_from_package`], appending each view-properties repair (audit
+/// finding 6.11) to `tolerance`, stamped with the view-properties part name.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn load_from_package_with_tolerance(
+    package: &OpcPackage,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<ViewProperties>> {
     let presentation = package.main_document_part()?;
     let mut found = presentation
         .rels()
@@ -38,7 +55,8 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>>
             part.content_type()
         )));
     }
-    let mut value = ViewProperties::parse(part.blob())?;
+    let mut repairs = ToleranceReport::default();
+    let mut value = ViewProperties::parse_with_tolerance(part.blob(), &mut repairs)?;
     if let Some(outline) = value.outline.as_mut() {
         for slide in &mut outline.slides {
             let relationship = part.rels().get(&slide.relationship_id).ok_or_else(|| {
@@ -53,6 +71,8 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>>
             slide.target = Some(relationship.target_ref().to_string());
         }
     }
+    repairs.locate_in_part(uri.as_str());
+    tolerance.append(&repairs);
     Ok(Some(value))
 }
 

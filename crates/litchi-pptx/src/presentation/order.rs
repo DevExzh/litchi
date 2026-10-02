@@ -531,10 +531,12 @@ fn validate_positional_metadata(package: &litchi_opc::SourceBackedPackage) -> Re
         check_execution_context(context.as_ref())?;
         match owner {
             MetadataOwner::ViewProperties => {
-                let properties = crate::view_properties::ViewProperties::parse(data.as_bytes())
-                    .map_err(|error| {
-                        metadata_refusal(owner, format!("view properties parse failed: {error}"))
-                    })?;
+                let properties = crate::view_properties::ViewProperties::parse_strict(
+                    data.as_bytes(),
+                )
+                .map_err(|error| {
+                    metadata_refusal(owner, format!("view properties parse failed: {error}"))
+                })?;
                 if properties
                     .outline
                     .as_ref()

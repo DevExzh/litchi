@@ -1248,3 +1248,75 @@ fn chart_info_repairs_are_applied_and_recorded() {
         [(Defect::Chart(ChartDefect::MissingElement), 0, Some(CHART1))]
     );
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.11: view-properties allow-lists and child order.
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::ViewDefect;
+use litchi_pptx::view_properties::{self, ViewProperties};
+
+const VIEW_PROPS: &str = "/ppt/viewProps.xml";
+
+#[test]
+fn view_properties_ignore_unknown_markup_and_accept_any_order() {
+    let package = Package::from_bytes(SHAPES).unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let conformant =
+        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
+            .unwrap()
+            .unwrap();
+    assert_clean(&report);
+
+    let deck = shapes_with_member("ppt/viewProps.xml", |xml| {
+        xml.replace(
+            "<p:normalViewPr>",
+            r#"<p:normalViewPr futureFlag="1"><p:futurePane sz="1"/>"#,
+        )
+        .replace(
+            r#"<p:restoredLeft sz="34615" autoAdjust="0"/><p:restoredTop sz="86387" autoAdjust="0"/>"#,
+            r#"<p:restoredTop sz="86387" autoAdjust="0"/><p:restoredLeft sz="34615" autoAdjust="0"/>"#,
+        )
+        .replace(
+            r#"<p:gridSpacing cx="76200" cy="76200"/>"#,
+            r#"<p:gridSpacing cx="76200" cy="76200"/><p:gridSpacing cx="1" cy="1"/>"#,
+        )
+    });
+    let package = Package::from_vec(deck).unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let repaired =
+        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
+            .unwrap()
+            .unwrap();
+    assert_eq!(repaired, conformant);
+    let at = |defect| (Defect::View(defect), 0, Some(VIEW_PROPS));
+    assert_eq!(
+        located(&report),
+        // The viewPr child list is resolved before the children are read.
+        [
+            at(ViewDefect::DuplicateElement),
+            at(ViewDefect::UnknownAttribute),
+            at(ViewDefect::UnknownElement),
+            at(ViewDefect::ElementOrder),
+        ]
+    );
+    assert_eq!(
+        view_properties::load_from_package(package.opc().unwrap()).unwrap(),
+        Some(conformant)
+    );
+
+    // The strict contract refuses the same markup; malformed values stay
+    // fatal under the tolerant one.
+    let blob = package
+        .opc()
+        .unwrap()
+        .get_part(&PackURI::new(VIEW_PROPS).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    assert!(ViewProperties::parse_strict(&blob).is_err());
+    let invalid = String::from_utf8(blob)
+        .unwrap()
+        .replace(r#"sz="34615""#, r#"sz="wide""#);
+    assert!(ViewProperties::parse(invalid.as_bytes()).is_err());
+}

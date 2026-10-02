@@ -8,6 +8,7 @@ use super::model::{
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties,
 };
+use crate::leniency::{ToleranceReport, ViewDefect};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::{
@@ -29,10 +30,48 @@ const MAX_GUIDES: usize = 4096;
 const MAX_SLIDES: usize = 100_000;
 
 impl ViewProperties {
+    /// Parse a view-properties part (`p:viewPr`), applying the repairs of
+    /// audit finding 6.11 ([`ViewDefect`]): unknown attributes and child
+    /// elements are ignored, children are accepted in any order, and a
+    /// repeated child keeps its first occurrence. Use
+    /// [`Self::parse_with_tolerance`] to collect the repairs, or
+    /// [`Self::parse_strict`] to refuse markup that needs one.
+    ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
+        Self::parse_with_tolerance(xml, &mut ToleranceReport::default())
+    }
+
+    /// [`Self::parse`], appending each repair to `tolerance` (no part is
+    /// stamped; [`super::load_from_package_with_tolerance`] stamps it).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse_with_tolerance(xml: &[u8], tolerance: &mut ToleranceReport) -> Result<Self> {
+        Self::parse_inner(
+            xml,
+            &mut Tol {
+                report: Some(tolerance),
+            },
+        )
+    }
+
+    /// Parse without any repair: an attribute or child the model does not
+    /// know, children out of schema order, or a repeated child is an error.
+    /// Edit planners that must account for every byte use this contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read, is malformed, or would
+    /// need a [`ViewDefect`] repair.
+    pub fn parse_strict(xml: &[u8]) -> Result<Self> {
+        Self::parse_inner(xml, &mut Tol { report: None })
+    }
+
+    fn parse_inner(xml: &[u8], tol: &mut Tol<'_>) -> Result<Self> {
         if xml.len() > MAX {
             return Err(invalid("view properties exceed 8 MiB"));
         }
@@ -40,7 +79,7 @@ impl ViewProperties {
         if x.len() > MAX {
             return Err(invalid("processed view properties exceed 8 MiB"));
         }
-        project(&parse_dom(x.as_ref())?)
+        project(&parse_dom(x.as_ref())?, tol)
     }
     /// # Errors
     ///
@@ -255,54 +294,135 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, n: Node) -> Result<()> {
     Ok(())
 }
 
-fn project(n: &Node) -> Result<ViewProperties> {
+/// Where a projection records the repairs it applies (audit finding 6.11):
+/// a report for the tolerant read, or nothing for the strict read, which
+/// refuses any markup that would need a repair.
+struct Tol<'r> {
+    report: Option<&'r mut ToleranceReport>,
+}
+
+impl Tol<'_> {
+    fn repair(&mut self, defect: ViewDefect, what: &str) -> Result<()> {
+        match self.report.as_deref_mut() {
+            Some(report) => {
+                report.record(defect, 0);
+                Ok(())
+            },
+            None => Err(invalid(what.to_string())),
+        }
+    }
+}
+
+/// The children of `n` named in `names` (in schema order) and drawn from the
+/// `namespaces`, one slot per name. Foreign or unknown children are skipped,
+/// a repeated child keeps its first occurrence, and any order is accepted;
+/// each such deviation is a repair.
+fn slots<'n, const N: usize>(
+    n: &'n Node,
+    names: [&str; N],
+    namespaces: [&str; 2],
+    tol: &mut Tol<'_>,
+) -> Result<[Option<&'n Node>; N]> {
+    let mut found = [None; N];
+    let mut order = 0;
+    for c in kids(n)? {
+        let position = if namespaces.contains(&c.ns.as_str()) {
+            names.iter().position(|name| *name == c.l)
+        } else {
+            None
+        };
+        let Some(position) = position else {
+            tol.repair(
+                ViewDefect::UnknownElement,
+                &format!("unexpected {} child '{}'", n.l, c.q),
+            )?;
+            continue;
+        };
+        if position < order {
+            tol.repair(
+                ViewDefect::ElementOrder,
+                &format!("{} children out of order", n.l),
+            )?;
+        }
+        order = order.max(position);
+        if found[position].is_some() {
+            tol.repair(
+                ViewDefect::DuplicateElement,
+                &format!("duplicate {} child '{}'", n.l, c.q),
+            )?;
+            continue;
+        }
+        found[position] = Some(c);
+    }
+    Ok(found)
+}
+
+const PNS: [&str; 2] = [P, PS];
+const ANS: [&str; 2] = [A, AS];
+
+fn required<'n>(slot: Option<&'n Node>, what: &str) -> Result<&'n Node> {
+    slot.ok_or_else(|| invalid(format!("{what} is required")))
+}
+
+/// The list items of `n` named `item`; other children are skipped.
+fn items<'n>(n: &'n Node, item: &str, tol: &mut Tol<'_>) -> Result<Vec<&'n Node>> {
+    let mut list = Vec::new();
+    for c in kids(n)? {
+        if (c.ns == P || c.ns == PS) && c.l == item {
+            list.push(c);
+        } else {
+            tol.repair(
+                ViewDefect::UnknownElement,
+                &format!("unexpected {} child '{}'", n.l, c.q),
+            )?;
+        }
+    }
+    Ok(list)
+}
+
+fn project(n: &Node, tol: &mut Tol<'_>) -> Result<ViewProperties> {
     expect_p(n, "viewPr")?;
     let mut v = ViewProperties {
         last_view: aopt(n, "lastView")?.map(parse_view).transpose()?,
         show_comments: bopt(n, "showComments")?,
         ..Default::default()
     };
-    only(n, &["lastView", "showComments"])?;
-    let mut order = 0;
-    for c in kids(n)? {
-        expect_p_any(c)?;
-        let i = match c.l.as_str() {
-            "normalViewPr" => 0,
-            "slideViewPr" => 1,
-            "outlineViewPr" => 2,
-            "notesTextViewPr" => 3,
-            "sorterViewPr" => 4,
-            "notesViewPr" => 5,
-            "gridSpacing" => 6,
-            "extLst" => 7,
-            _ => return Err(invalid("unexpected viewPr child")),
-        };
-        if i < order {
-            return Err(invalid("viewPr children out of order"));
-        }
-        order = i;
-        match i {
-            0 => set(&mut v.normal, parse_normal(c)?)?,
-            1 => set(&mut v.slide, parse_slide_like(c)?)?,
-            2 => set(&mut v.outline, parse_outline(c)?)?,
-            3 => set(&mut v.notes_text, parse_simple(c)?)?,
-            4 => set(&mut v.sorter, parse_sorter(c)?)?,
-            5 => set(&mut v.notes, parse_slide_like(c)?)?,
-            6 => set(
-                &mut v.grid_spacing,
-                GridSpacing {
-                    cx: u32req(c, "cx")?,
-                    cy: u32req(c, "cy")?,
-                },
-            )?,
-            7 => set(&mut v.extension_xml, node_xml(c, false)?)?,
-            _ => unreachable!(),
-        }
-    }
+    only(n, &["lastView", "showComments"], tol)?;
+    let [normal, slide, outline, notes_text, sorter, notes, grid, ext] = slots(
+        n,
+        [
+            "normalViewPr",
+            "slideViewPr",
+            "outlineViewPr",
+            "notesTextViewPr",
+            "sorterViewPr",
+            "notesViewPr",
+            "gridSpacing",
+            "extLst",
+        ],
+        PNS,
+        tol,
+    )?;
+    v.normal = normal.map(|c| parse_normal(c, tol)).transpose()?;
+    v.slide = slide.map(|c| parse_slide_like(c, tol)).transpose()?;
+    v.outline = outline.map(|c| parse_outline(c, tol)).transpose()?;
+    v.notes_text = notes_text.map(|c| parse_simple(c, tol)).transpose()?;
+    v.sorter = sorter.map(|c| parse_sorter(c, tol)).transpose()?;
+    v.notes = notes.map(|c| parse_slide_like(c, tol)).transpose()?;
+    v.grid_spacing = grid
+        .map(|c| -> Result<GridSpacing> {
+            only(c, &["cx", "cy"], tol)?;
+            Ok(GridSpacing {
+                cx: u32req(c, "cx")?,
+                cy: u32req(c, "cy")?,
+            })
+        })
+        .transpose()?;
+    v.extension_xml = ext.map(|c| node_xml(c, false)).transpose()?;
     validate(&v)?;
     Ok(v)
 }
-fn parse_normal(n: &Node) -> Result<NormalView> {
+fn parse_normal(n: &Node, tol: &mut Tol<'_>) -> Result<NormalView> {
     let show_outline_icons = bopt(n, "showOutlineIcons")?;
     let snap_vertical_splitter = bopt(n, "snapVertSplitter")?;
     let vertical_bar_state = aopt(n, "vertBarState")?.map(parse_splitter).transpose()?;
@@ -317,23 +437,12 @@ fn parse_normal(n: &Node) -> Result<NormalView> {
             "horzBarState",
             "preferSingleView",
         ],
+        tol,
     )?;
-    let c = kids(n)?;
-    if c.len() < 2 || c.len() > 3 || c[0].l != "restoredLeft" || c[1].l != "restoredTop" {
-        return Err(invalid(
-            "normalViewPr requires restoredLeft then restoredTop",
-        ));
-    }
-    let restored_left = parse_pane(c[0])?;
-    let restored_top = parse_pane(c[1])?;
-    let extension_xml = if c.len() == 3 {
-        if c[2].l != "extLst" {
-            return Err(invalid("invalid normalViewPr extension"));
-        }
-        Some(node_xml(c[2], false)?)
-    } else {
-        None
-    };
+    let [left, top, ext] = slots(n, ["restoredLeft", "restoredTop", "extLst"], PNS, tol)?;
+    let restored_left = parse_pane(required(left, "normalViewPr restoredLeft")?, tol)?;
+    let restored_top = parse_pane(required(top, "normalViewPr restoredTop")?, tol)?;
+    let extension_xml = ext.map(|c| node_xml(c, false)).transpose()?;
     Ok(NormalView {
         show_outline_icons,
         snap_vertical_splitter,
@@ -345,44 +454,41 @@ fn parse_normal(n: &Node) -> Result<NormalView> {
         extension_xml,
     })
 }
-fn parse_pane(n: &Node) -> Result<RestoredPane> {
+fn parse_pane(n: &Node, tol: &mut Tol<'_>) -> Result<RestoredPane> {
     let size = u32req(n, "sz")?;
     if size > 100_000 {
         return Err(invalid("restored pane size exceeds 100000"));
     }
     let auto_adjust = bopt(n, "autoAdjust")?;
-    only(n, &["sz", "autoAdjust"])?;
-    leaf(n)?;
+    only(n, &["sz", "autoAdjust"], tol)?;
+    leaf(n, tol)?;
     Ok(RestoredPane { size, auto_adjust })
 }
-fn parse_common(n: &Node) -> Result<CommonView> {
+fn parse_common(n: &Node, tol: &mut Tol<'_>) -> Result<CommonView> {
     expect_p(n, "cViewPr")?;
     let variable_scale = bopt(n, "varScale")?;
-    only(n, &["varScale"])?;
-    let c = kids(n)?;
-    if c.len() != 2 || c[0].l != "scale" || c[1].l != "origin" {
-        return Err(invalid("cViewPr requires scale then origin"));
-    }
-    let s = kids(c[0])?;
-    if s.len() != 2 || s[0].l != "sx" || s[1].l != "sy" {
-        return Err(invalid("scale requires DrawingML sx then sy"));
-    }
-    let scale_x = ratio(s[0])?;
-    let scale_y = ratio(s[1])?;
-    let origin = Point {
-        x: i64req(c[1], "x")?,
-        y: i64req(c[1], "y")?,
+    only(n, &["varScale"], tol)?;
+    let [scale, origin] = slots(n, ["scale", "origin"], PNS, tol)?;
+    let scale = required(scale, "cViewPr scale")?;
+    let origin = required(origin, "cViewPr origin")?;
+    only(scale, &[], tol)?;
+    let [sx, sy] = slots(scale, ["sx", "sy"], ANS, tol)?;
+    let scale_x = ratio(required(sx, "scale sx")?, tol)?;
+    let scale_y = ratio(required(sy, "scale sy")?, tol)?;
+    let point = Point {
+        x: i64req(origin, "x")?,
+        y: i64req(origin, "y")?,
     };
-    only(c[1], &["x", "y"])?;
-    leaf(c[1])?;
+    only(origin, &["x", "y"], tol)?;
+    leaf(origin, tol)?;
     Ok(CommonView {
         variable_scale,
         scale_x,
         scale_y,
-        origin,
+        origin: point,
     })
 }
-fn ratio(n: &Node) -> Result<Ratio> {
+fn ratio(n: &Node, tol: &mut Tol<'_>) -> Result<Ratio> {
     if n.ns != A && n.ns != AS {
         return Err(invalid("ratio must use DrawingML namespace"));
     }
@@ -391,31 +497,26 @@ fn ratio(n: &Node) -> Result<Ratio> {
     if denominator == 0 {
         return Err(invalid("scale denominator cannot be zero"));
     }
-    only(n, &["n", "d"])?;
-    leaf(n)?;
+    only(n, &["n", "d"], tol)?;
+    leaf(n, tol)?;
     Ok(Ratio {
         numerator,
         denominator,
     })
 }
-fn parse_common_slide(n: &Node) -> Result<CommonSlideView> {
+fn parse_common_slide(n: &Node, tol: &mut Tol<'_>) -> Result<CommonSlideView> {
     expect_p(n, "cSldViewPr")?;
     let snap_to_grid = bopt(n, "snapToGrid")?;
     let snap_to_objects = bopt(n, "snapToObjects")?;
     let show_guides = bopt(n, "showGuides")?;
-    only(n, &["snapToGrid", "snapToObjects", "showGuides"])?;
-    let c = kids(n)?;
-    if c.is_empty() || c.len() > 2 || c[0].l != "cViewPr" {
-        return Err(invalid("cSldViewPr requires cViewPr"));
-    }
-    let view = parse_common(c[0])?;
+    only(n, &["snapToGrid", "snapToObjects", "showGuides"], tol)?;
+    let [view, guide_list] = slots(n, ["cViewPr", "guideLst"], PNS, tol)?;
+    let view = parse_common(required(view, "cSldViewPr cViewPr")?, tol)?;
     let mut guides = Vec::new();
-    if c.len() == 2 {
-        if c[1].l != "guideLst" {
-            return Err(invalid("unexpected cSldViewPr child"));
-        }
-        for g in kids(c[1])? {
-            if g.l != "guide" || guides.len() >= MAX_GUIDES {
+    if let Some(guide_list) = guide_list {
+        only(guide_list, &[], tol)?;
+        for g in items(guide_list, "guide", tol)? {
+            if guides.len() >= MAX_GUIDES {
                 return Err(invalid("invalid guide list or limit"));
             }
             let orientation = aopt(g, "orient")?
@@ -426,8 +527,8 @@ fn parse_common_slide(n: &Node) -> Result<CommonSlideView> {
                 })
                 .transpose()?;
             let position = i32opt(g, "pos")?;
-            only(g, &["orient", "pos"])?;
-            leaf(g)?;
+            only(g, &["orient", "pos"], tol)?;
+            leaf(g, tol)?;
             guides.push(Guide {
                 orientation,
                 position,
@@ -442,98 +543,60 @@ fn parse_common_slide(n: &Node) -> Result<CommonSlideView> {
         guides,
     })
 }
-fn parse_slide_like(n: &Node) -> Result<SlideLikeView> {
-    noattrs(n)?;
-    let c = kids(n)?;
-    if c.is_empty() || c.len() > 2 || c[0].l != "cSldViewPr" {
-        return Err(invalid("slide-like view requires cSldViewPr"));
-    }
-    let common = parse_common_slide(c[0])?;
-    let extension_xml = ext_second(&c)?;
+fn parse_slide_like(n: &Node, tol: &mut Tol<'_>) -> Result<SlideLikeView> {
+    only(n, &[], tol)?;
+    let [common, ext] = slots(n, ["cSldViewPr", "extLst"], PNS, tol)?;
+    let common = parse_common_slide(required(common, "slide-like view cSldViewPr")?, tol)?;
     Ok(SlideLikeView {
         common,
-        extension_xml,
+        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
     })
 }
-fn parse_simple(n: &Node) -> Result<SimpleView> {
-    noattrs(n)?;
-    let c = kids(n)?;
-    if c.is_empty() || c.len() > 2 || c[0].l != "cViewPr" {
-        return Err(invalid("view requires cViewPr"));
-    }
+fn parse_simple(n: &Node, tol: &mut Tol<'_>) -> Result<SimpleView> {
+    only(n, &[], tol)?;
+    let [view, ext] = slots(n, ["cViewPr", "extLst"], PNS, tol)?;
     Ok(SimpleView {
-        view: parse_common(c[0])?,
-        extension_xml: ext_second(&c)?,
+        view: parse_common(required(view, "view cViewPr")?, tol)?,
+        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
     })
 }
-fn parse_sorter(n: &Node) -> Result<SorterView> {
+fn parse_sorter(n: &Node, tol: &mut Tol<'_>) -> Result<SorterView> {
     let show_formatting = bopt(n, "showFormatting")?;
-    only(n, &["showFormatting"])?;
-    let c = kids(n)?;
-    if c.is_empty() || c.len() > 2 || c[0].l != "cViewPr" {
-        return Err(invalid("sorterViewPr requires cViewPr"));
-    }
+    only(n, &["showFormatting"], tol)?;
+    let [view, ext] = slots(n, ["cViewPr", "extLst"], PNS, tol)?;
     Ok(SorterView {
         show_formatting,
-        view: parse_common(c[0])?,
-        extension_xml: ext_second(&c)?,
+        view: parse_common(required(view, "sorterViewPr cViewPr")?, tol)?,
+        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
     })
 }
-fn parse_outline(n: &Node) -> Result<OutlineView> {
-    noattrs(n)?;
-    let c = kids(n)?;
-    if c.is_empty() || c.len() > 3 || c[0].l != "cViewPr" {
-        return Err(invalid("outlineViewPr requires cViewPr"));
-    }
-    let view = parse_common(c[0])?;
+fn parse_outline(n: &Node, tol: &mut Tol<'_>) -> Result<OutlineView> {
+    only(n, &[], tol)?;
+    let [view, slide_list, ext] = slots(n, ["cViewPr", "sldLst", "extLst"], PNS, tol)?;
+    let view = parse_common(required(view, "outlineViewPr cViewPr")?, tol)?;
     let mut slides = Vec::new();
-    let mut extension_xml = None;
-    for child in &c[1..] {
-        match child.l.as_str() {
-            "sldLst" => {
-                if !slides.is_empty() {
-                    return Err(invalid("duplicate outline slide list"));
-                }
-                for s in kids(child)? {
-                    if slides.len() >= MAX_SLIDES {
-                        return Err(invalid("outline slide limit exceeded"));
-                    }
-                    expect_p(s, "sld")?;
-                    let id = arel(s, "id")?;
-                    let collapse = bopt(s, "collapse")?;
-                    only_rel(s, &["collapse"], "id")?;
-                    leaf(s)?;
-                    slides.push(OutlineSlide {
-                        relationship_id: id,
-                        collapse,
-                        target: None,
-                    });
-                }
-            },
-            "extLst" => {
-                if extension_xml.is_some() {
-                    return Err(invalid("duplicate outline extension"));
-                }
-                extension_xml = Some(node_xml(child, false)?);
-            },
-            _ => return Err(invalid("unexpected outline child")),
+    if let Some(slide_list) = slide_list {
+        only(slide_list, &[], tol)?;
+        for s in items(slide_list, "sld", tol)? {
+            if slides.len() >= MAX_SLIDES {
+                return Err(invalid("outline slide limit exceeded"));
+            }
+            let id = arel(s, "id")?;
+            let collapse = bopt(s, "collapse")?;
+            only_rel(s, &["collapse"], "id", tol)?;
+            leaf(s, tol)?;
+            slides.push(OutlineSlide {
+                relationship_id: id,
+                collapse,
+                target: None,
+            });
         }
     }
     Ok(OutlineView {
         view,
         slides,
-        extension_xml,
+        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
     })
-}
-fn ext_second(c: &[&Node]) -> Result<Option<Vec<u8>>> {
-    if c.len() == 2 {
-        if c[1].l != "extLst" {
-            return Err(invalid("expected extLst"));
-        }
-        Ok(Some(node_xml(c[1], false)?))
-    } else {
-        Ok(None)
-    }
 }
 
 fn write_normal(x: &mut String, v: &NormalView, s: bool) -> Result<()> {
@@ -795,25 +858,20 @@ fn kids(n: &Node) -> Result<Vec<&Node>> {
     }
     Ok(v)
 }
-fn leaf(n: &Node) -> Result<()> {
-    if kids(n)?.is_empty() {
-        Ok(())
-    } else {
-        Err(invalid("leaf view property has children"))
+fn leaf(n: &Node, tol: &mut Tol<'_>) -> Result<()> {
+    for c in kids(n)? {
+        tol.repair(
+            ViewDefect::UnknownElement,
+            &format!("leaf view property {} has child '{}'", n.l, c.q),
+        )?;
     }
+    Ok(())
 }
 fn expect_p(n: &Node, l: &str) -> Result<()> {
     if (n.ns == P || n.ns == PS) && n.l == l {
         Ok(())
     } else {
         Err(invalid(format!("expected {l}")))
-    }
-}
-fn expect_p_any(n: &Node) -> Result<()> {
-    if n.ns == P || n.ns == PS {
-        Ok(())
-    } else {
-        Err(invalid("expected PresentationML child"))
     }
 }
 fn aopt(n: &Node, l: &str) -> Result<Option<String>> {
@@ -868,33 +926,31 @@ fn i32opt(n: &Node, l: &str) -> Result<Option<i32>> {
         })
         .transpose()
 }
-fn only(n: &Node, allowed: &[&str]) -> Result<()> {
+/// Ignore (recording) every attribute of `n` outside `allowed`: newer
+/// `PowerPoint` releases add attributes to these elements.
+fn only(n: &Node, allowed: &[&str], tol: &mut Tol<'_>) -> Result<()> {
     for a in &n.attrs {
         if !a.ns.is_empty() || !allowed.contains(&a.l.as_str()) {
-            return Err(invalid(format!("unexpected attribute '{}'", a.q)));
+            tol.repair(
+                ViewDefect::UnknownAttribute,
+                &format!("unexpected attribute '{}'", a.q),
+            )?;
         }
     }
     Ok(())
 }
-fn only_rel(n: &Node, plain: &[&str], rel: &str) -> Result<()> {
+fn only_rel(n: &Node, plain: &[&str], rel: &str, tol: &mut Tol<'_>) -> Result<()> {
     for a in &n.attrs {
         if !((a.ns.is_empty() && plain.contains(&a.l.as_str()))
             || ((a.ns == R || a.ns == RS) && a.l == rel))
         {
-            return Err(invalid(format!("unexpected attribute '{}'", a.q)));
+            tol.repair(
+                ViewDefect::UnknownAttribute,
+                &format!("unexpected attribute '{}'", a.q),
+            )?;
         }
     }
     Ok(())
-}
-fn noattrs(n: &Node) -> Result<()> {
-    only(n, &[])
-}
-fn set<T>(slot: &mut Option<T>, v: T) -> Result<()> {
-    if slot.replace(v).is_some() {
-        Err(invalid("duplicate view property"))
-    } else {
-        Ok(())
-    }
 }
 fn split(q: &str) -> Result<(&str, &str)> {
     if let Some((p, l)) = q.split_once(':') {

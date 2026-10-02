@@ -236,6 +236,24 @@
 //! part. XML well-formedness, a missing or foreign `c:chartSpace` root, and
 //! nested title text stay hard errors.
 //!
+//! # View properties (audit finding 6.11)
+//!
+//! [`crate::view_properties::ViewProperties::parse`] and
+//! [`crate::view_properties::load_from_package`] no longer fail
+//! `viewProps.xml` over an attribute or child their model does not know
+//! ([`ViewDefect::UnknownAttribute`], [`ViewDefect::UnknownElement`]; a new
+//! Office release adding one attribute would otherwise make every file it
+//! saves unreadable), over children out of schema order (read by name,
+//! [`ViewDefect::ElementOrder`]), or over a repeated child (first wins,
+//! [`ViewDefect::DuplicateElement`]). The `*_with_tolerance` companions
+//! collect the repairs, stamped with the view-properties part by
+//! [`crate::view_properties::load_from_package_with_tolerance`]. A required
+//! child that is missing, an invalid value (boolean, integer, enumeration,
+//! zero scale denominator), text in typed content, XML well-formedness, and
+//! the size/depth/count limits stay hard errors.
+//! [`crate::view_properties::ViewProperties::parse_strict`] keeps the old
+//! contract and backs the slide-order edit planner's metadata inspection.
+//!
 //! # Shape metadata (audit finding 6.8)
 //!
 //! A `p:cNvPr@id` that is not an `unsignedInt` leaves the shape without an
@@ -373,6 +391,8 @@ pub enum Defect {
     Comment(CommentDefect),
     /// A chart-part defect repaired by the chart inspection.
     Chart(ChartDefect),
+    /// A view-properties defect repaired by the view-properties reader.
+    View(ViewDefect),
     /// A core- or custom-properties defect repaired by
     /// `litchi_ooxml_common` while the document metadata was read, folded
     /// into the presentation's report.
@@ -392,6 +412,7 @@ impl Defect {
             Self::Package(defect) => defect.repair(),
             Self::Comment(defect) => defect.repair(),
             Self::Chart(defect) => defect.repair(),
+            Self::View(defect) => defect.repair(),
             Self::Properties(defect) => defect.repair(),
         }
     }
@@ -726,6 +747,49 @@ impl ChartDefect {
                 "reported an unknown chart type for a chart without a chart or plot area"
             },
         }
+    }
+}
+
+/// The class of view-properties defect (`viewProps.xml`, audit finding
+/// 6.11) the reader repairs.
+///
+/// Closed by design, and repaired under every [`Leniency`] variant.
+/// `viewProps.xml` is non-authoring metadata (window panes, zoom, guides),
+/// and `PowerPoint` round-trips view-property attributes it does not know,
+/// so the reader ignores what its model does not cover instead of failing.
+/// The context is `0`; the part is the view-properties part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ViewDefect {
+    /// An element carried an attribute the model does not know (such as one
+    /// added by a newer `PowerPoint` release). The attribute is ignored.
+    UnknownAttribute,
+    /// An element carried a child the model does not know, or one in a
+    /// foreign namespace. The child and its subtree are ignored.
+    UnknownElement,
+    /// Known children appeared out of schema order. They are read by name.
+    ElementOrder,
+    /// A known child occurred more than once. The first occurrence is read
+    /// and later ones are ignored.
+    DuplicateElement,
+}
+
+impl ViewDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnknownAttribute => "ignored an unknown view-properties attribute",
+            Self::UnknownElement => "ignored an unknown view-properties element and its subtree",
+            Self::ElementOrder => "read out-of-order view-properties children by name",
+            Self::DuplicateElement => "read the first of a repeated view-properties element",
+        }
+    }
+}
+
+impl From<ViewDefect> for Defect {
+    fn from(defect: ViewDefect) -> Self {
+        Self::View(defect)
     }
 }
 
@@ -1106,6 +1170,10 @@ mod tests {
             Defect::from(PresentationDefect::SlideListContent),
             Defect::from(MarkupDefect::ProcessingInstruction),
             Defect::from(MarkupDefect::ForeignTextElement),
+            Defect::from(ViewDefect::UnknownAttribute),
+            Defect::from(ViewDefect::UnknownElement),
+            Defect::from(ViewDefect::ElementOrder),
+            Defect::from(ViewDefect::DuplicateElement),
             Defect::from(ChartDefect::BarDirection),
             Defect::from(ChartDefect::DuplicateElement),
             Defect::from(ChartDefect::MissingElement),
