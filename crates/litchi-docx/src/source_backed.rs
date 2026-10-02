@@ -129,6 +129,10 @@ pub struct Package {
     /// codecs that record. See `crate::leniency`. Interior mutability keeps
     /// the lazy read facades on `&self`.
     tolerance: Mutex<crate::leniency::ToleranceReport>,
+    /// Whether [`Package::metadata`] has folded the core-properties repairs
+    /// into `tolerance`. The source is pinned to one revision, so every read
+    /// repairs the same defects; they are recorded once, not per call.
+    properties_recorded: std::sync::atomic::AtomicBool,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -620,6 +624,7 @@ impl Package {
             execution,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             tolerance: Mutex::new(tolerance),
+            properties_recorded: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -946,7 +951,7 @@ impl Package {
     /// silently. It starts with the OPC packaging repairs made at open
     /// ([`Defect::Package`](crate::Defect::Package)); [`Self::metadata`] adds
     /// the core-properties repairs ([`Defect::Properties`](crate::Defect::Properties))
-    /// each time it reads them, and the semantic text sink (`write_text_to`)
+    /// the first time it reads them successfully, and the semantic text sink (`write_text_to`)
     /// records foreign `*:t` skips.
     #[must_use]
     pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
@@ -1072,11 +1077,15 @@ impl Package {
         self.package.source_version()?;
         self.package.check_execution()?;
         let properties = properties?;
-        if !repaired.is_clean() {
-            self.tolerance
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .append_properties(&repaired);
+        let mut tolerance = self
+            .tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !self
+            .properties_recorded
+            .swap(true, std::sync::atomic::Ordering::AcqRel)
+        {
+            tolerance.append_properties(&repaired);
         }
         Ok(properties.map(Into::into).unwrap_or_default())
     }
