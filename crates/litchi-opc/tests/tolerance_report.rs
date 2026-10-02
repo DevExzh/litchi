@@ -217,3 +217,48 @@ fn target_mode_is_case_insensitive_and_unknown_modes_read_as_external() {
     assert_eq!(rels.get("rId4").unwrap().target_mode(), TargetMode::External);
     assert_round_trips(&bytes);
 }
+
+/// LENIENCY_AUDIT 8.8: a relationship with a missing or empty `Target` or
+/// `Type` is skipped and recorded; its Id stays free for a later
+/// well-formed relationship.
+#[test]
+fn relationships_without_target_or_type_are_skipped_and_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" TargetMode="External"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="" TargetMode="External"/><Relationship Id="rId4" Target="https://example.com/" TargetMode="External"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    let hyperlink = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.item(), tolerated.value()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Defect::Relationship(RelationshipDefect::MissingTarget),
+                Some("rId2"),
+                Some(hyperlink),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::MissingTarget),
+                Some("rId3"),
+                Some(hyperlink),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::MissingType),
+                Some("rId4"),
+                Some("https://example.com/"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let document = package
+        .get_part(&PackURI::new("/word/document.xml").unwrap())
+        .unwrap();
+    assert_eq!(document.rels().len(), 2);
+    assert_eq!(
+        document.rels().get("rId2").unwrap().target_ref(),
+        "https://example.org/"
+    );
+    assert_round_trips(&bytes);
+}

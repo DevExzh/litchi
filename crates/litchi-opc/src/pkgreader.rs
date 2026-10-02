@@ -2276,18 +2276,49 @@ fn inspect_relationship_element(
         }
     }
     let id = required_relationship_attribute(id_attribute, "Id")?;
-    let relationship_type = required_relationship_attribute(type_attribute, "Type")?;
-    let target = required_relationship_attribute(target_attribute, "Target")?;
-    limits.check(
-        ReadResource::RelationshipTargetBytes,
-        target.len() as u64,
-        limits.max_relationship_target_bytes() as u64,
-    )?;
+    if let Some(target) = target_attribute.as_deref() {
+        limits.check(
+            ReadResource::RelationshipTargetBytes,
+            target.len() as u64,
+            limits.max_relationship_target_bytes() as u64,
+        )?;
+    }
     if !is_xml_id(&id) {
         return Err(OpcError::InvalidRelationshipsManifest(format!(
             "relationship Id '{id}' is not an XML ID"
         )));
     }
+    // CT_Relationship marks Type and Target required, a schema rule with no
+    // consumer directive: LibreOffice requires only Id, and Word keeps such a
+    // relationship as a dead link. A relationship that names no type or no
+    // target can reach nothing and be found by no consumer, so it is skipped
+    // and recorded (still charged against the relationship budget). It never
+    // claims its Id, so a later well-formed relationship may use it.
+    let relationship_type = type_attribute.filter(|value| !value.is_empty());
+    let target = target_attribute.filter(|value| !value.is_empty());
+    let (relationship_type, target) = match (relationship_type, target) {
+        (Some(relationship_type), Some(target)) => (relationship_type, target),
+        (None, target) => {
+            ledger.add_relationship(limits)?;
+            report.record(
+                RelationshipDefect::MissingType,
+                owner,
+                Some(&id),
+                target.as_deref(),
+            );
+            return Ok(());
+        },
+        (Some(relationship_type), None) => {
+            ledger.add_relationship(limits)?;
+            report.record(
+                RelationshipDefect::MissingTarget,
+                owner,
+                Some(&id),
+                Some(&relationship_type),
+            );
+            return Ok(());
+        },
+    };
     if ids.contains(&id) {
         // ECMA-376 Part 2 §6.5.3.4 makes Id uniqueness a producer rule with no
         // consumer directive. Keep the first relationship — LibreOffice
@@ -3021,16 +3052,26 @@ mod tests {
     }
 
     #[test]
-    fn relationships_require_attributes_ids_and_exact_target_modes() {
+    fn relationships_require_ids_and_repair_cataloged_defects() {
         for child in [
             r#"<Relationship Type="urn:test" Target="part.xml"/>"#,
-            r#"<Relationship Id="rId1" Target="part.xml"/>"#,
-            r#"<Relationship Id="rId1" Type="urn:test"/>"#,
             r#"<Relationship Id="1bad" Type="urn:test" Target="part.xml"/>"#,
             r#"<Relationship Id="r:id" Type="urn:test" Target="part.xml"/>"#,
         ] {
             let xml = relationships_xml(child);
             assert!(PackageReader::parse_rels_xml(xml.as_bytes(), "/word").is_err());
+        }
+
+        // LENIENCY_AUDIT 8.8: a relationship without Type or Target is skipped.
+        for child in [
+            r#"<Relationship Id="rId1" Target="part.xml"/>"#,
+            r#"<Relationship Id="rId1" Type="urn:test"/>"#,
+            r#"<Relationship Id="rId1" Type="" Target="part.xml"/>"#,
+            r#"<Relationship Id="rId1" Type="urn:test" Target=""/>"#,
+        ] {
+            let xml = relationships_xml(child);
+            let parsed = PackageReader::parse_rels_xml(xml.as_bytes(), "/word").unwrap();
+            assert!(parsed.is_empty(), "{child}");
         }
 
         // LENIENCY_AUDIT 8.7: TargetMode is read case-insensitively, and an
