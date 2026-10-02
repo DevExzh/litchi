@@ -17,6 +17,7 @@ fn source_with_property(name: &str, value: Value, payload: &[u8], empty_storage:
         system_identifier: 0,
         class_identifier: Guid::from_bytes([0; 16]),
         sections: vec![section],
+        tolerance: crate::leniency::ToleranceReport::default(),
     }
     .to_bytes()
     .expect("synthetic contents");
@@ -417,6 +418,7 @@ fn storage_variant_keeps_empty_storage_and_reversible_source() {
         system_identifier: 0,
         class_identifier: Guid::from_bytes([0; 16]),
         sections: vec![section],
+        tolerance: crate::leniency::ToleranceReport::default(),
     }
     .to_bytes()
     .expect("contents");
@@ -474,6 +476,7 @@ fn every_indirect_variant_checks_its_cfb_element_kind_and_versioned_tail() {
         system_identifier: 0,
         class_identifier: Guid::from_bytes([0; 16]),
         sections: vec![section],
+        tolerance: crate::leniency::ToleranceReport::default(),
     }
     .to_bytes()
     .expect("contents");
@@ -517,6 +520,7 @@ fn every_indirect_variant_checks_its_cfb_element_kind_and_versioned_tail() {
         system_identifier: 0,
         class_identifier: Guid::from_bytes([0; 16]),
         sections: vec![wrong_kind],
+        tolerance: crate::leniency::ToleranceReport::default(),
     }
     .to_bytes()
     .expect("wrong contents");
@@ -608,6 +612,7 @@ fn root_clsid_mismatch_is_checked_when_contents_is_requested() {
         system_identifier: 0,
         class_identifier: Guid::from_bytes([0xAA; 16]),
         sections: vec![section],
+        tolerance: crate::leniency::ToleranceReport::default(),
     }
     .to_bytes()
     .expect("contents");

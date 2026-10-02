@@ -18,6 +18,7 @@ use super::wire::{
     read_u32, reserve_bytes,
 };
 use super::{parse_typed_property, parse_typed_property_for_property};
+use crate::leniency::ToleranceReport;
 use litchi_cfb::OleError;
 use litchi_cfb::consts::VT_I2;
 use std::collections::HashMap;
@@ -114,6 +115,9 @@ fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, O
         system_identifier,
         class_identifier,
         sections,
+        // No property-set repair has landed yet (leniency audit F7.8-F7.12),
+        // so every successful parse is a conformant one.
+        tolerance: ToleranceReport::default(),
     })
 }
 

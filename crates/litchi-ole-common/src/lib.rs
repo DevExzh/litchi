@@ -7,6 +7,7 @@
 
 pub mod custom_xml;
 pub mod dataspaces;
+pub mod leniency;
 pub mod object;
 pub mod ole1;
 pub mod ole_streams;

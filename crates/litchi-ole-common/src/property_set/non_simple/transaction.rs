@@ -601,6 +601,7 @@ fn clone_stream(source: &Stream) -> Result<Stream, OleError> {
         system_identifier: source.system_identifier,
         class_identifier: source.class_identifier,
         sections,
+        tolerance: source.tolerance.clone(),
     })
 }
 

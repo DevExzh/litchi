@@ -42,6 +42,26 @@ fn parses_typed_stream_and_unsigned_codepage() {
 }
 
 #[test]
+fn conformant_streams_parse_with_a_clean_tolerance_report() {
+    let stream = Stream::parse(&summary_property_stream()).unwrap();
+    assert!(stream.tolerance_report().is_clean());
+    let reparsed = Stream::parse(&stream.to_bytes().unwrap()).unwrap();
+    assert!(reparsed.tolerance_report().is_clean());
+    assert_eq!(reparsed, stream);
+
+    let bytes = fixture("test-data/poi/test-data/hpsf/TestMickey.doc");
+    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    assert!(ole.tolerance_report().is_clean());
+    for binding in [
+        Binding::SummaryInformation,
+        Binding::DocumentSummaryInformation,
+    ] {
+        let parsed = PropertySetReader::property_set(&mut ole, binding).unwrap();
+        assert!(parsed.tolerance_report().is_clean());
+    }
+}
+
+#[test]
 fn version_one_round_trips_versioned_numeric_properties() {
     let mut section = Section::new(SUMMARY_INFORMATION_FMTID);
     section.add(2, Value::I1(-7)).unwrap();

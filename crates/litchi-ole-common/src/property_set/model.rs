@@ -3,6 +3,7 @@
 #[path = "model/composite.rs"]
 mod composite;
 
+use crate::leniency::ToleranceReport;
 use chrono::{DateTime, Duration, Utc};
 use litchi_cfb::OleError;
 use litchi_cfb::consts::{
@@ -249,12 +250,27 @@ impl TryFrom<u16> for CodePage {
 }
 
 /// One complete OLE Property Set stream.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// Equality compares the property-set content only; the
+/// [`Self::tolerance_report`] describing how a parse reached that content is
+/// not part of it.
+#[derive(Debug, Clone)]
 pub struct Stream {
     pub version: u16,
     pub system_identifier: u32,
     pub class_identifier: Guid,
     pub sections: Vec<Section>,
+    /// Every reference-compatible repair the parse applied.
+    pub(crate) tolerance: ToleranceReport,
+}
+
+impl PartialEq for Stream {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+            && self.system_identifier == other.system_identifier
+            && self.class_identifier == other.class_identifier
+            && self.sections == other.sections
+    }
 }
 
 /// One independently bounded section within a Property Set stream.
@@ -964,7 +980,19 @@ impl Stream {
             system_identifier: 0,
             class_identifier: Guid::from_bytes([0; 16]),
             sections: vec![section],
+            tolerance: ToleranceReport::default(),
         }
+    }
+
+    /// Every reference-compatible repair applied while this stream was
+    /// parsed.
+    ///
+    /// The report is empty for a conformant stream and for a stream built in
+    /// memory. See [`crate::leniency`] for the repairs it can list and how
+    /// format crates merge it.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
     #[must_use]
     pub fn section(&self, format_identifier: Guid) -> Option<&Section> {
