@@ -540,7 +540,9 @@ fn package_reads_skip_bad_custom_properties_and_record_them() {
         property(3, "Due", "<vt:date>2026-01-01</vt:date>"),
         property(4, "Flag", "<vt:bool>maybe</vt:bool>"),
         r#"<property pid="5" name="NoFmtid"><vt:i4>1</vt:i4></property>"#.to_owned(),
-        format!(r#"<property fmtid="{FORMAT_ID}" pid="1" name="LowPid"><vt:i4>1</vt:i4></property>"#),
+        format!(
+            r#"<property fmtid="{FORMAT_ID}" pid="1" name="LowPid"><vt:i4>1</vt:i4></property>"#
+        ),
         property(2, "SamePid", "<vt:i4>1</vt:i4>"),
         property(6, "good", "<vt:i4>1</vt:i4>"),
         r#"<x:ext xmlns:x="urn:x"><x:y/></x:ext>"#.to_owned(),
@@ -608,7 +610,13 @@ fn reserved_property_violations_are_skipped_on_read_for() {
     let reported: Vec<_> = props
         .tolerance_report()
         .iter()
-        .map(|t| (t.defect(), t.item().map(str::to_owned), t.value().map(str::to_owned)))
+        .map(|t| {
+            (
+                t.defect(),
+                t.item().map(str::to_owned),
+                t.value().map(str::to_owned),
+            )
+        })
         .collect();
     assert_eq!(
         reported,

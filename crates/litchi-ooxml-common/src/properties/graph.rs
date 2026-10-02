@@ -1,8 +1,8 @@
 use super::{Dialect, STRICT_CORE_PROPERTIES_RELATIONSHIP};
 use crate::leniency::{CorePropertiesDefect, ToleranceReport};
 use crate::{Error, Result};
-use litchi_opc::packuri::PACKAGE_URI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::packuri::PACKAGE_URI;
 use litchi_opc::{
     OpcPackage, PackURI, Part, PartMetadata, PartView, Relationships, SourceBackedPackage,
 };
@@ -182,7 +182,12 @@ where
                 )));
             };
             for orphan in std::iter::once(&part).chain(&extra_core_parts) {
-                report.record(CorePropertiesDefect::OrphanedPart, orphan.as_str(), None, None);
+                report.record(
+                    CorePropertiesDefect::OrphanedPart,
+                    orphan.as_str(),
+                    None,
+                    None,
+                );
             }
         }
         return Ok(Graph {
@@ -236,7 +241,12 @@ where
             Some(relationship.target_ref()),
         );
         for orphan in core_part.iter().chain(&extra_core_parts) {
-            report.record(CorePropertiesDefect::OrphanedPart, orphan.as_str(), None, None);
+            report.record(
+                CorePropertiesDefect::OrphanedPart,
+                orphan.as_str(),
+                None,
+                None,
+            );
         }
         return Ok(Graph {
             part: None,
@@ -247,7 +257,12 @@ where
     if let Some(report) = report {
         for extra in core_part.iter().chain(&extra_core_parts) {
             if !same_name(extra, &actual) {
-                report.record(CorePropertiesDefect::DuplicatePart, extra.as_str(), None, None);
+                report.record(
+                    CorePropertiesDefect::DuplicatePart,
+                    extra.as_str(),
+                    None,
+                    None,
+                );
             }
         }
     } else if core_part

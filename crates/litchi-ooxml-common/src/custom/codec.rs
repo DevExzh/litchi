@@ -261,14 +261,13 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
                         let property = pending.as_mut().ok_or_else(|| {
                             invalid("custom-property value has no owning property")
                         })?;
-                        let parsed = start_value(property, value_kind.is_some(), &namespace, &element)
-                            .and_then(|kind| {
-                                parse_value(kind, "")
-                                    .map(|value| (kind, value))
-                                    .map_err(|error| {
-                                        (error, CustomPropertiesDefect::InvalidValue, None)
-                                    })
-                            });
+                        let parsed =
+                            start_value(property, value_kind.is_some(), &namespace, &element)
+                                .and_then(|kind| {
+                                    parse_value(kind, "").map(|value| (kind, value)).map_err(
+                                        |error| (error, CustomPropertiesDefect::InvalidValue, None),
+                                    )
+                                });
                         match parsed {
                             Ok(value) => property.value = Some(value),
                             Err((error, defect, value)) => {
@@ -499,7 +498,11 @@ fn start_value(
 
 /// Insert a completed property, recording the per-property failures a read
 /// repairs; collection-level limits stay errors.
-fn insert_property(props: &mut Props, property: PendingProperty, sink: &mut Sink<'_>) -> Result<()> {
+fn insert_property(
+    props: &mut Props,
+    property: PendingProperty,
+    sink: &mut Sink<'_>,
+) -> Result<()> {
     let Some((wire, value)) = property.value else {
         return sink.tolerate(
             invalid(format!(
