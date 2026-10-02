@@ -1,6 +1,6 @@
 //! Raw-cell materialization and formula semantics.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::super::formula::{Range as FormulaRange, translate};
 use super::super::strings::decode_spreadsheet_text;
@@ -274,7 +274,30 @@ fn parse_shared_string_index(value: &str) -> Result<usize> {
         .map_err(|_source| invalid(format!("invalid shared-string index '{value}'")))
 }
 
-pub(super) fn resolve_shared_formulas(cells: &mut [RawCell<'_>]) -> Result<()> {
+/// Resolve shared-formula groups into per-cell scalar formulas.
+///
+/// With `tolerance` present, a structurally broken group (audit finding 4.6)
+/// is repaired per cell and recorded at the cell as
+/// [`CellDefect::BrokenSharedFormulaGroup`], the way LibreOffice falls back to
+/// plain cells for an unusable shared reference:
+///
+/// * a would-be master that cannot anchor a group — no `ref`, no expression,
+///   not the first cell of its `ref`, or a second master for the same `si`
+///   (first wins) — keeps its own expression verbatim as an ordinary
+///   formula when it has one, and otherwise reads as a plain cell holding
+///   its cached value;
+/// * a member whose group has no usable master, or which lies outside the
+///   master's range, reads as a plain cell holding its cached value: the
+///   expression is never translated from a master that does not cover it,
+///   so no formula is invented.
+///
+/// A `ref` that is not a range lexical at all is rejected while the `f`
+/// element is read and stays a hard error. Without `tolerance` each
+/// inconsistency fails the parse as it historically did.
+pub(super) fn resolve_shared_formulas(
+    cells: &mut [RawCell<'_>],
+    mut tolerance: Option<&mut ToleranceReport>,
+) -> Result<()> {
     let mut members = Vec::new();
     for (cell_index, cell) in cells.iter().enumerate() {
         let Some(RawFormula {
@@ -297,67 +320,78 @@ pub(super) fn resolve_shared_formulas(cells: &mut [RawCell<'_>]) -> Result<()> {
         return Ok(());
     }
 
+    // Record one repair at `cell_index`, or refuse it with `error`.
+    let mut repair = |cells: &[RawCell<'_>], cell_index: usize, error: crate::Error| {
+        let tolerance = tolerance.as_deref_mut().ok_or(error)?;
+        let cell = cells
+            .get(cell_index)
+            .ok_or_else(|| invalid("shared formula membership lost its cell"))?;
+        tolerance.record(
+            CellDefect::BrokenSharedFormulaGroup,
+            Location::Cell(cell.address),
+        );
+        Ok::<(), crate::Error>(())
+    };
+
     let mut masters = HashMap::<u32, SharedMaster>::new();
+    let mut repaired_masters = HashSet::new();
     for member in &members {
         if member.range.is_none() && member.text.is_empty() {
             continue;
         }
-        let range_text = member.range.as_deref().ok_or_else(|| {
-            invalid(format!(
-                "shared formula master at ({}, {}) is missing ref",
-                member.row, member.column
-            ))
-        })?;
-        if member.text.is_empty() {
-            return Err(invalid(format!(
-                "shared formula master at ({}, {}) has no expression",
-                member.row, member.column
-            )));
-        }
-        let range = FormulaRange::parse(range_text)?;
-        let rect = formula_range_rect(range)?;
-        if (member.row, member.column) != (range.first_row, range.first_column) {
-            return Err(invalid(format!(
-                "shared formula master at ({}, {}) is not first in '{range_text}'",
-                member.row, member.column
-            )));
-        }
-        if masters
-            .insert(
-                member.index,
-                SharedMaster {
-                    row: member.row,
-                    column: member.column,
-                    range,
-                    rect,
-                    reference: boxed_str(range_text, "shared formula reference")?,
-                    text: member.text.clone(),
-                },
-            )
-            .is_some()
-        {
-            return Err(invalid(format!(
-                "duplicate shared formula master for si={}",
-                member.index
-            )));
+        match shared_master(member, &masters) {
+            Ok(master) => {
+                masters.insert(member.index, master);
+            },
+            Err(error) => {
+                repair(cells, member.cell_index, error)?;
+                repaired_masters.insert(member.cell_index);
+                let cell = cells
+                    .get_mut(member.cell_index)
+                    .ok_or_else(|| invalid("shared formula membership lost its cell"))?;
+                if member.text.is_empty() {
+                    cell.formula = None;
+                } else if let Some(formula) = cell.formula.as_mut() {
+                    formula.kind = RawFormulaKind::Scalar;
+                }
+            },
         }
     }
 
     for member in members {
-        let master = masters.get(&member.index).ok_or_else(|| {
-            invalid(format!(
-                "shared formula at ({}, {}) has no master for si={}",
-                member.row, member.column, member.index
-            ))
-        })?;
-        if !master.range.contains(member.row, member.column) {
-            return Err(invalid(format!(
-                "shared formula at ({}, {}) lies outside its master range",
-                member.row, member.column
-            )));
+        if repaired_masters.contains(&member.cell_index) {
+            continue;
         }
+        let is_master_record = member.range.is_some() || !member.text.is_empty();
+        let master = match masters.get(&member.index) {
+            Some(master) if master.range.contains(member.row, member.column) => master,
+            Some(_) => {
+                repair(
+                    cells,
+                    member.cell_index,
+                    invalid(format!(
+                        "shared formula at ({}, {}) lies outside its master range",
+                        member.row, member.column
+                    )),
+                )?;
+                orphan(cells, member.cell_index)?;
+                continue;
+            },
+            None => {
+                repair(
+                    cells,
+                    member.cell_index,
+                    invalid(format!(
+                        "shared formula at ({}, {}) has no master for si={}",
+                        member.row, member.column, member.index
+                    )),
+                )?;
+                orphan(cells, member.cell_index)?;
+                continue;
+            },
+        };
         let is_master = (member.row, member.column) == (master.row, master.column);
-        if !is_master && (!member.text.is_empty() || member.range.is_some()) {
+        if !is_master && is_master_record {
             return Err(invalid(format!(
                 "shared formula follower at ({}, {}) contains master data",
                 member.row, member.column
@@ -391,5 +425,57 @@ pub(super) fn resolve_shared_formulas(cells: &mut [RawCell<'_>]) -> Result<()> {
         formula.text = text;
         formula.kind = RawFormulaKind::Scalar;
     }
+    Ok(())
+}
+
+/// Validate one would-be shared-formula master against the masters accepted
+/// so far.
+fn shared_master(
+    member: &SharedMember,
+    masters: &HashMap<u32, SharedMaster>,
+) -> Result<SharedMaster> {
+    let range_text = member.range.as_deref().ok_or_else(|| {
+        invalid(format!(
+            "shared formula master at ({}, {}) is missing ref",
+            member.row, member.column
+        ))
+    })?;
+    if member.text.is_empty() {
+        return Err(invalid(format!(
+            "shared formula master at ({}, {}) has no expression",
+            member.row, member.column
+        )));
+    }
+    let range = FormulaRange::parse(range_text)?;
+    let rect = formula_range_rect(range)?;
+    if (member.row, member.column) != (range.first_row, range.first_column) {
+        return Err(invalid(format!(
+            "shared formula master at ({}, {}) is not first in '{range_text}'",
+            member.row, member.column
+        )));
+    }
+    if masters.contains_key(&member.index) {
+        return Err(invalid(format!(
+            "duplicate shared formula master for si={}",
+            member.index
+        )));
+    }
+    Ok(SharedMaster {
+        row: member.row,
+        column: member.column,
+        range,
+        rect,
+        reference: boxed_str(range_text, "shared formula reference")?,
+        text: member.text.clone(),
+    })
+}
+
+/// Drop an orphaned shared-formula member's formula so the cell reads as a
+/// plain cell holding its cached value.
+fn orphan(cells: &mut [RawCell<'_>], cell_index: usize) -> Result<()> {
+    cells
+        .get_mut(cell_index)
+        .ok_or_else(|| invalid("shared formula membership lost its cell"))?
+        .formula = None;
     Ok(())
 }

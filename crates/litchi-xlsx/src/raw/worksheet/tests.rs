@@ -670,6 +670,111 @@ fn clamps_and_records_out_of_domain_geometry() {
     }
 }
 
+/// Audit finding 4.6: a broken shared-formula group is repaired per cell
+/// and recorded at the cell; write-path admission keeps the errors.
+#[test]
+fn repairs_and_records_broken_shared_formula_groups() {
+    use crate::leniency::{CellDefect, Defect, Location};
+
+    let read = |body: &str, repaired: &[&str]| {
+        let xml = format!(r#"<worksheet xmlns="{S}"><sheetData>{body}</sheetData></worksheet>"#);
+        let store =
+            parse(xml.as_bytes(), || Ok(None)).unwrap_or_else(|error| panic!("{body}: {error}"));
+        let locations = store
+            .tolerance_report()
+            .iter()
+            .map(|entry| {
+                assert_eq!(
+                    entry.defect,
+                    Defect::Cell(CellDefect::BrokenSharedFormulaGroup)
+                );
+                entry.location.clone()
+            })
+            .collect::<Vec<_>>();
+        let expected = repaired
+            .iter()
+            .map(|a1| Location::Cell(Address::from_a1(a1).expect("address")))
+            .collect::<Vec<_>>();
+        assert_eq!(locations, expected, "{body}");
+        assert_eq!(
+            super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)).is_err(),
+            !repaired.is_empty(),
+            "write-path admission verdict for {body}"
+        );
+        store
+    };
+    let at = |a1: &str| Address::from_a1(a1).expect("address");
+    let plain_number = |store: &crate::cell::Store, a1: &str, expected: &str| {
+        assert!(
+            matches!(store.get(at(a1)), Some(Cell::Value(Value::Number(n))) if n.as_str() == expected),
+            "{a1}: {:?}",
+            store.get(at(a1))
+        );
+    };
+    let scalar = |store: &crate::cell::Store, a1: &str, expected: &str| match store.get(at(a1)) {
+        Some(Cell::Formula(formula)) => {
+            assert_eq!(formula.text(), expected);
+            assert!(store.entry(at(a1)).expect("entry").shared_formula.is_none());
+        },
+        other => panic!("{a1}: expected a formula, got {other:?}"),
+    };
+
+    // Follower with no master: the cached value is kept, the formula dropped.
+    let store = read(
+        r#"<row r="1"><c r="A1"><f t="shared" si="0"/><v>4</v></c></row>"#,
+        &["A1"],
+    );
+    plain_number(&store, "A1", "4");
+
+    // Master without ref keeps its own text; its follower is orphaned.
+    let store = read(
+        r#"<row r="1"><c r="A1"><f t="shared" si="0">B1*2</f><v>2</v></c></row><row r="2"><c r="A2"><f t="shared" si="0"/><v>6</v></c></row>"#,
+        &["A1", "A2"],
+    );
+    scalar(&store, "A1", "B1*2");
+    plain_number(&store, "A2", "6");
+
+    // Master without an expression reads as its cached value.
+    let store = read(
+        r#"<row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="0"></f><v>3</v></c></row><row r="2"><c r="A2"><f t="shared" si="0"/><v>5</v></c></row>"#,
+        &["A1", "A2"],
+    );
+    plain_number(&store, "A1", "3");
+    plain_number(&store, "A2", "5");
+
+    // Master not first in its range.
+    let store = read(
+        r#"<row r="2"><c r="A2"><f t="shared" ref="A1:A3" si="0">B2</f><v>1</v></c></row>"#,
+        &["A2"],
+    );
+    scalar(&store, "A2", "B2");
+
+    // Duplicate master: the first wins and still serves its followers.
+    let store = read(
+        r#"<row r="1"><c r="A1"><f t="shared" ref="A1:A3" si="0">B1</f><v>1</v></c></row><row r="2"><c r="A2"><f t="shared" ref="A2:A3" si="0">C2</f><v>2</v></c></row><row r="3"><c r="A3"><f t="shared" si="0"/><v>3</v></c></row>"#,
+        &["A2"],
+    );
+    scalar(&store, "A2", "C2");
+    match store.get(at("A3")) {
+        Some(Cell::Formula(formula)) => assert_eq!(formula.text(), "B3"),
+        other => panic!("expected a translated follower, got {other:?}"),
+    }
+
+    // A member outside its master's range is not translated.
+    let store = read(
+        r#"<row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="0">B1</f><v>1</v></c></row><row r="5"><c r="A5"><f t="shared" si="0"/><v>9</v></c></row>"#,
+        &["A5"],
+    );
+    plain_number(&store, "A5", "9");
+
+    // A conformant group repairs nothing.
+    let store = read(
+        r#"<row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="0">B1</f><v>1</v></c></row><row r="2"><c r="A2"><f t="shared" si="0"/><v>2</v></c></row>"#,
+        &[],
+    );
+    assert!(store.tolerance_report().is_clean());
+}
+
 #[test]
 fn rejects_grid_escape_duplicates_and_broken_shared_groups() {
     for body in [
@@ -681,7 +786,6 @@ fn rejects_grid_escape_duplicates_and_broken_shared_groups() {
         r#"<row r="1"><c r="A1" cm="0"/></row>"#,
         r#"<row r="1"><c r="A1" vm="2147483648"/></row>"#,
         r#"<row r="1"><c r="A1"><f bx="1">1</f></c></row>"#,
-        r#"<row r="1"><c r="A1"><f t="shared" si="0"/></c></row>"#,
     ] {
         let xml = format!(r#"<worksheet xmlns="{S}"><sheetData>{body}</sheetData></worksheet>"#);
         assert!(
@@ -4257,7 +4361,9 @@ mod change_0658_ineligibility_gate_tests {
                     r#"<sheetData><row r="1"><c r="A1"><f t="shared" si="0">A2</f><v>1</v></c></row></sheetData>"#,
                 ),
                 NotEligibleReason::FormulaSemantics,
-                Some("invalid XLSX structure: shared formula master at (1, 1) is missing ref"),
+                // The materialized parser repairs the broken group (leniency
+                // finding 4.6) instead of failing.
+                None,
             ),
             (
                 "rich-inline-text",

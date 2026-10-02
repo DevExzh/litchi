@@ -106,6 +106,8 @@
 //!   after the open-time entries, with no sheet. The bounded selected
 //!   dependency scan reports such a table as irregular and the read falls
 //!   back to the repairing parse.
+//! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
+//!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
 //! * finding 4.3 — cell materialization records
 //!   [`CellDefect::MalformedNumber`], [`CellDefect::MalformedBoolean`], and
 //!   [`CellDefect::MalformedDate`] at the cell; the selected-range scanner
@@ -204,11 +206,18 @@ pub enum CellDefect {
     /// A `t="d"` value is outside the accepted ISO 8601 layouts (audit
     /// finding 4.3). The value is demoted to its text.
     MalformedDate,
-    /// A shared-formula group is structurally inconsistent — master without
-    /// `ref` or expression, duplicate master, follower without master
-    /// (audit finding 4.6). *Roadmap contract:* the master text is kept
-    /// verbatim and orphaned followers read with an `Unknown` formula
-    /// instead of a translated one; the location is the follower cell.
+    /// A shared-formula group is structurally inconsistent — a would-be
+    /// master without `ref` or expression, not first in its `ref`, or a
+    /// second master for one `si`; a member without a master or outside the
+    /// master's range (audit finding 4.6).
+    ///
+    /// LibreOffice falls back to plain cells for an unusable shared
+    /// reference. A would-be master keeps its own expression verbatim as an
+    /// ordinary formula (or, without one, reads as its cached value); the
+    /// first master of an `si` wins. An orphaned member is never translated
+    /// from a master that does not cover it: it loses the formula and reads
+    /// as a plain cell holding its cached value. The location is the
+    /// repaired cell. A `ref` that is not a range lexical stays fatal.
     BrokenSharedFormulaGroup,
     /// A scalar or array `<f>` starts with `=` (audit finding 4.9).
     /// *Roadmap contract:* one leading `=` is stripped.
@@ -240,7 +249,7 @@ impl CellDefect {
             },
             Self::MalformedDate => "demoted the unparseable date to text",
             Self::BrokenSharedFormulaGroup => {
-                "kept the shared-formula master verbatim; the orphaned member reads as unknown"
+                "kept the would-be master's own formula, or kept the orphaned member's cached value without a formula"
             },
             Self::FormulaLeadingEquals => "stripped the leading '=' from the formula",
             Self::EmptyFormula => "dropped the empty formula",

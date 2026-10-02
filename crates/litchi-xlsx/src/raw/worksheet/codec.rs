@@ -615,7 +615,14 @@ impl<'c> Parser<'c> {
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
     {
-        resolve_shared_formulas(&mut self.cells)?;
+        let repairs = self.repairs;
+        resolve_shared_formulas(
+            &mut self.cells,
+            match repairs {
+                super::Repairs::Apply => Some(&mut self.tolerance),
+                super::Repairs::Refuse => None,
+            },
+        )?;
         let needs_strings = self
             .lane_cells
             .iter()

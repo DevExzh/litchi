@@ -327,3 +327,35 @@ fn malformed_shared_string_count_hints_are_ignored_and_recorded() {
     assert_eq!(worksheet_entries(&report), [hint.clone(), hint]);
     assert_eq!(source.tolerance_report(), report);
 }
+
+/// Finding 4.6: an orphaned shared-formula member keeps its cached value,
+/// loses the formula it cannot be given, and is recorded at the cell.
+#[test]
+fn orphaned_shared_formula_member_keeps_its_cached_value() {
+    use litchi_xlsx::{Address, Cell, CellDefect, SourceCellView, Value};
+
+    let bytes = patched(&[(
+        "xl/worksheets/sheet1.xml",
+        &replace(
+            r#"<c r="B3" s="7"/>"#,
+            r#"<c r="B3" s="7"><f t="shared" si="7"/><v>12</v></c>"#,
+        ),
+    )]);
+
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let flags = source.sheet(0usize).unwrap().unwrap();
+    assert!(matches!(
+        flags.cell("B3").unwrap(),
+        SourceCellView::Stored(Cell::Value(Value::Number(number))) if number.as_str() == "12"
+    ));
+
+    let report = both_reports(&bytes);
+    assert_eq!(
+        worksheet_entries(&report),
+        [(
+            Defect::Cell(CellDefect::BrokenSharedFormulaGroup),
+            Some(0),
+            ToleranceLocation::Cell(Address::from_a1("B3").unwrap())
+        )]
+    );
+}
