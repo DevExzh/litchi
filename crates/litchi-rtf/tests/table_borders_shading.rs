@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, ShadingPattern};
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -145,7 +147,10 @@ fn rejects_malformed_parameters_order_duplicates_bounds_and_caps() {
         r"{\rtf1\trowd\clcfpat-1\cellx1}",
         r"{\rtf1\trowd\clcbpat65536\cellx1}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
     let mut source = String::from("{\\rtf1\\trowd");
     for index in 0..=4096 {
@@ -153,5 +158,7 @@ fn rejects_malformed_parameters_order_duplicates_bounds_and_caps() {
         source.push_str(&(index + 1).to_string());
     }
     source.push('}');
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &RtfDocument::parse(&source)
+    ));
 }

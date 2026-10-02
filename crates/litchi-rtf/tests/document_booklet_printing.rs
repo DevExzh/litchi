@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentBookletPrinting, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> std::io::Result<Vec<u8>> {
@@ -111,7 +113,7 @@ fn rejects_invalid_values_parameters_duplicates_starred_grouped_and_late_forms()
         r"{\rtf1\bookfoldsheets99999999999 Body}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }
@@ -119,7 +121,7 @@ fn rejects_invalid_values_parameters_duplicates_starred_grouped_and_late_forms()
         for suffix in ["0", "1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
                 "accepted malformed {source}"
             );
         }
@@ -133,7 +135,7 @@ fn rejects_invalid_values_parameters_duplicates_starred_grouped_and_late_forms()
             format!(r"{{\rtf1 Body\{control}}}"),
         ] {
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
                 "accepted malformed {name}: {source}"
             );
         }

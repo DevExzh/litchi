@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentTableLayoutCompatibility, RtfDocument, RtfWriter};
 
 const CONTROLS: [&str; 8] = [
@@ -107,10 +109,15 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1\ansi{{\{name}}}Body}}"),
             format!(r"{{\rtf1\ansi Body\{name}}}"),
         ] {
-            assert!(RtfDocument::parse(&input).is_err(), "accepted {input}");
+            assert!(
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&input)),
+                "accepted {input}"
+            );
         }
     }
-    assert!(RtfDocument::parse(r"{\rtf1\ansi\otblrul999999999999 Body}").is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &RtfDocument::parse(r"{\rtf1\ansi\otblrul999999999999 Body}")
+    ));
 }
 
 #[test]

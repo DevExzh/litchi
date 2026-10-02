@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     DocumentAutoFormatType, DocumentOrigin, DocumentOriginMetadata, HtmlEmailVersion, RtfDocument,
     RtfWriter,
@@ -126,7 +128,7 @@ fn rejects_invalid_versions_types_conflicts_starred_grouped_and_late_forms() {
         r"{\rtf1 Body\doctype2}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }

@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     AssociatedCharacterBaseline, AssociatedCharacterFormatting, CharacterBaseline,
     CharacterExpansion, CharacterPositioning, RtfDocument, RtfWriter,
@@ -244,7 +246,10 @@ fn rejects_out_of_range_parameters() {
         r"{\rtf1 A{\footnote\nosupersub1 N}B}",
         r"{\rtf1{\stylesheet{\s0\nosupersub1 Normal;}}Body}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
     assert!(RtfDocument::parse(r"{\rtf1 A{\*\unknown\nosupersub1 hidden}B}").is_ok());
     assert!(

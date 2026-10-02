@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableAutoformatFlag, TableAutoformatFlags, TableRowBandIndex,
     TableRowBanding,
@@ -131,7 +133,10 @@ fn rejects_missing_parameters_parameters_on_flags_duplicates_and_out_of_range_va
         "tbllkfont\\tbllkfont",
     ] {
         let source = format!(r"{{\rtf1\trowd\{controls}\cellx1000\intbl X\cell\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {controls}"
+        );
     }
     assert!(
         RtfDocument::parse(r"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}")

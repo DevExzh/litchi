@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     DocumentJustificationMode, DocumentRenderingOrientation, DocumentRenderingSettings,
     RtfDocument, RtfWriter,
@@ -136,7 +138,7 @@ fn rejects_numeric_starred_grouped_late_duplicate_and_conflicting_forms() {
         r"{\rtf1 Body\lnongrid}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }

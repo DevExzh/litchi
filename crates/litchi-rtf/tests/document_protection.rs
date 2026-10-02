@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::write::Writer;
 use litchi_rtf::{
     Document, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel, ProtectionType, RtfDocument,
@@ -94,7 +96,10 @@ fn rejects_malformed_duplicate_or_misplaced_protection() {
             r"{{\rtf1\trowd\cellx1000\intbl\cell\row{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}}}}}"
         ),
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 }
 

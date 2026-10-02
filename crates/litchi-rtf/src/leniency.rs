@@ -105,7 +105,10 @@ pub enum ParameterDefect {
     /// (`\page2`).
     ///
     /// LibreOffice's tokenizer documents that "flags ignore any parameter by
-    /// definition", and Word does the same. The parameter is dropped.
+    /// definition", and Word does the same. The parameter is dropped. The
+    /// emphasis-mark (`\acc*`) and associated-underline (`\aul*`) selectors,
+    /// which Word and LibreOffice treat as toggles, are turned off by a zero
+    /// parameter instead.
     UnexpectedParameter,
     /// A value control that requires a numeric parameter had none (`\fs`).
     ///
@@ -121,7 +124,9 @@ impl ParameterDefect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::NonBinaryToggle => "treated the nonzero toggle parameter as on",
-            Self::UnexpectedParameter => "ignored the parameter the control does not define",
+            Self::UnexpectedParameter => {
+                "ignored the parameter the control does not define (a zero turns a toggled selector off)"
+            },
             Self::MissingParameter => "substituted the control's default parameter",
         }
     }

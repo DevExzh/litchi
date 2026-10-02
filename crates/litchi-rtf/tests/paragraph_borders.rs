@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, StyleType};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -144,6 +146,9 @@ fn rejects_malformed_paragraph_borders() {
         r"{\rtf1\pard\box\brdrs\box\brdrdot Text\par}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            "accepted malformed {rtf}"
+        );
     }
 }

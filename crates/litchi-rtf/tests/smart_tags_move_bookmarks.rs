@@ -1,3 +1,5 @@
+mod repair_support;
+
 use litchi_rtf::{Document, RtfResult, SmartTagAttribute};
 use std::borrow::Cow;
 
@@ -75,15 +77,21 @@ fn unmatched_move_start_is_ignored_in_the_semantic_model() -> Result<(), Box<dyn
 
 #[test]
 fn malformed_move_marker_fields_are_rejected() {
-    assert!(Document::parse(r#"{\rtf1\ansi{\*\mvfmf bad-tag 0100EFCDAB00}}"#).is_err());
-    assert!(Document::parse(r#"{\rtf1\ansi{\*\mvfml tag trailing}}"#).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(r#"{\rtf1\ansi{\*\mvfmf bad-tag 0100EFCDAB00}}"#)
+    ));
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(r#"{\rtf1\ansi{\*\mvfml tag trailing}}"#)
+    ));
     for source in [
         r#"{\rtf1\ansi{\*\mvfmf1 tag 0100EFCDAB00}x{\*\mvfml tag}}"#,
         r#"{\rtf1\ansi{\*\mvfml1 tag}}"#,
         r#"{\rtf1\ansi{\*\mvtof1 tag 0100EFCDAB00}x{\*\mvtol tag}}"#,
         r#"{\rtf1\ansi{\*\mvtol1 tag}}"#,
     ] {
-        assert!(Document::parse(source).is_err());
+        assert!(repair_support::rejected_or_parameter_repaired(
+            &Document::parse(source)
+        ));
     }
 }
 
@@ -103,32 +111,50 @@ fn smart_tags_and_moves_are_main_body_only() {
 #[test]
 fn smart_tag_enforces_page_153_namespace_and_attribute_grammar() {
     let missing_xml_namespace = r#"{\rtf1\ansi{\*\xmlopen{\factoidname date}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(missing_xml_namespace).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(missing_xml_namespace)
+    ));
 
     let xmlattr_alias = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr1{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(xmlattr_alias).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(xmlattr_alias)
+    ));
 
     let missing_attribute_namespace = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(missing_attribute_namespace).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(missing_attribute_namespace)
+    ));
 
     let value_before_name = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrvalue 4}{\xmlattrname Month}}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(value_before_name).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(value_before_name)
+    ));
 
     let direct_value_before_name = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0\xmlattrvalue 4\xmlattrname Month}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(direct_value_before_name).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(direct_value_before_name)
+    ));
 
     let negative_namespace = r#"{\rtf1\ansi{\*\xmlopen\xmlns-1{\factoidname date}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(negative_namespace).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(negative_namespace)
+    ));
 
     let negative_attribute_namespace = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns-1{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(negative_attribute_namespace).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(negative_attribute_namespace)
+    ));
 
     let missing_namespace_parameter =
         r#"{\rtf1\ansi{\*\xmlopen\xmlns{\factoidname date}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(missing_namespace_parameter).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(missing_namespace_parameter)
+    ));
 
     let missing_attribute_namespace_parameter = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
-    assert!(Document::parse(missing_attribute_namespace_parameter).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &Document::parse(missing_attribute_namespace_parameter)
+    ));
 
     for source in [
         r#"{\rtf1\ansi{\*\xmlopen1\xmlns2{\factoidname date}}x{\*\xmlclose}}"#,
@@ -137,7 +163,9 @@ fn smart_tag_enforces_page_153_namespace_and_attribute_grammar() {
         r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrname1 Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#,
         r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrname Month}{\xmlattrvalue1 4}}}x{\*\xmlclose}}"#,
     ] {
-        assert!(Document::parse(source).is_err());
+        assert!(repair_support::rejected_or_parameter_repaired(
+            &Document::parse(source)
+        ));
     }
 }
 

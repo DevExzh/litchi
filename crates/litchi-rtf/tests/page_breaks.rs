@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{BodyStoryEvent, CellStoryEvent, RtfDocument, RtfWriter, StoryEvent};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -120,7 +122,10 @@ fn rejects_parameters_and_non_story_destinations_but_skips_unknown_groups() {
         r"{\rtf1{\stylesheet{\s0\page Normal;}}x}",
         r"{\rtf1{\*\defchp\page}x}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 
     let document = RtfDocument::parse(r"{\rtf1 A{\*\unknown\page1 ignored}B}").unwrap();

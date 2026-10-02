@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{FitText, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -58,7 +60,10 @@ fn rejects_malformed_fittext_controls() {
         r"{\rtf1{\fittext-2 x}}",
         r"{\rtf1{\fittext1048577 x}}",
     ] {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            "accepted malformed {rtf}"
+        );
     }
     // Zero is a valid (degenerate) width.
     assert!(RtfDocument::parse(r"{\rtf1{\fittext0 x}}").is_ok());

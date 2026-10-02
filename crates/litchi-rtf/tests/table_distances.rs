@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, TableDistanceUnit};
 
 #[test]
@@ -108,7 +110,10 @@ fn rejects_malformed_values_and_units() {
         r"{\rtf1\trowd\trpaddfl1 X}",
         r"{\rtf1\trowd\clspdfb4 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
     assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\trpaddl-1\trpaddfl9 bad}Visible}").is_ok());
 }

@@ -9,10 +9,11 @@
 //! reports clean.
 
 use litchi_rtf::leniency::{
-    Defect, Leniency, SyntaxDefect, ToleranceReport, ToleratedDefect, UnicodeDefect,
+    Defect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
+    UnicodeDefect,
 };
 use litchi_rtf::read::{Limits, Options};
-use litchi_rtf::{Document, RtfDocument, compress};
+use litchi_rtf::{Document, EmphasisMark, RtfDocument, compress};
 
 /// A conformant document touching the main destinations.
 const CONFORMANT: &str = concat!(
@@ -214,4 +215,79 @@ fn word_style_surrogate_pairs_with_fallbacks_decode_cleanly_in_destinations() {
     assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{1f60a}");
     assert_eq!(document.info().title.as_deref(), Some("T\u{1f60a}"));
     assert_clean(document.tolerance_report());
+}
+
+// F9.5: malformed parameter shapes take Word's interpretation (LibreOffice's
+// `RTFTokenizer::dispatchKeyword`) and every repair is recorded.
+#[test]
+fn malformed_parameter_shapes_take_words_interpretation_and_are_recorded() {
+    let source =
+        r"{\rtf1\ansi\hyphauto2\deff0{\fonttbl{\f0 Arial;}}\pard\fs A\page2 B\accdot0 C\par}";
+    let document = RtfDocument::parse(source).unwrap();
+
+    // A nonzero toggle parameter is on.
+    assert_eq!(document.hyphenation().automatic, Some(true));
+    // A missing value takes the keyword default (12 points).
+    let block = |text: &str| {
+        document
+            .blocks()
+            .iter()
+            .find(|block| block.text == text)
+            .unwrap_or_else(|| panic!("missing block {text:?}"))
+    };
+    assert_eq!(block("A").formatting.font_size.get(), 24);
+    // A flag ignores its parameter.
+    assert_eq!(document.page_breaks().count(), 1);
+    // A zero parameter on a toggled selector turns it off, so `C` keeps the
+    // formatting of `B` and shares its block.
+    assert_eq!(block("BC").formatting.emphasis_mark, EmphasisMark::None);
+
+    let at = |needle: &str| source.find(needle).unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (
+                Defect::Parameter(ParameterDefect::NonBinaryToggle),
+                at(r"\hyphauto2")
+            ),
+            (
+                Defect::Parameter(ParameterDefect::MissingParameter),
+                at(r"\fs ")
+            ),
+            (
+                Defect::Parameter(ParameterDefect::UnexpectedParameter),
+                at(r"\page2")
+            ),
+            (
+                Defect::Parameter(ParameterDefect::UnexpectedParameter),
+                at(r"\accdot0")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn well_formed_parameter_shapes_are_not_defects() {
+    let source = r"{\rtf1\ansi\hyphauto1\deff0{\fonttbl{\f0 Arial;}}\pard\fs24 A\page B\accdot C\accnone\par}";
+    let document = RtfDocument::parse(source).unwrap();
+    assert_eq!(document.page_breaks().count(), 1);
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn parameter_shapes_in_destinations_are_repaired() {
+    // Stylesheet, table-row, and section controls share the lexer's repair.
+    let source = concat!(
+        r"{\rtf1\ansi{\stylesheet{\s0\sbauto Normal;}{\*\cs10\fs Char;}}",
+        r"\trowd\trgaph\trql2\cellx1000\pard\intbl X\cell\row",
+        r"\sectd\vertsect1\pard Y\par}",
+    );
+    let document = RtfDocument::parse(source).unwrap();
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 5, "{report:?}");
+    assert!(
+        report
+            .iter()
+            .all(|tolerated| matches!(tolerated.defect, Defect::Parameter(_)))
+    );
 }

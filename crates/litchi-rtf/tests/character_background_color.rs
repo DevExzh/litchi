@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{Formatting, RtfDocument, RtfWriter, StyleBlock};
 
 fn block<'a>(document: &'a RtfDocument<'a>, text: &str) -> &'a StyleBlock<'a> {
@@ -101,7 +103,10 @@ fn rejects_missing_negative_overflow_and_unrepresentable_shape_runs() {
         r"{\rtf1\cb65536 Overflow}",
         concat!(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 one", r"\cb2 two}}}}"),
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "{source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "{source}"
+        );
     }
 
     let inert = RtfDocument::parse(concat!(

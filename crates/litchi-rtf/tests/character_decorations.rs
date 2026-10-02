@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{CharacterBorderStyle, RtfDocument, RtfWriter};
 
 #[test]
@@ -121,7 +123,10 @@ fn rejects_malformed_character_decorations() {
         r"{\rtf1\chcfpat65536 X}",
         r"{\rtf1\chcbpat-1 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 
     assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}").is_ok());

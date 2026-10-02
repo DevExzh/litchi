@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{ParagraphSpacingPolicy, RtfDocument, RtfWriter, StyleBlock};
 fn block<'a>(d: &'a RtfDocument<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
@@ -130,6 +132,9 @@ fn rejects_missing_out_of_range_and_selector_parameters() {
         r"{\rtf1\nosnaplinegrid0 X}",
         r"{\rtf1\contextualspace1 X}",
     ] {
-        assert!(RtfDocument::parse(s).is_err(), "accepted {s}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(s)),
+            "accepted {s}"
+        );
     }
 }

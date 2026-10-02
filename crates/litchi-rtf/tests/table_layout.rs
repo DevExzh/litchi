@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment,
     TableRowAlignment, TableRowLayout, TextDirection,
@@ -156,7 +158,10 @@ fn rejects_parameters_and_enforces_existing_cell_cap() {
         "clhidemark0",
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1000\\intbl X\\cell\\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {word}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {word}"
+        );
     }
     let mut source = String::from("{\\rtf1\\trowd");
     for index in 0..=4096 {
@@ -164,5 +169,7 @@ fn rejects_parameters_and_enforces_existing_cell_cap() {
         source.push_str(&(index + 1).to_string());
     }
     source.push('}');
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &RtfDocument::parse(&source)
+    ));
 }

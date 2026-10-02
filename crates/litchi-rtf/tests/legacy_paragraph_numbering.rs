@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     LegacyParagraphNumberingAlignment, LegacyParagraphNumberingFormat,
     LegacyParagraphNumberingLevel, LegacyParagraphNumberingUnderline, RtfDocument, RtfWriter,
@@ -116,7 +118,7 @@ fn rejects_adversarial_pn_destinations() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed RTF: {source}"
         );
     }

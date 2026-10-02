@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfDocument,
     RtfWriter, WriterOptions,
@@ -120,7 +122,10 @@ fn malformed_domain_duplicates_and_placement_are_rejected() {
         r"{\rtf1\ansi{\*\deftab720}body}",
         r"{\rtf1\ansi body\deftab720}",
     ] {
-        assert!(RtfDocument::parse(hostile).is_err(), "accepted {hostile}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(hostile)),
+            "accepted {hostile}"
+        );
     }
 
     let doc = RtfDocument::parse(r"{\rtf1\ansi body}").unwrap();

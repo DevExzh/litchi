@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DefaultFormattingDestination, ParagraphWrapping, RtfDocument, RtfWriter};
 
 const PRODUCER: &str = r"{\rtf1\ansi\adeff7\deff2\stshfdbch31505\stshfloch31506\stshfhich31507\stshfbi31508
@@ -108,7 +110,7 @@ fn rejects_malformed_default_formatting() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed RTF: {source}"
         );
     }

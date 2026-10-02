@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{Cell, RtfDocument, RtfWriter, Table};
 
 fn nested_count(table: &Table<'_>) -> usize {
@@ -147,7 +149,10 @@ fn rejects_malformed_levels_destinations_and_boundaries() {
         r"{\rtf1\trowd\cellx1\intbl\itap3 X}",
         r"{\rtf1\trowd\cellx1\intbl\itap2 X\nestcell{\nesttableprops\trowd\cellx1\cellx2\nestrow}}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 }
 

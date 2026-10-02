@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{CharacterGrid, CharacterType, Formatting, RtfDocument, RtfWriter};
 
 fn formatting_for<'a>(document: &'a RtfDocument<'a>, text: &str) -> Formatting {
@@ -95,7 +97,10 @@ fn rejects_invalid_parameters_and_duplicate_document_defaults() {
         r"{\rtf1{\*\defchp\fcs0\fcs1}X}",
         r"{\rtf1{\*\defchp\cgrid\cgrid0}X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 }
 

@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings, RtfDocument,
     RtfWriter,
@@ -171,7 +173,7 @@ fn rejects_missing_invalid_overflow_duplicate_starred_grouped_and_late_forms() {
         r"{\rtf1 Body\grfdocevents0}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }

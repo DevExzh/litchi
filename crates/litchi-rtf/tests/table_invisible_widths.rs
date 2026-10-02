@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, TablePreferredWidthUnit, TextDirection};
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -166,7 +168,10 @@ fn rejects_malformed_duplicate_unpaired_and_out_of_range_controls() {
         "trftsWidthA3\\trwWidthA1\\trwWidthA2",
     ] {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {controls}"
+        );
     }
     assert!(RtfDocument::parse(r"{\rtf1\trowd\trftsWidthB2\trwWidthB5000\trftsWidthA3\trwWidthA31680\cellx31680\intbl X\cell\row}").is_ok());
 }

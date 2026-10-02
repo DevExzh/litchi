@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{ImageType, Picture, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
@@ -67,7 +69,7 @@ fn picture_layout_controls_reject_ambiguous_or_unbounded_forms() {
         r"{\rtf1\piccropl1 Body}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted hostile source: {source}"
         );
     }

@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, RtfDocument, RtfWriter, TabAlignment, TabLeader};
 use std::fmt::Write as _;
 
@@ -167,7 +169,10 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
         r"{\rtf1\tqr\tb20 X}",
         r"{\rtf1\tx2147483648 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 
     let mut over_limit = String::from(r"{\rtf1");
@@ -175,7 +180,9 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
         write!(over_limit, r"\tx{}", position * 20).unwrap();
     }
     over_limit.push_str(" X}");
-    assert!(RtfDocument::parse(&over_limit).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &RtfDocument::parse(&over_limit)
+    ));
 
     assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}",).is_ok());
 }

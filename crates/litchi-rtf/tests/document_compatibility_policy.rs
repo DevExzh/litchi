@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentCompatibilityPolicy, DocumentFeatureThrottle, RtfDocument, RtfWriter};
 
 fn write(doc: &RtfDocument<'_>) -> String {
@@ -104,7 +106,10 @@ fn rejects_malformed_duplicates_starred_grouped_and_late_controls() {
             format!(r"{{\rtf1\ansi{{\{name}}}Body}}"),
             format!(r"{{\rtf1\ansi Body\{name}}}"),
         ] {
-            assert!(RtfDocument::parse(&input).is_err(), "accepted {input}");
+            assert!(
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&input)),
+                "accepted {input}"
+            );
         }
     }
 
@@ -118,7 +123,10 @@ fn rejects_malformed_duplicates_starred_grouped_and_late_controls() {
         r"{\rtf1\ansi Body\nofeaturethrottle1}",
         r"{\rtf1\ansi\nofeaturethrottle999999999999 Body}",
     ] {
-        assert!(RtfDocument::parse(input).is_err(), "accepted {input}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(input)),
+            "accepted {input}"
+        );
     }
 }
 

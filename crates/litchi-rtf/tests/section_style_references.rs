@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, SectionProperties, StyleType};
 
 #[test]
@@ -65,7 +67,10 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
         r"{\rtf1{\stylesheet{\*\b\ds1 Late;}}}",
         r"{\rtf1{\stylesheet{\*\ds1\ds2 Duplicate;}}}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 
     let inert =

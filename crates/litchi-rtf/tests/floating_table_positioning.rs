@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableHorizontalPosition, TableHorizontalReference,
     TableVerticalPosition, TableVerticalReference,
@@ -176,7 +178,10 @@ fn rejects_malformed_parameters_and_caps() {
         r"{\rtf1\trowd\tdfrmtxtLeft31681 X}",
         r"{\rtf1\trowd\tabsnoovrlp2 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
     assert!(
         RtfDocument::parse(r"{\rtf1\trowd\tabsnoovrlp0\cellx1\intbl X\cell\row}")

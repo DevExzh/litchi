@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{ParagraphLogicalIndentation, RtfDocument, RtfWriter, StyleBlock};
 fn block<'a>(d: &'a RtfDocument<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
@@ -84,6 +86,8 @@ fn malformed() {
         r"{\rtf1\curi-10000001 X}",
         r"{\rtf1\indmirror0 X}",
     ] {
-        assert!(RtfDocument::parse(s).is_err());
+        assert!(repair_support::rejected_or_parameter_repaired(
+            &RtfDocument::parse(s)
+        ));
     }
 }

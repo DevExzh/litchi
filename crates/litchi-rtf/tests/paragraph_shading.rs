@@ -9,6 +9,8 @@
 
 mod support;
 
+mod repair_support;
+
 use litchi_rtf::{Paragraph, RtfDocument, RtfWriter, Shading, StyleBlock};
 
 fn block<'a>(document: &'a RtfDocument<'a>, text: &str) -> &'a StyleBlock<'a> {
@@ -104,7 +106,10 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
         r"{\rtf1\cbpat-1 X}",
         r"{\rtf1\cbpat65536 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "{source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "{source}"
+        );
     }
 
     let inert =

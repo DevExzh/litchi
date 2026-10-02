@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{Formatting, RtfDocument, RtfWriter, StyleType};
 
 fn formatting_for<'a>(document: &'a RtfDocument<'a>, text: &str) -> Formatting {
@@ -114,7 +116,10 @@ fn rejects_missing_out_of_range_duplicate_and_misplaced_references() {
         r"{\rtf1{\*\defchp\cs1\cs2}X}",
         r"{\rtf1{\*\defchp\cs}X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 
     let inert =

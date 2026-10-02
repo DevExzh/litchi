@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod repair_support;
+
 use std::borrow::Cow;
 
 use litchi_rtf::{
@@ -243,7 +245,10 @@ fn rejects_missing_or_oversized_frame_parameters() {
         r#"{\rtf1{\stylesheet{\s7\abslock2 Bad;}}Text}"#,
         r#"{\rtf1{\stylesheet{\s7\absnoovrlp2 Bad;}}Text}"#,
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 }
 

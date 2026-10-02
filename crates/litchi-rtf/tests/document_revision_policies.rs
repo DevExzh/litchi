@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentRevisionPolicies, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -90,13 +92,13 @@ fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
         for suffix in ["", "-1", "2", "32767", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
                 "accepted malformed {source}"
             );
         }
         let source = format!(r"{{\rtf1\{name}0\{name}1 Body}}");
         assert!(
-            RtfDocument::parse(&source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
             "accepted duplicate {source}"
         );
     }

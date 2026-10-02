@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Result<Vec<u8>, std::io::Error> {
@@ -158,7 +160,7 @@ fn rejects_malformed_bounds_duplicates_grouping_and_late_placement() {
         r"{\rtf1 Body\gutter720}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }

@@ -91,8 +91,13 @@ impl<'a> Lexer<'a> {
             self.advance()?;
         }
 
-        // Match control word to enum variant
-        let control = match_control_word(word, param)?;
+        // Match control word to enum variant, applying the Word-compatible
+        // interpretation of a malformed parameter shape.
+        let mut repair = None;
+        let control = match_control_word(word, param, &mut repair)?;
+        if let Some(defect) = repair {
+            self.tolerance.record(defect, start.saturating_sub(1));
+        }
 
         // Handle binary data immediately after \bin. The input uses a one-byte
         // Latin-1 transport mapping, so each scalar maps back to its source byte.

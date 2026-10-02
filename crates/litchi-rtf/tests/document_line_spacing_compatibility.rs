@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentLineSpacingCompatibility, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -110,7 +112,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         for suffix in ["0", "1", "-1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
                 "accepted malformed {source}"
             );
         }
@@ -121,7 +123,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
                 "accepted malformed {source}"
             );
         }

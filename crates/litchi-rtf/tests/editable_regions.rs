@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -73,6 +75,9 @@ fn rejects_unbalanced_or_misplaced_editable_region_marks() {
         r"{\rtf1 body{\footnote\ebcstart note\ebcend}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            "accepted malformed {rtf}"
+        );
     }
 }

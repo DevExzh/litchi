@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, TableDistanceUnit, TablePreferredWidthUnit};
 
 #[test]
@@ -114,7 +116,10 @@ fn rejects_malformed_default_controls() {
         r"{\rtf1\trowd\tsbrdrt\brdrw20 X}",
         r"{\rtf1\trowd\tsbrdrt\brdrs\brdrw80 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
     assert!(
         RtfDocument::parse(r"{\rtf1{\*\unknown\tscellpaddl-1\tscellwidthfts9 bad}Visible}").is_ok()

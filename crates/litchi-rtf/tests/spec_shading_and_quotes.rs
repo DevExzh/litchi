@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, ShadingPattern};
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -71,7 +73,10 @@ fn paragraph_and_character_pattern_shading_round_trip_typed() {
 #[test]
 fn shading_pattern_controls_reject_numeric_parameters() {
     for source in [r"{\rtf1\bghoriz1 invalid}", r"{\rtf1\chbgvert0 invalid}"] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 }
 

@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, TableCellMergeRole};
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -62,7 +64,10 @@ fn resets_trowd_restores_groups_and_snapshots_each_cellx() {
 fn rejects_parameters_duplicates_conflicts_and_invalid_horizontal_ordering() {
     for word in ["clmgf0", "clmrg1", "clvmgf-1", "clvmrg2"] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1000\\intbl X\\cell\\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {word}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {word}"
+        );
     }
     for controls in [
         "clmgf\\clmgf",
@@ -75,13 +80,19 @@ fn rejects_parameters_duplicates_conflicts_and_invalid_horizontal_ordering() {
         "clvmrg\\clvmgf",
     ] {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {controls}"
+        );
     }
     for source in [
         r"{\rtf1\trowd\clmrg\cellx1000\intbl X\cell\row}",
         r"{\rtf1\trowd\clmgf\cellx1000\cellx2000\clmrg\cellx3000\intbl X\cell Y\cell Z\cell\row}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
     assert!(RtfDocument::parse(r"{\rtf1\trowd\clmgf\clvmgf\cellx1000\intbl X\cell\row}").is_ok());
 }

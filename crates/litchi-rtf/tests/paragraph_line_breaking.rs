@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, RtfDocument, RtfWriter, StyleBlock};
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
@@ -175,6 +177,9 @@ fn rejects_invalid_parameters() {
         r"{\rtf1\favar1 X}",
         r"{\rtf1\fafixed1 X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            "accepted {source}"
+        );
     }
 }

@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableCellMergeRole, TableIndentUnit, TablePreferredWidthUnit,
     TableRowGeometry, TableRowHeight,
@@ -142,7 +144,10 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
     ];
     for controls in controls {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {controls}"
+        );
     }
     let cell_controls = [
         "clftsWidth",
@@ -157,7 +162,10 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
     ];
     for controls in cell_controls {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+            "accepted {controls}"
+        );
     }
     let defaulted = RtfDocument::parse(r"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}").unwrap();
     let indent = defaulted.tables()[0].rows()[0].geometry().indent().unwrap();

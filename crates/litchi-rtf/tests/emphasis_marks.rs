@@ -9,6 +9,8 @@
 
 //! Round-trip tests for East Asian `\acc*` emphasis-mark character controls.
 
+mod repair_support;
+
 use litchi_rtf::{EmphasisMark, RtfDocument, RtfWriter};
 
 const MARKS: &[(EmphasisMark, &str)] = &[
@@ -101,7 +103,7 @@ fn emphasis_mark_controls_reject_parameters() {
         r"{\rtf1\ansi\accnone1 Text\par}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }

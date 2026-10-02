@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     DocumentDrawingGrid, DrawingGridLineInterval, DrawingGridSpacing, RtfDocument, RtfWriter,
 };
@@ -158,7 +160,7 @@ fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
         r"{\rtf1\dgvshow1\dgvshow2 Body}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }

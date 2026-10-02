@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, SectionRendering};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -110,6 +112,9 @@ fn rejects_parameterized_section_and_paragraph_flags() {
         r"{\rtf1\pard\noline1 Text\par}",
         r"{\rtf1\pard\notabind0 Text\par}",
     ] {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            "accepted malformed {rtf}"
+        );
     }
 }

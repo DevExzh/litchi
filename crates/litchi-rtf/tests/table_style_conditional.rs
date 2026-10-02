@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, StyleType};
 
 const TABLE_STYLE_SOURCE: &str = concat!(
@@ -118,6 +120,9 @@ fn rejects_misplaced_or_duplicate_table_style_controls() {
         r"{\rtf1{\stylesheet{\*\ts16\tscbandsv65536 T;}}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            "accepted malformed {rtf}"
+        );
     }
 }

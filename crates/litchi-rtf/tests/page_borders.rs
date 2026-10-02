@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{
     PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderStyle,
     RtfDocument, RtfWriter,
@@ -89,11 +91,16 @@ fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
         r"{\rtf1\pgbrdropt64 Body}",
         r"{\rtf1\pgbrdrt\brdrs\brdrw10\pgbrdrt\brdrs Body}",
     ] {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted {rtf}");
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            "accepted {rtf}"
+        );
     }
     let negative = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf"
     ));
-    assert!(RtfDocument::parse(negative).is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &RtfDocument::parse(negative)
+    ));
 }

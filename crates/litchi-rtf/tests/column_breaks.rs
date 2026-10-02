@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{BodyStoryEvent, CellStoryEvent, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -85,7 +87,9 @@ fn document_column_breaks_can_be_pushed_and_cleared() {
 
 #[test]
 fn rejects_parameters_in_the_body() {
-    assert!(RtfDocument::parse(r"{\rtf1 A\column1 B}").is_err());
+    assert!(repair_support::rejected_or_parameter_repaired(
+        &RtfDocument::parse(r"{\rtf1 A\column1 B}")
+    ));
 }
 
 #[test]

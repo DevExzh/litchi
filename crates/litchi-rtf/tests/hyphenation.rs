@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod repair_support;
+
 use litchi_rtf::{DocumentHyphenation, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -90,7 +92,7 @@ fn rejects_bad_values_duplicates_and_non_root_or_late_placement() {
         r"{\rtf1 Body\hyphauto1}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
             "accepted malformed {source}"
         );
     }
@@ -103,7 +105,7 @@ fn rejects_bad_values_duplicates_and_non_root_or_late_placement() {
             format!(r"{{\rtf1 Body\{control}}}"),
         ] {
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
                 "accepted malformed {source}"
             );
         }
