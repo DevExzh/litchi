@@ -90,11 +90,21 @@
 //!   [`crate::PersistMapping::build_from_records_with_report`] apply the
 //!   same repairs per entry instead of dropping a whole holder. A truncated
 //!   or misaligned directory stays an error.
-//! - **F5.8** (username-length part,
-//!   [`PersistDefect::CurrentUserNameLength`]) — a "Current User"
-//!   `lenUserName` above 255, or one the stream truncates, reads as no
-//!   username (POI's posture) instead of failing the open; the edit offset
-//!   and header token are still read and validated.
+//! - **F5.8** ([`PersistDefect::CurrentUserNameLength`],
+//!   [`PersistDefect::CurrentUserHeader`], [`PersistDefect::CurrentUserSize`])
+//!   — a "Current User" `lenUserName` above 255, or one the stream
+//!   truncates, reads as no username (POI's posture), and a nonzero
+//!   recVer/recInstance or a `size` other than 20 is ignored, instead of
+//!   failing the open. The record type and header token identify the
+//!   stream and its encryption state, so they are still validated.
+//! - **F5.10** ([`SlideListDefect::SlideListVersion`],
+//!   [`SlideListDefect::DuplicateSlideList`],
+//!   [`SlideListDefect::UnreadableSlideListText`]) — the presentation
+//!   `SlideListWithTextContainer` is found by record type and instance
+//!   whatever its version nibble, a duplicate one is ignored (first wins,
+//!   POI), and a slide whose slide-list text interactions or outline
+//!   references cannot be read keeps empty ones instead of failing the
+//!   open.
 //! - **F5.12** ([`PersistDefect::UserEditAtomLength`]) — the live
 //!   `UserEditAtom` may carry any payload of at least 28 bytes, as the
 //!   mid-chain walk already allowed; `encryptSessionPersistIdRef` is
@@ -412,7 +422,7 @@ impl ShapeDefect {
 }
 
 /// The class of presentation slide-list defect the reader repairs the way
-/// LibreOffice and POI repair it (findings F5.4 and F5.5).
+/// LibreOffice and POI repair it (findings F5.4, F5.5, and F5.10).
 ///
 /// These repairs happen while the presentation is opened, so they are
 /// recorded in [`crate::Presentation::tolerance_report`]. Each entry's
@@ -457,6 +467,25 @@ pub enum SlideListDefect {
     /// F5.5). Incrementally saved files carry such stale references. The
     /// context is the `slideId`.
     StaleSlidePersistRef,
+    /// The presentation `SlideListWithTextContainer` (instance 0) carried a
+    /// record-version nibble other than 0xF; it is still read as the
+    /// container its record type names, as POI and LibreOffice dispatch on
+    /// the record type alone (finding F5.10). The context is the version
+    /// nibble.
+    SlideListVersion,
+    /// The `DocumentContainer` held more than one presentation
+    /// `SlideListWithTextContainer` (instance 0); the first is read and each
+    /// later one ignored, as POI's `Document.getSlideSlideListWithText`
+    /// returns the first (finding F5.10). Incrementally saved files can
+    /// accrete duplicates. The context is the dropped list's one-based
+    /// ordinal among the instance-0 lists (2 for the first duplicate).
+    DuplicateSlideList,
+    /// The slide-list text of one slide (its text interactions or outline
+    /// text references) could not be read; that slide keeps empty outline
+    /// interactions and references and every other slide is unaffected, as
+    /// LibreOffice ignores slide-list text it cannot map (finding F5.10).
+    /// Resource limits stay fatal. The context is the `slideId`.
+    UnreadableSlideListText,
 }
 
 impl SlideListDefect {
@@ -482,6 +511,15 @@ impl SlideListDefect {
             },
             Self::StaleSlidePersistRef => {
                 "skipped a slide whose persist reference does not resolve to a SlideContainer"
+            },
+            Self::SlideListVersion => {
+                "read a presentation SlideListWithTextContainer with a nonconforming record version"
+            },
+            Self::DuplicateSlideList => {
+                "kept the first presentation SlideListWithTextContainer and ignored the duplicate"
+            },
+            Self::UnreadableSlideListText => {
+                "left a slide's unreadable slide-list text interactions and outline references empty"
             },
         }
     }
@@ -540,6 +578,16 @@ pub enum PersistDefect {
     /// newest-first merge of the chain (finding F5.7). The context is the
     /// persist ID.
     DuplicatePersistId,
+    /// The "Current User" atom's packed recVer/recInstance word was not
+    /// zero; the atom is read by field offset, as POI's
+    /// `CurrentUserAtom.java` reads it without validating the header
+    /// (finding F5.8). The record type is still checked. The context is the
+    /// raw packed word.
+    CurrentUserHeader,
+    /// The "Current User" atom's `size` field was not 20; the atom is read
+    /// by field offset, as POI reads it without consulting the field
+    /// (finding F5.8). The context is the raw `size`.
+    CurrentUserSize,
 }
 
 impl PersistDefect {
@@ -565,6 +613,12 @@ impl PersistDefect {
             Self::ZeroCountPersistRun => "skipped a persist-directory entry with a zero count",
             Self::DuplicatePersistId => {
                 "kept the first offset of a persist ID repeated within one persist directory"
+            },
+            Self::CurrentUserHeader => {
+                "read a Current User atom with a nonzero record version or instance by field offset"
+            },
+            Self::CurrentUserSize => {
+                "read a Current User atom whose size field is not 20 by field offset"
             },
         }
     }
@@ -1047,6 +1101,11 @@ mod tests {
             Defect::from(PersistDefect::PersistDirectoryRecordType),
             Defect::from(PersistDefect::ZeroCountPersistRun),
             Defect::from(PersistDefect::DuplicatePersistId),
+            Defect::from(PersistDefect::CurrentUserHeader),
+            Defect::from(PersistDefect::CurrentUserSize),
+            Defect::from(SlideListDefect::SlideListVersion),
+            Defect::from(SlideListDefect::DuplicateSlideList),
+            Defect::from(SlideListDefect::UnreadableSlideListText),
             Defect::from(UserEditChainDefect::Cycle),
             Defect::from(ShapeDefect::UnreadableShape),
             Defect::from(ShapeDefect::DuplicateTextRuler),

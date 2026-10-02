@@ -24,6 +24,7 @@ use crate::slide_sync::Synchronization;
 use once_cell::unsync::OnceCell;
 
 pub use model::{ParsedComment, ParsedSlideTiming};
+pub(crate) use validation::is_isolatable_shape_error;
 
 /// A slide in a `PowerPoint` presentation with lazy-loaded shapes and metadata.
 ///

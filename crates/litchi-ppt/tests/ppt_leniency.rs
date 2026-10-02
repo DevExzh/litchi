@@ -1467,3 +1467,115 @@ fn property_set_repairs_join_the_open_time_report() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// F5.10: slide-list container cross-checks degrade instead of failing.
+// ---------------------------------------------------------------------------
+
+/// The unique offset of `pattern` in `bytes`.
+fn unique_offset(bytes: &[u8], pattern: &[u8]) -> usize {
+    let offsets: Vec<usize> = bytes
+        .windows(pattern.len())
+        .enumerate()
+        .filter(|(_, window)| *window == pattern)
+        .map(|(offset, _)| offset)
+        .collect();
+    assert_eq!(offsets.len(), 1, "pattern {pattern:02X?}");
+    offsets[0]
+}
+
+/// Record header of the presentation slide list: version 0xF, instance 0,
+/// type 0x0FF0 (`SlideListWithTextContainer`).
+const PRESENTATION_SLIDE_LIST_HEADER: [u8; 4] = [0x0F, 0x00, 0xF0, 0x0F];
+
+#[test]
+fn a_nonconforming_slide_list_version_is_read_and_recorded() {
+    let deck = Deck::new(2);
+    let at = unique_offset(&deck.bytes, &PRESENTATION_SLIDE_LIST_HEADER);
+    let deck = deck.patch_u16(at, 0x0000);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(SlideListDefect::SlideListVersion, 0, None)],
+    );
+}
+
+#[test]
+fn a_duplicate_presentation_slide_list_is_ignored_and_recorded() {
+    // Turn the empty EndDocumentAtom that closes the DocumentContainer into a
+    // second, empty instance-0 SlideListWithTextContainer.
+    let deck = Deck::new(2);
+    let at = unique_offset(&deck.bytes, &[0x00, 0x00, 0xEA, 0x03, 0, 0, 0, 0]);
+    let deck = deck.patch_u16(at, 0x000F).patch_u16(at + 2, 0x0FF0);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(SlideListDefect::DuplicateSlideList, 2, None)],
+    );
+}
+
+#[test]
+fn unreadable_slide_list_text_is_isolated_to_its_slide() {
+    // Retype the second SlidePersistAtom as an OutlineTextRefAtom (strictly
+    // four bytes), so the first slide's slide-list text holds an unreadable
+    // outline reference.
+    let deck = Deck::new(2);
+    let (first_persist, first_slide) = deck.slides[0];
+    let at = deck.slide_persist_atom(1) - 8;
+    let deck = deck.patch_u16(at + 2, OUTLINE_TEXT_REF_ATOM);
+    deck.assert_opens(
+        &[0],
+        &[open_time(
+            SlideListDefect::UnreadableSlideListText,
+            first_slide,
+            Some(first_persist),
+        )],
+    );
+    for presentation in open_both(&deck.bytes) {
+        let slides = presentation.slides().unwrap();
+        assert!(
+            presentation
+                .slide_directory()
+                .entries()
+                .iter()
+                .all(|entry| entry.outline_text_refs().is_empty())
+        );
+        assert_eq!(slides.len(), 1);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// F5.8: Current User fixed fields POI never validates.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn current_user_header_and_size_deviations_are_read_and_recorded() {
+    let deck = Deck::new(1);
+    let pattern = [0x00, 0x00, 0xF6, 0x0F];
+    let at = deck
+        .bytes
+        .windows(16)
+        .position(|window| {
+            window.starts_with(&pattern)
+                && window[8..12] == 20u32.to_le_bytes()
+                && window[12..16] == 0xE391_C05Fu32.to_le_bytes()
+        })
+        .expect("Current User atom");
+    let deck = deck.patch_u16(at, 0x0010).patch_u32(at + 8, 24);
+    deck.assert_opens(
+        &[0],
+        &[
+            open_time(PersistDefect::CurrentUserHeader, 0x0010, None),
+            open_time(PersistDefect::CurrentUserSize, 24, None),
+        ],
+    );
+
+    // The record type still identifies the stream: a Current User atom of
+    // another type is refused.
+    let mut bytes = deck.bytes;
+    bytes[at + 2..at + 4].copy_from_slice(&0x0FF5u16.to_le_bytes());
+    assert!(
+        Package::from_reader(Cursor::new(bytes))
+            .unwrap()
+            .presentation()
+            .is_err()
+    );
+}

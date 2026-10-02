@@ -195,21 +195,25 @@ impl SlideDirectory {
             )));
         }
 
+        // MS-PPT 2.4.14.3 defines one presentation slide list. POI returns
+        // the first instance-0 list and dispatches on the record type alone,
+        // so a later duplicate is ignored and a nonconforming version nibble
+        // is read anyway; both are recorded (finding F5.10).
         let mut slide_list = None;
+        let mut presentation_lists = 0u32;
         for child in document.extract_slide_list_with_texts() {
             if child.get_instance() != SLIDE_LIST_INSTANCE {
                 continue;
             }
+            presentation_lists = presentation_lists.saturating_add(1);
+            if slide_list.is_some() {
+                report.record(SlideListDefect::DuplicateSlideList, presentation_lists);
+                continue;
+            }
             if child.version != 0x0f {
-                return Err(Error::Corrupted(
-                    "presentation SlideListWithTextContainer has invalid version".to_string(),
-                ));
+                report.record(SlideListDefect::SlideListVersion, u32::from(child.version));
             }
-            if slide_list.replace(child).is_some() {
-                return Err(Error::Corrupted(
-                    "duplicate presentation SlideListWithTextContainer".to_string(),
-                ));
-            }
+            slide_list = Some(child);
         }
 
         let mut entries: Vec<SlideDirectoryEntry> = Vec::new();
@@ -270,8 +274,31 @@ impl SlideDirectory {
                 let Some(index) = index else {
                     continue;
                 };
-                entries[index].outline_text_interactions = set.text_interactions()?;
-                entries[index].outline_text_refs = set.outline_text_refs()?;
+                // Slide-list text is isolated per slide: a content-level
+                // failure leaves this slide's outline interactions and
+                // references empty, as LibreOffice ignores slide-list text it
+                // cannot map; limits stay fatal (finding F5.10).
+                match set
+                    .text_interactions()
+                    .and_then(|interactions| Ok((interactions, set.outline_text_refs()?)))
+                {
+                    Ok((interactions, refs)) => {
+                        entries[index].outline_text_interactions = interactions;
+                        entries[index].outline_text_refs = refs;
+                    },
+                    Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
+                        let entry = &entries[index];
+                        report.record_at(
+                            SlideListDefect::UnreadableSlideListText,
+                            entry.slide_id,
+                            DefectLocation {
+                                persist_id: Some(entry.persist_id),
+                                shape_id: None,
+                            },
+                        );
+                    },
+                    Err(error) => return Err(error),
+                }
             }
         }
 
@@ -355,6 +382,12 @@ pub(crate) fn locate_head_user_edit(
     let defect = match current_user_data {
         Some(data) => {
             let current_user = CurrentUser::parse_with_limits(data, limits)?;
+            if let Some(raw) = current_user.nonconforming_header() {
+                report.record(PersistDefect::CurrentUserHeader, u32::from(raw));
+            }
+            if let Some(raw) = current_user.nonconforming_size() {
+                report.record(PersistDefect::CurrentUserSize, raw);
+            }
             if let Some(raw) = current_user.unusable_username_length() {
                 report.record(PersistDefect::CurrentUserNameLength, u32::from(raw));
             }

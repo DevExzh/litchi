@@ -31,6 +31,12 @@ pub struct CurrentUser {
     /// the username/release fields, so the username was treated as absent
     /// (finding F5.8, the POI posture).
     unusable_username_length: Option<u16>,
+    /// The raw packed `recVer`/`recInstance` word when it was not zero; the
+    /// atom is read by field offset anyway (finding F5.8).
+    nonconforming_header: Option<u16>,
+    /// The raw `size` field when it was not 20; the atom is read by field
+    /// offset anyway (finding F5.8).
+    nonconforming_size: Option<u32>,
 }
 
 impl CurrentUser {
@@ -102,20 +108,22 @@ impl CurrentUser {
             return Err(Error::Corrupted("CurrentUser stream too short".to_string()));
         }
 
+        // The record type and the header token identify the stream and its
+        // encryption state, so they stay validated (LibreOffice checks the
+        // record type, `svdfppt.cxx`). MS-PPT 2.3.2 also fixes recVer,
+        // recInstance, and `size`, but POI's `CurrentUserAtom` validates none
+        // of them and reads every field by offset; do the same and expose
+        // the deviation for recording (finding F5.8).
         let ver_instance = u16::from_le_bytes([data[0], data[1]]);
         let record_type = u16::from_le_bytes([data[2], data[3]]);
-        if ver_instance != 0 || record_type != CURRENT_USER_RECORD_TYPE {
+        if record_type != CURRENT_USER_RECORD_TYPE {
             return Err(Error::InvalidFormat(format!(
                 "Invalid CurrentUser record header: ver/instance=0x{ver_instance:04X}, type=0x{record_type:04X}"
             )));
         }
-
+        let nonconforming_header = (ver_instance != 0).then_some(ver_instance);
         let fixed_size = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-        if fixed_size != 20 {
-            return Err(Error::InvalidFormat(format!(
-                "Invalid CurrentUser fixed size: {fixed_size}"
-            )));
-        }
+        let nonconforming_size = (fixed_size != 20).then_some(fixed_size);
 
         let header_token = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
         let encrypted = match header_token {
@@ -148,6 +156,8 @@ impl CurrentUser {
                 encrypted,
                 username: String::new(),
                 unusable_username_length: Some(username_length),
+                nonconforming_header,
+                nonconforming_size,
             });
         }
 
@@ -175,6 +185,8 @@ impl CurrentUser {
             encrypted,
             username,
             unusable_username_length: None,
+            nonconforming_header,
+            nonconforming_size,
         })
     }
 
@@ -182,6 +194,18 @@ impl CurrentUser {
     /// username was therefore treated as absent (finding F5.8).
     pub(crate) fn unusable_username_length(&self) -> Option<u16> {
         self.unusable_username_length
+    }
+
+    /// The raw packed `recVer`/`recInstance` word when it was not zero and
+    /// was ignored (finding F5.8).
+    pub(crate) fn nonconforming_header(&self) -> Option<u16> {
+        self.nonconforming_header
+    }
+
+    /// The raw `size` field when it was not 20 and was ignored (finding
+    /// F5.8).
+    pub(crate) fn nonconforming_size(&self) -> Option<u32> {
+        self.nonconforming_size
     }
 
     /// Get the offset to the current `UserEditAtom` record.
@@ -351,6 +375,30 @@ mod tests {
                 .unusable_username_length(),
             None
         );
+    }
+
+    /// A nonzero recVer/recInstance or a `size` other than 20 is read by
+    /// field offset (F5.8, the POI posture) and exposed for recording; the
+    /// record type and header token still identify the stream.
+    #[test]
+    fn fixed_header_fields_are_ignored_but_the_identifying_fields_are_not() {
+        let mut data = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
+        data[0..2].copy_from_slice(&0x0012u16.to_le_bytes());
+        data[8..12].copy_from_slice(&24u32.to_le_bytes());
+        let current_user = CurrentUser::parse(&data).unwrap();
+        assert_eq!(current_user.current_edit_offset(), 0x1000);
+        assert_eq!(current_user.username(), "AB");
+        assert_eq!(current_user.nonconforming_header(), Some(0x0012));
+        assert_eq!(current_user.nonconforming_size(), Some(24));
+
+        let conformant = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
+        let current_user = CurrentUser::parse(&conformant).unwrap();
+        assert_eq!(current_user.nonconforming_header(), None);
+        assert_eq!(current_user.nonconforming_size(), None);
+
+        let mut wrong_type = conformant;
+        wrong_type[2..4].copy_from_slice(&0x0FF5u16.to_le_bytes());
+        assert!(CurrentUser::parse(&wrong_type).is_err());
     }
 
     #[test]
