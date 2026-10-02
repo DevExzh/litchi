@@ -189,8 +189,8 @@ impl Document {
         // Parse footnotes and endnotes tables
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
-        let comments_table = auxiliary_or_default(
-            CommentsTable::parse(&fib, &table_stream),
+        let comments_table = auxiliary_recorded(
+            CommentsTable::parse_recording(&fib, &table_stream),
             AuxiliaryTableDefect::Comments,
             &mut tolerance,
         );
@@ -560,6 +560,29 @@ fn auxiliary_or_default<T: Default>(
 ) -> T {
     match result {
         Ok(table) => table,
+        Err(_) => {
+            tolerance.record(defect, defect.fib_index());
+            T::default()
+        },
+    }
+}
+
+/// [`auxiliary_or_default`] for tables that also report per-item repairs.
+///
+/// The per-item record is merged only when the table as a whole parsed; a
+/// table that still fails degrades to its default with only the
+/// table-level defect recorded, so a discarded table never reports repairs
+/// to items the caller cannot see.
+fn auxiliary_recorded<T: Default>(
+    result: Result<(T, ToleranceReport)>,
+    defect: AuxiliaryTableDefect,
+    tolerance: &mut ToleranceReport,
+) -> T {
+    match result {
+        Ok((table, repairs)) => {
+            tolerance.append(&repairs);
+            table
+        },
         Err(_) => {
             tolerance.record(defect, defect.fib_index());
             T::default()

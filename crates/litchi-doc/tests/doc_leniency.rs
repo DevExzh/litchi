@@ -37,8 +37,8 @@
 use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::CommentEntry;
 use litchi_doc::{
-    AuxiliaryTableDefect, Defect, Leniency, OpenOptions, Package, StshifDefect, StyleDefect,
-    StylesheetDefect, Writer,
+    AuxiliaryTableDefect, CommentDefect, Defect, Leniency, OpenOptions, Package, StshifDefect,
+    StyleDefect, StylesheetDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -476,5 +476,85 @@ fn reserved_grfstd_bits_are_ignored_and_recorded() {
             defect: Defect::Style(StyleDefect::ReservedStyleFlags),
             context: 0,
         }]
+    );
+}
+
+/// Rewrite the table stream of a DOC package in place. The closure gets the
+/// `WordDocument` stream (for FIB pointers) and the table stream.
+fn edit_table_stream(bytes: Vec<u8>, edit: impl FnOnce(&[u8], &mut [u8])) -> Vec<u8> {
+    let mut package =
+        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+    let word = package
+        .stream(&["WordDocument".to_string()])
+        .expect("WordDocument stream")
+        .to_vec();
+    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table_path = [table_name.to_string()];
+    let mut table = package.stream(&table_path).expect("table stream").to_vec();
+    edit(&word, &mut table);
+    package
+        .put_stream(&table_path, table)
+        .expect("edited table stream");
+    package.finish().expect("edited package")
+}
+
+/// The table-stream offset stored for one FIB `rgFcLcb` pointer.
+fn table_pointer(word: &[u8], index: usize) -> usize {
+    let pair = 154 + index * 8;
+    usize::try_from(u32::from_le_bytes(word[pair..pair + 4].try_into().unwrap())).unwrap()
+}
+
+/// MS-DOC 2.9.7 marks the ATRDPre10 reserved fields "MUST be ignored", and
+/// an author index or bookmark tag out of its domain is a cross-reference
+/// defect, not framing: each repair stays on the comment carrying it.
+#[test]
+fn comment_descriptor_defects_are_repaired_per_comment() {
+    let clean = writer_document(|writer| {
+        writer.add_comment(CommentEntry::new(4, "Review", "Alice", "A"));
+    });
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+    let original_comments = original.comments().expect("comments");
+    assert_eq!(original_comments.len(), 1);
+    assert_eq!(original_comments[0].author, "Alice");
+    assert_eq!(original_comments[0].bookmark_tag, None);
+
+    let bytes = edit_table_stream(clean, |word, table| {
+        // PlcfandRef (FIB pointer 4) holds two CPs, then the ATRDPre10.
+        let atrd = table_pointer(word, 4) + 8;
+        table[atrd + 20..atrd + 22].copy_from_slice(&9u16.to_le_bytes()); // ibst
+        table[atrd + 22..atrd + 24].copy_from_slice(&0xBEEFu16.to_le_bytes()); // bitsNotUsed
+        table[atrd + 26..atrd + 30].copy_from_slice(&(-7i32).to_le_bytes()); // lTagBkmk
+    });
+    let document = open_degraded(bytes);
+    let comments = document.comments().expect("comments");
+    assert_eq!(
+        comments.len(),
+        1,
+        "the comment survives its descriptor defects"
+    );
+    assert_eq!(comments[0].text, original_comments[0].text);
+    assert_eq!(comments[0].initials, "A");
+    assert_eq!(
+        comments[0].author, "",
+        "an unresolvable author is left empty"
+    );
+    assert_eq!(comments[0].bookmark_tag, None);
+    assert_eq!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>(),
+        vec![
+            (Defect::Comment(CommentDefect::AuthorIndex), 0),
+            (Defect::Comment(CommentDefect::ReservedFields), 0),
+            (Defect::Comment(CommentDefect::BookmarkTag), 0),
+        ]
     );
 }

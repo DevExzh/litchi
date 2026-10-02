@@ -6,6 +6,7 @@
 use super::super::package::{Error as PackageError, Result};
 use super::super::{DateTime, ExtendedMetadata};
 use super::fib::FileInformationBlock;
+use crate::leniency::{CommentDefect, ToleranceReport};
 use crate::parts::annotation_bookmarks::MAX_ENTRIES;
 use crate::plcf::Plcf;
 use std::collections::{HashMap, HashSet};
@@ -18,14 +19,25 @@ const ATRD_POST10_SIZE: usize = 18;
 pub struct CommentDescriptor {
     /// Initials stored directly in the descriptor.
     pub initials: String,
-    /// Index into the comment-owner XST array.
+    /// Index into the comment-owner XST array, as stored.
+    ///
+    /// An index outside the owner array is kept verbatim; the comment's
+    /// resolved author is then empty and [`CommentDefect::AuthorIndex`] is
+    /// recorded.
     pub author_index: u16,
     /// Annotation-bookmark tag, or `None` for a zero-length commented range.
     pub bookmark_tag: Option<u32>,
 }
 
 impl CommentDescriptor {
-    fn parse(data: &[u8], author_count: usize) -> Result<Self> {
+    /// Parse one `ATRDPre10`, repairing the non-structural deviations
+    /// [`CommentDefect`] lists and recording them under `comment_index`.
+    fn parse(
+        data: &[u8],
+        author_count: usize,
+        comment_index: u16,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Self> {
         if data.len() != ATRD_PRE10_SIZE {
             return Err(PackageError::Corrupted(
                 "ATRDPre10 must be exactly 30 bytes".to_string(),
@@ -39,18 +51,19 @@ impl CommentDescriptor {
             ));
         }
         let initials = decode_utf16(&data[2..2 + initials_len * 2], "comment initials")?;
+        // The author index is a cross-reference, not framing: Word renders
+        // the comment with a generic author, so the index is kept and the
+        // resolved author is left empty.
         let author_index = read_u16(data, 20, "ATRDPre10 author index")?;
         if usize::from(author_index) >= author_count {
-            return Err(PackageError::Corrupted(
-                "ATRDPre10 author index exceeds the comment-owner array".to_string(),
-            ));
+            tolerance.record(CommentDefect::AuthorIndex, comment_index);
         }
+        // MS-DOC 2.9.7: bitsNotUsed and grfNotused "MUST be 0, and MUST be
+        // ignored".
         if read_u16(data, 22, "ATRDPre10 unused bits")? != 0
             || read_u16(data, 24, "ATRDPre10 unused flags")? != 0
         {
-            return Err(PackageError::Corrupted(
-                "ATRDPre10 reserved fields must be zero".to_string(),
-            ));
+            tolerance.record(CommentDefect::ReservedFields, comment_index);
         }
 
         let raw_tag = litchi_core::binary::read_i32_le(data, 26).map_err(|error| {
@@ -59,10 +72,11 @@ impl CommentDescriptor {
         let bookmark_tag = match raw_tag {
             -1 => None,
             value if value >= 0 => Some(value as u32),
+            // Any other negative tag cannot name an annotation bookmark; the
+            // comment is read as a point comment, like an lTagBkmk of -1.
             _ => {
-                return Err(PackageError::Corrupted(
-                    "ATRDPre10 bookmark tag is less than -1".to_string(),
-                ));
+                tolerance.record(CommentDefect::BookmarkTag, comment_index);
+                None
             },
         };
 
@@ -84,6 +98,9 @@ pub struct CommentReference {
     /// Absolute CP immediately after the comment story.
     pub text_end_cp: u32,
     /// Comment author name resolved through the owner array.
+    ///
+    /// Empty when the descriptor's author index lies outside the owner
+    /// array ([`CommentDefect::AuthorIndex`]).
     pub author: String,
     /// Descriptor stored in `PlcfandRef`.
     pub descriptor: CommentDescriptor,
@@ -103,9 +120,22 @@ pub struct CommentsTable {
 
 impl CommentsTable {
     /// Parse all Word 97+ comment references and text ranges.
+    ///
+    /// Word-compatible per-comment repairs are applied but their record is
+    /// discarded; use [`Self::parse_recording`] to enumerate them.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
+        Self::parse_recording(fib, table_stream).map(|(table, _)| table)
+    }
+
+    /// Parse all comment references, returning the repairs [`CommentDefect`]
+    /// lists alongside the table.
+    pub(crate) fn parse_recording(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Result<(Self, ToleranceReport)> {
+        let mut tolerance = ToleranceReport::default();
         let Some((subdoc_start, subdoc_end)) = fib.get_comment_range() else {
-            return Ok(Self::default());
+            return Ok((Self::default(), tolerance));
         };
         let main_end = fib.get_main_doc_range().1;
         let owners = parse_owners(required_table_slice(
@@ -148,6 +178,8 @@ impl CommentsTable {
                     PackageError::Corrupted("PlcfandRef is missing an ATRDPre10".to_string())
                 })?,
                 owners.len(),
+                u16::try_from(index).unwrap_or(u16::MAX),
+                &mut tolerance,
             )?;
             if let Some(tag) = descriptor.bookmark_tag
                 && !referenced_tags.insert(tag)
@@ -184,7 +216,10 @@ impl CommentsTable {
                 .ok_or_else(|| {
                     PackageError::Corrupted("comment story end CP overflows".to_string())
                 })?;
-            let author = owners[usize::from(descriptor.author_index)].clone();
+            let author = owners
+                .get(usize::from(descriptor.author_index))
+                .cloned()
+                .unwrap_or_default();
             let range = descriptor
                 .bookmark_tag
                 .map(|tag| {
@@ -208,7 +243,7 @@ impl CommentsTable {
             });
         }
 
-        Ok(Self { references })
+        Ok((Self { references }, tolerance))
     }
 
     /// All comments in main-document reference order.
@@ -706,22 +741,63 @@ mod tests {
         let owners = [3, 0, b'A', 0, 0x3D, 0xD8, 2, 0xDE]; // A + U+1F602
         assert_eq!(parse_owners(&owners).unwrap(), ["A😂"]);
 
-        let parsed = CommentDescriptor::parse(&descriptor("XY", 0, -1), 1).unwrap();
+        let mut tolerance = ToleranceReport::default();
+        let parsed =
+            CommentDescriptor::parse(&descriptor("XY", 0, -1), 1, 0, &mut tolerance).unwrap();
         assert_eq!(parsed.initials, "XY");
         assert_eq!(parsed.author_index, 0);
         assert_eq!(parsed.bookmark_tag, None);
+        assert!(tolerance.is_clean());
     }
 
     #[test]
     fn rejects_invalid_owner_arrays_and_descriptors() {
         assert!(parse_owners(&[1, 0, 0x00]).is_err());
         assert!(parse_owners(&[1, 0, b'A', 0, 1, 0, b'A', 0]).is_err());
-        assert!(CommentDescriptor::parse(&descriptor("X", 1, -1), 1).is_err());
-        assert!(CommentDescriptor::parse(&descriptor("X", 0, -2), 1).is_err());
+        let mut tolerance = ToleranceReport::default();
+        assert!(CommentDescriptor::parse(&[0; 28], 1, 0, &mut tolerance).is_err());
+        let mut long_initials = descriptor("X", 0, -1);
+        long_initials[0] = 10;
+        assert!(CommentDescriptor::parse(&long_initials, 1, 0, &mut tolerance).is_err());
+        assert!(tolerance.is_clean());
+    }
 
-        let mut reserved = descriptor("X", 0, -1);
+    #[test]
+    fn repairs_descriptor_reserved_fields_author_and_tag() {
+        use crate::leniency::{Defect, ToleratedDefect};
+
+        let mut tolerance = ToleranceReport::default();
+        let parsed =
+            CommentDescriptor::parse(&descriptor("X", 1, -1), 1, 3, &mut tolerance).unwrap();
+        assert_eq!(parsed.author_index, 1, "the stored index is kept");
+        let parsed =
+            CommentDescriptor::parse(&descriptor("X", 0, -2), 1, 4, &mut tolerance).unwrap();
+        assert_eq!(
+            parsed.bookmark_tag, None,
+            "a tag below -1 reads as no range"
+        );
+        let mut reserved = descriptor("X", 0, 5);
         reserved[22] = 1;
-        assert!(CommentDescriptor::parse(&reserved, 1).is_err());
+        reserved[25] = 0x80;
+        let parsed = CommentDescriptor::parse(&reserved, 1, 5, &mut tolerance).unwrap();
+        assert_eq!(parsed.bookmark_tag, Some(5));
+        assert_eq!(
+            tolerance.defects(),
+            &[
+                ToleratedDefect {
+                    defect: Defect::Comment(CommentDefect::AuthorIndex),
+                    context: 3,
+                },
+                ToleratedDefect {
+                    defect: Defect::Comment(CommentDefect::BookmarkTag),
+                    context: 4,
+                },
+                ToleratedDefect {
+                    defect: Defect::Comment(CommentDefect::ReservedFields),
+                    context: 5,
+                },
+            ]
+        );
     }
 
     #[test]

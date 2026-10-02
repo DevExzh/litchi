@@ -425,6 +425,53 @@ impl StyleDefect {
     }
 }
 
+/// The class of comment-descriptor (`ATRDPre10`) defect the reader repairs
+/// the way Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// per-comment repairs a read applies under every [`Leniency`] variant,
+/// including [`Leniency::Strict`]. Each repair is confined to the one comment
+/// that carries it; the rest of the comment table is read unchanged. The
+/// recorded [`ToleratedDefect::context`] is the comment's index in
+/// `PlcfandRef` (saturating at `u16::MAX`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CommentDefect {
+    /// `ATRDPre10.bitsNotUsed` or `grfNotused` was non-zero.
+    ///
+    /// MS-DOC 2.9.7: both "MUST be 0, and MUST be ignored". They carry no
+    /// information the reader acts on, so only the deviation is recorded.
+    ReservedFields,
+    /// `ATRDPre10.ibst` named an author outside the comment-owner array.
+    ///
+    /// The index is a cross-reference, not framing. The stored index is
+    /// kept in `CommentDescriptor::author_index` and the comment's resolved
+    /// author is the empty string — no author is invented — mirroring Word,
+    /// which shows such a comment with a generic author.
+    AuthorIndex,
+    /// `ATRDPre10.lTagBkmk` was below -1.
+    ///
+    /// Such a tag cannot name an annotation bookmark, so the comment is read
+    /// as a point comment with no commented range, as if the tag were -1.
+    BookmarkTag,
+}
+
+impl CommentDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ReservedFields => "ignored the non-zero ATRDPre10 reserved fields",
+            Self::AuthorIndex => {
+                "kept the out-of-range author index; the comment's author is left empty"
+            },
+            Self::BookmarkTag => {
+                "read the comment as a point comment; the tag below -1 names no bookmark"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -445,6 +492,9 @@ pub enum Defect {
     AuxiliaryTable(AuxiliaryTableDefect),
     /// A style-record (`STD`) defect repaired the way Word repairs it.
     Style(StyleDefect),
+    /// A comment-descriptor (`ATRDPre10`) defect repaired the way Word
+    /// repairs it.
+    Comment(CommentDefect),
 }
 
 impl Defect {
@@ -457,6 +507,7 @@ impl Defect {
             Self::Stshif(defect) => defect.repair(),
             Self::AuxiliaryTable(defect) => defect.repair(),
             Self::Style(defect) => defect.repair(),
+            Self::Comment(defect) => defect.repair(),
         }
     }
 }
@@ -491,6 +542,12 @@ impl From<StyleDefect> for Defect {
     }
 }
 
+impl From<CommentDefect> for Defect {
+    fn from(defect: CommentDefect) -> Self {
+        Self::Comment(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -501,7 +558,8 @@ pub struct ToleratedDefect {
     /// offending 16-bit Stshif word for a [`Defect::Stshif`], and the FIB
     /// `rgFcLcb` pointer index for a [`Defect::AuxiliaryTable`] (the style
     /// index for [`AuxiliaryTableDefect::RevisionAuthorResolution`]), and
-    /// the style index (`istd`) for a [`Defect::Style`].
+    /// the style index (`istd`) for a [`Defect::Style`], and the comment
+    /// index in `PlcfandRef` for a [`Defect::Comment`].
     pub context: u16,
 }
 
@@ -689,6 +747,9 @@ mod tests {
             Defect::from(StyleDefect::ReservedStyleFlags),
             Defect::from(StyleDefect::ReservedPost2000Flags),
             Defect::from(StyleDefect::Priority),
+            Defect::from(CommentDefect::ReservedFields),
+            Defect::from(CommentDefect::AuthorIndex),
+            Defect::from(CommentDefect::BookmarkTag),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

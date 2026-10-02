@@ -197,7 +197,7 @@ pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use leniency::{
-    AuxiliaryTableDefect, Defect, Leniency, SprmDefect, StshifDefect, StyleDefect,
+    AuxiliaryTableDefect, CommentDefect, Defect, Leniency, SprmDefect, StshifDefect, StyleDefect,
     StylesheetDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
