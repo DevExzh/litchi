@@ -1208,7 +1208,8 @@ impl SourceBackedWorkbook {
         // while the positional index was built, before any BIFF record was
         // read. The owner never reads the metadata property-set streams (its
         // open reads each globals byte once and nothing else), so it records
-        // no `Defect::PropertySet` entries.
+        // no `Defect::PropertySet` entries; a caller that reads the metadata
+        // folds them in with `ToleranceReport::append_property_sets`.
         let mut tolerance = ToleranceReport::default();
         tolerance.append_container(cfb.tolerance_report());
         tolerance.absorb(parsed.tolerance);

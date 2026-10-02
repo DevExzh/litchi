@@ -994,7 +994,13 @@ impl ToleranceReport {
     /// records nothing and does not fail the open: no workbook content
     /// depends on the metadata, and the property-set accessors still report
     /// the failure when the metadata is asked for.
-    pub(crate) fn append_property_sets(
+    ///
+    /// The eager [`Workbook`](crate::Workbook) open does this itself. A
+    /// [`SourceBackedWorkbook`](crate::SourceBackedWorkbook) never reads the
+    /// metadata streams, so a caller that reads them alongside it (the
+    /// `litchi` facade does) folds their repairs in with this method, for
+    /// example `report.append_property_sets(|path| cfb.property_set_stream(path))`.
+    pub fn append_property_sets(
         &mut self,
         mut read: impl FnMut(
             &[&str],

@@ -16,6 +16,14 @@ use std::io::{Read, Seek};
 pub trait PropertySetReader {
     /// Parse standard `SummaryInformation` and `DocumentSummaryInformation` metadata.
     ///
+    /// This is a projection: the streams are parsed with the
+    /// reference-compatible repairs of [`Stream::parse`], and the parsed
+    /// streams' [`Stream::tolerance_report`]s are not returned. The format
+    /// readers record those repairs themselves — the DOC, PPT and XLS opens
+    /// fold [`Self::property_set_stream`]'s reports into their document
+    /// reports — so call this only next to such an owner, or parse the
+    /// streams with [`Self::property_set_stream`] to enumerate the repairs.
+    ///
     /// # Errors
     ///
     /// Returns an error if a present standard stream cannot be read or parsed,
@@ -24,7 +32,9 @@ pub trait PropertySetReader {
         project_metadata(|binding| self.property_set(binding))
     }
 
-    /// Strictly parse a standard or GUID-derived Property Set binding.
+    /// Parse a standard or GUID-derived Property Set binding, applying and
+    /// recording (in [`Stream::tolerance_report`]) the reference-compatible
+    /// repairs of [`Stream::parse`].
     ///
     /// # Errors
     ///
@@ -35,7 +45,9 @@ pub trait PropertySetReader {
         self.property_set_stream(&[name.as_str()])
     }
 
-    /// Strictly parse a Property Set stream at path.
+    /// Parse a Property Set stream at path, applying and recording (in
+    /// [`Stream::tolerance_report`]) the reference-compatible repairs of
+    /// [`Stream::parse`].
     ///
     /// # Errors
     ///
@@ -55,6 +67,14 @@ pub trait SharedPropertySetReader {
     /// Parse standard `SummaryInformation` and `DocumentSummaryInformation`
     /// metadata from the positional source.
     ///
+    /// This is a projection: the streams are parsed with the
+    /// reference-compatible repairs of [`Stream::parse`], and the parsed
+    /// streams' [`Stream::tolerance_report`]s are not returned. The format
+    /// readers record those repairs themselves — the DOC, PPT and XLS opens
+    /// fold [`Self::property_set_stream`]'s reports into their document
+    /// reports — so call this only next to such an owner, or parse the
+    /// streams with [`Self::property_set_stream`] to enumerate the repairs.
+    ///
     /// # Errors
     ///
     /// Returns an error if a present standard stream cannot be read or parsed,
@@ -63,7 +83,9 @@ pub trait SharedPropertySetReader {
         project_metadata(|binding| self.property_set(binding))
     }
 
-    /// Strictly parse a standard or GUID-derived Property Set binding.
+    /// Parse a standard or GUID-derived Property Set binding, applying and
+    /// recording (in [`Stream::tolerance_report`]) the reference-compatible
+    /// repairs of [`Stream::parse`].
     ///
     /// # Errors
     ///
@@ -74,7 +96,9 @@ pub trait SharedPropertySetReader {
         self.property_set_stream(&[name.as_str()])
     }
 
-    /// Strictly parse a Property Set stream at path.
+    /// Parse a Property Set stream at path, applying and recording (in
+    /// [`Stream::tolerance_report`]) the reference-compatible repairs of
+    /// [`Stream::parse`].
     ///
     /// # Errors
     ///
@@ -84,7 +108,9 @@ pub trait SharedPropertySetReader {
 }
 
 impl<R: Read + Seek> PropertySetReader for OleFile<R> {
-    /// Strictly parse a Property Set stream at path.
+    /// Parse a Property Set stream at path, applying and recording (in
+    /// [`Stream::tolerance_report`]) the reference-compatible repairs of
+    /// [`Stream::parse`].
     fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, OleError> {
         let data = self.open_stream(path)?;
         Stream::parse(&data)
