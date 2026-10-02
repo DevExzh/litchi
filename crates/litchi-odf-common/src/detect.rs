@@ -380,7 +380,20 @@ pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>>
         // extra-field-carrying, or relocated `mimetype` member is a tolerated
         // container deviation (LENIENCY_AUDIT F9.1) recorded by the
         // subsequent open, so it no longer withholds the classification.
-        soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
+        let archive =
+            soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
+        // The strict offset-0 sniff reads only the local header. When it
+        // matched, the central record must agree that the member is stored:
+        // a local/central compression disagreement is structural corruption
+        // that every open path rejects, so detection must not classify it.
+        // The tolerant fallback enforces the same agreement itself.
+        if packaged_mime_bytes(value).is_some()
+            && !archive
+                .is_stored(MIMETYPE_PATH)
+                .map_err(map_detector_zip_error)?
+        {
+            return Ok(None);
+        }
         return Ok(Some(format));
     }
     flat_with_limits(value, limits)
