@@ -5,7 +5,7 @@
 
 //! Source-bound worksheet-cell snapshots and structural edits.
 
-use crate::leniency::ToleranceReport;
+use crate::leniency::{ReservedFieldDefect, Tolerance, ToleranceReport};
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
 use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
@@ -1585,7 +1585,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
     }
 
     let mut entries = Vec::new();
-    let tolerance = ToleranceReport::default();
+    let mut tolerance = ToleranceReport::default();
     let mut in_sheet_data = false;
     let mut current_row = None;
     let mut frt_depth = 0usize;
@@ -1648,7 +1648,8 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
                         cell_kind_name(cell_kind)
                     ))
                 })?;
-                let entry = parse_entry(&record, row, limits)?;
+                let entry =
+                    parse_entry(&record, row, limits, Tolerance::recording(&mut tolerance))?;
                 entries
                     .try_reserve(1)
                     .map_err(|allocation_error| Error::Allocation {
@@ -1673,7 +1674,12 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
     })
 }
 
-fn parse_entry(record: &crate::raw::Record<'_>, row: u32, limits: Limits) -> Result<Entry> {
+fn parse_entry(
+    record: &crate::raw::Record<'_>,
+    row: u32,
+    limits: Limits,
+    mut tolerance: Tolerance<'_>,
+) -> Result<Entry> {
     let payload = record.payload();
     if payload.len() < 8 {
         return Err(Error::InvalidLength {
@@ -1681,18 +1687,28 @@ fn parse_entry(record: &crate::raw::Record<'_>, row: u32, limits: Limits) -> Res
             found: payload.len(),
         });
     }
+    // MS-XLSB 2.5.10 Cell: the 7 reserved bits MUST be 0 and MUST be ignored.
+    // Only fPhShow is read below; an unedited record keeps its source bytes.
     if payload[7] & 0xfe != 0 {
-        return Err(Error::InvalidFormat(format!(
-            "{} has nonzero reserved Cell flag bits 0x{:02X}",
-            cell_kind_name(record.kind()),
-            payload[7]
-        )));
+        tolerance.tolerate(
+            ReservedFieldDefect::CellFlags,
+            record.kind(),
+            row,
+            u32::from(payload[7] & 0xfe),
+            || {
+                Error::InvalidFormat(format!(
+                    "{} has nonzero reserved Cell flag bits 0x{:02X}",
+                    cell_kind_name(record.kind()),
+                    payload[7]
+                ))
+            },
+        )?;
     }
     let reference = Reference::new(row, binary::read_u32_le_at(payload, 0)?)?;
     let style_raw =
         u32::from(payload[4]) | (u32::from(payload[5]) << 8) | (u32::from(payload[6]) << 16);
     let style = StyleIndex::new(style_raw)?;
-    let (value, formula) = parse_value(record.kind(), payload, limits.raw)?;
+    let (value, formula) = parse_value(record.kind(), payload, limits.raw, row, &mut tolerance)?;
     let cell = StoredCell {
         reference,
         style,
@@ -1711,6 +1727,8 @@ fn parse_value(
     kind_value: crate::raw::Kind,
     payload: &[u8],
     limits: RawLimits,
+    row: u32,
+    tolerance: &mut Tolerance<'_>,
 ) -> Result<(Value, Option<CellFormula>)> {
     match kind_value {
         kind::CELL_BLANK => {
@@ -1736,7 +1754,7 @@ fn parse_value(
             validate_xnum(value, "BrtCellReal")?;
             Ok((Value::Number(value), None))
         },
-        kind::CELL_ST => parse_string_value(payload, limits, false),
+        kind::CELL_ST => parse_string_value(kind_value, payload, limits, false, row, tolerance),
         kind::CELL_ISST => {
             require_exact(payload, 12)?;
             Ok((
@@ -1748,28 +1766,28 @@ fn parse_value(
             require_at_least(payload, 13)?;
             Ok((Value::RichString(SharedString::parse(&payload[8..])?), None))
         },
-        kind::FMLA_STRING => parse_string_value(payload, limits, true),
+        kind::FMLA_STRING => parse_string_value(kind_value, payload, limits, true, row, tolerance),
         kind::FMLA_NUM => {
             require_at_least(payload, 26)?;
             let value = binary::read_f64_le_at(payload, 8)?;
             validate_xnum(value, "BrtFmlaNum cache")?;
             Ok((
                 Value::FormulaNumberCache(value),
-                Some(parse_formula(payload, 16)?),
+                Some(parse_formula(kind_value, payload, 16, row, tolerance)?),
             ))
         },
         kind::FMLA_BOOL => {
             require_at_least(payload, 19)?;
             Ok((
                 Value::FormulaBooleanCache(parse_bool(payload[8])?),
-                Some(parse_formula(payload, 9)?),
+                Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
             ))
         },
         kind::FMLA_ERROR => {
             require_at_least(payload, 19)?;
             Ok((
                 Value::FormulaErrorCache(CellError::from_code(payload[8])?),
-                Some(parse_formula(payload, 9)?),
+                Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
             ))
         },
         _ => Err(Error::InvalidRecordType(kind_value.get())),
@@ -1777,9 +1795,12 @@ fn parse_value(
 }
 
 fn parse_string_value(
+    kind_value: crate::raw::Kind,
     payload: &[u8],
     limits: RawLimits,
     formula: bool,
+    row: u32,
+    tolerance: &mut Tolerance<'_>,
 ) -> Result<(Value, Option<CellFormula>)> {
     require_at_least(payload, if formula { 14 } else { 12 })?;
     let mut cursor = Cursor::with_limits(&payload[8..], "cell string", limits);
@@ -1791,10 +1812,10 @@ fn parse_string_value(
             found: units,
         });
     }
-    if !formula && cursor.remaining() != 0 {
-        return Err(Error::InvalidFormat(
-            "BrtCellSt contains trailing bytes".to_string(),
-        ));
+    if !formula {
+        tolerance.tolerate_trailing(kind_value, row, cursor.remaining(), || {
+            Error::InvalidFormat("BrtCellSt contains trailing bytes".to_string())
+        })?;
     }
     if formula && cursor.remaining() < 10 {
         return Err(Error::InvalidFormat(
@@ -1809,7 +1830,13 @@ fn parse_string_value(
             .ok_or(Error::CapacityOverflow {
                 resource: "formula string offset",
             })?;
-        Some(parse_formula(payload, flags_offset)?)
+        Some(parse_formula(
+            kind_value,
+            payload,
+            flags_offset,
+            row,
+            tolerance,
+        )?)
     } else {
         None
     };
@@ -1823,24 +1850,43 @@ fn parse_string_value(
     ))
 }
 
-fn parse_formula(payload: &[u8], flags_offset: usize) -> Result<CellFormula> {
+fn parse_formula(
+    kind_value: crate::raw::Kind,
+    payload: &[u8],
+    flags_offset: usize,
+    row: u32,
+    tolerance: &mut Tolerance<'_>,
+) -> Result<CellFormula> {
     let formula_offset = flags_offset.checked_add(2).ok_or(Error::CapacityOverflow {
         resource: "cell formula offset",
     })?;
     require_at_least(payload, formula_offset.saturating_add(8))?;
-    let flags = binary::read_u16_le_at(payload, flags_offset)?;
+    let mut flags = binary::read_u16_le_at(payload, flags_offset)?;
+    // MS-XLSB 2.5.97.3 GrbitFmla: only fAlwaysCalc is defined; the reserved
+    // and unused bits MUST be ignored.
+    if flags & !GRBIT_FMLA_DEFINED != 0 {
+        tolerance.tolerate(
+            ReservedFieldDefect::FormulaFlags,
+            kind_value,
+            row,
+            u32::from(flags & !GRBIT_FMLA_DEFINED),
+            || Error::InvalidFormula(format!("invalid GrbitFmla flags 0x{flags:04X}")),
+        )?;
+        flags &= GRBIT_FMLA_DEFINED;
+    }
     let (parsed, consumed) = crate::formula::ParsedFormula::parse(&payload[formula_offset..])
         .map_err(|error| Error::InvalidFormula(error.to_string()))?;
-    if formula_offset.saturating_add(consumed) != payload.len() {
-        return Err(Error::InvalidFormula(format!(
-            "formula record has {} trailing bytes",
-            payload
-                .len()
-                .saturating_sub(formula_offset.saturating_add(consumed))
-        )));
-    }
+    let trailing = payload
+        .len()
+        .saturating_sub(formula_offset.saturating_add(consumed));
+    tolerance.tolerate_trailing(kind_value, row, trailing, || {
+        Error::InvalidFormula(format!("formula record has {trailing} trailing bytes"))
+    })?;
     CellFormula::from_source(flags, parsed.rgce, parsed.rgcb)
 }
+
+/// `GrbitFmla` bits MS-XLSB 2.5.97.3 defines: fAlwaysCalc.
+const GRBIT_FMLA_DEFINED: u16 = 0x0002;
 
 fn is_supported_cell(kind_value: crate::raw::Kind) -> bool {
     matches!(

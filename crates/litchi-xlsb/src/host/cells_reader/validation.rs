@@ -13,14 +13,19 @@ use crate::conditional_formatting::{
     AxisPosition14, Bar, Bar14, Color, Formatting, Icon, IconSet, IconSet14, RecordKind, Rule,
     RuleType, Scale, Value, icon_count14, parse_rule_extension_guid,
 };
+use crate::leniency::{ReservedFieldDefect, Tolerance};
 use crate::package::cell::CellHeader;
 use crate::package::data_validation::{Validation, parse_dval_list};
 use crate::package::error::{Error, Result};
-use crate::raw::kind;
+use crate::raw::{Kind, kind};
 use crate::sheet::{AutoFilter, ColumnInfo, RowInfo, SheetProtection, StrongProtection};
 use litchi_core::binary;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
+
+/// `BrtColInfo` flag bits MS-XLSB 2.4.323 defines: fHidden, fUserSet,
+/// fBestFit, fPhonetic, iOutLevel, and fCollapsed.
+const COLUMN_INFO_DEFINED_FLAGS: u16 = 0x170F;
 
 impl<'a, RS> CellsReader<'a, RS>
 where
@@ -39,7 +44,11 @@ where
         }
     }
 
-    pub(super) fn parse_column_info(data: &[u8], cell_xf_count: usize) -> Result<ColumnInfo> {
+    pub(super) fn parse_column_info(
+        data: &[u8],
+        cell_xf_count: usize,
+        mut tolerance: Tolerance<'_>,
+    ) -> Result<ColumnInfo> {
         if data.len() != 18 {
             return Err(Error::InvalidLength {
                 expected: 18,
@@ -50,7 +59,7 @@ where
         let last_column = binary::read_u32_le_at(data, 4)?;
         let width_raw = binary::read_u32_le_at(data, 8)?;
         let style_id = binary::read_u32_le_at(data, 12)?;
-        let flags = binary::read_u16_le_at(data, 16)?;
+        let mut flags = binary::read_u16_le_at(data, 16)?;
         if first_column > last_column || last_column >= 0x4000 {
             return Err(Error::Unrecognized {
                 typ: "BrtColInfo range".to_string(),
@@ -69,11 +78,20 @@ where
                 val: format!("{style_id} (cell XF count {cell_xf_count})"),
             });
         }
-        if flags & !0x170F != 0 {
-            return Err(Error::Unrecognized {
-                typ: "BrtColInfo flags".to_string(),
-                val: format!("0x{flags:04X}"),
-            });
+        // MS-XLSB 2.4.323: reserved1, unused1, and reserved2 MUST be ignored.
+        let reserved = flags & !COLUMN_INFO_DEFINED_FLAGS;
+        if reserved != 0 {
+            tolerance.tolerate(
+                ReservedFieldDefect::ColumnInfoFlags,
+                kind::COL_INFO,
+                first_column,
+                u32::from(reserved),
+                || Error::Unrecognized {
+                    typ: "BrtColInfo flags".to_string(),
+                    val: format!("0x{flags:04X}"),
+                },
+            )?;
+            flags &= COLUMN_INFO_DEFINED_FLAGS;
         }
         Ok(ColumnInfo {
             first_column,
@@ -93,6 +111,7 @@ where
         data: &[u8],
         cell_xf_count: usize,
         previous_row: Option<u32>,
+        mut tolerance: Tolerance<'_>,
     ) -> Result<RowInfo> {
         if data.len() < 17 {
             return Err(Error::InvalidLength {
@@ -103,9 +122,9 @@ where
         let row = binary::read_u32_le_at(data, 0)?;
         let raw_style_id = binary::read_u32_le_at(data, 4)?;
         let height_twips = binary::read_u16_le_at(data, 8)?;
-        let flags1 = data[10];
-        let flags2 = data[11];
-        let phonetic_flags = data[12];
+        let mut flags1 = data[10];
+        let mut flags2 = data[11];
+        let mut phonetic_flags = data[12];
         let span_count = binary::read_u32_le_at(data, 13)? as usize;
         if span_count > 16 {
             return Err(Error::Unrecognized {
@@ -135,11 +154,22 @@ where
                 val: height_twips.to_string(),
             });
         }
-        if flags1 & 0xFC != 0 || flags2 & 0x80 != 0 || phonetic_flags & 0xFE != 0 {
-            return Err(Error::Unrecognized {
-                typ: "BrtRowHdr flags".to_string(),
-                val: format!("0x{flags1:02X}/0x{flags2:02X}/0x{phonetic_flags:02X}"),
-            });
+        // MS-XLSB 2.4.726: reserved1, fReserved, and unused2 MUST be ignored.
+        let reserved = [flags1 & 0xFC, flags2 & 0x80, phonetic_flags & 0xFE];
+        if reserved != [0; 3] {
+            tolerance.tolerate(
+                ReservedFieldDefect::RowHeaderFlags,
+                kind::ROW_HDR,
+                row,
+                u32::from_le_bytes([reserved[0], reserved[1], reserved[2], 0]),
+                || Error::Unrecognized {
+                    typ: "BrtRowHdr flags".to_string(),
+                    val: format!("0x{flags1:02X}/0x{flags2:02X}/0x{phonetic_flags:02X}"),
+                },
+            )?;
+            flags1 &= 0x03;
+            flags2 &= 0x7F;
+            phonetic_flags &= 0x01;
         }
         let style_applied = flags2 & 0x40 != 0;
         if style_applied && raw_style_id as usize >= cell_xf_count {
@@ -183,11 +213,34 @@ where
         })
     }
 
-    pub(super) fn parse_cell_header(&self) -> Result<CellHeader> {
-        Self::decode_cell_header(&self.buf, self.cell_xf_count)
+    pub(super) fn parse_cell_header(&mut self, record_type: Kind) -> Result<CellHeader> {
+        Self::decode_cell_header_with(
+            &self.buf,
+            self.cell_xf_count,
+            record_type,
+            self.current_row,
+            Tolerance::recording(&mut self.tolerance),
+        )
     }
 
+    #[cfg(test)]
     pub(super) fn decode_cell_header(data: &[u8], cell_xf_count: usize) -> Result<CellHeader> {
+        Self::decode_cell_header_with(
+            data,
+            cell_xf_count,
+            kind::CELL_BLANK,
+            0,
+            Tolerance::refusing(),
+        )
+    }
+
+    pub(super) fn decode_cell_header_with(
+        data: &[u8],
+        cell_xf_count: usize,
+        record_type: Kind,
+        row: u32,
+        mut tolerance: Tolerance<'_>,
+    ) -> Result<CellHeader> {
         if data.len() < 8 {
             return Err(Error::InvalidLength {
                 expected: 8,
@@ -195,11 +248,18 @@ where
             });
         }
         let flags = data[7];
+        // MS-XLSB 2.5.10 Cell: the 7 reserved bits MUST be 0 and MUST be ignored.
         if flags & 0xFE != 0 {
-            return Err(Error::Unrecognized {
-                typ: "Cell flags".to_string(),
-                val: format!("0x{flags:02X}"),
-            });
+            tolerance.tolerate(
+                ReservedFieldDefect::CellFlags,
+                record_type,
+                row,
+                u32::from(flags & 0xFE),
+                || Error::Unrecognized {
+                    typ: "Cell flags".to_string(),
+                    val: format!("0x{flags:02X}"),
+                },
+            )?;
         }
         let col = binary::read_u32_le_at(data, 0)?;
         let style_id = u32::from(data[4]) | (u32::from(data[5]) << 8) | (u32::from(data[6]) << 16);

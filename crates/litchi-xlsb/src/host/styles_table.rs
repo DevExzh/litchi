@@ -55,7 +55,10 @@ impl Default for StylesTable {
 }
 
 impl StylesTable {
-    /// Load styles from a styles.bin payload.
+    /// Load styles from a styles.bin payload, refusing every defect.
+    ///
+    /// This standalone constructor cannot report repairs; an opened workbook
+    /// repairs and records them instead (see [`crate::leniency`]).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         crate::styles::read(bytes)
             .map(Self::from_owner)

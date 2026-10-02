@@ -8,6 +8,7 @@
 use super::model::{CellsReader, Dimensions, ParsedFormulaCell};
 use crate::conditional_formatting::{Formatting, parse_classic_header};
 use crate::hyperlinks::Hyperlink;
+use crate::leniency::{ReservedFieldDefect, Tolerance, ToleranceReport};
 use crate::merged_cells::MergedCell;
 use crate::package::cell::{Cell, CellHeader};
 use crate::package::data_validation::parse_collection_settings;
@@ -16,12 +17,15 @@ use crate::package::formula::{Context, Group, GroupKind, ParsedFormula};
 use crate::package::records::Stream;
 use crate::package::shared_strings::SharedString;
 use crate::package::web_extension_bindings::Binding;
-use crate::raw::{Cursor, kind};
+use crate::raw::{Cursor, Kind, kind};
 use litchi_core::binary;
 use litchi_core::sheet::CellValue;
 use std::collections::HashSet;
 use std::io::{Read, Seek};
 use std::sync::Arc;
+
+/// `GrbitFmla` bits MS-XLSB 2.5.97.3 defines: fAlwaysCalc.
+const GRBIT_FMLA_DEFINED: u16 = 0x0002;
 
 fn required_cell_header(header: Option<CellHeader>) -> Result<CellHeader> {
     header.ok_or_else(|| {
@@ -67,6 +71,7 @@ where
         // future records. Producers disagree on whether the WSVIEWS block
         // precedes or follows BrtWsDim, so both phases capture it.
         let mut column_infos = Vec::new();
+        let mut tolerance = ToleranceReport::default();
         loop {
             let typ = iter.read_type()?;
             let _ = iter.fill_buffer(&mut buf)?;
@@ -74,7 +79,11 @@ where
                 break;
             }
             if typ == kind::COL_INFO {
-                column_infos.push(Self::parse_column_info(&buf, cell_xf_count)?);
+                column_infos.push(Self::parse_column_info(
+                    &buf,
+                    cell_xf_count,
+                    Tolerance::recording(&mut tolerance),
+                )?);
             } else if typ == kind::BEGIN_WS_VIEWS {
                 views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
             }
@@ -105,7 +114,7 @@ where
             web_extension_bindings: Vec::new(),
             views,
             saw_web_extension_collection: false,
-            tolerance: crate::leniency::ToleranceReport::default(),
+            tolerance,
         })
     }
 
@@ -139,7 +148,7 @@ where
                 .contains(&typ.get())
                 || typ == kind::CELL_R_STRING
             {
-                Some(self.parse_cell_header()?)
+                Some(self.parse_cell_header(typ)?)
             } else {
                 None
             };
@@ -151,6 +160,7 @@ where
                         &self.buf,
                         self.cell_xf_count,
                         self.last_row,
+                        Tolerance::recording(&mut self.tolerance),
                     )?;
                     self.current_row = info.row;
                     self.last_row = Some(info.row);
@@ -277,7 +287,12 @@ where
                     let (string, consumed) =
                         crate::package::records::decode_string(&self.buf[8..])?;
                     let parsed =
-                        self.parse_formula_cell(header, CellValue::String(string), 8 + consumed)?;
+                        self.parse_formula_cell(
+                        typ,
+                        header,
+                        CellValue::String(string),
+                        8 + consumed,
+                    )?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 kind::FMLA_NUM => {
@@ -291,7 +306,7 @@ where
                     let header = required_cell_header(cell_header)?;
                     let num_value = binary::read_f64_le_at(&self.buf, 8)?;
                     let parsed =
-                        self.parse_formula_cell(header, CellValue::Float(num_value), 16)?;
+                        self.parse_formula_cell(typ, header, CellValue::Float(num_value), 16)?;
                     return self.resolve_formula_record(parsed).map(Some);
                 },
                 kind::FMLA_BOOL => {
@@ -306,6 +321,7 @@ where
                     let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value");
                     let bool_value = cursor.read_bool8()?;
                     let parsed = self.parse_formula_cell(
+                        typ,
                         header,
                         CellValue::Bool(bool_value),
                         9,
@@ -323,6 +339,7 @@ where
                     let header = required_cell_header(cell_header)?;
                     let error_msg = super::semantic::error_text(self.buf[8]);
                     let parsed = self.parse_formula_cell(
+                        typ,
                         header,
                         CellValue::Error(error_msg.to_string()),
                         9,
@@ -343,7 +360,8 @@ where
     }
 
     fn parse_formula_cell(
-        &self,
+        &mut self,
+        record_type: Kind,
         header: CellHeader,
         cached_value: CellValue,
         flags_offset: usize,
@@ -357,19 +375,26 @@ where
                 found: self.buf.len(),
             });
         }
-        let flags = binary::read_u16_le_at(&self.buf, flags_offset)?;
-        if flags & !0x0002 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "invalid GrbitFmla flags 0x{flags:04X}"
-            )));
+        let mut flags = binary::read_u16_le_at(&self.buf, flags_offset)?;
+        let row = self.current_row;
+        let mut tolerance = Tolerance::recording(&mut self.tolerance);
+        // MS-XLSB 2.5.97.3 GrbitFmla: only fAlwaysCalc is defined; the
+        // reserved and unused bits MUST be ignored.
+        if flags & !GRBIT_FMLA_DEFINED != 0 {
+            tolerance.tolerate(
+                ReservedFieldDefect::FormulaFlags,
+                record_type,
+                row,
+                u32::from(flags & !GRBIT_FMLA_DEFINED),
+                || Error::InvalidFormula(format!("invalid GrbitFmla flags 0x{flags:04X}")),
+            )?;
+            flags &= GRBIT_FMLA_DEFINED;
         }
         let (formula, consumed) = ParsedFormula::parse(&self.buf[formula_offset..])?;
-        if formula_offset + consumed != self.buf.len() {
-            return Err(Error::InvalidFormula(format!(
-                "formula record has {} trailing bytes",
-                self.buf.len() - formula_offset - consumed
-            )));
-        }
+        let trailing = self.buf.len().saturating_sub(formula_offset + consumed);
+        tolerance.tolerate_trailing(record_type, row, trailing, || {
+            Error::InvalidFormula(format!("formula record has {trailing} trailing bytes"))
+        })?;
         Ok(ParsedFormulaCell {
             header,
             cached_value,

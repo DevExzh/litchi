@@ -90,7 +90,19 @@ pub struct BundleSheetRecord {
 }
 
 impl BundleSheetRecord {
+    /// Parse one `BrtBundleSh` payload, refusing every defect.
     pub fn parse(data: &[u8]) -> Result<Self> {
+        Self::parse_with(data, 0, crate::leniency::Tolerance::refusing())
+    }
+
+    /// Parse one `BrtBundleSh` payload, ignoring trailing payload bytes
+    /// through `tolerance`. `ordinal` locates the record among the
+    /// workbook's `BrtBundleSh` records.
+    pub(crate) fn parse_with(
+        data: &[u8],
+        ordinal: u32,
+        mut tolerance: crate::leniency::Tolerance<'_>,
+    ) -> Result<Self> {
         if data.len() < 12 {
             return Err(Error::InvalidLength {
                 expected: 12,
@@ -149,15 +161,13 @@ impl BundleSheetRecord {
             .checked_add(rel_consumed)
             .ok_or_else(|| Error::Encoding("BrtBundleSh relationship size overflow".to_string()))?;
         let (name, name_consumed) = decode_string(&data[name_offset..])?;
-        if name_offset + name_consumed != data.len() {
-            return Err(Error::Unrecognized {
+        let trailing = data.len().saturating_sub(name_offset + name_consumed);
+        tolerance.tolerate_trailing(kind::BUNDLE_SH, ordinal, trailing, || {
+            Error::Unrecognized {
                 typ: "BrtBundleSh".to_string(),
-                val: format!(
-                    "{} trailing bytes",
-                    data.len() - name_offset - name_consumed
-                ),
-            });
-        }
+                val: format!("{trailing} trailing bytes"),
+            }
+        })?;
         let name_len = name.encode_utf16().count();
         if name_len == 0
             || name_len > 31

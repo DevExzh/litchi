@@ -91,5 +91,6 @@ pub enum Error {
     },
 }
 
+pub(crate) use codec::read_with;
 pub use codec::{read, write};
 pub use model::{Delta, Mode, Opts, Props, Threads};

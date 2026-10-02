@@ -18,6 +18,13 @@
 //! a record's defined layout, and producer obligations for which MS-XLSB
 //! defines no reader-side refusal. Each substitutes the value documented on
 //! the corresponding [`ReservedFieldDefect`] or [`LayoutDefect`] variant.
+//! They are applied in the workbook stream (`BrtCalcProp`, `BrtBundleSh`,
+//! `BrtName`), the styles part (`BrtFont`/`BrtFill` colors, `BrtBorder`,
+//! `BrtFmt`), and worksheet streams (`Cell` flags, `BrtRowHdr`, `BrtColInfo`,
+//! formula-cell `GrbitFmla` and trailing bytes). Adjunct parts (tables,
+//! PivotTables, connections, comments, …) and the binary-index point lookup
+//! behind `SourceBackedIndexedWorksheet::cached_value` keep their strict
+//! checks for now.
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. None exists yet: the [`CachedNumberDefect`] class (MS-XLSB
@@ -124,6 +131,9 @@ pub enum ReservedFieldDefect {
     /// `BrtCalcProp` (MS-XLSB 2.4.318) had option bits outside the defined
     /// set. They are masked off; every defined calculation switch is kept.
     CalcOptions,
+    /// `BrtName` (MS-XLSB 2.4.647) had any of its 14 reserved flag bits set.
+    /// They are masked off; every defined name flag is kept.
+    NameFlags,
 }
 
 impl ReservedFieldDefect {
@@ -145,6 +155,9 @@ impl ReservedFieldDefect {
             Self::BorderSideReserved => "ignored the reserved Blxf byte",
             Self::CalcOptions => {
                 "masked the undefined BrtCalcProp option bits; every defined switch was kept"
+            },
+            Self::NameFlags => {
+                "masked the reserved BrtName flag bits; every defined name flag was kept"
             },
         }
     }
@@ -443,7 +456,6 @@ impl ToleranceReport {
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored
     /// entries; the excess is counted in [`ToleranceReport::unrecorded`].
-    #[allow(dead_code, reason = "PHASE0: repair sites land with F3.11")]
     pub(crate) fn record(
         &mut self,
         defect: impl Into<Defect>,
@@ -460,7 +472,6 @@ impl ToleranceReport {
     }
 
     /// Record trailing payload bytes ignored past a record's defined layout.
-    #[allow(dead_code, reason = "PHASE0: repair sites land with F3.11")]
     pub(crate) fn record_trailing(
         &mut self,
         record_type: crate::raw::Kind,
@@ -503,13 +514,11 @@ impl ToleranceReport {
 /// with the documented substitute value; when no report can carry the repair
 /// (a low-level public codec function returning a bare value), the original
 /// error is returned unchanged, so a repair is never applied unrecorded.
-#[allow(dead_code, reason = "PHASE0: repair sites land with F3.11")]
 #[derive(Debug)]
 pub(crate) struct Tolerance<'a> {
     report: Option<&'a mut ToleranceReport>,
 }
 
-#[allow(dead_code, reason = "PHASE0: repair sites land with F3.11")]
 impl<'a> Tolerance<'a> {
     /// A channel that refuses every defect with the parser's original error.
     pub(crate) const fn refusing() -> Self {
@@ -764,6 +773,7 @@ mod tests {
             Defect::from(ReservedFieldDefect::BorderFlags),
             Defect::from(ReservedFieldDefect::BorderSideReserved),
             Defect::from(ReservedFieldDefect::CalcOptions),
+            Defect::from(ReservedFieldDefect::NameFlags),
             Defect::from(LayoutDefect::TrailingBytes),
             Defect::from(LayoutDefect::ColorWithoutValidRgb),
             Defect::from(LayoutDefect::BorderStyle),

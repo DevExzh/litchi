@@ -7,7 +7,7 @@ use super::model::{
     Alignment, Border, BorderSide, BorderStyle, CellFormat, Fill, Font, HorizontalAlignment, Table,
     VerticalAlignment,
 };
-use crate::leniency::{Tolerance, ToleranceReport};
+use crate::leniency::{LayoutDefect, ReservedFieldDefect, Tolerance, ToleranceReport};
 use crate::raw::{Cursor, Records, kind};
 use std::collections::TryReserveError;
 use thiserror::Error;
@@ -51,7 +51,7 @@ pub(crate) fn read_with_report(bytes: &[u8], report: &mut ToleranceReport) -> Re
     read_with(bytes, Tolerance::recording(report))
 }
 
-fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
+fn read_with(bytes: &[u8], mut tolerance: Tolerance<'_>) -> Result<Table> {
     let mut table = Table::default();
     let mut in_fonts = false;
     let mut in_fills = false;
@@ -59,6 +59,7 @@ fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
     let mut in_fmts = false;
     let mut in_cell_xfs = false;
     let mut in_cell_style_xfs = false;
+    let mut fmt_ordinal = 0u32;
 
     for record in Records::new(bytes) {
         let record = record?;
@@ -71,7 +72,10 @@ fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
             kind::END_FONTS => in_fonts = false,
             kind::FONT if in_fonts => {
                 reserve(&mut table.fonts, 1, "styles fonts")?;
-                table.fonts.push(parse_font(data)?);
+                let ordinal = ordinal(table.fonts.len());
+                table
+                    .fonts
+                    .push(parse_font_with(data, ordinal, tolerance.reborrow())?);
             },
             kind::BEGIN_FILLS => {
                 in_fills = true;
@@ -80,7 +84,10 @@ fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
             kind::END_FILLS => in_fills = false,
             kind::FILL if in_fills => {
                 reserve(&mut table.fills, 1, "styles fills")?;
-                table.fills.push(parse_fill(data)?);
+                let ordinal = ordinal(table.fills.len());
+                table
+                    .fills
+                    .push(parse_fill_with(data, ordinal, tolerance.reborrow())?);
             },
             kind::BEGIN_BORDERS => {
                 in_borders = true;
@@ -89,12 +96,17 @@ fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
             kind::END_BORDERS => in_borders = false,
             kind::BORDER if in_borders => {
                 reserve(&mut table.borders, 1, "styles borders")?;
-                table.borders.push(parse_border(data)?);
+                let ordinal = ordinal(table.borders.len());
+                table
+                    .borders
+                    .push(parse_border_with(data, ordinal, tolerance.reborrow())?);
             },
             kind::BEGIN_FMTS => in_fmts = true,
             kind::END_FMTS => in_fmts = false,
             kind::FMT if in_fmts => {
-                let (id, format_code) = parse_num_fmt(data)?;
+                let (id, format_code) =
+                    parse_num_fmt_with(data, fmt_ordinal, tolerance.reborrow())?;
+                fmt_ordinal = fmt_ordinal.saturating_add(1);
                 table
                     .num_fmts
                     .try_reserve(1)
@@ -126,8 +138,17 @@ fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
     Ok(table)
 }
 
+/// A collection ordinal for the tolerance report, saturated to `u32`.
+fn ordinal(index: usize) -> u32 {
+    u32::try_from(index).unwrap_or(u32::MAX)
+}
+
 /// Parse a BrtFont payload.
 pub fn parse_font(data: &[u8]) -> Result<Font> {
+    parse_font_with(data, 0, Tolerance::refusing())
+}
+
+fn parse_font_with(data: &[u8], ordinal: u32, mut tolerance: Tolerance<'_>) -> Result<Font> {
     const FONT_NAME_OFFSET: usize = 21;
     if data.len() < FONT_NAME_OFFSET {
         return Err(Error::InvalidLength {
@@ -143,7 +164,7 @@ pub fn parse_font(data: &[u8]) -> Result<Font> {
     let strike = flags & 0x0008 != 0;
     let bold = read_u16(data, 4)? >= 0x02BC;
     let underline = data[8] != 0;
-    let color = parse_direct_color(data, 12)?;
+    let color = direct_color(data, 12, kind::FONT, ordinal, &mut tolerance)?;
     let (name, _) = decode_string(&data[FONT_NAME_OFFSET..])?;
 
     Ok(Font {
@@ -159,6 +180,10 @@ pub fn parse_font(data: &[u8]) -> Result<Font> {
 
 /// Parse a BrtFill payload.
 pub fn parse_fill(data: &[u8]) -> Result<Fill> {
+    parse_fill_with(data, 0, Tolerance::refusing())
+}
+
+fn parse_fill_with(data: &[u8], ordinal: u32, mut tolerance: Tolerance<'_>) -> Result<Fill> {
     const FIXED_FILL_SIZE: usize = 68;
     if data.len() < FIXED_FILL_SIZE {
         return Err(Error::InvalidLength {
@@ -171,7 +196,10 @@ pub fn parse_fill(data: &[u8]) -> Result<Fill> {
     let (fg_color, bg_color) = if pattern_type == 0x28 {
         (None, None)
     } else {
-        (parse_direct_color(data, 4)?, parse_direct_color(data, 12)?)
+        (
+            direct_color(data, 4, kind::FILL, ordinal, &mut tolerance)?,
+            direct_color(data, 12, kind::FILL, ordinal, &mut tolerance)?,
+        )
     };
 
     Ok(Fill {
@@ -182,7 +210,20 @@ pub fn parse_fill(data: &[u8]) -> Result<Fill> {
 }
 
 /// Parse one direct BrtColor into compact ARGB form.
+///
+/// A direct color whose `fValidRGB` bit is clear is refused here; an opened
+/// workbook reads it as no color and records the repair.
 pub fn parse_direct_color(data: &[u8], offset: usize) -> Result<Option<u32>> {
+    direct_color(data, offset, kind::FONT, 0, &mut Tolerance::refusing())
+}
+
+fn direct_color(
+    data: &[u8],
+    offset: usize,
+    record_type: crate::raw::Kind,
+    ordinal: u32,
+    tolerance: &mut Tolerance<'_>,
+) -> Result<Option<u32>> {
     let end = offset.checked_add(8).ok_or(Error::InvalidLength {
         expected: usize::MAX,
         found: data.len(),
@@ -201,10 +242,18 @@ pub fn parse_direct_color(data: &[u8], offset: usize) -> Result<Option<u32>> {
         return Ok(None);
     }
     if !valid_rgb {
-        return Err(Error::Unrecognized {
-            typ: "BrtColor".to_string(),
-            val: "direct RGB color is not marked valid".to_string(),
-        });
+        // MS-XLSB 2.5.17: with fValidRGB clear the RGB bytes carry no color.
+        tolerance.tolerate(
+            LayoutDefect::ColorWithoutValidRgb,
+            record_type,
+            ordinal,
+            u32::from(flags),
+            || Error::Unrecognized {
+                typ: "BrtColor".to_string(),
+                val: "direct RGB color is not marked valid".to_string(),
+            },
+        )?;
+        return Ok(None);
     }
 
     let red = u32::from(data[offset + 4]);
@@ -216,6 +265,10 @@ pub fn parse_direct_color(data: &[u8], offset: usize) -> Result<Option<u32>> {
 
 /// Parse a BrtBorder payload.
 pub fn parse_border(data: &[u8]) -> Result<Border> {
+    parse_border_with(data, 0, Tolerance::refusing())
+}
+
+fn parse_border_with(data: &[u8], ordinal: u32, mut tolerance: Tolerance<'_>) -> Result<Border> {
     const BORDER_SIZE: usize = 51;
     if data.len() < BORDER_SIZE {
         return Err(Error::InvalidLength {
@@ -225,19 +278,29 @@ pub fn parse_border(data: &[u8]) -> Result<Border> {
     }
 
     let flags = data[0];
+    // MS-XLSB 2.4.43: only fBdrDiagDown and fBdrDiagUp are defined; the
+    // reserved bits MUST be ignored.
     if flags & !0x03 != 0 {
-        return Err(Error::Unrecognized {
-            typ: "BrtBorder flags".to_string(),
-            val: format!("0x{flags:02X}"),
-        });
+        tolerance.tolerate(
+            ReservedFieldDefect::BorderFlags,
+            kind::BORDER,
+            ordinal,
+            u32::from(flags & !0x03),
+            || Error::Unrecognized {
+                typ: "BrtBorder flags".to_string(),
+                val: format!("0x{flags:02X}"),
+            },
+        )?;
     }
 
+    let mut side =
+        |range: std::ops::Range<usize>| parse_side(&data[range], ordinal, &mut tolerance);
     Ok(Border {
-        top: parse_side(&data[1..11])?,
-        bottom: parse_side(&data[11..21])?,
-        left: parse_side(&data[21..31])?,
-        right: parse_side(&data[31..41])?,
-        diagonal: parse_side(&data[41..51])?,
+        top: side(1..11)?,
+        bottom: side(11..21)?,
+        left: side(21..31)?,
+        right: side(31..41)?,
+        diagonal: side(41..51)?,
         vertical: None,
         horizontal: None,
         diagonal_down: flags & 1 != 0,
@@ -247,34 +310,51 @@ pub fn parse_border(data: &[u8]) -> Result<Border> {
 
 /// Parse a BrtFmt payload.
 pub fn parse_num_fmt(data: &[u8]) -> Result<(u32, String)> {
-    if data.len() < 8 {
+    parse_num_fmt_with(data, 0, Tolerance::refusing())
+}
+
+fn parse_num_fmt_with(
+    data: &[u8],
+    ordinal: u32,
+    mut tolerance: Tolerance<'_>,
+) -> Result<(u32, String)> {
+    // ifmt plus the XLWideString character count; the code-length domain is
+    // checked separately below.
+    if data.len() < 6 {
         return Err(Error::InvalidLength {
-            expected: 8,
+            expected: 6,
             found: data.len(),
         });
     }
 
     let id = u32::from(read_u16(data, 0)?);
     if !matches!(id, 5..=8 | 23..=26 | 41..=44 | 63..=66 | 164..=382) {
-        return Err(Error::Unrecognized {
-            typ: "BrtFmt ifmt".to_string(),
-            val: id.to_string(),
-        });
+        tolerance.tolerate(LayoutDefect::NumberFormatId, kind::FMT, ordinal, id, || {
+            Error::Unrecognized {
+                typ: "BrtFmt ifmt".to_string(),
+                val: id.to_string(),
+            }
+        })?;
     }
     let (format_code, consumed) = decode_string(&data[2..])?;
     let length = format_code.encode_utf16().count();
     if !(1..=255).contains(&length) {
-        return Err(Error::Unrecognized {
-            typ: "BrtFmt stFmtCode length".to_string(),
-            val: length.to_string(),
-        });
+        tolerance.tolerate(
+            LayoutDefect::NumberFormatCodeLength,
+            kind::FMT,
+            ordinal,
+            u32::try_from(length).unwrap_or(u32::MAX),
+            || Error::Unrecognized {
+                typ: "BrtFmt stFmtCode length".to_string(),
+                val: length.to_string(),
+            },
+        )?;
     }
-    if consumed.checked_add(2) != Some(data.len()) {
-        return Err(Error::Unrecognized {
-            typ: "BrtFmt".to_string(),
-            val: format!("{} trailing bytes", data.len() - consumed - 2),
-        });
-    }
+    let trailing = data.len().saturating_sub(consumed.saturating_add(2));
+    tolerance.tolerate_trailing(kind::FMT, ordinal, trailing, || Error::Unrecognized {
+        typ: "BrtFmt".to_string(),
+        val: format!("{trailing} trailing bytes"),
+    })?;
 
     Ok((id, format_code))
 }
@@ -317,13 +397,35 @@ fn parse_alignment(data: &[u8]) -> Option<Alignment> {
     })
 }
 
-fn parse_side(data: &[u8]) -> Result<Option<BorderSide>> {
+fn parse_side(
+    data: &[u8],
+    ordinal: u32,
+    tolerance: &mut Tolerance<'_>,
+) -> Result<Option<BorderSide>> {
     let style_byte = data[0];
-    if style_byte > 13 || data[1] != 0 {
-        return Err(Error::Unrecognized {
-            typ: "Blxf".to_string(),
-            val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
-        });
+    let refusal = || Error::Unrecognized {
+        typ: "Blxf".to_string(),
+        val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
+    };
+    // MS-XLSB 2.5.5 Blxf: the reserved byte MUST be 0 and MUST be ignored.
+    if data[1] != 0 {
+        tolerance.tolerate(
+            ReservedFieldDefect::BorderSideReserved,
+            kind::BORDER,
+            ordinal,
+            u32::from(data[1]),
+            refusal,
+        )?;
+    }
+    if style_byte > 13 {
+        tolerance.tolerate(
+            LayoutDefect::BorderStyle,
+            kind::BORDER,
+            ordinal,
+            u32::from(style_byte),
+            refusal,
+        )?;
+        return Ok(None);
     }
 
     let style = BorderStyle::from_u8(style_byte);
@@ -333,7 +435,7 @@ fn parse_side(data: &[u8]) -> Result<Option<BorderSide>> {
 
     Ok(Some(BorderSide {
         style,
-        color: parse_direct_color(data, 2)?,
+        color: direct_color(data, 2, kind::BORDER, ordinal, tolerance)?,
     }))
 }
 

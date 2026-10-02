@@ -9,7 +9,7 @@
 
 use super::super::model::Workbook;
 use crate::calc::{self, Props};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Tolerance, ToleranceReport};
 use crate::named_ranges::Definition;
 use crate::package::error::Result;
 use crate::package::formula::{
@@ -37,7 +37,7 @@ impl Workbook {
     /// into `report` (see [`crate::leniency`]).
     pub(in crate::workbook) fn read_workbook(
         iter: &mut Records<'_>,
-        _report: &mut ToleranceReport,
+        report: &mut ToleranceReport,
     ) -> Result<ParsedWorkbookInfo> {
         let mut info = ParsedWorkbookInfo::default();
         let worksheet_names = &mut info.worksheet_names;
@@ -135,11 +135,17 @@ impl Workbook {
                             val: "duplicate record".to_string(),
                         });
                     }
-                    info.calc = Some(calc::read(record.payload())?);
+                    info.calc = Some(calc::read_with(
+                        record.payload(),
+                        Tolerance::recording(report),
+                    )?);
                 },
                 kind::BUNDLE_SH => {
-                    let bundle_sh =
-                        crate::package::records::BundleSheetRecord::parse(record.payload())?;
+                    let bundle_sh = crate::package::records::BundleSheetRecord::parse_with(
+                        record.payload(),
+                        u32::try_from(worksheet_names.len()).unwrap_or(u32::MAX),
+                        Tolerance::recording(report),
+                    )?;
                     if worksheet_names
                         .iter()
                         .any(|name| excel_name_eq(name, &bundle_sh.name))
@@ -194,7 +200,11 @@ impl Workbook {
                     Self::parse_extern_sheet(record.payload(), external_sheets)?;
                 },
                 kind::NAME => {
-                    let named_range = Definition::parse(record.payload())?;
+                    let named_range = Definition::parse_with(
+                        record.payload(),
+                        u32::try_from(defined_names.len()).unwrap_or(u32::MAX),
+                        Tolerance::recording(report),
+                    )?;
                     if named_range
                         .sheet_id
                         .is_some_and(|index| index as usize >= worksheet_names.len())

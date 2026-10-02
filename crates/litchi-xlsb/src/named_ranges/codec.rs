@@ -9,7 +9,11 @@
 use super::model::{Definition, validate_name};
 use super::{Error, Result};
 use crate::formula::{ParsedFormula, ptg_types};
-use crate::raw::{Cursor, Limits};
+use crate::leniency::{ReservedFieldDefect, Tolerance};
+use crate::raw::{Cursor, Limits, kind};
+
+/// The reserved high bits of the `BrtName` flag word.
+const NAME_RESERVED_FLAGS: u32 = 0xFFFC_0000;
 
 /// Maximum bytes accepted for one `BrtName` payload.
 pub const MAX_RECORD_BYTES: usize = 64 * 1024 * 1024;
@@ -22,8 +26,23 @@ const MAX_COMMENT_UNITS: usize = 255;
 /// Maximum UTF-16 units in each macro description field.
 const MAX_MACRO_DESCRIPTION_UNITS: usize = 32_767;
 
-/// Parse one complete `BrtName` payload.
+/// Parse one complete `BrtName` payload, refusing every defect.
+///
+/// This standalone function cannot report repairs, so it also rejects the
+/// reserved flag bits and trailing bytes an opened workbook repairs and
+/// records; see [`crate::leniency`].
 pub fn parse(data: &[u8]) -> Result<Definition> {
+    parse_with(data, 0, Tolerance::refusing())
+}
+
+/// Parse one `BrtName` payload, masking reserved flag bits and ignoring
+/// trailing payload bytes through `tolerance`. `ordinal` locates the record
+/// among the workbook's `BrtName` records.
+pub(crate) fn parse_with(
+    data: &[u8],
+    ordinal: u32,
+    mut tolerance: Tolerance<'_>,
+) -> Result<Definition> {
     if data.len() > MAX_RECORD_BYTES {
         return Err(Error::InvalidLength {
             expected: MAX_RECORD_BYTES,
@@ -39,11 +58,17 @@ pub fn parse(data: &[u8]) -> Result<Definition> {
 
     let limits = Limits::new(MAX_RECORD_BYTES, MAX_WIDE_STRING_UNITS);
     let mut cursor = Cursor::with_limits(data, "BrtName", limits);
-    let flags = cursor.read_u32()?;
-    if flags & 0xFFFC_0000 != 0 {
-        return Err(Error::InvalidFormula(format!(
-            "BrtName reserved flags are nonzero: 0x{flags:08X}"
-        )));
+    let mut flags = cursor.read_u32()?;
+    // MS-XLSB 2.4.647: the 14 reserved bits MUST be 0 and MUST be ignored.
+    if flags & NAME_RESERVED_FLAGS != 0 {
+        tolerance.tolerate(
+            ReservedFieldDefect::NameFlags,
+            kind::NAME,
+            ordinal,
+            flags & NAME_RESERVED_FLAGS,
+            || Error::InvalidFormula(format!("BrtName reserved flags are nonzero: 0x{flags:08X}")),
+        )?;
+        flags &= !NAME_RESERVED_FLAGS;
     }
     let hidden = (flags & 0x0001) != 0;
     let f_func = (flags & 0x0002) != 0;
@@ -123,12 +148,10 @@ pub fn parse(data: &[u8]) -> Result<Definition> {
             }
         }
     }
-    if cursor.remaining() != 0 {
-        return Err(Error::InvalidFormula(format!(
-            "BrtName has {} trailing bytes",
-            cursor.remaining()
-        )));
-    }
+    let trailing = cursor.remaining();
+    tolerance.tolerate_trailing(kind::NAME, ordinal, trailing, || {
+        Error::InvalidFormula(format!("BrtName has {trailing} trailing bytes"))
+    })?;
 
     Ok(Definition {
         name,
@@ -143,6 +166,11 @@ impl Definition {
     /// Parse one complete `BrtName` payload.
     pub fn parse(data: &[u8]) -> Result<Self> {
         parse(data)
+    }
+
+    /// Parse one `BrtName` payload, recording repairs through `tolerance`.
+    pub(crate) fn parse_with(data: &[u8], ordinal: u32, tolerance: Tolerance<'_>) -> Result<Self> {
+        parse_with(data, ordinal, tolerance)
     }
 
     /// Create a 3D area formula token stream for a workbook-local range.
