@@ -62,16 +62,24 @@ fn generated_hostile_bodies_keep_identical_values_and_refusals() {
 
 #[test]
 fn shared_string_refusals_keep_their_precedence() {
-    // No shared-string part: the refusal comes from materialization after
-    // the whole worksheet parsed, on both routes.
+    // No shared-string part: the refusal (write-path admission) comes from
+    // materialization after the whole worksheet parsed, on both routes.
     let document = worksheet("<row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row>");
     route::reset();
-    let fast = super::parse(document.as_bytes(), || Ok(None));
+    let fast = super::parse_refusing_repairs(document.as_bytes(), || Ok(None));
     assert_eq!(route::admitted(Pass::Parse), 1);
-    let slow = route::without_lane(|| super::parse(document.as_bytes(), || Ok(None)));
+    let slow =
+        route::without_lane(|| super::parse_refusing_repairs(document.as_bytes(), || Ok(None)));
     assert_eq!(
         format!("{:?}", fast.expect_err("no strings")),
         format!("{:?}", slow.expect_err("no strings"))
+    );
+    // The read path repairs the same cell identically on both routes.
+    let fast = super::parse(document.as_bytes(), || Ok(None));
+    let slow = route::without_lane(|| super::parse(document.as_bytes(), || Ok(None)));
+    assert_eq!(
+        format!("{:?}", fast.expect("repaired")),
+        format!("{:?}", slow.expect("repaired"))
     );
     // An out-of-range index and an unreadable table behave identically too.
     assert!(assert_parity(

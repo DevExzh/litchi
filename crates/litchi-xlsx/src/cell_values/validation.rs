@@ -308,13 +308,19 @@ where
             drop(validator);
             drop(builder);
             worksheet_xml(content)?;
-            Ok((raw::worksheet::parse(content, strings)?, None))
+            Ok((
+                raw::worksheet::parse_refusing_repairs(content, strings)?,
+                None,
+            ))
         },
         raw::worksheet::SourceParseAttempt::ReaderFailed => {
             drop(validator);
             drop(builder);
             worksheet_xml(content)?;
-            Ok((raw::worksheet::parse(content, strings)?, None))
+            Ok((
+                raw::worksheet::parse_refusing_repairs(content, strings)?,
+                None,
+            ))
         },
     }
 }

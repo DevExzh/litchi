@@ -12,7 +12,7 @@ use crate::column;
 use crate::error::{Result, allocation, invalid};
 use crate::formula::{Formula, Kind};
 use crate::layout::Defaults;
-use crate::leniency::{Location, ToleranceReport};
+use crate::leniency::{CellDefect, Location, ToleranceReport};
 use crate::merge;
 use crate::row;
 
@@ -826,6 +826,68 @@ impl Store {
     /// Attach the repairs the parse that built this store made.
     pub(crate) fn set_tolerance_report(&mut self, report: ToleranceReport) {
         self.tolerance = report;
+    }
+
+    /// Whether any cell, row, or column record names a shared style.
+    pub(crate) fn references_styles(&self) -> bool {
+        self.cells.iter().any(|entry| entry.style.is_some())
+            || self
+                .rows
+                .iter()
+                .any(|entry| entry.properties.style.is_some())
+            || self
+                .columns
+                .iter()
+                .any(|entry| entry.properties.style.is_some())
+    }
+
+    /// Repair every cell, row, and column style index at or beyond the
+    /// workbook's `cellXfs` count (audit finding 4.2) and record each repair.
+    ///
+    /// Excel substitutes the default format for a stale index. The stale
+    /// index becomes the mandatory default format, `cellXfs` entry 0, so the
+    /// record stays explicitly styled; when the workbook has no cell formats
+    /// at all, the index is dropped and the styled extent is recomputed.
+    pub(crate) fn repair_style_indexes(&mut self, len: u32) -> Result<()> {
+        let substitute = (len > 0).then_some(0);
+        let mut dropped = false;
+        for entry in &mut self.cells {
+            if entry.style.is_some_and(|key| key >= len) {
+                entry.style = substitute;
+                dropped |= substitute.is_none();
+                self.tolerance.record(
+                    CellDefect::StyleIndexOutOfRange,
+                    Location::Cell(entry.address),
+                );
+            }
+        }
+        for entry in &mut self.rows {
+            if entry.properties.style.is_some_and(|key| key >= len) {
+                entry.properties.style = substitute;
+                self.tolerance
+                    .record(CellDefect::StyleIndexOutOfRange, Location::Row(entry.index));
+            }
+        }
+        for entry in &mut self.columns {
+            if entry.properties.style.is_some_and(|key| key >= len) {
+                entry.properties.style = substitute;
+                self.tolerance.record(
+                    CellDefect::StyleIndexOutOfRange,
+                    Location::Columns {
+                        first: entry.first,
+                        last: entry.last,
+                    },
+                );
+            }
+        }
+        if dropped {
+            let mut styled = Bounds::default();
+            for entry in self.cells.iter().filter(|entry| entry.style.is_some()) {
+                styled.push(entry.address);
+            }
+            self.extents.styled = styled.finish()?;
+        }
+        Ok(())
     }
 
     /// Merge source cell records named by reduced-readback provenance into a

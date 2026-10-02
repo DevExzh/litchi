@@ -437,15 +437,17 @@ fn styles_graph_table_and_cell_references_are_checked() {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"/></row></sheetData></worksheet>"#.to_vec(),
         );
+    // Audit finding 4.2: a stale style index no longer kills the sheet. It
+    // reads with the default format (cellXfs 0) and the repair is recorded.
     let dangling = Workbook::from_package(dangling).expect("lazy worksheet");
-    assert!(matches!(
-        dangling
-            .sheet(0usize)
-            .expect("lookup")
-            .expect("sheet")
-            .cell("A1"),
-        Err(Error::Invalid(message)) if message.contains("A1 references shared style 1")
-    ));
+    let sheet = dangling.sheet(0usize).expect("lookup").expect("sheet");
+    sheet.cell("A1").expect("stale cell style is repaired");
+    assert_eq!(sheet.store().expect("store").entries()[0].style, Some(0));
+    assert_style_repair(
+        &dangling,
+        &sheet,
+        crate::ToleranceLocation::Cell(litchi_sheet::Cell::from_a1("A1").expect("A1")),
+    );
 
     let mut dangling_column = baseline.inner.package.clone();
     dangling_column
@@ -455,14 +457,26 @@ fn styles_graph_table_and_cell_references_are_checked() {
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="2" max="2" style="1"/></cols><sheetData/></worksheet>"#.to_vec(),
         );
     let dangling_column = Workbook::from_package(dangling_column).expect("lazy column style");
-    assert!(matches!(
-        dangling_column
-            .sheet(0usize)
-            .expect("lookup")
-            .expect("sheet")
-            .column(1),
-        Err(Error::Invalid(message)) if message.contains("column 1 references shared style 1")
-    ));
+    let sheet = dangling_column
+        .sheet(0usize)
+        .expect("lookup")
+        .expect("sheet");
+    sheet.column(1).expect("stale column style is repaired");
+    assert_eq!(
+        sheet.store().expect("store").column_entries()[0]
+            .properties
+            .style,
+        Some(0)
+    );
+    let column = litchi_sheet::Column::new(1).expect("column B");
+    assert_style_repair(
+        &dangling_column,
+        &sheet,
+        crate::ToleranceLocation::Columns {
+            first: column,
+            last: column,
+        },
+    );
 
     let mut dangling_row = baseline.inner.package.clone();
     dangling_row
@@ -472,14 +486,32 @@ fn styles_graph_table_and_cell_references_are_checked() {
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="2" s="1" customFormat="1"/></sheetData></worksheet>"#.to_vec(),
         );
     let dangling_row = Workbook::from_package(dangling_row).expect("lazy row style");
-    assert!(matches!(
-        dangling_row
-            .sheet(0usize)
-            .expect("lookup")
-            .expect("sheet")
-            .row(1),
-        Err(Error::Invalid(message)) if message.contains("row 1 references shared style 1")
-    ));
+    let sheet = dangling_row.sheet(0usize).expect("lookup").expect("sheet");
+    sheet.row(1).expect("stale row style is repaired");
+    assert_eq!(
+        sheet.store().expect("store").row_entries()[0]
+            .properties
+            .style,
+        Some(0)
+    );
+    assert_style_repair(
+        &dangling_row,
+        &sheet,
+        crate::ToleranceLocation::Row(litchi_sheet::Row::new(1).expect("row 2")),
+    );
+}
+
+fn assert_style_repair(workbook: &Workbook, sheet: &Worksheet, location: crate::ToleranceLocation) {
+    let defect = crate::Defect::Cell(crate::CellDefect::StyleIndexOutOfRange);
+    let report = sheet.tolerance_report().expect("sheet report");
+    assert_eq!(report.total(), 1);
+    assert_eq!(report.defects()[0].defect, defect);
+    assert_eq!(report.defects()[0].sheet, None);
+    assert_eq!(report.defects()[0].location, location);
+    let aggregate = workbook.tolerance_report();
+    assert_eq!(aggregate.total(), 1);
+    assert_eq!(aggregate.defects()[0].sheet, Some(0));
+    assert_eq!(aggregate.defects()[0].location, location);
 }
 
 #[test]
@@ -775,4 +807,57 @@ fn validated_worksheet_store_adoption_requires_exact_bytes_and_lineage() {
         )
         .expect("skip lineage-mismatched cache");
     assert!(distinct_lineage.inner.sheets[0].cells.get().is_none());
+}
+
+/// Audit finding 4.4 through the owned facade: a dangling shared-string
+/// reference opens by default, reads empty, and is recorded; the conformant
+/// control reports clean; malformed worksheet XML is still fatal.
+#[test]
+fn dangling_shared_string_reference_opens_with_a_recorded_repair() {
+    let baseline = Workbook::new().expect("valid baseline");
+    let sheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI");
+    let with_sheet = |xml: &[u8]| {
+        let mut package = baseline.inner.package.clone();
+        package
+            .get_part_mut(&sheet_uri)
+            .expect("sheet part")
+            .set_blob(xml.to_vec());
+        Workbook::from_package(package).expect("lazy worksheet")
+    };
+
+    let dangling = with_sheet(
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>3</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#,
+    );
+    assert!(dangling.tolerance_report().is_clean(), "nothing parsed yet");
+    let sheet = dangling.sheet(0usize).expect("lookup").expect("sheet");
+    assert!(matches!(
+        sheet.cell("A1").expect("repaired cell"),
+        crate::cell::View::Stored(Cell::Value(Value::Text(text))) if text.as_str().is_empty()
+    ));
+    let report = dangling.tolerance_report();
+    assert_eq!(report.total(), 1);
+    assert_eq!(
+        report.defects()[0].defect,
+        crate::Defect::Cell(crate::CellDefect::MissingSharedStringTable)
+    );
+    assert_eq!(report.defects()[0].sheet, Some(0));
+    assert_eq!(
+        report.defects()[0].location,
+        crate::ToleranceLocation::Cell(litchi_sheet::Cell::from_a1("A1").expect("A1"))
+    );
+
+    let control = with_sheet(
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#,
+    );
+    let sheet = control.sheet(0usize).expect("lookup").expect("sheet");
+    sheet.cell("B1").expect("conformant cell");
+    assert!(sheet.tolerance_report().expect("report").is_clean());
+    assert!(control.tolerance_report().is_clean());
+
+    let malformed = with_sheet(
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>3</v></c></row></worksheet>"#,
+    );
+    let sheet = malformed.sheet(0usize).expect("lookup").expect("sheet");
+    assert!(sheet.cell("A1").is_err());
+    assert!(sheet.tolerance_report().is_err());
 }

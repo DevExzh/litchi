@@ -564,7 +564,8 @@ const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac
 /// then the preprocessing raw parse of the same source.
 fn authoritative(content: &[u8]) -> crate::Result<crate::cell::Store> {
     super::worksheet_xml(content)?;
-    crate::raw::worksheet::parse(content, || Ok(None))
+    // Value-only admission refuses repairs, so its oracle does too.
+    crate::raw::worksheet::parse_refusing_repairs(content, || Ok(None))
 }
 
 /// The admitted path, exactly as `Snapshot::from_source_selected` drives it.

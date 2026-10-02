@@ -404,7 +404,8 @@ where
     if !shared_event_bound_within_cap(content) {
         return SourceParseAttempt::ProvisionalFailed;
     }
-    codec::parse_source_with_observer(content, admission, strings, observer)
+    // Only write-path admission uses the shared source traversal.
+    codec::parse_source_with_observer(content, admission, strings, observer, Repairs::Refuse)
 }
 
 /// Finish a source-backed raw parse while retaining the historical x14ac
@@ -433,7 +434,38 @@ fn complete_source_parse_with_extension_state(
     parsed
 }
 
+/// Whether a worksheet parse repairs cataloged reference defects.
+///
+/// The read facades repair and record them (see `crate::leniency`), so a
+/// workbook carrying a stale reference still opens. Write-path admission —
+/// the value-only cell editor — refuses them instead, with the historical
+/// error: re-serializing a repaired cell would make a judgment call durable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Repairs {
+    /// Repair each defect and record it in the store's tolerance report.
+    Apply,
+    /// Fail the parse on the first defect.
+    Refuse,
+}
+
+/// Parse a worksheet, repairing and recording cataloged defects.
 pub(crate) fn parse<'a, F>(content: &[u8], strings: F) -> Result<Store>
+where
+    F: FnOnce() -> Result<Option<&'a [Text]>>,
+{
+    parse_with_repairs(content, strings, Repairs::Apply)
+}
+
+/// Parse a worksheet for write-path admission, refusing every defect the
+/// read facades would repair.
+pub(crate) fn parse_refusing_repairs<'a, F>(content: &[u8], strings: F) -> Result<Store>
+where
+    F: FnOnce() -> Result<Option<&'a [Text]>>,
+{
+    parse_with_repairs(content, strings, Repairs::Refuse)
+}
+
+fn parse_with_repairs<'a, F>(content: &[u8], strings: F, repairs: Repairs) -> Result<Store>
 where
     F: FnOnce() -> Result<Option<&'a [Text]>>,
 {
@@ -447,7 +479,7 @@ where
         let processed = process_ooxml(content)?;
         let content = std::str::from_utf8(processed.as_ref())
             .map_err(|error| invalid(format!("worksheet XML is not UTF-8: {error}")))?;
-        model::Parser::parse(content, strings, extensions)
+        model::Parser::parse(content, strings, extensions, repairs)
     })();
 
     complete_source_parse_with_extension_state(content, needs_extension_capture, parsed)

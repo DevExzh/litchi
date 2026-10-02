@@ -1155,8 +1155,8 @@ impl SourceWorksheet {
         }
 
         let data = part.data()?;
-        let parsed = raw::worksheet::parse(data.as_bytes(), || self.owner.shared_strings())?;
-        self.owner.validate_styles(&parsed)?;
+        let mut parsed = raw::worksheet::parse(data.as_bytes(), || self.owner.shared_strings())?;
+        self.owner.repair_styles(&mut parsed)?;
         self.owner.execution_check()?;
         self.owner.package.source_version()?;
         let _publish_result = self.data.cells.set(parsed);
@@ -1472,54 +1472,15 @@ impl SourceInner {
             })
     }
 
-    fn validate_styles(&self, store: &Store) -> Result<()> {
-        if !store.entries().iter().any(|entry| entry.style.is_some())
-            && !store
-                .row_entries()
-                .iter()
-                .any(|entry| entry.properties.style.is_some())
-            && !store
-                .column_entries()
-                .iter()
-                .any(|entry| entry.properties.style.is_some())
-        {
+    /// Repair stale style indexes in a freshly parsed worksheet store before
+    /// it is published to the read cache (audit finding 4.2).
+    ///
+    /// Each repair is recorded in the store's own tolerance report.
+    fn repair_styles(&self, store: &mut Store) -> Result<()> {
+        if !store.references_styles() {
             return Ok(());
         }
-        let len = self.style_count()?;
-        if let Some(entry) = store
-            .entries()
-            .iter()
-            .find(|entry| entry.style.is_some_and(|key| key >= len))
-        {
-            return Err(invalid(format!(
-                "worksheet cell {} references shared style {}, but the workbook contains {len} cell formats",
-                entry.address,
-                entry.style.unwrap_or_default()
-            )));
-        }
-        if let Some(entry) = store
-            .row_entries()
-            .iter()
-            .find(|entry| entry.properties.style.is_some_and(|key| key >= len))
-        {
-            return Err(invalid(format!(
-                "worksheet row {} references shared style {}, but the workbook contains {len} cell formats",
-                entry.index,
-                entry.properties.style.unwrap_or_default()
-            )));
-        }
-        if let Some(entry) = store
-            .column_entries()
-            .iter()
-            .find(|entry| entry.properties.style.is_some_and(|key| key >= len))
-        {
-            return Err(invalid(format!(
-                "worksheet column {} references shared style {}, but the workbook contains {len} cell formats",
-                entry.first,
-                entry.properties.style.unwrap_or_default()
-            )));
-        }
-        Ok(())
+        store.repair_style_indexes(self.style_count()?)
     }
 }
 
@@ -2611,13 +2572,6 @@ mod tests {
             ));
         }
 
-        fn assert_error_without_store(bytes: Vec<u8>) {
-            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
-            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
-            assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
-        }
-
         #[test]
         fn plain_shared_string_and_style_stream_0364_avoids_materialization() {
             let bytes = dependency_xlsx(
@@ -2657,10 +2611,13 @@ mod tests {
                 Some(&plain_shared_strings(&["selected"])),
                 None,
             );
+            // An unselected dangling reference still forces the materializing
+            // fallback, which repairs B1 (audit finding 4.4) and records it.
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(invalid)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
-            assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert_text(sheet.cell("A1").unwrap(), "selected");
+            assert!(sheet.data.cells.get().is_some());
+            assert_eq!(sheet.tolerance_report().unwrap().total(), 1);
         }
 
         #[test]
@@ -2689,27 +2646,62 @@ mod tests {
         }
 
         #[test]
-        fn invalid_and_missing_dependency_refs_0364_fall_back_without_store() {
-            assert_error_without_store(dependency_xlsx(
-                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
-                None,
-                None,
-            ));
-            assert_error_without_store(dependency_xlsx(
-                &worksheet(r#"<c r="A1" t="s"><v>1</v></c>"#),
-                Some(&plain_shared_strings(&["only zero"])),
-                None,
-            ));
-            assert_error_without_store(dependency_xlsx(
-                &worksheet(r#"<c r="A1" s="0"><v>7</v></c>"#),
-                None,
-                None,
-            ));
-            assert_error_without_store(dependency_xlsx(
-                &worksheet(r#"<c r="A1" s="1"><v>7</v></c>"#),
-                None,
-                Some(&styles(1)),
-            ));
+        fn invalid_and_missing_dependency_refs_0364_fall_back_to_a_recorded_repair() {
+            use crate::leniency::{CellDefect, Defect};
+            // Audit findings 4.4 and 4.2: an irregular dependency makes the
+            // selected scanner fall back to the materializing parse, which
+            // repairs the cell and records the repair in the sheet report.
+            for (bytes, defect, style) in [
+                (
+                    dependency_xlsx(&worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#), None, None),
+                    CellDefect::MissingSharedStringTable,
+                    None,
+                ),
+                (
+                    dependency_xlsx(
+                        &worksheet(r#"<c r="A1" t="s"><v>1</v></c>"#),
+                        Some(&plain_shared_strings(&["only zero"])),
+                        None,
+                    ),
+                    CellDefect::SharedStringIndexOutOfRange,
+                    None,
+                ),
+                (
+                    dependency_xlsx(&worksheet(r#"<c r="A1" s="0"><v>7</v></c>"#), None, None),
+                    CellDefect::StyleIndexOutOfRange,
+                    None,
+                ),
+                (
+                    dependency_xlsx(
+                        &worksheet(r#"<c r="A1" s="1"><v>7</v></c>"#),
+                        None,
+                        Some(&styles(1)),
+                    ),
+                    CellDefect::StyleIndexOutOfRange,
+                    Some(0),
+                ),
+            ] {
+                let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+                assert!(workbook.tolerance_report().is_clean());
+                let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+                let view = sheet.cell("A1").expect("repaired cell");
+                if matches!(defect, CellDefect::StyleIndexOutOfRange) {
+                    assert!(matches!(
+                        view,
+                        SourceCellView::Stored(Cell::Value(Value::Number(_)))
+                    ));
+                } else {
+                    assert_text(view, "");
+                }
+                let store = sheet.data.cells.get().expect("fallback published a store");
+                assert_eq!(store.entries()[0].style, style);
+                let report = sheet.tolerance_report().unwrap();
+                assert_eq!(report.total(), 1);
+                assert_eq!(report.defects()[0].defect, Defect::Cell(defect));
+                let aggregate = workbook.tolerance_report();
+                assert_eq!(aggregate.total(), 1);
+                assert_eq!(aggregate.defects()[0].sheet, Some(0));
+            }
         }
 
         #[test]

@@ -77,8 +77,19 @@
 //!
 //! The plumbing is in place: both workbook handles carry an open-time
 //! report, every worksheet store carries the report of the parse that built
-//! it, and the aggregates above expose them. No recording site is live yet,
-//! so every variant below is a roadmap contract and every read reports clean.
+//! it, and the aggregates above expose them. Live recording sites:
+//!
+//! * finding 4.2 — `Store::repair_style_indexes`, run by both read facades
+//!   before a worksheet store is published, records
+//!   [`CellDefect::StyleIndexOutOfRange`] at the cell, row, or column;
+//! * finding 4.4 — cell materialization (`raw/worksheet/semantic.rs`)
+//!   records [`CellDefect::SharedStringIndexOutOfRange`] and
+//!   [`CellDefect::MissingSharedStringTable`] at the cell.
+//!
+//! Write paths stay strict: the value-only cell editor parses with repairs
+//! refused and keeps its historical errors, and commit-time readback
+//! verification still refuses stale style indexes, so an edit never makes a
+//! repair durable. Every other variant below is a roadmap contract.
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents and `crates/litchi-xls/src/leniency.rs` for
@@ -128,8 +139,6 @@ pub enum CellDefect {
     /// index, so the cell, row, or column reads with the mandatory default
     /// format (`cellXfs` entry 0). `MAX_CELL_STYLE` remains an allocation
     /// guard and is still a hard error.
-    ///
-    /// *Roadmap contract:* no read produces this yet.
     StyleIndexOutOfRange,
     /// A `t="s"` cell names a shared-string index at or beyond the table's
     /// length (audit finding 4.4).
@@ -137,16 +146,12 @@ pub enum CellDefect {
     /// Excel repairs the cell; LibreOffice resolves the lookup to empty. The
     /// reader substitutes an empty string, matching the LibreOffice result.
     /// An index that is not an unsigned integer at all stays a hard error.
-    ///
-    /// *Roadmap contract:* no read produces this yet.
     SharedStringIndexOutOfRange,
     /// A `t="s"` cell appears in a workbook that has no shared-string part
     /// (audit finding 4.4).
     ///
     /// The reader substitutes an empty string for each such cell, exactly as
     /// for an out-of-range index into an empty table.
-    ///
-    /// *Roadmap contract:* no read produces this yet.
     MissingSharedStringTable,
     /// A number `<v>` does not parse as a finite `xsd:double` (audit finding
     /// 4.3). *Roadmap contract:* the cell is demoted to `Cell::Unknown`

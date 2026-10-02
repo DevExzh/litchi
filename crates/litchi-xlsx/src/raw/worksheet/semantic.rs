@@ -12,9 +12,19 @@ use crate::cell::{
 };
 use crate::error::{Result, allocation, invalid};
 use crate::formula::{Cache, Formula, Kind};
+use crate::leniency::{CellDefect, Location, ToleranceReport};
 use litchi_sheet::{Cell as Address, Rect};
 
-pub(super) fn materialize(raw: RawCell<'_>, strings: Option<&[Text]>) -> Result<Stored> {
+/// Materialize one raw cell record.
+///
+/// With `tolerance` present, a dangling shared-string reference (audit
+/// finding 4.4) is repaired to an empty string and recorded at the cell;
+/// without it, the reference fails the parse as it historically did.
+pub(super) fn materialize(
+    raw: RawCell<'_>,
+    strings: Option<&[Text]>,
+    mut tolerance: Option<&mut ToleranceReport>,
+) -> Result<Stored> {
     let formula_range = if let Some(range) = raw.formula_range {
         Some(formula_range_rect(range)?)
     } else {
@@ -35,9 +45,13 @@ pub(super) fn materialize(raw: RawCell<'_>, strings: Option<&[Text]>) -> Result<
                 .as_deref()
                 .map(parse_shared_string_index)
                 .transpose()?
+                // A repaired dangling reference names no item, so it must not
+                // be retained as transferable shared-string provenance.
+                .filter(|index| strings.is_some_and(|strings| *index < strings.len()))
         } else {
             None
         };
+    let address = raw.address;
     let unknown_cell_type = raw
         .cell_type
         .as_deref()
@@ -72,13 +86,22 @@ pub(super) fn materialize(raw: RawCell<'_>, strings: Option<&[Text]>) -> Result<
         let cached = raw
             .value
             .as_deref()
-            .map(|value| parse_value(raw.cell_type.as_deref(), value, strings))
+            .map(|value| {
+                parse_value(
+                    raw.cell_type.as_deref(),
+                    value,
+                    strings,
+                    address,
+                    tolerance.as_deref_mut(),
+                )
+            })
             .transpose()?
             .flatten()
             .map(Cache::stored);
         Cell::Formula(Formula::parsed(text, kind, cached))
     } else if let Some(value) = raw.value.as_deref() {
-        parse_value(raw.cell_type.as_deref(), value, strings)?.map_or(Cell::Empty, Cell::Value)
+        parse_value(raw.cell_type.as_deref(), value, strings, address, tolerance)?
+            .map_or(Cell::Empty, Cell::Value)
     } else if let Some(kind) = raw.cell_type.as_deref()
         && !matches!(kind, "n" | "inlineStr")
     {
@@ -121,6 +144,8 @@ fn parse_value(
     cell_type: Option<&str>,
     value: &str,
     strings: Option<&[Text]>,
+    address: Address,
+    tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Option<Value>> {
     match cell_type {
         None | Some("n") if value.trim().is_empty() => Ok(None),
@@ -137,16 +162,29 @@ fn parse_value(
         Some("d") => Date::new(value).map(Value::Date).map(Some),
         Some("s") => {
             let index = parse_shared_string_index(value)?;
-            let strings = strings.ok_or_else(|| {
-                invalid("worksheet uses shared strings but the workbook has no shared-string part")
-            })?;
-            let text = strings.get(index).ok_or_else(|| {
-                invalid(format!(
-                    "shared-string index {index} exceeds table length {}",
-                    strings.len()
-                ))
-            })?;
-            Ok(Some(Value::Text(text.clone())))
+            let (defect, error) = match strings {
+                Some(strings) => match strings.get(index) {
+                    Some(text) => return Ok(Some(Value::Text(text.clone()))),
+                    None => (
+                        CellDefect::SharedStringIndexOutOfRange,
+                        invalid(format!(
+                            "shared-string index {index} exceeds table length {}",
+                            strings.len()
+                        )),
+                    ),
+                },
+                None => (
+                    CellDefect::MissingSharedStringTable,
+                    invalid(
+                        "worksheet uses shared strings but the workbook has no shared-string part",
+                    ),
+                ),
+            };
+            // Excel repairs the cell and LibreOffice resolves the lookup to
+            // empty (audit finding 4.4): substitute an empty string.
+            let tolerance = tolerance.ok_or(error)?;
+            tolerance.record(defect, Location::Cell(address));
+            Ok(Some(Value::Text(Text::from(""))))
         },
         Some("b") => match value.trim() {
             "1" | "true" => Ok(Some(Value::Bool(true))),

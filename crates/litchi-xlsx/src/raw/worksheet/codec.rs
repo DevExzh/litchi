@@ -317,6 +317,7 @@ impl<'c> Parser<'c> {
         content: &'c str,
         strings: F,
         extensions: x14ac::Values,
+        repairs: super::Repairs,
     ) -> Result<Store>
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
@@ -362,7 +363,7 @@ impl<'c> Parser<'c> {
             }
         }
 
-        parser.finish_parse(strings)
+        parser.finish_parse(strings, repairs)
     }
 
     /// Feed reader events to [`Self::transition`] until end of file.
@@ -597,7 +598,7 @@ impl<'c> Parser<'c> {
         self.start_row(&element, decoder)
     }
 
-    fn finish_parse<'a, F>(mut self, strings: F) -> Result<Store>
+    fn finish_parse<'a, F>(mut self, strings: F, repairs: super::Repairs) -> Result<Store>
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
     {
@@ -627,12 +628,16 @@ impl<'c> Parser<'c> {
         let merges = self.merges;
         // Cell-level recording sites (crate::leniency) thread `&mut tolerance`
         // through materialization; the report travels inside the store.
-        let tolerance = ToleranceReport::default();
+        let mut tolerance = ToleranceReport::default();
+        let mut sink = match repairs {
+            super::Repairs::Apply => Some(&mut tolerance),
+            super::Repairs::Refuse => None,
+        };
         for cell in self.lane_cells {
-            cells.push(materialize(cell.into_raw(), strings)?);
+            cells.push(materialize(cell.into_raw(), strings, sink.as_deref_mut())?);
         }
         for cell in self.cells {
-            cells.push(materialize(cell, strings)?);
+            cells.push(materialize(cell, strings, sink.as_deref_mut())?);
         }
         let mut store =
             Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)?;
@@ -1466,6 +1471,7 @@ pub(super) fn parse_source_with_observer<'a, F, O>(
     admission: super::SourceAdmission,
     strings: F,
     mut observer: O,
+    repairs: super::Repairs,
 ) -> super::SourceParseAttempt
 where
     F: FnOnce() -> Result<Option<&'a [Text]>>,
@@ -1542,5 +1548,5 @@ where
         }
     }
 
-    super::SourceParseAttempt::Complete(parser.finish_parse(strings))
+    super::SourceParseAttempt::Complete(parser.finish_parse(strings, repairs))
 }

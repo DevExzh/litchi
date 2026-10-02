@@ -1725,8 +1725,8 @@ impl Worksheet {
         }
 
         let part = self.owner.package.get_part(&self.data.part_uri)?;
-        let parsed = raw::worksheet::parse(part.blob(), || self.owner.shared_strings())?;
-        self.owner.validate_styles(&parsed)?;
+        let mut parsed = raw::worksheet::parse(part.blob(), || self.owner.shared_strings())?;
+        self.owner.repair_styles(&mut parsed)?;
         let _publish_result = self.data.cells.set(parsed);
         self.data
             .cells
@@ -1782,6 +1782,19 @@ impl Inner {
             )));
         }
         Ok(())
+    }
+
+    /// Repair stale style indexes in a freshly parsed worksheet store before
+    /// it is published to the read cache (audit finding 4.2).
+    ///
+    /// Each repair is recorded in the store's own tolerance report. The
+    /// commit-time verification paths keep using `validate_styles`, which
+    /// still refuses a stale index: an edit must not make the repair durable.
+    pub(super) fn repair_styles(&self, store: &mut Store) -> Result<()> {
+        if !store.references_styles() {
+            return Ok(());
+        }
+        store.repair_style_indexes(self.style_count()?)
     }
 
     pub(super) fn validate_styles(&self, store: &Store) -> Result<()> {

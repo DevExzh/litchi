@@ -698,14 +698,57 @@ fn rejects_missing_shared_strings_bad_indexes_and_formula_markers() {
     let shared = format!(
         r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1" t="s"><v>1</v></c></row></sheetData></worksheet>"#
     );
-    assert!(parse(shared.as_bytes(), || Ok(None)).is_err());
+    // Write-path admission refuses dangling shared-string references.
+    assert!(super::parse_refusing_repairs(shared.as_bytes(), || Ok(None)).is_err());
     let strings = [Text::from("only index zero")];
-    assert!(parse(shared.as_bytes(), || Ok(Some(&strings))).is_err());
+    assert!(super::parse_refusing_repairs(shared.as_bytes(), || Ok(Some(&strings))).is_err());
 
     let marked = format!(
         r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><f>=1+1</f><v>2</v></c></row></sheetData></worksheet>"#
     );
     assert!(parse(marked.as_bytes(), || Ok(None)).is_err());
+}
+
+/// Audit finding 4.4: the read path repairs a dangling shared-string
+/// reference to an empty string and records it; a malformed index lexical
+/// is still fatal.
+#[test]
+fn repairs_and_records_dangling_shared_string_references() {
+    use crate::leniency::{CellDefect, Defect, Location};
+
+    let a1 = Address::from_a1("A1").expect("address");
+    let shared = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1" t="s"><v>1</v></c><c r="B1" t="str"><f>"x"</f><v>kept</v></c></row></sheetData></worksheet>"#
+    );
+    let strings = [Text::from("only index zero")];
+    for (table, defect) in [
+        (None, CellDefect::MissingSharedStringTable),
+        (Some(&strings[..]), CellDefect::SharedStringIndexOutOfRange),
+    ] {
+        let store = parse(shared.as_bytes(), || Ok(table)).expect("dangling reference is repaired");
+        assert!(matches!(
+            store.get(a1),
+            Some(Cell::Value(Value::Text(text))) if text.as_ref() == ""
+        ));
+        assert_eq!(store.entry(a1).expect("A1").shared_string, None);
+        let report = store.tolerance_report();
+        assert_eq!(report.total(), 1);
+        assert_eq!(report.defects()[0].defect, Defect::Cell(defect));
+        assert_eq!(report.defects()[0].location, Location::Cell(a1));
+    }
+
+    // A conformant reference repairs nothing.
+    let valid = shared.replace("<v>1</v>", "<v>0</v>");
+    let store = parse(valid.as_bytes(), || Ok(Some(&strings))).expect("valid reference");
+    assert!(store.tolerance_report().is_clean());
+    assert_eq!(store.entry(a1).expect("A1").shared_string, Some(0));
+
+    // A non-numeric index is not a dangling reference: it stays fatal, as
+    // does malformed XML.
+    let malformed = shared.replace("<v>1</v>", "<v>x</v>");
+    assert!(parse(malformed.as_bytes(), || Ok(Some(&strings))).is_err());
+    let broken = shared.replace("</sheetData>", "");
+    assert!(parse(broken.as_bytes(), || Ok(Some(&strings))).is_err());
 }
 
 #[test]

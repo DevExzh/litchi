@@ -426,7 +426,7 @@ impl Snapshot {
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
         validation::worksheet_xml(worksheet_xml.as_slice())?;
         let shared_strings = capture.shared_strings.as_ref();
-        let cells = raw::worksheet::parse(worksheet_xml.as_slice(), || {
+        let cells = raw::worksheet::parse_refusing_repairs(worksheet_xml.as_slice(), || {
             shared_strings.map(SharedStringsState::strings).transpose()
         })?;
         validate_style_references(&cells, capture.style_count)?;
@@ -491,7 +491,7 @@ impl Snapshot {
         } else {
             validation::worksheet_xml(worksheet_xml.as_bytes())?;
             (
-                raw::worksheet::parse(worksheet_xml.as_bytes(), || {
+                raw::worksheet::parse_refusing_repairs(worksheet_xml.as_bytes(), || {
                     shared_strings.map(SharedStringsState::strings).transpose()
                 })?,
                 None,
@@ -736,7 +736,7 @@ impl Snapshot {
             ));
         }
         let shared_strings_ref = shared_strings.as_ref();
-        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || {
+        let cells = raw::worksheet::parse_refusing_repairs(worksheet_xml.as_bytes(), || {
             shared_strings_ref
                 .map(SharedStringsState::strings)
                 .transpose()
@@ -770,7 +770,7 @@ impl Snapshot {
         source.source.check_execution()?;
         validation::worksheet_xml(&bytes)?;
         let shared_strings = source.source.shared_strings.as_ref();
-        let cells = raw::worksheet::parse(&bytes, || {
+        let cells = raw::worksheet::parse_refusing_repairs(&bytes, || {
             shared_strings.map(SharedStringsState::strings).transpose()
         })?;
         let mut result = source.clone();
@@ -802,7 +802,7 @@ impl Snapshot {
             Some(cells) => cells,
             None => {
                 let shared_strings = source.source.shared_strings.as_ref();
-                raw::worksheet::parse(&rewrite.bytes, || {
+                raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
                     shared_strings.map(SharedStringsState::strings).transpose()
                 })?
             },
@@ -822,7 +822,7 @@ impl Snapshot {
         let reduced =
             raw::worksheet::edit::reduced_readback(&rewrite.bytes, &rewrite.omitted).ok()?;
         let shared_strings = source.source.shared_strings.as_ref();
-        let parsed = raw::worksheet::parse(&reduced, || {
+        let parsed = raw::worksheet::parse_refusing_repairs(&reduced, || {
             shared_strings.map(SharedStringsState::strings).transpose()
         })
         .ok()?;
@@ -2691,7 +2691,8 @@ mod row_reuse_tests {
     }
 
     fn full_store(bytes: &[u8]) -> Store {
-        raw::worksheet::parse(bytes, || Ok(None)).expect("complete candidate worksheet parse")
+        raw::worksheet::parse_refusing_repairs(bytes, || Ok(None))
+            .expect("complete candidate worksheet parse")
     }
 
     fn assert_store_matches(actual: &Store, expected: &Store) {
