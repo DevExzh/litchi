@@ -136,15 +136,17 @@ impl StringDefect {
 pub enum PropertyDefect {
     /// A nested reserved word or trailing padding was not zero (F7.11).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation. The
-    /// repair ignores the bytes, as the parser already does for the
-    /// top-level reserved word.
+    /// The bytes are ignored, as the parser already did for the top-level
+    /// reserved word; the offset table bounds every value, so they carry
+    /// nothing and a rewrite zeroes them.
     NonZeroPadding,
     /// One property's value could not be parsed (F7.11).
     ///
-    /// Not yet repaired: the parser currently rejects the whole section. The
-    /// repair keeps the property's raw bytes as an unknown value so every
-    /// other property in the section stays readable.
+    /// The property (and any dictionary name for it) is dropped so every
+    /// other property in the section stays readable, as POI's per-property
+    /// resolution and Word's property pages allow. Allocation failures and
+    /// resource limits stay fatal. The drop loses content, so the
+    /// property-set editor refuses to rewrite such a stream.
     MalformedValue,
 }
 
@@ -154,7 +156,9 @@ impl PropertyDefect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::NonZeroPadding => "ignored the nonzero reserved or padding bytes",
-            Self::MalformedValue => "kept the malformed property's raw bytes as an unknown value",
+            Self::MalformedValue => {
+                "dropped the malformed property; the rest of the section was kept"
+            },
         }
     }
 }

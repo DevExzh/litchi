@@ -5,7 +5,7 @@
 //! stream without the deviation must parse with a clean report.
 
 use super::*;
-use crate::leniency::{Defect, StringDefect, ToleranceReport};
+use crate::leniency::{Defect, PropertyDefect, StringDefect, ToleranceReport};
 use litchi_cfb::OleFile;
 use litchi_cfb::consts::*;
 use litchi_cfb::writer::OleWriter;
@@ -286,4 +286,112 @@ fn unterminated_dictionary_names_are_read_to_their_declared_length() {
     let section = parsed.section(custom).unwrap();
     assert_eq!(section.property_name(PID_TITLE), Some("Name"));
     assert_eq!(parsed, clean);
+}
+
+// --- F7.11: one malformed property fails the stream; nested padding ---
+
+#[test]
+fn nested_reserved_words_and_trailing_padding_are_ignored_and_recorded() {
+    // A VT_VECTOR | VT_VARIANT of one VT_I4 whose nested reserved word is
+    // nonzero, then a VT_I4 property followed by nonzero trailing bytes.
+    let vector = |reserved: u16| {
+        let mut body = u32le(1).to_vec();
+        body.extend_from_slice(&u16le(VT_I4));
+        body.extend_from_slice(&u16le(reserved));
+        body.extend_from_slice(&u32le(7));
+        typed(VT_VECTOR | VT_VARIANT, &body)
+    };
+    let padded = |tail: [u8; 4]| {
+        let mut value = typed(VT_I4, &u32le(9));
+        value.extend_from_slice(&tail);
+        value
+    };
+    let clean = summary_stream(&[
+        codepage_property(1252),
+        (0x20, vector(0)),
+        (PID_SUBJECT, padded([0; 4])),
+    ]);
+    let clean = Stream::parse(&clean).unwrap();
+    assert!(clean.tolerance_report().is_clean());
+
+    let faulted = summary_stream(&[
+        codepage_property(1252),
+        (0x20, vector(0xbeef)),
+        (PID_SUBJECT, padded([1, 2, 3, 4])),
+    ]);
+    let parsed = Stream::parse(&faulted).unwrap();
+    assert_eq!(
+        recorded(parsed.tolerance_report()),
+        [
+            (PropertyDefect::NonZeroPadding.into(), 0x20),
+            (PropertyDefect::NonZeroPadding.into(), PID_SUBJECT),
+        ]
+    );
+    assert_eq!(parsed, clean);
+    assert!(parsed.tolerance_report().preserves_content());
+}
+
+#[test]
+fn one_malformed_property_is_dropped_and_the_rest_stay_readable() {
+    // PID 3 claims a 4 GiB string; PID 2 and PID 4 are well formed. PID 3
+    // also has a dictionary name, which is dropped with it.
+    let custom = Guid::from_bytes([0x6b; 16]);
+    let dictionary = {
+        let mut body = u32le(2).to_vec();
+        for (pid, name) in [(PID_TITLE, b"Two\0"), (PID_SUBJECT, b"Bad\0")] {
+            body.extend_from_slice(&u32le(pid));
+            body.extend_from_slice(&u32le(4));
+            body.extend_from_slice(name);
+        }
+        (0, body)
+    };
+    let mut overrun = typed(VT_LPSTR, &u32le(u32::MAX));
+    overrun.extend_from_slice(b"xx\0\0");
+    let parsed = Stream::parse(&one_section_stream(
+        custom,
+        &[
+            dictionary,
+            codepage_property(1252),
+            (PID_TITLE, lpstr(b"kept\0")),
+            (PID_SUBJECT, overrun),
+            (4, typed(VT_I4, &u32le(5))),
+        ],
+    ))
+    .unwrap();
+    assert_eq!(
+        recorded(parsed.tolerance_report()),
+        [(PropertyDefect::MalformedValue.into(), PID_SUBJECT)]
+    );
+    let section = parsed.section(custom).unwrap();
+    assert_eq!(
+        section.property(PID_TITLE),
+        Some(&Value::Lpstr("kept".into()))
+    );
+    assert_eq!(section.property(PID_SUBJECT), None);
+    assert_eq!(section.property(4), Some(&Value::I4(5)));
+    assert_eq!(section.property_name(PID_TITLE), Some("Two"));
+    assert_eq!(section.property_name(PID_SUBJECT), None);
+    assert!(!parsed.tolerance_report().preserves_content());
+
+    // A dropped property is content loss: the editor will not write the
+    // degraded section back over the source.
+    let summary = summary_stream(&[
+        codepage_property(1252),
+        (PID_TITLE, lpstr(b"kept\0")),
+        (PID_SUBJECT, {
+            let mut value = typed(VT_LPSTR, &u32le(u32::MAX));
+            value.extend_from_slice(b"xx\0\0");
+            value
+        }),
+    ]);
+    let mut ole = OleFile::open(Cursor::new(compound_file(&summary))).unwrap();
+    let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
+    assert_eq!(metadata.title.as_deref(), Some("kept"));
+    assert_eq!(metadata.subject, None);
+    let mut editor = Editor::new(compound_file(&summary)).unwrap();
+    assert!(
+        editor
+            .update(Binding::SummaryInformation, |_| Ok(()))
+            .is_err()
+    );
 }

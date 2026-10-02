@@ -80,11 +80,7 @@ pub(super) fn parse_heading_pairs(
         if variant_type != VT_I4 {
             return Err(invalid("Heading pair part count must be VT_I4"));
         }
-        if reader.read_u16("heading pair part-count reserved field")? != 0 {
-            return Err(invalid(
-                "Heading pair part-count reserved field must be zero",
-            ));
-        }
+        reader.read_reserved_u16("heading pair part-count reserved field")?;
         let raw_part_count = reader.read_i32("heading pair part count")?;
         if raw_part_count < 0 {
             return Err(invalid("Heading pair part count must be nonnegative"));
@@ -184,9 +180,7 @@ fn append_relative_padding<S: ByteSink + ?Sized>(
 
 fn read_heading_string(reader: &mut ValueReader<'_>, codepage: u16) -> Result<String, OleError> {
     let string_type = reader.read_u16("heading string type")?;
-    if reader.read_u16("heading string reserved field")? != 0 {
-        return Err(invalid("Heading string reserved field must be zero"));
-    }
+    reader.read_reserved_u16("heading string reserved field")?;
     match string_type {
         VT_LPSTR if codepage != UNICODE_CODEPAGE => {
             read_unaligned_ansi(reader, codepage, "heading string")

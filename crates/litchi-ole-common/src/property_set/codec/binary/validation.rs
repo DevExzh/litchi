@@ -18,7 +18,7 @@ use super::wire::{
     read_guid, read_u16, read_u32, reserve_bytes, utf16_text_end,
 };
 use super::{Repairs, parse_typed_property, parse_typed_property_for_property};
-use crate::leniency::{StringDefect, ToleranceReport};
+use crate::leniency::{PropertyDefect, StringDefect, ToleranceReport};
 use litchi_cfb::OleError;
 use litchi_cfb::consts::VT_I2;
 use std::collections::HashMap;
@@ -632,7 +632,7 @@ fn parse_section(
             .get(index + 1)
             .map_or(data.len(), |(offset, _)| *offset);
         let bytes = &data[*start..end];
-        let value = if allow_indirect {
+        let parsed = if allow_indirect {
             super::parse_typed_property_for_non_simple_property(
                 bytes,
                 effective_codepage,
@@ -641,23 +641,42 @@ fn parse_section(
             )
         } else {
             parse_typed_property_for_property(bytes, effective_codepage, *start, *identifier)
+        };
+        match parsed {
+            Ok((value, repairs)) => {
+                repairs.record(tolerance, *identifier);
+                properties.insert(*identifier, value);
+            },
+            // One malformed value no longer costs every other property in
+            // the section: as POI resolves properties independently and Word
+            // shows the readable ones, the property is dropped and recorded
+            // (leniency audit F7.11). Only grammar failures degrade;
+            // allocation failures and resource limits stay fatal.
+            Err(OleError::InvalidFormat(_)) => {
+                tolerance.record(PropertyDefect::MalformedValue, *identifier);
+            },
+            Err(error) => {
+                return Err(invalid(format!(
+                    "Property {identifier} at section offset {start} is invalid: {error}"
+                )));
+            },
         }
-        .map_err(|error| {
-            invalid(format!(
-                "Property {identifier} at section offset {start} is invalid: {error}"
-            ))
-        })?;
-        let (value, repairs) = value;
-        repairs.record(tolerance, *identifier);
-        properties.insert(*identifier, value);
     }
+    let mut dictionary = dictionary;
+    let mut dictionary_order = dictionary_order;
+    // A dropped property's dictionary name would name nothing.
+    dictionary.retain(|identifier, _| properties.contains_key(identifier));
+    dictionary_order.retain(|identifier| dictionary.contains_key(identifier));
     let mut property_order = try_vec_with_capacity(descriptors.len(), "property order")?;
     property_order.extend(
         descriptors
             .iter()
             .map(|(_, identifier)| *identifier)
-            // A PID 1 dropped by the code-page fallback has no value.
-            .filter(|identifier| *identifier != PID_CODEPAGE || codepage.is_some()),
+            // A PID 1 dropped by the code-page fallback, or a property
+            // dropped as malformed, has no value.
+            .filter(|identifier| {
+                *identifier == PID_DICTIONARY || properties.contains_key(identifier)
+            }),
     );
     let section = Section {
         format_identifier,
@@ -735,6 +754,6 @@ fn parse_dictionary(
         }
         order.push(identifier);
     }
-    reader.finish_zero_padding("dictionary padding")?;
+    reader.finish_padding();
     Ok((dictionary, order, reader.repairs))
 }

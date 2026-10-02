@@ -120,14 +120,24 @@ fn property_set_pages_are_checked_before_mutation() {
 }
 
 #[test]
-fn rejects_duplicate_offsets_and_truncated_values() {
+fn rejects_duplicate_offsets_and_drops_truncated_values() {
     let mut duplicate = summary_property_stream();
     duplicate[68..72].copy_from_slice(&24u32.to_le_bytes());
     assert!(Stream::parse(&duplicate).is_err());
 
+    // A value overrunning its property range is dropped and recorded
+    // (leniency audit F7.11); the rest of the section stays readable.
     let mut truncated = summary_property_stream();
     truncated[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
-    assert!(Stream::parse(&truncated).is_err());
+    let stream = Stream::parse(&truncated).unwrap();
+    let section = &stream.sections[0];
+    assert_eq!(section.property(2), None);
+    assert_eq!(section.page().map(CodePage::id), Some(65001));
+    assert!(
+        stream
+            .tolerance_report()
+            .contains(crate::leniency::PropertyDefect::MalformedValue)
+    );
 }
 
 #[test]

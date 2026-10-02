@@ -359,14 +359,7 @@ fn parse_typed_property_context(
         // property offset table still bounds the value.
         reader.take_remaining();
     } else {
-        reader
-            .finish_zero_padding("property padding")
-            .map_err(|error| {
-                invalid(format!(
-                    "variant 0x{variant_type:04x} has {} trailing bytes: {error}",
-                    reader.remaining_len()
-                ))
-            })?;
+        reader.finish_padding();
     }
     Ok((value, reader.repairs))
 }
@@ -586,9 +579,7 @@ fn parse_vector(
     for _ in 0..count {
         let value = if scalar == Scalar::Variant {
             let nested_type = reader.read_u16("variant vector element type")?;
-            if reader.read_u16("variant vector reserved field")? != 0 {
-                return Err(invalid("Variant vector reserved field must be zero"));
-            }
+            reader.read_reserved_u16("variant vector reserved field")?;
             let value = parse_value_body(
                 reader,
                 nested_type,
@@ -655,9 +646,7 @@ fn parse_array(
     for _ in 0..count {
         let value = if scalar == Scalar::Variant {
             let nested_type = reader.read_u16("array variant element type")?;
-            if reader.read_u16("array variant reserved field")? != 0 {
-                return Err(invalid("Array variant reserved field must be zero"));
-            }
+            reader.read_reserved_u16("array variant reserved field")?;
             let value = parse_value_body(
                 reader,
                 nested_type,

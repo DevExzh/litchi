@@ -4,7 +4,7 @@ use super::super::super::model::{
     Guid, UNICODE_CODEPAGE, checked_add, invalid, try_clone_string, try_vec_with_capacity,
 };
 use super::super::support::allocation;
-use crate::leniency::{StringDefect, ToleranceReport};
+use crate::leniency::{PropertyDefect, StringDefect, ToleranceReport};
 use litchi_cfb::OleError;
 use litchi_codepage::Mbcs;
 use std::borrow::Cow;
@@ -163,11 +163,13 @@ pub(crate) struct Repairs {
     pub(crate) lossy_decode: bool,
     /// A string was not NUL-terminated within its declared size (F7.10).
     pub(crate) missing_terminator: bool,
+    /// A nested reserved word or trailing padding was not zero (F7.11).
+    pub(crate) nonzero_padding: bool,
 }
 
 impl Repairs {
     pub(crate) const fn is_empty(self) -> bool {
-        !(self.lossy_decode || self.missing_terminator)
+        !(self.lossy_decode || self.missing_terminator || self.nonzero_padding)
     }
 
     /// Records every repair class set here against `property_identifier`.
@@ -177,6 +179,9 @@ impl Repairs {
         }
         if self.missing_terminator {
             report.record(StringDefect::MissingTerminator, property_identifier);
+        }
+        if self.nonzero_padding {
+            report.record(PropertyDefect::NonZeroPadding, property_identifier);
         }
     }
 
@@ -209,6 +214,7 @@ impl<'a> ValueReader<'a> {
             repairs: Repairs {
                 lossy_decode: false,
                 missing_terminator: false,
+                nonzero_padding: false,
             },
         }
     }
@@ -300,12 +306,28 @@ impl<'a> ValueReader<'a> {
         Ok(())
     }
 
-    pub(super) fn finish_zero_padding(&mut self, description: &str) -> Result<(), OleError> {
+    /// Consumes the bytes after a value up to the end of its range.
+    ///
+    /// The offset table bounds every value, so trailing bytes carry nothing.
+    /// MS-OLEPS asks producers to zero them; fast-saved documents leave
+    /// garbage there, and POI and Word read past it. Nonzero padding is
+    /// noted in `repairs` instead of rejected (leniency audit F7.11).
+    pub(super) fn finish_padding(&mut self) {
         let remaining = &self.data[self.position..];
         if remaining.iter().any(|byte| *byte != 0) {
-            return Err(invalid(format!("{description} must be zero")));
+            self.repairs.nonzero_padding = true;
         }
         self.position = self.data.len();
+    }
+
+    /// Reads a reserved 16-bit word that MS-OLEPS/MS-OSHARED ask producers
+    /// to zero, noting a nonzero value in `repairs` instead of rejecting it
+    /// (leniency audit F7.11). The top-level reserved word was already
+    /// ignored; nested ones now match it.
+    pub(super) fn read_reserved_u16(&mut self, description: &str) -> Result<(), OleError> {
+        if self.read_u16(description)? != 0 {
+            self.repairs.nonzero_padding = true;
+        }
         Ok(())
     }
 }
