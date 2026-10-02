@@ -143,11 +143,21 @@ impl SlideDirectory {
                 "CurrentUser does not reference a valid UserEditAtom".to_string(),
             ));
         }
-        if !matches!(user_edit.data_len, 28 | 32) {
+        // MS-PPT 2.3.3 requires 28 or 32 bytes; POI pads short reads and
+        // LibreOffice never inspects recLen. Every field read here lies in
+        // the first 28 bytes, so accept any longer atom and record it
+        // (finding F5.12).
+        if user_edit.data_len < 28 {
             return Err(Error::Corrupted(format!(
                 "UserEditAtom has invalid length {}",
                 user_edit.data_len
             )));
+        }
+        if user_edit.data_len != 32 && user_edit.data_len != 28 {
+            report.record(
+                PersistDefect::UserEditAtomLength,
+                u32::try_from(user_edit.data_len).unwrap_or(u32::MAX),
+            );
         }
         let payload_offset = user_edit_offset
             .checked_add(8)
@@ -382,7 +392,8 @@ pub(crate) fn locate_head_user_edit(
 }
 
 /// Whether `offset` (nonzero) holds a `UserEditAtom` header — version 0,
-/// instance 0, a 28- or 32-byte payload — that fits in the stream.
+/// instance 0, a payload of at least 28 bytes (finding F5.12) — that fits
+/// in the stream.
 fn is_live_user_edit(document_data: &[u8], offset: u32) -> bool {
     offset != 0
         && usize::try_from(offset)
@@ -392,7 +403,7 @@ fn is_live_user_edit(document_data: &[u8], offset: u32) -> bool {
                 header.version == 0
                     && header.instance == 0
                     && header.record_type == USER_EDIT_ATOM
-                    && matches!(header.data_len, 28 | 32)
+                    && header.data_len >= 28
             })
 }
 
@@ -948,6 +959,44 @@ mod tests {
         edit[16..20].copy_from_slice(&1u32.to_le_bytes());
         longer.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
         assert_eq!(locate(&longer, None).0.unwrap(), later);
+    }
+
+    /// The head UserEditAtom may be longer than 28 bytes (recorded, F5.12)
+    /// but never shorter.
+    #[test]
+    fn accepts_long_head_user_edits_and_rejects_short_ones() {
+        use crate::Defect;
+
+        for (length, expected) in [(28, None), (32, None), (30, Some(30)), (40, Some(40))] {
+            let (mut stream, _, mapping) = synthetic_directory(&[(3, 256, 0)], false);
+            stream.truncate(stream.len() - 36);
+            let edit_offset = u32::try_from(stream.len()).unwrap();
+            let mut edit = vec![0u8; length];
+            edit[16..20].copy_from_slice(&1u32.to_le_bytes());
+            stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
+            let (directory, defects) =
+                build_reporting(&stream, &current_user(edit_offset), &mapping);
+            assert_eq!(persist_ids(&directory), [3]);
+            let expected: Vec<_> = expected
+                .map(|length| {
+                    (
+                        Defect::Persist(PersistDefect::UserEditAtomLength),
+                        length,
+                        None,
+                    )
+                })
+                .into_iter()
+                .collect();
+            assert_eq!(defects, expected);
+        }
+
+        let (mut stream, _, mapping) = synthetic_directory(&[(3, 256, 0)], false);
+        stream.truncate(stream.len() - 36);
+        let edit_offset = u32::try_from(stream.len()).unwrap();
+        let mut edit = vec![0u8; 24];
+        edit[16..20].copy_from_slice(&1u32.to_le_bytes());
+        stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
+        assert!(SlideDirectory::build(&stream, &current_user(edit_offset), &mapping).is_err());
     }
 
     #[test]

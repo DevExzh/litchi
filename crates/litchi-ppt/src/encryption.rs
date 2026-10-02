@@ -317,10 +317,33 @@ pub(super) fn decrypt_powerpoint_document(
         return Ok(None);
     }
     if !matches!(user_edit.data_len, 28 | 32) {
-        return Err(Error::MalformedEncryptionHeader(format!(
-            "UserEditAtom has invalid length {}",
-            user_edit.data_len
-        )));
+        // A nonconforming length is never accepted for an encrypted
+        // presentation. An unencrypted one is left to the plaintext read
+        // path, which accepts any length of at least 28 bytes (finding
+        // F5.12) — unless the atom names an encryption session.
+        if current_user.is_encrypted() || user_edit.data_len < 28 {
+            return Err(Error::MalformedEncryptionHeader(format!(
+                "UserEditAtom has invalid length {}",
+                user_edit.data_len
+            )));
+        }
+        let user_data = checked_slice(
+            document,
+            user_edit_offset + 8,
+            user_edit.data_len,
+            "UserEditAtom",
+        )?;
+        let session = (user_edit.data_len >= 32)
+            .then(|| le_u32(user_data, 28))
+            .transpose()?
+            .filter(|id| *id != u32::MAX && *id != 0);
+        if session.is_some() {
+            return Err(Error::MalformedEncryptionHeader(format!(
+                "UserEditAtom has invalid length {}",
+                user_edit.data_len
+            )));
+        }
+        return Ok(None);
     }
     let user_data = checked_slice(
         document,

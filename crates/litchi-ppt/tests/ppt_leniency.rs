@@ -1188,3 +1188,34 @@ fn out_of_range_current_user_name_length_reads_as_no_username() {
         &[open_time(PersistDefect::CurrentUserNameLength, 300, None)],
     );
 }
+
+#[test]
+fn nonconforming_user_edit_length_is_read_and_recorded() {
+    // Point Current User at the older UserEditAtom of the edited deck and
+    // give it a 30-byte payload: the two extra bytes overlap the record
+    // that follows, but every field the reader uses is in the first 28.
+    let edited = EditedDeck::new();
+    let user_edits = record_headers(&edited.deck.bytes, 0x0FF5);
+    let older = user_edits[0];
+    // The newer atom's offsetLastEdit is the older atom's stream offset.
+    let at = edited.user_edit;
+    let older_offset = u32::from_le_bytes(edited.deck.bytes[at + 8..at + 12].try_into().unwrap());
+    let field = edited.deck.current_edit_field();
+    let mut deck = edited.deck.patch_u32(field, older_offset);
+    deck.bytes[older + 4..older + 8].copy_from_slice(&30u32.to_le_bytes());
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(PersistDefect::UserEditAtomLength, 30, None)],
+    );
+    // The older edit is the one read: the second slide's pre-edit text.
+    let presentation = Package::from_reader(Cursor::new(deck.bytes.clone()))
+        .unwrap()
+        .presentation()
+        .unwrap();
+    let slides = presentation.slides().unwrap();
+    let shapes = slides[1].shapes().unwrap();
+    let ShapeEnum::TextBox(textbox) = &shapes[0] else {
+        panic!("expected a text box");
+    };
+    assert_eq!(textbox.text(), "slide 1");
+}

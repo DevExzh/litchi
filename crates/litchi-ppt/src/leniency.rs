@@ -94,6 +94,10 @@
 //!   `lenUserName` above 255, or one the stream truncates, reads as no
 //!   username (POI's posture) instead of failing the open; the edit offset
 //!   and header token are still read and validated.
+//! - **F5.12** ([`PersistDefect::UserEditAtomLength`]) — the live
+//!   `UserEditAtom` may carry any payload of at least 28 bytes, as the
+//!   mid-chain walk already allowed; `encryptSessionPersistIdRef` is
+//!   consulted only when 32 bytes are present.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
@@ -423,7 +427,7 @@ impl SlideListDefect {
 }
 
 /// The class of `UserEdit`/persist-chain defect the reader repairs the way
-/// LibreOffice or POI repairs it (findings F5.6, F5.7, and F5.8).
+/// LibreOffice or POI repairs it (findings F5.6–F5.8 and F5.12).
 ///
 /// These repairs happen while the presentation is opened, so they are
 /// recorded in [`crate::Presentation::tolerance_report`]; the context is
@@ -452,6 +456,14 @@ pub enum PersistDefect {
     /// (`CurrentUserAtom.java`), and LibreOffice never reads it (finding
     /// F5.8). The context is the raw `lenUserName`.
     CurrentUserNameLength,
+    /// The live `UserEditAtom`'s payload was longer than 28 bytes but not
+    /// the 28 or 32 MS-PPT 2.3.3 allows; every field the reader uses lies in
+    /// the first 28 bytes, so the atom is read as is (finding F5.12). POI
+    /// pads short reads without checking the declared length
+    /// (`UserEditAtom.java`) and LibreOffice reads the fixed fields without
+    /// inspecting it. Shorter atoms stay an error. The context is the
+    /// payload length.
+    UserEditAtomLength,
     /// A `UserEditAtom`'s `offsetPersistDirectory` pointed at a record other
     /// than a `PersistDirectoryAtom`; that edit contributes no persist
     /// entries and the chain walk continues, as LibreOffice only processes
@@ -482,6 +494,9 @@ impl PersistDefect {
             },
             Self::CurrentUserNameLength => {
                 "treated a Current User username with an invalid or truncated length as absent"
+            },
+            Self::UserEditAtomLength => {
+                "read a UserEditAtom whose payload exceeds 28 bytes but is not 28 or 32"
             },
             Self::PersistDirectoryRecordType => {
                 "ignored a persist-directory pointer to a record that is not a PersistDirectoryAtom"
@@ -884,6 +899,7 @@ mod tests {
             Defect::from(PersistDefect::MissingCurrentUser),
             Defect::from(PersistDefect::UnusableCurrentEditOffset),
             Defect::from(PersistDefect::CurrentUserNameLength),
+            Defect::from(PersistDefect::UserEditAtomLength),
             Defect::from(PersistDefect::PersistDirectoryRecordType),
             Defect::from(PersistDefect::ZeroCountPersistRun),
             Defect::from(PersistDefect::DuplicatePersistId),
