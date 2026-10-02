@@ -231,3 +231,67 @@ fn out_of_domain_geometry_is_clamped_and_recorded() {
     assert_eq!(sheet.column(1).unwrap().width(), None);
     assert_eq!(sheet.defaults().unwrap().unwrap().height().get(), 15.0);
 }
+
+/// Finding 4.3: malformed number, boolean, and date lexicals are repaired per
+/// cell and recorded at the cell; a cold source-backed selected read defers
+/// to the repairing parse instead of failing.
+#[test]
+fn malformed_value_lexicals_are_repaired_per_cell_and_recorded() {
+    use litchi_xlsx::{Address, Cell, CellDefect as C, SourceCellView, Value};
+
+    let bytes = patched(&[
+        ("xl/worksheets/sheet1.xml", &|text: &str| {
+            replace(
+                r#"<c r="B3" s="7"/>"#,
+                r#"<c r="B3" s="7" t="b"><v>TRUE</v></c>"#,
+            )(text)
+            .replacen(
+                "</row><row r=\"3\"",
+                r#"<c r="D2" t="d"><v>2026-13-01</v></c></row><row r="3""#,
+                1,
+            )
+        }),
+        (
+            "xl/worksheets/sheet2.xml",
+            &replace(
+                r#"<c r="C2" s="10"><v>17816.607951388887</v>"#,
+                r#"<c r="C2" s="10"><v>17,816.6</v>"#,
+            ),
+        ),
+    ]);
+
+    // A cold selected read on the source-backed facade falls back to the
+    // repairing parse.
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let tests = source.sheet(1usize).unwrap().unwrap();
+    match tests.cell("C2").unwrap() {
+        SourceCellView::Stored(Cell::Unknown(unknown)) => {
+            assert_eq!(unknown.kind(), "n");
+            assert_eq!(unknown.value(), Some("17,816.6"));
+        },
+        other => panic!("expected a demoted cell, got {other:?}"),
+    }
+    assert_eq!(source.tolerance_report().total(), 1);
+
+    let cell = |a1: &str| ToleranceLocation::Cell(Address::from_a1(a1).unwrap());
+    let report = both_reports(&bytes);
+    assert_eq!(
+        worksheet_entries(&report),
+        [
+            (Defect::Cell(C::MalformedDate), Some(0), cell("D2")),
+            (Defect::Cell(C::MalformedBoolean), Some(0), cell("B3")),
+            (Defect::Cell(C::MalformedNumber), Some(1), cell("C2")),
+        ]
+    );
+
+    let workbook = Workbook::from_slice(&bytes).unwrap();
+    let flags = workbook.sheet(0usize).unwrap().unwrap();
+    assert!(matches!(
+        flags.cell("B3").unwrap(),
+        litchi_xlsx::cell::View::Stored(Cell::Value(Value::Bool(true)))
+    ));
+    assert!(matches!(
+        flags.cell("D2").unwrap(),
+        litchi_xlsx::cell::View::Stored(Cell::Value(Value::Text(text))) if text.as_str() == "2026-13-01"
+    ));
+}

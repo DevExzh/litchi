@@ -100,6 +100,10 @@
 //!   in with [`ToleranceReport::append_properties`] as
 //!   [`Defect::Properties`]. Custom properties read through
 //!   `Package::custom_props` carry their own report on the returned value.
+//! * finding 4.3 — cell materialization records
+//!   [`CellDefect::MalformedNumber`], [`CellDefect::MalformedBoolean`], and
+//!   [`CellDefect::MalformedDate`] at the cell; the selected-range scanner
+//!   defers such a cell to the materializing parse.
 //! * finding 4.1 — the worksheet event parser (`raw/worksheet/codec.rs`,
 //!   with `sheetFormatPr` in `raw/worksheet/validation.rs`) records
 //!   [`WorksheetDefect::RowHeightOutOfRange`],
@@ -175,16 +179,24 @@ pub enum CellDefect {
     /// The reader substitutes an empty string for each such cell, exactly as
     /// for an out-of-range index into an empty table.
     MissingSharedStringTable,
-    /// A number `<v>` does not parse as a finite `xsd:double` (audit finding
-    /// 4.3). *Roadmap contract:* the cell is demoted to `Cell::Unknown`
-    /// preserving the lexical, instead of failing the sheet.
+    /// A number `<v>` does not parse as a finite `xsd:double` — `1,234.56`,
+    /// `1E+999`, `NaN` (audit finding 4.3).
+    ///
+    /// LibreOffice converts lossily and Apache POI keeps the raw string; the
+    /// reader keeps the raw string without inventing a number: the cell is
+    /// demoted to `Cell::Unknown` with kind `n` and the lexical as its value.
+    /// On a formula cell the malformed cached value is dropped and the
+    /// formula kept (Excel recalculates it).
     MalformedNumber,
     /// A boolean `<v>` is outside `{0, 1, true, false}` (audit finding 4.3).
-    /// *Roadmap contract:* parsed case-insensitively, with any non-zero
-    /// number read as true, as LibreOffice does.
+    ///
+    /// Read as LibreOffice reads it — `true`/`false` in any ASCII case, and
+    /// any finite number as non-zero-is-true. A lexical neither form covers
+    /// (for example `yes`) is demoted to `Cell::Unknown` with kind `b`
+    /// instead of being guessed; a formula's cached value is then dropped.
     MalformedBoolean,
     /// A `t="d"` value is outside the accepted ISO 8601 layouts (audit
-    /// finding 4.3). *Roadmap contract:* demoted to text.
+    /// finding 4.3). The value is demoted to its text.
     MalformedDate,
     /// A shared-formula group is structurally inconsistent — master without
     /// `ref` or expression, duplicate master, follower without master
@@ -214,8 +226,12 @@ impl CellDefect {
             Self::MissingSharedStringTable => {
                 "substituted an empty string; the workbook has no shared-string table"
             },
-            Self::MalformedNumber => "demoted the unparseable number to an unknown cell",
-            Self::MalformedBoolean => "read the nonstandard boolean lexical leniently",
+            Self::MalformedNumber => {
+                "demoted the unparseable number to an unknown cell, or dropped the cached formula value"
+            },
+            Self::MalformedBoolean => {
+                "read the nonstandard boolean lexical leniently, or demoted it to an unknown cell"
+            },
             Self::MalformedDate => "demoted the unparseable date to text",
             Self::BrokenSharedFormulaGroup => {
                 "kept the shared-formula master verbatim; the orphaned member reads as unknown"

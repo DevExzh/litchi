@@ -899,8 +899,103 @@ fn validates_typed_date_cells_without_normalizing_the_lexeme() {
             if date.as_str() == "2026-07-31T12:34:56.250-07:00"
     ));
 
+    // An invalid date is demoted to its text and recorded (finding 4.3);
+    // write-path admission still refuses it.
     let invalid = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="d"><v>2026-02-29</v></c></row></sheetData></worksheet>"#;
-    assert!(parse(invalid, || Ok(None)).is_err());
+    let store = parse(invalid, || Ok(None)).expect("demoted date");
+    assert!(matches!(
+        store.get(Address::from_a1("A1").expect("address")),
+        Some(Cell::Value(Value::Text(text))) if text.as_str() == "2026-02-29"
+    ));
+    assert_eq!(store.tolerance_report().total(), 1);
+    assert!(super::parse_refusing_repairs(invalid, || Ok(None)).is_err());
+}
+
+/// Audit finding 4.3: malformed number, boolean, and date lexicals are
+/// repaired per cell and recorded at the cell, instead of failing the
+/// sheet; write-path admission keeps the historical errors.
+#[test]
+fn repairs_and_records_malformed_value_lexicals() {
+    use crate::leniency::{CellDefect, Defect, Location};
+
+    let cell = |xml: &str| {
+        format!(
+            r#"<worksheet xmlns="{S}"><sheetData><row r="3">{xml}</row></sheetData></worksheet>"#
+        )
+    };
+    let c3 = Address::from_a1("C3").expect("address");
+    let read = |xml: &str, defect: CellDefect| {
+        let xml = cell(xml);
+        let store =
+            parse(xml.as_bytes(), || Ok(None)).unwrap_or_else(|error| panic!("{xml}: {error}"));
+        let report = store.tolerance_report();
+        assert_eq!(report.total(), 1, "{xml}");
+        assert_eq!(report.defects()[0].defect, Defect::Cell(defect), "{xml}");
+        assert_eq!(report.defects()[0].location, Location::Cell(c3), "{xml}");
+        assert!(
+            super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)).is_err(),
+            "write-path admission accepted {xml}"
+        );
+        store.get(c3).cloned()
+    };
+
+    for (xml, kind, lexical) in [
+        (r#"<c r="C3"><v>1,234.56</v></c>"#, "n", "1,234.56"),
+        (r#"<c r="C3" t="n"><v>1E+999</v></c>"#, "n", "1E+999"),
+        (r#"<c r="C3"><v>NaN</v></c>"#, "n", "NaN"),
+        (r#"<c r="C3" t="b"><v>yes</v></c>"#, "b", "yes"),
+    ] {
+        let defect = if kind == "b" {
+            CellDefect::MalformedBoolean
+        } else {
+            CellDefect::MalformedNumber
+        };
+        match read(xml, defect) {
+            Some(Cell::Unknown(unknown)) => {
+                assert_eq!(unknown.kind(), kind);
+                assert_eq!(unknown.value(), Some(lexical));
+                assert_eq!(unknown.formula(), None);
+            },
+            other => panic!("{xml}: expected a demoted cell, got {other:?}"),
+        }
+    }
+    for (lexical, expected) in [
+        ("TRUE", true),
+        ("False", false),
+        ("2", true),
+        ("0.0", false),
+    ] {
+        let xml = format!(r#"<c r="C3" t="b"><v>{lexical}</v></c>"#);
+        assert!(
+            matches!(read(&xml, CellDefect::MalformedBoolean), Some(Cell::Value(Value::Bool(value))) if value == expected),
+            "{lexical}"
+        );
+    }
+    // A malformed cached value is dropped; the formula is kept.
+    match read(
+        r#"<c r="C3"><f>A1*2</f><v>#,##</v></c>"#,
+        CellDefect::MalformedNumber,
+    ) {
+        Some(Cell::Formula(formula)) => {
+            assert_eq!(formula.text(), "A1*2");
+            assert!(formula.cached().is_none());
+        },
+        other => panic!("expected a formula, got {other:?}"),
+    }
+    match read(
+        r#"<c r="C3" t="d"><v>31/12/2026</v></c>"#,
+        CellDefect::MalformedDate,
+    ) {
+        Some(Cell::Value(Value::Text(text))) => assert_eq!(text.as_str(), "31/12/2026"),
+        other => panic!("expected demoted text, got {other:?}"),
+    }
+
+    // Conformant lexicals repair nothing.
+    let xml = cell(
+        r#"<c r="C3"><v> 6.02E+23 </v></c><c r="D3" t="b"><v>true</v></c><c r="E3" t="d"><v>2026-12-31</v></c>"#,
+    );
+    let store = parse(xml.as_bytes(), || Ok(None)).expect("conformant");
+    assert!(store.tolerance_report().is_clean());
 }
 
 #[test]
@@ -2418,7 +2513,7 @@ mod streaming_0365_range_tests {
         );
 
         let callback_then_malformed_tail = format!(
-            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>not-a-number</v></c></row></sheetData></worksheet><tail>"#
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>1</v><v>2</v></c></row></sheetData></worksheet><tail>"#
         );
         let mut baseline_input = Cursor::new(callback_then_malformed_tail.as_bytes());
         let baseline = scan_targets(
@@ -3733,14 +3828,6 @@ mod streaming_0400_numeric_scratch_tests {
         }
     }
 
-    fn assert_number_error(xml: &str, expected: &str) {
-        let error = scan_xml(xml, "A1").expect_err("invalid worksheet number");
-        assert!(
-            error.to_string().contains(expected),
-            "expected error containing {expected:?}, got {error}"
-        );
-    }
-
     fn assert_unselected_inline_error_matches_selected(inline: &str, expected: Option<&str>) {
         let selected = worksheet(&format!(
             r#"<sheetData><row r="1"><c r="A1">{inline}</c></row></sheetData>"#
@@ -3887,7 +3974,10 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0401_numeric_elision_keeps_selected_and_unselected_errors_exact() {
+    fn streaming_0401_numeric_elision_defers_malformed_numbers_to_the_repairing_parser() {
+        // The materialized parser repairs and records a malformed number
+        // (leniency finding 4.3); the scanner never repairs, so a selected
+        // or unselected malformed lexical defers to it.
         for (value, expected) in [
             ("not-a-number", "invalid worksheet number 'not-a-number'"),
             ("NaN", "non-finite worksheet number 'NaN'"),
@@ -3896,12 +3986,25 @@ mod streaming_0400_numeric_scratch_tests {
             let selected = worksheet(&format!(
                 r#"<sheetData><row r="1"><c r="A1"><v>{value}</v></c></row></sheetData>"#
             ));
-            assert_number_error(&selected, expected);
+            assert_not_eligible(&selected, NotEligibleReason::IrregularValue);
 
             let unselected = worksheet(&format!(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>{value}</v></c></row></sheetData>"#
             ));
-            assert_number_error(&unselected, expected);
+            assert_not_eligible(&unselected, NotEligibleReason::IrregularValue);
+            for xml in [&selected, &unselected] {
+                assert!(matches!(
+                    crate::raw::worksheet::selected::scan_targets_bytes(
+                        xml.as_bytes(),
+                        &Capabilities::default(),
+                        &StreamLimits::default(),
+                        &[Address::from_a1("A1").expect("A1")],
+                    ),
+                    Ok(RangeScanOutcome::NotEligible(
+                        NotEligibleReason::IrregularValue
+                    ))
+                ));
+            }
 
             let error = Number::new(value)
                 .expect_err("owned constructor must reject invalid value")

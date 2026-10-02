@@ -177,6 +177,10 @@ pub enum NotEligibleReason {
     Ordering,
     /// A text payload contains an XML reference unavailable to this observer.
     GeneralReference,
+    /// A number or boolean value lexical is malformed. The materialized
+    /// parser repairs and records it (see `crate::leniency`, audit finding
+    /// 4.3); this scanner never repairs.
+    IrregularValue,
 }
 
 /// Result of one bounded selected-cell stream.
@@ -679,8 +683,10 @@ impl<'a> PlainScanner<'a> {
         } = cell;
         if selected {
             let semantic = if saw_value && !value.trim().is_empty() {
+                // A malformed lexical is repaired by the materialized parser
+                // (audit finding 4.3), never by this scanner.
                 let number =
-                    Number::new(value.into_boxed_str()).map_err(PlainScanError::Callback)?;
+                    Number::new(value.into_boxed_str()).map_err(|_| PlainScanError::Fallback)?;
                 Cell::Value(Value::Number(number))
             } else {
                 Cell::Empty
@@ -691,7 +697,7 @@ impl<'a> PlainScanner<'a> {
             });
         } else {
             if saw_value && !value.trim().is_empty() {
-                Number::validate_lexical(&value).map_err(PlainScanError::Callback)?;
+                Number::validate_lexical(&value).map_err(|_| PlainScanError::Fallback)?;
             }
             self.numeric_value_scratch = value;
         }
@@ -1869,6 +1875,12 @@ impl<'a> Scanner<'a> {
         } else {
             None
         };
+        if cell.saw_value && !regular_lexical(cell.kind, &cell.value) {
+            // The materialized parser repairs and records a malformed value
+            // lexical (audit finding 4.3); this scanner never repairs.
+            self.mark(NotEligibleReason::IrregularValue);
+            return Ok(());
+        }
         let shared_string_index =
             if formula.is_none() && matches!(cell.kind, CellKind::SharedString) && cell.saw_value {
                 let Some(index) = cell.value.trim().parse::<u32>().ok() else {
@@ -2094,6 +2106,23 @@ impl<'a> Scanner<'a> {
         if self.not_eligible.is_none() {
             self.not_eligible = Some(reason);
         }
+    }
+}
+
+/// Whether a `<v>` lexical is one the materialized parser reads without a
+/// repair; see [`NotEligibleReason::IrregularValue`].
+fn regular_lexical(kind: CellKind, value: &str) -> bool {
+    match kind {
+        CellKind::Untyped | CellKind::Numeric => {
+            value.trim().is_empty() || Number::validate_lexical(value).is_ok()
+        },
+        CellKind::Boolean => matches!(value.trim(), "1" | "0" | "true" | "false"),
+        CellKind::String
+        | CellKind::Error
+        | CellKind::InlineString
+        | CellKind::SharedString
+        | CellKind::Date
+        | CellKind::Unknown => true,
     }
 }
 

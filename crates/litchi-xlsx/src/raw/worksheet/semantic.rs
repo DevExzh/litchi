@@ -83,25 +83,32 @@ pub(super) fn materialize(
             },
             RawFormulaKind::Unknown(value) => Kind::Unknown(value.into()),
         };
-        let cached = raw
-            .value
-            .as_deref()
-            .map(|value| {
-                parse_value(
-                    raw.cell_type.as_deref(),
-                    value,
-                    strings,
-                    address,
-                    tolerance.as_deref_mut(),
-                )
-            })
-            .transpose()?
-            .flatten()
-            .map(Cache::stored);
+        // A malformed cached value (finding 4.3) is dropped: the formula is
+        // authoritative and Excel recalculates it.
+        let cached = match raw.value.as_deref() {
+            Some(value) => match parse_value(
+                raw.cell_type.as_deref(),
+                value,
+                strings,
+                address,
+                tolerance.as_deref_mut(),
+            )? {
+                Parsed::Value(value) => value.map(Cache::stored),
+                Parsed::Malformed => None,
+            },
+            None => None,
+        };
         Cell::Formula(Formula::parsed(text, kind, cached))
     } else if let Some(value) = raw.value.as_deref() {
-        parse_value(raw.cell_type.as_deref(), value, strings, address, tolerance)?
-            .map_or(Cell::Empty, Cell::Value)
+        match parse_value(raw.cell_type.as_deref(), value, strings, address, tolerance)? {
+            Parsed::Value(value) => value.map_or(Cell::Empty, Cell::Value),
+            // Demoted with its lexical preserved (finding 4.3).
+            Parsed::Malformed => Cell::Unknown(Unknown::new(
+                raw.cell_type.as_deref().unwrap_or("n"),
+                Some(value.to_owned()),
+                None,
+            )),
+        }
     } else if let Some(kind) = raw.cell_type.as_deref()
         && !matches!(kind, "n" | "inlineStr")
     {
@@ -140,16 +147,42 @@ fn formula_range_rect(range: FormulaRange) -> Result<Rect> {
     Ok(Rect::new(start, range.last_row, range.last_column)?)
 }
 
+/// The outcome of reading one `<v>` lexical.
+enum Parsed {
+    /// The typed value (`None` for an empty numeric lexical).
+    Value(Option<Value>),
+    /// A number or boolean lexical no reading can type (audit finding 4.3);
+    /// the repair was recorded and the caller demotes the cell.
+    Malformed,
+}
+
+/// Read one `<v>` lexical by cell type.
+///
+/// With `tolerance` present, malformed lexicals (audit finding 4.3) are
+/// repaired and recorded at the cell: an unparseable or non-finite number is
+/// [`Parsed::Malformed`]; a boolean is read the way LibreOffice reads it —
+/// `true`/`false` in any ASCII case, any number as non-zero-is-true — and
+/// only a lexical neither form covers is [`Parsed::Malformed`]; an invalid
+/// date is demoted to its text. Without `tolerance` each fails the parse as
+/// it historically did.
 fn parse_value(
     cell_type: Option<&str>,
     value: &str,
     strings: Option<&[Text]>,
     address: Address,
     tolerance: Option<&mut ToleranceReport>,
-) -> Result<Option<Value>> {
+) -> Result<Parsed> {
+    let parsed = |value: Value| Ok(Parsed::Value(Some(value)));
     match cell_type {
-        None | Some("n") if value.trim().is_empty() => Ok(None),
-        None | Some("n") => Number::new(value).map(Value::Number).map(Some),
+        None | Some("n") if value.trim().is_empty() => Ok(Parsed::Value(None)),
+        None | Some("n") => match Number::new(value) {
+            Ok(number) => parsed(Value::Number(number)),
+            Err(error) => {
+                let tolerance = tolerance.ok_or(error)?;
+                tolerance.record(CellDefect::MalformedNumber, Location::Cell(address));
+                Ok(Parsed::Malformed)
+            },
+        },
         Some("str") => {
             let value = decode_spreadsheet_text(value)?;
             if value.chars().count() > MAX_CELL_CHARACTERS {
@@ -157,14 +190,21 @@ fn parse_value(
                     "worksheet string exceeds {MAX_CELL_CHARACTERS} characters"
                 )));
             }
-            Ok(Some(Value::Text(value.into())))
+            parsed(Value::Text(value.into()))
         },
-        Some("d") => Date::new(value).map(Value::Date).map(Some),
+        Some("d") => match Date::new(value) {
+            Ok(date) => parsed(Value::Date(date)),
+            Err(error) => {
+                let tolerance = tolerance.ok_or(error)?;
+                tolerance.record(CellDefect::MalformedDate, Location::Cell(address));
+                parsed(Value::Text(value.into()))
+            },
+        },
         Some("s") => {
             let index = parse_shared_string_index(value)?;
             let (defect, error) = match strings {
                 Some(strings) => match strings.get(index) {
-                    Some(text) => return Ok(Some(Value::Text(text.clone()))),
+                    Some(text) => return parsed(Value::Text(text.clone())),
                     None => (
                         CellDefect::SharedStringIndexOutOfRange,
                         invalid(format!(
@@ -184,14 +224,22 @@ fn parse_value(
             // empty (audit finding 4.4): substitute an empty string.
             let tolerance = tolerance.ok_or(error)?;
             tolerance.record(defect, Location::Cell(address));
-            Ok(Some(Value::Text(Text::from(""))))
+            parsed(Value::Text(Text::from("")))
         },
         Some("b") => match value.trim() {
-            "1" | "true" => Ok(Some(Value::Bool(true))),
-            "0" | "false" => Ok(Some(Value::Bool(false))),
-            other => Err(invalid(format!("invalid worksheet boolean '{other}'"))),
+            "1" | "true" => parsed(Value::Bool(true)),
+            "0" | "false" => parsed(Value::Bool(false)),
+            other => {
+                let error = invalid(format!("invalid worksheet boolean '{other}'"));
+                let tolerance = tolerance.ok_or(error)?;
+                tolerance.record(CellDefect::MalformedBoolean, Location::Cell(address));
+                Ok(match lenient_boolean(other) {
+                    Some(value) => Parsed::Value(Some(Value::Bool(value))),
+                    None => Parsed::Malformed,
+                })
+            },
         },
-        Some("e") => Ok(Some(Value::Error(ErrorValue::parse(value)))),
+        Some("e") => parsed(Value::Error(ErrorValue::parse(value))),
         Some("inlineStr") => Err(invalid(
             "inline-string cell stores text in an is element, not v",
         )),
@@ -199,6 +247,24 @@ fn parse_value(
             "unsupported worksheet cell type '{other}'"
         ))),
     }
+}
+
+/// LibreOffice's boolean reading ("Some generators may write true or false
+/// instead of 1 or 0", `sheetdatacontext.cxx`): `true`/`false` in any ASCII
+/// case, and any finite number as non-zero-is-true. `None` for a lexical
+/// neither form covers.
+fn lenient_boolean(value: &str) -> Option<bool> {
+    if value.eq_ignore_ascii_case("true") {
+        return Some(true);
+    }
+    if value.eq_ignore_ascii_case("false") {
+        return Some(false);
+    }
+    value
+        .parse::<f64>()
+        .ok()
+        .filter(|number| number.is_finite())
+        .map(|number| number != 0.0)
 }
 
 fn parse_shared_string_index(value: &str) -> Result<usize> {
