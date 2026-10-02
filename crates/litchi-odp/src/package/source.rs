@@ -71,9 +71,12 @@ pub struct SourceBackedPresentation {
     slides_cache: OnceLock<Option<Arc<[Slide]>>>,
     text_queries: AtomicUsize,
     text_cache: OnceLock<Option<String>>,
-    /// Package repairs followed by the slide scan's content repairs,
-    /// computed by the first [`Self::tolerance_report`] or complete slide
-    /// scan.
+    /// Package repairs and the repairs applied while `content.xml` was
+    /// loaded at open.
+    open_tolerance: litchi_odf_common::leniency::ToleranceReport,
+    /// [`Self::open_tolerance`] followed by the slide scan's content
+    /// repairs, computed by the first [`Self::tolerance_report`] or
+    /// complete slide scan.
     tolerance: OnceLock<litchi_odf_common::leniency::ToleranceReport>,
 }
 
@@ -222,10 +225,12 @@ impl SourceBackedPresentation {
                 package.member_materialized_size("content.xml")?,
                 FAMILY_NAME,
             )?;
-            let content_xml =
+            let mut content_xml =
                 String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
                     Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
                 })?;
+            let doctype =
+                litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
 
             let styles_xml = if package.has_file("styles.xml")? {
@@ -249,14 +254,21 @@ impl SourceBackedPresentation {
                 None
             };
 
-            Ok((content_xml, styles_xml, metadata))
+            Ok((content_xml, styles_xml, metadata, doctype))
         })();
 
         // Reconcile the source before exposing any secondary parse error. This
         // keeps stale-source errors authoritative across the whole open pass,
         // including pure validation and UTF-8/metadata parsing work.
-        let (content_xml, styles_xml, metadata) =
+        let (content_xml, styles_xml, metadata, doctype) =
             reconcile_source(source.as_ref(), source_version, parsed)?;
+        let mut open_tolerance = package.tolerance_report().clone();
+        if doctype {
+            open_tolerance.record(
+                litchi_odf_common::leniency::ContentDefect::DoctypeDeclaration,
+                0,
+            );
+        }
 
         Ok(Self {
             package,
@@ -267,6 +279,7 @@ impl SourceBackedPresentation {
             metadata,
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
+            open_tolerance,
             tolerance: OnceLock::new(),
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
@@ -289,7 +302,7 @@ impl SourceBackedPresentation {
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
         self.tolerance.get_or_init(|| {
-            let mut merged = self.package.tolerance_report().clone();
+            let mut merged = self.open_tolerance.clone();
             // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
             // scan; a scan that fails outright reports its error through
             // `slides()`, and the report then lists the package repairs only.
@@ -369,7 +382,7 @@ impl SourceBackedPresentation {
         ensure_current(self.source_version, observed)?;
         let (slides, content) = result?;
         if self.tolerance.get().is_none() {
-            let mut merged = self.package.tolerance_report().clone();
+            let mut merged = self.open_tolerance.clone();
             merged.append(&content);
             let _ = self.tolerance.set(merged);
         }

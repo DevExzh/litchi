@@ -256,3 +256,118 @@ impl ContentDocumentValidator {
         Ok(())
     }
 }
+
+/// Byte span of a document type declaration in the prologue of an XML part,
+/// or `None` when the prologue has none.
+///
+/// Only the prologue is tokenized: scanning stops at the root element. A
+/// prologue that does not tokenize is left alone for the part's validator to
+/// reject with its own error.
+fn prologue_doctype_span(xml: &[u8]) -> Option<(usize, usize)> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut buffer = Vec::new();
+    loop {
+        let before = usize::try_from(reader.buffer_position()).ok()?;
+        let event = reader.read_event_into(&mut buffer).ok()?;
+        match event {
+            Event::DocType(_) => {
+                let after = usize::try_from(reader.buffer_position()).ok()?;
+                let span = xml.get(before..after)?;
+                // Defensive: only a complete `<!...>` declaration is replaced.
+                return (span.starts_with(b"<!") && span.ends_with(b">"))
+                    .then_some((before, after));
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) | Event::Eof => return None,
+            Event::Decl(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+/// Neutralize a document type declaration in the prologue of an ODF
+/// `content.xml` (LENIENCY_AUDIT F9.11), returning whether one was found.
+///
+/// ODF 1.2 documents are not DTD-validated and XML lets a non-validating
+/// processor skip the declaration; LibreOffice's SAX import ignores it, so
+/// old generator pipelines (DocBook-to-ODF stylesheets, OpenOffice.org 1.x
+/// style prologues) open there. The declaration's bytes are overwritten with
+/// the same number of spaces — legal prologue whitespace — so every later
+/// byte offset is unchanged and no downstream parser ever sees a DTD.
+///
+/// The declaration is never processed: no external subset is fetched and no
+/// internal-subset entity is declared, so a reference to an entity it would
+/// have declared is still rejected by content validation. A declaration
+/// after the root element is not touched and stays an error.
+pub fn neutralize_prologue_doctype_bytes(xml: &mut [u8]) -> bool {
+    let Some((start, end)) = prologue_doctype_span(xml) else {
+        return false;
+    };
+    if let Some(span) = xml.get_mut(start..end) {
+        span.fill(b' ');
+        true
+    } else {
+        false
+    }
+}
+
+/// [`neutralize_prologue_doctype_bytes`] for an already decoded part.
+pub fn neutralize_prologue_doctype(xml: &mut String) -> bool {
+    let Some((start, end)) = prologue_doctype_span(xml.as_bytes()) else {
+        return false;
+    };
+    // The span starts at `<` and ends after `>`, both ASCII, so both ends
+    // are character boundaries.
+    if xml.is_char_boundary(start) && xml.is_char_boundary(end) {
+        xml.replace_range(start..end, &" ".repeat(end - start));
+        true
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod doctype_tests {
+    use super::{neutralize_prologue_doctype, neutralize_prologue_doctype_bytes};
+
+    const ROOT: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text/></office:body></office:document-content>"#;
+
+    #[test]
+    fn a_prologue_doctype_is_blanked_in_place() {
+        let doctype = r#"<!DOCTYPE office:document-content [ <!ENTITY e "a > b"> <!-- ] > --> ]>"#;
+        let original = format!("<?xml version=\"1.0\"?>\n<!-- lead -->{doctype}{ROOT}");
+        let mut xml = original.clone();
+        assert!(neutralize_prologue_doctype(&mut xml));
+        assert_eq!(xml.len(), original.len(), "byte offsets are preserved");
+        assert!(!xml.contains("DOCTYPE"));
+        assert!(xml.ends_with(ROOT));
+        assert_eq!(
+            xml.replace(' ', ""),
+            original.replace(doctype, "").replace(' ', "")
+        );
+
+        let mut bytes = original.clone().into_bytes();
+        assert!(neutralize_prologue_doctype_bytes(&mut bytes));
+        assert_eq!(bytes, xml.into_bytes());
+    }
+
+    #[test]
+    fn documents_without_a_prologue_doctype_are_untouched() {
+        for source in [
+            ROOT.to_string(),
+            format!("<?xml version=\"1.0\"?>{ROOT}"),
+            // A DOCTYPE after the root element is not a prologue declaration.
+            format!("{ROOT}<!DOCTYPE late>"),
+            // Unreadable XML is left for the part's validator to reject.
+            "<?xml version=\"1.0\"?><!DOCTYPE unterminated".to_string(),
+        ] {
+            let mut xml = source.clone();
+            assert!(!neutralize_prologue_doctype(&mut xml), "{source}");
+            assert_eq!(xml, source);
+        }
+    }
+}

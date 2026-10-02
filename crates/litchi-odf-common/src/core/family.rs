@@ -412,7 +412,7 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
-        let tolerance = archive.tolerance_report().clone();
+        let mut tolerance = archive.tolerance_report().clone();
         let found = archive.mimetype()?;
         if found != mimetype {
             return Err(Error::InvalidFormat(format!(
@@ -431,11 +431,14 @@ impl Package {
                 "ODF content.xml exceeds the family limit".into(),
             ));
         }
-        let content_bytes = archive.get_file("content.xml")?;
+        let mut content_bytes = archive.get_file("content.xml")?;
         if content_bytes.len() > MAX_CONTENT_BYTES {
             return Err(Error::InvalidFormat(
                 "ODF content.xml exceeds the family limit".into(),
             ));
+        }
+        if super::content_validation::neutralize_prologue_doctype_bytes(&mut content_bytes) {
+            tolerance.record(crate::leniency::ContentDefect::DoctypeDeclaration, 0);
         }
         let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
             Error::InvalidFormat(format!("{family_name} content.xml is not UTF-8: {error}"))

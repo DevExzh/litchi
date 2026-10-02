@@ -4,6 +4,8 @@ use super::model::Document;
 use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, SourcePackageLimits, Styles};
 use crate::elements::style::{StyleElements, StyleRegistry};
 use litchi_core::{Error, Result};
+use litchi_odf_common::core::private::neutralize_prologue_doctype_bytes;
+use litchi_odf_common::leniency::ContentDefect;
 use std::path::Path;
 use zeroize::Zeroizing;
 
@@ -193,14 +195,17 @@ impl Document {
     }
 
     pub(crate) fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
-        let tolerance = owned_package.tolerance_report().clone();
+        let mut tolerance = owned_package.tolerance_report().clone();
         let package = owned_package.package()?;
 
         // Verify this is a text document.
         validate_mimetype(package.mimetype())?;
 
         // Parse core components
-        let content_bytes = package.get_file("content.xml")?;
+        let mut content_bytes = package.get_file("content.xml")?;
+        if neutralize_prologue_doctype_bytes(&mut content_bytes) {
+            tolerance.record(ContentDefect::DoctypeDeclaration, 0);
+        }
         let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
             Error::InvalidFormat(format!("ODT content.xml is not UTF-8: {error}"))
         })?;
@@ -847,6 +852,7 @@ fn transaction_index(commit: &crate::transaction::Commit) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::Document;
+    use super::{ContentDefect, neutralize_prologue_doctype_bytes};
     use crate::core::OwnedPackage;
     use crate::elements::style::StyleElements;
     use litchi_core::Result;
@@ -863,14 +869,17 @@ mod tests {
     /// retained verbatim to cross-check the fused `OpenParse` open on error
     /// precedence, error messages, and the resulting document state.
     fn from_owned_package_sequential_oracle(owned_package: OwnedPackage) -> Result<Document> {
-        let tolerance = owned_package.tolerance_report().clone();
+        let mut tolerance = owned_package.tolerance_report().clone();
         let package = owned_package.package()?;
 
         // Verify this is a text document.
         super::validate_mimetype(package.mimetype())?;
 
         // Parse core components
-        let content_bytes = package.get_file("content.xml")?;
+        let mut content_bytes = package.get_file("content.xml")?;
+        if neutralize_prologue_doctype_bytes(&mut content_bytes) {
+            tolerance.record(ContentDefect::DoctypeDeclaration, 0);
+        }
         let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
             litchi_core::Error::InvalidFormat(format!("ODT content.xml is not UTF-8: {error}"))
         })?;

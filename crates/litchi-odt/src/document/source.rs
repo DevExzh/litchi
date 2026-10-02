@@ -58,6 +58,8 @@ pub struct SourceBackedDocument {
     style_registry: StyleRegistry,
     text_queries: AtomicUsize,
     text_cache: OnceLock<Option<String>>,
+    /// Package repairs followed by the content repairs of the open.
+    tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
 impl fmt::Debug for SourceBackedDocument {
@@ -217,7 +219,16 @@ impl SourceBackedDocument {
                     "{FAMILY_NAME} content.xml exceeds the family limit"
                 )));
             }
-            let content_bytes = package.get_file(crate::constants::ODF_CONTENT)?;
+            let mut content_bytes = package.get_file(crate::constants::ODF_CONTENT)?;
+            let mut tolerance = package.tolerance_report().clone();
+            if litchi_odf_common::core::private::neutralize_prologue_doctype_bytes(
+                &mut content_bytes,
+            ) {
+                tolerance.record(
+                    litchi_odf_common::leniency::ContentDefect::DoctypeDeclaration,
+                    0,
+                );
+            }
             let content = Content::from_vec(content_bytes)?;
             // One fused tokenization validates the content structure and
             // collects the automatic styles; a validation error returns
@@ -250,9 +261,9 @@ impl SourceBackedDocument {
             }
             style_registry.try_extend(content_styles.finish()?)?;
 
-            Ok((content, styles, meta, style_registry))
+            Ok((content, styles, meta, style_registry, tolerance))
         })();
-        let (content, styles, meta, style_registry) =
+        let (content, styles, meta, style_registry, tolerance) =
             prefer_current(source.as_ref(), source_version, parsed)?;
 
         Ok(Self {
@@ -265,6 +276,7 @@ impl SourceBackedDocument {
             style_registry,
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
+            tolerance,
         })
     }
 
@@ -280,7 +292,7 @@ impl SourceBackedDocument {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        self.package.tolerance_report()
+        &self.tolerance
     }
 
     /// Return the source identity captured during open.

@@ -226,6 +226,20 @@ pub enum ContentDefect {
     /// element inside an animation node; the location is the slide
     /// ([`DefectLocation::Slide`]).
     UnknownAnimationElement,
+    /// `content.xml` carried a document type declaration in its prologue
+    /// (LENIENCY_AUDIT F9.11), as old generator pipelines (DocBook-to-ODF
+    /// stylesheets, OpenOffice.org 1.x-style prologues, hand-assembled
+    /// parts) emit.
+    ///
+    /// ODF 1.2 documents are not DTD-validated, XML lets a non-validating
+    /// processor skip the declaration, and LibreOffice's SAX import ignores
+    /// it. The repair blanks the declaration to prologue whitespace before
+    /// any parser sees it; it is never processed, so no external subset is
+    /// fetched and an entity declared in an internal subset stays undeclared
+    /// (a reference to it is still a hard error). A declaration after the
+    /// root element stays a hard error. The context is 0 (`content.xml`).
+    /// There is no location.
+    DoctypeDeclaration,
 }
 
 impl ContentDefect {
@@ -244,6 +258,9 @@ impl ContentDefect {
             },
             Self::UnknownAnimationElement => {
                 "skipped an unmappable animation element and its subtree, keeping the slide"
+            },
+            Self::DoctypeDeclaration => {
+                "ignored the document type declaration in the content.xml prologue without processing it"
             },
         }
     }
@@ -540,6 +557,7 @@ mod tests {
             Defect::from(ContentDefect::CalculationSettingsUnknownChild),
             Defect::from(ContentDefect::CalculationSettingsReordered),
             Defect::from(ContentDefect::UnknownAnimationElement),
+            Defect::from(ContentDefect::DoctypeDeclaration),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

@@ -95,7 +95,9 @@ pub use crate::package::ArchiveLimits;
 #[doc(hidden)]
 pub mod private {
     pub use super::binding_tracker::{BindingTracker, BindingTrackerError};
-    pub use super::content_validation::ContentDocumentValidator;
+    pub use super::content_validation::{
+        ContentDocumentValidator, neutralize_prologue_doctype, neutralize_prologue_doctype_bytes,
+    };
     pub use super::stream_xml::{XmlStreamEvent, XmlStreamLimits, XmlStreamReport, scan_xml};
 }
 

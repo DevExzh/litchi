@@ -220,10 +220,12 @@ impl SourceBackedSpreadsheet {
                 package.member_materialized_size("content.xml")?,
                 FAMILY_NAME,
             )?;
-            let content_xml =
+            let mut content_xml =
                 String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
                     Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
                 })?;
+            let doctype =
+                litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
             let open_parse = crate::open_parse::OpenParse::run(&content_xml)?;
             let styles_xml = if package.has_file("styles.xml")? {
@@ -269,12 +271,25 @@ impl SourceBackedSpreadsheet {
                 sheets,
                 metadata,
                 settings,
-                content_tolerance,
+                (doctype, content_tolerance),
             ))
         })();
-        let (content_xml, styles_xml, definitions, sheets, metadata, settings, content_tolerance) =
-            prefer_current(source.as_ref(), source_version, parsed)?;
+        let (
+            content_xml,
+            styles_xml,
+            definitions,
+            sheets,
+            metadata,
+            settings,
+            (doctype, content_tolerance),
+        ) = prefer_current(source.as_ref(), source_version, parsed)?;
         let mut tolerance = package.tolerance_report().clone();
+        if doctype {
+            tolerance.record(
+                litchi_odf_common::leniency::ContentDefect::DoctypeDeclaration,
+                0,
+            );
+        }
         tolerance.append(&content_tolerance);
 
         Ok(Self {
