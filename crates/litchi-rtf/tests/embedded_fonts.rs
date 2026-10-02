@@ -91,10 +91,7 @@ fn rejects_malformed_embedded_fonts() {
         // Duplicate fontfile code page.
         r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1252\cpg1250 a.ttf}}Arial;}}}",
         // Out-of-range fontfile code page.
-        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg70000 a.ttf}}Arial;}}}",
         // Wide and unsupported fontfile code pages.
-        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}",
-        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}",
         // Nested group inside the fontfile name destination.
         r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile {\field X}}}Arial;}}}",
         // Unterminated fontemb destination.
@@ -104,6 +101,25 @@ fn rejects_malformed_embedded_fonts() {
         assert!(
             RtfDocument::parse(source).is_err(),
             "accepted malformed RTF: {source}"
+        );
+    }
+
+    // An undecodable fontfile code page falls back to the document code page, as in
+    // LibreOffice, and is recorded.
+    for source in [
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg70000 a.ttf}}Arial;}}}",
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}",
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}",
+    ] {
+        let document =
+            RtfDocument::parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let report = document.tolerance_report();
+        assert!(!report.is_clean(), "{source}");
+        assert!(
+            report
+                .iter()
+                .all(|tolerated| matches!(tolerated.defect, litchi_rtf::leniency::Defect::Font(_))),
+            "{source}"
         );
     }
 }

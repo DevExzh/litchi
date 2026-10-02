@@ -44,6 +44,8 @@ impl<'a> Parser<'a> {
                 document_valid: false,
             },
             tolerance: crate::leniency::ToleranceReport::default(),
+            unmapped_charset_fonts: HashMap::new(),
+            unmapped_charset_uses: RefCell::new(Vec::new()),
             opaque_nodes: Vec::new(),
             opaque_bytes: 0,
             unknown_syntax_markers: 0,
@@ -622,6 +624,10 @@ impl<'a> Parser<'a> {
         }
         self.parse_provenance.document_valid = true;
 
+        for (_, offset) in self.unmapped_charset_uses.take() {
+            self.tolerance
+                .record(crate::leniency::FontDefect::UnmappedCharset, offset);
+        }
         Ok(ParsedDocument {
             tolerance_report: self.tolerance,
             ordinary_body_source_span,

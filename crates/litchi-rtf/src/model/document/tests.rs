@@ -763,11 +763,19 @@ fn font_switches_select_exact_explicit_and_charset_codepages() {
     .unwrap();
     assert_eq!(override_page.text(), "あ");
 
-    assert!(
-        RtfDocument::parse(
-            r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 Japanese;}}\f0\'82\'a0}",
-        )
-        .is_err()
+    // A charset without a code-page mapping (Mac Shift-JIS) takes the
+    // document code page, as LibreOffice does, and its first use is recorded.
+    let unmapped = RtfDocument::parse(
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 Japanese;}}\f0\'82\'a0}",
+    )
+    .unwrap();
+    assert_eq!(unmapped.text(), "\u{201a}\u{a0}");
+    assert_eq!(
+        unmapped.tolerance_report().defects(),
+        &[crate::leniency::ToleratedDefect {
+            defect: crate::leniency::FontDefect::UnmappedCharset.into(),
+            offset: 41,
+        }]
     );
 }
 

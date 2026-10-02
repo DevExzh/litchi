@@ -70,16 +70,32 @@ fn rejects_malformed_extended_font_metadata() {
         r"{\rtf1{\fonttbl{\f0\fnil{\*\falt A}{\*\falt B}Arial;}}}",
         r"{\rtf1{\fonttbl{\f0\fnil{\*\falt {\field X}}Arial;}}}",
         r"{\rtf1{\fonttbl{\f0\fnil;}}}",
-        r"{\rtf1{\fonttbl{\f0\fnil\cpg70000 Arial;}}}",
-        r"{\rtf1{\fonttbl{\f0\fnil\cpg1200 Arial;}}}",
-        r"{\rtf1{\fonttbl{\f0\fnil\cpg65000 Arial;}}}",
-        r"{\rtf1{\fonttbl{\f0\fnil\fcharset3 Arial;}}}",
-        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 \'82\'a0;}}}",
     ];
     for source in malformed {
         assert!(
             RtfDocument::parse(source).is_err(),
             "accepted malformed RTF: {source}"
+        );
+    }
+
+    // Undefined or undecodable charsets and code pages fall back to the document
+    // code page, as in LibreOffice, and are recorded.
+    for source in [
+        r"{\rtf1{\fonttbl{\f0\fnil\cpg70000 Arial;}}}",
+        r"{\rtf1{\fonttbl{\f0\fnil\cpg1200 Arial;}}}",
+        r"{\rtf1{\fonttbl{\f0\fnil\cpg65000 Arial;}}}",
+        r"{\rtf1{\fonttbl{\f0\fnil\fcharset3 Arial;}}}",
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 \'82\'a0;}}}",
+    ] {
+        let document =
+            RtfDocument::parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let report = document.tolerance_report();
+        assert!(!report.is_clean(), "{source}");
+        assert!(
+            report
+                .iter()
+                .all(|tolerated| matches!(tolerated.defect, litchi_rtf::leniency::Defect::Font(_))),
+            "{source}"
         );
     }
 }

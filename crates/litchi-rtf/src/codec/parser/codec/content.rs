@@ -517,16 +517,18 @@ impl<'a> Parser<'a> {
         if charset == FontCharset::Default {
             return Ok(fallback_encoding);
         }
-        charset
-            .page()
-            .map(RtfEncoding::from_font_page)
-            .ok_or_else(|| {
-                RtfError::MalformedDocument(format!(
-                    "unsupported RTF font charset {} for font {}",
-                    charset.id(),
-                    font_ref
-                ))
-            })
+        if let Some(page) = charset.page() {
+            return Ok(RtfEncoding::from_font_page(page));
+        }
+        // LibreOffice gives a font whose charset has no encoding row the
+        // document code page; note the first use so it is recorded.
+        if let Some(&offset) = self.unmapped_charset_fonts.get(&font_ref) {
+            let mut uses = self.unmapped_charset_uses.borrow_mut();
+            if !uses.iter().any(|(used, _)| *used == font_ref) {
+                uses.push((font_ref, offset));
+            }
+        }
+        Ok(fallback_encoding)
     }
 
     /// Decode a byte-preserving transport slice without allowing the decoder

@@ -9,7 +9,7 @@
 //! reports clean.
 
 use litchi_rtf::leniency::{
-    Defect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
+    Defect, FontDefect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
     UnicodeDefect,
 };
 use litchi_rtf::read::{Limits, Options};
@@ -455,4 +455,54 @@ fn documents_opened_through_an_opt_in_stay_editable() {
     edit.remove_paragraph(0).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.snapshot().paragraph_count(), 2);
+}
+
+// F9.12: undefined or undecodable font charsets and code pages fall back to
+// the document code page, as LibreOffice does, and are recorded.
+#[test]
+fn unsupported_font_charsets_and_code_pages_fall_back_and_are_recorded() {
+    let source = concat!(
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset5 Old\'e9;}",
+        r"{\f1\fnil\cpg70000 Wide;}{\f2\fnil\fcharset2 Symbol;}{\f3\fnil\fcharset2 Unused;}}",
+        r"\f0 caf\'e9 \f1 x\f2 \'b7\f0 y\f2 z\par}",
+    );
+    let document = Document::parse(source).unwrap();
+    assert_eq!(document.text(), "caf\u{e9} x\u{b7}yz\n");
+    let names: Vec<_> = document
+        .fonts()
+        .iter()
+        .map(|font| font.name().to_string())
+        .collect();
+    assert_eq!(names, ["Old\u{e9}", "Wide", "Symbol", "Unused"]);
+    let at = |needle: &str| source.find(needle).unwrap() as u64;
+    // The Symbol font is recorded once, at its first use; the unused one is
+    // declared but never decodes text, so it conforms.
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (
+                Defect::Font(FontDefect::UnsupportedCharset),
+                at(r"\fcharset5")
+            ),
+            (
+                Defect::Font(FontDefect::UnsupportedCodePage),
+                at(r"\cpg70000")
+            ),
+            (
+                Defect::Font(FontDefect::UnmappedCharset),
+                at(r"\fcharset2 Symbol")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn supported_font_charsets_are_not_defects() {
+    let source = concat!(
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset204 Cyr;}{\f1\fnil\fcharset0 Arial;}",
+        r"{\f2\fnil\fcharset2 Symbol;}}\f0\'cf\'f0\f1 x\par}",
+    );
+    let document = Document::parse(source).unwrap();
+    assert_eq!(document.text(), "\u{41f}\u{440}x\n");
+    assert_clean(document.tolerance_report());
 }

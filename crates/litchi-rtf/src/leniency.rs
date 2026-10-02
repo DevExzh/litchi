@@ -218,6 +218,53 @@ impl UnicodeDefect {
     }
 }
 
+/// A font-table charset or code page the reader cannot decode with.
+///
+/// This enumeration is closed by design. LibreOffice looks a font's
+/// `\fcharset` up in a fixed table (`rtfcharsets.cxx`) and, when no row
+/// matches, leaves the font without an encoding so its text uses the
+/// document's `\ansicpg` code page; Word likewise falls back to the default
+/// code page. Each repair applies that fallback, decoding lossily (U+FFFD for
+/// bytes the fallback page does not define). The recorded
+/// [`ToleratedDefect::offset`] is the byte offset of the font's `\fcharset`
+/// or `\cpg` control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum FontDefect {
+    /// `\fcharsetN` named a charset outside the RTF 1.9.1 table (for example
+    /// `\fcharset5`). The font is kept without a charset and its text uses
+    /// the document code page.
+    UnsupportedCharset,
+    /// `\cpgN` named a code page the reader has no decoder for. The font
+    /// (or embedded font file name) is kept without a code page and falls
+    /// back to its charset or the document code page.
+    UnsupportedCodePage,
+    /// A defined charset with no code-page mapping in this reader (Symbol,
+    /// the Macintosh CJK and script charsets, Johab, and the user-defined
+    /// Arabic and Hebrew charsets) decoded text. The document code page is
+    /// used instead. Recorded once per font, when the fallback is first
+    /// used; a font that is declared but never decodes text conforms.
+    UnmappedCharset,
+}
+
+impl FontDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnsupportedCharset => {
+                "dropped the undefined charset; the font's text uses the document code page"
+            },
+            Self::UnsupportedCodePage => {
+                "dropped the undecodable code page; the font falls back to its charset or the document code page"
+            },
+            Self::UnmappedCharset => {
+                "decoded the font's text with the document code page, which its charset has no mapping for"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -231,6 +278,8 @@ pub enum Defect {
     Parameter(ParameterDefect),
     /// A lossily decoded Unicode escape.
     Unicode(UnicodeDefect),
+    /// A font charset or code page replaced by the document code page.
+    Font(FontDefect),
 }
 
 impl Defect {
@@ -241,6 +290,7 @@ impl Defect {
             Self::Syntax(defect) => defect.repair(),
             Self::Parameter(defect) => defect.repair(),
             Self::Unicode(defect) => defect.repair(),
+            Self::Font(defect) => defect.repair(),
         }
     }
 }
@@ -260,6 +310,12 @@ impl From<ParameterDefect> for Defect {
 impl From<UnicodeDefect> for Defect {
     fn from(defect: UnicodeDefect) -> Self {
         Self::Unicode(defect)
+    }
+}
+
+impl From<FontDefect> for Defect {
+    fn from(defect: FontDefect) -> Self {
+        Self::Font(defect)
     }
 }
 
@@ -513,6 +569,9 @@ mod tests {
             Defect::from(ParameterDefect::UnexpectedParameter),
             Defect::from(ParameterDefect::MissingParameter),
             Defect::from(UnicodeDefect::UnpairedSurrogate),
+            Defect::from(FontDefect::UnsupportedCharset),
+            Defect::from(FontDefect::UnsupportedCodePage),
+            Defect::from(FontDefect::UnmappedCharset),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

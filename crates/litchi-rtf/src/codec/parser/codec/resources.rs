@@ -269,6 +269,8 @@ impl<'a> Parser<'a> {
         let mut charset = None;
         let mut pitch = FontPitch::Default;
         let mut code_page = None;
+        let mut charset_offset = None;
+        let mut fell_back = false;
         let mut theme = None;
         let mut bidi = false;
         let mut alternate_name = None;
@@ -400,14 +402,16 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font charset".to_string(),
                         ));
                     }
-                    let charset_id = u8::try_from(*cs).map_err(|_err| {
-                        RtfError::MalformedDocument("invalid RTF font charset".to_string())
-                    })?;
-                    charset = Some(FontCharset::new(charset_id).ok_or_else(|| {
-                        RtfError::MalformedDocument(format!(
-                            "unsupported RTF font charset {charset_id}"
-                        ))
-                    })?);
+                    let offset = self.token_offset(self.pos);
+                    charset = u8::try_from(*cs).ok().and_then(FontCharset::new);
+                    if charset.is_none() {
+                        // LibreOffice finds no row in its charset table and
+                        // leaves the font on the document code page.
+                        self.tolerance
+                            .record(crate::leniency::FontDefect::UnsupportedCharset, offset);
+                        fell_back = true;
+                    }
+                    charset_offset = Some(offset);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontPitch(value)) => {
@@ -434,14 +438,13 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font code page".to_string(),
                         ));
                     }
-                    let page = u32::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument("invalid RTF font code page".to_string())
-                    })?;
-                    code_page = Some(FontPage::new(page).ok_or_else(|| {
-                        RtfError::MalformedDocument(format!(
-                            "unsupported RTF font code page {page}"
-                        ))
-                    })?);
+                    code_page = u32::try_from(*value).ok().and_then(FontPage::new);
+                    if code_page.is_none() {
+                        let offset = self.token_offset(self.pos);
+                        self.tolerance
+                            .record(crate::leniency::FontDefect::UnsupportedCodePage, offset);
+                        fell_back = true;
+                    }
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontTheme(word)) => {
@@ -501,6 +504,7 @@ impl<'a> Parser<'a> {
         let font_num = font_num
             .ok_or_else(|| RtfError::MalformedDocument("RTF font entry lacks an ID".to_string()))?;
         let header_encoding = self.current_state()?.encoding;
+        let mut lossy = fell_back;
         let encoding = match (code_page, charset) {
             (Some(page), _) => RtfEncoding::from_font_page(page),
             (None, Some(FontCharset::Default) | None) => header_encoding,
@@ -515,20 +519,23 @@ impl<'a> Parser<'a> {
                         || non_tagged_name
                             .as_ref()
                             .is_some_and(DeferredText::has_non_ascii_transport);
+                    // ASCII transport and explicit Unicode escapes are
+                    // invariant across the unmapped charset and the header
+                    // page; other bytes take the document code page, as in
+                    // LibreOffice, and the substitution is recorded.
                     if has_non_ascii {
-                        return Err(RtfError::MalformedDocument(format!(
-                            "unsupported RTF font charset {} for non-ASCII font metadata",
-                            charset.id()
-                        )));
+                        lossy = true;
+                        self.tolerance.record(
+                            crate::leniency::FontDefect::UnmappedCharset,
+                            charset_offset.unwrap_or_default(),
+                        );
                     }
-                    // ASCII transport and explicit Unicode escapes are invariant
-                    // across the unavailable legacy charset and the header page.
                     header_encoding
                 }
             },
         };
         let decode_name = |value: DeferredText, context: &str| -> RtfResult<String> {
-            let value = value.decode(encoding, context)?;
+            let value = value.decode_with(encoding, context, lossy)?;
             Ok(value
                 .trim()
                 .strip_suffix(';')
@@ -554,6 +561,14 @@ impl<'a> Parser<'a> {
         font.theme = theme;
         font.bidi = bidi;
         font.validate()?;
+        if code_page.is_none()
+            && let Some(charset) = charset
+            && charset != FontCharset::Default
+            && charset.page().is_none()
+        {
+            self.unmapped_charset_fonts
+                .insert(font_num, charset_offset.unwrap_or_default());
+        }
         if let Some(existing) = self.font_table.borrow().get(font_num) {
             if existing == &font {
                 return Ok(());
@@ -812,6 +827,7 @@ impl<'a> Parser<'a> {
         self.pos += 1;
         let mut name = DeferredText::default();
         let mut code_page = None;
+        let mut fell_back = false;
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -820,7 +836,7 @@ impl<'a> Parser<'a> {
                     let encoding = code_page
                         .map_or(self.current_state()?.encoding, RtfEncoding::from_font_page);
                     let name = name
-                        .decode(encoding, "embedded font file name")?
+                        .decode_with(encoding, "embedded font file name", fell_back)?
                         .trim()
                         .to_string();
                     if name.is_empty() || name.len() > EmbeddedFont::MAX_FILE_NAME_BYTES {
@@ -831,19 +847,18 @@ impl<'a> Parser<'a> {
                     return Ok((name, code_page));
                 },
                 Some(Token::Control(ControlWord::FontCodePage(value))) => {
-                    if code_page.is_some() {
+                    if code_page.is_some() || fell_back {
                         return Err(RtfError::MalformedDocument(
                             "duplicate RTF fontfile code page".to_string(),
                         ));
                     }
-                    let page = u32::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument("invalid RTF fontfile code page".to_string())
-                    })?;
-                    code_page = Some(FontPage::new(page).ok_or_else(|| {
-                        RtfError::MalformedDocument(format!(
-                            "unsupported RTF fontfile code page {page}"
-                        ))
-                    })?);
+                    code_page = u32::try_from(*value).ok().and_then(FontPage::new);
+                    if code_page.is_none() {
+                        let offset = self.token_offset(self.pos);
+                        self.tolerance
+                            .record(crate::leniency::FontDefect::UnsupportedCodePage, offset);
+                        fell_back = true;
+                    }
                 },
                 Some(Token::Text(text)) => name.push_transport(text)?,
                 Some(Token::Control(ControlWord::Unicode(first))) => {

@@ -114,6 +114,22 @@ impl DeferredText {
             .any(|part| matches!(part, DeferredTextPart::Bytes(bytes) if !bytes.is_ascii()))
     }
 
+    /// Decode with `encoding`, substituting U+FFFD for undefined bytes when
+    /// `lossy` (the font-charset fallback) and failing on them otherwise.
+    fn decode_with(self, encoding: RtfEncoding, context: &str, lossy: bool) -> RtfResult<String> {
+        if !lossy {
+            return self.decode(encoding, context);
+        }
+        let mut output = String::with_capacity(self.source_len);
+        for part in self.parts {
+            match part {
+                DeferredTextPart::Bytes(bytes) => output.push_str(&encoding.decode(&bytes)),
+                DeferredTextPart::Unicode(text) => output.push_str(&text),
+            }
+        }
+        Ok(output)
+    }
+
     fn decode(self, encoding: RtfEncoding, context: &str) -> RtfResult<String> {
         let mut output = String::with_capacity(self.source_len);
         for part in self.parts {
@@ -1485,6 +1501,13 @@ pub(crate) struct Parser<'a> {
     parse_provenance: crate::validation::ParseProvenance,
     /// Repairs applied while tokenizing and parsing, in discovery order.
     tolerance: crate::leniency::ToleranceReport,
+    /// Offset of the `\fcharset` control of each font whose charset has no
+    /// code-page mapping, so its first use can be recorded.
+    unmapped_charset_fonts: HashMap<FontRef, usize>,
+    /// Unmapped-charset fonts whose document-code-page fallback has decoded
+    /// text, with their charset offsets, in first-use order. Interior
+    /// mutability lets the shared-borrow encoding lookup note the use.
+    unmapped_charset_uses: RefCell<Vec<(FontRef, usize)>>,
     opaque_nodes: Vec<crate::opaque::Node>,
     opaque_bytes: usize,
     unknown_syntax_markers: usize,
