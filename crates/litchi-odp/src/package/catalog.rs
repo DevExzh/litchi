@@ -6,7 +6,14 @@
 //! `content.xml` catalog scan, selected slide XML, and optional `styles.xml`
 //! are temporary projections and are never retained by this owner.
 
-use std::{borrow::Cow, fmt, sync::Arc};
+use std::{
+    borrow::Cow,
+    fmt,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -15,6 +22,7 @@ use std::path::Path;
 use litchi_core::FileSource;
 use litchi_core::{Error, ReadAt, Result, SourceVersion};
 use litchi_odf_common::{
+    ToleranceReport,
     core::{
         SourceBackedPackage,
         private::{BindingTracker, BindingTrackerError, ContentDocumentValidator},
@@ -74,6 +82,14 @@ pub struct SourceBackedPresentationCatalog {
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
     entries: Arc<[SlideCatalogEntry]>,
+    /// The package repairs of the open, then the content repairs of the
+    /// first selected-slide read (see [`Self::tolerance_report`]).
+    tolerance: Mutex<ToleranceReport>,
+    /// Whether the content repairs have joined `tolerance`. A selected read
+    /// validates (and repairs) every slide, so the first successful read
+    /// records the whole document's content repairs and later reads repeat
+    /// them.
+    recorded: AtomicBool,
 }
 
 impl fmt::Debug for SourceBackedPresentationCatalog {
@@ -218,12 +234,16 @@ impl SourceBackedPresentationCatalog {
             scan_catalog(&content)
         })();
         let entries = prefer_current(source.as_ref(), source_version, parsed)?;
+        let tolerance = Mutex::new(package.tolerance_report().clone());
+        let recorded = AtomicBool::new(false);
 
         Ok(Self {
             package,
             source,
             source_version,
             entries: Arc::from(entries),
+            tolerance,
+            recorded,
         })
     }
 
@@ -262,24 +282,53 @@ impl SourceBackedPresentationCatalog {
         prefer_current(self.source.as_ref(), self.source_version, Ok(count))
     }
 
+    /// Everything repaired so far: the package repairs of the open, then —
+    /// once a slide has been selected through [`Self::slide_at`] or
+    /// [`Self::slide`] — the content repairs of the whole presentation, which
+    /// every selected read validates. An empty report means everything read
+    /// so far conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> ToleranceReport {
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     /// Read one slide selected by its zero-based document position.
     ///
     /// The selected query temporarily reads `content.xml` and optional
     /// `styles.xml`, then uses the established parser. That parser retains
     /// full-document validation semantics, so malformed unselected content
-    /// can still make this operation fail.
+    /// can still make this operation fail. Its content repairs join
+    /// [`Self::tolerance_report`].
     pub fn slide_at(&self, index: usize) -> Result<Option<Slide>> {
         self.check_source()?;
         if index >= self.entries.len() {
             self.check_source()?;
             return Ok(None);
         }
+        let mut repairs = ToleranceReport::default();
         let result = (|| {
             let content = read_content(&self.package)?;
             let styles = read_styles(&self.package)?;
-            Parser::parse_slide_with_styles_at(&content, styles.as_deref(), index)
+            Parser::parse_slide_with_styles_at_recording(
+                &content,
+                styles.as_deref(),
+                index,
+                &mut repairs,
+            )
         })();
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        let result = prefer_current(self.source.as_ref(), self.source_version, result)?;
+        let mut tolerance = self
+            .tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !self.recorded.swap(true, Ordering::AcqRel) {
+            tolerance.append(&repairs);
+        }
+        Ok(result)
     }
 
     /// Read the first slide with an exact producer-supplied `draw:name`.

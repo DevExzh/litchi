@@ -19,7 +19,9 @@ use std::sync::Arc;
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
 use litchi_ods::worksheet::{CellValue, Sheet};
-use litchi_ods::{FlatSnapshot, SourceBackedSpreadsheet, Spreadsheet};
+use litchi_ods::{
+    FlatSnapshot, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, Spreadsheet,
+};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 
@@ -173,6 +175,24 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
     if !defects.is_empty() {
         assert_degraded_cells(source.sheets().unwrap(), &format!("{label}: source-backed"));
     }
+
+    // The selective catalog records each selected sheet's repairs once, at
+    // the sheet's document position.
+    let catalog =
+        SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec())))
+            .unwrap();
+    assert!(
+        catalog.tolerance_report().is_clean(),
+        "{label}: catalog open"
+    );
+    for index in [0, 1, 1, 0] {
+        assert!(catalog.sheet_at(index).unwrap().is_some(), "{label}");
+    }
+    assert_eq!(
+        recorded(&catalog.tolerance_report()),
+        defects,
+        "{label}: catalog"
+    );
 }
 
 #[test]

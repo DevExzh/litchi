@@ -12,8 +12,8 @@ use std::{
     fmt,
     ops::Range,
     sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 
@@ -24,6 +24,7 @@ use std::path::Path;
 use litchi_core::FileSource;
 use litchi_core::{Error, ReadAt, Result, SourceVersion};
 use litchi_odf_common::{
+    ToleranceReport,
     core::{SourceBackedPackage, private::ContentDocumentValidator},
     package::{is_media_path, resolve_package_path},
 };
@@ -170,6 +171,12 @@ pub struct SourceBackedSpreadsheetCatalog {
     source_version: SourceVersion,
     entries: Arc<[SheetCatalogEntry]>,
     meter: Arc<ReadMeter>,
+    /// The package repairs of the open, then the content repairs of each
+    /// selected worksheet read so far (see [`Self::tolerance_report`]).
+    tolerance: Mutex<ToleranceReport>,
+    /// Whether each worksheet's content repairs have joined `tolerance`; a
+    /// worksheet re-read on the same source repairs the same defects.
+    recorded: Box<[AtomicBool]>,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheetCatalog {
@@ -308,12 +315,16 @@ impl SourceBackedSpreadsheetCatalog {
             scan_catalog(&content)
         })();
         let entries = prefer_current(metered.as_ref(), source_version, entries)?;
+        let tolerance = Mutex::new(package.tolerance_report().clone());
+        let recorded = entries.iter().map(|_| AtomicBool::new(false)).collect();
         Ok(Self {
             package,
             source: metered,
             source_version,
             entries: Arc::from(entries),
             meter,
+            tolerance,
+            recorded,
         })
     }
 
@@ -380,15 +391,43 @@ impl SourceBackedSpreadsheetCatalog {
         prefer_current(self.source.as_ref(), self.source_version, Ok(count))
     }
 
+    /// Everything repaired so far: the package repairs of the open, then the
+    /// content repairs of every worksheet selected through [`Self::sheet_at`]
+    /// or [`Self::sheet`], each recorded the first time that worksheet is
+    /// read. An empty report means everything read so far conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> ToleranceReport {
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     /// Read one worksheet selected by its zero-based document position.
+    ///
+    /// Its content repairs join [`Self::tolerance_report`].
     pub fn sheet_at(&self, index: usize) -> Result<Option<Sheet>> {
         self.check_source()?;
         if index >= self.entries.len() {
             return Ok(None);
         }
         let content = read_content(&self.package)?;
-        let result = parse_selected_sheet(&content, index);
-        prefer_current(self.source.as_ref(), self.source_version, result)
+        let mut repairs = ToleranceReport::default();
+        let result = parse_selected_sheet(&content, index, &mut repairs);
+        let result = prefer_current(self.source.as_ref(), self.source_version, result)?;
+        // The selected table was parsed on its own, as sheet 0.
+        repairs.locate_in_sheet(u32::try_from(index).unwrap_or(u32::MAX));
+        if let Some(recorded) = self.recorded.get(index) {
+            let mut tolerance = self
+                .tolerance
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !recorded.swap(true, Ordering::AcqRel) {
+                tolerance.append(&repairs);
+            }
+        }
+        Ok(result)
     }
 
     /// Read one worksheet selected by its exact ODF name.
@@ -702,7 +741,11 @@ fn table_name(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<Stri
     Ok(name.unwrap_or_else(|| "Sheet1".to_string()))
 }
 
-fn parse_selected_sheet(xml: &str, index: usize) -> Result<Option<Sheet>> {
+fn parse_selected_sheet(
+    xml: &str,
+    index: usize,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<Sheet>> {
     let (range, wrapper) = find_sheet_range(xml, index)?;
     let Some(range) = range else {
         return Ok(None);
@@ -711,7 +754,7 @@ fn parse_selected_sheet(xml: &str, index: usize) -> Result<Option<Sheet>> {
         Error::InvalidFormat("ODS selected worksheet source range is invalid".to_string())
     })?;
     let wrapped = wrapper.wrap(table)?;
-    let mut sheets = crate::worksheet::codec::parse(&wrapped)?;
+    let mut sheets = crate::worksheet::codec::parse_recording(&wrapped, tolerance)?;
     if sheets.len() != 1 {
         return Err(Error::InvalidFormat(
             "ODS selected worksheet parser returned an unexpected sheet count".to_string(),

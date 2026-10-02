@@ -420,6 +420,21 @@ impl ToleranceReport {
         }
     }
 
+    /// Re-stamp every cell location with sheet index `sheet`.
+    ///
+    /// A reader that parses one selected sheet in isolation records its
+    /// cells as sheet 0; this moves them to the sheet's document position.
+    /// This is format-family plumbing; it is hidden because locating is part
+    /// of a read, not caller API.
+    #[doc(hidden)]
+    pub fn locate_in_sheet(&mut self, sheet: u32) {
+        for tolerated in &mut self.defects {
+            if let Some(DefectLocation::Cell { sheet: located, .. }) = &mut tolerated.location {
+                *located = sheet;
+            }
+        }
+    }
+
     /// Merge another parse's report into this one, keeping discovery order.
     ///
     /// The stored-entry bound applies to the merged report as a whole; entries

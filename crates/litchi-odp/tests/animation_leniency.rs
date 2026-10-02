@@ -20,7 +20,7 @@ use std::sync::Arc;
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
 use litchi_odp::model::animation::Kind;
-use litchi_odp::{Presentation, SourceBackedPresentation};
+use litchi_odp::{Presentation, SourceBackedPresentation, SourceBackedPresentationCatalog};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 
@@ -109,6 +109,24 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
         recorded(source.tolerance_report()),
         defects,
         "{label}: source-backed"
+    );
+
+    // The selective catalog records the content repairs once, on the first
+    // selected read (which validates every slide).
+    let catalog =
+        SourceBackedPresentationCatalog::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec())))
+            .unwrap();
+    assert!(
+        catalog.tolerance_report().is_clean(),
+        "{label}: catalog open"
+    );
+    for index in (0..5).chain(0..5) {
+        assert!(catalog.slide_at(index).unwrap().is_some(), "{label}");
+    }
+    assert_eq!(
+        recorded(&catalog.tolerance_report()),
+        defects,
+        "{label}: catalog"
     );
 }
 

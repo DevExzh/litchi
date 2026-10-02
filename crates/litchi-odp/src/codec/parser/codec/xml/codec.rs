@@ -912,10 +912,31 @@ impl Parser {
     }
 
     /// Parse one slide while retaining full-document validation semantics.
+    ///
+    /// The content repairs are not returned: [`crate::Presentation`] and
+    /// [`crate::SourceBackedPresentation`] enumerate them through the full
+    /// slide scan behind their `tolerance_report()`. A reader without such
+    /// a scan uses [`Self::parse_slide_with_styles_at_recording`].
     pub(crate) fn parse_slide_with_styles_at(
         xml_content: &str,
         styles_xml: Option<&str>,
         index: usize,
+    ) -> Result<Option<Slide>> {
+        Self::parse_slide_with_styles_at_recording(
+            xml_content,
+            styles_xml,
+            index,
+            &mut ToleranceReport::default(),
+        )
+    }
+
+    /// [`Self::parse_slide_with_styles_at`], appending every content repair
+    /// to `tolerance`.
+    pub(crate) fn parse_slide_with_styles_at_recording(
+        xml_content: &str,
+        styles_xml: Option<&str>,
+        index: usize,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Option<Slide>> {
         let mut slides = Self::parse_pages_with_styles::<true>(
             xml_content,
@@ -923,7 +944,7 @@ impl Parser {
             index,
             false,
             ShapeContainerScope::DrawPages,
-            &mut ToleranceReport::default(),
+            tolerance,
         )?;
         Ok(slides.pop())
     }

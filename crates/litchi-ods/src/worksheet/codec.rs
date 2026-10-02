@@ -538,8 +538,18 @@ fn reserve_parser_push<T>(
 }
 
 /// Parse all direct spreadsheet tables from an ODS content part.
+///
+/// The content repairs (unparseable cell values) are not returned: callers
+/// re-read content whose repairs the owning document already recorded at
+/// open, or an editor's own output. A read that owns no such report uses
+/// [`parse_recording`].
 pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
     parse_impl(xml, true, &mut ToleranceReport::default())
+}
+
+/// [`parse`], appending every content repair to `tolerance`.
+pub(crate) fn parse_recording(xml: &str, tolerance: &mut ToleranceReport) -> Result<Vec<Sheet>> {
+    parse_impl(xml, true, tolerance)
 }
 
 /// Parse flat spreadsheet tables while retaining duplicate names for
