@@ -22,6 +22,20 @@ listed in Appendix A, and areas reviewers found already tolerant in Appendix B.
 **108 findings kept, 0 dropped: 8 P0, 67 P1, 33 P2.** Confidence is high unless the
 finding title says otherwise.
 
+## Implementation status (2026-10-02)
+
+Phase 0 is complete: every scoped crate (doc, docx, xls, xlsb, xlsx, ppt, pptx, cfb, ole-common,
+opc, ooxml-common, rtf, odf-common and the odt/ods/odp facades) carries a bounded
+`ToleranceReport`, lower-layer reports (cfb, property sets, OPC packaging, core/custom
+properties) fold into the owning document's report, and the umbrella `litchi::Document`,
+`Presentation` and `Workbook` expose a unified `tolerance_report()`. Report-less
+core-properties readers were removed so metadata repairs cannot be swallowed. All 8 P0 and all
+67 P1 findings are FIXED (opt-in where the roadmap says opt-in: xls F3.3/F3.5, xlsb F3.10,
+xlsx F4.8, rtf F9.3/F9.7, ppt F5.9). Of the 33 P2 findings, all are fixed except two
+deliberate partials: pptx F6.3 (feature readers without a report still reject processing
+instructions) and ole-common F7.12 (unknown version and section count stay errors). Each
+finding's status line below records the repair, the defect variant and what stays fatal.
+
 ## The tolerance contract
 
 Findings align with the repair model established in `crates/litchi-doc/src/leniency.rs`
