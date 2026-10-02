@@ -143,6 +143,18 @@ pub enum SettingsDefect {
     /// settings part. Strict readers map both namespaces onto the same flag
     /// set, so the flag is kept with its declared value.
     TransitionalCompatFlagInStrict,
+    /// A setting the schema allows once (`maxOccurs="1"`) appeared again:
+    /// a singleton element such as `w:view`, `w:defaultTabStop`, or
+    /// `w:documentProtection`; a second `w:compat`, `w:footnotePr`, or
+    /// `w:endnotePr` group; or a repeated flag or note property inside one.
+    ///
+    /// LibreOffice's settings importer assigns each occurrence in document
+    /// order, so the later value wins; WPS, merge tools, and hand edits emit
+    /// such duplicates. The reader does the same — a repeated singleton
+    /// replaces the earlier element, and a repeated group's children apply on
+    /// top of the first group's — and records one defect per repeated
+    /// element.
+    DuplicateSetting,
 }
 
 impl SettingsDefect {
@@ -155,6 +167,9 @@ impl SettingsDefect {
             },
             Self::TransitionalCompatFlagInStrict => {
                 "kept the Transitional-only compatibility flag found in a Strict settings part"
+            },
+            Self::DuplicateSetting => {
+                "applied the repeated setting over the earlier occurrence (later value wins)"
             },
         }
     }
@@ -364,6 +379,7 @@ mod tests {
             Defect::from(TextDefect::SkippedForeignMarkup),
             Defect::from(SettingsDefect::UnknownCompatFlag),
             Defect::from(SettingsDefect::TransitionalCompatFlagInStrict),
+            Defect::from(SettingsDefect::DuplicateSetting),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

@@ -11,6 +11,15 @@ use litchi_opc::PackURI;
 use litchi_opc::part::{BlobPart, Part};
 use std::mem::size_of;
 
+/// Assert that `settings` recorded exactly `count` duplicate-setting repairs
+/// and nothing else.
+fn assert_duplicates(settings: &DocumentSettings, count: usize) {
+    let defects = settings.tolerance_report().defects();
+    assert_eq!(defects.len(), count, "{defects:?}");
+    assert!(defects.iter().all(|tolerated| tolerated.defect
+        == crate::Defect::Settings(crate::SettingsDefect::DuplicateSetting)));
+}
+
 #[test]
 fn test_settings_creation() {
     let settings = DocumentSettings::new();
@@ -90,8 +99,11 @@ fn validates_smart_tag_settings() {
     let invalid_on_off = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags w:val="maybe"/></w:settings>"#;
     assert!(DocumentSettings::extract_from_xml(invalid_on_off).is_err());
 
-    let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags/><w:doNotEmbedSmartTags/></w:settings>"#;
-    assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+    // Duplicate singletons are recorded and the later value wins (F2.3).
+    let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags/><w:doNotEmbedSmartTags w:val="0"/></w:settings>"#;
+    let parsed = DocumentSettings::extract_from_xml(duplicate).unwrap();
+    assert!(!parsed.do_not_embed_smart_tags());
+    assert_duplicates(&parsed, 1);
 }
 
 #[test]
@@ -256,9 +268,12 @@ fn strict_and_transitional_compatibility_flag_domains_are_exhaustive() {
         );
 
         let duplicate = format!(
-            r#"<w:settings xmlns:w="{namespace}"><w:compat><w:spaceForUL/><w:spaceForUL/></w:compat></w:settings>"#
+            r#"<w:settings xmlns:w="{namespace}"><w:compat><w:spaceForUL/><w:spaceForUL w:val="off"/></w:compat></w:settings>"#
         );
-        assert!(DocumentSettings::extract_from_xml(duplicate.as_bytes()).is_err());
+        let parsed = DocumentSettings::extract_from_xml(duplicate.as_bytes()).unwrap();
+        assert_eq!(parsed.compatibility_options().len(), 1);
+        assert!(!parsed.compatibility_options()[0].is_enabled());
+        assert_duplicates(&parsed, 1);
     }
 }
 
@@ -277,8 +292,11 @@ fn parses_empty_and_strict_compat_groups() {
 
 #[test]
 fn rejects_invalid_compat_groups() {
-    let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/><w:compat/></w:settings>"#;
-    assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+    // A repeated group merges over the first and is recorded (F2.3).
+    let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:useFELayout/></w:compat><w:compat><w:spaceForUL/></w:compat></w:settings>"#;
+    let parsed = DocumentSettings::extract_from_xml(duplicate).unwrap();
+    assert_eq!(parsed.compatibility_options().len(), 2);
+    assert_duplicates(&parsed, 1);
 
     let missing_value = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word"/></w:compat></w:settings>"#;
     assert!(DocumentSettings::extract_from_xml(missing_value).is_err());
@@ -385,8 +403,12 @@ fn strict_and_transitional_note_position_domains_are_closed() {
 
 #[test]
 fn rejects_invalid_note_property_groups() {
-    let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr/><w:footnotePr/></w:settings>"#;
-    assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+    let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numStart w:val="3"/></w:footnotePr><w:footnotePr><w:numFmt w:val="lowerRoman"/></w:footnotePr></w:settings>"#;
+    let parsed = DocumentSettings::extract_from_xml(duplicate).unwrap();
+    let footnotes = parsed.footnote_properties().unwrap();
+    assert_eq!(footnotes.start(), Some(3));
+    assert_eq!(footnotes.format(), Some(Format::LowerRoman));
+    assert_duplicates(&parsed, 1);
 
     let bad_start = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnotePr><w:numStart w:val="soon"/></w:endnotePr></w:settings>"#;
     assert!(DocumentSettings::extract_from_xml(bad_start).is_err());
@@ -404,7 +426,12 @@ fn rejects_invalid_note_property_groups() {
     assert!(DocumentSettings::extract_from_xml(bad_format).is_err());
 
     let duplicate_child = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numFmt w:val="decimal"/><w:numFmt w:val="bullet"/></w:footnotePr></w:settings>"#;
-    assert!(DocumentSettings::extract_from_xml(duplicate_child).is_err());
+    let parsed = DocumentSettings::extract_from_xml(duplicate_child).unwrap();
+    assert_eq!(
+        parsed.footnote_properties().unwrap().format(),
+        Some(Format::Bullet)
+    );
+    assert_duplicates(&parsed, 1);
 }
 
 #[test]
@@ -564,22 +591,44 @@ fn rejects_invalid_editing_settings() {
 
     assert!(reject(br#"<w:view/>"#).is_err());
     assert!(reject(br#"<w:view w:val="immersive"/>"#).is_err());
-    assert!(reject(br#"<w:view w:val="print"/><w:view w:val="web"/>"#).is_err());
     assert!(reject(br#"<w:proofState w:spelling="pending"/>"#).is_err());
     assert!(reject(br#"<w:proofState w:grammar="maybe"/>"#).is_err());
-    assert!(reject(br#"<w:proofState/><w:proofState/>"#).is_err());
     assert!(reject(br#"<w:defaultTabStop/>"#).is_err());
     assert!(reject(br#"<w:defaultTabStop w:val="wide"/>"#).is_err());
     assert!(reject(br#"<w:defaultTabStop w:val="-720"/>"#).is_err());
     assert!(reject(br#"<w:defaultTabStop w:val="99999999999999999999"/>"#).is_err());
-    assert!(reject(br#"<w:defaultTabStop w:val="720"/><w:defaultTabStop w:val="720"/>"#).is_err());
     assert!(reject(br#"<w:themeFontLang w:val=""/>"#).is_err());
     assert!(reject(br#"<w:themeFontLang w:eastAsia="ja&#0;-JP"/>"#).is_err());
-    assert!(reject(br#"<w:themeFontLang w:val="en-US"/><w:themeFontLang/>"#).is_err());
     assert!(reject(br#"<w:clrSchemeMapping w:bg1="light7"/>"#).is_err());
-    assert!(reject(br#"<w:clrSchemeMapping/><w:clrSchemeMapping/>"#).is_err());
-    assert!(reject(br#"<w:writeProtection/><w:writeProtection/>"#).is_err());
     assert!(reject(br#"<w:writeProtection w:val="maybe"/>"#).is_err());
+
+    // Duplicate singletons are Word-compatible repairs (F2.3): the later
+    // element wins and each repeat is recorded.
+    let view = reject(br#"<w:view w:val="print"/><w:view w:val="web"/>"#).unwrap();
+    assert_eq!(view.view(), Some(View::Web));
+    assert_duplicates(&view, 1);
+    let tab = reject(br#"<w:defaultTabStop w:val="720"/><w:defaultTabStop w:val="360"/><w:defaultTabStop w:val="240"/>"#).unwrap();
+    assert_eq!(tab.default_tab_stop_twips(), Some(240));
+    assert_duplicates(&tab, 2);
+    let languages = reject(br#"<w:themeFontLang w:val="en-US"/><w:themeFontLang/>"#).unwrap();
+    assert_eq!(languages.theme_font_languages().unwrap().latin(), None);
+    assert_duplicates(&languages, 1);
+    for body in [
+        br#"<w:proofState/><w:proofState/>"#.as_slice(),
+        br#"<w:clrSchemeMapping/><w:clrSchemeMapping/>"#,
+        br#"<w:writeProtection/><w:writeProtection/>"#,
+        br#"<w:trackRevisions/><w:trackRevisions/>"#,
+        br#"<w:documentProtection w:edit="readOnly"/><w:documentProtection/>"#,
+    ] {
+        assert_duplicates(&reject(body).unwrap(), 1);
+    }
+    let protection = reject(
+        br#"<w:documentProtection w:edit="readOnly"/><w:documentProtection w:edit="forms"/>"#,
+    )
+    .unwrap();
+    assert_eq!(protection.protection_type(), Some(ProtectionType::Forms));
+    // A duplicate never excuses an invalid value.
+    assert!(reject(br#"<w:view w:val="print"/><w:view w:val="immersive"/>"#).is_err());
 }
 
 #[test]

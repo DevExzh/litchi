@@ -130,9 +130,13 @@ impl DocumentSettings {
                         saw_root = true;
                     } else if saw_root && is_wordprocessing_namespace(&namespace) {
                         if depth == 2 {
-                            if let Some(group) =
-                                begin_settings_group(&element, &settings, &mut saw_compat)?
-                            {
+                            if let Some(group) = begin_settings_group(
+                                &element,
+                                &settings,
+                                &mut saw_compat,
+                                &mut tolerance,
+                                element_offset,
+                            ) {
                                 pending_group = Some(group);
                             } else {
                                 parse_setting(
@@ -141,6 +145,8 @@ impl DocumentSettings {
                                     &resolver,
                                     &mut settings,
                                     &mut seen,
+                                    &mut tolerance,
+                                    element_offset,
                                 )?;
                             }
                         } else if depth == 3
@@ -172,10 +178,14 @@ impl DocumentSettings {
                         saw_root = true;
                     } else if saw_root && is_wordprocessing_namespace(&namespace) {
                         if child_depth == 2 {
-                            if let Some(group) =
-                                begin_settings_group(&element, &settings, &mut saw_compat)?
-                            {
-                                finish_settings_group(&mut settings, group)?;
+                            if let Some(group) = begin_settings_group(
+                                &element,
+                                &settings,
+                                &mut saw_compat,
+                                &mut tolerance,
+                                element_offset,
+                            ) {
+                                finish_settings_group(&mut settings, group);
                             } else {
                                 parse_setting(
                                     &element,
@@ -183,6 +193,8 @@ impl DocumentSettings {
                                     &resolver,
                                     &mut settings,
                                     &mut seen,
+                                    &mut tolerance,
+                                    element_offset,
                                 )?;
                             }
                         } else if child_depth == 3
@@ -204,7 +216,7 @@ impl DocumentSettings {
                     if depth == 2
                         && let Some(group) = pending_group.take()
                     {
-                        finish_settings_group(&mut settings, group)?;
+                        finish_settings_group(&mut settings, group);
                     }
                     depth = depth.checked_sub(1).ok_or_else(|| {
                         Error::InvalidFormat("invalid Word settings XML nesting".into())
@@ -269,48 +281,53 @@ enum NoteKind {
     Endnote,
 }
 
+/// Open a grouped settings element.
+///
+/// A repeated group (a second `w:compat`, `w:footnotePr`, or `w:endnotePr`)
+/// is a recorded [`SettingsDefect::DuplicateSetting`], not a failure: like
+/// LibreOffice's settings importer, its children are applied on top of the
+/// first occurrence's in document order, so a property both declare takes
+/// the later value.
 fn begin_settings_group(
     element: &BytesStart<'_>,
     settings: &DocumentSettings,
     saw_compat: &mut bool,
-) -> Result<Option<PendingGroup>> {
+    tolerance: &mut ToleranceReport,
+    element_offset: u64,
+) -> Option<PendingGroup> {
     match element.local_name().as_ref() {
         b"compat" => {
             if std::mem::replace(saw_compat, true) {
-                return Err(Error::InvalidFormat(
-                    "duplicate compat settings group".into(),
-                ));
+                tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
             }
-            Ok(Some(PendingGroup::Compatibility {
-                options: Vec::new(),
-                settings: Vec::new(),
-            }))
+            Some(PendingGroup::Compatibility {
+                options: settings.values.compatibility_options().to_vec(),
+                settings: settings.values.compatibility_settings().to_vec(),
+            })
         },
         b"footnotePr" => {
-            if settings.values.footnote_properties().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate footnotePr settings group".into(),
-                ));
+            let existing = settings.values.footnote_properties().cloned();
+            if existing.is_some() {
+                tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
             }
-            Ok(Some(PendingGroup::FootnoteProperties(
-                NoteNumberingProperties::<Format>::default(),
-            )))
+            Some(PendingGroup::FootnoteProperties(
+                existing.unwrap_or_default(),
+            ))
         },
         b"endnotePr" => {
-            if settings.values.endnote_properties().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate endnotePr settings group".into(),
-                ));
+            let existing = settings.values.endnote_properties().cloned();
+            if existing.is_some() {
+                tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
             }
-            Ok(Some(PendingGroup::EndnoteProperties(
-                NoteNumberingProperties::<Format>::default(),
-            )))
+            Some(PendingGroup::EndnoteProperties(
+                existing.unwrap_or_default(),
+            ))
         },
-        _ => Ok(None),
+        _ => None,
     }
 }
 
-fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) -> Result<()> {
+fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) {
     match group {
         PendingGroup::Compatibility {
             options,
@@ -320,23 +337,12 @@ fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) -
             settings.values.set_compatibility_settings(triples);
         },
         PendingGroup::FootnoteProperties(properties) => {
-            if settings.values.footnote_properties().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate footnotePr settings group".into(),
-                ));
-            }
             settings.values.set_footnote_properties(Some(properties));
         },
         PendingGroup::EndnoteProperties(properties) => {
-            if settings.values.endnote_properties().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate endnotePr settings group".into(),
-                ));
-            }
             settings.values.set_endnote_properties(Some(properties));
         },
     }
-    Ok(())
 }
 
 fn parse_group_child(
@@ -378,43 +384,63 @@ fn parse_group_child(
                         element_offset,
                     );
                 }
-                if options.iter().any(|option| option.flag() == flag) {
-                    return Err(Error::InvalidFormat(format!(
-                        "duplicate compatibility flag '{raw}'"
-                    )));
+                let option =
+                    CompatibilityOption::new(flag, parse_on_off(element, decoder, resolver)?);
+                if let Some(existing) = options.iter_mut().find(|option| option.flag() == flag) {
+                    // A repeated flag: the later value wins in place, as in
+                    // LibreOffice's settings importer.
+                    tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
+                    *existing = option;
+                } else {
+                    options.push(option);
                 }
-                options.push(CompatibilityOption::new(
-                    flag,
-                    parse_on_off(element, decoder, resolver)?,
-                ));
             }
         },
         PendingGroup::FootnoteProperties(properties) => {
-            parse_note_property_child(properties, NoteKind::Footnote, element, decoder, resolver)?;
+            let duplicate = parse_note_property_child(
+                properties,
+                NoteKind::Footnote,
+                element,
+                decoder,
+                resolver,
+            )?;
+            if duplicate {
+                tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
+            }
         },
         PendingGroup::EndnoteProperties(properties) => {
-            parse_note_property_child(properties, NoteKind::Endnote, element, decoder, resolver)?;
+            let duplicate = parse_note_property_child(
+                properties,
+                NoteKind::Endnote,
+                element,
+                decoder,
+                resolver,
+            )?;
+            if duplicate {
+                tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
+            }
         },
     }
     Ok(())
 }
 
+/// Apply one note-property child, returning whether it replaced a value an
+/// earlier child already set (a duplicate, which the later value wins).
 fn parse_note_property_child(
     properties: &mut NoteNumberingProperties<Format>,
     kind: NoteKind,
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
-) -> Result<()> {
+) -> Result<bool> {
     let mut position = properties.position();
     let mut format = properties.format();
     let mut start = properties.start();
     let mut restart = properties.restart();
+    let duplicate;
     match element.local_name().as_ref() {
         b"pos" => {
-            if position.is_some() {
-                return Err(Error::InvalidFormat("duplicate note position".into()));
-            }
+            duplicate = position.is_some();
             let value = required_attribute(element, b"val", decoder, resolver, "note position")?;
             let parsed_position = value.parse::<NotePosition>().map_err(|_source_error| {
                 Error::InvalidFormat(format!("invalid note position '{value}'"))
@@ -428,33 +454,21 @@ fn parse_note_property_child(
             position = Some(parsed_position);
         },
         b"numFmt" => {
-            if format.is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate note numbering format".into(),
-                ));
-            }
+            duplicate = format.is_some();
             let value = required_attribute(element, b"val", decoder, resolver, "note numFmt")?;
             format = Some(value.parse().map_err(|_source_error| {
                 Error::InvalidFormat(format!("invalid note numbering format '{value}'"))
             })?);
         },
         b"numStart" => {
-            if start.is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate note numbering start".into(),
-                ));
-            }
+            duplicate = start.is_some();
             let value = required_attribute(element, b"val", decoder, resolver, "note numStart")?;
             start = Some(value.parse().map_err(|_source_error| {
                 Error::InvalidFormat(format!("invalid note numbering start '{value}'"))
             })?);
         },
         b"numRestart" => {
-            if restart.is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate note numbering restart".into(),
-                ));
-            }
+            duplicate = restart.is_some();
             let value = required_attribute(element, b"val", decoder, resolver, "note numRestart")?;
             restart = Some(
                 NoteNumberingRestart::from_xml(&value)
@@ -462,10 +476,10 @@ fn parse_note_property_child(
             );
         },
         // `w:footnote`/`w:endnote` separator references carry no properties.
-        _ => {},
+        _ => return Ok(false),
     }
     *properties = NoteNumberingProperties::<Format>::from_parts(position, format, start, restart);
-    Ok(())
+    Ok(duplicate)
 }
 
 /// Cardinality flags for on/off settings whose "not seen" state cannot be
@@ -485,16 +499,22 @@ fn parse_setting(
     resolver: &NamespaceResolver,
     settings: &mut DocumentSettings,
     seen: &mut SeenSettings,
+    tolerance: &mut ToleranceReport,
+    element_offset: u64,
 ) -> Result<()> {
+    // A repeated singleton setting is a recorded repair, not a failure: like
+    // LibreOffice's settings importer, which assigns each occurrence in
+    // document order, the later element replaces the earlier one.
+    let mut duplicate = |repeated: bool| {
+        if repeated {
+            tolerance.record(SettingsDefect::DuplicateSetting, element_offset);
+        }
+    };
     match element.local_name().as_ref() {
         b"documentProtection" => {
-            if seen.document_protection {
-                return Err(Error::InvalidFormat(
-                    "duplicate documentProtection setting".into(),
-                ));
-            }
-            seen.document_protection = true;
+            duplicate(std::mem::replace(&mut seen.document_protection, true));
             settings.values.set_protected(true);
+            settings.values.set_protection_type(None);
             if let Some(value) = word_attribute_value(element, b"edit", decoder, resolver)? {
                 settings
                     .values
@@ -505,12 +525,7 @@ fn parse_setting(
             }
         },
         b"trackRevisions" => {
-            if seen.track_revisions {
-                return Err(Error::InvalidFormat(
-                    "duplicate trackRevisions setting".into(),
-                ));
-            }
-            seen.track_revisions = true;
+            duplicate(std::mem::replace(&mut seen.track_revisions, true));
             settings
                 .values
                 .set_track_revisions(parse_on_off(element, decoder, resolver)?);
@@ -544,19 +559,11 @@ fn parse_setting(
                 .push(SmartTagType::new(namespace_uri, name, url).map_err(map_docx_error)?);
         },
         b"doNotEmbedSmartTags" => {
-            if std::mem::replace(&mut seen.do_not_embed_smart_tags, true) {
-                return Err(Error::InvalidFormat(
-                    "duplicate doNotEmbedSmartTags setting".into(),
-                ));
-            }
+            duplicate(std::mem::replace(&mut seen.do_not_embed_smart_tags, true));
             settings.do_not_embed_smart_tags = parse_on_off(element, decoder, resolver)?;
         },
         b"attachedTemplate" => {
-            if std::mem::replace(&mut seen.attached_template, true) {
-                return Err(Error::InvalidFormat(
-                    "duplicate attachedTemplate setting".into(),
-                ));
-            }
+            duplicate(std::mem::replace(&mut seen.attached_template, true));
             let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
                 .ok_or_else(|| {
                     Error::InvalidFormat("attachedTemplate relationship ID is required".into())
@@ -572,28 +579,20 @@ fn parse_setting(
             });
         },
         b"writeProtection" => {
-            if std::mem::replace(&mut seen.write_protection, true) {
-                return Err(Error::InvalidFormat(
-                    "duplicate writeProtection setting".into(),
-                ));
-            }
+            duplicate(std::mem::replace(&mut seen.write_protection, true));
             settings
                 .values
                 .set_write_protected(parse_on_off(element, decoder, resolver)?);
         },
         b"view" => {
-            if settings.values.view().is_some() {
-                return Err(Error::InvalidFormat("duplicate view setting".into()));
-            }
+            duplicate(settings.values.view().is_some());
             let value = required_attribute(element, b"val", decoder, resolver, "view mode")?;
             settings.values.set_view(Some(
                 View::from_xml(&value).map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ));
         },
         b"proofState" => {
-            if settings.values.proofing_state().is_some() {
-                return Err(Error::InvalidFormat("duplicate proofState setting".into()));
-            }
+            duplicate(settings.values.proofing_state().is_some());
             let mut state = ProofingState::new();
             if let Some(value) = word_attribute_value(element, b"spelling", decoder, resolver)? {
                 state.set_spelling(Some(
@@ -610,11 +609,7 @@ fn parse_setting(
             settings.values.set_proofing_state(Some(state));
         },
         b"defaultTabStop" => {
-            if settings.values.default_tab_stop_twips().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate defaultTabStop setting".into(),
-                ));
-            }
+            duplicate(settings.values.default_tab_stop_twips().is_some());
             let value = required_attribute(element, b"val", decoder, resolver, "default tab stop")?;
             settings
                 .values
@@ -623,11 +618,7 @@ fn parse_setting(
                 })?));
         },
         b"themeFontLang" => {
-            if settings.values.theme_font_languages().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate themeFontLang setting".into(),
-                ));
-            }
+            duplicate(settings.values.theme_font_languages().is_some());
             let mut languages = ThemeFontLanguages::new();
             if let Some(value) = word_attribute_value(element, b"val", decoder, resolver)? {
                 languages.set_latin(Some(value))?;
@@ -641,11 +632,7 @@ fn parse_setting(
             settings.values.set_theme_font_languages(Some(languages));
         },
         b"clrSchemeMapping" => {
-            if settings.values.color_scheme_mapping().is_some() {
-                return Err(Error::InvalidFormat(
-                    "duplicate clrSchemeMapping setting".into(),
-                ));
-            }
+            duplicate(settings.values.color_scheme_mapping().is_some());
             let mut mapping = ColorSchemeMapping::new();
             for slot in ColorSchemeSlot::ALL {
                 if let Some(value) = word_attribute_value(

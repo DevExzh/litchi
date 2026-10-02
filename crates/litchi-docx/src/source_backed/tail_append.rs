@@ -1479,6 +1479,28 @@ pub(super) fn validate_topology(
         )
         .map_err(Error::Document)?;
         check_progress(managed_context.as_ref(), cancellation, 0).map_err(map_scan_error)?;
+        // Reads resolve a repeated singleton setting later-value-wins and
+        // record it (`SettingsDefect::DuplicateSetting`). An in-place edit
+        // must not guess which `w:documentProtection` or `w:trackRevisions`
+        // occurrence a consumer honors, so the writer keeps the cardinality
+        // rule as a hard refusal.
+        if inspected
+            .tolerance_report()
+            .defects()
+            .iter()
+            .any(|tolerated| {
+                tolerated.defect
+                    == crate::leniency::Defect::Settings(
+                        crate::leniency::SettingsDefect::DuplicateSetting,
+                    )
+            })
+            || inspected.tolerance_report().unrecorded() != 0
+        {
+            return Err(Error::Document(DocumentError::InvalidFormat(
+                "settings part repeats a singleton setting; tail append requires unambiguous settings"
+                    .into(),
+            )));
+        }
         if inspected.is_protected() || inspected.is_write_protected() || inspected.track_revisions()
         {
             return Err(Error::Refused(Refusal::Protection));

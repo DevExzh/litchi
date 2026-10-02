@@ -181,3 +181,49 @@ fn ill_formed_settings_xml_stays_fatal() {
     let package = open(&settings_package(&settings_xml));
     assert!(package.document().expect("document").settings().is_err());
 }
+
+// ---------------------------------------------------------------------------
+// F2.3 — duplicate singleton settings elements
+// ---------------------------------------------------------------------------
+
+#[test]
+fn duplicate_singleton_settings_take_the_later_value_and_are_recorded() {
+    let settings_xml = format!(
+        r#"<w:settings xmlns:w="{W}"><w:view w:val="print"/><w:defaultTabStop w:val="720"/><w:view w:val="web"/><w:compat><w:spaceForUL/></w:compat><w:defaultTabStop w:val="360"/></w:settings>"#
+    );
+    let second_view = offset_of(&settings_xml, r#"<w:view w:val="web""#);
+    let second_tab = offset_of(&settings_xml, r#"<w:defaultTabStop w:val="360""#);
+    let package = open(&settings_package(&settings_xml));
+    let document = package.document().expect("document");
+    let settings = document
+        .settings()
+        .expect("duplicate settings no longer fail the part")
+        .expect("settings present");
+    assert_eq!(settings.view(), Some(litchi_docx::settings::View::Web));
+    assert_eq!(settings.default_tab_stop_twips(), Some(360));
+    assert_eq!(settings.compatibility_options().len(), 1);
+    let recorded = [
+        ToleratedDefect {
+            defect: Defect::Settings(SettingsDefect::DuplicateSetting),
+            context: second_view,
+        },
+        ToleratedDefect {
+            defect: Defect::Settings(SettingsDefect::DuplicateSetting),
+            context: second_tab,
+        },
+    ];
+    assert_eq!(settings.tolerance_report().defects(), &recorded);
+    assert_eq!(document.tolerance_report().defects(), &recorded);
+}
+
+#[test]
+fn singleton_settings_record_nothing() {
+    let settings_xml = format!(
+        r#"<w:settings xmlns:w="{W}"><w:view w:val="print"/><w:defaultTabStop w:val="720"/><w:footnotePr><w:numFmt w:val="lowerRoman"/></w:footnotePr></w:settings>"#
+    );
+    let package = open(&settings_package(&settings_xml));
+    let document = package.document().expect("document");
+    let settings = document.settings().expect("settings").expect("present");
+    assert!(settings.tolerance_report().is_clean());
+    assert!(document.tolerance_report().is_clean());
+}
