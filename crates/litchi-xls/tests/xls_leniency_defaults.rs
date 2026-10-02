@@ -15,12 +15,13 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::Cell as _;
 use litchi_xls::{
-    Defect, EncodingDefect, Leniency, OpenOptions, SheetNameDefect, SourceBackedOptions,
-    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
+    Defect, EncodingDefect, Leniency, OpenOptions, PaletteDefect, SheetNameDefect,
+    SourceBackedOptions, SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
 };
 
 const CODEPAGE: u16 = 0x0042;
 const BOUND_SHEET: u16 = 0x0085;
+const PALETTE: u16 = 0x0092;
 const INDEX: u16 = 0x020B;
 
 /// One BIFF record of a Workbook stream, remembering where it sat in the
@@ -31,6 +32,16 @@ struct Record {
     kind: u16,
     payload: Vec<u8>,
     original_offset: Option<usize>,
+}
+
+impl Record {
+    fn new(kind: u16, payload: Vec<u8>) -> Self {
+        Self {
+            kind,
+            payload,
+            original_offset: None,
+        }
+    }
 }
 
 /// A writer-built workbook's Workbook stream, split into records.
@@ -87,6 +98,12 @@ impl Stream {
     fn payload_mut(&mut self, kind: u16, nth: usize) -> &mut Vec<u8> {
         let index = self.position(kind, nth);
         &mut self.records[index].payload
+    }
+
+    /// Insert `record` immediately before the `nth` record of `kind`.
+    fn insert_before(&mut self, kind: u16, nth: usize, record: Record) {
+        let index = self.position(kind, nth);
+        self.records.insert(index, record);
     }
 
     /// Byte offset the `index`th record will occupy in the serialized stream.
@@ -209,6 +226,25 @@ fn assert_repairs_under(
 /// exactly the `expected` repairs, in order. Returns the eager workbook.
 fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<Cursor<Vec<u8>>> {
     assert_repairs_under(package, Leniency::default(), expected)
+}
+
+/// The eager open records exactly `expected` under the default policy; the
+/// source-backed open, which never reads the carrying record, opens it with
+/// nothing to repair.
+fn assert_eager_repairs(
+    package: &[u8],
+    expected: &[(Defect, u32, u32)],
+) -> Workbook<Cursor<Vec<u8>>> {
+    let (workbook, source_report) = open_both(package, Leniency::default());
+    let found = workbook
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|entry| (entry.defect(), entry.ordinal(), entry.observed()))
+        .collect::<Vec<_>>();
+    assert_eq!(found, expected);
+    assert!(source_report.is_clean(), "{source_report:?}");
+    workbook
 }
 
 /// Both read paths refuse `package` under `leniency`, each with an error
@@ -399,4 +435,91 @@ fn the_sheet_name_opt_in_records_nothing_for_conforming_names() {
         // A name that differs from another by more than case is no duplicate.
         assert_clean_under(&with_second_sheet_name("Data2"), leniency);
     }
+}
+
+// ---------------------------------------------------------------------------
+// F3.4: Palette reserved byte, color count, duplicates
+// ---------------------------------------------------------------------------
+
+/// A `Palette` payload of `count` entries, entry `i` colored `(i, i, i)` with
+/// reserved byte `reserved`.
+fn palette_payload(count: i16, reserved: u8) -> Vec<u8> {
+    let mut payload = count.to_le_bytes().to_vec();
+    for index in 0..count {
+        let level = u8::try_from(index).unwrap();
+        payload.extend_from_slice(&[level, level, level, reserved]);
+    }
+    payload
+}
+
+/// The fixture with one `Palette` record per payload inserted before the
+/// first `BoundSheet8`, plus each record's offset.
+fn with_palettes(payloads: &[Vec<u8>]) -> (Vec<u8>, Vec<u32>) {
+    let mut stream = Stream::simple();
+    for payload in payloads {
+        stream.insert_before(BOUND_SHEET, 0, Record::new(PALETTE, payload.clone()));
+    }
+    let offsets = (0..payloads.len())
+        .map(|nth| stream.offset_of_kind(PALETTE, nth))
+        .collect();
+    (stream.package(), offsets)
+}
+
+#[test]
+fn a_palette_reserved_byte_is_ignored_and_recorded() {
+    let (package, offsets) = with_palettes(&[palette_payload(56, 0xFF)]);
+    let workbook = assert_eager_repairs(
+        &package,
+        &[(Defect::Palette(PaletteDefect::ReservedByte), offsets[0], 56)],
+    );
+    let color = workbook.palette().color(0x08 + 9).unwrap();
+    assert_eq!((color.red(), color.green(), color.blue()), (9, 9, 9));
+}
+
+#[test]
+fn a_short_palette_keeps_default_colors_for_the_remainder() {
+    let (package, offsets) = with_palettes(&[palette_payload(16, 0)]);
+    let workbook = assert_eager_repairs(
+        &package,
+        &[(Defect::Palette(PaletteDefect::ColorCount), offsets[0], 16)],
+    );
+    let custom = workbook.palette().color(0x08 + 15).unwrap();
+    assert_eq!(custom.red(), 15);
+    // Entry 0x3F is past the record's 16 colors: the default (51, 51, 51).
+    let default = workbook.palette().color(0x3F).unwrap();
+    assert_eq!(
+        (default.red(), default.green(), default.blue()),
+        (51, 51, 51)
+    );
+}
+
+#[test]
+fn the_last_of_two_palettes_wins_and_is_recorded() {
+    let mut second = palette_payload(56, 0);
+    second[2..5].copy_from_slice(&[200, 100, 50]);
+    let (package, offsets) = with_palettes(&[palette_payload(56, 0), second]);
+    let workbook = assert_eager_repairs(
+        &package,
+        &[(Defect::Palette(PaletteDefect::Duplicate), offsets[1], 2)],
+    );
+    let color = workbook.palette().color(0x08).unwrap();
+    assert_eq!((color.red(), color.green(), color.blue()), (200, 100, 50));
+}
+
+#[test]
+fn a_conforming_palette_records_nothing() {
+    let (package, _) = with_palettes(&[palette_payload(56, 0)]);
+    assert_clean(&package);
+}
+
+#[test]
+fn a_palette_whose_length_contradicts_its_count_is_still_refused() {
+    let mut payload = palette_payload(56, 0);
+    payload.truncate(payload.len() - 4);
+    let (package, _) = with_palettes(&[payload]);
+    let Err(error) = Workbook::new(Cursor::new(package)) else {
+        panic!("record framing stays a hard error");
+    };
+    let error = error.to_string();
+    assert!(error.contains("Palette"), "{error}");
 }

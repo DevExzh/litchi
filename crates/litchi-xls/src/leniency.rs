@@ -17,8 +17,8 @@
 //! bytes Excel and LibreOffice read past without complaint, so rejecting
 //! them would cost the caller a whole worksheet over metadata that cannot
 //! change what a conforming workbook means. Each substitutes the value
-//! documented on the corresponding [`CellFormatDefect`] or [`EncodingDefect`]
-//! variant.
+//! documented on the corresponding [`CellFormatDefect`], [`EncodingDefect`],
+//! or [`PaletteDefect`] variant.
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
@@ -26,7 +26,10 @@
 //! documented substitute value only under
 //! [`Leniency::TolerateFormattingDefects`]; under [`Leniency::Strict`] they
 //! remain hard errors, because rejecting them is the only way to guarantee a
-//! caller never silently reads a value the file did not contain.
+//! caller never silently reads a value the file did not contain. Worksheet
+//! names that break the MS-XLS naming rules ([`SheetNameDefect`]) are kept
+//! verbatim only under [`Leniency::TolerateSheetNameDefects`];
+//! [`Leniency::TolerateAllDefects`] enables both opt-in classes.
 
 use super::error::{Error, Result};
 
@@ -299,11 +302,57 @@ impl EncodingDefect {
 /// `CODEPAGE` (MS-XLS 2.4.52).
 const CODEPAGE_RECORD: u16 = 0x0042;
 
+/// The class of `Palette` defect the reader repairs the way Excel repairs it.
+///
+/// Repaired and recorded under every [`Leniency`] variant: each repair
+/// follows a MS-XLS "MUST be ignored" directive or the reading LibreOffice
+/// and POI apply, and none can change a conforming workbook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PaletteDefect {
+    /// One or more `LongRGB.reserved` bytes (MS-XLS 2.5.177) were nonzero.
+    ///
+    /// The bytes are ignored, as the specification directs; the colors are
+    /// read from the red, green, and blue bytes alone.
+    ReservedByte,
+    /// `Palette.ccv` (MS-XLS 2.4.188) was not 56, though the payload held
+    /// exactly `ccv` entries.
+    ///
+    /// The first 56 entries are used and any missing entry keeps its default
+    /// color, as LibreOffice and POI read a short or long palette.
+    ColorCount,
+    /// The workbook globals held more than one `Palette` record.
+    ///
+    /// The last record wins, as in Excel and LibreOffice.
+    Duplicate,
+}
+
+impl PaletteDefect {
+    /// The BIFF record type whose payload carried the defect: `Palette`.
+    #[must_use]
+    pub fn record_type(self) -> u16 {
+        PALETTE_RECORD
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            PaletteDefect::ReservedByte => "Palette LongRGB reserved byte is nonzero",
+            PaletteDefect::ColorCount => "Palette declares a color count other than 56",
+            PaletteDefect::Duplicate => "Workbook globals contain more than one Palette record",
+        }
+    }
+}
+
+/// `Palette` (MS-XLS 2.4.188).
+const PALETTE_RECORD: u16 = 0x0092;
+
 /// One class of defect repaired while a workbook was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
-/// a read may change about a workbook. [`Defect::CellFormat`] and
-/// [`Defect::Encoding`] classes are repaired under every [`Leniency`]
+/// a read may change about a workbook. Every class except the two opt-in
+/// ones is an Excel-compatible repair applied under every [`Leniency`]
 /// variant; [`Defect::Formatting`] classes require
 /// [`Leniency::TolerateFormattingDefects`] and [`Defect::SheetName`] classes
 /// [`Leniency::TolerateSheetNameDefects`] (either is implied by
@@ -318,6 +367,8 @@ pub enum Defect {
     CellFormat(CellFormatDefect),
     /// A text-encoding defect repaired the way Excel repairs it.
     Encoding(EncodingDefect),
+    /// A `Palette` defect repaired the way Excel repairs it.
+    Palette(PaletteDefect),
     /// A worksheet-name defect repaired by the opt-in [`Leniency`] variant.
     SheetName(SheetNameDefect),
 }
@@ -334,6 +385,7 @@ impl Defect {
             Defect::Formatting(defect) => Some(defect.record_type()),
             Defect::CellFormat(defect) => defect.record_type(),
             Defect::Encoding(defect) => defect.record_type(),
+            Defect::Palette(defect) => Some(defect.record_type()),
             Defect::SheetName(defect) => Some(defect.record_type()),
         }
     }
@@ -345,6 +397,7 @@ impl Defect {
             Defect::Formatting(defect) => defect.description(),
             Defect::CellFormat(defect) => defect.description(),
             Defect::Encoding(defect) => defect.description(),
+            Defect::Palette(defect) => defect.description(),
             Defect::SheetName(defect) => defect.description(),
         }
     }
@@ -365,6 +418,12 @@ impl From<CellFormatDefect> for Defect {
 impl From<SheetNameDefect> for Defect {
     fn from(defect: SheetNameDefect) -> Self {
         Self::SheetName(defect)
+    }
+}
+
+impl From<PaletteDefect> for Defect {
+    fn from(defect: PaletteDefect) -> Self {
+        Self::Palette(defect)
     }
 }
 
@@ -403,7 +462,8 @@ impl ToleratedDefect {
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
     /// the `CODEPAGE` record within the Workbook stream. For every
     /// [`SheetNameDefect`] it is the zero-based workbook sheet index of the
-    /// `BoundSheet8` record.
+    /// `BoundSheet8` record. For every [`PaletteDefect`] it is the byte
+    /// offset of the `Palette` record within the Workbook stream.
     #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -425,7 +485,11 @@ impl ToleratedDefect {
     /// the first forbidden character's scalar value; for
     /// [`SheetNameDefect::EdgeApostrophe`] the apostrophe (0x27); for
     /// [`SheetNameDefect::Duplicate`] the sheet index of the earlier sheet it
-    /// repeats; and zero for [`SheetNameDefect::Empty`].
+    /// repeats; and zero for [`SheetNameDefect::Empty`]. For
+    /// [`PaletteDefect::ReservedByte`] it is the number of entries whose
+    /// reserved byte was nonzero; for [`PaletteDefect::ColorCount`] the
+    /// declared `ccv`; for [`PaletteDefect::Duplicate`] the one-based count
+    /// of `Palette` records seen so far.
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
@@ -444,10 +508,9 @@ impl ToleratedDefect {
 /// Everything a read repaired, in the order the defects were found.
 ///
 /// An empty report means the workbook conformed and no substitution was made.
-/// After a [`Leniency::Strict`] read the report can still list
-/// [`Defect::CellFormat`] and [`Defect::Encoding`] repairs, which Excel
-/// itself applies; it never lists the opt-in [`Defect::Formatting`] or
-/// [`Defect::SheetName`] repairs.
+/// After a [`Leniency::Strict`] read the report can still list the
+/// Excel-compatible repairs Excel itself applies; it never lists the opt-in
+/// [`Defect::Formatting`] or [`Defect::SheetName`] repairs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,

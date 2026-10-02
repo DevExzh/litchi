@@ -41,7 +41,7 @@ impl<R: Read + Seek> Workbook<R> {
         self.formatting = Arc::new(Formatting::parse_globals(&records, tolerance)?);
         self.is_1904_date_system = self.formatting.date_system() == DateSystem::Excel1904;
 
-        let mut palette_seen = false;
+        let mut palette_seen = 0_u32;
         let mut protection_collector = protection::WorkbookProtectionCollector::new();
         let mut calculation_collector = crate::calculation::WorkbookCalculationCollector::new();
         let mut vba_collector = crate::vba::WorkbookVbaCollector::new();
@@ -98,7 +98,9 @@ impl<R: Read + Seek> Workbook<R> {
                 0x0092 => {
                     self.palette = crate::palette::Palette::parse_unique_record(
                         record.payload(),
+                        record_offset(record),
                         &mut palette_seen,
+                        tolerance.report_mut(),
                     )?;
                 },
                 crate::theme::THEME_RECORD_TYPE => {
