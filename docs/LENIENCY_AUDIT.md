@@ -453,6 +453,8 @@ against the crate's public API.
   untyped occurrence (keep range and content), record the reason; never abort the
   inventory; unknown lock values → unlocked with record.
 ### 2.9 `ilvl` value > 8 hard-errors paragraph and style numbering — P2 (confidence: high on behavior; medium on frequency)
+> **Status: FIXED (2026-10-02)** — paragraph/style `ilvl` > 8 clamps to 8 and style `outlineLvl` > 9 is ignored (Word), recorded as `NumberingDefect::LevelOutOfRange` / `StyleDefect`. Also fixed a
+> silent bug: style properties expanded by markup-compatibility processing (`<x></x>` form, every Word 2010+ styles.xml) were dropped. Package/metadata repairs now fold into the docx report.
 - **Location**: `crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs:108` and
   :149 ("invalid paragraph ilvl '{raw}'"); styles at `styles.rs:424-427` ("invalid style
   outlineLvl '{raw}'").
@@ -466,6 +468,8 @@ against the crate's public API.
   record `IlvlOutOfRange`; for styles, skip the offending property rather than failing
   the style table load.
 ### 2.10 Drawing shape inventory rejects unknown `a:prstGeom@prst` values — P2 (confidence: high on behavior; medium on frequency)
+> **Status: FIXED (2026-10-02)** — unknown/missing `a:prstGeom@prst` keeps the object (`preset()` None, raw token in `unknown_preset()`), recorded as `DrawingDefect::{UnknownPreset, MissingPreset}`
+> via `Document::drawing_objects()`.
 - **Location**: `crates/litchi-docx/src/drawing/codec.rs:357` ("invalid DrawingML shape
   preset '{value}'"); rejection asserted as desired behavior in drawing/tests.rs:12-15.
 - **Check**: `prst` missing or not in the closed `Preset` enum raises
@@ -481,6 +485,7 @@ against the crate's public API.
 - **Suggested posture**: default-repair — model `Preset::Unknown(String)` (preserve
   token) or degrade `preset` to `None` keeping the rest of the object; record.
 ### 2.11 `w:fldSimple` missing `w:instr` kills the entire field listing — P2
+> **Status: FIXED (2026-10-02)** — `w:fldSimple` without `w:instr` is kept with an empty instruction and its cached result (LibreOffice), recorded as `FieldDefect::MissingInstruction`; the listing survives.
 - **Location**: `crates/litchi-docx/src/field/codec.rs:1366` ("DOCX simple field is
   missing w:instr").
 - **Check**: `Error::Invalid` from the single-pass extractor; `doc.fields()` returns no
@@ -494,6 +499,8 @@ against the crate's public API.
 - **Suggested posture**: default-repair — skip the offending field (or model it with an
   empty instruction), record `FldSimpleMissingInstr`.
 ### 2.12 Section header/footer reference rejects non-XML-ID relationship IDs — P2 (confidence: high on code; medium-low on frequency)
+> **Status: FIXED (2026-10-02)** — a non-empty, non-NCName header/footer `r:id` is kept and recorded as `SectionDefect::NonConformingRelationshipId`; an empty ID stays fatal and writers still require
+> an NCName. (litchi-opc still rejects non-XML-ID `.rels` Ids, so such a reference cannot resolve yet.)
 - **Location**: `crates/litchi-docx/src/section/codec.rs:1148` (`is_xml_id` check on
   `headerReference`/`footerReference` `r:id`; helper at :1159).
 - **Check**: `r:id` must be non-empty and start with a letter/underscore; otherwise
@@ -1217,8 +1224,8 @@ absolutely.
   coordinates, clamp negative extents to 0 (or record raw), dropping only the offending
   shape's `Bounds`, never the scene; record each repair.
 ### 6.3 Processing instructions are hard-rejected crate-wide (108 `Event::PI` rejection sites) — P2 (confidence: high; low frequency, near-zero fix cost)
-> **Status: PARTIALLY FIXED (2026-10-02)** — processing instructions are skipped by the shape scene, slide text, animation host scan, layout-list scan and transition readers and recorded as
-> `MarkupDefect::ProcessingInstruction`; feature readers without a report carrier still reject them; DOCTYPE stays rejected.
+> **Status: PARTIALLY FIXED (2026-10-02)** — processing instructions are skipped and recorded (`MarkupDefect::ProcessingInstruction`) by the shape scene, slide text, animation, layout,
+> transition, view/presentation properties, chart info and comments readers; byte-exact edit planners stay strict by design, and feature readers without a report (notes, table styles, tags, fonts, media, …) still reject; listed in pptx `leniency.rs`.
 - **Location**: `crates/litchi-pptx/src/shape/reader.rs:551-554` (representative; also
   `parts/slide.rs:146-148,418-422,915-919`, `font/codec.rs:296-298`,
   `view_properties/codec.rs:178-180`, `media_parts/codec.rs:545`,
@@ -1324,6 +1331,8 @@ absolutely.
 - **Suggested posture**: default-repair — treat unparseable id/idx as `None` (both fields
   are already `Option` in `Record`), record the drop. Semantics-preserving.
 ### 6.9 Semantic slide text: foreign `t` elements, CDATA/entity references outside `a:t` are fatal — P2
+> **Status: FIXED (2026-10-02)** — non-DrawingML `t` elements are skipped with their subtree and recorded as `MarkupDefect::ForeignTextElement` (`text_with_tolerance`); CDATA/entities outside `a:t`
+> are accepted as valid XML; undefined entities stay fatal. OPC + core/custom-properties repairs now fold into the pptx open-time report.
 - **Location**: `crates/litchi-pptx/src/parts/slide.rs:683` ("foreign text element is not
   a DrawingML a:t element", also :715, :747), :906-911 (CDATA / general entity reference
   outside DrawingML text), raw-scan equivalents :415-422,445-447,466-469.
@@ -1340,6 +1349,7 @@ absolutely.
   through/skip CDATA and entity events outside `a:t` (the sibling extractor already proves
   this is safe); record the encounter. Same shape as litchi-docx F2.1.
 ### 6.10 Chart info: `barDir` value, duplicate structural elements, required `chart`/`plotArea` are fatal — P2
+> **Status: FIXED (2026-10-02)** — missing/unknown `barDir` → Column (LibreOffice), duplicate chart/title/legend/plotArea first-wins, missing chart/plotArea → `Type::Unknown`; recorded as `ChartDefect`.
 - **Location**: `crates/litchi-pptx/src/chart/codec.rs:334-347` ("barDir is missing its
   val attribute" :337; "invalid barDir value" :343), :217-247,272-302 (duplicate
   chart/title/legend/plotArea), :153-157 (missing chart or plotArea).
@@ -1354,6 +1364,7 @@ absolutely.
   duplicates → first wins; missing `chart`/`plotArea` → `Type::Unknown` with empty info.
   Record each.
 ### 6.11 View properties: allow-listed attributes/children plus strict child ordering — P2
+> **Status: FIXED (2026-10-02)** — view properties ignore unknown attributes/children, accept any order, keep the first duplicate; recorded as `ViewDefect` (`parse_with_tolerance`); `parse_strict` kept for reorder checks.
 - **Location**: `crates/litchi-pptx/src/view_properties/codec.rs:871-878` (`only()` — any
   non-allow-listed attribute is `Error::Invalid`; call sites at :265, :311, :354, :361,
   :376), :278-283 (unknown `viewPr` child / out-of-order children), :322-325,363-368
@@ -1373,6 +1384,8 @@ absolutely.
   child order (assign by name), preserve unknown subtrees opaquely as for `extLst`; record
   the skips.
 ### 6.12 Comments: `idx == 0` and duplicate `(authorId, idx)` keys fail the whole comment part — P2
+> **Status: FIXED (2026-10-02)** — comments with `idx="0"` or a repeated `(authorId, idx)` load (both kept, as LibreOffice imports every `p:cm`) and are recorded as `CommentDefect::{ZeroIndex,
+> DuplicateKey}` via `load_presentation_comments_with_tolerance`; comment edits load strictly and refuse a repaired graph.
 - **Location**: `crates/litchi-pptx/src/comments/codec.rs:124-131` ("duplicate
   author/index comment key in slide" :130; `idx` parse at :120), mirrored at :210-218
   (validate).
@@ -1817,6 +1830,8 @@ and manifest grammar purism.
   record; identical-mapping duplicates are trivially safe, conflicting ones degrade to
   first-wins exactly like LibreOffice.
 ### 8.10 A `.rels` member declared with a non-relationships content type rejects the package — P2 (confidence: high on code/references; low-medium on frequency)
+> **Status: FIXED (2026-10-02)** — a `.rels` member declared with another content type is read as relationships (LibreOffice/POI identify by name) and recorded as `RelationshipPartType`.
+> OPC repairs now also fold into the xlsb workbook report.
 - **Location**: `crates/litchi-opc/src/pkgreader.rs:1922-1937`
   (`relationship_part_content_type`: a manifest mapping a `_rels/*.rels` name to anything
   other than the fixed constant → `OpcError::InvalidContentType`).
@@ -1831,6 +1846,8 @@ and manifest grammar purism.
 - **Suggested posture**: default-repair — override the declared type with the fixed
   constant (the part *is* parsed as relationships regardless), record the mismatch.
 ### 8.11 Manifest shape strictness: unknown elements, unexpected attributes, text, CDATA in `[Content_Types].xml` and `.rels` — P2 (confidence: high on code/POI/LO; medium on rarity)
+> **Status: FIXED (2026-10-02)** — unknown elements (with subtree), unknown attributes and text/CDATA in `[Content_Types].xml` and `.rels` are ignored and recorded (POI); ill-formed XML, unbound
+> prefixes, DOCTYPE, wrong root, missing key attributes and limits stay fatal.
 - **Location**: `[Content_Types].xml` — `crates/litchi-opc/src/content_type.rs:136-146`
   (non-whitespace text / CDATA), :327 ("unexpected element or namespace in content types
   manifest"), :348-350 (children other than Default/Override), :393 ("unexpected
@@ -1850,6 +1867,8 @@ and manifest grammar purism.
   (ignore + record); opt-in leniency for unknown elements (skip + record), since
   LibreOffice shares the element-level strictness.
 ### 8.12 MIME grammar validation of every ContentType value — P2 (confidence: high on code/POI parity; low-medium on frequency)
+> **Status: FIXED (2026-10-02)** — non-grammatical content types/extensions are kept verbatim and compared exactly (LibreOffice), recorded as `InvalidMediaType`/`InvalidExtension`; empty values and
+> control characters stay fatal; new/edited parts still get the grammar check.
 - **Location**: `crates/litchi-opc/src/content_type.rs:232-266`
   (`validate_content_type`) + :268 (`is_token`); :406-418 (`InvalidContentTypeExtension`
   for extensions with spaces/non-ASCII).
