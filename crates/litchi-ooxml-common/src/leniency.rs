@@ -39,10 +39,9 @@
 //!
 //! # Status
 //!
-//! The carriers are in place; the defect classes are the contract for
-//! findings 8.1–8.4 of `docs/LENIENCY_AUDIT.md`. Recording sites land finding
-//! by finding: 8.1 (core-properties body), 8.2 (core-properties graph), 8.3
-//! (custom-properties records).
+//! Live for findings 8.1 (core-properties body), 8.2 (core-properties graph),
+//! 8.3 (custom-properties records), and 8.4 (reserved sensitivity-label
+//! properties, advisory on read) of `docs/LENIENCY_AUDIT.md`.
 
 use std::fmt;
 

@@ -6,8 +6,9 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec;
 use super::model::Props;
-use super::reserved::Host;
+use super::reserved::{self, Host};
 use super::schema::{PART_NAME, PART_TARGET, invalid};
+use crate::leniency::CustomPropertiesDefect;
 use crate::{Error, Result};
 
 impl Props {
@@ -23,12 +24,19 @@ impl Props {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     pub fn read(package: &OpcPackage) -> Result<Self> {
+        Ok(Self::read_selected(package)?.0)
+    }
+
+    /// Read the relationship-selected part, returning its name with the
+    /// collection.
+    fn read_selected(package: &OpcPackage) -> Result<(Self, Option<PackURI>)> {
         let graph = inspect_graph(package)?;
         let Some(part_name) = graph.part_name else {
-            return Ok(Self::new());
+            return Ok((Self::new(), None));
         };
         let part = package.get_part(&part_name)?;
-        codec::decode_tolerant(part.blob(), part_name.as_str())
+        let properties = codec::decode_tolerant(part.blob(), part_name.as_str())?;
+        Ok((properties, Some(part_name)))
     }
 
     /// Reads custom properties and validates reserved names for `host`.
@@ -40,8 +48,33 @@ impl Props {
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
+    ///
+    /// On read the host check is advisory (LENIENCY_AUDIT 8.4): a reserved
+    /// property scoped to another host, or one whose value lacks the inferred
+    /// format, is skipped and recorded as
+    /// [`ReservedProperty`](crate::leniency::CustomPropertiesDefect::ReservedProperty)
+    /// rather than failing the document. [`Self::write_for`] still validates
+    /// strictly.
     pub fn read_for(package: &OpcPackage, host: Host) -> Result<Self> {
-        let properties = Self::read(package)?;
+        let (mut properties, part_name) = Self::read_selected(package)?;
+        let rejected: Vec<String> = properties
+            .properties
+            .iter()
+            .filter(|(name, property)| {
+                reserved::validate_property(name, &property.value, Some(host)).is_err()
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+        let part = part_name.as_ref().map_or(PART_NAME, PackURI::as_str);
+        for name in rejected {
+            properties.remove(&name);
+            properties.tolerance_report.record(
+                CustomPropertiesDefect::ReservedProperty,
+                part,
+                Some(&name),
+                Some(host_name(host)),
+            );
+        }
         properties.validate_for(host)?;
         Ok(properties)
     }
@@ -213,6 +246,14 @@ fn inspect_graph(package: &OpcPackage) -> Result<PackageGraph> {
         part_name: Some(part_name),
         relationship_id: Some(relationship.r_id().to_owned()),
     })
+}
+
+fn host_name(host: Host) -> &'static str {
+    match host {
+        Host::Excel => "Excel",
+        Host::Word => "Word",
+        Host::PowerPoint => "PowerPoint",
+    }
 }
 
 pub(super) fn custom_part_name() -> Result<PackURI> {

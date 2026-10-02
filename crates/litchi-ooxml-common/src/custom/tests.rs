@@ -494,7 +494,11 @@ fn powerpoint_locations_require_escaped_names_and_host_boundaries() {
         .write_for(&mut package, Host::PowerPoint)
         .expect("host-aware write");
     Props::read_for(&package, Host::PowerPoint).expect("host-aware read");
-    assert!(Props::read_for(&package, Host::Word).is_err());
+    // LENIENCY_AUDIT 8.4: on read the host scope is advisory.
+    let word = Props::read_for(&package, Host::Word).expect("advisory on read");
+    assert!(!word.contains(HEADER_LOCATIONS));
+    assert!(word.contains(HEADER_TEXT));
+    assert_eq!(word.tolerance_report().total(), 1);
 }
 
 /// Build a package whose custom-properties part holds `xml`.
@@ -579,4 +583,57 @@ fn package_reads_skip_bad_custom_properties_and_record_them() {
     .expect("clean");
     assert!(clean.tolerance_report().is_clean());
     assert!(Props::read(&package_with_custom(&format!("{PREFIX}<property"))).is_err());
+}
+
+/// LENIENCY_AUDIT 8.4: reserved sensitivity-label checks are advisory on
+/// read — a property scoped to another host or with a malformed value is
+/// skipped and recorded instead of failing the document; writes stay strict.
+#[test]
+fn reserved_property_violations_are_skipped_on_read_for() {
+    use crate::leniency::CustomPropertiesDefect as D;
+    let body = [
+        property(2, "Keep", "<vt:lpwstr>yes</vt:lpwstr>"),
+        property(
+            3,
+            "ClassificationWatermarkLocations",
+            "<vt:lpwstr>Office Theme:10</vt:lpwstr>",
+        ),
+        property(4, "Sensitivity", "<vt:lpwstr>not-a-guid</vt:lpwstr>"),
+    ]
+    .concat();
+    let package = package_with_custom(&document(&body));
+    let props = Props::read_for(&package, Host::Word).expect("advisory on read");
+    assert_eq!(props.len(), 1);
+    assert!(props.contains("Keep"));
+    let reported: Vec<_> = props
+        .tolerance_report()
+        .iter()
+        .map(|t| (t.defect(), t.item().map(str::to_owned), t.value().map(str::to_owned)))
+        .collect();
+    assert_eq!(
+        reported,
+        vec![
+            (
+                D::ReservedProperty.into(),
+                Some("Sensitivity".to_owned()),
+                None
+            ),
+            (
+                D::ReservedProperty.into(),
+                Some("ClassificationWatermarkLocations".to_owned()),
+                Some("Word".to_owned())
+            ),
+        ]
+    );
+
+    // PowerPoint owns the watermark locations, so only the bad GUID is skipped.
+    let props = Props::read_for(&package, Host::PowerPoint).expect("advisory on read");
+    assert_eq!(props.len(), 2);
+
+    // Authoring stays strict.
+    let mut authored = Props::new();
+    authored
+        .insert("ClassificationWatermarkLocations", "Office Theme:10")
+        .expect("host-independent insert");
+    assert!(authored.validate_for(Host::Word).is_err());
 }
