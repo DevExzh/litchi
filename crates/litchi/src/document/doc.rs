@@ -695,7 +695,7 @@ impl Document {
             {
                 let detected =
                     crate::detection_smart::detected::detect_document_source_path(path.as_ref())?;
-                return match detected {
+                match detected {
                     #[cfg(feature = "odt")]
                     crate::detection_smart::detected::DocumentSourcePathDetection::Odt(
                         candidate,
@@ -721,7 +721,7 @@ impl Document {
                     crate::detection_smart::detected::DocumentSourcePathDetection::Bytes(bytes) => {
                         Self::from_bytes(bytes)
                     },
-                };
+                }
             }
 
             #[cfg(not(any(unix, windows)))]
