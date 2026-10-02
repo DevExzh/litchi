@@ -258,17 +258,53 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 ///
 /// Based on Apache POI's `StyleTextPropAtom` parsing logic.
 /// Returns (`paragraph_styles`, `character_styles`).
+///
+/// The parse is lenient (finding F5.1's posture): run coverage is clamped to
+/// `text_length + 1`, each section stops at its first unreadable run, and
+/// trailing bytes are dropped. Repairs applied along the way are *not*
+/// enumerable through this convenience function; the crate's text-box read
+/// path ([`crate::EscherTextboxWrapper::new_with_report`] and the slide
+/// shape readers) records each one as
+/// [`crate::TextPropDefect::StyleTextPropCoverage`].
 #[must_use]
 pub fn parse_style_text_prop_atom(
     data: &[u8],
     text_length: usize,
 ) -> (Vec<TextPropCollection>, Vec<TextPropCollection>) {
+    parse_style_text_prop_atom_with_report(
+        data,
+        text_length,
+        &mut crate::leniency::ToleranceReport::default(),
+    )
+}
+
+/// Parse `StyleTextPropAtom` data the way POI and LibreOffice read it,
+/// recording every deviation from the strict MS-PPT framing in `report`.
+///
+/// This is the read-path posture for leniency finding F5.1: run coverage is
+/// clamped to what remains of `text_length + 1`, each of the paragraph and
+/// character sections stops at its first unreadable run (a zero-length run or
+/// a truncated header or property payload), and trailing bytes are dropped.
+/// Each clamp, stop, and dropped tail is recorded as
+/// [`crate::TextPropDefect::StyleTextPropCoverage`] whose context is the
+/// zero-based index of the offending run within the atom (paragraph runs
+/// first, then character runs); a stop or dropped tail records the index
+/// where the next run was expected. When the paragraph section already ran
+/// out of bytes, the resulting character-section shortfall is the same
+/// defect and is not recorded twice.
+///
+/// The strict [`parse_style_text_prop_atom_strict`] rejects exactly the
+/// inputs this parser records a coverage defect for, so a conformant atom
+/// always leaves `report` untouched.
+pub(crate) fn parse_style_text_prop_atom_with_report(
+    data: &[u8],
+    text_length: usize,
+    report: &mut crate::leniency::ToleranceReport,
+) -> (Vec<TextPropCollection>, Vec<TextPropCollection>) {
+    use crate::leniency::TextPropDefect;
+
     let mut paragraph_styles = Vec::new();
     let mut character_styles = Vec::new();
-
-    if data.len() < 8 {
-        return (paragraph_styles, character_styles);
-    }
 
     let mut offset = 0;
     let style_length = u32::try_from(text_length)
@@ -277,29 +313,41 @@ pub fn parse_style_text_prop_atom(
 
     // Parse paragraph styles first
     let mut para_chars_covered = 0u32;
-    while para_chars_covered < style_length && offset + 10 <= data.len() {
-        // Read character count (4 bytes in POI's implementation)
-        let char_count = read_u32_le(data, offset)
-            .unwrap_or(0)
-            .min(style_length - para_chars_covered);
-        offset += 4;
-
-        if char_count == 0 {
+    // Set when the paragraph section ran out of bytes. The character section
+    // then cannot be complete either, and that shortfall is the same defect,
+    // so it is recorded once.
+    let mut data_exhausted = false;
+    while para_chars_covered < style_length {
+        let index = paragraph_styles.len() as u32;
+        if offset + 10 > data.len() {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+            data_exhausted = true;
             break;
         }
+        let declared_count = read_u32_le(data, offset).unwrap_or(0);
+        offset += 4;
+        if declared_count == 0 {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+            break;
+        }
+        let char_count = declared_count.min(style_length - para_chars_covered);
+        if char_count != declared_count {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+        }
 
-        // Read indent level (2 bytes)
         let indent_level = read_u16_le(data, offset).unwrap_or(0);
         offset += 2;
-
-        // Read mask (4 bytes)
         if offset + 4 > data.len() {
+            // Unreachable: the header check above guarantees ten bytes.
             break;
         }
         let mask = read_u32_le(data, offset).unwrap_or(0);
         offset += 4;
 
-        // Parse properties based on mask
+        let payload_truncated = match paragraph_property_size(data, offset, mask) {
+            Ok(size) => offset.saturating_add(size) > data.len(),
+            Err(_err) => true,
+        };
         let (properties, tab_stops) = parse_paragraph_properties(data, &mut offset, mask);
 
         let mut collection = TextPropCollection::new(char_count, TextPropType::Paragraph);
@@ -308,39 +356,68 @@ pub fn parse_style_text_prop_atom(
         collection.property_mask = mask;
         collection.tab_stops = tab_stops;
         paragraph_styles.push(collection);
-
         para_chars_covered += char_count;
+
+        if payload_truncated {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+            data_exhausted = true;
+            break;
+        }
     }
 
     // Parse character styles
     let mut char_chars_covered = 0u32;
-    while char_chars_covered < style_length && offset + 8 <= data.len() {
-        // Read character count (4 bytes)
-        let char_count = read_u32_le(data, offset)
-            .unwrap_or(0)
-            .min(style_length - char_chars_covered);
-        offset += 4;
-
-        if char_count == 0 {
+    while char_chars_covered < style_length {
+        let index = (paragraph_styles.len() + character_styles.len()) as u32;
+        if offset + 8 > data.len() {
+            if !data_exhausted {
+                report.record(TextPropDefect::StyleTextPropCoverage, index);
+            }
             break;
         }
+        let declared_count = read_u32_le(data, offset).unwrap_or(0);
+        offset += 4;
+        if declared_count == 0 {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+            break;
+        }
+        let char_count = declared_count.min(style_length - char_chars_covered);
+        if char_count != declared_count {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+        }
 
-        // Read mask (4 bytes) - no indent level for character styles
         if offset + 4 > data.len() {
+            // Unreachable: the header check above guarantees eight bytes.
             break;
         }
         let mask = read_u32_le(data, offset).unwrap_or(0);
         offset += 4;
 
-        // Parse properties based on mask
+        let payload_truncated = offset.saturating_add(character_property_size(mask)) > data.len();
         let properties = parse_character_properties(data, &mut offset, mask);
 
         let mut collection = TextPropCollection::new(char_count, TextPropType::Character);
         collection.properties = properties;
         collection.property_mask = mask;
         character_styles.push(collection);
-
         char_chars_covered += char_count;
+
+        if payload_truncated {
+            report.record(TextPropDefect::StyleTextPropCoverage, index);
+            break;
+        }
+    }
+
+    // Leftover bytes after full coverage are dropped trailing data. When a
+    // section stopped early its record already accounts for the remainder.
+    if para_chars_covered >= style_length
+        && char_chars_covered >= style_length
+        && offset < data.len()
+    {
+        report.record(
+            TextPropDefect::StyleTextPropCoverage,
+            (paragraph_styles.len() + character_styles.len()) as u32,
+        );
     }
 
     (paragraph_styles, character_styles)
@@ -653,6 +730,82 @@ mod tests {
         trailing.push(0);
         let error = parse_style_text_prop_atom_strict(&trailing, 1).unwrap_err();
         assert!(error.to_string().contains("trailing bytes"));
+    }
+
+    fn report_for(data: &[u8], text_length: usize) -> crate::leniency::ToleranceReport {
+        let mut report = crate::leniency::ToleranceReport::default();
+        let _styles = parse_style_text_prop_atom_with_report(data, text_length, &mut report);
+        report
+    }
+
+    /// F5.1: the reporting parser records a defect exactly when the strict
+    /// parser rejects the coverage framing, so a conformant atom always
+    /// yields a clean report and nothing the strict parser refuses is
+    /// repaired silently.
+    #[test]
+    fn reporting_parser_records_exactly_what_the_strict_parser_rejects() {
+        let valid = minimal_style_data();
+        let mut cases = vec![valid.clone()];
+        for (index, count) in [(0usize, 0u32), (0, 3), (0, 1), (10, 0), (10, 3), (10, 1)] {
+            let mut data = valid.clone();
+            data[index..index + 4].copy_from_slice(&count.to_le_bytes());
+            cases.push(data);
+        }
+        cases.extend((0..valid.len()).map(|length| valid[..length].to_vec()));
+        let mut trailing = valid;
+        trailing.push(0);
+        cases.push(trailing);
+
+        for data in &cases {
+            let strict_rejects = parse_style_text_prop_atom_strict(data, 1).is_err();
+            let report = report_for(data, 1);
+            assert_eq!(strict_rejects, !report.is_clean(), "{data:02x?}");
+        }
+    }
+
+    #[test]
+    fn reporting_parser_locates_each_clamp_by_run_index() {
+        use crate::leniency::{Defect, TextPropDefect};
+        let contexts = |report: &crate::leniency::ToleranceReport| {
+            report
+                .defects()
+                .iter()
+                .map(|tolerated| {
+                    assert_eq!(
+                        tolerated.defect,
+                        Defect::TextProp(TextPropDefect::StyleTextPropCoverage)
+                    );
+                    tolerated.context
+                })
+                .collect::<Vec<_>>()
+        };
+
+        // Overlong paragraph run 0: clamped, character run still parsed.
+        let mut overlong = minimal_style_data();
+        overlong[..4].copy_from_slice(&3u32.to_le_bytes());
+        assert_eq!(contexts(&report_for(&overlong, 1)), vec![0]);
+        let (paragraphs, characters) = parse_style_text_prop_atom(&overlong, 1);
+        assert_eq!(paragraphs[0].characters_covered, 2);
+        assert_eq!(characters[0].characters_covered, 2);
+
+        // Zero-length character run (index 1): parsing stops there.
+        let mut zero_character = minimal_style_data();
+        zero_character[10..14].copy_from_slice(&0u32.to_le_bytes());
+        assert_eq!(contexts(&report_for(&zero_character, 1)), vec![1]);
+
+        // Missing character section: recorded where run 1 was expected.
+        assert_eq!(
+            contexts(&report_for(&minimal_style_data()[..10], 1)),
+            vec![1]
+        );
+
+        // Trailing bytes after full coverage: recorded at the next index.
+        let mut trailing = minimal_style_data();
+        trailing.extend_from_slice(&[0, 0]);
+        assert_eq!(contexts(&report_for(&trailing, 1)), vec![2]);
+
+        // Empty atom: recorded at run 0.
+        assert_eq!(contexts(&report_for(&[], 1)), vec![0]);
     }
 
     #[test]

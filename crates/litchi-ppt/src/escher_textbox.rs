@@ -44,6 +44,11 @@ impl EscherTextboxWrapper {
     /// Based on POI's `EscherTextboxWrapper` constructor which calls
     /// Record.findChildRecords(data, 0, data.length).
     ///
+    /// Text-style defects repaired while parsing (see
+    /// [`crate::TextPropDefect`]) are applied but *not* enumerable through
+    /// this convenience constructor; use [`Self::new_with_report`] to
+    /// enumerate them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -53,6 +58,10 @@ impl EscherTextboxWrapper {
 
     /// Create a wrapper with explicit text-interaction resource limits.
     ///
+    /// Like [`Self::new`], repaired text-style defects are not enumerable
+    /// through this constructor; use
+    /// [`Self::new_with_interaction_limits_and_report`] to enumerate them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -60,11 +69,49 @@ impl EscherTextboxWrapper {
         data: Vec<u8>,
         limits: TextInteractionLimits,
     ) -> Result<Self> {
+        Self::new_with_interaction_limits_and_report(
+            data,
+            limits,
+            &mut crate::leniency::ToleranceReport::default(),
+        )
+    }
+
+    /// Create a wrapper, recording every repaired non-structural text-style
+    /// defect in `report`.
+    ///
+    /// Records [`crate::TextPropDefect`] classes repaired while the textbox's
+    /// `StyleTextPropAtom` is parsed: clamped run coverage (F5.1) and masked
+    /// reserved `BulletFlags`/`PFWrapFlags` bits (F5.2). A detached
+    /// text-box payload knows neither its slide nor its shape, so the
+    /// recorded [`crate::DefectLocation`] fields stay `None`; the slide and
+    /// notes shape readers fill them in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn new_with_report(
+        data: Vec<u8>,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        Self::new_with_interaction_limits_and_report(data, TextInteractionLimits::default(), report)
+    }
+
+    /// Create a wrapper with explicit text-interaction resource limits,
+    /// recording every repaired non-structural text-style defect in `report`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn new_with_interaction_limits_and_report(
+        data: Vec<u8>,
+        limits: TextInteractionLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
         // Parse child records from the escher data
         let child_records = Self::find_child_records(&data)?;
 
         let mut extractor = TextRunExtractor::new();
-        extractor.extract_from_records(&child_records)?;
+        extractor.extract_from_records_with_report(&child_records, report)?;
         let text = extractor.text().to_string();
         let runs = extractor.runs().to_vec();
         let paragraph_runs = extractor.paragraph_runs().to_vec();

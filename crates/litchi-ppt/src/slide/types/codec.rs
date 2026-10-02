@@ -48,27 +48,44 @@ impl Slide<'_> {
         Ok(None)
     }
 
-    pub(super) fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
+    /// Parse this slide's shapes, returning them with the non-structural
+    /// defects repaired along the way, each located by this slide's persist
+    /// ID.
+    pub(super) fn parse_shapes(
+        &self,
+    ) -> Result<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)> {
+        let mut report = crate::leniency::ToleranceReport::default();
         // Find PPDrawing record
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), report));
         };
 
-        Self::parse_shape_enums(&ppdrawing.data)
+        let shapes = Self::parse_shape_enums(&ppdrawing.data, &mut report)?;
+        report.locate_from(
+            0,
+            crate::leniency::DefectLocation {
+                persist_id: Some(self.persist_id),
+                shape_id: None,
+            },
+        );
+        Ok((shapes, report))
     }
 
     /// Parse the source-order shape values from one complete PPDrawing
     /// payload. Source-backed selector paths use this helper after reading
     /// exactly one selected Slide record, avoiding a full Document/NotesIndex
     /// materialization while retaining the ordinary shape ordering rules.
-    pub(crate) fn parse_shape_enums(ppdrawing_data: &[u8]) -> Result<Vec<ShapeEnum<'static>>> {
+    pub(crate) fn parse_shape_enums(
+        ppdrawing_data: &[u8],
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Vec<ShapeEnum<'static>>> {
         // Extract Escher shapes from PPDrawing data
         let escher_shapes = crate::odraw::parse(ppdrawing_data)?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());
         for escher_shape in &escher_shapes {
-            if let Some(mut shape) = Self::convert_odraw_to_shape_enum(escher_shape)? {
+            if let Some(mut shape) = Self::convert_odraw_to_shape_enum(escher_shape, report)? {
                 shape.mark_source_bound_recursive();
                 shapes.push(shape);
             }
@@ -85,13 +102,15 @@ impl Slide<'_> {
     /// - Pattern matching for type dispatch
     pub(crate) fn convert_odraw_to_shape_enum(
         odraw_shape: &litchi_odraw::shape::Shape<'_>,
+        report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
-        Self::convert_odraw_shape(odraw_shape, 0)
+        Self::convert_odraw_shape(odraw_shape, 0, report)
     }
 
     fn convert_odraw_shape(
         escher_shape: &litchi_odraw::shape::Shape<'_>,
         depth: usize,
+        report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
         use crate::shapes::{
             AutoShape, PictureFrameKind, PictureShape, Placeholder, PlaceholderSize,
@@ -185,6 +204,7 @@ impl Slide<'_> {
                 Ok(Some(ShapeEnum::TextBox(TextBox::from_odraw(
                     properties,
                     escher_shape,
+                    report,
                 )?)))
             },
 
@@ -268,7 +288,9 @@ impl Slide<'_> {
                 // Recursively parse child shapes
                 // This follows Apache POI's approach: iterate child shapes and convert them
                 for child_escher in escher_shape.children() {
-                    if let Some(child_shape) = Self::convert_odraw_shape(child_escher, depth + 1)? {
+                    if let Some(child_shape) =
+                        Self::convert_odraw_shape(child_escher, depth + 1, report)?
+                    {
                         group.add_decoded_child(child_shape);
                     }
                 }

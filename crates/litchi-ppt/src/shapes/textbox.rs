@@ -82,10 +82,21 @@ impl<'a> TextBox<'a> {
     pub(crate) fn from_odraw(
         properties: ShapeProperties,
         shape: &OdrawShape<'_>,
+        report: &mut crate::leniency::ToleranceReport,
     ) -> super::super::package::Result<TextBox<'static>> {
+        let first_defect = report.defects().len();
         let wrapper = crate::odraw::textbox(shape)?
-            .map(|record| crate::EscherTextboxWrapper::new(record.data().to_vec()))
+            .map(|record| {
+                crate::EscherTextboxWrapper::new_with_report(record.data().to_vec(), report)
+            })
             .transpose()?;
+        report.locate_from(
+            first_defect,
+            crate::leniency::DefectLocation {
+                persist_id: None,
+                shape_id: Some(properties.id),
+            },
+        );
         let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) = match wrapper {
             Some(textbox_wrapper) => (
                 textbox_wrapper.text().to_owned(),
@@ -853,7 +864,11 @@ mod tests {
             shape_type: ShapeType::TextBox,
             ..Default::default()
         };
-        TextBox::from_odraw(properties, shape)
+        TextBox::from_odraw(
+            properties,
+            shape,
+            &mut crate::leniency::ToleranceReport::default(),
+        )
     }
 
     #[test]

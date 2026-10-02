@@ -201,7 +201,9 @@ pub struct SpeakerNotes {
     persist_id: u32,
     slide_id_ref: u32,
     record: Record,
-    shapes: OnceCell<Vec<ShapeEnum<'static>>>,
+    /// Lazily parsed shapes, together with the non-structural defects
+    /// repaired while they were parsed.
+    shapes: OnceCell<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)>,
     text: OnceCell<String>,
 }
 
@@ -313,14 +315,56 @@ impl SpeakerNotes {
     /// returned shape is bound to its parsed source and refuses public
     /// mutation.
     ///
+    /// Non-structural text-style defects repaired while the shapes are
+    /// parsed (see [`crate::TextPropDefect`]) are recorded alongside the
+    /// cached shapes; enumerate them with [`Self::tolerance_report`] or
+    /// thread a report through [`Self::shapes_with_report`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the `PPDrawing` payload is malformed or a shape
     /// fails to decode.
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
-        self.shapes
-            .get_or_try_init(|| self.parse_shapes())
-            .map(Vec::as_slice)
+        self.parsed_shapes().map(|(shapes, _)| shapes.as_slice())
+    }
+
+    /// Return the shapes drawn on this notes page, appending every
+    /// non-structural defect repaired while they were parsed to `report`.
+    ///
+    /// Records the [`crate::TextPropDefect`] classes repaired while shape
+    /// text is parsed (F5.1/F5.2), each located by this notes page's persist
+    /// ID and the text box's shape ID. The shapes and their repairs are
+    /// parsed once and cached together, so every call appends the same
+    /// entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `PPDrawing` payload is malformed or a shape
+    /// fails to decode.
+    pub fn shapes_with_report(
+        &self,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<&[ShapeEnum<'static>]> {
+        let (shapes, tolerance) = self.parsed_shapes()?;
+        report.append(tolerance);
+        Ok(shapes.as_slice())
+    }
+
+    /// Every non-structural defect repaired while this notes page's shapes
+    /// were parsed (triggers parsing if not yet loaded).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `PPDrawing` payload is malformed or a shape
+    /// fails to decode.
+    pub fn tolerance_report(&self) -> Result<&crate::leniency::ToleranceReport> {
+        self.parsed_shapes().map(|(_, tolerance)| tolerance)
+    }
+
+    fn parsed_shapes(
+        &self,
+    ) -> Result<&(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)> {
+        self.shapes.get_or_try_init(|| self.parse_shapes())
     }
 
     /// Return the body text of this notes page.
@@ -337,20 +381,29 @@ impl SpeakerNotes {
             .map(String::as_str)
     }
 
-    fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
+    fn parse_shapes(&self) -> Result<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)> {
+        let mut report = crate::leniency::ToleranceReport::default();
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), report));
         };
         let parsed = crate::odraw::parse(&drawing.data)?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for shape in &parsed {
-            if let Some(mut converted_shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)?
+            if let Some(mut converted_shape) =
+                Slide::<'static>::convert_odraw_to_shape_enum(shape, &mut report)?
             {
                 converted_shape.mark_source_bound_recursive();
                 shapes.push(converted_shape);
             }
         }
-        Ok(shapes)
+        report.locate_from(
+            0,
+            crate::leniency::DefectLocation {
+                persist_id: Some(self.persist_id),
+                shape_id: None,
+            },
+        );
+        Ok((shapes, report))
     }
 
     fn extract_notes_body_text(&self) -> Result<String> {

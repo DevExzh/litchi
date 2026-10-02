@@ -146,9 +146,56 @@ pub struct Presentation {
     pub(super) pictures_source: Option<LazyPictures>,
     /// Record limits retained for lazy live-persist parsing.
     pub(crate) record_limits: RecordLimits,
+    /// Non-structural defects repaired while the presentation was opened.
+    ///
+    /// Aggregated by the constructors in `package.rs`; see
+    /// [`crate::leniency`] for where future recording sites plug in.
+    pub(super) tolerance: crate::leniency::ToleranceReport,
 }
 
 impl Presentation {
+    /// Every non-structural defect the reader repaired while opening this
+    /// presentation, in discovery order.
+    ///
+    /// This is the open-time aggregate: the record tree, `UserEdit`/persist
+    /// chain, and slide directory are parsed at open, and none of them repairs
+    /// anything yet, so the report is clean for every presentation that
+    /// opens. Text-style repairs ([`crate::TextPropDefect`]) fire while shapes
+    /// are lazily parsed; they are reported per slide by
+    /// [`Slide::tolerance_report`] and for the whole presentation by
+    /// [`Self::collect_tolerance_report`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Every non-structural defect the reader repairs when reading this whole
+    /// presentation: the open-time aggregate ([`Self::tolerance_report`])
+    /// followed by the repairs made while each slide's shapes and each
+    /// slide's speaker-notes shapes are parsed, in slide order.
+    ///
+    /// Each entry is located by the persist ID of its slide or notes page and
+    /// the shape ID of its text box (see [`crate::DefectLocation`]). An empty
+    /// report means the presentation conformed. This walks every slide, so it
+    /// parses every slide's and notes page's shapes; the per-slide
+    /// [`Slide::tolerance_report`] is the incremental alternative.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a slide, notes page, or shape tree cannot be
+    /// parsed — the structural failures that stay fatal under every
+    /// [`crate::Leniency`] variant.
+    pub fn collect_tolerance_report(&self) -> Result<crate::leniency::ToleranceReport> {
+        let mut report = self.tolerance.clone();
+        for slide in self.slides()? {
+            slide.shapes_with_report(&mut report)?;
+            if let Some(notes) = slide.speaker_notes()? {
+                notes.shapes_with_report(&mut report)?;
+            }
+        }
+        Ok(report)
+    }
+
     /// Get iterator over all slides with zero-copy borrowing.
     ///
     /// # Performance
@@ -269,16 +316,42 @@ impl Presentation {
     /// notes, and master drawing groups. They are inert: placeholders are
     /// never substituted, formatted, or laid out.
     ///
+    /// Text-style defects repaired while the text boxes are parsed (see
+    /// [`crate::TextPropDefect`]) are applied but *not* enumerable through
+    /// this convenience method; use [`Self::text_metachars_with_report`] to
+    /// enumerate them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn text_metachars(&self) -> Result<Vec<crate::text_metachar::TextMetachar>> {
+        self.text_metachars_with_report(&mut crate::leniency::ToleranceReport::default())
+    }
+
+    /// All header/footer metacharacter placeholders found in the document
+    /// stream, in stream order, recording every repaired non-structural
+    /// text-style defect in `report`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn text_metachars_with_report(
+        &self,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Vec<crate::text_metachar::TextMetachar>> {
         use crate::text_metachar::TextMetachar;
 
-        fn collect(record: &Record, out: &mut Vec<TextMetachar>) -> Result<()> {
+        fn collect(
+            record: &Record,
+            out: &mut Vec<TextMetachar>,
+            report: &mut crate::leniency::ToleranceReport,
+        ) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
                 for textbox in super::codec::drawing_textboxes(&record.data)? {
-                    let wrapper = crate::EscherTextboxWrapper::new(textbox.data().to_vec())?;
+                    let wrapper = crate::EscherTextboxWrapper::new_with_report(
+                        textbox.data().to_vec(),
+                        report,
+                    )?;
                     out.extend_from_slice(wrapper.metachars());
                 }
             } else if matches!(
@@ -297,7 +370,7 @@ impl Presentation {
 
         let mut result = Vec::new();
         for record in self.parser.find_records_ref() {
-            collect(record, &mut result)?;
+            collect(record, &mut result, report)?;
         }
         Ok(result)
     }
@@ -359,16 +432,42 @@ impl Presentation {
     /// in the Escher text boxes of slide shapes, so they are collected both
     /// from the record tree and from every drawing-group text box.
     ///
+    /// Text-style defects repaired while the text boxes are parsed (see
+    /// [`crate::TextPropDefect`]) are applied but *not* enumerable through
+    /// this convenience method; use [`Self::outline_text_refs_with_report`]
+    /// to enumerate them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn outline_text_refs(&self) -> Result<Vec<crate::OutlineTextRef>> {
+        self.outline_text_refs_with_report(&mut crate::leniency::ToleranceReport::default())
+    }
+
+    /// All outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) in
+    /// the document stream, in stream order, recording every repaired
+    /// non-structural text-style defect in `report`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn outline_text_refs_with_report(
+        &self,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Vec<crate::OutlineTextRef>> {
         use crate::OutlineTextRef;
 
-        fn collect(record: &Record, out: &mut Vec<OutlineTextRef>) -> Result<()> {
+        fn collect(
+            record: &Record,
+            out: &mut Vec<OutlineTextRef>,
+            report: &mut crate::leniency::ToleranceReport,
+        ) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
                 for textbox in super::codec::drawing_textboxes(&record.data)? {
-                    let wrapper = crate::EscherTextboxWrapper::new(textbox.data().to_vec())?;
+                    let wrapper = crate::EscherTextboxWrapper::new_with_report(
+                        textbox.data().to_vec(),
+                        report,
+                    )?;
                     out.extend_from_slice(wrapper.outline_text_refs());
                 }
             } else if record.record_type == RecordType::OutlineTextRefAtom {
@@ -379,7 +478,7 @@ impl Presentation {
 
         let mut result = Vec::new();
         for record in self.parser.find_records_ref() {
-            collect(record, &mut result)?;
+            collect(record, &mut result, report)?;
         }
         Ok(result)
     }

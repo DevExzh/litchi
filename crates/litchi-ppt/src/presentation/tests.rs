@@ -63,6 +63,7 @@ fn presentation_with_vba_storage() -> Presentation {
         pictures_data: None,
         pictures_source: None,
         record_limits: crate::RecordLimits::default(),
+        tolerance: crate::leniency::ToleranceReport::default(),
     }
 }
 
@@ -82,6 +83,7 @@ fn lazy_live_document_reuses_presentation_record_limits() {
             max_record_payload_bytes: 0,
             ..crate::RecordLimits::default()
         },
+        tolerance: crate::leniency::ToleranceReport::default(),
     };
 
     assert!(matches!(

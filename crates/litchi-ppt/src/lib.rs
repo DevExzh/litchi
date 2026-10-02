@@ -71,6 +71,9 @@ pub mod presentation_advisor;
 pub mod sound_collection;
 pub mod view_info;
 
+/// Repair reporting for non-structural defects in legacy presentations.
+pub mod leniency;
+
 // Non-zoom (outline and slide-sorter) view metadata
 pub mod non_zoom_view;
 
@@ -260,6 +263,9 @@ pub use hyperlink::{
     InteractionTrigger, InteractiveInfoAtom, MacroNameAtom, ShapeInteractionEntry,
 };
 pub use kinsoku::{BaseKinsokuSettings, Kinsoku, KinsokuLanguage, KinsokuLevel, KinsokuSettings9};
+pub use leniency::{
+    Defect, DefectLocation, Leniency, TextPropDefect, ToleranceReport, ToleratedDefect,
+};
 pub use main_master::{
     ContentMasterInfo, MainMasterMetadata12, MainMasterTextStyles, MainMasterTextStylesSource,
 };

@@ -6,6 +6,7 @@ use super::model::{
 };
 use super::package::TextRunExtractor;
 use crate::consts::RecordType;
+use crate::leniency::{TextPropDefect, ToleranceReport};
 use crate::package::{Error, Result};
 use crate::records::Record;
 use crate::text::extractor::{decode_text_bytes, from_utf16le_lossy};
@@ -15,6 +16,11 @@ impl TextRunExtractor {
     ///
     /// Based on Apache POI's `TextExtractor` and `SlideShow` text parsing logic.
     ///
+    /// `StyleTextPropAtom` framing defects are repaired the way POI and
+    /// LibreOffice repair them (clamped coverage, masked reserved flag bits);
+    /// the repairs are *not* enumerable through this convenience method — use
+    /// [`Self::extract_from_records_with_report`] to enumerate them.
+    ///
     /// # Arguments
     ///
     /// * `records` - PPT records to extract text from
@@ -23,8 +29,29 @@ impl TextRunExtractor {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn extract_from_records(&mut self, records: &[Record]) -> Result<()> {
+        self.extract_from_records_with_report(records, &mut ToleranceReport::default())
+    }
+
+    /// Extract text runs from PPT records, recording every repaired
+    /// non-structural defect in `report`.
+    ///
+    /// Records [`TextPropDefect::StyleTextPropCoverage`] when a
+    /// `StyleTextPropAtom`'s run coverage does not tile the text length + 1
+    /// exactly (clamped, per POI/LibreOffice), and
+    /// [`TextPropDefect::ReservedBulletFlagBits`] /
+    /// [`TextPropDefect::ReservedWrapFlagBits`] when a `TextPFRun` carries
+    /// reserved flag bits (masked to the defined set).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn extract_from_records_with_report(
+        &mut self,
+        records: &[Record],
+        report: &mut ToleranceReport,
+    ) -> Result<()> {
         for record in records {
-            self.process_record(record)?;
+            self.process_record(record, report)?;
         }
         Ok(())
     }
@@ -35,7 +62,7 @@ impl TextRunExtractor {
         reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; every record other \
                   than the three text atoms is handled uniformly by recursing into child records"
     )]
-    fn process_record(&mut self, record: &Record) -> Result<()> {
+    fn process_record(&mut self, record: &Record, report: &mut ToleranceReport) -> Result<()> {
         match record.record_type {
             RecordType::TextCharsAtom => {
                 // UTF-16LE text
@@ -59,12 +86,12 @@ impl TextRunExtractor {
             },
             RecordType::StyleTextPropAtom => {
                 // Text formatting properties
-                self.apply_style_properties(record)?;
+                self.apply_style_properties(record, report)?;
             },
             _ => {
                 // Recursively process child records
                 for child in &record.children {
-                    self.process_record(child)?;
+                    self.process_record(child, report)?;
                 }
             },
         }
@@ -75,11 +102,18 @@ impl TextRunExtractor {
     /// Apply style properties from `StyleTextPropAtom`.
     ///
     /// Based on Apache POI's `StyleTextPropAtom` parsing.
-    fn apply_style_properties(&mut self, record: &Record) -> Result<()> {
-        if record.data.len() < 8 {
-            return Ok(()); // Not enough data
-        }
-
+    ///
+    /// The read path parses with the clamping POI/LibreOffice posture
+    /// ([`crate::text_prop::parse_style_text_prop_atom_with_report`]) and
+    /// records each repaired framing defect (finding F5.1); the strict
+    /// parsers ([`crate::text_prop::parse_style_text_prop_atom_strict`],
+    /// [`crate::StyleTextPropAtom`]) are retained for the writer and the
+    /// text-edit/reparse-verification path.
+    fn apply_style_properties(
+        &mut self,
+        record: &Record,
+        report: &mut ToleranceReport,
+    ) -> Result<()> {
         let Some((source_text, start_index)) = self.pending_text.take() else {
             return Ok(());
         };
@@ -92,9 +126,13 @@ impl TextRunExtractor {
         };
         let text_length = source_text.encode_utf16().count();
         let (paragraph_styles, character_styles) =
-            crate::text_prop::parse_style_text_prop_atom_strict(&record.data, text_length)?;
+            crate::text_prop::parse_style_text_prop_atom_with_report(
+                &record.data,
+                text_length,
+                report,
+            );
 
-        self.apply_paragraph_styles(&source_text, start_index, &paragraph_styles)?;
+        self.apply_paragraph_styles(&source_text, start_index, &paragraph_styles, report)?;
 
         if character_styles.is_empty() {
             if !source_run.text.is_empty() {
@@ -143,6 +181,7 @@ impl TextRunExtractor {
         source_text: &str,
         start_index: usize,
         paragraph_styles: &[crate::text_prop::TextPropCollection],
+        report: &mut ToleranceReport,
     ) -> Result<()> {
         if paragraph_styles.is_empty() {
             return Ok(());
@@ -160,7 +199,7 @@ impl TextRunExtractor {
             self.paragraph_runs.push(ParagraphRun::with_formatting(
                 text,
                 start_index + character_offset,
-                paragraph_formatting_from_style(style)?,
+                paragraph_formatting_from_style(style, report)?,
             ));
             remaining = &remaining[byte_count..];
             character_offset += character_count;
@@ -268,6 +307,7 @@ pub(super) fn formatting_from_style(
 
 pub(super) fn paragraph_formatting_from_style(
     style: &crate::text_prop::TextPropCollection,
+    report: &mut ToleranceReport,
 ) -> Result<ParagraphRunFormatting> {
     if style.indent_level > 4 {
         return Err(Error::Corrupted(
@@ -296,13 +336,15 @@ pub(super) fn paragraph_formatting_from_style(
             .transpose()
     };
     let bullet_flags_raw = u16_property("paragraph.flags")?;
-    if bullet_flags_raw.is_some_and(|flags| flags & !0x000F != 0) {
-        return Err(Error::Corrupted(
-            "TextPFRun has reserved BulletFlags bits set".to_string(),
-        ));
+    if let Some(raw) = bullet_flags_raw.filter(|raw| raw & !0x000F != 0) {
+        // MS-PPT 2.9.22 reserves the high twelve bits and says they MUST be
+        // ignored; PowerPoint, POI, and LibreOffice read only the defined
+        // bits. Mask rather than reject, keep the raw value for round-trip.
+        report.record(TextPropDefect::ReservedBulletFlagBits, u32::from(raw));
     }
+    let bullet_flags = bullet_flags_raw.map(|raw| raw & 0x000F);
     let bullet_flag = |mask: u32, bit: u16| {
-        (property_mask & mask != 0).then(|| bullet_flags_raw.is_some_and(|flags| flags & bit != 0))
+        (property_mask & mask != 0).then(|| bullet_flags.is_some_and(|flags| flags & bit != 0))
     };
 
     let bullet_color_raw = style.get_value("bullet.color").map(i32::cast_unsigned);
@@ -381,13 +423,15 @@ pub(super) fn paragraph_formatting_from_style(
     };
 
     let wrap_flags_raw = u16_property("wrapFlags")?;
-    if wrap_flags_raw.is_some_and(|flags| flags & !0x0007 != 0) {
-        return Err(Error::Corrupted(
-            "TextPFRun has reserved PFWrapFlags bits set".to_string(),
-        ));
+    if let Some(raw) = wrap_flags_raw.filter(|raw| raw & !0x0007 != 0) {
+        // MS-PPT 2.9.25 reserves the high thirteen bits and says they MUST be
+        // ignored; mask rather than reject, keep the raw value for
+        // round-trip.
+        report.record(TextPropDefect::ReservedWrapFlagBits, u32::from(raw));
     }
+    let wrap_flags = wrap_flags_raw.map(|raw| raw & 0x0007);
     let wrap_flag = |mask: u32, bit: u16| {
-        (property_mask & mask != 0).then(|| wrap_flags_raw.is_some_and(|flags| flags & bit != 0))
+        (property_mask & mask != 0).then(|| wrap_flags.is_some_and(|flags| flags & bit != 0))
     };
 
     Ok(ParagraphRunFormatting {

@@ -252,7 +252,13 @@ pub(super) fn resolve_source_target(
     let ppdrawing = slide
         .find_child(RecordType::PPDrawing)
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-    let shapes = crate::slide::types::Slide::parse_shape_enums(&ppdrawing.data)?;
+    // The edit path applies text-style repairs (see `crate::leniency`) while
+    // resolving the source range without enumerating them; the presentation
+    // is being rewritten rather than read.
+    let shapes = crate::slide::types::Slide::parse_shape_enums(
+        &ppdrawing.data,
+        &mut crate::leniency::ToleranceReport::default(),
+    )?;
     let shape = shapes
         .get(target.shape.get())
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;

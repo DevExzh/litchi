@@ -136,6 +136,10 @@ pub struct ParagraphRunFormatting {
     /// Paragraph indentation level.
     pub indent_level: u16,
     /// Raw `BulletFlags` value, when present.
+    ///
+    /// Kept unmasked for round-trip: it can carry reserved bits the reader
+    /// ignored (recorded as [`crate::TextPropDefect::ReservedBulletFlagBits`]);
+    /// the decoded bullet fields use only the defined bits.
     pub bullet_flags_raw: Option<u16>,
     /// Whether the paragraph has a bullet, when explicitly specified.
     pub bullet_enabled: Option<bool>,
@@ -182,6 +186,10 @@ pub struct ParagraphRunFormatting {
     /// Whether hanging punctuation is allowed, when explicitly specified.
     pub overflow: Option<bool>,
     /// Raw `PFWrapFlags` value, when present.
+    ///
+    /// Kept unmasked for round-trip: it can carry reserved bits the reader
+    /// ignored (recorded as [`crate::TextPropDefect::ReservedWrapFlagBits`]);
+    /// the decoded wrap fields use only the defined bits.
     pub wrap_flags_raw: Option<u16>,
     /// Paragraph text direction.
     pub text_direction: Option<ParagraphTextDirection>,

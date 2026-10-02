@@ -49,8 +49,9 @@ pub struct Slide<'doc> {
     /// Where the document stream lives, for lazy speaker-notes parsing.
     #[allow(dead_code, reason = "reserved for lazy speaker-notes parsing")]
     source: crate::records::PayloadStore<'doc>,
-    /// Lazily-loaded shapes stored as owned values.
-    shapes: OnceCell<Vec<ShapeEnum<'static>>>,
+    /// Lazily-loaded shapes stored as owned values, together with the
+    /// non-structural defects repaired while they were parsed.
+    shapes: OnceCell<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)>,
     /// Cached text content.
     text_cache: OnceCell<String>,
     /// Lazily parsed, inert shape animation metadata.

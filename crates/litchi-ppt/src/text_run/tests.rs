@@ -277,11 +277,15 @@ fn rejects_invalid_paragraph_enumerations() {
         alignment: 4,
     });
 
-    let tab_error = paragraph_formatting_from_style(&style).unwrap_err();
+    let tab_error =
+        paragraph_formatting_from_style(&style, &mut crate::leniency::ToleranceReport::default())
+            .unwrap_err();
     assert!(tab_error.to_string().contains("TextTabTypeEnum"));
 
     style.indent_level = 5;
-    let indent_error = paragraph_formatting_from_style(&style).unwrap_err();
+    let indent_error =
+        paragraph_formatting_from_style(&style, &mut crate::leniency::ToleranceReport::default())
+            .unwrap_err();
     assert!(indent_error.to_string().contains("indent level"));
 }
 

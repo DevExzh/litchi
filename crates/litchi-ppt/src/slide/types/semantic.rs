@@ -35,6 +35,11 @@ impl Slide<'_> {
 
     /// Get shapes on this slide (lazy-loaded).
     ///
+    /// Non-structural text-style defects repaired while the shapes are parsed
+    /// (see [`crate::TextPropDefect`]) are recorded alongside the cached
+    /// shapes; enumerate them with [`Self::tolerance_report`] or thread a
+    /// report through [`Self::shapes_with_report`].
+    ///
     /// # Performance
     ///
     /// - Shapes are parsed only on first call
@@ -45,9 +50,49 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
-        self.shapes
-            .get_or_try_init(|| self.parse_shapes())
-            .map(Vec::as_slice)
+        self.parsed_shapes().map(|(shapes, _)| shapes.as_slice())
+    }
+
+    /// Get shapes on this slide (lazy-loaded), appending every non-structural
+    /// defect repaired while they were parsed to `report`.
+    ///
+    /// Records the [`crate::TextPropDefect`] classes repaired while shape
+    /// text is parsed: clamped `StyleTextPropAtom` run coverage (F5.1) and
+    /// masked reserved `BulletFlags`/`PFWrapFlags` bits (F5.2), each located
+    /// by this slide's persist ID and the text box's shape ID.
+    ///
+    /// The shapes and their repairs are parsed once and cached together, so
+    /// every call appends the same entries, whichever accessor triggered the
+    /// parse.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn shapes_with_report(
+        &self,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<&[ShapeEnum<'static>]> {
+        let (shapes, tolerance) = self.parsed_shapes()?;
+        report.append(tolerance);
+        Ok(shapes.as_slice())
+    }
+
+    /// Every non-structural defect repaired while this slide's shapes were
+    /// parsed (triggers parsing if not yet loaded).
+    ///
+    /// An empty report means the slide's text styling conformed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shapes cannot be parsed.
+    pub fn tolerance_report(&self) -> Result<&crate::leniency::ToleranceReport> {
+        self.parsed_shapes().map(|(_, tolerance)| tolerance)
+    }
+
+    fn parsed_shapes(
+        &self,
+    ) -> Result<&(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)> {
+        self.shapes.get_or_try_init(|| self.parse_shapes())
     }
 
     /// Get the number of shapes (triggers parsing if not yet loaded).
