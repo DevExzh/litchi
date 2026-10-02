@@ -862,3 +862,38 @@ fn nonconforming_slide_persist_atom_header_is_read_by_offset_and_recorded() {
         )],
     );
 }
+
+#[test]
+fn unmapped_slide_persist_ref_skips_the_slide_and_is_recorded() {
+    let deck = Deck::new(3);
+    let (_, slide_id) = deck.slides[1];
+    let at = deck.slide_persist_atom(1);
+    let deck = deck.patch_u32(at, 999);
+    deck.assert_opens(
+        &[0, 2],
+        &[open_time(
+            SlideListDefect::StaleSlidePersistRef,
+            slide_id,
+            Some(999),
+        )],
+    );
+}
+
+#[test]
+fn slide_persist_ref_to_a_non_slide_skips_the_slide_and_is_recorded() {
+    let deck = Deck::new(2);
+    let document_persist_id = open_both(&deck.bytes)[0]
+        .slide_directory()
+        .document_persist_id();
+    let (_, slide_id) = deck.slides[0];
+    let at = deck.slide_persist_atom(0);
+    let deck = deck.patch_u32(at, document_persist_id);
+    deck.assert_opens(
+        &[1],
+        &[open_time(
+            SlideListDefect::StaleSlidePersistRef,
+            slide_id,
+            Some(document_persist_id),
+        )],
+    );
+}

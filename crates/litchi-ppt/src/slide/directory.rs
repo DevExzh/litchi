@@ -353,9 +353,8 @@ fn directory_entry(
         return Ok(None);
     }
     if !resolves_to_slide(document_data, persist_mapping, persist_id)? {
-        return Err(Error::Corrupted(format!(
-            "persist ID {persist_id} does not resolve to a SlideContainer"
-        )));
+        report.record_at(SlideListDefect::StaleSlidePersistRef, slide_id, location);
+        return Ok(None);
     }
     let text_placeholder_count = if text_placeholder_count > 8 {
         report.record_at(
@@ -718,11 +717,59 @@ mod tests {
         );
     }
 
+    /// A slide reference the live persist directory does not map, that maps
+    /// outside the stream, or that maps to another record is skipped and
+    /// recorded, as LibreOffice skips it (F5.5).
     #[test]
-    fn rejects_entries_that_do_not_resolve_to_a_slide() {
-        let (zero_stream, zero_user, mut zero_mapping) = synthetic_directory(&[(3, 256, 0)], false);
-        zero_mapping.add_mapping(3, 0);
-        assert!(SlideDirectory::build(&zero_stream, &zero_user, &zero_mapping).is_err());
+    fn skips_stale_slide_references() {
+        use crate::Defect;
+
+        let stale = |persist_id| {
+            (
+                Defect::SlideList(SlideListDefect::StaleSlidePersistRef),
+                256,
+                Some(persist_id),
+            )
+        };
+
+        // Mapped to the DocumentContainer at offset 0.
+        let (stream, current_user, mut mapping) =
+            synthetic_directory(&[(3, 256, 0), (4, 257, 0)], false);
+        mapping.add_mapping(3, 0);
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(persist_ids(&directory), [4]);
+        assert_eq!(defects, [stale(3)]);
+
+        // Not mapped at all.
+        let (stream, current_user, mapping) =
+            synthetic_directory(&[(3, 256, 0), (4, 257, 0)], false);
+        let mut unmapped = PersistMapping::new();
+        for (&persist_id, &offset) in mapping.iter() {
+            if persist_id != 3 {
+                unmapped.add_mapping(persist_id, offset);
+            }
+        }
+        let (directory, defects) = build_reporting(&stream, &current_user, &unmapped);
+        assert_eq!(persist_ids(&directory), [4]);
+        assert_eq!(defects, [stale(3)]);
+
+        // Mapped past the end of the stream.
+        let (stream, current_user, mut mapping) =
+            synthetic_directory(&[(3, 256, 0), (4, 257, 0)], false);
+        mapping.add_mapping(3, u32::try_from(stream.len()).unwrap());
+        let (directory, defects) = build_reporting(&stream, &current_user, &mapping);
+        assert_eq!(persist_ids(&directory), [4]);
+        assert_eq!(defects, [stale(3)]);
+    }
+
+    /// A `SlideContainer` header whose length overruns the document stream
+    /// is broken framing, not a stale reference.
+    #[test]
+    fn rejects_slide_containers_that_overrun_the_stream() {
+        let (mut stream, current_user, mapping) = synthetic_directory(&[(3, 256, 0)], false);
+        let slide_offset = mapping.get_offset(3).unwrap() as usize;
+        stream[slide_offset + 4..slide_offset + 8].copy_from_slice(&0x00FF_FFFFu32.to_le_bytes());
+        assert!(SlideDirectory::build(&stream, &current_user, &mapping).is_err());
     }
 
     #[test]

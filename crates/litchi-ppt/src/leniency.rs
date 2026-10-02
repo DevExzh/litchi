@@ -66,6 +66,12 @@
 //!   null `persistIdRef`/`slideId` drops that entry, a repeated `slideId` or
 //!   `persistIdRef` keeps the first entry, and `cTexts` above 8 clamps to 8.
 //!   These are open-time repairs.
+//! - **F5.5** ([`SlideListDefect::StaleSlidePersistRef`]) — a slide whose
+//!   persist ID the live persist directory does not map, or that maps
+//!   outside the document stream or to a record other than a
+//!   `SlideContainer`, is skipped as LibreOffice skips it; the presentation
+//!   opens with the remaining slides. A `SlideContainer` whose own length
+//!   overruns the stream stays fatal.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
