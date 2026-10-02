@@ -13,6 +13,7 @@ use litchi_docx::{
     source_backed,
 };
 use litchi_drawingml::geom::Preset;
+use litchi_opc::leniency::{Defect as PackageDefect, RelationshipDefect};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 fn fixture(name: &str) -> Vec<u8> {
@@ -520,8 +521,8 @@ fn header_fixture() -> Vec<u8> {
 }
 
 /// The header fixture with the default header reference written as the
-/// numeric ID `5`. (The OPC reader itself requires XML IDs in `.rels`, so
-/// the reference cannot name an existing relationship.)
+/// numeric ID `5`, which names no relationship (see
+/// [`numeric_header_relationship`] for one that resolves).
 fn numeric_header_id() -> Vec<u8> {
     patch(
         &header_fixture(),
@@ -730,4 +731,106 @@ fn nested_style_num_pr_stays_fatal() {
         .styles()
         .expect("styles");
     assert!(styles.len().is_err());
+}
+
+/// The header fixture with the default header relationship's `.rels` `Id`
+/// and its `w:headerReference r:id` both written as the numeric ID `1`.
+fn numeric_header_relationship() -> Vec<u8> {
+    let bytes = patch(
+        &header_fixture(),
+        "word/_rels/document.xml.rels",
+        r#"Id="rId5""#,
+        r#"Id="1""#,
+    );
+    patch(
+        &bytes,
+        "word/document.xml",
+        DEFAULT_HEADER,
+        r#"<w:headerReference w:type="default" r:id="1"/>"#,
+    )
+}
+
+fn header_texts(package: &Package) -> Vec<String> {
+    package
+        .document()
+        .expect("document")
+        .headers()
+        .expect("headers resolve")
+        .iter()
+        .map(|header| header.text().expect("header text"))
+        .collect()
+}
+
+/// `(defect, part, item)` of each packaging entry; section entries carry no
+/// package location.
+fn report_entries(
+    report: &litchi_docx::ToleranceReport,
+) -> Vec<(Defect, Option<(String, Option<String>)>)> {
+    report
+        .defects()
+        .iter()
+        .map(|tolerated| {
+            (
+                tolerated.defect,
+                tolerated.location.as_deref().map(|location| {
+                    (
+                        location.part().to_owned(),
+                        location.item().map(str::to_owned),
+                    )
+                }),
+            )
+        })
+        .collect()
+}
+
+/// F2.12 end to end: litchi-opc admits the non-XML-ID `.rels` `Id` verbatim
+/// (recorded as `RelationshipDefect::NonConformingId`), so the equally
+/// numeric `r:id` resolves and the header text is read.
+#[test]
+fn numeric_header_relationship_resolves_end_to_end() {
+    let control = open(&header_fixture());
+    let expected_texts = header_texts(&control);
+    let control_document = control.document().expect("document");
+    control_document.section_inventory().expect("sections");
+    assert!(control_document.tolerance_report().is_clean());
+
+    let bytes = numeric_header_relationship();
+    let package = open(&bytes);
+    let texts = header_texts(&package);
+    assert_eq!(texts, expected_texts);
+    assert!(
+        texts
+            .iter()
+            .any(|text| text.contains("This is a simple header")),
+        "{texts:?}"
+    );
+
+    // The OPC repair is in the package report from open; reading the
+    // section inventory adds the section repair.
+    let expected = [
+        (
+            Defect::Package(PackageDefect::Relationship(
+                RelationshipDefect::NonConformingId,
+            )),
+            Some(("/word/document.xml".to_owned(), Some("1".to_owned()))),
+        ),
+        (
+            Defect::Section(SectionDefect::NonConformingRelationshipId),
+            None,
+        ),
+    ];
+    assert_eq!(report_entries(&package.tolerance_report()), expected[..1]);
+    let document = package.document().expect("document");
+    document.section_inventory().expect("sections");
+    assert_eq!(report_entries(&document.tolerance_report()), expected);
+
+    // The source-backed facade records the same pair, and its owned
+    // materialization resolves the header too.
+    let source = open_source_backed(&bytes);
+    assert_eq!(report_entries(&source.tolerance_report()), expected[..1]);
+    let pinned = source.document().expect("pinned document");
+    pinned.section_inventory().expect("sections");
+    assert_eq!(report_entries(&pinned.tolerance_report()), expected);
+    let owned = source.to_owned_package().expect("owned package");
+    assert_eq!(header_texts(&owned), expected_texts);
 }

@@ -542,9 +542,11 @@ pub enum SectionDefect {
     /// A `w:headerReference`/`w:footerReference` `r:id` is not an XML ID
     /// (for example a numeric `"1"`). `ST_RelationshipId` is an `xsd:ID`, but
     /// OPC resolves a relationship by literal string equality, so Word and
-    /// LibreOffice follow it; the reference is kept as written. Rewriting
-    /// such a section through the section writers still requires an
-    /// `NCName`.
+    /// LibreOffice follow it; the reference is kept as written. The matching
+    /// `.rels` `Id` is admitted verbatim by `litchi-opc` (recorded as
+    /// `RelationshipDefect::NonConformingId`), so the reference resolves.
+    /// Rewriting such a section through the section writers still requires
+    /// an `NCName`.
     NonConformingRelationshipId,
 }
 
