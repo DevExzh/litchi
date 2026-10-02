@@ -357,3 +357,68 @@ fn the_opt_in_keeps_truncated_tokens_and_nesting_limits_fatal() {
     let deep = format!(r"{{\rtf1 {}", "{".repeat(400));
     assert!(Document::parse_with_options(&deep, options).is_err());
 }
+
+// F9.7: malformed `\'hh` escapes stay fatal by default and decode the way
+// LibreOffice decodes them under the named opt-in.
+#[test]
+fn malformed_hex_escapes_are_rejected_by_default() {
+    for source in [
+        r"{\rtf1\ansi a\'g1 b}",
+        r"{\rtf1\ansi a\'zz b}",
+        r"{\rtf1\ansi a\'4}",
+        "{\\rtf1\\ansi a\\'4",
+    ] {
+        assert!(Document::parse(source).is_err(), "accepted {source}");
+        let groups_only = Options::new().with_leniency(Leniency::TolerateUnclosedGroups);
+        assert!(
+            Document::parse_with_options(source, groups_only).is_err(),
+            "accepted {source} without the hex opt-in"
+        );
+    }
+}
+
+#[test]
+fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
+    let options = Options::new().with_leniency(Leniency::TolerateMalformedHexEscapes);
+    assert!(options.leniency().tolerates_malformed_hex_escapes());
+    // `\'g1` keeps its one valid digit (byte 0x01, LibreOffice's
+    // "`\'<number><junk>` means `\'0<number>`"), `\'zz` has none and is
+    // dropped, `\'4` before a brace keeps its digit, and `\'41` is intact.
+    let source = r"{\rtf1\ansi a\'4gb\'zzc{\'4}d\'41\par}";
+    let document = Document::parse_with_options(source, options).unwrap();
+    assert_eq!(document.text(), "a\u{4}bc\u{4}dA\n");
+    let malformed = Defect::Syntax(SyntaxDefect::MalformedHexEscape);
+    let first = source.find(r"\'4g").unwrap() as u64;
+    let second = source.find(r"\'zz").unwrap() as u64;
+    let third = source.find(r"\'4}").unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(malformed, first), (malformed, second), (malformed, third)]
+    );
+    assert!(!SyntaxDefect::MalformedHexEscape.repair().is_empty());
+
+    // Well-formed escapes are unaffected by the opt-in.
+    let document = Document::parse_with_options(CONFORMANT, options).unwrap();
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
+    let options = Options::new().with_leniency(Leniency::TolerateSyntaxDefects);
+    let source = "{\\rtf1\\ansi caf\\'e";
+    let document = Document::parse_with_options(source, options).unwrap();
+    assert_eq!(document.text(), "caf\u{e}");
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (
+                Defect::Syntax(SyntaxDefect::MalformedHexEscape),
+                source.find("\\'e").unwrap() as u64
+            ),
+            (
+                Defect::Syntax(SyntaxDefect::UnclosedGroup),
+                source.len() as u64
+            ),
+        ]
+    );
+}

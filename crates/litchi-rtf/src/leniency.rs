@@ -50,6 +50,15 @@ pub enum Leniency {
     /// rejects it. A missing closing brace can mean the file lost its tail,
     /// so the repair is opt-in.
     TolerateUnclosedGroups,
+    /// Also decode malformed `\'hh` escapes (see
+    /// [`SyntaxDefect::MalformedHexEscape`]).
+    ///
+    /// A malformed escape can hide corrupted text, so the repair is opt-in.
+    TolerateMalformedHexEscapes,
+    /// Apply every opt-in syntax repair: both
+    /// [`Self::TolerateUnclosedGroups`] and
+    /// [`Self::TolerateMalformedHexEscapes`].
+    TolerateSyntaxDefects,
 }
 
 impl Leniency {
@@ -58,7 +67,20 @@ impl Leniency {
     #[inline]
     #[must_use]
     pub const fn tolerates_unclosed_groups(self) -> bool {
-        matches!(self, Self::TolerateUnclosedGroups)
+        matches!(
+            self,
+            Self::TolerateUnclosedGroups | Self::TolerateSyntaxDefects
+        )
+    }
+
+    /// Whether malformed `\'hh` escapes are decoded rather than rejected.
+    #[inline]
+    #[must_use]
+    pub const fn tolerates_malformed_hex_escapes(self) -> bool {
+        matches!(
+            self,
+            Self::TolerateMalformedHexEscapes | Self::TolerateSyntaxDefects
+        )
     }
 }
 
@@ -93,6 +115,17 @@ pub enum SyntaxDefect {
     /// the end-of-input offset. Repaired only under
     /// [`Leniency::TolerateUnclosedGroups`].
     UnclosedGroup,
+    /// A `\'hh` escape did not carry two hexadecimal digits (`\'g1`, or
+    /// `\'4` cut off by a brace or end of input).
+    ///
+    /// LibreOffice reads the two characters after `\'`, keeps the hex
+    /// digits among them, and ignores the rest ("`\'<number><junk>` means
+    /// `\'0<number>`"); Word recovers likewise. The escape yields the byte
+    /// its valid digits spell, or nothing when it has none. A structural
+    /// `\`, `{`, or `}` ends the escape early and is read normally. Repaired
+    /// only under [`Leniency::TolerateMalformedHexEscapes`] or
+    /// [`Leniency::TolerateSyntaxDefects`].
+    MalformedHexEscape,
 }
 
 impl SyntaxDefect {
@@ -107,6 +140,9 @@ impl SyntaxDefect {
                 "ignored the content after the root group's closing brace"
             },
             Self::UnclosedGroup => "closed the group left open at end of input",
+            Self::MalformedHexEscape => {
+                "kept the escape's valid hex digits as one byte and dropped the rest"
+            },
         }
     }
 }
@@ -366,6 +402,12 @@ mod tests {
         assert_eq!(Leniency::default(), Leniency::Strict);
         assert!(!Leniency::Strict.tolerates_unclosed_groups());
         assert!(Leniency::TolerateUnclosedGroups.tolerates_unclosed_groups());
+        assert!(!Leniency::TolerateUnclosedGroups.tolerates_malformed_hex_escapes());
+        assert!(!Leniency::Strict.tolerates_malformed_hex_escapes());
+        assert!(Leniency::TolerateMalformedHexEscapes.tolerates_malformed_hex_escapes());
+        assert!(!Leniency::TolerateMalformedHexEscapes.tolerates_unclosed_groups());
+        assert!(Leniency::TolerateSyntaxDefects.tolerates_unclosed_groups());
+        assert!(Leniency::TolerateSyntaxDefects.tolerates_malformed_hex_escapes());
     }
 
     #[test]
@@ -466,6 +508,7 @@ mod tests {
             Defect::from(SyntaxDefect::UnknownControlSymbol),
             Defect::from(SyntaxDefect::TrailingContentAfterRoot),
             Defect::from(SyntaxDefect::UnclosedGroup),
+            Defect::from(SyntaxDefect::MalformedHexEscape),
             Defect::from(ParameterDefect::NonBinaryToggle),
             Defect::from(ParameterDefect::UnexpectedParameter),
             Defect::from(ParameterDefect::MissingParameter),
