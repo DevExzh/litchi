@@ -923,3 +923,75 @@ fn an_unpaired_font_name_surrogate_decodes_to_the_replacement_character() {
     );
     assert_eq!(workbook.font(0).unwrap().name(), "A\u{FFFD}");
 }
+
+// ---------------------------------------------------------------------------
+// F3.9: number-format, font, and XFCRC cross-references
+// ---------------------------------------------------------------------------
+
+const XFCRC: u16 = 0x087C;
+
+#[test]
+fn an_unresolvable_number_format_and_reserved_font_fall_back_and_are_recorded() {
+    let package = with_cell_xf(|payload| {
+        payload[0..2].copy_from_slice(&4u16.to_le_bytes()); // ifnt 4 is reserved
+        payload[2..4].copy_from_slice(&300u16.to_le_bytes()); // no Format 300
+    });
+    let workbook = assert_repairs(
+        &package,
+        &[
+            (Defect::CellFormat(CellFormatDefect::FontReference), 15, 4),
+            (
+                Defect::CellFormat(CellFormatDefect::NumberFormatReference),
+                15,
+                300,
+            ),
+        ],
+    );
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let format = worksheet.format_for_cell(0, 0).unwrap();
+    assert_eq!(format.number_format_id(), 0, "General");
+    assert_eq!(format.font_index(), 0);
+    assert_eq!(
+        worksheet.get_cell(0, 0).unwrap().value(),
+        &CellValue::Float(42.5)
+    );
+}
+
+/// The fixture with an `XFCRC` record after its last `XF`, declaring the
+/// true XF count, with the reserved bytes set to `reserved`.
+fn with_xfcrc(reserved: u8) -> (Vec<u8>, u32) {
+    let mut stream = Stream::simple();
+    let xf_count = stream
+        .records
+        .iter()
+        .filter(|record| record.kind == XF)
+        .count();
+    let mut payload = vec![0u8; 20];
+    payload[0..2].copy_from_slice(&XFCRC.to_le_bytes());
+    payload[4..12].fill(reserved);
+    payload[14..16].copy_from_slice(&u16::try_from(xf_count).unwrap().to_le_bytes());
+    let last_xf = stream.position(XF, xf_count - 1);
+    stream
+        .records
+        .insert(last_xf + 1, Record::new(XFCRC, payload));
+    let offset = stream.offset_of_kind(XFCRC, 0);
+    (stream.package(), offset)
+}
+
+#[test]
+fn xfcrc_reserved_bytes_are_ignored_and_recorded() {
+    let (package, offset) = with_xfcrc(0xAB);
+    assert_repairs(
+        &package,
+        &[(
+            Defect::CellFormat(CellFormatDefect::XfcrcReserved),
+            offset,
+            8,
+        )],
+    );
+}
+
+#[test]
+fn a_conforming_xfcrc_records_nothing() {
+    assert_clean(&with_xfcrc(0).0);
+}

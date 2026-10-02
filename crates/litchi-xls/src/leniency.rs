@@ -327,6 +327,39 @@ pub enum CellFormatDefect {
     ///
     /// Repaired to 0x7F, the automatic color.
     ColorIndex,
+    /// `XF.ifmt` named neither a built-in format nor a `Format` record.
+    ///
+    /// Repaired to General (0), the format Excel renders such a cell with.
+    NumberFormatReference,
+    /// A `DXF` number-format property named neither a built-in format nor a
+    /// `Format` record.
+    ///
+    /// Repaired to General (0).
+    DxfNumberFormatReference,
+    /// A `Format` record's `ifmt` (MS-XLS 2.4.126) was outside the ranges a
+    /// workbook may define.
+    ///
+    /// The record is kept, as LibreOffice keeps it, so an `XF` naming the
+    /// identifier still resolves to its code.
+    FormatIdentifier,
+    /// A style `XF` had the `f123Prefix` bit set.
+    ///
+    /// Ignored: the quote prefix is a cell-XF property.
+    StylePrefix,
+    /// `XF.ifnt` was the reserved index 4 or above 1022.
+    ///
+    /// Repaired to font 0, the default font Excel renders the cell with.
+    FontReference,
+    /// The `XFCRC` record's future-record header type or reserved bytes were
+    /// wrong.
+    ///
+    /// Ignored, as MS-XLS directs ("MUST be zero, and MUST be ignored").
+    XfcrcReserved,
+    /// `XFCRC.cxfs` was outside `16..=4050`.
+    ///
+    /// The redundant summary is discarded; the `XF` records themselves are
+    /// the data.
+    XfcrcCount,
 }
 
 impl CellFormatDefect {
@@ -343,7 +376,17 @@ impl CellFormatDefect {
             | CellFormatDefect::BorderStyle
             | CellFormatDefect::FillPattern
             | CellFormatDefect::DiagonalBorder
-            | CellFormatDefect::ColorIndex => Some(super::number_format::XF_RECORD),
+            | CellFormatDefect::ColorIndex
+            | CellFormatDefect::NumberFormatReference
+            | CellFormatDefect::StylePrefix
+            | CellFormatDefect::FontReference => Some(super::number_format::XF_RECORD),
+            CellFormatDefect::DxfNumberFormatReference => {
+                Some(super::differential_format::DXF_RECORD_TYPE)
+            },
+            CellFormatDefect::FormatIdentifier => Some(super::number_format::FORMAT_RECORD),
+            CellFormatDefect::XfcrcReserved | CellFormatDefect::XfcrcCount => {
+                Some(super::number_format::XFCRC_RECORD)
+            },
         }
     }
 
@@ -368,6 +411,19 @@ impl CellFormatDefect {
                 "XF diagonal border direction and style contradict each other"
             },
             CellFormatDefect::ColorIndex => "XF border or fill color index names no palette entry",
+            CellFormatDefect::NumberFormatReference => {
+                "XF number format identifier resolves to no format"
+            },
+            CellFormatDefect::DxfNumberFormatReference => {
+                "DXF number format identifier resolves to no format"
+            },
+            CellFormatDefect::FormatIdentifier => {
+                "Format record identifier is outside the permitted ranges"
+            },
+            CellFormatDefect::StylePrefix => "Style XF has the f123Prefix bit set",
+            CellFormatDefect::FontReference => "XF font index is reserved or out of range",
+            CellFormatDefect::XfcrcReserved => "XFCRC header or reserved fields are nonzero",
+            CellFormatDefect::XfcrcCount => "XFCRC count is outside 16..=4050",
         }
     }
 }
@@ -723,7 +779,12 @@ impl ToleratedDefect {
     /// it is the number of `XF` records that were actually parsed. For
     /// [`CellFormatDefect::XfReference`] it is the zero-based row of the
     /// cell or `ROW` record, or the first column of the `COLINFO` record.
-    /// For the other [`CellFormatDefect`] classes it is the `XF` index.
+    /// For [`CellFormatDefect::DxfNumberFormatReference`] it is the `DXF`
+    /// index, for [`CellFormatDefect::FormatIdentifier`] the `Format`
+    /// record's ordinal, and for [`CellFormatDefect::XfcrcReserved`] and
+    /// [`CellFormatDefect::XfcrcCount`] the `XFCRC` record's byte offset in
+    /// the Workbook stream. For the other [`CellFormatDefect`] classes it is
+    /// the `XF` index.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
     /// the `CODEPAGE` record within the Workbook stream. For
     /// [`EncodingDefect::LabelSurrogate`] it is the cell's zero-based row; for
@@ -754,7 +815,12 @@ impl ToleratedDefect {
     /// [`CellFormatDefect`] classes it is the raw field value (the whole
     /// indentation byte for [`CellFormatDefect::AlignmentReservedBit`]); for
     /// [`CellFormatDefect::DiagonalBorder`] it is the stored flags and style
-    /// packed as `fDgDown | fDgUp << 1 | dgDiag << 2`.
+    /// packed as `fDgDown | fDgUp << 1 | dgDiag << 2`. For the number-format,
+    /// identifier, and font-reference classes it is the raw identifier or
+    /// index; for [`CellFormatDefect::StylePrefix`] the XF's flags word; for
+    /// [`CellFormatDefect::XfcrcReserved`] the number of nonzero reserved
+    /// bytes (zero when only the header type was wrong); for
+    /// [`CellFormatDefect::XfcrcCount`] the declared `cxfs`.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the raw `cv` code
     /// page identifier; for [`EncodingDefect::LabelSurrogate`] the cell's
     /// zero-based column; for [`EncodingDefect::FontNameSurrogate`],

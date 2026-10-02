@@ -386,4 +386,16 @@ impl DifferentialFormat {
     pub fn properties(&self) -> &XfProperties {
         &self.properties
     }
+
+    /// Every number-format identifier this format carries, for the reader's
+    /// Excel-compatible substitution of an unresolvable one.
+    pub(crate) fn number_format_ids_mut(&mut self) -> impl Iterator<Item = &mut u16> {
+        self.properties
+            .properties
+            .iter_mut()
+            .filter_map(|property| match property {
+                XfProperty::NumberFormatId(id) => Some(id),
+                _ => None,
+            })
+    }
 }

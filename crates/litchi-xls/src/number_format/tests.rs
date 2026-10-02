@@ -237,17 +237,13 @@ fn a_truncated_format_string_drops_a_split_utf16_code_unit() {
 }
 
 #[test]
-fn a_lenient_policy_still_rejects_trailing_bytes_and_a_bad_format_identifier() {
+fn a_lenient_policy_still_rejects_trailing_bytes() {
     let mut tolerance = ToleranceLog::new(crate::leniency::Leniency::TolerateFormattingDefects);
     // Trailing bytes past a satisfied `cch` are a framing defect.
     let mut trailing = overlong_format_record(4, "0.00");
     trailing.push(0);
     trailing.push(0);
     assert!(parse_number_format_with_tolerance(&trailing, 0, &mut tolerance).is_err());
-    // An identifier outside the permitted ranges is not a formatting defect.
-    let mut bad_id = overlong_format_record(4, "0.00");
-    bad_id[0..2].copy_from_slice(&0u16.to_le_bytes());
-    assert!(parse_number_format_with_tolerance(&bad_id, 0, &mut tolerance).is_err());
     assert!(tolerance.into_report().is_clean());
 }
 
@@ -260,9 +256,89 @@ fn rejects_invalid_date_xf_and_crc_shapes() {
     let mut crc = [0u8; 20];
     crc[0..2].copy_from_slice(&XFCRC_RECORD.to_le_bytes());
     crc[14..16].copy_from_slice(&16u16.to_le_bytes());
-    assert_eq!(parse_xfcrc(&crc).unwrap(), 16);
+    let mut report = ToleranceReport::default();
+    assert_eq!(parse_xfcrc(&crc, 0, &mut report).unwrap(), Some(16));
+    assert!(report.is_clean());
+    assert!(parse_xfcrc(&crc[..19], 0, &mut report).is_err());
+}
+
+#[test]
+fn ignores_xfcrc_reserved_fields_and_an_impossible_count() {
+    let mut crc = [0u8; 20];
+    crc[0..2].copy_from_slice(&0x1234u16.to_le_bytes());
     crc[2] = 1;
-    assert!(parse_xfcrc(&crc).is_err());
+    crc[9] = 7;
+    crc[14..16].copy_from_slice(&16u16.to_le_bytes());
+    let mut report = ToleranceReport::default();
+    assert_eq!(parse_xfcrc(&crc, 300, &mut report).unwrap(), Some(16));
+    assert_eq!(report.count(CellFormatDefect::XfcrcReserved), 1);
+    assert_eq!(report.defects()[0].ordinal(), 300);
+    assert_eq!(report.defects()[0].observed(), 2);
+
+    crc[14..16].copy_from_slice(&5u16.to_le_bytes());
+    let mut report = ToleranceReport::default();
+    assert_eq!(parse_xfcrc(&crc, 0, &mut report).unwrap(), None);
+    assert_eq!(report.count(CellFormatDefect::XfcrcCount), 1);
+}
+
+#[test]
+fn repairs_xf_number_format_font_and_prefix_references() {
+    fn xf_data(style: bool, parent: u16, format_id: u16) -> Vec<u8> {
+        let mut data = vec![0u8; 20];
+        data[2..4].copy_from_slice(&format_id.to_le_bytes());
+        let flags = (parent << 4) | u16::from(style) << 2 | 1;
+        data[4..6].copy_from_slice(&flags.to_le_bytes());
+        data
+    }
+    let mut records = vec![record(DATE1904_RECORD, vec![0, 0])];
+    // A Format record outside the permitted ranges is kept.
+    records.push(format_record(100, "0.0"));
+    for _ in 0..15 {
+        records.push(xf(true, 0x0fff, 0));
+    }
+    records.push(xf(false, 0, 0));
+    // XF 16 names a missing custom format; XF 17 the kept id 100; XF 18 the
+    // reserved font 4; XF 19 is a style XF with f123Prefix set.
+    records.push(record(XF_RECORD, xf_data(false, 0, 200)));
+    records.push(record(XF_RECORD, xf_data(false, 0, 100)));
+    let mut font = xf_data(false, 0, 0);
+    font[0..2].copy_from_slice(&4u16.to_le_bytes());
+    records.push(record(XF_RECORD, font));
+    let mut prefix = xf_data(true, 0x0fff, 0);
+    prefix[4] |= 0x08;
+    records.push(record(XF_RECORD, prefix));
+
+    for leniency in [
+        crate::leniency::Leniency::Strict,
+        crate::leniency::Leniency::TolerateFormattingDefects,
+    ] {
+        let refs = records
+            .iter()
+            .map(|record| record.as_ref())
+            .collect::<Vec<_>>();
+        let mut tolerance = ToleranceLog::new(leniency);
+        let formatting = Formatting::parse_globals(&refs, &mut tolerance)
+            .expect("the Excel-compatible repairs apply under every policy");
+        let xfs = formatting.extended_formats();
+        assert_eq!(xfs[16].number_format_id(), 0, "missing format -> General");
+        assert_eq!(xfs[17].number_format_id(), 100, "a kept Format resolves");
+        assert_eq!(xfs[18].font_index(), 0, "reserved font -> font 0");
+        let found = tolerance
+            .into_report()
+            .defects()
+            .iter()
+            .map(|entry| (entry.defect(), entry.ordinal(), entry.observed()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            found,
+            [
+                (CellFormatDefect::FormatIdentifier.into(), 0, 100),
+                (CellFormatDefect::FontReference.into(), 18, 4),
+                (CellFormatDefect::StylePrefix.into(), 19, 0xfffd),
+                (CellFormatDefect::NumberFormatReference.into(), 16, 200),
+            ]
+        );
+    }
 }
 
 #[test]

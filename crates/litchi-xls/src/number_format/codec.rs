@@ -105,6 +105,15 @@ impl Formatting {
                         invalid(FORMAT_RECORD, "Format record ordinal does not fit in u32")
                     })?;
                     let format = parse_number_format(record.payload(), ordinal, tolerance)?;
+                    if !is_permitted_format_id(format.id) {
+                        // Kept, as LibreOffice keeps it: an XF naming the id
+                        // still resolves to this record's code.
+                        tolerance.report_mut().record(
+                            CellFormatDefect::FormatIdentifier,
+                            ordinal,
+                            u32::from(format.id),
+                        );
+                    }
                     if format_by_id.contains_key(&format.id) {
                         return Err(invalid(
                             FORMAT_RECORD,
@@ -127,7 +136,11 @@ impl Formatting {
                     if xfcrc.is_some() {
                         return Err(invalid(XFCRC_RECORD, "duplicate XFCRC record"));
                     }
-                    xfcrc = Some(parse_xfcrc(record.payload())?);
+                    xfcrc = Some(parse_xfcrc(
+                        record.payload(),
+                        u32::try_from(record.offset()).unwrap_or(u32::MAX),
+                        tolerance.report_mut(),
+                    )?);
                 },
                 crate::xf_ext::XF_EXT_RECORD_TYPE => {
                     if xf_extensions.len() == MAX_XF_RECORDS {
@@ -170,7 +183,7 @@ impl Formatting {
                 ),
             ));
         }
-        if let Some(count) = xfcrc {
+        if let Some(Some(count)) = xfcrc {
             let parsed = extended_formats.len();
             if count as usize != parsed {
                 // XFCRC is a redundant integrity summary over the XF table.
@@ -190,6 +203,19 @@ impl Formatting {
             }
         }
 
+        // An `ifmt` that names neither a built-in format nor a `Format` record
+        // renders as General in Excel; POI never checks it at open.
+        for format in &mut extended_formats {
+            let id = format.number_format_id;
+            if id > MAX_BUILT_IN_FORMAT_ID && !format_by_id.contains_key(&id) {
+                tolerance.report_mut().record(
+                    CellFormatDefect::NumberFormatReference,
+                    u32::from(format.index),
+                    u32::from(id),
+                );
+                format.number_format_id = GENERAL_FORMAT_ID;
+            }
+        }
         for (index, format) in extended_formats.iter().enumerate() {
             if index < 15 && !matches!(format.kind, ExtendedFormatKind::Style) {
                 return Err(invalid(
@@ -199,26 +225,6 @@ impl Formatting {
             }
             if index == 15 && !format.is_cell_format() {
                 return Err(invalid(XF_RECORD, "mandatory XF slot 15 is not a cell XF"));
-            }
-            if format.number_format_id > 81 {
-                if !(164..=392).contains(&format.number_format_id) {
-                    return Err(invalid(
-                        XF_RECORD,
-                        format!(
-                            "XF {index} uses reserved number format identifier {}",
-                            format.number_format_id
-                        ),
-                    ));
-                }
-                if !format_by_id.contains_key(&format.number_format_id) {
-                    return Err(invalid(
-                        XF_RECORD,
-                        format!(
-                            "XF {index} references missing custom number format {}",
-                            format.number_format_id
-                        ),
-                    ));
-                }
             }
             if let ExtendedFormatKind::Cell { parent_style_xf } = format.kind {
                 let parent = extended_formats
@@ -251,23 +257,15 @@ impl Formatting {
             }
         }
 
-        for (dxf_index, dxf) in differential_formats.iter().enumerate() {
-            for property in dxf.properties().properties() {
-                if let crate::differential_format::XfProperty::NumberFormatId(id) = property
-                    && *id > 81
-                {
-                    if !(164..=392).contains(id) {
-                        return Err(invalid(
-                            crate::differential_format::DXF_RECORD_TYPE,
-                            format!("DXF {dxf_index} uses reserved number format identifier {id}"),
-                        ));
-                    }
-                    if !format_by_id.contains_key(id) {
-                        return Err(invalid(
-                            crate::differential_format::DXF_RECORD_TYPE,
-                            format!("DXF {dxf_index} references missing custom number format {id}"),
-                        ));
-                    }
+        for (dxf_index, dxf) in (0_u32..).zip(differential_formats.iter_mut()) {
+            for id in dxf.number_format_ids_mut() {
+                if *id > MAX_BUILT_IN_FORMAT_ID && !format_by_id.contains_key(id) {
+                    tolerance.report_mut().record(
+                        CellFormatDefect::DxfNumberFormatReference,
+                        dxf_index,
+                        u32::from(*id),
+                    );
+                    *id = GENERAL_FORMAT_ID;
                 }
             }
         }
@@ -281,6 +279,16 @@ impl Formatting {
             format_by_id,
         })
     }
+}
+
+/// The General number format: the substitute for an unresolvable `ifmt`.
+const GENERAL_FORMAT_ID: u16 = 0;
+/// The largest number format identifier that never needs a `Format` record.
+const MAX_BUILT_IN_FORMAT_ID: u16 = 81;
+
+/// Whether MS-XLS 2.4.126 permits a `Format` record to define `id`.
+fn is_permitted_format_id(id: u16) -> bool {
+    matches!(id, 5..=8 | 23..=26 | 41..=44 | 63..=66 | 164..=392)
 }
 
 pub(super) fn parse_date_system(data: &[u8]) -> Result<DateSystem> {
@@ -318,13 +326,9 @@ pub(super) fn parse_number_format(
     if data.len() < 5 {
         return Err(invalid(FORMAT_RECORD, "truncated Format record"));
     }
+    // An identifier outside the permitted ranges is recorded by the caller as
+    // `CellFormatDefect::FormatIdentifier` and the record kept.
     let id = u16::from_le_bytes([data[0], data[1]]);
-    if !matches!(id, 5..=8 | 23..=26 | 41..=44 | 63..=66 | 164..=392) {
-        return Err(invalid(
-            FORMAT_RECORD,
-            format!("number format identifier {id} is outside the permitted ranges"),
-        ));
-    }
     let (code, truncated) = parse_xl_unicode_string(&data[2..], ordinal, tolerance)?;
     let count = code.encode_utf16().count();
     // A truncated code was already recorded as `FormatStringOverrun`; its
@@ -433,7 +437,13 @@ pub(super) fn parse_xf(
     let prefix = flags & 0x0008 != 0;
     let parent = flags >> 4;
     if style && prefix {
-        return Err(invalid(XF_RECORD, "style XF has the f123Prefix bit set"));
+        // MS-XLS 2.4.353 leaves f123Prefix undefined on a style XF; it is
+        // ignored there (the cell-only quote prefix is never derived from it).
+        tolerance.report_mut().record(
+            CellFormatDefect::StylePrefix,
+            u32::from(index),
+            u32::from(flags),
+        );
     }
     let kind = if style {
         ExtendedFormatKind::Style
@@ -442,8 +452,17 @@ pub(super) fn parse_xf(
             parent_style_xf: parent,
         }
     };
-    let font_index = u16::from_le_bytes([data[0], data[1]]);
-    crate::font::validate_font_index(font_index)?;
+    let mut font_index = u16::from_le_bytes([data[0], data[1]]);
+    if crate::font::validate_font_index(font_index).is_err() {
+        // Index 4 is reserved and indices above 1022 are out of range; Excel
+        // renders such a cell in the default font.
+        tolerance.report_mut().record(
+            CellFormatDefect::FontReference,
+            u32::from(index),
+            u32::from(font_index),
+        );
+        font_index = 0;
+    }
     let applications = if style {
         ExtendedFormatApplications::all_local()
     } else {
@@ -476,30 +495,43 @@ pub(super) fn parse_xf(
     })
 }
 
-pub(super) fn parse_xfcrc(data: &[u8]) -> Result<u16> {
+/// Parse an `XFCRC` payload into its `cxfs`, or `None` when the count is
+/// outside `16..=4050` and the record is therefore ignored.
+///
+/// `XFCRC` is a redundant integrity summary, so its header and reserved
+/// fields are ignored ("MUST be ignored") and an impossible count discards
+/// the summary; each repair is recorded against `record_offset`. Only a
+/// payload of the wrong size stays a framing error.
+pub(super) fn parse_xfcrc(
+    data: &[u8],
+    record_offset: u32,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<u16>> {
     if data.len() != 20 {
         return Err(invalid(
             XFCRC_RECORD,
             format!("XFCRC payload has {} bytes; expected 20", data.len()),
         ));
     }
-    if u16::from_le_bytes([data[0], data[1]]) != XFCRC_RECORD {
-        return Err(invalid(
-            XFCRC_RECORD,
-            "XFCRC FrtHeader has the wrong record type",
-        ));
-    }
-    if data[2..14].iter().any(|byte| *byte != 0) {
-        return Err(invalid(XFCRC_RECORD, "XFCRC reserved fields are nonzero"));
+    let header_type = u16::from_le_bytes([data[0], data[1]]);
+    let reserved = data[2..14].iter().filter(|byte| **byte != 0).count();
+    if header_type != XFCRC_RECORD || reserved != 0 {
+        tolerance.record(
+            CellFormatDefect::XfcrcReserved,
+            record_offset,
+            u32::try_from(reserved).unwrap_or(u32::MAX),
+        );
     }
     let count = u16::from_le_bytes([data[14], data[15]]);
     if !(16..=4050).contains(&count) {
-        return Err(invalid(
-            XFCRC_RECORD,
-            format!("XFCRC count {count} is outside 16 through 4050"),
-        ));
+        tolerance.record(
+            CellFormatDefect::XfcrcCount,
+            record_offset,
+            u32::from(count),
+        );
+        return Ok(None);
     }
-    Ok(count)
+    Ok(Some(count))
 }
 
 pub(super) fn is_custom_date_time(code: &str) -> bool {
