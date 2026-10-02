@@ -1,5 +1,6 @@
 //! BIFF8 XF border and fill metadata.
 
+use crate::leniency::{CellFormatDefect, ToleranceReport};
 use crate::{Color, Error, Palette, Result};
 
 /// A BIFF8 cell border line style.
@@ -24,6 +25,16 @@ pub enum BorderStyle {
 }
 
 impl BorderStyle {
+    /// The style `value` names, or [`BorderStyle::None`] — the default
+    /// LibreOffice substitutes — recorded as
+    /// [`CellFormatDefect::BorderStyle`] against XF `xf_index`.
+    fn repaired(value: u32, xf_index: u16, tolerance: &mut ToleranceReport) -> Self {
+        Self::from_bits(value).unwrap_or_else(|_| {
+            tolerance.record(CellFormatDefect::BorderStyle, u32::from(xf_index), value);
+            Self::None
+        })
+    }
+
     fn from_bits(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::None),
@@ -149,6 +160,16 @@ pub enum FillPattern {
 }
 
 impl FillPattern {
+    /// The pattern `value` names, or [`FillPattern::None`] — the default
+    /// LibreOffice substitutes — recorded as
+    /// [`CellFormatDefect::FillPattern`] against XF `xf_index`.
+    fn repaired(value: u32, xf_index: u16, tolerance: &mut ToleranceReport) -> Self {
+        Self::from_bits(value).unwrap_or_else(|_| {
+            tolerance.record(CellFormatDefect::FillPattern, u32::from(xf_index), value);
+            Self::None
+        })
+    }
+
     fn from_bits(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::None),
@@ -212,61 +233,72 @@ impl CellFill {
     }
 }
 
-pub(crate) fn parse_xf_border_fill(data: &[u8], style_xf: bool) -> Result<(CellBorders, CellFill)> {
+/// The automatic 7-bit border/fill color index, the substitute for an index
+/// outside the palette.
+const AUTOMATIC_COLOR: u16 = 0x7f;
+
+/// Parse the border and fill fields of the XF `xf_index`, applying the
+/// Excel-compatible repairs under every policy and recording each as a
+/// [`CellFormatDefect`]: an undefined border style or fill pattern reads as
+/// none, a color index outside the palette as automatic (0x7F), and a
+/// diagonal whose direction flags and style contradict each other is kept
+/// exactly as stored (it draws no line, as in LibreOffice).
+pub(crate) fn parse_xf_border_fill(
+    data: &[u8],
+    xf_index: u16,
+    tolerance: &mut ToleranceReport,
+) -> (CellBorders, CellFill) {
     debug_assert!(data.len() >= 20);
     let border1 = u32::from_le_bytes([data[10], data[11], data[12], data[13]]);
     let border2 = u32::from_le_bytes([data[14], data[15], data[16], data[17]]);
     let area = u16::from_le_bytes([data[18], data[19]]);
 
-    let _ = style_xf;
-
     let diagonal_down = border1 & (1 << 30) != 0;
     let diagonal_up = border1 & (1 << 31) != 0;
-    let diagonal_style = BorderStyle::from_bits((border2 >> 21) & 0x0f)?;
+    let diagonal_style = BorderStyle::repaired((border2 >> 21) & 0x0f, xf_index, tolerance);
     if (diagonal_down || diagonal_up) != (diagonal_style != BorderStyle::None) {
-        return Err(Error::InvalidData(
-            "BIFF8 diagonal border direction and style contradict each other".to_string(),
-        ));
+        tolerance.record(
+            CellFormatDefect::DiagonalBorder,
+            u32::from(xf_index),
+            (border1 >> 30) | ((border2 >> 21) & 0x0f) << 2,
+        );
     }
 
-    let left_color = ((border1 >> 16) & 0x7f) as u16;
-    let right_color = ((border1 >> 23) & 0x7f) as u16;
-    let top_color = (border2 & 0x7f) as u16;
-    let bottom_color = ((border2 >> 7) & 0x7f) as u16;
-    let diagonal_color = ((border2 >> 14) & 0x7f) as u16;
-    let foreground_color = area & 0x7f;
-    let background_color = (area >> 7) & 0x7f;
-    for (name, color) in [
-        ("left border", left_color),
-        ("right border", right_color),
-        ("top border", top_color),
-        ("bottom border", bottom_color),
-        ("diagonal border", diagonal_color),
-        ("fill foreground", foreground_color),
-        ("fill background", background_color),
-    ] {
-        if color > 0x41 && color != 0x7f {
-            return Err(Error::InvalidData(format!(
-                "invalid BIFF8 {name} color index {color:#04x}"
-            )));
+    let mut color = |value: u16| -> u16 {
+        if value > 0x41 && value != AUTOMATIC_COLOR {
+            tolerance.record(
+                CellFormatDefect::ColorIndex,
+                u32::from(xf_index),
+                u32::from(value),
+            );
+            AUTOMATIC_COLOR
+        } else {
+            value
         }
-    }
+    };
+    let left_color = color(((border1 >> 16) & 0x7f) as u16);
+    let right_color = color(((border1 >> 23) & 0x7f) as u16);
+    let top_color = color((border2 & 0x7f) as u16);
+    let bottom_color = color(((border2 >> 7) & 0x7f) as u16);
+    let diagonal_color = color(((border2 >> 14) & 0x7f) as u16);
+    let foreground_color = color(area & 0x7f);
+    let background_color = color((area >> 7) & 0x7f);
 
     let borders = CellBorders {
         left: BorderSide {
-            style: BorderStyle::from_bits(border1 & 0x0f)?,
+            style: BorderStyle::repaired(border1 & 0x0f, xf_index, tolerance),
             color_index: left_color,
         },
         right: BorderSide {
-            style: BorderStyle::from_bits((border1 >> 4) & 0x0f)?,
+            style: BorderStyle::repaired((border1 >> 4) & 0x0f, xf_index, tolerance),
             color_index: right_color,
         },
         top: BorderSide {
-            style: BorderStyle::from_bits((border1 >> 8) & 0x0f)?,
+            style: BorderStyle::repaired((border1 >> 8) & 0x0f, xf_index, tolerance),
             color_index: top_color,
         },
         bottom: BorderSide {
-            style: BorderStyle::from_bits((border1 >> 12) & 0x0f)?,
+            style: BorderStyle::repaired((border1 >> 12) & 0x0f, xf_index, tolerance),
             color_index: bottom_color,
         },
         diagonal: BorderSide {
@@ -277,11 +309,11 @@ pub(crate) fn parse_xf_border_fill(data: &[u8], style_xf: bool) -> Result<(CellB
         diagonal_up,
     };
     let fill = CellFill {
-        pattern: FillPattern::from_bits(border2 >> 26)?,
+        pattern: FillPattern::repaired(border2 >> 26, xf_index, tolerance),
         foreground_color_index: foreground_color,
         background_color_index: background_color,
     };
-    Ok((borders, fill))
+    (borders, fill)
 }
 
 #[cfg(test)]
@@ -335,8 +367,21 @@ mod tests {
         data
     }
 
+    /// Conforming-only shim: refuses anything the parser had to repair.
     fn parse_cell(data: &[u8]) -> Result<(CellBorders, CellFill)> {
-        parse_xf_border_fill(data, false)
+        let mut report = ToleranceReport::default();
+        let parsed = parse_xf_border_fill(data, 0, &mut report);
+        if report.is_clean() {
+            Ok(parsed)
+        } else {
+            Err(Error::InvalidData(format!("repaired: {report:?}")))
+        }
+    }
+
+    fn parse_repaired(data: &[u8]) -> ((CellBorders, CellFill), ToleranceReport) {
+        let mut report = ToleranceReport::default();
+        let parsed = parse_xf_border_fill(data, 33, &mut report);
+        (parsed, report)
     }
 
     #[test]
@@ -380,26 +425,65 @@ mod tests {
         }
     }
 
+    fn single_repair(report: &ToleranceReport) -> (CellFormatDefect, u32) {
+        assert_eq!(report.total(), 1, "{report:?}");
+        let entry = report.defects()[0];
+        assert_eq!(entry.ordinal(), 33, "the XF index");
+        let crate::leniency::Defect::CellFormat(defect) = entry.defect() else {
+            panic!("unexpected class {entry:?}");
+        };
+        (defect, entry.observed())
+    }
+
     #[test]
-    fn rejects_invalid_and_contradictory_encodings() {
-        assert!(parse_cell(&xf(14, 0, 0)).is_err());
-        assert!(parse_cell(&xf(0, 19 << 26, 0)).is_err());
-        assert!(parse_cell(&xf(0, 1 << 21, 0)).is_err());
-        assert!(parse_cell(&xf(1 << 30, 0, 0)).is_err());
-        assert!(parse_cell(&xf(0x42 << 16, 0, 0)).is_err());
+    fn an_undefined_border_style_reads_as_none() {
+        let ((borders, _), report) = parse_repaired(&xf(14 << 4, 0, 0));
+        assert_eq!(borders.right().style(), BorderStyle::None);
+        assert_eq!(single_repair(&report), (CellFormatDefect::BorderStyle, 14));
+    }
+
+    #[test]
+    fn an_undefined_fill_pattern_reads_as_none() {
+        let ((_, fill), report) = parse_repaired(&xf(0, 19 << 26, 0));
+        assert_eq!(fill.pattern(), FillPattern::None);
+        assert_eq!(single_repair(&report), (CellFormatDefect::FillPattern, 19));
+    }
+
+    #[test]
+    fn an_out_of_palette_color_reads_as_automatic() {
+        let ((borders, _), report) = parse_repaired(&xf(0x42 << 16, 0, 0));
+        assert_eq!(borders.left().color_index(), 0x7f);
+        assert_eq!(single_repair(&report), (CellFormatDefect::ColorIndex, 0x42));
+        let ((_, fill), report) = parse_repaired(&xf(0, 0, 0x50 << 7));
+        assert_eq!(fill.background_color_index(), 0x7f);
+        assert_eq!(single_repair(&report), (CellFormatDefect::ColorIndex, 0x50));
+    }
+
+    #[test]
+    fn a_contradictory_diagonal_is_kept_as_stored() {
+        // A style without a direction.
+        let ((borders, _), report) = parse_repaired(&xf(0, 1 << 21, 0));
+        assert_eq!(borders.diagonal().style(), BorderStyle::Thin);
+        assert!(!borders.diagonal_down() && !borders.diagonal_up());
+        assert_eq!(
+            single_repair(&report),
+            (CellFormatDefect::DiagonalBorder, 1 << 2)
+        );
+        // A direction without a style.
+        let ((borders, _), report) = parse_repaired(&xf(1 << 30, 0, 0));
+        assert_eq!(borders.diagonal().style(), BorderStyle::None);
+        assert!(borders.diagonal_down());
+        assert_eq!(
+            single_repair(&report),
+            (CellFormatDefect::DiagonalBorder, 1)
+        );
     }
 
     #[test]
     fn style_xf_ignores_must_zero_reserved_bits() {
-        assert!(parse_xf_border_fill(&xf(0, 1 << 25, 0), true).is_ok());
-        assert!(parse_xf_border_fill(&xf(0, 0, 1 << 14), true).is_ok());
-        assert!(parse_xf_border_fill(&xf(0, 0, 1 << 15), true).is_ok());
-    }
-
-    #[test]
-    fn cell_xf_preserves_extension_and_button_bits() {
-        assert!(parse_xf_border_fill(&xf(0, 1 << 25, 0), false).is_ok());
-        assert!(parse_xf_border_fill(&xf(0, 0, 1 << 14), false).is_ok());
+        assert!(parse_cell(&xf(0, 1 << 25, 0)).is_ok());
+        assert!(parse_cell(&xf(0, 0, 1 << 14)).is_ok());
+        assert!(parse_cell(&xf(0, 0, 1 << 15)).is_ok());
     }
 
     #[test]

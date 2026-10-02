@@ -435,13 +435,6 @@ pub(super) fn parse_xf(
     if style && prefix {
         return Err(invalid(XF_RECORD, "style XF has the f123Prefix bit set"));
     }
-    let rotation = data[7];
-    if rotation > 180 && rotation != 255 {
-        return Err(invalid(
-            XF_RECORD,
-            format!("XF text rotation {rotation} is outside the permitted range"),
-        ));
-    }
     let kind = if style {
         ExtendedFormatKind::Style
     } else {
@@ -463,7 +456,8 @@ pub(super) fn parse_xf(
     let pivot_button = !style && area & (1 << 14) != 0;
     let alignment =
         crate::alignment::CellAlignment::parse(data[6], data[7], data[8], index, tolerance)?;
-    let (borders, fill) = crate::border_fill::parse_xf_border_fill(data, style)?;
+    let (borders, fill) =
+        crate::border_fill::parse_xf_border_fill(data, index, tolerance.report_mut());
 
     Ok(ExtendedFormat {
         index,

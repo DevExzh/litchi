@@ -1,7 +1,7 @@
 //! BIFF8 XF cell and style alignment metadata.
 
 use super::error::{Error, Result};
-use super::leniency::{FormattingDefect, ToleranceLog};
+use super::leniency::{CellFormatDefect, FormattingDefect, ToleranceLog};
 
 /// Horizontal alignment of cell text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -114,11 +114,14 @@ impl CellAlignment {
 
     /// Parse the three XF alignment bytes under an explicit leniency policy.
     ///
-    /// `xf_index` locates the owning XF record in the recorded report. The only
-    /// tolerated defect is `fJustLast` without distributed horizontal
-    /// alignment, which is cleared; invalid vertical alignment, rotation,
-    /// reading order, and reserved bits stay hard errors because each of those
-    /// would otherwise silently invent a layout the file never specified.
+    /// `xf_index` locates the owning XF record in the recorded report.
+    /// `fJustLast` without distributed horizontal alignment is cleared only
+    /// under the opt-in [`super::Leniency::TolerateFormattingDefects`]. The
+    /// Excel-compatible repairs are applied under every policy, each recorded
+    /// as a [`CellFormatDefect`]: an undefined vertical alignment reads as
+    /// bottom, an undefined rotation as none, an undefined reading order as
+    /// context, and the reserved indentation bit is ignored — the defaults
+    /// LibreOffice substitutes, so no layout is invented.
     pub(crate) fn parse(
         alignment_options: u8,
         rotation: u8,
@@ -144,7 +147,15 @@ impl CellAlignment {
             2 => VerticalAlignment::Bottom,
             3 => VerticalAlignment::Justify,
             4 => VerticalAlignment::Distributed,
-            value => return Err(invalid(format!("XF vertical alignment {value} is invalid"))),
+            value => {
+                record(
+                    tolerance,
+                    CellFormatDefect::AlignmentVertical,
+                    xf_index,
+                    value,
+                );
+                VerticalAlignment::Bottom
+            },
         };
         let mut justify_last_line = alignment_options & 0x80 != 0;
         if justify_last_line && horizontal != HorizontalAlignment::Distributed {
@@ -162,17 +173,39 @@ impl CellAlignment {
             1..=90 => TextRotation::CounterClockwise(rotation),
             91..=180 => TextRotation::Clockwise(rotation - 90),
             255 => TextRotation::Vertical,
-            value => return Err(invalid(format!("XF text rotation {value} is invalid"))),
+            value => {
+                record(
+                    tolerance,
+                    CellFormatDefect::AlignmentRotation,
+                    xf_index,
+                    value,
+                );
+                TextRotation::None
+            },
         };
 
         if indentation_options & 0x20 != 0 {
-            return Err(invalid("XF alignment reserved bit is set"));
+            // MS-XLS 2.4.353: "MUST be zero, and MUST be ignored".
+            record(
+                tolerance,
+                CellFormatDefect::AlignmentReservedBit,
+                xf_index,
+                indentation_options,
+            );
         }
         let reading_order = match indentation_options >> 6 {
             0 => ReadingOrder::Context,
             1 => ReadingOrder::LeftToRight,
             2 => ReadingOrder::RightToLeft,
-            value => return Err(invalid(format!("XF reading order {value} is invalid"))),
+            value => {
+                record(
+                    tolerance,
+                    CellFormatDefect::AlignmentReadingOrder,
+                    xf_index,
+                    value,
+                );
+                ReadingOrder::Context
+            },
         };
 
         Ok(Self {
@@ -190,6 +223,13 @@ impl CellAlignment {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidData(message.into())
+}
+
+/// Record an Excel-compatible alignment repair against XF `xf_index`.
+fn record(tolerance: &mut ToleranceLog, defect: CellFormatDefect, xf_index: u16, value: u8) {
+    tolerance
+        .report_mut()
+        .record(defect, u32::from(xf_index), u32::from(value));
 }
 
 #[cfg(test)]
@@ -280,15 +320,39 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_enum_and_reserved_values() {
-        for value in 5..=7 {
-            assert!(parse(value << 4, 0, 0).is_err());
+    fn repairs_undefined_enum_values_and_the_reserved_bit_under_every_policy() {
+        let cases: [(u8, u8, u8, CellFormatDefect, u32); 6] = [
+            (0x50, 0, 0, CellFormatDefect::AlignmentVertical, 5),
+            (0x70, 0, 0, CellFormatDefect::AlignmentVertical, 7),
+            (0x20, 181, 0, CellFormatDefect::AlignmentRotation, 181),
+            (0x20, 254, 0, CellFormatDefect::AlignmentRotation, 254),
+            (0x20, 0, 0x23, CellFormatDefect::AlignmentReservedBit, 0x23),
+            (0x20, 0, 0xc0, CellFormatDefect::AlignmentReadingOrder, 3),
+        ];
+        for leniency in [Leniency::Strict, Leniency::TolerateFormattingDefects] {
+            for (alignment_options, rotation, indentation_options, defect, observed) in cases {
+                let mut tolerance = ToleranceLog::new(leniency);
+                let parsed = CellAlignment::parse(
+                    alignment_options,
+                    rotation,
+                    indentation_options,
+                    21,
+                    &mut tolerance,
+                )
+                .expect("the Excel-compatible repair applies");
+                assert_eq!(parsed.vertical(), VerticalAlignment::Bottom);
+                assert_eq!(parsed.rotation(), TextRotation::None);
+                assert_eq!(parsed.reading_order(), ReadingOrder::Context);
+                assert_eq!(parsed.indent(), indentation_options & 0x0f);
+                let report = tolerance.into_report();
+                assert_eq!(report.total(), 1, "{defect:?}");
+                assert_eq!(report.count(defect), 1);
+                assert_eq!(report.defects()[0].ordinal(), 21);
+                assert_eq!(report.defects()[0].observed(), observed);
+            }
         }
+        // fJustLast without distributed alignment stays an opt-in repair.
         assert!(parse(0x80, 0, 0).is_err());
-        assert!(parse(0x20, 181, 0).is_err());
-        assert!(parse(0x20, 254, 0).is_err());
-        assert!(parse(0x20, 0, 0x20).is_err());
-        assert!(parse(0x20, 0, 0xc0).is_err());
     }
 
     #[test]
@@ -309,32 +373,6 @@ mod tests {
         let entry = report.defects()[0];
         assert_eq!(entry.ordinal(), u32::from(XF_INDEX));
         assert_eq!(entry.observed(), u32::from(HorizontalAlignment::Left as u8));
-    }
-
-    #[test]
-    fn a_lenient_policy_still_rejects_every_other_alignment_defect() {
-        // Only the justify-last-line contradiction is cosmetic; an unknown
-        // vertical alignment, rotation, or reading order would otherwise make
-        // the reader invent a layout the file never specified.
-        let mut tolerance = ToleranceLog::new(Leniency::TolerateFormattingDefects);
-        for (alignment_options, rotation, indentation_options) in [
-            (0x50u8, 0u8, 0u8),
-            (0x20, 181, 0),
-            (0x20, 0, 0x20),
-            (0x20, 0, 0xc0),
-        ] {
-            assert!(
-                CellAlignment::parse(
-                    alignment_options,
-                    rotation,
-                    indentation_options,
-                    0,
-                    &mut tolerance,
-                )
-                .is_err()
-            );
-        }
-        assert!(tolerance.into_report().is_clean());
     }
 
     #[test]

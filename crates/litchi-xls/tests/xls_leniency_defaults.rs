@@ -15,15 +15,16 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::Cell as _;
 use litchi_xls::{
-    Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions, PaletteDefect, SheetDefect,
-    SheetNameDefect, SourceBackedOptions, SourceBackedWorkbook, ToleranceReport, ToleratedDefect,
-    Workbook, Writer,
+    CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
+    PaletteDefect, SheetDefect, SheetNameDefect, SourceBackedOptions, SourceBackedWorkbook,
+    ToleranceReport, ToleratedDefect, Workbook, Writer,
 };
 
 const CODEPAGE: u16 = 0x0042;
 const BOUND_SHEET: u16 = 0x0085;
 const PALETTE: u16 = 0x0092;
 const FONT: u16 = 0x0031;
+const XF: u16 = 0x00E0;
 const INDEX: u16 = 0x020B;
 
 /// One BIFF record of a Workbook stream, remembering where it sat in the
@@ -657,4 +658,80 @@ fn a_bound_sheet_too_short_for_its_name_is_still_refused() {
         payload.pop();
     });
     assert_refused(&package, Leniency::default(), "BoundSheet8");
+}
+
+// ---------------------------------------------------------------------------
+// F3.7: XF alignment / border / fill enumerations
+// ---------------------------------------------------------------------------
+
+/// The fixture with XF 15 — the default cell XF the number uses — edited.
+fn with_cell_xf(edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
+    let mut stream = Stream::simple();
+    edit(stream.payload_mut(XF, 15));
+    stream.package()
+}
+
+#[test]
+fn undefined_xf_enumerations_read_as_defaults_and_are_recorded() {
+    let package = with_cell_xf(|payload| {
+        payload[6] = (payload[6] & 0x8F) | (6 << 4); // alcV = 6
+        payload[7] = 200; // trot
+        payload[8] |= 0xE0; // reserved bit + iReadOrder = 3
+        let mut border1 = u32::from_le_bytes(payload[10..14].try_into().unwrap());
+        border1 = (border1 & !0x0F) | 14; // dgLeft = 14
+        border1 = (border1 & !(0x7F << 16)) | (0x60 << 16); // icvLeft
+        payload[10..14].copy_from_slice(&border1.to_le_bytes());
+        let mut border2 = u32::from_le_bytes(payload[14..18].try_into().unwrap());
+        border2 = (border2 & !(0x3F << 26)) | (20 << 26); // fls = 20
+        payload[14..18].copy_from_slice(&border2.to_le_bytes());
+    });
+    let workbook = assert_repairs(
+        &package,
+        &[
+            (
+                Defect::CellFormat(CellFormatDefect::AlignmentVertical),
+                15,
+                6,
+            ),
+            (
+                Defect::CellFormat(CellFormatDefect::AlignmentRotation),
+                15,
+                200,
+            ),
+            (
+                Defect::CellFormat(CellFormatDefect::AlignmentReservedBit),
+                15,
+                0xE0,
+            ),
+            (
+                Defect::CellFormat(CellFormatDefect::AlignmentReadingOrder),
+                15,
+                3,
+            ),
+            (Defect::CellFormat(CellFormatDefect::ColorIndex), 15, 0x60),
+            (Defect::CellFormat(CellFormatDefect::BorderStyle), 15, 14),
+            (Defect::CellFormat(CellFormatDefect::FillPattern), 15, 20),
+        ],
+    );
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let format = worksheet
+        .format_for_cell(0, 0)
+        .expect("the repaired cell XF");
+    assert_eq!(
+        format.alignment().vertical(),
+        litchi_xls::VerticalAlignment::Bottom
+    );
+    assert_eq!(
+        format.borders().left().style(),
+        litchi_xls::BorderStyle::None
+    );
+    assert_eq!(format.borders().left().color_index(), 0x7F);
+    assert_eq!(format.fill().pattern(), litchi_xls::FillPattern::None);
+    assert_eq!(
+        worksheet.get_cell(0, 0).unwrap().value(),
+        &litchi_core::sheet::CellValue::Float(42.5)
+    );
+    for entry in workbook.tolerance_report().defects() {
+        assert_eq!(entry.record_type(), Some(XF));
+    }
 }

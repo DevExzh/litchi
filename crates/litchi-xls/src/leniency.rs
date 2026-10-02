@@ -292,6 +292,41 @@ pub enum CellFormatDefect {
     /// at index 15 (MS-XLS 2.4.353). Only styling falls back; the cell's
     /// value is never touched.
     XfReference,
+    /// `XF.alcV` (MS-XLS 2.4.353) was 5–7, outside the enumeration.
+    ///
+    /// Repaired to bottom alignment, the default LibreOffice substitutes.
+    AlignmentVertical,
+    /// `XF.trot` was 181–254, outside the defined rotations.
+    ///
+    /// Repaired to no rotation.
+    AlignmentRotation,
+    /// The reserved bit of `XF.cIndent`'s byte (0x20) was set.
+    ///
+    /// Ignored, as MS-XLS directs: "MUST be zero, and MUST be ignored".
+    AlignmentReservedBit,
+    /// `XF.iReadOrder` was 3, outside the enumeration.
+    ///
+    /// Repaired to context reading order.
+    AlignmentReadingOrder,
+    /// An `XF` border line style was greater than 13.
+    ///
+    /// Repaired to no border, the default LibreOffice substitutes.
+    BorderStyle,
+    /// `XF.fls` was greater than 18.
+    ///
+    /// Repaired to no fill, the default LibreOffice substitutes.
+    FillPattern,
+    /// `XF` diagonal direction flags and diagonal style contradicted each
+    /// other: a direction without a style, or a style without a direction.
+    ///
+    /// Kept exactly as stored; such a diagonal draws no line, as in
+    /// LibreOffice.
+    DiagonalBorder,
+    /// An `XF` border or fill color index named no palette entry
+    /// (0x42–0x7E).
+    ///
+    /// Repaired to 0x7F, the automatic color.
+    ColorIndex,
 }
 
 impl CellFormatDefect {
@@ -301,6 +336,14 @@ impl CellFormatDefect {
     pub fn record_type(self) -> Option<u16> {
         match self {
             CellFormatDefect::XfReference => None,
+            CellFormatDefect::AlignmentVertical
+            | CellFormatDefect::AlignmentRotation
+            | CellFormatDefect::AlignmentReservedBit
+            | CellFormatDefect::AlignmentReadingOrder
+            | CellFormatDefect::BorderStyle
+            | CellFormatDefect::FillPattern
+            | CellFormatDefect::DiagonalBorder
+            | CellFormatDefect::ColorIndex => Some(super::number_format::XF_RECORD),
         }
     }
 
@@ -311,6 +354,20 @@ impl CellFormatDefect {
             CellFormatDefect::XfReference => {
                 "Cell, row, or column references an XF that cannot format a cell"
             },
+            CellFormatDefect::AlignmentVertical => {
+                "XF vertical alignment is outside the enumeration"
+            },
+            CellFormatDefect::AlignmentRotation => "XF text rotation is outside 0..=180 and 255",
+            CellFormatDefect::AlignmentReservedBit => "XF indentation reserved bit is set",
+            CellFormatDefect::AlignmentReadingOrder => {
+                "XF reading order is outside the enumeration"
+            },
+            CellFormatDefect::BorderStyle => "XF border style is outside the enumeration",
+            CellFormatDefect::FillPattern => "XF fill pattern is outside the enumeration",
+            CellFormatDefect::DiagonalBorder => {
+                "XF diagonal border direction and style contradict each other"
+            },
+            CellFormatDefect::ColorIndex => "XF border or fill color index names no palette entry",
         }
     }
 }
@@ -574,6 +631,7 @@ impl ToleratedDefect {
     /// it is the number of `XF` records that were actually parsed. For
     /// [`CellFormatDefect::XfReference`] it is the zero-based row of the
     /// cell or `ROW` record, or the first column of the `COLINFO` record.
+    /// For the other [`CellFormatDefect`] classes it is the `XF` index.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
     /// the `CODEPAGE` record within the Workbook stream. For every
     /// [`SheetNameDefect`] and [`SheetDefect`] it is the zero-based workbook sheet index of the
@@ -597,6 +655,11 @@ impl ToleratedDefect {
     /// declared `cch`. For [`FormattingDefect::FontNameEmpty`] it is always
     /// zero, since the defect *is* the value. For
     /// [`CellFormatDefect::XfReference`] it is the `ixfe` the record carried.
+    /// For the alignment, border-style, fill-pattern, and color-index
+    /// [`CellFormatDefect`] classes it is the raw field value (the whole
+    /// indentation byte for [`CellFormatDefect::AlignmentReservedBit`]); for
+    /// [`CellFormatDefect::DiagonalBorder`] it is the stored flags and style
+    /// packed as `fDgDown | fDgUp << 1 | dgDiag << 2`.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the raw `cv` code
     /// page identifier. For [`SheetNameDefect::TooLong`] it is the name's
     /// length in UTF-16 code units; for [`SheetNameDefect::ForbiddenCharacter`]
