@@ -1043,13 +1043,18 @@ pub(crate) fn decode_cached_value(
         kind::CELL_ERROR => {
             require_cached_exact(payload, 9)?;
             Ok(crate::cell_values::Value::Error(
-                crate::cell_values::CellError::from_code(payload[8])?,
+                crate::cell_values::CellError::from_code_with(
+                    payload[8], tolerance, kind_value, row,
+                )?,
             ))
         },
         kind::CELL_BOOL => {
             require_cached_exact(payload, 9)?;
-            Ok(crate::cell_values::Value::Boolean(read_cached_bool(
+            Ok(crate::cell_values::Value::Boolean(tolerance.bool_byte(
                 payload[8],
+                kind_value,
+                row,
+                || invalid("cell Boolean value is neither zero nor one"),
             )?))
         },
         kind::CELL_REAL => {
@@ -1071,8 +1076,8 @@ pub(crate) fn decode_cached_value(
         kind::CELL_ST => {
             let mut cursor =
                 raw::Cursor::with_limits(&payload[8..], "BrtCellSt", cell_string_limits);
-            let value = cursor.read_wide_string()?;
-            cursor.finish()?;
+            let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
+            tolerance.finish(&cursor, kind_value, row)?;
             Ok(crate::cell_values::Value::InlineString(value))
         },
         kind::CELL_ISST => {
@@ -1085,14 +1090,19 @@ pub(crate) fn decode_cached_value(
             require_cached_at_least(payload, 13)?;
             preflight_cached_rich_string(&payload[8..], limits)?;
             Ok(crate::cell_values::Value::RichString(
-                crate::package::SharedString::parse(&payload[8..])?,
+                crate::package::SharedString::parse_with(
+                    &payload[8..],
+                    tolerance,
+                    kind_value,
+                    row,
+                )?,
             ))
         },
         kind::FMLA_STRING => {
             require_cached_at_least(payload, 14)?;
             let mut cursor =
                 raw::Cursor::with_limits(&payload[8..], "BrtFmlaString", cell_string_limits);
-            let value = cursor.read_wide_string()?;
+            let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
             if cursor.remaining() < 10 {
                 return Err(invalid("BrtFmlaString is missing formula metadata"));
             }
@@ -1119,13 +1129,17 @@ pub(crate) fn decode_cached_value(
         kind::FMLA_BOOL => {
             require_cached_at_least(payload, 19)?;
             Ok(crate::cell_values::Value::FormulaBooleanCache(
-                read_cached_bool(payload[8])?,
+                tolerance.bool_byte(payload[8], kind_value, row, || {
+                    invalid("cell Boolean value is neither zero nor one")
+                })?,
             ))
         },
         kind::FMLA_ERROR => {
             require_cached_at_least(payload, 19)?;
             Ok(crate::cell_values::Value::FormulaErrorCache(
-                crate::cell_values::CellError::from_code(payload[8])?,
+                crate::cell_values::CellError::from_code_with(
+                    payload[8], tolerance, kind_value, row,
+                )?,
             ))
         },
         _ => Err(Error::InvalidRecordType(kind_value.get())),
@@ -1150,14 +1164,6 @@ fn require_cached_at_least(payload: &[u8], expected: usize) -> Result<()> {
         });
     }
     Ok(())
-}
-
-fn read_cached_bool(value: u8) -> Result<bool> {
-    match value {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => Err(invalid("cell Boolean value is neither zero nor one")),
-    }
 }
 
 fn cached_number_error() -> Error {

@@ -8,7 +8,9 @@
 use super::model::{CellsReader, Dimensions, ParsedFormulaCell};
 use crate::conditional_formatting::{Formatting, parse_classic_header};
 use crate::hyperlinks::Hyperlink;
-use crate::leniency::{CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport};
+use crate::leniency::{
+    CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport, ValueEncodingDefect,
+};
 use crate::merged_cells::MergedCell;
 use crate::package::cell::{Cell, CellHeader};
 use crate::package::data_validation::parse_collection_settings;
@@ -194,18 +196,7 @@ where
                     // BrtCellError
                     if self.buf.len() >= 9 => {
                         let header = required_cell_header(cell_header)?;
-                        let error_code = self.buf[8];
-                        let error_msg = match error_code {
-                            0x00 => "#NULL!",
-                            0x07 => "#DIV/0!",
-                            0x0F => "#VALUE!",
-                            0x17 => "#REF!",
-                            0x1D => "#NAME?",
-                            0x24 => "#NUM!",
-                            0x2A => "#N/A",
-                            0x2B => "#GETTING_DATA",
-                            _ => "#ERR!",
-                        };
+                        let error_msg = self.error_text(typ, self.buf[8])?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
@@ -217,7 +208,9 @@ where
                     if self.buf.len() >= 9 => {
                         let header = required_cell_header(cell_header)?;
                         let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool");
-                        let value = cursor.read_bool8()?;
+                        let row = self.current_row;
+                        let value = Tolerance::recording(&mut self.tolerance)
+                            .read_bool8(&mut cursor, typ, row)?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
@@ -240,7 +233,13 @@ where
                     // BrtCellSt
                     if self.buf.len() >= 8 => {
                         let header = required_cell_header(cell_header)?;
-                        let (string, _) = crate::package::records::decode_string(&self.buf[8..])?;
+                        let row = self.current_row;
+                        let (string, _) = crate::package::records::decode_string_with(
+                            &self.buf[8..],
+                            &mut Tolerance::recording(&mut self.tolerance),
+                            typ,
+                            row,
+                        )?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
                             header,
@@ -271,7 +270,13 @@ where
                         });
                     }
                     let header = required_cell_header(cell_header)?;
-                    let rich_string = SharedString::parse(&self.buf[8..])?;
+                    let row = self.current_row;
+                    let rich_string = SharedString::parse_with(
+                        &self.buf[8..],
+                        &mut Tolerance::recording(&mut self.tolerance),
+                        typ,
+                        row,
+                    )?;
                     return Ok(Some(Cell::new_rich_string(
                         self.current_row,
                         header,
@@ -287,8 +292,13 @@ where
                         });
                     }
                     let header = required_cell_header(cell_header)?;
-                    let (string, consumed) =
-                        crate::package::records::decode_string(&self.buf[8..])?;
+                    let row = self.current_row;
+                    let (string, consumed) = crate::package::records::decode_string_with(
+                        &self.buf[8..],
+                        &mut Tolerance::recording(&mut self.tolerance),
+                        typ,
+                        row,
+                    )?;
                     let parsed =
                         self.parse_formula_cell(
                         typ,
@@ -322,7 +332,9 @@ where
                     }
                     let header = required_cell_header(cell_header)?;
                     let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value");
-                    let bool_value = cursor.read_bool8()?;
+                    let row = self.current_row;
+                    let bool_value = Tolerance::recording(&mut self.tolerance)
+                        .read_bool8(&mut cursor, typ, row)?;
                     let parsed = self.parse_formula_cell(
                         typ,
                         header,
@@ -340,7 +352,7 @@ where
                         });
                     }
                     let header = required_cell_header(cell_header)?;
-                    let error_msg = super::semantic::error_text(self.buf[8]);
+                    let error_msg = self.error_text(typ, self.buf[8])?;
                     let parsed = self.parse_formula_cell(
                         typ,
                         header,
@@ -360,6 +372,24 @@ where
                 },
             }
         }
+    }
+
+    /// The display text of a `BErr` byte. An undefined code reads as the
+    /// generic `#ERR!` this reader has always shown and is recorded as
+    /// [`ValueEncodingDefect::ErrorCode`].
+    fn error_text(&mut self, record_type: Kind, code: u8) -> Result<&'static str> {
+        let text = super::semantic::error_text(code);
+        if text == super::semantic::UNKNOWN_ERROR_TEXT {
+            let row = self.current_row;
+            Tolerance::recording(&mut self.tolerance).tolerate(
+                ValueEncodingDefect::ErrorCode,
+                record_type,
+                row,
+                u32::from(code),
+                || Error::InvalidFormat(format!("invalid BErr value 0x{code:02X}")),
+            )?;
+        }
+        Ok(text)
     }
 
     /// The value a cached `Xnum` reads as. This reader has always passed

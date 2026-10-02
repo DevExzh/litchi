@@ -126,7 +126,7 @@ fn shared_string_owner_validates_declared_count() {
     .unwrap();
     let mut records = Records::new(&data);
     let mut strings: Vec<SharedString> = Vec::new();
-    Workbook::read_shared_strings(&mut records, &mut strings).unwrap();
+    Workbook::read_shared_strings(&mut records, &mut strings, &mut Default::default()).unwrap();
     assert_eq!(strings.len(), 1);
     assert_eq!(strings[0].text, "value");
 }

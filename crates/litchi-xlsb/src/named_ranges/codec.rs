@@ -105,7 +105,7 @@ pub(crate) fn parse_with(
         Some(sheet_id_raw as u32)
     };
 
-    let name = cursor.read_wide_string()?;
+    let name = tolerance.read_wide_string(&mut cursor, kind::NAME, ordinal)?;
     if name.encode_utf16().count() > MAX_NAME_UNITS {
         return Err(Error::InvalidFormula(format!(
             "defined name length {} is outside 1..=255",
@@ -119,7 +119,7 @@ pub(crate) fn parse_with(
         ParsedFormula::parse(&data[formula_start..]).map_err(Error::from)?;
     cursor.skip(formula_bytes)?;
 
-    let comment = cursor.read_nullable_wide_string()?;
+    let comment = tolerance.read_nullable_wide_string(&mut cursor, kind::NAME, ordinal)?;
     if comment
         .as_ref()
         .is_some_and(|value| value.encode_utf16().count() > MAX_COMMENT_UNITS)
@@ -131,7 +131,7 @@ pub(crate) fn parse_with(
 
     if f_proc {
         for index in 0..4 {
-            let value = cursor.read_nullable_wide_string()?;
+            let value = tolerance.read_nullable_wide_string(&mut cursor, kind::NAME, ordinal)?;
             if matches!(index, 0 | 3) && value.is_some() {
                 return Err(Error::InvalidFormula(
                     "BrtName macro unused string is not NULL".to_string(),

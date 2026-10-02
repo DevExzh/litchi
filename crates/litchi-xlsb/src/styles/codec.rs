@@ -165,7 +165,12 @@ fn parse_font_with(data: &[u8], ordinal: u32, mut tolerance: Tolerance<'_>) -> R
     let bold = read_u16(data, 4)? >= 0x02BC;
     let underline = data[8] != 0;
     let color = direct_color(data, 12, kind::FONT, ordinal, &mut tolerance)?;
-    let (name, _) = decode_string(&data[FONT_NAME_OFFSET..])?;
+    let (name, _) = decode_string(
+        &data[FONT_NAME_OFFSET..],
+        &mut tolerance,
+        kind::FONT,
+        ordinal,
+    )?;
 
     Ok(Font {
         size,
@@ -336,7 +341,7 @@ fn parse_num_fmt_with(
             }
         })?;
     }
-    let (format_code, consumed) = decode_string(&data[2..])?;
+    let (format_code, consumed) = decode_string(&data[2..], &mut tolerance, kind::FMT, ordinal)?;
     let length = format_code.encode_utf16().count();
     if !(1..=255).contains(&length) {
         tolerance.tolerate(
@@ -439,9 +444,14 @@ fn parse_side(
     }))
 }
 
-fn decode_string(data: &[u8]) -> Result<(String, usize)> {
+fn decode_string(
+    data: &[u8],
+    tolerance: &mut Tolerance<'_>,
+    record_type: crate::raw::Kind,
+    ordinal: u32,
+) -> Result<(String, usize)> {
     let mut cursor = Cursor::new(data, "XLWideString");
-    let value = cursor.read_wide_string()?;
+    let value = tolerance.read_wide_string(&mut cursor, record_type, ordinal)?;
     Ok((value, cursor.position()))
 }
 

@@ -5,7 +5,9 @@
 
 //! Source-bound worksheet-cell snapshots and structural edits.
 
-use crate::leniency::{CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport};
+use crate::leniency::{
+    CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport, ValueEncodingDefect,
+};
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
 use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
@@ -291,6 +293,31 @@ impl CellError {
             _ => Err(Error::InvalidFormat(format!(
                 "invalid BIFF12 BErr value 0x{code:02X}"
             ))),
+        }
+    }
+
+    /// Decode a `BErr` byte the way Excel renders it: an undefined code reads
+    /// as `#NULL!` and is recorded as
+    /// [`ValueEncodingDefect::ErrorCode`]
+    /// through `tolerance`, which refuses it when it cannot record.
+    pub(crate) fn from_code_with(
+        code: u8,
+        tolerance: &mut Tolerance<'_>,
+        record_type: crate::raw::Kind,
+        row: u32,
+    ) -> Result<Self> {
+        match Self::from_code(code) {
+            Ok(error) => Ok(error),
+            Err(refusal) => {
+                tolerance.tolerate(
+                    ValueEncodingDefect::ErrorCode,
+                    record_type,
+                    row,
+                    u32::from(code),
+                    || refusal,
+                )?;
+                Ok(Self::Null)
+            },
         }
     }
 
@@ -1760,11 +1787,19 @@ fn parse_value(
         },
         kind::CELL_ERROR => {
             require_exact(payload, 9)?;
-            Ok((Value::Error(CellError::from_code(payload[8])?), None))
+            Ok((
+                Value::Error(CellError::from_code_with(
+                    payload[8], tolerance, kind_value, row,
+                )?),
+                None,
+            ))
         },
         kind::CELL_BOOL => {
             require_exact(payload, 9)?;
-            Ok((Value::Boolean(parse_bool(payload[8])?), None))
+            Ok((
+                Value::Boolean(parse_bool(payload[8], tolerance, kind_value, row)?),
+                None,
+            ))
         },
         kind::CELL_REAL => {
             require_exact(payload, 16)?;
@@ -1787,7 +1822,15 @@ fn parse_value(
         },
         kind::CELL_R_STRING => {
             require_at_least(payload, 13)?;
-            Ok((Value::RichString(SharedString::parse(&payload[8..])?), None))
+            Ok((
+                Value::RichString(SharedString::parse_with(
+                    &payload[8..],
+                    tolerance,
+                    kind_value,
+                    row,
+                )?),
+                None,
+            ))
         },
         kind::FMLA_STRING => parse_string_value(kind_value, payload, limits, true, row, tolerance),
         kind::FMLA_NUM => {
@@ -1807,14 +1850,16 @@ fn parse_value(
         kind::FMLA_BOOL => {
             require_at_least(payload, 19)?;
             Ok((
-                Value::FormulaBooleanCache(parse_bool(payload[8])?),
+                Value::FormulaBooleanCache(parse_bool(payload[8], tolerance, kind_value, row)?),
                 Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
             ))
         },
         kind::FMLA_ERROR => {
             require_at_least(payload, 19)?;
             Ok((
-                Value::FormulaErrorCache(CellError::from_code(payload[8])?),
+                Value::FormulaErrorCache(CellError::from_code_with(
+                    payload[8], tolerance, kind_value, row,
+                )?),
                 Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
             ))
         },
@@ -1832,7 +1877,7 @@ fn parse_string_value(
 ) -> Result<(Value, Option<CellFormula>)> {
     require_at_least(payload, if formula { 14 } else { 12 })?;
     let mut cursor = Cursor::with_limits(&payload[8..], "cell string", limits);
-    let value = cursor.read_wide_string()?;
+    let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
     let units = value.encode_utf16().count();
     if units > MAX_CELL_STRING_UNITS {
         return Err(Error::InvalidLength {
@@ -2877,14 +2922,15 @@ fn encode_rk(value: f64) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn parse_bool(value: u8) -> Result<bool> {
-    match value {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => Err(Error::InvalidFormat(format!(
-            "invalid BIFF12 Boolean byte 0x{value:02X}"
-        ))),
-    }
+fn parse_bool(
+    value: u8,
+    tolerance: &mut Tolerance<'_>,
+    record_type: crate::raw::Kind,
+    row: u32,
+) -> Result<bool> {
+    tolerance.bool_byte(value, record_type, row, || {
+        Error::InvalidFormat(format!("invalid BIFF12 Boolean byte 0x{value:02X}"))
+    })
 }
 
 fn require_exact(payload: &[u8], expected: usize) -> Result<()> {

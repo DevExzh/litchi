@@ -65,9 +65,12 @@ pub(super) fn error_text(error_code: u8) -> &'static str {
         0x24 => "#NUM!",
         0x2A => "#N/A",
         0x2B => "#GETTING_DATA",
-        _ => "#ERR!",
+        _ => UNKNOWN_ERROR_TEXT,
     }
 }
+
+/// The generic text shown for an undefined `BErr` code.
+pub(super) const UNKNOWN_ERROR_TEXT: &str = "#ERR!";
 
 pub(super) fn cell_value_from_number(value: f64) -> CellValue {
     if value.to_bits() == value.round().to_bits()

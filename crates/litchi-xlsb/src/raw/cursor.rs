@@ -179,6 +179,30 @@ impl<'a> Cursor<'a> {
 
     /// Strictly decode one `XLWideString`.
     pub fn read_wide_string(&mut self) -> Result<String> {
+        self.decode_wide_string(false).map(|(value, _)| value)
+    }
+
+    /// Decode one `XLWideString`, replacing each unpaired UTF-16 surrogate
+    /// with U+FFFD.
+    ///
+    /// Returns the decoded string and the number of replacements made; every
+    /// framing and limit check of [`Self::read_wide_string`] still applies.
+    pub fn read_wide_string_lossy(&mut self) -> Result<(String, usize)> {
+        self.decode_wide_string(true)
+    }
+
+    /// Decode one `XLNullableWideString` lossily; see
+    /// [`Self::read_wide_string_lossy`].
+    pub fn read_nullable_wide_string_lossy(&mut self) -> Result<(Option<String>, usize)> {
+        if self.peek_null_marker()? {
+            self.skip(4)?;
+            return Ok((None, 0));
+        }
+        self.read_wide_string_lossy()
+            .map(|(value, replaced)| (Some(value), replaced))
+    }
+
+    fn decode_wide_string(&mut self, lossy: bool) -> Result<(String, usize)> {
         let length_offset = self.offset;
         let units_u32 = self.read_u32()?;
         let units = usize::try_from(units_u32).map_err(|_| Error::LengthOverflow {
@@ -199,13 +223,39 @@ impl<'a> Cursor<'a> {
         let string_offset = self.offset;
         let bytes = self.read_bytes(byte_len)?;
         let mut output = String::with_capacity(units);
+        let mut replaced = 0usize;
         for decoded in char::decode_utf16(Utf16Le::new(bytes)) {
-            let value = decoded.map_err(|_| Error::InvalidUtf16 {
-                offset: string_offset,
-            })?;
+            let value = match decoded {
+                Ok(value) => value,
+                Err(_) if lossy => {
+                    replaced = replaced.saturating_add(1);
+                    char::REPLACEMENT_CHARACTER
+                },
+                Err(_) => {
+                    return Err(Error::InvalidUtf16 {
+                        offset: string_offset,
+                    });
+                },
+            };
             output.push(value);
         }
-        Ok(output)
+        Ok((output, replaced))
+    }
+
+    /// Whether the next four bytes are the `XLNullableWideString` NULL
+    /// marker, without consuming them.
+    fn peek_null_marker(&self) -> Result<bool> {
+        self.guard(4)?;
+        let prefix = self
+            .data
+            .get(self.offset..self.offset.saturating_add(4))
+            .ok_or(Error::Truncated {
+                stage: Stage::Value,
+                offset: self.offset,
+                needed: 4,
+                available: self.remaining(),
+            })?;
+        Ok(prefix == [0xFF; 4])
     }
 
     /// Strictly decode one `XLNullableWideString`.

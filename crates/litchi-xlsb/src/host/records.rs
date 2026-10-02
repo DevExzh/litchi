@@ -13,6 +13,19 @@ pub(crate) fn decode_string(buf: &[u8]) -> Result<(String, usize)> {
     Ok((value, cursor.position()))
 }
 
+/// Decode one BIFF12 wide string, replacing unpaired surrogates through
+/// `tolerance` (see [`crate::leniency`]), and report consumed bytes.
+pub(crate) fn decode_string_with(
+    buf: &[u8],
+    tolerance: &mut crate::leniency::Tolerance<'_>,
+    record_type: Kind,
+    location: u32,
+) -> Result<(String, usize)> {
+    let mut cursor = Cursor::new(buf, "XLWideString");
+    let value = tolerance.read_wide_string(&mut cursor, record_type, location)?;
+    Ok((value, cursor.position()))
+}
+
 /// Private streaming adapter for seek-based worksheet readers.
 ///
 /// Header validation remains owned by `crate::raw::Header`; this adapter
@@ -142,7 +155,12 @@ impl BundleSheetRecord {
         let (rel_id, rel_consumed) = if binary::read_u32_le_at(data, strings_offset)? == u32::MAX {
             (None, 4)
         } else {
-            let (value, consumed) = decode_string(&data[strings_offset..])?;
+            let (value, consumed) = decode_string_with(
+                &data[strings_offset..],
+                &mut tolerance,
+                kind::BUNDLE_SH,
+                ordinal,
+            )?;
             if value.is_empty() {
                 return Err(Error::Unrecognized {
                     typ: "BrtBundleSh strRelID".to_string(),
@@ -160,7 +178,12 @@ impl BundleSheetRecord {
         let name_offset = strings_offset
             .checked_add(rel_consumed)
             .ok_or_else(|| Error::Encoding("BrtBundleSh relationship size overflow".to_string()))?;
-        let (name, name_consumed) = decode_string(&data[name_offset..])?;
+        let (name, name_consumed) = decode_string_with(
+            &data[name_offset..],
+            &mut tolerance,
+            kind::BUNDLE_SH,
+            ordinal,
+        )?;
         let trailing = data.len().saturating_sub(name_offset + name_consumed);
         tolerance.tolerate_trailing(kind::BUNDLE_SH, ordinal, trailing, || {
             Error::Unrecognized {

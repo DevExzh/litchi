@@ -108,6 +108,7 @@ impl Workbook {
     pub(in crate::workbook) fn read_shared_strings(
         iter: &mut Records<'_>,
         strings: &mut Vec<SharedString>,
+        report: &mut crate::leniency::ToleranceReport,
     ) -> Result<()> {
         let initial_count = strings.len();
         let mut expected_unique = None;
@@ -152,7 +153,13 @@ impl Workbook {
                             val: format!("more than declared {expected}"),
                         });
                     }
-                    strings.push(SharedString::parse(record.payload())?);
+                    let location = u32::try_from(found).unwrap_or(u32::MAX);
+                    strings.push(SharedString::parse_with(
+                        record.payload(),
+                        &mut crate::leniency::Tolerance::recording(report),
+                        kind::SST_ITEM,
+                        location,
+                    )?);
                 },
                 kind::END_SST => {
                     if !record.payload().is_empty() {

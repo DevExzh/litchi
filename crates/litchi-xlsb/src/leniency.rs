@@ -17,7 +17,11 @@
 //! describes as "MUST be 0 and MUST be ignored", payload bytes past the end of
 //! a record's defined layout, and producer obligations for which MS-XLSB
 //! defines no reader-side refusal. Each substitutes the value documented on
-//! the corresponding [`ReservedFieldDefect`] or [`LayoutDefect`] variant.
+//! the corresponding [`ReservedFieldDefect`], [`LayoutDefect`], or
+//! [`ValueEncodingDefect`] variant. The value-encoding repairs (audit finding
+//! F3.12) cover Boolean bytes, `BErr` codes, and UTF-16 in cell values,
+//! formula caches, shared strings, sheet/defined/font/format names and
+//! comments, plus `BrtDVal`/`BrtDVal14` flag words.
 //! They are applied in the workbook stream (`BrtCalcProp`, `BrtBundleSh`,
 //! `BrtName`), the styles part (`BrtFont`/`BrtFill` colors, `BrtBorder`,
 //! `BrtFmt`), and worksheet streams (`Cell` flags, `BrtRowHdr`, `BrtColInfo`,
@@ -35,10 +39,6 @@
 //! default. Select it with [`Workbook::new_with_leniency`](crate::Workbook::new_with_leniency),
 //! [`Workbook::from_opc_package_with_leniency`](crate::Workbook::from_opc_package_with_leniency),
 //! or [`SourceBackedWorkbook::from_reader_with_leniency`](crate::SourceBackedWorkbook::from_reader_with_leniency).
-//! [`ValueEncodingDefect`] enumerates the value-domain repairs (Boolean
-//! bytes, `BErr` codes, UTF-16, data-validation enums). A class whose repair
-//! has not landed is never recorded; the corresponding input is still a hard
-//! error.
 //!
 //! **Structural corruption and security limits stay hard errors** under every
 //! variant: BIFF12 record framing (header varints, declared lengths, truncated
@@ -301,23 +301,32 @@ pub(crate) enum CachedNumber {
 
 /// A value-domain defect in an individual value (audit finding F3.12).
 ///
-/// This class is enumerated to complete the contract but is **not yet
-/// repaired**: each input is still a hard error. The documented repairs are
-/// the ones a later iteration will apply under every [`Leniency`] variant.
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// value repairs a read applies under every [`Leniency`] variant. Each matches
+/// what Excel does with a value MS-XLSB enumerates as a producer obligation,
+/// and only the one value changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ValueEncodingDefect {
-    /// A Boolean byte held a value other than 0 or 1; Excel reads any nonzero
-    /// byte as TRUE.
+    /// A cell or formula-cache Boolean byte held a value other than 0 or 1;
+    /// Excel reads any nonzero byte as TRUE, and so does the reader. Observed:
+    /// the byte.
     BooleanByte,
-    /// A `BErr` byte held a code outside the defined error values; Excel
-    /// renders it as `#NULL!`.
+    /// A cell or formula-cache `BErr` byte held a code outside the defined
+    /// error values. Materialized worksheets show the generic `#ERR!` text
+    /// they have always used for it; the typed cell-value model, which has
+    /// no generic error, reads it as `#NULL!`, as Excel renders it. Observed:
+    /// the byte.
     ErrorCode,
-    /// A wide string contained an unpaired UTF-16 surrogate; it decodes with
-    /// U+FFFD in its place.
+    /// A wide string contained unpaired UTF-16 surrogates; each decodes as
+    /// U+FFFD. Observed: the number of replacements.
     Utf16,
-    /// A `BrtDVal`/`BrtDVal14` record carried an undefined enumeration value
-    /// or reserved bit; the rule falls back to its default.
+    /// A `BrtDVal`/`BrtDVal14` flag word carried an undefined `valType`,
+    /// `errStyle`, `mdImeMode`, or `typOperator` value, or reserved bits. The
+    /// undefined fields fall back to AnyValue, Stop, NoControl, and Between,
+    /// reserved bits are masked, and the rule's stored formulas are kept
+    /// without the type/operator presence cross-check. Observed: the original
+    /// flag word; location: the rule's ordinal on its worksheet.
     DataValidation,
 }
 
@@ -327,7 +336,7 @@ impl ValueEncodingDefect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::BooleanByte => "read a nonzero Boolean byte as TRUE",
-            Self::ErrorCode => "read an undefined BErr code as #NULL!",
+            Self::ErrorCode => "read an undefined BErr code as a generic error (#ERR!, or #NULL!)",
             Self::Utf16 => "decoded an unpaired UTF-16 surrogate as U+FFFD",
             Self::DataValidation => "fell back to the default for an undefined validation field",
         }
@@ -691,6 +700,100 @@ impl Tolerance<'_> {
     }
 }
 
+impl Tolerance<'_> {
+    /// Decode one `XLWideString`, replacing unpaired UTF-16 surrogates with
+    /// U+FFFD and recording [`ValueEncodingDefect::Utf16`] (observed: the
+    /// number of replacements) when this channel records; strict otherwise.
+    pub(crate) fn read_wide_string(
+        &mut self,
+        cursor: &mut crate::raw::Cursor<'_>,
+        record_type: crate::raw::Kind,
+        location: u32,
+    ) -> Result<String, crate::raw::Error> {
+        let Some(report) = self.report.as_deref_mut() else {
+            return cursor.read_wide_string();
+        };
+        let (value, replaced) = cursor.read_wide_string_lossy()?;
+        record_utf16(report, record_type, location, replaced);
+        Ok(value)
+    }
+
+    /// Decode one `XLNullableWideString`; see [`Self::read_wide_string`].
+    pub(crate) fn read_nullable_wide_string(
+        &mut self,
+        cursor: &mut crate::raw::Cursor<'_>,
+        record_type: crate::raw::Kind,
+        location: u32,
+    ) -> Result<Option<String>, crate::raw::Error> {
+        let Some(report) = self.report.as_deref_mut() else {
+            return cursor.read_nullable_wide_string();
+        };
+        let (value, replaced) = cursor.read_nullable_wide_string_lossy()?;
+        record_utf16(report, record_type, location, replaced);
+        Ok(value)
+    }
+
+    /// Read a byte Boolean: any nonzero byte reads as TRUE, recording
+    /// [`ValueEncodingDefect::BooleanByte`] (observed: the byte) for values
+    /// other than 0 and 1 when this channel records; strict otherwise.
+    pub(crate) fn read_bool8(
+        &mut self,
+        cursor: &mut crate::raw::Cursor<'_>,
+        record_type: crate::raw::Kind,
+        location: u32,
+    ) -> Result<bool, crate::raw::Error> {
+        if self.report.is_none() {
+            return cursor.read_bool8();
+        }
+        let offset = cursor.position();
+        let value = cursor.read_u8()?;
+        self.bool_byte(value, record_type, location, || {
+            crate::raw::Error::InvalidBool {
+                value: u32::from(value),
+                offset,
+            }
+        })
+    }
+
+    /// Interpret a Boolean byte the way Excel does (nonzero is TRUE),
+    /// recording [`ValueEncodingDefect::BooleanByte`] for values other than 0
+    /// and 1, or return `on_refusal()` when this channel cannot record.
+    pub(crate) fn bool_byte<E>(
+        &mut self,
+        value: u8,
+        record_type: crate::raw::Kind,
+        location: u32,
+        on_refusal: impl FnOnce() -> E,
+    ) -> Result<bool, E> {
+        if value > 1 {
+            self.tolerate(
+                ValueEncodingDefect::BooleanByte,
+                record_type,
+                location,
+                u32::from(value),
+                on_refusal,
+            )?;
+        }
+        Ok(value != 0)
+    }
+}
+
+fn record_utf16(
+    report: &mut ToleranceReport,
+    record_type: crate::raw::Kind,
+    location: u32,
+    replaced: usize,
+) {
+    if replaced != 0 {
+        report.record(
+            ValueEncodingDefect::Utf16,
+            record_type,
+            location,
+            u32::try_from(replaced).unwrap_or(u32::MAX),
+        );
+    }
+}
+
 impl<'a> IntoIterator for &'a ToleranceReport {
     type Item = &'a ToleratedDefect;
     type IntoIter = std::slice::Iter<'a, ToleratedDefect>;
@@ -907,6 +1010,54 @@ mod tests {
         assert_eq!(report.defects()[1].observed(), 0x8000_0000);
         assert!(Leniency::TolerateCachedNumbers.tolerates_cached_numbers());
         assert!(!Leniency::Strict.tolerates_cached_numbers());
+    }
+
+    #[test]
+    fn value_encodings_are_repaired_when_recording_and_refused_otherwise() {
+        // "A", an unpaired high surrogate, "B".
+        let data = [3, 0, 0, 0, 0x41, 0, 0x00, 0xD8, 0x42, 0];
+        let mut cursor = crate::raw::Cursor::new(&data, "test");
+        assert!(
+            Tolerance::refusing()
+                .read_wide_string(&mut cursor, kind::CELL_ST, 0)
+                .is_err()
+        );
+
+        let mut report = ToleranceReport::default();
+        let mut tolerance = Tolerance::recording(&mut report);
+        let mut cursor = crate::raw::Cursor::new(&data, "test");
+        assert_eq!(
+            tolerance
+                .read_wide_string(&mut cursor, kind::CELL_ST, 4)
+                .unwrap(),
+            "A\u{FFFD}B"
+        );
+        let null = [0xFF; 4];
+        let mut cursor = crate::raw::Cursor::new(&null, "test");
+        assert_eq!(
+            tolerance
+                .read_nullable_wide_string(&mut cursor, kind::NAME, 0)
+                .unwrap(),
+            None
+        );
+        let mut cursor = crate::raw::Cursor::new(&[5], "test");
+        assert!(
+            tolerance
+                .read_bool8(&mut cursor, kind::CELL_BOOL, 6)
+                .unwrap()
+        );
+        assert_eq!(
+            tolerance.bool_byte(0, kind::CELL_BOOL, 6, || "strict"),
+            Ok(false)
+        );
+        assert_eq!(
+            Tolerance::refusing().bool_byte(2, kind::CELL_BOOL, 6, || "strict"),
+            Err("strict")
+        );
+        assert_eq!(report.count(ValueEncodingDefect::Utf16), 1);
+        assert_eq!(report.count(ValueEncodingDefect::BooleanByte), 1);
+        assert_eq!(report.defects()[0].observed(), 1);
+        assert_eq!(report.defects()[1].observed(), 5);
     }
 
     #[test]

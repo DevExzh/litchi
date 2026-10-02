@@ -373,10 +373,13 @@ where
                     pending_list = Some(parse_dval_list(&self.buf)?);
                 },
                 kind::D_VAL => {
-                    let rule = Validation::parse_classic(
+                    let location = u32::try_from(self.data_validations.len()).unwrap_or(u32::MAX);
+                    let rule = Validation::parse_classic_with(
                         &self.buf,
                         pending_list.take(),
                         self.formula_context,
+                        &mut Tolerance::recording(&mut self.tolerance),
+                        location,
                     )?;
                     self.data_validations.push(rule);
                 },
@@ -420,10 +423,16 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::D_VAL14 => self.data_validations.push(Validation::parse_extension14(
-                    &self.buf,
-                    self.formula_context,
-                )?),
+                kind::D_VAL14 => {
+                    let location = u32::try_from(self.data_validations.len()).unwrap_or(u32::MAX);
+                    self.data_validations
+                        .push(Validation::parse_extension14_with(
+                            &self.buf,
+                            self.formula_context,
+                            &mut Tolerance::recording(&mut self.tolerance),
+                            location,
+                        )?);
+                },
                 kind::END_D_VALS14 => {
                     if !self.buf.is_empty() {
                         return Err(Error::InvalidLength {

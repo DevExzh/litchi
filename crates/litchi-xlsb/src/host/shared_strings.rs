@@ -17,7 +17,7 @@
 )]
 
 use crate::package::error::{Error, Result};
-use crate::package::records::decode_string;
+use crate::package::records::decode_string_with;
 use crate::raw::Writer;
 use litchi_core::binary;
 
@@ -135,6 +135,22 @@ pub struct SharedString {
 
 impl SharedString {
     pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+        Self::parse_with(
+            data,
+            &mut crate::leniency::Tolerance::refusing(),
+            crate::raw::kind::SST_ITEM,
+            0,
+        )
+    }
+
+    /// Parse a `RichStr`, decoding its strings lossily through `tolerance`
+    /// (see [`crate::leniency`]).
+    pub(crate) fn parse_with(
+        data: &[u8],
+        tolerance: &mut crate::leniency::Tolerance<'_>,
+        record_type: crate::raw::Kind,
+        location: u32,
+    ) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::InvalidLength {
                 expected: 1,
@@ -143,7 +159,7 @@ impl SharedString {
         }
         let rich = data[0] & 1 != 0;
         let extended = data[0] & 2 != 0;
-        let (text, consumed) = decode_string(&data[1..])?;
+        let (text, consumed) = decode_string_with(&data[1..], tolerance, record_type, location)?;
         let text_len = text.encode_utf16().count();
         if text_len > 0x7FFF {
             return Err(Error::Unrecognized {
@@ -189,7 +205,8 @@ impl SharedString {
         }
 
         let phonetic = if extended {
-            let (phonetic_text, consumed) = decode_string(&data[offset..])?;
+            let (phonetic_text, consumed) =
+                decode_string_with(&data[offset..], tolerance, record_type, location)?;
             offset += consumed;
             let phonetic_len = phonetic_text.encode_utf16().count();
             let count = Self::read_count(data, &mut offset, "PhRun")?;

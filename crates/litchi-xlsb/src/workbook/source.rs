@@ -1388,19 +1388,22 @@ impl SourceInner {
         let strings = self.shared_strings.get_or_try_init(|| {
             self.package.check_execution()?;
             self.package.source_version()?;
+            let mut report = ToleranceReport::default();
             let mut strings = Vec::new();
             if let Some(partname) = self.shared_strings_part.as_ref() {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
                 let mut records = Records::new(data.as_bytes());
-                Workbook::read_shared_strings(&mut records, &mut strings)?;
+                Workbook::read_shared_strings(&mut records, &mut strings, &mut report)?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
             }
             let strings = Arc::new(strings);
             self.package.check_execution()?;
             self.package.source_version()?;
+            // Published only on success; see `styles`.
+            self.lock_tolerance().append(&report);
             Ok::<_, Error>(strings)
         })?;
         self.package.check_execution()?;

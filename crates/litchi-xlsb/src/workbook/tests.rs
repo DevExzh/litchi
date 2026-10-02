@@ -265,7 +265,7 @@ fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<Sha
     let data = external_link_records(records);
     let mut iter = Records::new(data.as_slice());
     let mut strings = Vec::new();
-    Workbook::read_shared_strings(&mut iter, &mut strings)?;
+    Workbook::read_shared_strings(&mut iter, &mut strings, &mut Default::default())?;
     Ok(strings)
 }
 

@@ -9,6 +9,7 @@
 use super::model::{FormulaBinary, RecordKind, Settings, Validation};
 use super::{Error, Result};
 use crate::formula::{Compiler, MAX_CELL_FORMULA_BYTES, Parser, Resolution};
+use crate::leniency::{Tolerance, ValueEncodingDefect};
 
 impl<F: FormulaBinary> Validation<F> {
     pub fn parse_classic<R: Resolution>(
@@ -16,34 +17,39 @@ impl<F: FormulaBinary> Validation<F> {
         list_formula: Option<String>,
         formula_context: &R,
     ) -> Result<Self> {
+        Self::parse_classic_with(
+            data,
+            list_formula,
+            formula_context,
+            &mut Tolerance::refusing(),
+            0,
+        )
+    }
+
+    /// Parse a `BrtDVal`, repairing undefined enumeration values and reserved
+    /// bits through `tolerance` (see [`crate::leniency`]). `location` is the
+    /// rule's zero-based ordinal on its worksheet.
+    pub(crate) fn parse_classic_with<R: Resolution>(
+        data: &[u8],
+        list_formula: Option<String>,
+        formula_context: &R,
+        tolerance: &mut Tolerance<'_>,
+        location: u32,
+    ) -> Result<Self> {
         let mut cursor = ValidationCursor::new(data, "BrtDVal");
-        let flags = cursor.read_u32()?;
+        let (flags, repaired) = normalize_flags(
+            cursor.read_u32()?,
+            0xff00_0000,
+            "BrtDVal",
+            crate::raw::kind::D_VAL,
+            location,
+            tolerance,
+        )?;
         let validation_type = (flags & 0x0f) as u8;
         let error_style = ((flags >> 4) & 0x07) as u8;
         let string_list = flags & 0x80 != 0;
         let ime_mode = ((flags >> 10) & 0xff) as u8;
         let operator = ((flags >> 20) & 0x0f) as u8;
-        if validation_type > 7 {
-            return Err(invalid(
-                "BrtDVal",
-                format!("validation type {validation_type}"),
-            ));
-        }
-        if error_style > 2 {
-            return Err(invalid("BrtDVal", format!("error style {error_style}")));
-        }
-        if ime_mode > 10 {
-            return Err(invalid("BrtDVal", format!("IME mode {ime_mode}")));
-        }
-        if !matches!(validation_type, 0 | 3 | 7) && operator > 7 {
-            return Err(invalid("BrtDVal", format!("operator {operator}")));
-        }
-        if flags & 0xff00_0000 != 0 {
-            return Err(invalid(
-                "BrtDVal",
-                format!("reserved flag bits are set in 0x{flags:08X}"),
-            ));
-        }
 
         let ranges = cursor.read_ranges(1, 8_191)?;
         let error_title = cursor.read_nullable_string(32, "error title")?;
@@ -54,13 +60,17 @@ impl<F: FormulaBinary> Validation<F> {
         let formula2_binary = cursor.read_classic_formula()?;
         cursor.finish()?;
 
-        validate_formula_presence(
-            "BrtDVal",
-            validation_type,
-            operator,
-            formula1_binary.is_some(),
-            formula2_binary.is_some(),
-        )?;
+        // A repaired enumeration no longer describes the stored formulas;
+        // they are kept verbatim instead of being cross-checked.
+        if !repaired {
+            validate_formula_presence(
+                "BrtDVal",
+                validation_type,
+                operator,
+                formula1_binary.is_some(),
+                formula2_binary.is_some(),
+            )?;
+        }
         let base = (ranges[0].0, ranges[0].2);
         let parsed_formula1 = render_formula(formula1_binary.as_ref(), base, formula_context)?;
         let formula1 = list_formula.clone().or(parsed_formula1);
@@ -91,6 +101,16 @@ impl<F: FormulaBinary> Validation<F> {
     }
 
     pub fn parse_extension14<R: Resolution>(data: &[u8], formula_context: &R) -> Result<Self> {
+        Self::parse_extension14_with(data, formula_context, &mut Tolerance::refusing(), 0)
+    }
+
+    /// Parse a `BrtDVal14`; see [`Self::parse_classic_with`].
+    pub(crate) fn parse_extension14_with<R: Resolution>(
+        data: &[u8],
+        formula_context: &R,
+        tolerance: &mut Tolerance<'_>,
+        location: u32,
+    ) -> Result<Self> {
         let mut cursor = ValidationCursor::new(data, "BrtDVal14");
         let header_flags = cursor.read_u32()?;
         if header_flags & !0x06 != 0 || header_flags & 0x02 == 0 {
@@ -132,7 +152,14 @@ impl<F: FormulaBinary> Validation<F> {
             }
         }
 
-        let flags = cursor.read_u32()?;
+        let (flags, repaired) = normalize_flags(
+            cursor.read_u32()?,
+            0xfc00_0000,
+            "BrtDVal14",
+            crate::raw::kind::D_VAL14,
+            location,
+            tolerance,
+        )?;
         let validation_type = (flags & 0x0f) as u8;
         let error_style = ((flags >> 4) & 0x07) as u8;
         let string_list = flags & 0x80 != 0;
@@ -140,27 +167,6 @@ impl<F: FormulaBinary> Validation<F> {
         let operator = ((flags >> 20) & 0x0f) as u8;
         let has_first = flags & 0x0100_0000 != 0;
         let has_second = flags & 0x0200_0000 != 0;
-        if validation_type > 7 {
-            return Err(invalid(
-                "BrtDVal14",
-                format!("validation type {validation_type}"),
-            ));
-        }
-        if error_style > 2 {
-            return Err(invalid("BrtDVal14", format!("error style {error_style}")));
-        }
-        if ime_mode > 10 {
-            return Err(invalid("BrtDVal14", format!("IME mode {ime_mode}")));
-        }
-        if !matches!(validation_type, 0 | 3 | 7) && operator > 7 {
-            return Err(invalid("BrtDVal14", format!("operator {operator}")));
-        }
-        if flags & 0xfc00_0000 != 0 {
-            return Err(invalid(
-                "BrtDVal14",
-                format!("reserved flag bits are set in 0x{flags:08X}"),
-            ));
-        }
         let expected_formula_count = usize::from(has_first) + usize::from(has_second);
         if formulas.len() != expected_formula_count
             || (header_flags & 0x04 != 0) != (expected_formula_count != 0)
@@ -170,13 +176,15 @@ impl<F: FormulaBinary> Validation<F> {
                 "FRTHeader formula metadata does not match DVal14 flags",
             ));
         }
-        validate_formula_presence(
-            "BrtDVal14",
-            validation_type,
-            operator,
-            has_first,
-            has_second,
-        )?;
+        if !repaired {
+            validate_formula_presence(
+                "BrtDVal14",
+                validation_type,
+                operator,
+                has_first,
+                has_second,
+            )?;
+        }
 
         let error_title = cursor.read_nullable_string(32, "error title")?;
         let error_text = cursor.read_nullable_string(225, "error message")?;
@@ -364,6 +372,59 @@ fn format_ranges(ranges: &[(u32, u32, u32, u32)]) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Validate a `BrtDVal`/`BrtDVal14` flag word, or repair it through
+/// `tolerance`: undefined `valType`, `errStyle`, `mdImeMode`, and `typOperator`
+/// values fall back to AnyValue, Stop, NoControl, and Between (all zero) and
+/// the reserved bits named by `reserved` are masked, recording
+/// [`ValueEncodingDefect::DataValidation`] with the original word. Returns
+/// the flag word to use and whether any field was repaired.
+fn normalize_flags(
+    flags: u32,
+    reserved: u32,
+    record: &'static str,
+    record_type: crate::raw::Kind,
+    location: u32,
+    tolerance: &mut Tolerance<'_>,
+) -> Result<(u32, bool)> {
+    let validation_type = flags & 0x0f;
+    let error_style = (flags >> 4) & 0x07;
+    let ime_mode = (flags >> 10) & 0xff;
+    let operator = (flags >> 20) & 0x0f;
+    let mut problem = None;
+    let mut repaired = flags;
+    if validation_type > 7 {
+        problem.get_or_insert_with(|| format!("validation type {validation_type}"));
+        repaired &= !0x0f;
+    }
+    if error_style > 2 {
+        problem.get_or_insert_with(|| format!("error style {error_style}"));
+        repaired &= !(0x07 << 4);
+    }
+    if ime_mode > 10 {
+        problem.get_or_insert_with(|| format!("IME mode {ime_mode}"));
+        repaired &= !(0xff << 10);
+    }
+    if !matches!(validation_type, 0 | 3 | 7) && validation_type <= 7 && operator > 7 {
+        problem.get_or_insert_with(|| format!("operator {operator}"));
+        repaired &= !(0x0f << 20);
+    }
+    if flags & reserved != 0 {
+        problem.get_or_insert_with(|| format!("reserved flag bits are set in 0x{flags:08X}"));
+        repaired &= !reserved;
+    }
+    let Some(problem) = problem else {
+        return Ok((flags, false));
+    };
+    tolerance.tolerate(
+        ValueEncodingDefect::DataValidation,
+        record_type,
+        location,
+        flags,
+        || invalid(record, problem),
+    )?;
+    Ok((repaired, true))
 }
 
 fn invalid(typ: &'static str, val: impl Into<String>) -> Error {

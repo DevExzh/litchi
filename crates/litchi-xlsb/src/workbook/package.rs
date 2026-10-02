@@ -1606,7 +1606,11 @@ impl Workbook {
             Ok(shared_strings_part) => {
                 let blob = shared_strings_part.blob();
                 let mut iter = Records::new(blob);
-                Self::read_shared_strings(&mut iter, &mut self.shared_strings)?;
+                Self::read_shared_strings(
+                    &mut iter,
+                    &mut self.shared_strings,
+                    &mut self.tolerance,
+                )?;
             },
             Err(OpcError::PartNotFound(_)) => {},
             Err(error) => return Err(error.into()),

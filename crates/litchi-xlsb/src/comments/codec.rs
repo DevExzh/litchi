@@ -98,7 +98,12 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
     {
         let record = &records[pos];
         pos += 1;
-        let (author, consumed) = decode_wide_string(record.payload())?;
+        let (author, consumed) = decode_wide_string(
+            record.payload(),
+            tolerance,
+            kind::COMMENT_AUTHOR,
+            record_location(record.offset()),
+        )?;
         let length = author.encode_utf16().count();
         if length > MAX_AUTHOR_UNITS {
             return Err(Error::Unrecognized {
@@ -371,9 +376,14 @@ fn expect(records: &[RawRecord<'_>], pos: &mut usize, expected: crate::raw::Kind
     Ok(())
 }
 
-fn decode_wide_string(data: &[u8]) -> Result<(String, usize)> {
+fn decode_wide_string(
+    data: &[u8],
+    tolerance: &mut Tolerance<'_>,
+    record_type: crate::raw::Kind,
+    location: u32,
+) -> Result<(String, usize)> {
     let mut cursor = Cursor::new(data, "XLWideString");
-    let value = cursor.read_wide_string()?;
+    let value = tolerance.read_wide_string(&mut cursor, record_type, location)?;
     Ok((value, cursor.position()))
 }
 
@@ -403,7 +413,8 @@ impl RichString {
         }
         let is_rich = data[0] & 1 != 0;
         let is_extended = data[0] & 2 != 0;
-        let (text, consumed) = decode_wide_string(&data[1..])?;
+        let (text, consumed) =
+            decode_wide_string(&data[1..], tolerance, kind::COMMENT_TEXT, location)?;
         let text_len = text.encode_utf16().count();
         if text_len > MAX_TEXT_UNITS {
             return Err(Error::Unrecognized {
@@ -451,7 +462,8 @@ impl RichString {
         }
 
         if is_extended {
-            let (phonetic_text, consumed) = decode_wide_string(&data[offset..])?;
+            let (phonetic_text, consumed) =
+                decode_wide_string(&data[offset..], tolerance, kind::COMMENT_TEXT, location)?;
             offset = offset
                 .checked_add(consumed)
                 .ok_or_else(|| Error::Encoding("phonetic text offset overflow".to_string()))?;
