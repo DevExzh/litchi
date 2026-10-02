@@ -656,6 +656,8 @@ errors.
   record; `f123Prefix` on style XF → mask + record; XFCRC reserved/header/count-range →
   ignore + record; `ifnt == 4`/out-of-range → substitute font 0 + record.
 ### 3.10 litchi-xlsb: cached numeric values rejected unless finite, normal, non-negative-zero — P1
+> **Status: FIXED (2026-10-02)** — opt-in `Leniency::TolerateCachedNumbers` (`*_with_leniency` open paths): NaN/∞ cached values read as `#NUM!` (formulas kept), denormal/−0 as 0,
+> recorded as `CachedNumberDefect::{NonFinite, Denormalized}`; the default still rejects them in cell-value snapshots and indexed lookups.
 - **Location**: `crates/litchi-xlsb/src/cell_values/worksheet.rs:1974-1983`
   (`validate_xnum`), called for `BrtCellReal` at :1723 and the `BrtFmlaNum` cache at
   :1742; same policy at `sparkline/model.rs:1357-1372` and
@@ -696,6 +698,8 @@ errors.
   "ignore remaining bytes + record" on the read path (keep on the write path); unknown
   border style → None.
 ### 3.12 litchi-xlsb: strict Boolean bytes, unknown BErr codes, strict UTF-16, DVal reserved fields — P2 (confidence: medium)
+> **Status: FIXED (2026-10-02)** — nonzero Boolean bytes read TRUE, unknown BErr codes → `#ERR!`/`#NULL!`, unpaired UTF-16 surrogates → U+FFFD, undefined DVal settings → defaults with
+> reserved bits masked; all recorded as `ValueEncodingDefect`. Adjunct parts (tables, PivotCache, connections, comments) and indexed lookups also apply the F3.11 repairs.
 - **Location**: `crates/litchi-xlsb/src/cell_values/worksheet.rs:2789-2797` (`parse_bool`),
   :280-294 (`CellError::from_code`); `raw/cursor.rs:164-173` (`InvalidBool`), :181-209
   (`InvalidUtf16` at :203); `data_validation/codec.rs:33-44`, :150-161 (`BrtDVal`/
