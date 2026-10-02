@@ -1218,11 +1218,15 @@ impl<'a> SlidePart<'a> {
 
     /// Build the bounded borrowed shape scene for this slide.
     ///
+    /// Per-shape repairs (a malformed transform degrades that shape's
+    /// geometry only) are listed, with this part's name, in
+    /// [`Scene::tolerance_report`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Scene::read(self.part.blob())
+        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Resolve ordinary `DrawingML` chart parts related to this slide.
@@ -1354,7 +1358,7 @@ impl<'a> SlideLayoutPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Scene::read(self.part.blob())
+        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the optional theme override attached to this layout.
@@ -1440,7 +1444,7 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Scene::read(self.part.blob())
+        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the theme reached from this slide master.

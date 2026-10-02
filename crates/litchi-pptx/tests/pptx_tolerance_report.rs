@@ -136,16 +136,47 @@ fn slide_xml(timing: &str, edit: impl FnOnce(String) -> String) -> Vec<u8> {
 /// Write `slide` over the first slide and round-trip the package through
 /// its serialized bytes, so the result is an ordinary file opened by default.
 fn deck_with_slide(slide: Vec<u8>) -> Package {
+    Package::from_vec(deck_bytes_with_part(SLIDE1, slide)).unwrap()
+}
+
+/// The serialized `shapes.pptx` deck with part `name` replaced by `blob`.
+fn deck_bytes_with_part(name: &str, blob: Vec<u8>) -> Vec<u8> {
     let mut package = Package::from_bytes(SHAPES).unwrap();
-    let part = PackURI::new(SLIDE1).unwrap();
+    let part = PackURI::new(name).unwrap();
     package
         .edit_opc(|opc| {
-            opc.get_part_mut(&part)?.set_blob(slide);
+            opc.get_part_mut(&part)?.set_blob(blob);
             Ok(())
         })
         .unwrap();
-    let bytes = package.to_bytes().unwrap();
-    Package::from_vec(bytes).unwrap()
+    package.to_bytes().unwrap()
+}
+
+/// The XML of part `name` in `shapes.pptx`.
+fn original_part(name: &str) -> String {
+    let package = Package::from_bytes(SHAPES).unwrap();
+    let part = PackURI::new(name).unwrap();
+    String::from_utf8(
+        package
+            .opc()
+            .unwrap()
+            .get_part(&part)
+            .unwrap()
+            .blob()
+            .to_vec(),
+    )
+    .unwrap()
+}
+
+/// `original_part(name)` with `edit` applied, asserting the edit changed it.
+fn patched_part(name: &str, edit: impl FnOnce(&str) -> String) -> Vec<u8> {
+    let original = original_part(name);
+    let patched = edit(&original);
+    assert_ne!(
+        patched, original,
+        "fixture patch point is missing in {name}"
+    );
+    patched.into_bytes()
 }
 
 fn first_slide_animations(package: &Package) -> litchi_pptx::Result<Sequence> {
@@ -321,4 +352,102 @@ fn structural_timing_corruption_stays_fatal() {
     // A duplicate build shape/group pair is grammar too.
     let duplicate_pair = slide_xml(&timing(&["4", "4"]), |xml| xml);
     assert!(Sequence::parse_slide_xml(&duplicate_pair).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.2: one malformed transform degrades only its own shape.
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::ShapeDefect;
+
+fn first_slide_geometry(
+    package: &Package,
+) -> (Vec<(Option<u32>, bool)>, litchi_pptx::ToleranceReport) {
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let scene = slides[0].shapes().unwrap();
+    let geometry = scene
+        .iter()
+        .map(|shape| (shape.id(), shape.bounds().is_some()))
+        .collect();
+    (geometry, scene.tolerance_report().clone())
+}
+
+#[test]
+fn conformant_transforms_report_no_shape_repairs() {
+    let package = Package::from_bytes(SHAPES).unwrap();
+    let (geometry, report) = first_slide_geometry(&package);
+    assert!(geometry.iter().all(|(_, bounded)| *bounded));
+    assert_clean(&report);
+}
+
+#[test]
+fn malformed_transform_degrades_only_its_shape_and_is_recorded() {
+    // A missing `y` on the text box and a negative width on the connector,
+    // as third-party converters emit for flipped shapes.
+    let slide = patched_part(SLIDE1, |xml| {
+        xml.replace(
+            r#"<a:off x="914400" y="914400"/>"#,
+            r#"<a:off x="914400"/>"#,
+        )
+        .replace(
+            r#"<a:ext cx="2133600" cy="0"/>"#,
+            r#"<a:ext cx="-2133600" cy="0"/>"#,
+        )
+    });
+    let package = deck_with_slide(slide);
+    let (geometry, report) = first_slide_geometry(&package);
+
+    assert_eq!(
+        geometry.len(),
+        Package::from_bytes(SHAPES)
+            .map(|p| first_slide_geometry(&p).0.len())
+            .unwrap()
+    );
+    let degraded: Vec<Option<u32>> = geometry
+        .iter()
+        .filter(|(_, bounded)| !bounded)
+        .map(|(id, _)| *id)
+        .collect();
+    assert_eq!(degraded, [Some(4), Some(6)]);
+    assert!(geometry.contains(&(Some(7), true)));
+
+    let malformed = Defect::Shape(ShapeDefect::MalformedTransform);
+    assert_eq!(
+        located(&report),
+        [(malformed, 4, Some(SLIDE1)), (malformed, 6, Some(SLIDE1))]
+    );
+    assert!(!malformed.repair().is_empty());
+    assert_clean(package.tolerance_report());
+}
+
+#[test]
+fn non_numeric_transform_coordinate_is_degraded_not_fatal() {
+    let slide = patched_part(SLIDE1, |xml| {
+        xml.replace(
+            r#"<a:off x="595961" y="2674961"/>"#,
+            r#"<a:off x="12pt" y="2674961"/>"#,
+        )
+    });
+    let package = deck_with_slide(slide);
+    let (_, report) = first_slide_geometry(&package);
+    assert_eq!(
+        located(&report),
+        [(
+            Defect::Shape(ShapeDefect::MalformedTransform),
+            7,
+            Some(SLIDE1)
+        )]
+    );
+}
+
+#[test]
+fn ill_formed_shape_xml_stays_fatal() {
+    let slide = patched_part(SLIDE1, |xml| {
+        xml.replace(
+            r#"<a:off x="914400" y="914400"/>"#,
+            r#"<a:off x="914400" y="914400">"#,
+        )
+    });
+    assert!(litchi_pptx::shape::Scene::read(&slide).is_err());
 }

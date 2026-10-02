@@ -111,6 +111,29 @@ mod tests {
     }
 
     #[test]
+    fn malformed_transforms_degrade_per_shape_and_extension_lists_are_not_geometry() {
+        let xml = format!(
+            r#"<p:spTree xmlns:p="{PML}" xmlns:a="{DML}"><p:nvGrpSpPr/><p:grpSpPr/>
+                <p:sp><p:nvSpPr><p:cNvPr id="2" name="NoY"/></p:nvSpPr><p:spPr><a:xfrm><a:off x="1"/><a:ext cx="3" cy="4"/></a:xfrm></p:spPr></p:sp>
+                <p:sp><p:nvSpPr><p:cNvPr id="3" name="Flipped"/></p:nvSpPr><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="-3" cy="4"/></a:xfrm></p:spPr></p:sp>
+                <p:sp><p:nvSpPr><p:cNvPr id="4" name="Inherited"/></p:nvSpPr><p:spPr><a:extLst><a:ext uri="urn:x"/></a:extLst></p:spPr></p:sp>
+                <p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Frame"/></p:nvGraphicFramePr><p:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></p:xfrm></p:graphicFrame>
+            </p:spTree>"#
+        );
+        let scene = Scene::read(xml.as_bytes()).expect("degraded scene");
+        let bounded: Vec<_> = scene.iter().map(|s| s.bounds().is_some()).collect();
+        assert_eq!(bounded, [false, false, false, true]);
+        let repaired: Vec<_> = scene
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|d| (d.defect, d.context, d.part()))
+            .collect();
+        let malformed = crate::Defect::Shape(crate::ShapeDefect::MalformedTransform);
+        assert_eq!(repaired, [(malformed, 2, None), (malformed, 3, None)]);
+    }
+
+    #[test]
     fn indexes_p232_placeholder_type_extensions_in_source_namespace_context() {
         let xml = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}">

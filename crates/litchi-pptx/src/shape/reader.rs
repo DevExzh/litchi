@@ -16,6 +16,7 @@ use quick_xml::{
 };
 use thiserror::Error as ThisError;
 
+use crate::leniency::{ShapeDefect, ToleranceReport};
 use crate::{Error, Result};
 
 use super::model::{
@@ -177,6 +178,7 @@ pub struct Scene<'a> {
     records: Vec<Record>,
     strings: String,
     limits: Limits,
+    tolerance: ToleranceReport,
 }
 
 impl<'a> Scene<'a> {
@@ -225,12 +227,13 @@ impl<'a> Scene<'a> {
             });
         }
 
-        let (records, strings) = Scanner::new(output.as_ref(), limits).scan()?;
+        let (records, strings, tolerance) = Scanner::new(output.as_ref(), limits).scan()?;
         Ok(Self {
             xml: output,
             records,
             strings,
             limits,
+            tolerance,
         })
     }
 
@@ -238,6 +241,26 @@ impl<'a> Scene<'a> {
     /// the owner XML is within them.
     pub(crate) const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// The repairs this read applied, in discovery order.
+    ///
+    /// A shape whose transform is malformed (audit finding 6.2) keeps its
+    /// place in the scene with no [`Bounds`] and is recorded here as
+    /// [`ShapeDefect::MalformedTransform`] with its shape ID. Scenes built
+    /// through a part view ([`crate::Slide::shapes`] and the layout/master
+    /// equivalents) name the part; a bare [`Self::read`] leaves it `None`.
+    /// An empty report means every shape conformed.
+    #[inline]
+    #[must_use]
+    pub const fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Stamp the owner part name on every recorded repair.
+    pub(crate) fn locate_in_part(mut self, part: &str) -> Self {
+        self.tolerance.locate_in_part(part);
+        self
     }
 
     /// Processed owner XML against which every [`Span`] is defined.
@@ -397,6 +420,11 @@ struct Active {
     y: Option<i64>,
     width: Option<i64>,
     height: Option<i64>,
+    seen_offset: bool,
+    seen_extent: bool,
+    /// The shape's first `a:off`/`a:ext` lacked, mangled, or negated a
+    /// coordinate; its geometry degrades to absent (audit finding 6.2).
+    malformed_transform: bool,
     markers: u8,
     text_depth: Option<usize>,
     text: Option<String>,
@@ -428,7 +456,9 @@ struct Scanner<'a> {
     retained_text: usize,
     depth: usize,
     nodes: usize,
-    pml_nv_pr_stack: Vec<bool>,
+    /// One flag set per open element: [`PARENT_NV_PR`] / [`PARENT_XFRM`].
+    parent_stack: Vec<u8>,
+    tolerance: ToleranceReport,
     common_slide_depth: Option<usize>,
     tree_depth: Option<usize>,
     seen_tree: bool,
@@ -445,14 +475,15 @@ impl<'a> Scanner<'a> {
             retained_text: 0,
             depth: 0,
             nodes: 0,
-            pml_nv_pr_stack: Vec::new(),
+            parent_stack: Vec::new(),
+            tolerance: ToleranceReport::default(),
             common_slide_depth: None,
             tree_depth: None,
             seen_tree: false,
         }
     }
 
-    fn scan(mut self) -> Result<(Vec<Record>, String)> {
+    fn scan(mut self) -> Result<(Vec<Record>, String, ToleranceReport)> {
         let mut reader = NsReader::from_reader(self.xml);
         // Spans are byte offsets into the owner XML, whose leading
         // byte-order mark precedes reader position zero.
@@ -471,35 +502,32 @@ impl<'a> Scanner<'a> {
                 Event::Start(element) => {
                     self.count_node()?;
                     let event_depth = self.enter_depth()?;
-                    let parent_is_nv_pr = self.pml_nv_pr_stack.last().copied().unwrap_or(false);
+                    let parent = self.parent_stack.last().copied().unwrap_or(0);
                     self.start_element(
                         &namespace,
                         &element,
                         decoder,
                         start,
                         event_depth,
-                        parent_is_nv_pr,
+                        parent,
                         false,
                         end,
                     )?;
-                    self.pml_nv_pr_stack.push(is_pml(
-                        &namespace,
-                        element.local_name().into_inner(),
-                        b"nvPr",
-                    ));
+                    self.parent_stack
+                        .push(parent_flags(&namespace, element.local_name().into_inner()));
                     self.depth = event_depth;
                 },
                 Event::Empty(element) => {
                     self.count_node()?;
                     let event_depth = self.enter_depth()?;
-                    let parent_is_nv_pr = self.pml_nv_pr_stack.last().copied().unwrap_or(false);
+                    let parent = self.parent_stack.last().copied().unwrap_or(0);
                     self.start_element(
                         &namespace,
                         &element,
                         decoder,
                         start,
                         event_depth,
-                        parent_is_nv_pr,
+                        parent,
                         true,
                         end,
                     )?;
@@ -544,7 +572,7 @@ impl<'a> Scanner<'a> {
                 },
                 Event::End(element) => {
                     self.end_element(&namespace, element.name(), end)?;
-                    self.pml_nv_pr_stack.pop().ok_or_else(|| {
+                    self.parent_stack.pop().ok_or_else(|| {
                         Error::Invalid("shape XML element stack became inconsistent".into())
                     })?;
                 },
@@ -557,12 +585,12 @@ impl<'a> Scanner<'a> {
                 _ => {},
             }
         }
-        if self.depth != 0 || !self.active.is_empty() || !self.pml_nv_pr_stack.is_empty() {
+        if self.depth != 0 || !self.active.is_empty() || !self.parent_stack.is_empty() {
             return Err(Error::Invalid(
                 "shape XML ended with unclosed elements".into(),
             ));
         }
-        Ok((self.records, self.strings))
+        Ok((self.records, self.strings, self.tolerance))
     }
 
     fn reject_placeholder_character_data(
@@ -605,10 +633,11 @@ impl<'a> Scanner<'a> {
         decoder: quick_xml::encoding::Decoder,
         start: usize,
         event_depth: usize,
-        parent_is_nv_pr: bool,
+        parent_flags: u8,
         empty: bool,
         end: usize,
     ) -> Result<()> {
+        let parent_is_nv_pr = parent_flags & PARENT_NV_PR != 0;
         // Every classification below compares this element's local name;
         // split the qualified name once rather than once per comparison.
         let local_name = element.local_name().into_inner();
@@ -725,23 +754,49 @@ impl<'a> Scanner<'a> {
                     .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
                 active.placeholder_depth = Some(event_depth);
             }
-        } else if is_dml(namespace, local_name, b"off") && relative <= 3 {
+        } else if is_dml(namespace, local_name, b"off")
+            && relative <= 3
+            && parent_flags & PARENT_XFRM != 0
+        {
             let active = self
                 .active
                 .get_mut(active_offset)
                 .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
-            if active.x.is_none() && active.y.is_none() {
-                active.x = Some(parse_i64(element, b"x", decoder)?);
-                active.y = Some(parse_i64(element, b"y", decoder)?);
+            // The first transform offset wins, as before; a malformed one
+            // degrades this shape's geometry instead of failing the scene.
+            if !active.seen_offset {
+                active.seen_offset = true;
+                match (
+                    parse_coordinate(element, b"x", decoder)?,
+                    parse_coordinate(element, b"y", decoder)?,
+                ) {
+                    (Some(x), Some(y)) => {
+                        active.x = Some(x);
+                        active.y = Some(y);
+                    },
+                    _ => active.malformed_transform = true,
+                }
             }
-        } else if is_dml(namespace, local_name, b"ext") && relative <= 3 {
+        } else if is_dml(namespace, local_name, b"ext")
+            && relative <= 3
+            && parent_flags & PARENT_XFRM != 0
+        {
             let active = self
                 .active
                 .get_mut(active_offset)
                 .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
-            if active.width.is_none() && active.height.is_none() {
-                active.width = Some(parse_nonnegative(element, b"cx", decoder)?);
-                active.height = Some(parse_nonnegative(element, b"cy", decoder)?);
+            if !active.seen_extent {
+                active.seen_extent = true;
+                match (
+                    parse_coordinate(element, b"cx", decoder)?,
+                    parse_coordinate(element, b"cy", decoder)?,
+                ) {
+                    (Some(width), Some(height)) if width >= 0 && height >= 0 => {
+                        active.width = Some(width);
+                        active.height = Some(height);
+                    },
+                    _ => active.malformed_transform = true,
+                }
             }
         }
 
@@ -1146,6 +1201,9 @@ impl<'a> Scanner<'a> {
             y: None,
             width: None,
             height: None,
+            seen_offset: false,
+            seen_extent: false,
+            malformed_transform: false,
             markers: 0,
             text_depth: None,
             text: None,
@@ -1205,9 +1263,15 @@ impl<'a> Scanner<'a> {
             .map(|value| self.retain(value))
             .transpose()?;
         let bounds = match (active.x, active.y, active.width, active.height) {
+            _ if active.malformed_transform => None,
             (Some(x), Some(y), Some(width), Some(height)) => Some(Bounds::new(x, y, width, height)),
             _ => None,
         };
+        if active.malformed_transform {
+            let id = self.records.get(index).and_then(|record| record.id);
+            self.tolerance
+                .record(ShapeDefect::MalformedTransform, id.unwrap_or(0));
+        }
         let record = self
             .records
             .get_mut(index)
@@ -1318,6 +1382,20 @@ impl<'a> Scanner<'a> {
     }
 }
 
+const PARENT_NV_PR: u8 = 1;
+const PARENT_XFRM: u8 = 1 << 1;
+
+/// The flags an open element contributes to its children's parent context.
+fn parent_flags(namespace: &ResolveResult<'_>, local_name: &[u8]) -> u8 {
+    if is_pml(namespace, local_name, b"nvPr") {
+        PARENT_NV_PR
+    } else if is_dml(namespace, local_name, b"xfrm") || is_pml(namespace, local_name, b"xfrm") {
+        PARENT_XFRM
+    } else {
+        0
+    }
+}
+
 fn classify_shape(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Option<Kind> {
     if is_pml(namespace, local_name, b"sp") {
         Some(Kind::Auto)
@@ -1376,40 +1454,15 @@ fn is_diagram(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) ->
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DIAGRAM || *value == STRICT_DIAGRAM)
 }
 
-fn parse_i64(
+/// Read one `a:off`/`a:ext` coordinate, or `None` when it is absent or not
+/// an `i64` lexical (`ST_Coordinate`/`ST_PositiveCoordinate`).
+fn parse_coordinate(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
-) -> Result<i64> {
-    let value = unqualified_attribute_value(element, name, decoder)?.ok_or_else(|| {
-        Error::Invalid(format!(
-            "DrawingML coordinate is missing '{}'",
-            String::from_utf8_lossy(name)
-        ))
-    })?;
-    value.parse::<i64>().map_err(|_err| {
-        Error::Invalid(format!(
-            "invalid DrawingML coordinate '{}' for '{}'",
-            value,
-            String::from_utf8_lossy(name)
-        ))
-    })
-}
-
-fn parse_nonnegative(
-    element: &BytesStart<'_>,
-    name: &[u8],
-    decoder: quick_xml::encoding::Decoder,
-) -> Result<i64> {
-    let value = parse_i64(element, name, decoder)?;
-    if value < 0 {
-        Err(Error::Invalid(format!(
-            "DrawingML extent '{}' cannot be negative",
-            String::from_utf8_lossy(name)
-        )))
-    } else {
-        Ok(value)
-    }
+) -> Result<Option<i64>> {
+    Ok(unqualified_attribute_value(element, name, decoder)?
+        .and_then(|value| value.parse::<i64>().ok()))
 }
 
 /// Validate the generic `p:ext` owner used by `CT_Extension`.

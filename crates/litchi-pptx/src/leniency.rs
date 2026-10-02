@@ -13,10 +13,11 @@
 //! `PowerPoint` and LibreOffice read past without complaint, so rejecting it
 //! would cost the caller the whole slide or timing tree over metadata that
 //! cannot change what a conforming deck means. Each substitutes the value
-//! documented on the corresponding [`TimingDefect`] variant. Every
-//! `PresentationML` repair implemented so far is in this class; the
-//! first members are the timing-tree cross-reference repairs of audit finding
-//! 6.1 (orphaned animation/build targets and duplicated shape IDs).
+//! documented on the corresponding defect variant ([`TimingDefect`],
+//! [`ShapeDefect`]). Every `PresentationML` repair implemented so far is in
+//! this class; the first members are the timing-tree cross-reference repairs
+//! of audit finding 6.1 (orphaned animation/build targets and duplicated
+//! shape IDs).
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. No `PresentationML` repair currently needs that
@@ -48,6 +49,10 @@
 //!   `*_with_tolerance` companions taking `&mut ToleranceReport` (explicit
 //!   threading, no interior mutability) so a caller can merge per-slide
 //!   reports into one deck-level aggregate.
+//! * A shape scene ([`crate::shape::Scene`], returned by
+//!   [`crate::Slide::shapes`] and the layout/master `shapes()` views) carries
+//!   its per-shape repairs in [`crate::shape::Scene::tolerance_report`],
+//!   stamped with the owner part name when read through a part view.
 //!
 //! # Timing-tree repairs (audit finding 6.1)
 //!
@@ -76,6 +81,23 @@
 //! self-consistent before a lossless rewrite keep the old contract through
 //! [`crate::animations::Sequence::parse_slide_xml_strict`], which rejects
 //! any slide whose parse needed a repair.
+//!
+//! # Shape-scene repairs (audit finding 6.2)
+//!
+//! [`crate::shape::Scene::read`] — behind `shapes()` on slides, layouts, and
+//! masters — no longer fails every shape on the owner over one malformed
+//! transform. Only an `a:off`/`a:ext` whose parent is the shape's own
+//! `a:xfrm` (or a graphic frame's `p:xfrm`) is read as geometry; when the
+//! first offset lacks `x`/`y`, the first extent lacks `cx`/`cy`, a value is
+//! not an integer, or an extent is negative, that shape keeps its place,
+//! identity, placeholder, and text but reports no
+//! [`crate::shape::Bounds`], and the repair is recorded as
+//! [`ShapeDefect::MalformedTransform`] with the shape ID. The reader drops
+//! the geometry rather than substituting LibreOffice's `0` defaults, because
+//! a `0` position or size would be content the producer never wrote; absent
+//! geometry is already how the scene represents a shape that inherits its
+//! placement. XML well-formedness, the scene's structural grammar, and its
+//! size/depth/count limits stay hard errors.
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
@@ -169,6 +191,8 @@ impl TimingDefect {
 pub enum Defect {
     /// A slide timing-tree defect repaired the way `PowerPoint` repairs it.
     Timing(TimingDefect),
+    /// A shape-tree defect repaired on the one shape carrying it.
+    Shape(ShapeDefect),
 }
 
 impl Defect {
@@ -177,7 +201,52 @@ impl Defect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::Timing(defect) => defect.repair(),
+            Self::Shape(defect) => defect.repair(),
         }
+    }
+}
+
+/// The class of shape-tree defect the scene reader repairs per shape.
+///
+/// Like [`TimingDefect`], this enumeration is closed by design and every
+/// variant is repaired under every [`Leniency`] variant. Each repair is
+/// confined to the one shape that carries the defect: the shape keeps its
+/// place, name, ID, placeholder, and text in the [`crate::shape::Scene`],
+/// and its well-formed siblings are unaffected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ShapeDefect {
+    /// The shape's transform (`a:xfrm`/`p:xfrm`) carried an offset
+    /// (`a:off`) without `x`/`y` or with a non-integer coordinate, or an
+    /// extent (`a:ext`) without `cx`/`cy`, with a non-integer value, or
+    /// with a negative one.
+    ///
+    /// ECMA-376-1 §20.1.7.3/§20.1.7.4 type these as `CT_Point2D` and
+    /// `CT_PositiveSize2D`, so the markup is non-conformant, but nothing
+    /// mandates refusing the subtree: LibreOffice's `oox` transform context
+    /// reads them with `getInteger(…, 0)` defaults and `PowerPoint` opens
+    /// such decks. Substituting `0` would invent a position the producer
+    /// never wrote, so the reader degrades only this shape's geometry to
+    /// absent ([`crate::shape::Shape::bounds`] is `None`, as for a shape that
+    /// inherits its placement) and keeps the rest of the scene.
+    MalformedTransform,
+}
+
+impl ShapeDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::MalformedTransform => {
+                "dropped the shape's malformed transform; its geometry is absent and the rest of the scene was kept"
+            },
+        }
+    }
+}
+
+impl From<ShapeDefect> for Defect {
+    fn from(defect: ShapeDefect) -> Self {
+        Self::Shape(defect)
     }
 }
 
@@ -192,10 +261,16 @@ impl From<TimingDefect> for Defect {
 pub struct ToleratedDefect {
     /// Which defect class was repaired.
     pub defect: Defect,
-    /// Where the defect was found within its part: the shape ID
-    /// (`p:cNvPr@id`, `ST_DrawingElementId`) the defect concerns — the
-    /// orphaned `spid` for [`TimingDefect::OrphanedTarget`], the duplicated
-    /// `id` for [`TimingDefect::DuplicateShapeId`].
+    /// Where the defect was found within its part. Its meaning is fixed per
+    /// defect class:
+    ///
+    /// * [`Defect::Timing`] — the shape ID (`p:cNvPr@id`,
+    ///   `ST_DrawingElementId`) the defect concerns: the orphaned `spid` for
+    ///   [`TimingDefect::OrphanedTarget`], the duplicated `id` for
+    ///   [`TimingDefect::DuplicateShapeId`];
+    /// * [`Defect::Shape`] — the shape ID of the repaired shape, or `0` when
+    ///   the shape carries no usable ID (`0` is outside the IDs `PowerPoint`
+    ///   assigns to shapes).
     pub context: u32,
     /// The package part the defect was found in, such as
     /// `/ppt/slides/slide3.xml`.
@@ -393,6 +468,7 @@ mod tests {
         let defects = [
             Defect::from(TimingDefect::OrphanedTarget),
             Defect::from(TimingDefect::DuplicateShapeId),
+            Defect::from(ShapeDefect::MalformedTransform),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());
