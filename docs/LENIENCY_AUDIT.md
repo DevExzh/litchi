@@ -87,25 +87,25 @@ applications already perform. Ranked by expected impact:
 1. **litchi-doc F1.1** — **[FIXED 2026-10-01]** ~24 optional metadata tables `?`-propagate at document open; any
    deviation in any auxiliary FIB table fails the whole file. Largest single blast radius
    in the audit; the crate already proves the tolerant pattern in the same function.
-2. **litchi-docx F2.1** — one OMML equation fails `Document::write_text_to` for the whole
+2. **litchi-docx F2.1** — **[FIXED 2026-10-02]** one OMML equation fails `Document::write_text_to` for the whole
    document; the sibling scanner in the same file already skips foreign subtrees.
    Equations are ubiquitous in technical documents.
 3. **litchi-xls F3.1** — **[FIXED 2026-10-01]** per-cell XF cross-reference validation kills the worksheet;
    out-of-range `ixfe` is one of the most common non-Microsoft-producer defects, and the
    repair (default XF) touches styling only, never values.
-4. **litchi-ppt F5.1** — `StyleTextPropAtom` exact-coverage framing; miscounted coverage
+4. **litchi-ppt F5.1** — **[FIXED 2026-10-02]** `StyleTextPropAtom` exact-coverage framing; miscounted coverage
    is among the most common .ppt deviations, and the crate already ships the lenient
    parser the read path never uses.
-5. **litchi-ppt F5.2** — reserved BulletFlags/PFWrapFlags bits fatal; verbatim "MUST be
+5. **litchi-ppt F5.2** — **[FIXED 2026-10-02]** reserved BulletFlags/PFWrapFlags bits fatal; verbatim "MUST be
    ignored" spec text, and one stray bit kills a whole slide's shapes via the missing
    per-shape isolation (F5.11).
-6. **litchi-pptx F6.1** — animation stale-shape-target and duplicate-shape-ID checks kill
+6. **litchi-pptx F6.1** — **[FIXED 2026-10-02]** animation stale-shape-target and duplicate-shape-ID checks kill
    the timing tree; PowerPoint routinely leaves orphaned timing entries when shapes are
    deleted, so edited decks are very likely carriers.
 7. **litchi-doc F1.2** — **[FIXED 2026-10-01]** stylesheet Stshif reserved-bit/fixed-count checks; the
    stylesheet is mandatory for every Word 97+ file, so one stray bit costs the whole
    document — the same class as the already-fixed cell-border side flags.
-8. **litchi-rtf/ODF F9.1** — deflated or re-zipped ODF `mimetype` member rejected at open
+8. **litchi-rtf/ODF F9.1** — **[FIXED 2026-10-02]** deflated or re-zipped ODF `mimetype` member rejected at open
    and at detection (classifies as "unsupported format"); LibreOffice inflates it through
    ordinary ZIP APIs. The crate already has an opt-in repair plan for the deviation class.
 
@@ -300,6 +300,8 @@ typed semantic codecs are single-pass, whole-part parsers that convert any schem
 deviation into a part-wide or document-wide `Err`. The reviewer reproduced these findings
 against the crate's public API.
 ### 2.1 Semantic text extraction rejects any foreign `*:t` element — OMML equations kill `write_text_to` — P0
+> **Status: FIXED (2026-10-02)** — litchi-docx gained its `ToleranceReport` carrier (`Document`/`source_backed::Package::tolerance_report()`); text extraction skips each foreign `*:t`
+> subtree (OMML `m:t`, DrawingML `a:t`) including entities/CDATA and records `TextDefect::SkippedForeignMarkup` (context = start-tag offset). Ill-formed XML, unbound prefixes, truncation and limits stay fatal.
 - **Location**: `crates/litchi-docx/src/paragraph/codec/text.rs:925` (Start), :978
   (Empty), :1043 (End) — "foreign semantic DOCX text element is not w:t".
 - **Check**: every element whose local name is `t` but is not bound to the
@@ -906,6 +908,8 @@ preserved; truncated containers degrade; text atoms decode lossily; notes index 
 instead of failing). The semantic layer (slide directory, CurrentUser/UserEdit chain,
 text-run/style parsing) is strict-to-fatal.
 ### 5.1 `StyleTextPropAtom` strict framing rejects files whose style coverage ≠ text length + 1 — P0
+> **Status: FIXED (2026-10-02)** — the text-box read path uses the clamping POI/LibreOffice StyleTextPropAtom parser and records each clamp/early stop/dropped tail as
+> `TextPropDefect::StyleTextPropCoverage` (run index + persist/shape ID); `Slide`/`SpeakerNotes::tolerance_report`, `Presentation::collect_tolerance_report`. Writer/reparse paths stay strict.
 - **Location**: `crates/litchi-ppt/src/text_prop.rs:376` ("TextPFRun has invalid
   character coverage"), :408 (TextCFRun), :433 ("StyleTextPropAtom has trailing bytes"),
   via `parse_style_text_prop_atom_strict` (:358), called at `text_run/codec.rs:95`.
@@ -923,6 +927,8 @@ text-run/style parsing) is strict-to-fatal.
   (clamp coverage, break on garbage, drop trailing bytes), record each clamp; keep the
   strict variant for the writer/reparse-verification path.
 ### 5.2 Reserved BulletFlags / PFWrapFlags bits are fatal instead of ignored — P0
+> **Status: FIXED (2026-10-02)** — reserved BulletFlags/PFWrapFlags bits are masked to 0x000F/0x0007 and recorded as `TextPropDefect::{ReservedBulletFlagBits, ReservedWrapFlagBits}`
+> (context = raw flags, plus persist/shape ID); defined bits still apply and raw words round-trip.
 - **Location**: `crates/litchi-ppt/src/text_run/codec.rs:301` ("TextPFRun has reserved
   BulletFlags bits set"), :386 ("TextPFRun has reserved PFWrapFlags bits set").
 - **Check**: any reserved bit set in the 2-byte `bulletFlags` or `wrapFlags` fields
@@ -1110,6 +1116,8 @@ MCE baseline processing everywhere, `dur` strips an "ms" suffix, `on`/`off` bool
 accepted. The crate preserves unknown *structure* generously but refuses unknown *values*
 absolutely.
 ### 6.1 Animations: stale shape-target and duplicate-shape-ID cross-reference checks kill the whole slide timing tree — P0
+> **Status: FIXED (2026-10-02)** — stale `spTgt`/build targets are skipped per entry and duplicate `cNvPr@id`s resolve first-wins, recorded as `TimingDefect::{OrphanedTarget,
+> DuplicateShapeId}` (slide part + spid) in `Sequence::tolerance_report()` via `Slide::animations()`; `Sequence::parse_slide_xml_strict` keeps the old check.
 - **Location**: `crates/litchi-pptx/src/animations/codec/xml/parser/semantic.rs:1117-1141`
   ("animation target {} is not a shape on the current slide"; "duplicate shape ID in
   slide" at :154-158), default-on via `animations/codec/semantic.rs:82-85`
@@ -1777,6 +1785,8 @@ theme: duplicate manifest entries are rejected ("Duplicate manifest file entry",
 crates/litchi-odf-common/src/package/codec.rs:347-352) where LibreOffice's
 duplicate-check-free `ManifestImport` tolerates them.
 ### 9.1 Deflated or re-zipped `mimetype` member rejected at package open — P0
+> **Status: FIXED (2026-10-02)** — owned, source-backed, prepared and detection paths read a deflated / extra-field / not-first `mimetype` member by name and record
+> `PackageDefect::{MimetypeDeflated, MimetypeExtraField, MimetypeNotFirst}` on odt/ods/odp `tolerance_report()`; verified through `litchi::Document::{open, from_bytes}`.
 - **Location**: `crates/litchi-odf-common/src/core/package.rs:709` ("ODF mimetype member
   must use ZIP Store compression"); companion detector grammar at `detect.rs:958`
   (`packaged_mime_layout` rejects `compression != 0`, any local extra field, any flag
