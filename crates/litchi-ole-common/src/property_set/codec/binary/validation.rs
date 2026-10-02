@@ -13,9 +13,9 @@ use super::semantic::{
     serialize_typed_for_property_with_limit,
 };
 use super::wire::{
-    ByteSink, ByteWriter, CountingWriter, ValueReader, append_ansi, append_bytes, append_u32,
-    checked_range, decode_ansi_lossy, decode_utf16_lossy, encoded_ansi_len, pad4, read_guid,
-    read_u16, read_u32, reserve_bytes,
+    ByteSink, ByteWriter, CountingWriter, ValueReader, ansi_text_end, append_ansi, append_bytes,
+    append_u32, checked_range, decode_ansi_lossy, decode_utf16_lossy, encoded_ansi_len, pad4,
+    read_guid, read_u16, read_u32, reserve_bytes, utf16_text_end,
 };
 use super::{Repairs, parse_typed_property, parse_typed_property_for_property};
 use crate::leniency::{StringDefect, ToleranceReport};
@@ -701,25 +701,32 @@ fn parse_dictionary(
         if length == 0 {
             return Err(invalid("Dictionary strings must include a terminator"));
         }
+        // The declared length bounds the name and counts its terminator.
+        // Like POI (`Section.readDictionary`) the name is read to that
+        // length; a missing terminator is recorded, not rejected (leniency
+        // audit F7.10).
         let name = if codepage == UNICODE_CODEPAGE {
-            let payload_units = length - 1;
-            let payload_bytes = payload_units
+            let byte_len = length
                 .checked_mul(2)
                 .ok_or_else(|| invalid("Dictionary Unicode length overflow"))?;
-            let raw = reader.take(payload_bytes, "dictionary Unicode string")?;
-            if reader.read_u16("dictionary Unicode terminator")? != 0 {
-                return Err(invalid("Dictionary Unicode string is not terminated"));
-            }
-            let decoded =
-                decode_utf16_lossy(raw, "dictionary Unicode string", &mut reader.repairs)?;
+            let raw = reader.take(byte_len, "dictionary Unicode string")?;
+            let end = utf16_text_end(raw, &mut reader.repairs);
+            let decoded = decode_utf16_lossy(
+                &raw[..end],
+                "dictionary Unicode string",
+                &mut reader.repairs,
+            )?;
             reader.align4(false, "dictionary Unicode padding")?;
             decoded
         } else {
-            let raw = reader.take(length - 1, "dictionary string")?;
-            if reader.read_u8("dictionary terminator")? != 0 {
-                return Err(invalid("Dictionary string is not terminated"));
-            }
-            decode_ansi_lossy(raw, codepage, "dictionary string", &mut reader.repairs)?
+            let raw = reader.take(length, "dictionary string")?;
+            let end = ansi_text_end(raw, &mut reader.repairs);
+            decode_ansi_lossy(
+                &raw[..end],
+                codepage,
+                "dictionary string",
+                &mut reader.repairs,
+            )?
         };
         if dictionary.insert(identifier, name).is_some() {
             return Err(invalid(format!(

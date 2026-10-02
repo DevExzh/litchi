@@ -99,9 +99,10 @@ pub enum StringDefect {
     LossyDecode,
     /// A string was not NUL-terminated within its declared size (F7.10).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation. The
-    /// repair decodes the declared bytes and strips a terminator only when
-    /// present, as POI does.
+    /// The declared bytes are decoded up to the first terminator, or whole
+    /// when none is present, as POI does; the size field alone bounds the
+    /// string, so nothing is lost and a rewrite adds the terminator. One
+    /// entry is recorded per affected property (PID 0 for the dictionary).
     MissingTerminator,
     /// PID 1 named a code page outside the supported table (F7.9).
     ///

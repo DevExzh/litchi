@@ -5,8 +5,8 @@ use super::super::super::model::{
     Value, checked_add, checked_mul, checked_u32, invalid, try_vec_with_capacity,
 };
 use super::wire::{
-    ByteSink, ValueReader, append_ansi, append_bytes, append_u16, append_u32, decode_ansi_lossy,
-    decode_utf16_lossy, encoded_ansi_len, reserve_bytes,
+    ByteSink, ValueReader, ansi_text_end, append_ansi, append_bytes, append_u16, append_u32,
+    decode_ansi_lossy, decode_utf16_lossy, encoded_ansi_len, reserve_bytes, utf16_text_end,
 };
 use litchi_cfb::OleError;
 use litchi_cfb::consts::{VT_I4, VT_LPSTR, VT_LPWSTR, VT_VARIANT, VT_VECTOR};
@@ -210,9 +210,7 @@ fn read_unaligned_ansi(
         return Ok(String::new());
     }
     let raw = reader.take(length, description)?;
-    let Some(end) = raw.iter().position(|byte| *byte == 0) else {
-        return Err(invalid(format!("{description} is not NUL-terminated")));
-    };
+    let end = ansi_text_end(raw, &mut reader.repairs);
     decode_ansi_lossy(&raw[..end], codepage, description, &mut reader.repairs)
 }
 
@@ -224,13 +222,7 @@ fn read_lpwstr(reader: &mut ValueReader<'_>, description: &str) -> Result<String
     }
     let byte_len = checked_mul(units, 2, description)?;
     let raw = reader.take(byte_len, description)?;
-    let end = raw
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .position(|pair| *pair == [0, 0])
-        .map(|terminator_index| terminator_index * 2)
-        .ok_or_else(|| invalid(format!("{description} is not UTF-16LE terminated")))?;
+    let end = utf16_text_end(raw, &mut reader.repairs);
     let value = decode_utf16_lossy(&raw[..end], description, &mut reader.repairs)?;
     let padding = (4 - (byte_len & 3)) & 3;
     reader.take(padding, &format!("{description} padding"))?;

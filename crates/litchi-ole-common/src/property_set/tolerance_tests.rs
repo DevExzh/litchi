@@ -80,13 +80,18 @@ fn section_body(properties: &[(u32, Vec<u8>)]) -> Vec<u8> {
 
 /// A complete one-section `SummaryInformation` stream.
 fn summary_stream(properties: &[(u32, Vec<u8>)]) -> Vec<u8> {
+    one_section_stream(SUMMARY_INFORMATION_FMTID, properties)
+}
+
+/// A complete one-section stream for `format_identifier`.
+fn one_section_stream(format_identifier: Guid, properties: &[(u32, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&u16le(0xfffe));
     data.extend_from_slice(&u16le(0));
     data.extend_from_slice(&u32le(0));
     data.extend_from_slice(&[0; 16]);
     data.extend_from_slice(&u32le(1));
-    data.extend_from_slice(SUMMARY_INFORMATION_FMTID.as_bytes());
+    data.extend_from_slice(format_identifier.as_bytes());
     data.extend_from_slice(&u32le(48));
     data.extend_from_slice(&section_body(properties));
     data
@@ -205,4 +210,80 @@ fn unsupported_codepage_falls_back_to_windows_1252_and_is_recorded() {
                 .is_err()
         );
     }
+}
+
+// --- F7.10: strings not NUL-terminated within their declared size ---
+
+#[test]
+fn unterminated_strings_are_read_to_their_declared_size_and_recorded() {
+    let faulted = summary_stream(&[
+        codepage_property(1252),
+        (PID_TITLE, lpstr(b"Hello")),
+        (PID_SUBJECT, lpwstr(&[0x41, 0x42])),
+    ]);
+    let parsed = Stream::parse(&faulted).unwrap();
+    assert_eq!(
+        recorded(parsed.tolerance_report()),
+        [
+            (StringDefect::MissingTerminator.into(), PID_TITLE),
+            (StringDefect::MissingTerminator.into(), PID_SUBJECT),
+        ]
+    );
+    let section = section_of(&parsed);
+    assert_eq!(
+        section.property(PID_TITLE),
+        Some(&Value::Lpstr("Hello".into()))
+    );
+    assert_eq!(
+        section.property(PID_SUBJECT),
+        Some(&Value::Lpwstr("AB".into()))
+    );
+
+    // The repair keeps the content, so the editor may rewrite the stream;
+    // the rewrite is canonical and therefore conformant.
+    let mut editor = Editor::new(compound_file(&faulted)).unwrap();
+    editor
+        .update(Binding::SummaryInformation, |_| Ok(()))
+        .unwrap();
+    let rewritten = editor.finish().unwrap();
+    let mut ole = OleFile::open(Cursor::new(rewritten)).unwrap();
+    let reparsed = PropertySetReader::property_set(&mut ole, Binding::SummaryInformation).unwrap();
+    assert!(reparsed.tolerance_report().is_clean());
+    assert_eq!(reparsed, parsed);
+}
+
+#[test]
+fn unterminated_dictionary_names_are_read_to_their_declared_length() {
+    let custom = Guid::from_bytes([0x5a; 16]);
+    let dictionary = |name: &[u8]| {
+        let mut body = u32le(1).to_vec();
+        body.extend_from_slice(&u32le(PID_TITLE));
+        body.extend_from_slice(&u32le(u32::try_from(name.len()).unwrap()));
+        body.extend_from_slice(name);
+        while body.len() % 4 != 0 {
+            body.push(0);
+        }
+        (0, body)
+    };
+    let stream = |name: &[u8]| {
+        one_section_stream(
+            custom,
+            &[
+                dictionary(name),
+                codepage_property(1252),
+                (PID_TITLE, typed(VT_I4, &u32le(7))),
+            ],
+        )
+    };
+    let clean = Stream::parse(&stream(b"Name\0")).unwrap();
+    assert!(clean.tolerance_report().is_clean());
+
+    let parsed = Stream::parse(&stream(b"Name")).unwrap();
+    assert_eq!(
+        recorded(parsed.tolerance_report()),
+        [(StringDefect::MissingTerminator.into(), 0)]
+    );
+    let section = parsed.section(custom).unwrap();
+    assert_eq!(section.property_name(PID_TITLE), Some("Name"));
+    assert_eq!(parsed, clean);
 }

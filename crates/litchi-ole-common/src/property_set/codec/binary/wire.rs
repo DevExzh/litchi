@@ -161,17 +161,22 @@ impl ByteSink for CountingWriter {
 pub(crate) struct Repairs {
     /// A string held malformed MBCS or unpaired UTF-16 (F7.8).
     pub(crate) lossy_decode: bool,
+    /// A string was not NUL-terminated within its declared size (F7.10).
+    pub(crate) missing_terminator: bool,
 }
 
 impl Repairs {
     pub(crate) const fn is_empty(self) -> bool {
-        !self.lossy_decode
+        !(self.lossy_decode || self.missing_terminator)
     }
 
     /// Records every repair class set here against `property_identifier`.
     pub(crate) fn record(self, report: &mut ToleranceReport, property_identifier: u32) {
         if self.lossy_decode {
             report.record(StringDefect::LossyDecode, property_identifier);
+        }
+        if self.missing_terminator {
+            report.record(StringDefect::MissingTerminator, property_identifier);
         }
     }
 
@@ -203,6 +208,7 @@ impl<'a> ValueReader<'a> {
             alignment_base,
             repairs: Repairs {
                 lossy_decode: false,
+                missing_terminator: false,
             },
         }
     }
@@ -407,21 +413,13 @@ pub(super) fn read_codepage_string(
     let value = if size == 0 {
         String::new()
     } else if codepage == UNICODE_CODEPAGE {
-        if size % 2 != 0 || !raw.ends_with(&[0, 0]) {
+        if size % 2 != 0 {
             return Err(invalid(format!("{description} is not terminated UTF-16LE")));
         }
-        let end = raw
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .position(|pair| *pair == [0, 0])
-            .map_or(raw.len(), |terminator_index| terminator_index * 2);
+        let end = utf16_text_end(raw, &mut reader.repairs);
         decode_utf16_lossy(&raw[..end], description, &mut reader.repairs)?
     } else {
-        if raw.last() != Some(&0) {
-            return Err(invalid(format!("{description} is not NUL-terminated")));
-        }
-        let end = raw.iter().position(|byte| *byte == 0).unwrap_or(raw.len());
+        let end = ansi_text_end(raw, &mut reader.repairs);
         decode_ansi_lossy(&raw[..end], codepage, description, &mut reader.repairs)?
     };
     reader.align4(top_level, &format!("{description} padding"))?;
@@ -442,19 +440,37 @@ pub(super) fn read_unicode_string(
     let value = if units == 0 {
         String::new()
     } else {
-        if !raw.ends_with(&[0, 0]) {
-            return Err(invalid(format!("{description} is not NUL-terminated")));
-        }
-        let end = raw
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .position(|pair| *pair == [0, 0])
-            .map_or(raw.len(), |terminator_index| terminator_index * 2);
+        let end = utf16_text_end(raw, &mut reader.repairs);
         decode_utf16_lossy(&raw[..end], description, &mut reader.repairs)?
     };
     reader.align4(top_level, &format!("{description} padding"))?;
     Ok(value)
+}
+
+/// The byte length of the text in a sized ANSI string: up to its first NUL.
+///
+/// MS-OLEPS 2.5 requires the declared size to end in a terminator, but the
+/// size alone bounds the string and producers disagree on whether it counts
+/// the terminator. Like POI (`CodePageString`) the string is read to its
+/// declared size and a missing terminator is noted in `repairs` rather than
+/// rejected (leniency audit F7.10).
+pub(super) fn ansi_text_end(raw: &[u8], repairs: &mut Repairs) -> usize {
+    if raw.last() != Some(&0) {
+        repairs.missing_terminator = true;
+    }
+    raw.iter().position(|byte| *byte == 0).unwrap_or(raw.len())
+}
+
+/// [`ansi_text_end`] for a sized UTF-16LE string of whole code units.
+pub(super) fn utf16_text_end(raw: &[u8], repairs: &mut Repairs) -> usize {
+    if !raw.ends_with(&[0, 0]) {
+        repairs.missing_terminator = true;
+    }
+    raw.as_chunks::<2>()
+        .0
+        .iter()
+        .position(|pair| *pair == [0, 0])
+        .map_or(raw.len() & !1, |terminator_index| terminator_index * 2)
 }
 
 /// Decodes UTF-16LE, substituting U+FFFD for unpaired surrogates (leniency
