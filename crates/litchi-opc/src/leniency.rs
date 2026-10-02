@@ -45,12 +45,23 @@
 //!
 //! # Status
 //!
-//! Live for findings 8.5–8.10 of `docs/LENIENCY_AUDIT.md`: duplicate
+//! Live for findings 8.5–8.11 of `docs/LENIENCY_AUDIT.md`: duplicate
 //! relationship `Id` (8.5), unresolvable internal target (8.6), `TargetMode`
 //! casing and value (8.7), missing `Target`/`Type` (8.8), duplicate
-//! content-type mappings (8.9), and a relationships part declared with
-//! another content type (8.10). The P2 manifest findings 8.11–8.12 remain
-//! strict.
+//! content-type mappings (8.9), a relationships part declared with another
+//! content type (8.10), and manifest shape — unknown elements and
+//! attributes, character data and CDATA in `[Content_Types].xml` and `.rels`
+//! (8.11). The P2 grammar finding 8.12 remains strict.
+//!
+//! Where the references differ the more tolerant one is followed, and only
+//! when the repair cannot change which part is which: relationships-part
+//! typing by name (LibreOffice and Apache POI alike), and Apache POI for
+//! unknown manifest elements (skipped, where LibreOffice's SAX handler
+//! throws) — skipping an element never invents a mapping or relationship,
+//! and the skip is recorded. A `DOCTYPE` (Apache POI disallows DTDs
+//! outright; entity declarations are a parser-security surface), an unbound
+//! namespace prefix, a missing `ContentType`, `Extension`, `PartName`, or
+//! `Id`, and a wrong document element stay hard errors.
 //!
 //! Source-preserving edits re-read the opened manifests under the same
 //! tolerant rules, so a package that opened with recorded repairs stays
@@ -65,6 +76,31 @@ use std::fmt;
 /// [`ToleranceReport::unrecorded`]. Each stored entry's strings are bounded
 /// by the attribute and part-name read limits that admitted them.
 pub const MAX_RECORDED_DEFECTS: usize = 1024;
+
+/// Longest element or attribute name stored in a recorded defect, in bytes.
+///
+/// Names are not bounded by the attribute read limits, so a recorded name is
+/// truncated (on a character boundary) to keep each entry small.
+pub(crate) const MAX_RECORDED_NAME_BYTES: usize = 256;
+
+/// Truncate `name` to at most [`MAX_RECORDED_NAME_BYTES`] bytes on a
+/// character boundary.
+pub(crate) fn bounded_name(name: &str) -> &str {
+    if name.len() <= MAX_RECORDED_NAME_BYTES {
+        return name;
+    }
+    let mut end = MAX_RECORDED_NAME_BYTES;
+    while !name.is_char_boundary(end) {
+        end -= 1;
+    }
+    &name[..end]
+}
+
+/// The recorded value of a [`RelationshipDefect::UnexpectedContent`] or
+/// [`ContentTypeDefect::UnexpectedContent`] for character data.
+pub(crate) const TEXT_NODE: &str = "#text";
+/// The recorded value of an unexpected CDATA section.
+pub(crate) const CDATA_NODE: &str = "#cdata-section";
 
 /// How the reader treats non-structural package defects.
 ///
@@ -138,6 +174,29 @@ pub enum RelationshipDefect {
     /// A relationship without a type cannot be looked up by any consumer, so
     /// it is skipped. Any recorded `Target` is the value.
     MissingType,
+    /// An element other than a direct `Relationship` child in the OPC
+    /// relationships namespace: an extension or foreign-namespace element
+    /// under `Relationships`, or any child of a `Relationship`
+    /// (Annex C closes both content models as a producer rule).
+    ///
+    /// The element and its whole subtree are skipped, as Apache POI skips
+    /// every element it does not query; nothing inside it is read as a
+    /// relationship. The element's qualified name is the value, and the
+    /// enclosing relationship's `Id` the item when the element sits inside
+    /// one.
+    UnknownElement,
+    /// A `Relationship` attribute other than `Id`, `Type`, `Target`,
+    /// `TargetMode`, or a namespace declaration.
+    ///
+    /// Ignored, as Apache POI and LibreOffice both ignore it. The attribute's
+    /// qualified name is the value, the relationship `Id` the item.
+    UnknownAttribute,
+    /// Non-whitespace character data or a CDATA section in the manifest.
+    ///
+    /// Ignored, as Apache POI and LibreOffice both ignore character data.
+    /// The value is `#text` or `#cdata-section`; the content itself is not
+    /// stored.
+    UnexpectedContent,
 }
 
 impl RelationshipDefect {
@@ -153,6 +212,11 @@ impl RelationshipDefect {
             Self::UnrecognizedTargetMode => "read the unrecognized TargetMode as External",
             Self::MissingTarget => "skipped the relationship with a missing or empty Target",
             Self::MissingType => "skipped the relationship with a missing or empty Type",
+            Self::UnknownElement => {
+                "skipped an unknown element in the relationships manifest, with its subtree"
+            },
+            Self::UnknownAttribute => "ignored an unknown Relationship attribute",
+            Self::UnexpectedContent => "ignored character data in the relationships manifest",
         }
     }
 }
@@ -190,6 +254,28 @@ pub enum ContentTypeDefect {
     /// mapping is missing. The item is the relationships part name, the
     /// value the declared content type.
     RelationshipPartType,
+    /// An element other than a direct `Default` or `Override` child in the
+    /// OPC content-types namespace: an extension or foreign-namespace element
+    /// under `Types`, or any child of a mapping (Annex C closes both content
+    /// models as a producer rule).
+    ///
+    /// The element and its whole subtree are skipped, as Apache POI skips
+    /// every element it does not query; no mapping inside it is read. The
+    /// element's qualified name is the value; the item is the enclosing
+    /// mapping's extension or part name when the element sits inside one.
+    UnknownElement,
+    /// A `Default` or `Override` attribute other than its key
+    /// (`Extension`/`PartName`), `ContentType`, or a namespace declaration.
+    ///
+    /// Ignored, as Apache POI and LibreOffice both ignore it. The attribute's
+    /// qualified name is the value, the mapping's key the item.
+    UnknownAttribute,
+    /// Non-whitespace character data or a CDATA section in the manifest.
+    ///
+    /// Ignored, as Apache POI and LibreOffice both ignore character data.
+    /// The value is `#text` or `#cdata-section`; the content itself is not
+    /// stored.
+    UnexpectedContent,
 }
 
 impl ContentTypeDefect {
@@ -206,6 +292,11 @@ impl ContentTypeDefect {
             Self::RelationshipPartType => {
                 "typed the relationships part with the fixed relationships content type"
             },
+            Self::UnknownElement => {
+                "skipped an unknown element in the content types manifest, with its subtree"
+            },
+            Self::UnknownAttribute => "ignored an unknown content-type mapping attribute",
+            Self::UnexpectedContent => "ignored character data in the content types manifest",
         }
     }
 }
@@ -476,6 +567,17 @@ mod tests {
     }
 
     #[test]
+    fn recorded_names_are_bounded_on_a_character_boundary() {
+        assert_eq!(bounded_name("w:ext"), "w:ext");
+        let long = "é".repeat(MAX_RECORDED_NAME_BYTES);
+        let bounded = bounded_name(&long);
+        assert!(bounded.len() <= MAX_RECORDED_NAME_BYTES);
+        assert_eq!(bounded.len(), MAX_RECORDED_NAME_BYTES);
+        let odd = format!("a{long}");
+        assert_eq!(bounded_name(&odd).len(), MAX_RECORDED_NAME_BYTES - 1);
+    }
+
+    #[test]
     fn appended_reports_merge_within_the_bound() {
         let mut base = ToleranceReport::default();
         base.record(RelationshipDefect::DuplicateId, "/", Some("rId1"), None);
@@ -516,7 +618,13 @@ mod tests {
             Defect::from(RelationshipDefect::MissingType),
             Defect::from(ContentTypeDefect::DuplicateDefault),
             Defect::from(ContentTypeDefect::DuplicateOverride),
+            Defect::from(RelationshipDefect::UnknownElement),
+            Defect::from(RelationshipDefect::UnknownAttribute),
+            Defect::from(RelationshipDefect::UnexpectedContent),
             Defect::from(ContentTypeDefect::RelationshipPartType),
+            Defect::from(ContentTypeDefect::UnknownElement),
+            Defect::from(ContentTypeDefect::UnknownAttribute),
+            Defect::from(ContentTypeDefect::UnexpectedContent),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

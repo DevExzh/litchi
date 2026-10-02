@@ -2,7 +2,7 @@
 
 use crate::constants::namespace;
 use crate::error::{OpcError, Result};
-use crate::leniency::{ContentTypeDefect, ToleranceReport};
+use crate::leniency::{CDATA_NODE, ContentTypeDefect, TEXT_NODE, ToleranceReport, bounded_name};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::{CONTENT_TYPES_URI, PackURI};
 use crate::xml_attributes::BytesStartExt as _;
@@ -112,6 +112,11 @@ impl ContentTypeMap {
         let mut root_seen = false;
         let mut entry_count = 0usize;
         let mut events = 0usize;
+        // While an unknown element's subtree is skipped, the depth of that
+        // element; everything nested in it is ignored with it.
+        let mut skip_from: Option<usize> = None;
+        // The key of the open mapping element, for locating defects inside it.
+        let mut open_mapping: Option<String> = None;
 
         loop {
             events = checked_increment(events, limits.max_xml_events(), ReadResource::XmlEvents)?;
@@ -121,46 +126,82 @@ impl ContentTypeMap {
                 Event::Start(element) => {
                     let next_depth =
                         checked_increment(depth, limits.max_xml_depth(), ReadResource::XmlDepth)?;
-                    inspect_element(
-                        &mut map,
-                        &resolved_namespace,
-                        &element,
-                        decoder,
-                        depth,
-                        &mut root_seen,
-                        &mut entry_count,
-                        limits,
-                        report,
-                    )?;
+                    if skip_from.is_none() {
+                        match inspect_element(
+                            &mut map,
+                            &resolved_namespace,
+                            &element,
+                            decoder,
+                            depth,
+                            &mut root_seen,
+                            &mut entry_count,
+                            open_mapping.as_deref(),
+                            limits,
+                            report,
+                        )? {
+                            Inspected::Root => {},
+                            Inspected::Mapping(key) => open_mapping = Some(key),
+                            Inspected::Skipped => skip_from = Some(depth),
+                        }
+                    }
                     depth = next_depth;
                 },
-                Event::Empty(element) => inspect_element(
-                    &mut map,
-                    &resolved_namespace,
-                    &element,
-                    decoder,
-                    depth,
-                    &mut root_seen,
-                    &mut entry_count,
-                    limits,
-                    report,
-                )?,
+                Event::Empty(element) => {
+                    if skip_from.is_none() {
+                        let _ = inspect_element(
+                            &mut map,
+                            &resolved_namespace,
+                            &element,
+                            decoder,
+                            depth,
+                            &mut root_seen,
+                            &mut entry_count,
+                            open_mapping.as_deref(),
+                            limits,
+                            report,
+                        )?;
+                    }
+                },
                 Event::End(_) => {
                     depth = depth.checked_sub(1).ok_or_else(|| {
                         OpcError::InvalidContentTypesManifest(
                             "unmatched closing element".to_string(),
                         )
                     })?;
+                    if skip_from == Some(depth) {
+                        skip_from = None;
+                    } else if skip_from.is_none() && depth == 1 {
+                        open_mapping = None;
+                    }
                 },
+                // Character data is ignored by Apache POI and LibreOffice
+                // alike (LENIENCY_AUDIT 8.11); it is recorded, not stored.
+                // Whitespace-only text never reaches here (`trim_text`).
                 Event::Text(text) if !text.as_ref().is_empty() => {
-                    return Err(OpcError::InvalidContentTypesManifest(
-                        "text is not permitted in the content types manifest".to_string(),
-                    ));
+                    if skip_from.is_none() {
+                        report.record(
+                            ContentTypeDefect::UnexpectedContent,
+                            CONTENT_TYPES_URI,
+                            open_mapping.as_deref(),
+                            Some(TEXT_NODE),
+                        );
+                    }
                 },
-                Event::CData(_) | Event::DocType(_) => {
+                Event::CData(data) => {
+                    if skip_from.is_none() && !data.as_ref().iter().all(u8::is_ascii_whitespace) {
+                        report.record(
+                            ContentTypeDefect::UnexpectedContent,
+                            CONTENT_TYPES_URI,
+                            open_mapping.as_deref(),
+                            Some(CDATA_NODE),
+                        );
+                    }
+                },
+                // A DTD stays fatal: Apache POI disallows DOCTYPE outright,
+                // and entity declarations are a parser-security surface.
+                Event::DocType(_) => {
                     return Err(OpcError::InvalidContentTypesManifest(
-                        "CDATA and DTDs are not permitted in the content types manifest"
-                            .to_string(),
+                        "DTDs are not permitted in the content types manifest".to_string(),
                     ));
                 },
                 Event::Eof => break,
@@ -335,6 +376,16 @@ fn is_token(value: &str) -> bool {
         })
 }
 
+/// What [`inspect_element`] found.
+enum Inspected {
+    /// The `Types` document element.
+    Root,
+    /// A `Default` or `Override` mapping, with its key.
+    Mapping(String),
+    /// An unknown element, recorded; its subtree must be skipped.
+    Skipped,
+}
+
 fn inspect_element(
     map: &mut ContentTypeMap,
     resolved_namespace: &ResolveResult<'_>,
@@ -343,9 +394,10 @@ fn inspect_element(
     depth: usize,
     root_seen: &mut bool,
     entry_count: &mut usize,
+    open_mapping: Option<&str>,
     limits: ReadLimits,
     report: &mut ToleranceReport,
-) -> Result<()> {
+) -> Result<Inspected> {
     let in_content_types_namespace = matches!(
         resolved_namespace,
         ResolveResult::Bound(Namespace(value))
@@ -364,13 +416,31 @@ fn inspect_element(
                 "root must be Types in the OPC content-types namespace".to_string(),
             ));
         }
-        return Ok(());
+        return Ok(Inspected::Root);
     }
 
-    if depth != 1 || !in_content_types_namespace {
-        return Err(OpcError::InvalidContentTypesManifest(
-            "unexpected element or namespace in content types manifest".to_string(),
-        ));
+    if let ResolveResult::Unknown(prefix) = resolved_namespace {
+        // An unbound prefix breaks namespace well-formedness: still fatal.
+        return Err(OpcError::InvalidContentTypesManifest(format!(
+            "unbound namespace prefix '{}' in content types manifest",
+            String::from_utf8_lossy(prefix)
+        )));
+    }
+    let local_name = element.local_name();
+    let is_mapping = matches!(local_name.as_ref(), b"Default" | b"Override");
+    if depth != 1 || !in_content_types_namespace || !is_mapping {
+        // Annex C closes the content model as a producer rule. Apache POI
+        // skips every element it does not query; LibreOffice's SAX handler
+        // throws. Skipping cannot invent a mapping, so the element and its
+        // subtree are skipped and recorded (LENIENCY_AUDIT 8.11).
+        let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
+        report.record(
+            ContentTypeDefect::UnknownElement,
+            CONTENT_TYPES_URI,
+            open_mapping,
+            Some(bounded_name(&name)),
+        );
+        return Ok(Inspected::Skipped);
     }
     *entry_count = checked_increment(
         *entry_count,
@@ -378,33 +448,45 @@ fn inspect_element(
         ReadResource::ContentTypeMappings,
     )?;
 
-    match element.local_name().as_ref() {
-        b"Default" => {
-            let (extension, content_type) =
-                required_attributes(element, decoder, "Extension", "Default", limits)?;
-            map.add_default(extension, ContentType::new(content_type)?, report)
-        },
-        b"Override" => {
-            let (partname, content_type) =
-                required_attributes(element, decoder, "PartName", "Override", limits)?;
-            let part_uri = PackURI::new(partname).map_err(OpcError::InvalidPackUri)?;
-            map.add_override(part_uri, ContentType::new(content_type)?, report)
-        },
-        _ => Err(OpcError::InvalidContentTypesManifest(
-            "only Default and Override children are permitted".to_string(),
-        )),
+    if local_name.as_ref() == b"Default" {
+        let (extension, content_type, unknown) =
+            required_attributes(element, decoder, "Extension", "Default", limits)?;
+        record_unknown_attributes(report, &extension, &unknown);
+        map.add_default(extension.clone(), ContentType::new(content_type)?, report)?;
+        Ok(Inspected::Mapping(extension))
+    } else {
+        let (partname, content_type, unknown) =
+            required_attributes(element, decoder, "PartName", "Override", limits)?;
+        record_unknown_attributes(report, &partname, &unknown);
+        let part_uri = PackURI::new(partname.clone()).map_err(OpcError::InvalidPackUri)?;
+        map.add_override(part_uri, ContentType::new(content_type)?, report)?;
+        Ok(Inspected::Mapping(partname))
     }
 }
 
+fn record_unknown_attributes(report: &mut ToleranceReport, key: &str, unknown: &[String]) {
+    for name in unknown {
+        report.record(
+            ContentTypeDefect::UnknownAttribute,
+            CONTENT_TYPES_URI,
+            Some(key),
+            Some(bounded_name(name)),
+        );
+    }
+}
+
+/// Read a mapping's key and `ContentType`, returning the qualified names of
+/// any other non-namespace attributes for the caller to record.
 fn required_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
     key_name: &str,
     element_name: &str,
     limits: ReadLimits,
-) -> Result<(String, String)> {
+) -> Result<(String, String, Vec<String>)> {
     let mut key_value = None;
     let mut content_type = None;
+    let mut unknown = Vec::new();
     for attribute_result in element.checked_attributes() {
         let attribute = attribute_result?;
         limits.check(
@@ -434,14 +516,17 @@ fn required_attributes(
             )?;
             content_type = Some(value);
         } else if raw_name != b"xmlns" && !raw_name.starts_with(b"xmlns:") {
-            return Err(OpcError::InvalidContentTypesManifest(format!(
-                "unexpected attribute on {element_name}"
-            )));
+            // Apache POI and LibreOffice both ignore attributes they do not
+            // query (LENIENCY_AUDIT 8.11); the caller records it.
+            unknown
+                .try_reserve(1)
+                .map_err(|source| allocation("OPC unknown content-type attributes", source))?;
+            unknown.push(String::from_utf8_lossy(raw_name).into_owned());
         }
     }
 
     match (key_value, content_type) {
-        (Some(key), Some(content_type_value)) => Ok((key, content_type_value)),
+        (Some(key), Some(content_type_value)) => Ok((key, content_type_value, unknown)),
         _ => Err(OpcError::InvalidContentTypesManifest(format!(
             "{element_name} requires {key_name} and ContentType attributes"
         ))),
@@ -490,6 +575,7 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::*;
+    use crate::leniency::Defect;
 
     const NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 
@@ -523,13 +609,123 @@ mod tests {
             "<Types/>",
             r#"<Types xmlns="urn:wrong"/>"#,
             &manifest(r#"<Default Extension="xml"/>"#),
-            &manifest(r#"<Other Extension="xml" ContentType="application/xml"/>"#),
+            &manifest(r#"<Default ContentType="application/xml"/>"#),
         ] {
             assert!(matches!(
                 ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()),
                 Err(OpcError::InvalidContentTypesManifest(_))
             ));
         }
+    }
+
+    fn recorded(report: &ToleranceReport) -> Vec<(Defect, Option<&str>, Option<&str>)> {
+        report
+            .iter()
+            .map(|tolerated| {
+                assert_eq!(tolerated.part(), CONTENT_TYPES_URI);
+                (tolerated.defect(), tolerated.item(), tolerated.value())
+            })
+            .collect()
+    }
+
+    /// LENIENCY_AUDIT 8.11: unknown elements (with their subtrees), unknown
+    /// mapping attributes, character data, and CDATA are ignored and
+    /// recorded; the known mappings around them are read normally.
+    #[test]
+    fn manifest_shape_deviations_are_ignored_and_recorded() {
+        let xml = format!(
+            r#"<Types xmlns="{NS}" xmlns:x="urn:vendor">stray<x:Extension><Default Extension="bin" ContentType="application/x-hidden"/></x:Extension><Default Extension="xml" ContentType="application/xml" x:hint="1" Producer="tool"><x:note>inner</x:note></Default><Override PartName="/a.xml" ContentType="text/xml"><![CDATA[data]]></Override><Unknown/><![CDATA[ ]]></Types>"#
+        );
+        let mut report = ToleranceReport::default();
+        let map =
+            ContentTypeMap::from_xml_reporting(xml.as_bytes(), ReadLimits::default(), &mut report)
+                .unwrap();
+        assert_eq!(map.mapping_count(), 2);
+        assert!(map.get(&PackURI::new("/b.bin").unwrap()).is_err());
+        assert_eq!(
+            map.get(&PackURI::new("/a.xml").unwrap()).unwrap(),
+            "text/xml"
+        );
+        assert_eq!(
+            recorded(&report),
+            vec![
+                (
+                    ContentTypeDefect::UnexpectedContent.into(),
+                    None,
+                    Some(TEXT_NODE)
+                ),
+                (
+                    ContentTypeDefect::UnknownElement.into(),
+                    None,
+                    Some("x:Extension")
+                ),
+                (
+                    ContentTypeDefect::UnknownAttribute.into(),
+                    Some("xml"),
+                    Some("x:hint")
+                ),
+                (
+                    ContentTypeDefect::UnknownAttribute.into(),
+                    Some("xml"),
+                    Some("Producer")
+                ),
+                (
+                    ContentTypeDefect::UnknownElement.into(),
+                    Some("xml"),
+                    Some("x:note")
+                ),
+                (
+                    ContentTypeDefect::UnexpectedContent.into(),
+                    Some("/a.xml"),
+                    Some(CDATA_NODE)
+                ),
+                (
+                    ContentTypeDefect::UnknownElement.into(),
+                    None,
+                    Some("Unknown")
+                ),
+            ]
+        );
+
+        // The same manifest read through the reportless entry point yields
+        // the same mappings.
+        assert_eq!(
+            ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()).unwrap(),
+            map
+        );
+    }
+
+    /// Well-formedness, the document element, DTDs, and the depth limit stay
+    /// fatal even inside a skipped subtree.
+    #[test]
+    fn manifest_structure_stays_fatal() {
+        for xml in [
+            manifest("<x:Unbound/>"),
+            manifest(
+                r#"<Extension><Default Extension="xml" ContentType="application/xml"></Extension>"#,
+            ),
+            format!(r#"<!DOCTYPE Types><Types xmlns="{NS}"/>"#),
+        ] {
+            assert!(
+                ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()).is_err(),
+                "{xml}"
+            );
+        }
+        let deep = manifest("<a><b><c></c></b></a>");
+        assert!(matches!(
+            ContentTypeMap::from_xml(
+                deep.as_bytes(),
+                ReadLimits::builder()
+                    .max_xml_depth(3)
+                    .unwrap()
+                    .build()
+                    .unwrap()
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlDepth,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -547,7 +743,8 @@ mod tests {
         .unwrap();
         assert_eq!(map.mapping_count(), 2);
         assert_eq!(
-            map.get(&PackURI::new("/word/document.xml").unwrap()).unwrap(),
+            map.get(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap(),
             "application/vnd.first+xml"
         );
         assert_eq!(
@@ -556,7 +753,14 @@ mod tests {
         );
         let recorded: Vec<_> = report
             .iter()
-            .map(|tolerated| (tolerated.defect(), tolerated.part(), tolerated.item(), tolerated.value()))
+            .map(|tolerated| {
+                (
+                    tolerated.defect(),
+                    tolerated.part(),
+                    tolerated.item(),
+                    tolerated.value(),
+                )
+            })
             .collect();
         assert_eq!(
             recorded,

@@ -8,7 +8,9 @@ use crate::constants::{content_type as ct, namespace};
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
-use crate::leniency::{ContentTypeDefect, RelationshipDefect, ToleranceReport};
+use crate::leniency::{
+    CDATA_NODE, ContentTypeDefect, RelationshipDefect, TEXT_NODE, ToleranceReport, bounded_name,
+};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
@@ -1170,6 +1172,13 @@ impl PackageReader {
         let mut root_seen = false;
         let mut ids = HashSet::new();
         let mut events = 0usize;
+        let owner = source_uri.unwrap_or(base_uri);
+        // While an unknown element's subtree is skipped, the depth of that
+        // element; everything nested in it is ignored with it.
+        let mut skip_from: Option<usize> = None;
+        // The `Id` of the open (non-empty) `Relationship`, for locating
+        // defects inside it.
+        let mut open_relationship: Option<String> = None;
 
         loop {
             events = checked_increment(events, limits.max_xml_events(), ReadResource::XmlEvents)?;
@@ -1180,48 +1189,85 @@ impl PackageReader {
                 Event::Start(element) => {
                     let next_depth =
                         checked_increment(depth, limits.max_xml_depth(), ReadResource::XmlDepth)?;
-                    inspect_relationship_element(
-                        &mut srels,
-                        &mut ids,
-                        &resolved_namespace,
-                        &element,
-                        decoder,
-                        base_uri,
-                        source_uri,
-                        depth,
-                        &mut root_seen,
-                        limits,
-                        ledger,
-                        report,
-                    )?;
+                    if skip_from.is_none() {
+                        match inspect_relationship_element(
+                            &mut srels,
+                            &mut ids,
+                            &resolved_namespace,
+                            &element,
+                            decoder,
+                            base_uri,
+                            source_uri,
+                            depth,
+                            &mut root_seen,
+                            open_relationship.as_deref(),
+                            limits,
+                            ledger,
+                            report,
+                        )? {
+                            InspectedRelationship::Root => {},
+                            InspectedRelationship::Relationship(id) => open_relationship = Some(id),
+                            InspectedRelationship::Skipped => skip_from = Some(depth),
+                        }
+                    }
                     depth = next_depth;
                 },
-                Event::Empty(element) => inspect_relationship_element(
-                    &mut srels,
-                    &mut ids,
-                    &resolved_namespace,
-                    &element,
-                    decoder,
-                    base_uri,
-                    source_uri,
-                    depth,
-                    &mut root_seen,
-                    limits,
-                    ledger,
-                    report,
-                )?,
+                Event::Empty(element) => {
+                    if skip_from.is_none() {
+                        let _ = inspect_relationship_element(
+                            &mut srels,
+                            &mut ids,
+                            &resolved_namespace,
+                            &element,
+                            decoder,
+                            base_uri,
+                            source_uri,
+                            depth,
+                            &mut root_seen,
+                            open_relationship.as_deref(),
+                            limits,
+                            ledger,
+                            report,
+                        )?;
+                    }
+                },
                 Event::End(_) => {
                     depth = depth.checked_sub(1).ok_or_else(|| {
                         OpcError::InvalidRelationshipsManifest(
                             "unmatched closing element".to_string(),
                         )
                     })?;
+                    if skip_from == Some(depth) {
+                        skip_from = None;
+                    } else if skip_from.is_none() && depth == 1 {
+                        open_relationship = None;
+                    }
                 },
-                Event::Text(text) if depth <= 1 && !text.as_ref().is_empty() => {
-                    return Err(OpcError::InvalidRelationshipsManifest(
-                        "text is not permitted under Relationships".to_string(),
-                    ));
+                // Character data is ignored by Apache POI and LibreOffice
+                // alike (LENIENCY_AUDIT 8.11); it is recorded, not stored.
+                // Whitespace-only text never reaches here (`trim_text`).
+                Event::Text(text) if !text.as_ref().is_empty() => {
+                    if skip_from.is_none() {
+                        report.record(
+                            RelationshipDefect::UnexpectedContent,
+                            owner,
+                            open_relationship.as_deref(),
+                            Some(TEXT_NODE),
+                        );
+                    }
                 },
+                Event::CData(data) => {
+                    if skip_from.is_none() && !data.as_ref().iter().all(u8::is_ascii_whitespace) {
+                        report.record(
+                            RelationshipDefect::UnexpectedContent,
+                            owner,
+                            open_relationship.as_deref(),
+                            Some(CDATA_NODE),
+                        );
+                    }
+                },
+                // A DTD stays fatal: Apache POI disallows DOCTYPE outright,
+                // and entity declarations are a parser-security surface.
                 Event::DocType(_) => {
                     return Err(OpcError::InvalidRelationshipsManifest(
                         "DTDs are not permitted in relationships parts".to_string(),
@@ -1229,7 +1275,6 @@ impl PackageReader {
                 },
                 Event::Eof => break,
                 Event::Text(_)
-                | Event::CData(_)
                 | Event::Comment(_)
                 | Event::Decl(_)
                 | Event::PI(_)
@@ -2208,6 +2253,16 @@ impl RelationshipLedger {
     }
 }
 
+/// What [`inspect_relationship_element`] found.
+enum InspectedRelationship {
+    /// The `Relationships` document element.
+    Root,
+    /// A `Relationship` element, with its `Id`.
+    Relationship(String),
+    /// An unknown element, recorded; its subtree must be skipped.
+    Skipped,
+}
+
 #[allow(
     clippy::too_many_arguments,
     reason = "relationship element parsing threads the shared parse state; bundling it into a struct would not reduce complexity"
@@ -2222,10 +2277,11 @@ fn inspect_relationship_element(
     source_uri: Option<&str>,
     depth: usize,
     root_seen: &mut bool,
+    open_relationship: Option<&str>,
     limits: ReadLimits,
     ledger: &mut RelationshipLedger,
     report: &mut ToleranceReport,
-) -> Result<()> {
+) -> Result<InspectedRelationship> {
     let owner = source_uri.unwrap_or(base_uri);
     let correct_namespace = matches!(
         resolved_namespace,
@@ -2244,12 +2300,28 @@ fn inspect_relationship_element(
                 "root must be Relationships in the OPC relationships namespace".to_string(),
             ));
         }
-        return Ok(());
+        return Ok(InspectedRelationship::Root);
+    }
+    if let ResolveResult::Unknown(prefix) = resolved_namespace {
+        // An unbound prefix breaks namespace well-formedness: still fatal.
+        return Err(OpcError::InvalidRelationshipsManifest(format!(
+            "unbound namespace prefix '{}' in relationships manifest",
+            String::from_utf8_lossy(prefix)
+        )));
     }
     if depth != 1 || element.local_name().as_ref() != b"Relationship" || !correct_namespace {
-        return Err(OpcError::InvalidRelationshipsManifest(
-            "only direct Relationship children are permitted".to_string(),
-        ));
+        // Annex C closes the content model as a producer rule. Apache POI
+        // queries only `Relationship` elements; LibreOffice's SAX handler
+        // throws. Skipping cannot invent a relationship, so the element and
+        // its subtree are skipped and recorded (LENIENCY_AUDIT 8.11).
+        let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
+        report.record(
+            RelationshipDefect::UnknownElement,
+            owner,
+            open_relationship,
+            Some(bounded_name(&name)),
+        );
+        return Ok(InspectedRelationship::Skipped);
     }
     let next_relationship_count = checked_increment(
         relationships.len(),
@@ -2261,6 +2333,7 @@ fn inspect_relationship_element(
     let mut type_attribute = None;
     let mut target_attribute = None;
     let mut target_mode_attribute = None;
+    let mut unknown_attributes: SmallVec<[String; 2]> = SmallVec::new();
     for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| {
             OpcError::InvalidRelationshipsManifest(format!(
@@ -2292,10 +2365,15 @@ fn inspect_relationship_element(
             b"TargetMode" => target_mode_attribute = Some(value),
             b"xmlns" => {},
             name if name.starts_with(b"xmlns:") => {},
-            _ => {
-                return Err(OpcError::InvalidRelationshipsManifest(
-                    "unexpected Relationship attribute".to_string(),
-                ));
+            // Apache POI and LibreOffice both ignore attributes they do not
+            // query (LENIENCY_AUDIT 8.11); recorded once the Id is known.
+            name => {
+                unknown_attributes
+                    .try_reserve(1)
+                    .map_err(|_| OpcError::CollectionAllocation {
+                        resource: "OPC unknown relationship attributes",
+                    })?;
+                unknown_attributes.push(String::from_utf8_lossy(name).into_owned());
             },
         }
     }
@@ -2312,6 +2390,15 @@ fn inspect_relationship_element(
             "relationship Id '{id}' is not an XML ID"
         )));
     }
+    for name in &unknown_attributes {
+        report.record(
+            RelationshipDefect::UnknownAttribute,
+            owner,
+            Some(&id),
+            Some(bounded_name(name)),
+        );
+    }
+    let opened = InspectedRelationship::Relationship(id.clone());
     // CT_Relationship marks Type and Target required, a schema rule with no
     // consumer directive: LibreOffice requires only Id, and Word keeps such a
     // relationship as a dead link. A relationship that names no type or no
@@ -2330,7 +2417,7 @@ fn inspect_relationship_element(
                 Some(&id),
                 target.as_deref(),
             );
-            return Ok(());
+            return Ok(opened);
         },
         (Some(relationship_type), None) => {
             ledger.add_relationship(limits)?;
@@ -2340,7 +2427,7 @@ fn inspect_relationship_element(
                 Some(&id),
                 Some(&relationship_type),
             );
-            return Ok(());
+            return Ok(opened);
         },
     };
     if ids.contains(&id) {
@@ -2355,7 +2442,7 @@ fn inspect_relationship_element(
             Some(&id),
             Some(&target),
         );
-        return Ok(());
+        return Ok(opened);
     }
     ids.try_reserve(1)
         .map_err(|source| allocation("OPC relationship IDs", source))?;
@@ -2393,7 +2480,7 @@ fn inspect_relationship_element(
         target_ref: target,
         target_mode,
     });
-    Ok(())
+    Ok(opened)
 }
 
 fn required_relationship_attribute(value: Option<String>, name: &str) -> Result<String> {
@@ -3002,8 +3089,10 @@ mod tests {
             "<Relationships/>",
             r#"<Relationships xmlns="urn:wrong"/>"#,
             r#"<Wrong xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
-            &relationships_xml(
-                r#"<Wrapper><Relationship Id="rId1" Type="urn:test" Target="part.xml"/></Wrapper>"#,
+            &relationships_xml("<x:Unbound/>"),
+            &format!(
+                "<!DOCTYPE Relationships>{}",
+                relationships_xml(r#"<Relationship Id="rId1" Type="urn:test" Target="part.xml"/>"#)
             ),
         ] {
             assert!(matches!(
@@ -3011,6 +3100,97 @@ mod tests {
                 Err(OpcError::InvalidRelationshipsManifest(_))
             ));
         }
+    }
+
+    /// LENIENCY_AUDIT 8.11: unknown elements (with their subtrees), unknown
+    /// attributes, character data, and CDATA are ignored and recorded.
+    #[test]
+    fn relationships_manifest_shape_deviations_are_ignored_and_recorded() {
+        let xml = format!(
+            r#"<Relationships xmlns="{}" xmlns:x="urn:vendor">text<x:Wrapper><Relationship Id="rId9" Type="urn:hidden" Target="hidden.xml"/></x:Wrapper><Relationship Id="rId1" Type="urn:test" Target="part.xml" x:hint="1" Extra="y"><x:note>inner</x:note><![CDATA[data]]></Relationship><Relationship Id="rId2" Type="urn:test" Target="other.xml">plain</Relationship></Relationships>"#,
+            namespace::OPC_RELATIONSHIPS
+        );
+        let limits = ReadLimits::default();
+        let mut ledger = RelationshipLedger::default();
+        let mut report = ToleranceReport::default();
+        let relationships = PackageReader::parse_rels_xml_with_source(
+            xml.as_bytes(),
+            "/word",
+            Some("/word/document.xml"),
+            limits,
+            &mut ledger,
+            &mut report,
+        )
+        .unwrap();
+        assert_eq!(
+            relationships
+                .iter()
+                .map(|relationship| relationship.r_id.as_str())
+                .collect::<Vec<_>>(),
+            ["rId1", "rId2"]
+        );
+        let recorded = report
+            .iter()
+            .map(|tolerated| {
+                assert_eq!(tolerated.part(), "/word/document.xml");
+                (tolerated.defect(), tolerated.item(), tolerated.value())
+            })
+            .collect::<Vec<_>>();
+        let defect = |defect: RelationshipDefect| crate::leniency::Defect::from(defect);
+        assert_eq!(
+            recorded,
+            vec![
+                (
+                    defect(RelationshipDefect::UnexpectedContent),
+                    None,
+                    Some(TEXT_NODE)
+                ),
+                (
+                    defect(RelationshipDefect::UnknownElement),
+                    None,
+                    Some("x:Wrapper")
+                ),
+                (
+                    defect(RelationshipDefect::UnknownAttribute),
+                    Some("rId1"),
+                    Some("x:hint")
+                ),
+                (
+                    defect(RelationshipDefect::UnknownAttribute),
+                    Some("rId1"),
+                    Some("Extra")
+                ),
+                (
+                    defect(RelationshipDefect::UnknownElement),
+                    Some("rId1"),
+                    Some("x:note")
+                ),
+                (
+                    defect(RelationshipDefect::UnexpectedContent),
+                    Some("rId1"),
+                    Some(CDATA_NODE)
+                ),
+                (
+                    defect(RelationshipDefect::UnexpectedContent),
+                    Some("rId2"),
+                    Some(TEXT_NODE)
+                ),
+            ]
+        );
+
+        // A conformant manifest records nothing.
+        let mut clean = ToleranceReport::default();
+        PackageReader::parse_rels_xml_with_source(
+            relationships_xml(r#"<Relationship Id="rId1" Type="urn:test" Target="part.xml"/>"#)
+                .as_bytes(),
+            "/word",
+            None,
+            limits,
+            &mut RelationshipLedger::default(),
+            &mut clean,
+        )
+        .unwrap();
+        assert!(clean.is_clean());
     }
 
     #[test]

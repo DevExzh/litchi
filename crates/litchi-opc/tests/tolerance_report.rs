@@ -392,6 +392,83 @@ fn relationships_parts_declared_with_another_type_are_read_and_recorded() {
     assert_round_trips(&bytes);
 }
 
+/// LENIENCY_AUDIT 8.11: unknown elements, unknown attributes, character
+/// data, and CDATA in either manifest are ignored and recorded.
+#[test]
+fn manifest_shape_deviations_are_ignored_and_recorded() {
+    let content_types = CONTENT_TYPES
+        .replace(
+            r#"<Default Extension="xml" ContentType="application/xml"/>"#,
+            r#"<Default Extension="xml" ContentType="application/xml" Producer="tool"/><x:Hint xmlns:x="urn:vendor"><Default Extension="bin" ContentType="application/x-hidden"/></x:Hint>"#,
+        )
+        .replace("</Types>", "stray</Types>");
+    let document_rels = DOCUMENT_RELS
+        .replace(
+            r#"Target="styles.xml"/>"#,
+            r#"Target="styles.xml" Extra="1"><![CDATA[note]]></Relationship>"#,
+        )
+        .replace(
+            "</Relationships>",
+            r#"<Wrapper><Relationship Id="rId9" Type="urn:hidden" Target="hidden.xml"/></Wrapper></Relationships>"#,
+        );
+    let bytes = package(&content_types, ROOT_RELS, &document_rels);
+    let report = reports(&bytes);
+    let content = |defect| Defect::ContentType(defect);
+    let relationship = |defect| Defect::Relationship(defect);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                content(ContentTypeDefect::UnknownAttribute),
+                CONTENT_TYPES_PART,
+                Some("xml"),
+                Some("Producer"),
+            ),
+            (
+                content(ContentTypeDefect::UnknownElement),
+                CONTENT_TYPES_PART,
+                None,
+                Some("x:Hint"),
+            ),
+            (
+                content(ContentTypeDefect::UnexpectedContent),
+                CONTENT_TYPES_PART,
+                None,
+                Some("#text"),
+            ),
+            (
+                relationship(RelationshipDefect::UnknownAttribute),
+                "/word/document.xml",
+                Some("rId1"),
+                Some("Extra"),
+            ),
+            (
+                relationship(RelationshipDefect::UnexpectedContent),
+                "/word/document.xml",
+                Some("rId1"),
+                Some("#cdata-section"),
+            ),
+            (
+                relationship(RelationshipDefect::UnknownElement),
+                "/word/document.xml",
+                None,
+                Some("Wrapper"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId9"),
+        None
+    );
+    assert_round_trips(&bytes);
+}
+
 /// Structural corruption stays fatal: a malformed relationships manifest,
 /// a relationship without an Id, and an ill-formed content-types manifest
 /// are still rejected.
@@ -403,4 +480,23 @@ fn structural_manifest_corruption_stays_fatal() {
     assert!(OpcPackage::from_bytes(&package(CONTENT_TYPES, ROOT_RELS, no_id)).is_err());
     let ill_formed = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"></Types>"#;
     assert!(OpcPackage::from_bytes(&package(ill_formed, ROOT_RELS, DOCUMENT_RELS)).is_err());
+    // A DTD, an unbound prefix, and a wrong document element stay fatal in
+    // both manifests.
+    let doctype_rels = format!("<!DOCTYPE Relationships>{DOCUMENT_RELS}");
+    let unbound_rels = DOCUMENT_RELS.replace("</Relationships>", "<x:Ext/></Relationships>");
+    for rels in [doctype_rels.as_str(), unbound_rels.as_str()] {
+        let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+        assert!(OpcPackage::from_bytes(&bytes).is_err(), "{rels}");
+        assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{rels}");
+    }
+    let doctype_types = format!("<!DOCTYPE Types>{CONTENT_TYPES}");
+    let unbound_types = CONTENT_TYPES.replace("</Types>", "<x:Ext/></Types>");
+    let wrong_root = CONTENT_TYPES
+        .replace("<Types ", "<Kinds ")
+        .replace("</Types>", "</Kinds>");
+    for types in [doctype_types, unbound_types, wrong_root] {
+        let bytes = package(&types, ROOT_RELS, DOCUMENT_RELS);
+        assert!(OpcPackage::from_bytes(&bytes).is_err(), "{types}");
+        assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{types}");
+    }
 }
