@@ -321,8 +321,14 @@ fn validate_active_transition(xml: &[u8], operation: &'static str) -> Result<()>
     // placement and attribute names. Run the bounded typed reader as well so
     // token/boolean domains, duplicate attributes, and exact p14 timing are
     // checked before a destructive branch splice.
-    let _ = crate::transition::read(processed.as_ref())?
+    let active = crate::transition::read(processed.as_ref())?
         .ok_or_else(|| invalid("active transition disappeared during typed validation"))?;
+    // The edit planner keeps the strict domain check the reader now repairs.
+    if !active.tolerance_report().is_clean() {
+        return Err(invalid(
+            "active transition carries values outside their domains",
+        ));
+    }
     Ok(())
 }
 

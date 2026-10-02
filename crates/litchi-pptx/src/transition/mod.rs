@@ -381,7 +381,6 @@ mod tests {
             r#"<p14:prism dir="center"/>"#,
             r#"<p14:reveal dir="u"/>"#,
             r#"<p14:shred pattern="circle"/>"#,
-            r#"<p14:wheelReverse spokes="6"/>"#,
         ] {
             assert!(
                 matches!(
@@ -415,11 +414,53 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_directions_spokes_and_timing() {
-        for effect in [r#"<p:push dir="horz"/>"#, r#"<p:wheel spokes="6"/>"#] {
-            let xml = transition_xml(effect);
-            assert!(matches!(read(xml.as_bytes()), Err(Error::Invalid(_))));
+    fn unsupported_spoke_counts_are_kept_raw_and_recorded() {
+        let wheel = transition_xml(r#"<p:wheel spokes="6"/>"#);
+        let reverse = transition_xml_with_p14(
+            r#"<p14:wheelReverse xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" spokes="12"/>"#,
+        );
+        for (xml, effect, count) in [
+            (wheel.as_str(), r#"<p:wheel spokes="6"/>"#, 6),
+            (reverse.as_str(), "spokes=\"12\"", 12),
+        ] {
+            let value = read(xml.as_bytes()).unwrap().unwrap();
+            let Kind::Raw(raw) = value.kind() else {
+                panic!("expected a raw effect, got {:?}", value.kind());
+            };
+            assert!(raw.xml().contains(effect), "{}", raw.xml());
+            // The verbatim element round-trips.
+            assert!(write(&value).unwrap().contains(effect));
+            let repaired: Vec<_> = value
+                .tolerance_report()
+                .defects()
+                .iter()
+                .map(|d| (d.defect, d.context, d.part()))
+                .collect();
+            assert_eq!(
+                repaired,
+                [(
+                    crate::Defect::Transition(crate::TransitionDefect::SpokeCount),
+                    count,
+                    None
+                )]
+            );
         }
+        // Supported counts stay typed and repair nothing.
+        let typed = read(transition_xml(r#"<p:wheel spokes="8"/>"#).as_bytes())
+            .unwrap()
+            .unwrap();
+        assert_eq!(typed.kind(), &Kind::Wheel(Spokes::Eight));
+        assert!(typed.tolerance_report().is_clean());
+        // A spoke count that is not an unsignedInt is not a spoke-count repair.
+        assert!(read(transition_xml(r#"<p:wheel spokes="-1"/>"#).as_bytes()).is_err());
+        // Ill-formed XML stays fatal.
+        assert!(read(transition_xml(r#"<p:wheel spokes="6">"#).as_bytes()).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_directions_spokes_and_timing() {
+        let xml = transition_xml(r#"<p:push dir="horz"/>"#);
+        assert!(matches!(read(xml.as_bytes()), Err(Error::Invalid(_))));
 
         let xml = transition_xml(r"<p:fade/>").replacen(
             "<p:transition>",

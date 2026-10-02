@@ -538,3 +538,63 @@ fn conformant_placeholder_extensions_report_nothing() {
     );
     assert_clean(&report);
 }
+
+// ---------------------------------------------------------------------------
+// Audit findings 6.5/6.6: transition attribute domains.
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::TransitionDefect;
+use litchi_pptx::transition::Kind as TransitionKind;
+
+/// The first slide of `shapes.pptx` with `transition` spliced in where
+/// `PowerPoint` writes it.
+fn deck_with_transition(transition: &str) -> Vec<u8> {
+    let slide = patched_part(SLIDE1, |xml| {
+        xml.replace("</p:clrMapOvr>", &format!("</p:clrMapOvr>{transition}"))
+    });
+    deck_bytes_with_part(SLIDE1, slide)
+}
+
+/// The first slide's transition, read through the source-backed snapshot
+/// that names its part.
+fn first_slide_transition(deck: Vec<u8>) -> litchi_pptx::transition::Transition {
+    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(std::sync::Arc::new(
+        litchi_core::source::OwnedSource::new(deck),
+    ))
+    .unwrap();
+    editor
+        .slide_snapshot(0)
+        .unwrap()
+        .transition()
+        .unwrap()
+        .expect("the slide has a transition")
+}
+
+#[test]
+fn unsupported_wheel_spoke_count_is_kept_raw_and_recorded() {
+    let transition = first_slide_transition(deck_with_transition(
+        r#"<p:transition spd="slow"><p:wheel spokes="6"/></p:transition>"#,
+    ));
+    let TransitionKind::Raw(raw) = transition.kind() else {
+        panic!("expected a raw effect, got {:?}", transition.kind());
+    };
+    assert!(raw.xml().contains(r#"spokes="6""#));
+    assert_eq!(transition.speed(), litchi_pptx::transition::Speed::Slow);
+    assert_eq!(
+        located(transition.tolerance_report()),
+        [(
+            Defect::Transition(TransitionDefect::SpokeCount),
+            6,
+            Some(SLIDE1)
+        )]
+    );
+}
+
+#[test]
+fn conformant_transition_reports_nothing() {
+    let transition = first_slide_transition(deck_with_transition(
+        r#"<p:transition spd="fast" advTm="2000"><p:wheel spokes="8"/></p:transition>"#,
+    ));
+    assert!(matches!(transition.kind(), TransitionKind::Wheel(_)));
+    assert_clean(transition.tolerance_report());
+}

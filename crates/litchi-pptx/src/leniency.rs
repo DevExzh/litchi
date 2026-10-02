@@ -53,6 +53,13 @@
 //!   [`crate::Slide::shapes`] and the layout/master `shapes()` views) carries
 //!   its per-shape repairs in [`crate::shape::Scene::tolerance_report`],
 //!   stamped with the owner part name when read through a part view.
+//! * A slide transition ([`crate::transition::Transition`], from
+//!   [`crate::transition::read`] or
+//!   [`crate::SourceBackedSlideSnapshot::transition`]) carries the repairs
+//!   its read applied in
+//!   [`crate::transition::Transition::tolerance_report`]; the snapshot
+//!   stamps its slide part name. The report shares the value's retained
+//!   read-state allocation, so a conforming transition stays one cache line.
 //!
 //! # Timing-tree repairs (audit finding 6.1)
 //!
@@ -115,6 +122,22 @@
 //! placeholder, recorded as [`ShapeDefect::PlaceholderTypeExtension`]; the
 //! placeholder, shape, and scene survive. The lossless placeholder-type
 //! *edit* planner in `master_layout` keeps its strict owner validation.
+//!
+//! # Transition repairs (audit finding 6.5)
+//!
+//! A wheel (`p:wheel`) or reverse wheel (`p14:wheelReverse`) whose `spokes`
+//! is an `xsd:unsignedInt` outside {1, 2, 3, 4, 8} no longer fails the
+//! transition. [`crate::transition::Spokes`] cannot represent the count, so
+//! the effect element is kept verbatim as [`crate::transition::Kind::Raw`]
+//! — the posture the reader already applies to an effect it does not know,
+//! and lossless on write — while speed, timing, and sibling children read
+//! normally; the repair is recorded as [`TransitionDefect::SpokeCount`]
+//! with the count. Mapping the count to the nearest supported value (as
+//! LibreOffice's renderer does) was rejected because it would silently
+//! rewrite the producer's value on save. A `spokes` that is not an
+//! `unsignedInt` at all is not this repair. The source-backed transition
+//! edit planner still refuses to splice over a transition whose read needed
+//! a repair.
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
@@ -210,6 +233,8 @@ pub enum Defect {
     Timing(TimingDefect),
     /// A shape-tree defect repaired on the one shape carrying it.
     Shape(ShapeDefect),
+    /// A slide-transition defect repaired on the one transition carrying it.
+    Transition(TransitionDefect),
 }
 
 impl Defect {
@@ -219,6 +244,7 @@ impl Defect {
         match self {
             Self::Timing(defect) => defect.repair(),
             Self::Shape(defect) => defect.repair(),
+            Self::Transition(defect) => defect.repair(),
         }
     }
 }
@@ -289,6 +315,48 @@ impl ShapeDefect {
     }
 }
 
+/// The class of slide-transition defect the transition reader repairs.
+///
+/// Closed by design, and repaired under every [`Leniency`] variant. The
+/// transition stays readable: an effect `PowerPoint` cannot model is kept
+/// verbatim as [`crate::transition::Kind::Raw`] (so a write reproduces the
+/// producer's bytes), the same posture the reader already applies to an
+/// effect element it does not know.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TransitionDefect {
+    /// A wheel (`p:wheel`) or reverse-wheel (`p14:wheelReverse`) effect
+    /// carried a `spokes` count outside the {1, 2, 3, 4, 8} that
+    /// `PowerPoint` offers.
+    ///
+    /// ECMA-376-1 `CT_WheelTransition` types `spokes` as plain
+    /// `xsd:unsignedInt`, so every such count is schema-valid; LibreOffice
+    /// imports it with `getUnsigned(XML_spokes, 4)` and never fails. The
+    /// typed [`crate::transition::Spokes`] cannot represent the count, and
+    /// rounding it to a supported one would rewrite the producer's value on
+    /// save, so the reader keeps the effect element verbatim as
+    /// [`crate::transition::Kind::Raw`]. The context is the spoke count.
+    SpokeCount,
+}
+
+impl TransitionDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::SpokeCount => {
+                "kept the wheel effect with an unsupported spoke count verbatim as a raw effect"
+            },
+        }
+    }
+}
+
+impl From<TransitionDefect> for Defect {
+    fn from(defect: TransitionDefect) -> Self {
+        Self::Transition(defect)
+    }
+}
+
 impl From<ShapeDefect> for Defect {
     fn from(defect: ShapeDefect) -> Self {
         Self::Shape(defect)
@@ -315,7 +383,10 @@ pub struct ToleratedDefect {
     ///   [`TimingDefect::DuplicateShapeId`];
     /// * [`Defect::Shape`] — the shape ID of the repaired shape, or `0` when
     ///   the shape carries no usable ID (`0` is outside the IDs `PowerPoint`
-    ///   assigns to shapes).
+    ///   assigns to shapes);
+    /// * [`Defect::Transition`] — a part holds at most one transition, so
+    ///   the part locates it; the context is the offending spoke count for
+    ///   [`TransitionDefect::SpokeCount`].
     pub context: u32,
     /// The package part the defect was found in, such as
     /// `/ppt/slides/slide3.xml`.
@@ -335,6 +406,12 @@ impl ToleratedDefect {
         self.part.as_deref()
     }
 }
+
+/// The empty report handed out by values that carry no repairs.
+pub(crate) static EMPTY_REPORT: ToleranceReport = ToleranceReport {
+    defects: Vec::new(),
+    unrecorded: 0,
+};
 
 /// Everything a read repaired, in the order the defects were found.
 ///
@@ -516,6 +593,7 @@ mod tests {
             Defect::from(ShapeDefect::MalformedTransform),
             Defect::from(ShapeDefect::PlaceholderExtensionOwner),
             Defect::from(ShapeDefect::PlaceholderTypeExtension),
+            Defect::from(TransitionDefect::SpokeCount),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

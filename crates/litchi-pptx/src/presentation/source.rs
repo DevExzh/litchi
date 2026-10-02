@@ -2176,13 +2176,20 @@ impl SourceBackedSlideSnapshot {
 
     /// Read this slide's direct typed transition, if present.
     ///
+    /// Repairs the read applied (for example a wheel spoke count kept as a
+    /// raw effect) are listed, with this slide's part name, in
+    /// [`crate::transition::Transition::tolerance_report`].
+    ///
     /// Inherited layout/master transitions are intentionally outside this
     /// direct-slide capability. Supported PowerPoint extension transitions are
     /// read through their typed MCE choice and fallback without selecting any
     /// unrelated slide markup.
     pub fn transition(&self) -> Result<Option<crate::transition::Transition>> {
         self.check_execution()?;
-        let transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
+        let mut transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
+        if let Some(transition) = transition.as_mut() {
+            transition.locate_in_part(self.part_uri.as_str());
+        }
         self.check_execution()?;
         Ok(transition)
     }

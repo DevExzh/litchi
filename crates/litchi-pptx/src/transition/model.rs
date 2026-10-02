@@ -3,6 +3,7 @@
 use std::fmt;
 use std::sync::Arc;
 
+use crate::leniency::ToleranceReport;
 use crate::time::Offset;
 use crate::{Error, Result as PptxResult};
 
@@ -900,6 +901,9 @@ pub(crate) struct Preserved {
     pub(crate) effect: Option<Raw>,
     pub(crate) before: Box<[Raw]>,
     pub(crate) after: Box<[Raw]>,
+    /// Repairs the read applied; empty for a conforming read. It shares the
+    /// read-state allocation so a typed value stays one cache line.
+    pub(crate) tolerance: ToleranceReport,
 }
 
 impl PartialEq for Transition {
@@ -926,6 +930,24 @@ impl Transition {
         }
     }
 
+    /// The repairs the reader applied to produce this value, in discovery
+    /// order.
+    ///
+    /// A read never fails over an attribute value outside its schema or
+    /// `PowerPoint` domain: a wheel whose spoke count `PowerPoint` cannot
+    /// play is kept verbatim as [`Kind::Raw`] and recorded as
+    /// [`crate::TransitionDefect::SpokeCount`]. An empty report means the
+    /// transition conformed; a value built in code always has an empty
+    /// report. The report is not part of equality.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        self.preserved
+            .as_deref()
+            .map_or(&crate::leniency::EMPTY_REPORT, |preserved| {
+                &preserved.tolerance
+            })
+    }
+
     /// Returns the visual effect.
     #[must_use]
     pub fn kind(&self) -> &Kind {
@@ -945,6 +967,15 @@ impl Transition {
             && self.after == other.after
     }
 
+    /// Stamp the owner part name on every recorded repair.
+    pub(crate) fn locate_in_part(&mut self, part: &str) {
+        if let Some(preserved) = self.preserved.as_mut()
+            && !preserved.tolerance.is_clean()
+        {
+            Arc::make_mut(preserved).tolerance.locate_in_part(part);
+        }
+    }
+
     /// Replaces the visual effect.
     ///
     /// Parsed extension children remain attached, but raw XML for the old
@@ -954,7 +985,8 @@ impl Transition {
         self.preserved = self.preserved.take().and_then(|mut preserved| {
             let raw = Arc::make_mut(&mut preserved);
             raw.effect = None;
-            (!raw.before.is_empty() || !raw.after.is_empty()).then_some(preserved)
+            (!raw.before.is_empty() || !raw.after.is_empty() || !raw.tolerance.is_clean())
+                .then_some(preserved)
         });
     }
 

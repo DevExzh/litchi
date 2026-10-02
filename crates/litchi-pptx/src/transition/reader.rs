@@ -13,6 +13,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use crate::leniency::{ToleranceReport, TransitionDefect};
 use crate::time::Offset;
 use crate::{Error, Result};
 
@@ -165,6 +166,7 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
     let mut selected_depth = None;
     let mut draft = None;
     let mut capture = None;
+    let mut repairs = ToleranceReport::default();
 
     loop {
         let start = position(&reader, origin)?;
@@ -193,6 +195,7 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                         draft.as_mut().ok_or_else(|| {
                             Error::Invalid("transition parser lost its selected value".into())
                         })?,
+                        &mut repairs,
                     )?;
                     capture = Some(Capture {
                         start,
@@ -228,6 +231,7 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                         draft.as_mut().ok_or_else(|| {
                             Error::Invalid("transition parser lost its selected value".into())
                         })?,
+                        &mut repairs,
                     )?;
                     let raw = bytes.get(start..end).ok_or_else(|| {
                         Error::Invalid("transition child byte range is outside its XML part".into())
@@ -315,7 +319,7 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
         ));
     }
 
-    Ok(draft.map(Draft::finish))
+    Ok(draft.map(|draft| draft.finish(repairs)))
 }
 
 #[derive(Debug)]
@@ -372,12 +376,17 @@ impl Draft {
         Ok(())
     }
 
-    fn finish(mut self) -> Transition {
-        if self.effect.is_some() || !self.before.is_empty() || !self.after.is_empty() {
+    fn finish(mut self, tolerance: ToleranceReport) -> Transition {
+        if self.effect.is_some()
+            || !self.before.is_empty()
+            || !self.after.is_empty()
+            || !tolerance.is_clean()
+        {
             self.value.preserved = Some(Arc::new(Preserved {
                 effect: self.effect,
                 before: self.before.into_boxed_slice(),
                 after: self.after.into_boxed_slice(),
+                tolerance,
             }));
         }
         self.value
@@ -433,8 +442,22 @@ fn classify_child(
     element: &BytesStart<'_>,
     decoder: Decoder,
     draft: &mut Draft,
+    repairs: &mut ToleranceReport,
 ) -> Result<Role> {
-    if let Some(kind) = parse_kind(namespace, element, decoder)? {
+    let kind = match parse_kind(namespace, element, decoder) {
+        Ok(kind) => kind,
+        // A wheel whose spoke count PowerPoint cannot play is kept verbatim
+        // as a raw effect, like an effect element this reader does not know
+        // (audit finding 6.5).
+        Err(Error::Invalid(_))
+            if let Some(count) = unsupported_spokes(namespace, element, decoder)? =>
+        {
+            repairs.record(TransitionDefect::SpokeCount, count);
+            None
+        },
+        Err(error) => return Err(error),
+    };
+    if let Some(kind) = kind {
         if draft.has_effect {
             return Err(Error::Invalid(
                 "a transition contains more than one visual effect".into(),
@@ -927,6 +950,25 @@ fn parse_spokes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Spokes> {
             "wheel transition spoke count '{value}' is not supported by PowerPoint"
         ))),
     }
+}
+
+/// The spoke count of a wheel or reverse-wheel effect whose `spokes` is an
+/// `xsd:unsignedInt` outside the counts [`Spokes`] models.
+fn unsupported_spokes(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<Option<u32>> {
+    let wheel = is_presentationml_name(namespace, element.name(), b"wheel")
+        || is_p14_name(namespace, element.name(), b"wheelReverse");
+    if !wheel {
+        return Ok(None);
+    }
+    let Some(value) = unqualified_attribute_value(element, b"spokes", decoder)? else {
+        return Ok(None);
+    };
+    let count = xsd_token_atom(&value).and_then(|token| token.parse::<u32>().ok());
+    Ok(count.filter(|count| !matches!(count, 1..=4 | 8)))
 }
 
 fn invalid_direction<T>(kind: &str, value: &str) -> Result<T> {
