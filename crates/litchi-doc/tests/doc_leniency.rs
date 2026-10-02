@@ -290,7 +290,7 @@ fn malformed_auxiliary_tables_degrade_and_are_recorded() {
         assert!(
             report.defects().iter().any(|tolerated| {
                 tolerated.defect == Defect::AuxiliaryTable(defect)
-                    && usize::from(tolerated.context) == index
+                    && usize::try_from(tolerated.context).unwrap() == index
             }),
             "missing {defect:?} at FIB index {index}: {:?}",
             report.defects()
@@ -894,5 +894,61 @@ fn an_unresolvable_piece_modifier_is_ignored_and_recorded() {
             defect: Defect::Piece(PieceDefect::PropertyModifier),
             context: 0,
         }]
+    );
+}
+
+/// Container repairs surface through the document report: a non-critical
+/// stream whose FAT chain runs past its declared size opens (POI and
+/// LibreOffice read exactly the declared bytes) and the compound-file repair
+/// is listed as a `Defect::Container` entry ahead of every DOC-level repair.
+#[test]
+fn container_repairs_join_the_document_report() {
+    let clean = writer_document(|_| {});
+    let mut package =
+        PackageEditor::open(clean, Targets::default(), Limits::default()).expect("fixture package");
+    package
+        .add_stream(vec!["LeniencyProbe".to_string()], vec![0xAB; 5000])
+        .expect("probe stream");
+    let with_probe = package.finish().expect("package with probe");
+
+    let conformant = open_degraded(with_probe.clone());
+    assert!(
+        conformant.tolerance_report().is_clean(),
+        "a conformant container records nothing: {:?}",
+        conformant.tolerance_report().defects()
+    );
+
+    // Shrink the probe's declared size from 5000 to 4096 bytes: its ten-sector
+    // chain now runs two sectors past the eight the size needs.
+    let name = "LeniencyProbe"
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let mut bytes = with_probe;
+    let entry = bytes
+        .windows(name.len())
+        .position(|window| window == name.as_slice())
+        .expect("probe directory entry");
+    assert_eq!(
+        u32::from_le_bytes(bytes[entry + 120..entry + 124].try_into().unwrap()),
+        5000
+    );
+    bytes[entry + 120..entry + 124].copy_from_slice(&4096u32.to_le_bytes());
+
+    let document = open_degraded(bytes);
+    assert!(document.text().unwrap().contains("Body text"));
+    let defects = document.tolerance_report().defects();
+    assert!(
+        defects.iter().any(|tolerated| tolerated.defect
+            == Defect::Container(litchi_cfb::Defect::Allocation(
+                litchi_cfb::AllocationDefect::ChainLongerThanSize
+            ))),
+        "missing the container repair: {defects:?}"
+    );
+    assert!(
+        defects
+            .iter()
+            .all(|tolerated| matches!(tolerated.defect, Defect::Container(_))),
+        "only container repairs are recorded: {defects:?}"
     );
 }

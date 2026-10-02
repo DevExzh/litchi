@@ -338,7 +338,7 @@ fn repairs_undefined_section_enumerations_and_booleans() {
             report.defects(),
             &[ToleratedDefect {
                 defect: Defect::Section(SectionDefect::EnumValue),
-                context: opcode,
+                context: u32::from(opcode),
             }],
             "opcode {opcode:#06x}"
         );
@@ -362,7 +362,7 @@ fn repairs_undefined_section_enumerations_and_booleans() {
             report.defects(),
             &[ToleratedDefect {
                 defect: Defect::Section(SectionDefect::Boolean),
-                context: opcode,
+                context: u32::from(opcode),
             }]
         );
     }

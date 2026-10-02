@@ -175,6 +175,9 @@ impl Document {
         // posture Word and LibreOffice take, and the one this function
         // already used for headers, footnotes, endnotes, and list tables.
         let mut tolerance = ToleranceReport::default();
+        // Container repairs come first: the compound-file reader applied
+        // them while the OLE file was opened, before any DOC stream was read.
+        tolerance.append_container(ole.tolerance_report());
 
         // Parse fields table to identify embedded equations and hyperlinks
         let fields_table = auxiliary_or_absent(
@@ -389,9 +392,9 @@ impl Document {
         };
 
         // Everything repaired while the document was opened, in discovery
-        // order: the optional auxiliary tables above first, then the
-        // stylesheet's repairs, then the piece-table and PAPX bin-table
-        // repairs, then the
+        // order: the container repairs and the optional auxiliary tables
+        // above first, then the stylesheet's repairs, then the piece-table
+        // and PAPX bin-table repairs, then the
         // attached glossary's own stylesheet and PAPX repairs.
         if let Some(parsed) = &stylesheet {
             tolerance.append(parsed.tolerance_report());

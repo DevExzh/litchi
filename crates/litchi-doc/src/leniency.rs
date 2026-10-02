@@ -756,6 +756,10 @@ pub enum Defect {
     Section(SectionDefect),
     /// A piece-table (`Pcd`) defect repaired the way Word repairs it.
     Piece(PieceDefect),
+    /// A compound-file (CFB) repair the container reader applied while the
+    /// document's OLE file was opened; see [`litchi_cfb::Defect`] for the
+    /// closed set of container repairs and their substitutions.
+    Container(litchi_cfb::Defect),
 }
 
 impl Defect {
@@ -774,6 +778,7 @@ impl Defect {
             Self::Papx(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
             Self::Piece(defect) => defect.repair(),
+            Self::Container(defect) => defect.repair(),
         }
     }
 }
@@ -844,6 +849,12 @@ impl From<PieceDefect> for Defect {
     }
 }
 
+impl From<litchi_cfb::Defect> for Defect {
+    fn from(defect: litchi_cfb::Defect) -> Self {
+        Self::Container(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -859,9 +870,14 @@ pub struct ToleratedDefect {
     /// index in `PlcfBkf` for a [`Defect::Bookmark`], and the cell (or
     /// boundary) index within the row for a [`Defect::TableDefinition`], and
     /// the `PlcfBtePapx` page index for a [`Defect::Papx`], and the SPRM
-    /// opcode for a [`Defect::Section`], and the piece index in `PlcPcd` for
-    /// a [`Defect::Piece`].
-    pub context: u16,
+    /// opcode for a [`Defect::Section`], the piece index in `PlcPcd` for
+    /// a [`Defect::Piece`], and the compound-file context (a directory SID,
+    /// sector index, or header field value — see
+    /// [`litchi_cfb::ToleratedDefect::context`]) for a [`Defect::Container`].
+    ///
+    /// The field is 32 bits wide so container contexts are carried exactly;
+    /// every DOC-level context fits in 16 bits.
+    pub context: u32,
 }
 
 /// Everything a read repaired, in the order the defects were found.
@@ -907,6 +923,11 @@ impl ToleranceReport {
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
     pub(crate) fn record(&mut self, defect: impl Into<Defect>, context: u16) {
+        self.record_wide(defect, u32::from(context));
+    }
+
+    /// [`Self::record`] for a 32-bit context (container repairs).
+    fn record_wide(&mut self, defect: impl Into<Defect>, context: u32) {
         if self.defects.len() < MAX_RECORDED_DEFECTS {
             self.defects.push(ToleratedDefect {
                 defect: defect.into(),
@@ -923,9 +944,19 @@ impl ToleranceReport {
     /// that no longer fit join the unrecorded count.
     pub(crate) fn append(&mut self, other: &ToleranceReport) {
         for tolerated in other.defects() {
-            self.record(tolerated.defect, tolerated.context);
+            self.record_wide(tolerated.defect, tolerated.context);
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+
+    /// Merge the repairs the compound-file reader applied while opening the
+    /// container, as [`Defect::Container`] entries in discovery order. The
+    /// container's own overflow count joins this report's unrecorded count.
+    pub(crate) fn append_container(&mut self, container: &litchi_cfb::ToleranceReport) {
+        for tolerated in container.defects() {
+            self.record_wide(Defect::Container(tolerated.defect), tolerated.context);
+        }
+        self.unrecorded = self.unrecorded.saturating_add(container.unrecorded());
     }
 }
 
@@ -1072,6 +1103,9 @@ mod tests {
             Defect::from(SectionDefect::EnumValue),
             Defect::from(SectionDefect::Boolean),
             Defect::from(PieceDefect::PropertyModifier),
+            Defect::from(litchi_cfb::Defect::Allocation(
+                litchi_cfb::AllocationDefect::ChainLongerThanSize,
+            )),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());
