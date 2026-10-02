@@ -10,7 +10,7 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{parse, write};
+pub use codec::{parse, parse_with_report, write};
 pub use model::{Iteration, IterationStatus, NullDate, Settings};
 
 // Fused-parser plumbing — kept `pub` (not `pub(crate)`) because family owner

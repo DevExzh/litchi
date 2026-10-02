@@ -189,6 +189,26 @@ pub enum ContentDefect {
     /// `currency`, 2 `percentage`, 3 `boolean`, 4 `date`, 5 `time`. The
     /// location is the cell ([`DefectLocation::Cell`]).
     CellValueUnparseable,
+    /// A child of `table:calculation-settings` other than `table:null-date`
+    /// and `table:iteration` — a vendor or LibreOffice extension element, or
+    /// an element of a later ODF version (LENIENCY_AUDIT F9.9).
+    ///
+    /// ODF 1.2 Part 1 §3.3 makes foreign elements ignorable, and LibreOffice's
+    /// `ScXMLCalculationSettingsContext::createFastChildContext` returns no
+    /// context for any other child, skipping it. The repair skips the child
+    /// with its whole subtree (depth-balanced; only predefined entity and
+    /// character references are accepted inside it) and keeps every other
+    /// setting. The context is 0 for a child outside the table namespace and
+    /// 1 for an unknown table-namespace child. There is no location.
+    CalculationSettingsUnknownChild,
+    /// `table:null-date` followed `table:iteration` inside
+    /// `table:calculation-settings`, against the schema's sequence order
+    /// (LENIENCY_AUDIT F9.9).
+    ///
+    /// LibreOffice dispatches each child by name and reads either order. The
+    /// repair accepts both settings exactly as in schema order; a duplicate
+    /// child stays a hard error. The context is 0. There is no location.
+    CalculationSettingsReordered,
 }
 
 impl ContentDefect {
@@ -198,6 +218,12 @@ impl ContentDefect {
         match self {
             Self::CellValueUnparseable => {
                 "kept the cell and its displayed text and stored its unreadable typed value as an uninterpreted value instead of failing the spreadsheet"
+            },
+            Self::CalculationSettingsUnknownChild => {
+                "skipped an unknown child of table:calculation-settings and its subtree"
+            },
+            Self::CalculationSettingsReordered => {
+                "accepted table:null-date after table:iteration in table:calculation-settings"
             },
         }
     }
@@ -486,6 +512,8 @@ mod tests {
             Defect::from(PackageDefect::MimetypeNotFirst),
             Defect::from(PackageDefect::ManifestRootMediaTypeMissing),
             Defect::from(ContentDefect::CellValueUnparseable),
+            Defect::from(ContentDefect::CalculationSettingsUnknownChild),
+            Defect::from(ContentDefect::CalculationSettingsReordered),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

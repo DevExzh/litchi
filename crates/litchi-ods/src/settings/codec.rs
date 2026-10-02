@@ -126,10 +126,16 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 }
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
-                if kind == Kind::Calculation
-                    || stack.iter().any(|open| open.kind == Kind::Calculation)
-                {
-                    validate_attributes(&element, reader.resolver())?;
+                match calculation_member(
+                    kind,
+                    parent,
+                    namespace,
+                    element.local_name().as_ref(),
+                    stack.iter().any(|open| open.kind == Kind::Calculation),
+                ) {
+                    CalculationMember::Owned => validate_attributes(&element, reader.resolver())?,
+                    CalculationMember::Unknown => opaque = true,
+                    CalculationMember::Outside => {},
                 }
                 let qname = qualified_name(&element, kind)?;
                 stack.push(OpenElement {
@@ -156,10 +162,16 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 }
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
-                if kind == Kind::Calculation
-                    || stack.iter().any(|open| open.kind == Kind::Calculation)
-                {
-                    validate_attributes(&element, reader.resolver())?;
+                match calculation_member(
+                    kind,
+                    parent,
+                    namespace,
+                    element.local_name().as_ref(),
+                    stack.iter().any(|open| open.kind == Kind::Calculation),
+                ) {
+                    CalculationMember::Owned => validate_attributes(&element, reader.resolver())?,
+                    CalculationMember::Unknown => opaque = true,
+                    CalculationMember::Outside => {},
                 }
                 let qname = qualified_name(&element, kind)?;
                 let span = Span {
@@ -283,10 +295,16 @@ impl LocateHandler {
                 }
                 let parent = self.stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
-                if kind == Kind::Calculation
-                    || self.stack.iter().any(|open| open.kind == Kind::Calculation)
-                {
-                    validate_attributes(element, resolver)?;
+                match calculation_member(
+                    kind,
+                    parent,
+                    namespace,
+                    element.local_name().as_ref(),
+                    self.stack.iter().any(|open| open.kind == Kind::Calculation),
+                ) {
+                    CalculationMember::Owned => validate_attributes(element, resolver)?,
+                    CalculationMember::Unknown => self.opaque = true,
+                    CalculationMember::Outside => {},
                 }
                 let qname = qualified_name(element, kind)?;
                 self.stack.push(OpenElement {
@@ -313,10 +331,16 @@ impl LocateHandler {
                 }
                 let parent = self.stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
-                if kind == Kind::Calculation
-                    || self.stack.iter().any(|open| open.kind == Kind::Calculation)
-                {
-                    validate_attributes(element, resolver)?;
+                match calculation_member(
+                    kind,
+                    parent,
+                    namespace,
+                    element.local_name().as_ref(),
+                    self.stack.iter().any(|open| open.kind == Kind::Calculation),
+                ) {
+                    CalculationMember::Owned => validate_attributes(element, resolver)?,
+                    CalculationMember::Unknown => self.opaque = true,
+                    CalculationMember::Outside => {},
                 }
                 let qname = qualified_name(element, kind)?;
                 let span = Span {
@@ -398,6 +422,40 @@ fn qualified_name(element: &quick_xml::events::BytesStart<'_>, kind: Kind) -> Re
         })
     } else {
         Ok(String::new())
+    }
+}
+
+/// How an element relates to the owned calculation-settings subtree.
+enum CalculationMember {
+    /// The settings element or one of its typed children, whose attributes
+    /// must all be owned for an edit to be lossless.
+    Owned,
+    /// An unknown child (or its descendant) that the semantic parse skips
+    /// (LENIENCY_AUDIT F9.9); its presence makes the span opaque so a
+    /// rewrite refuses instead of dropping it.
+    Unknown,
+    /// Outside the calculation-settings subtree.
+    Outside,
+}
+
+fn calculation_member(
+    kind: Kind,
+    parent: Option<Kind>,
+    namespace: NamespaceKind,
+    local: &[u8],
+    inside_calculation: bool,
+) -> CalculationMember {
+    if kind == Kind::Calculation {
+        CalculationMember::Owned
+    } else if !inside_calculation {
+        CalculationMember::Outside
+    } else if parent == Some(Kind::Calculation)
+        && namespace == NamespaceKind::Table
+        && matches!(local, b"null-date" | b"iteration")
+    {
+        CalculationMember::Owned
+    } else {
+        CalculationMember::Unknown
     }
 }
 

@@ -8,6 +8,7 @@ use quick_xml::reader::NsReader;
 use std::num::NonZeroUsize;
 
 use super::model::{Iteration, IterationStatus, NullDate, Settings};
+use crate::leniency::{ContentDefect, ToleranceReport};
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -88,7 +89,25 @@ pub fn write(out: &mut String, settings_option: Option<&Settings>) -> Result<()>
 /// Returns an error for malformed XML, invalid settings, or exceeded resource
 /// limits.
 pub fn parse(xml: &str) -> Result<Option<Settings>> {
+    parse_with_report(xml).map(|(settings, _tolerance)| settings)
+}
+
+/// [`parse`], also returning the repairs applied while parsing.
+///
+/// An unknown or foreign-namespace child of `table:calculation-settings` is
+/// skipped with its whole subtree and a `table:null-date` that follows
+/// `table:iteration` is accepted, each recorded as a
+/// [`ContentDefect`] (LENIENCY_AUDIT F9.9), exactly as LibreOffice's
+/// `ScXMLCalculationSettingsContext` ignores children it does not handle.
+///
+/// # Errors
+///
+/// Returns an error for malformed XML, invalid settings, or exceeded resource
+/// limits.
+pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport)> {
     validate_size(xml)?;
+    let mut tolerance = ToleranceReport::default();
+    let mut skip_depth = 0usize;
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut current = None;
@@ -161,6 +180,17 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                     &element,
                 )?);
             },
+            Event::Start(_) if current.is_some() && skip_depth > 0 => {
+                skip_depth = skip_depth.saturating_add(1);
+            },
+            Event::Empty(_) | Event::Text(_) | Event::CData(_)
+                if current.is_some() && skip_depth > 0 => {},
+            Event::GeneralRef(reference) if current.is_some() && skip_depth > 0 => {
+                skipped_reference(&reference)?;
+            },
+            Event::End(_) if current.is_some() && skip_depth > 0 => {
+                skip_depth -= 1;
+            },
             Event::Start(element) if current.is_some() => {
                 if child_open {
                     return Err(Error::InvalidFormat(
@@ -170,14 +200,18 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                 let settings = current.as_mut().ok_or_else(|| {
                     Error::InvalidFormat("calculation settings child has no parent".to_string())
                 })?;
-                parse_settings_child(
+                if settings_child(
                     settings,
                     reader.resolver(),
                     reader.decoder(),
                     is_table,
                     &element,
-                )?;
-                child_open = true;
+                    &mut tolerance,
+                )? {
+                    child_open = true;
+                } else {
+                    skip_depth = 1;
+                }
             },
             Event::Empty(element) if current.is_some() => {
                 if child_open {
@@ -188,12 +222,13 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                 let settings = current.as_mut().ok_or_else(|| {
                     Error::InvalidFormat("calculation settings child has no parent".to_string())
                 })?;
-                parse_settings_child(
+                settings_child(
                     settings,
                     reader.resolver(),
                     reader.decoder(),
                     is_table,
                     &element,
+                    &mut tolerance,
                 )?;
             },
             Event::End(element) if current.is_some() => {
@@ -260,7 +295,7 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
     if let Some(settings) = &result {
         settings.validate()?;
     }
-    Ok(result)
+    Ok((result, tolerance))
 }
 
 /// Enforce the pre-parse byte-size limit of the calculation-settings source.
@@ -306,6 +341,9 @@ pub struct CalculationHandler {
     depth: usize,
     events: usize,
     document_body_depth: Option<usize>,
+    /// Open elements of the unknown child subtree being skipped (F9.9).
+    skip_depth: usize,
+    tolerance: ToleranceReport,
 }
 
 impl CalculationHandler {
@@ -373,6 +411,17 @@ impl CalculationHandler {
                 }
                 self.result = Some(parse_settings_attributes(resolver, decoder, element)?);
             },
+            Event::Start(_) if self.current.is_some() && self.skip_depth > 0 => {
+                self.skip_depth = self.skip_depth.saturating_add(1);
+            },
+            Event::Empty(_) | Event::Text(_) | Event::CData(_)
+                if self.current.is_some() && self.skip_depth > 0 => {},
+            Event::GeneralRef(reference) if self.current.is_some() && self.skip_depth > 0 => {
+                skipped_reference(reference)?;
+            },
+            Event::End(_) if self.current.is_some() && self.skip_depth > 0 => {
+                self.skip_depth -= 1;
+            },
             Event::Start(element) if self.current.is_some() => {
                 if self.child_open {
                     return Err(Error::InvalidFormat(
@@ -382,8 +431,18 @@ impl CalculationHandler {
                 let settings = self.current.as_mut().ok_or_else(|| {
                     Error::InvalidFormat("calculation settings child has no parent".to_string())
                 })?;
-                parse_settings_child(settings, resolver, decoder, is_table, element)?;
-                self.child_open = true;
+                if settings_child(
+                    settings,
+                    resolver,
+                    decoder,
+                    is_table,
+                    element,
+                    &mut self.tolerance,
+                )? {
+                    self.child_open = true;
+                } else {
+                    self.skip_depth = 1;
+                }
             },
             Event::Empty(element) if self.current.is_some() => {
                 if self.child_open {
@@ -394,7 +453,14 @@ impl CalculationHandler {
                 let settings = self.current.as_mut().ok_or_else(|| {
                     Error::InvalidFormat("calculation settings child has no parent".to_string())
                 })?;
-                parse_settings_child(settings, resolver, decoder, is_table, element)?;
+                settings_child(
+                    settings,
+                    resolver,
+                    decoder,
+                    is_table,
+                    element,
+                    &mut self.tolerance,
+                )?;
             },
             Event::End(element) if self.current.is_some() => {
                 if self.child_open {
@@ -455,6 +521,13 @@ impl CalculationHandler {
 
     /// Run the post-stream checks and return the parsed settings.
     pub fn finish(self) -> Result<Option<Settings>> {
+        self.finish_with_report()
+            .map(|(settings, _tolerance)| settings)
+    }
+
+    /// [`Self::finish`], also returning the repairs applied while parsing
+    /// (see [`parse_with_report`]).
+    pub fn finish_with_report(self) -> Result<(Option<Settings>, ToleranceReport)> {
         if self.current.is_some() {
             return Err(Error::InvalidFormat(
                 "unterminated table:calculation-settings".to_string(),
@@ -463,7 +536,7 @@ impl CalculationHandler {
         if let Some(settings) = &self.result {
             settings.validate()?;
         }
-        Ok(self.result)
+        Ok((self.result, self.tolerance))
     }
 }
 
@@ -495,24 +568,66 @@ fn parse_settings_attributes(
     })
 }
 
-fn parse_settings_child(
+/// Apply one child of `table:calculation-settings`, returning whether it
+/// was a known setting.
+///
+/// An unknown or foreign-namespace child is recorded as
+/// [`ContentDefect::CalculationSettingsUnknownChild`] and returns `false`;
+/// the caller skips its subtree, the way LibreOffice's
+/// `ScXMLCalculationSettingsContext::createFastChildContext` returns no
+/// context for it (LENIENCY_AUDIT F9.9).
+fn settings_child(
     settings: &mut Settings,
     resolver: &NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
     is_table: bool,
     element: &BytesStart<'_>,
-) -> Result<()> {
-    if !is_table {
-        return Err(Error::InvalidFormat(
-            "unsupported calculation settings child".to_string(),
-        ));
+    tolerance: &mut ToleranceReport,
+) -> Result<bool> {
+    if !is_table || !matches!(element.local_name().as_ref(), b"null-date" | b"iteration") {
+        tolerance.record(
+            ContentDefect::CalculationSettingsUnknownChild,
+            u16::from(is_table),
+        );
+        return Ok(false);
     }
+    parse_settings_child(settings, resolver, decoder, element, tolerance)?;
+    Ok(true)
+}
+
+/// Check an entity reference inside a skipped settings subtree: only the
+/// predefined XML entities and character references are accepted, so
+/// skipping never relaxes entity safety.
+fn skipped_reference(reference: &[u8]) -> Result<()> {
+    if matches!(reference, b"amp" | b"lt" | b"gt" | b"apos" | b"quot")
+        || reference.first() == Some(&b'#')
+    {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(
+            "table:calculation-settings cannot contain entity references".to_string(),
+        ))
+    }
+}
+
+fn parse_settings_child(
+    settings: &mut Settings,
+    resolver: &NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    element: &BytesStart<'_>,
+    tolerance: &mut ToleranceReport,
+) -> Result<()> {
     match element.local_name().as_ref() {
         b"null-date" => {
-            if settings.null_date.is_some() || settings.iteration.is_some() {
+            if settings.null_date.is_some() {
                 return Err(Error::InvalidFormat(
-                    "duplicate or out-of-order table:null-date".to_string(),
+                    "duplicate table:null-date".to_string(),
                 ));
+            }
+            if settings.iteration.is_some() {
+                // ODF schema order is null-date then iteration; LibreOffice
+                // reads either order.
+                tolerance.record(ContentDefect::CalculationSettingsReordered, 0);
             }
             let value_type = optional_attribute(resolver, decoder, element, b"value-type")?;
             if value_type.as_deref().is_some_and(|value| value != "date") {

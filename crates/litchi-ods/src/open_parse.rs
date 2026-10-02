@@ -40,7 +40,7 @@ pub(crate) struct OpenOutputs {
     pub(crate) definitions: Vec<Definition>,
     /// The typed worksheets in document order (pass 4).
     pub(crate) sheets: Vec<Sheet>,
-    /// The content repairs applied while parsing (LENIENCY_AUDIT F9.8),
+    /// The content repairs applied while parsing (LENIENCY_AUDIT F9.8, F9.9),
     /// for the opening document handle to carry after its package report.
     pub(crate) tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
@@ -246,7 +246,7 @@ impl OpenParse {
         if let Some(error) = self.calculation_error {
             return Err(error);
         }
-        let calculation = self.calculation.finish()?;
+        let (calculation, mut tolerance) = self.calculation.finish_with_report()?;
         if let Some(error) = self.locate_error {
             return Err(error);
         }
@@ -264,7 +264,10 @@ impl OpenParse {
         if let Some(error) = self.worksheet_error {
             return Err(error);
         }
-        let (sheets, tolerance) = self.worksheet.finish()?;
+        let (sheets, worksheet_tolerance) = self.worksheet.finish()?;
+        // Calculation settings precede the tables in `content.xml`, so this
+        // keeps the report in discovery order.
+        tolerance.append(&worksheet_tolerance);
 
         Ok((
             calculation,

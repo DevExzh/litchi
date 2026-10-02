@@ -77,7 +77,7 @@ fn parses_all_settings_with_namespace_aliases() {
 }
 
 #[test]
-fn rejects_invalid_or_out_of_order_settings() {
+fn rejects_invalid_settings_and_records_out_of_order_ones() {
     let invalid = r#"<o:document-content
           xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
           xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
@@ -90,7 +90,20 @@ fn rejects_invalid_or_out_of_order_settings() {
         .replace("t:null-year=\"0\"", "t:null-year=\"1930\"")
         .replace("t:steps=\"0\"", "t:steps=\"1\"")
         .replace("not-a-date", "1899-12-30");
-    assert!(parse(&out_of_order).is_err());
+    // LENIENCY_AUDIT F9.9: LibreOffice reads either child order, so the
+    // reordered settings are accepted and the repair is recorded.
+    let (settings, report) = super::codec::parse_with_report(&out_of_order).unwrap();
+    let settings = settings.unwrap();
+    assert!(settings.null_date.is_some() && settings.iteration.is_some());
+    assert_eq!(report.defects().len(), 1);
+    assert_eq!(
+        report.defects()[0].defect,
+        crate::leniency::Defect::Content(
+            crate::leniency::ContentDefect::CalculationSettingsReordered
+        )
+    );
+    let duplicate_child = out_of_order.replace("<t:iteration t:steps=\"1\"/>", "<t:null-date/>");
+    assert!(parse(&duplicate_child).is_err());
     let duplicate = r#"<o:document-content
           xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
           xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
