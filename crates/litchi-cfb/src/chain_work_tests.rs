@@ -271,6 +271,7 @@ fn before_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) {
 /// the base's scratch was tested to match. Record 0769 changed the bound on
 /// mini sectors (`MiniStreamEnd`) in both, identically.
 fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Result<(), OleError> {
+    file.repair_empty_stream_start(None);
     let root = file
         .root
         .as_ref()
@@ -305,6 +306,10 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
         if entry.entry_type != STGTY_STREAM {
             continue;
         }
+        file.repair_empty_stream_start(Some(index));
+        let Some(entry) = file.dir_entries[index].as_ref() else {
+            continue;
+        };
         let (sid, is_minifat, start_sector, size) =
             (entry.sid, entry.is_minifat, entry.start_sector, entry.size);
         if file.sector_size == SECTOR_SIZE_V4 && !is_minifat && start_sector == RANGE_LOCK_SECTOR_V4
@@ -550,6 +555,19 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
                 reused.minifat, fresh.minifat,
                 "file {file_index} case {case}"
             );
+            assert_eq!(
+                reused
+                    .dir_entries
+                    .iter()
+                    .map(|entry| entry.as_ref().map(|entry| entry.start_sector))
+                    .collect::<Vec<_>>(),
+                fresh
+                    .dir_entries
+                    .iter()
+                    .map(|entry| entry.as_ref().map(|entry| entry.start_sector))
+                    .collect::<Vec<_>>(),
+                "file {file_index} case {case}"
+            );
             if oracle.is_ok() && !fresh.tolerance.is_clean() {
                 *outcomes.entry("repaired".to_string()).or_default() += 1;
             }
@@ -571,8 +589,8 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
         }
     }
     // The faults reach the cycle, overlap, truncation, marker, bounds and
-    // ownership refusals, the recorded surplus-chain repair (leniency audit
-    // F7.1), and some leave the file valid.
+    // ownership refusals, the recorded surplus-chain and stale empty-start
+    // repairs (leniency audit F7.1, F7.2), and some leave the file valid.
     let seen = |needle: &str| outcomes.keys().any(|key| key.contains(needle));
     for needle in [
         "accepted",
@@ -587,7 +605,6 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
         "Invalid sector marker",
         "Invalid start marker",
         "outside the root mini stream",
-        "chain must start with ENDOFCHAIN",
     ] {
         assert!(seen(needle), "no case reached {needle:?}: {outcomes:?}");
     }

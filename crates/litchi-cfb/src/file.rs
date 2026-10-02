@@ -1563,7 +1563,42 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(())
     }
 
+    /// Treats a zero-length stream whose start sector is not `ENDOFCHAIN`
+    /// as empty (leniency audit F7.2).
+    ///
+    /// MS-CFB prescribes no start value for an empty stream and a zero-byte
+    /// read never consults it; POI and LibreOffice return an empty stream
+    /// whatever it holds. The in-memory entry is set to `ENDOFCHAIN` so no
+    /// reader follows the stale sector, and the repair is recorded. `None`
+    /// repairs the root entry, whose mini stream is then absent.
+    fn repair_empty_stream_start(&mut self, sid_index: Option<usize>) {
+        let entry = match sid_index {
+            None => self.root.as_mut(),
+            Some(index) => self.dir_entries.get_mut(index).and_then(Option::as_mut),
+        };
+        let Some(entry) = entry else {
+            return;
+        };
+        if entry.size != 0 || entry.start_sector == ENDOFCHAIN {
+            return;
+        }
+        entry.start_sector = ENDOFCHAIN;
+        let sid = entry.sid;
+        // The root entry is held twice; keep both copies repaired.
+        if sid == 0 {
+            if let Some(root) = self.root.as_mut() {
+                root.start_sector = ENDOFCHAIN;
+            }
+            if let Some(Some(root)) = self.dir_entries.get_mut(0) {
+                root.start_sector = ENDOFCHAIN;
+            }
+        }
+        self.tolerance
+            .record(AllocationDefect::EmptyStreamStartSector, sid);
+    }
+
     fn validate_stream_allocations(&mut self) -> Result<(), OleError> {
+        self.repair_empty_stream_start(None);
         let root = self
             .root
             .as_ref()
@@ -1612,6 +1647,10 @@ impl<R: Read + Seek> OleFile<R> {
             if entry.entry_type != STGTY_STREAM {
                 continue;
             }
+            self.repair_empty_stream_start(Some(index));
+            let Some(entry) = self.dir_entries[index].as_ref() else {
+                continue;
+            };
             let (sid, is_minifat, start_sector, size) =
                 (entry.sid, entry.is_minifat, entry.start_sector, entry.size);
             if self.sector_size == SECTOR_SIZE_V4

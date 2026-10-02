@@ -286,3 +286,52 @@ fn chain_faults_within_the_declared_length_stay_fatal() {
         }
     }
 }
+
+// --- F7.2: zero-size stream whose start sector is not ENDOFCHAIN ---
+
+#[test]
+fn empty_stream_with_a_stale_start_sector_reads_as_empty_and_is_recorded() {
+    let data = pattern(5000, 6);
+    let bytes = build(&[(&["Data"], &data), (&["Empty"], b"")]);
+    assert!(open_report(&bytes).is_clean());
+
+    let (sid, offset) = entry(&bytes, "Empty");
+    assert_eq!(read_u32(&bytes, offset + 116), crate::consts::ENDOFCHAIN);
+    // A sector another stream owns, a free marker, and a dangling index.
+    let (_, data_offset) = entry(&bytes, "Data");
+    let owned = read_u32(&bytes, data_offset + 116);
+    for stale in [owned, crate::consts::FREESECT, 5000] {
+        let mut faulted = bytes.clone();
+        write_u32(&mut faulted, offset + 116, stale);
+        assert_eq!(
+            recorded(&open_report(&faulted)),
+            [(AllocationDefect::EmptyStreamStartSector.into(), sid)],
+            "stale start {stale:#x}"
+        );
+        assert!(read_both(&faulted, &["Empty"]).is_empty());
+        assert_eq!(read_both(&faulted, &["Data"]), data);
+        let file = OleFile::open(Cursor::new(faulted)).unwrap();
+        let repaired = file.directory_entry_by_sid(sid).unwrap();
+        assert_eq!(repaired.start_sector, crate::consts::ENDOFCHAIN);
+    }
+}
+
+#[test]
+fn empty_root_mini_stream_with_a_stale_start_sector_is_recorded() {
+    let data = pattern(4096, 7);
+    let mut bytes = build(&[(&["Data"], &data)]);
+    let root = directory_offsets(&bytes)[0];
+    assert_eq!(
+        read_u32(&bytes, root + 120),
+        0,
+        "fixture has no mini stream"
+    );
+    assert!(open_report(&bytes).is_clean());
+
+    write_u32(&mut bytes, root + 116, 0);
+    assert_eq!(
+        recorded(&open_report(&bytes)),
+        [(AllocationDefect::EmptyStreamStartSector.into(), 0)]
+    );
+    assert_eq!(read_both(&bytes, &["Data"]), data);
+}

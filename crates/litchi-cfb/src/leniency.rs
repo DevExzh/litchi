@@ -151,8 +151,6 @@ pub enum AllocationDefect {
     /// return an empty stream regardless of it. The reader treats the stream
     /// as empty and never follows the stale start sector. The context is the
     /// stream's directory SID.
-    ///
-    /// Not yet repaired: the reader currently rejects this deviation.
     EmptyStreamStartSector,
 }
 
