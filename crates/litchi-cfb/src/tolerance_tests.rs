@@ -335,3 +335,99 @@ fn empty_root_mini_stream_with_a_stale_start_sector_is_recorded() {
     );
     assert_eq!(read_both(&bytes, &["Data"]), data);
 }
+
+// --- F7.3: red-black sibling-tree name-ordering violation ---
+
+/// Swaps the left and right links of the sibling-tree node at `entry`.
+fn swap_sibling_links(bytes: &mut [u8], entry: usize) {
+    let left = read_u32(bytes, entry + 68);
+    let right = read_u32(bytes, entry + 72);
+    assert_ne!(left, right, "fixture node needs two distinct links");
+    write_u32(bytes, entry + 68, right);
+    write_u32(bytes, entry + 72, left);
+}
+
+fn sibling_names() -> Vec<String> {
+    [
+        "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+#[test]
+fn misordered_sibling_tree_opens_and_every_name_still_resolves() {
+    let names = sibling_names();
+    let contents: Vec<Vec<u8>> = (0..names.len())
+        .map(|index| pattern(40 + index * 700, u8::try_from(index).unwrap()))
+        .collect();
+    let paths: Vec<[&str; 1]> = names.iter().map(|name| [name.as_str()]).collect();
+    let nested = pattern(300, 9);
+    let mut streams: Vec<(&[&str], &[u8])> = paths
+        .iter()
+        .zip(&contents)
+        .map(|(path, data)| (path.as_slice(), data.as_slice()))
+        .collect();
+    let nested_paths: Vec<[&str; 2]> = names.iter().map(|name| ["Store", name.as_str()]).collect();
+    for path in &nested_paths {
+        streams.push((path.as_slice(), &nested));
+    }
+    let mut bytes = build(&streams);
+    assert!(open_report(&bytes).is_clean());
+
+    // Reverse the root storage's tree and the nested storage's tree at their
+    // tree roots, so a descent by name goes the wrong way.
+    let directory = directory_offsets(&bytes);
+    let root_tree = read_u32(&bytes, directory[0] + 76);
+    swap_sibling_links(&mut bytes, directory[root_tree as usize]);
+    let (_, store) = entry(&bytes, "Store");
+    let store_tree = read_u32(&bytes, store + 76);
+    swap_sibling_links(&mut bytes, directory[store_tree as usize]);
+
+    let report = open_report(&bytes);
+    assert!(!report.is_clean());
+    assert!(
+        report
+            .iter()
+            .all(|tolerated| tolerated.defect == crate::DirectoryDefect::SiblingNameOrder.into())
+    );
+    for (path, data) in paths.iter().zip(&contents) {
+        assert_eq!(&read_both(&bytes, path), data, "{path:?}");
+    }
+    for path in &nested_paths {
+        assert_eq!(read_both(&bytes, path), nested, "{path:?}");
+    }
+    // Lookups are case-insensitive as before, and a missing name is still
+    // not found by either reader.
+    assert_eq!(read_both(&bytes, &["ALPHA"]), contents[0]);
+    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    assert!(matches!(
+        file.open_stream(&["Missing"]),
+        Err(OleError::StreamNotFound)
+    ));
+    let shared = SharedOleFile::open_owned(Arc::from(bytes), SourceVersion::new(0x7c, 0)).unwrap();
+    assert!(matches!(
+        shared.open_stream(&["Store", "Missing"]),
+        Err(OleError::StreamNotFound)
+    ));
+}
+
+/// The ordering repair never relaxes acyclicity or unique ownership.
+#[test]
+fn sibling_tree_cycles_stay_fatal_when_ordering_is_tolerated() {
+    let names = sibling_names();
+    let paths: Vec<[&str; 1]> = names.iter().map(|name| [name.as_str()]).collect();
+    let streams: Vec<(&[&str], &[u8])> = paths
+        .iter()
+        .map(|path| (path.as_slice(), b"x".as_slice()))
+        .collect();
+    let mut bytes = build(&streams);
+    let directory = directory_offsets(&bytes);
+    let root_tree = read_u32(&bytes, directory[0] + 76);
+    // Point the tree root's left link back at itself.
+    write_u32(&mut bytes, directory[root_tree as usize] + 68, root_tree);
+    assert!(matches!(
+        OleFile::open(Cursor::new(bytes)),
+        Err(OleError::CorruptedFile(message)) if message.contains("repeated SID")
+    ));
+}

@@ -5,7 +5,7 @@ use super::consts::{
     TWO_GIB_BYTES,
 };
 use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
-use crate::leniency::{AllocationDefect, ToleranceReport};
+use crate::leniency::{AllocationDefect, DirectoryDefect, ToleranceReport};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -476,6 +476,9 @@ pub struct OleFile<R: Read + Seek> {
     stream_chain: EndChainScratch,
     /// Every reference-compatible repair the open applied.
     tolerance: ToleranceReport,
+    /// Whether some sibling tree violates the MS-CFB 2.6.4 name ordering,
+    /// so name lookups must scan instead of descending (leniency audit F7.3).
+    misordered_siblings: bool,
 }
 
 /// The validated, cursor-independent portion of an OLE file.
@@ -497,6 +500,8 @@ pub(crate) struct ParsedOleIndex {
     pub(crate) dir_name_data: Vec<Option<DirectoryNameData>>,
     /// Every reference-compatible repair the open applied.
     pub(crate) tolerance: ToleranceReport,
+    /// Whether name lookups must scan sibling trees (leniency audit F7.3).
+    pub(crate) misordered_siblings: bool,
 }
 
 /// Represents an OLE directory entry (stream or storage)
@@ -910,6 +915,7 @@ impl<R: Read + Seek> OleFile<R> {
             dir_entries: self.dir_entries,
             dir_name_data: self.dir_name_data,
             tolerance: self.tolerance,
+            misordered_siblings: self.misordered_siblings,
         }
     }
 
@@ -1114,6 +1120,7 @@ impl<R: Read + Seek> OleFile<R> {
             sector_roles,
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
 
         // Load FAT (File Allocation Table)
@@ -1481,7 +1488,9 @@ impl<R: Read + Seek> OleFile<R> {
         let mut dir_data = try_filled_vec(data_len, 0u8, "directory data")?;
         self.read_sectors_batched(&sectors, &mut dir_data)?;
 
-        let validated_entries = Self::validated_directory_entries(&dir_data, self.sector_size)?;
+        let mut tolerance = ToleranceReport::default();
+        let (validated_entries, misordered_siblings) =
+            Self::validated_directory_entries(&dir_data, self.sector_size, &mut tolerance)?;
 
         // Each directory entry is 128 bytes
         let num_entries = dir_data.len() / DIRENTRY_SIZE;
@@ -1537,6 +1546,8 @@ impl<R: Read + Seek> OleFile<R> {
         self.root = root_entry;
         self.dir_entries = dir_entries;
         self.dir_name_data = dir_name_data;
+        self.misordered_siblings = misordered_siblings;
+        self.tolerance.append(&tolerance);
 
         Ok(())
     }
@@ -1788,14 +1799,26 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     #[cfg(test)]
-    pub(crate) fn validate_directory(dir_data: &[u8], sector_size: usize) -> Result<(), OleError> {
-        Self::validated_directory_entries(dir_data, sector_size).map(drop)
+    pub(crate) fn validate_directory(
+        dir_data: &[u8],
+        sector_size: usize,
+    ) -> Result<ToleranceReport, OleError> {
+        let mut tolerance = ToleranceReport::default();
+        Self::validated_directory_entries(dir_data, sector_size, &mut tolerance)?;
+        Ok(tolerance)
     }
 
+    /// Validates every directory entry and the storage tree.
+    ///
+    /// Returns the validated entries and whether any sibling tree violates
+    /// the MS-CFB 2.6.4 name ordering; each violation is recorded in
+    /// `tolerance`.
     fn validated_directory_entries(
         dir_data: &[u8],
         sector_size: usize,
-    ) -> Result<Vec<Option<ValidatedDirectoryEntry>>, OleError> {
+        tolerance: &mut ToleranceReport,
+    ) -> Result<(Vec<Option<ValidatedDirectoryEntry>>, bool), OleError> {
+        let mut misordered = false;
         if dir_data.is_empty() || !dir_data.len().is_multiple_of(DIRENTRY_SIZE) {
             return Err(OleError::CorruptedFile(
                 "CFB directory stream must contain complete 128-byte entries".to_string(),
@@ -1881,9 +1904,12 @@ impl<R: Read + Seek> OleFile<R> {
                     false
                 };
                 if violates_lower || violates_upper {
-                    return Err(OleError::CorruptedFile(format!(
-                        "CFB sibling tree violates name ordering at SID {sid}"
-                    )));
+                    // MS-CFB 2.6.4 constrains writers only; LibreOffice never
+                    // checks the order and POI looks names up linearly.
+                    // Bounds, acyclicity, and unique ownership above stay
+                    // enforced; lookups switch to a scan (leniency audit F7.3).
+                    tolerance.record(DirectoryDefect::SiblingNameOrder, sid);
+                    misordered = true;
                 }
 
                 if entry.entry_type == STGTY_STORAGE && entry.sid_child != NOSTREAM {
@@ -1919,7 +1945,7 @@ impl<R: Read + Seek> OleFile<R> {
                 )));
             }
         }
-        Ok(entries)
+        Ok((entries, misordered))
     }
 
     fn parse_validated_directory_entry(
@@ -3418,34 +3444,13 @@ impl<R: Read + Seek> OleFile<R> {
     where
         C: Fn(&DirectoryNameData) -> Ordering,
     {
-        let mut current_sid = sid;
-
-        for _ in 0..self.dir_entries.len() {
-            if current_sid == NOSTREAM {
-                return Err(OleError::StreamNotFound);
-            }
-            let Some(current_index) = usize::try_from(current_sid).ok() else {
-                return Err(OleError::StreamNotFound);
-            };
-            let entry = self
-                .dir_entries
-                .get(current_index)
-                .and_then(Option::as_ref)
-                .ok_or(OleError::StreamNotFound)?;
-            let entry_name = self
-                .dir_name_data
-                .get(current_index)
-                .and_then(Option::as_ref)
-                .ok_or(OleError::StreamNotFound)?;
-
-            current_sid = match compare(entry_name) {
-                Ordering::Less => entry.sid_left,
-                Ordering::Equal => return Ok(entry),
-                Ordering::Greater => entry.sid_right,
-            };
-        }
-
-        Err(OleError::StreamNotFound)
+        find_sibling_by_name(
+            &self.dir_entries,
+            &self.dir_name_data,
+            sid,
+            self.misordered_siblings,
+            compare,
+        )
     }
 
     /// Get the root entry name
@@ -3928,6 +3933,80 @@ fn read_u32_le(bytes: &[u8], description: &str) -> Result<u32, OleError> {
         .try_into()
         .map_err(|_err| OleError::InvalidFormat(format!("{description} is truncated")))?;
     Ok(u32::from_le_bytes(value))
+}
+
+/// Finds the entry `compare` reports equal in the sibling tree rooted at
+/// `tree_root`.
+///
+/// A validated, ordered tree is searched by descent. When open-time
+/// validation recorded a name-ordering violation (leniency audit F7.3) the
+/// descent could miss an entry, so every node of the tree is scanned in
+/// order instead, as POI's linear name lookup does, and the first match
+/// wins. Both forms visit at most one node per directory entry, a final
+/// defense against a malformed in-memory graph.
+pub(crate) fn find_sibling_by_name<'a, C>(
+    dir_entries: &'a [Option<DirectoryEntry>],
+    dir_name_data: &[Option<DirectoryNameData>],
+    tree_root: u32,
+    misordered: bool,
+    compare: C,
+) -> Result<&'a DirectoryEntry, OleError>
+where
+    C: Fn(&DirectoryNameData) -> Ordering,
+{
+    let node = |sid: u32| -> Option<(&'a DirectoryEntry, &DirectoryNameData)> {
+        let index = usize::try_from(sid).ok()?;
+        let entry = dir_entries.get(index)?.as_ref()?;
+        let name = dir_name_data.get(index)?.as_ref()?;
+        Some((entry, name))
+    };
+
+    if !misordered {
+        let mut current_sid = tree_root;
+        for _ in 0..dir_entries.len() {
+            if current_sid == NOSTREAM {
+                return Err(OleError::StreamNotFound);
+            }
+            let (entry, entry_name) = node(current_sid).ok_or(OleError::StreamNotFound)?;
+            current_sid = match compare(entry_name) {
+                Ordering::Less => entry.sid_left,
+                Ordering::Equal => return Ok(entry),
+                Ordering::Greater => entry.sid_right,
+            };
+        }
+        return Err(OleError::StreamNotFound);
+    }
+
+    // In-order scan with an explicit stack: the tree is untrusted input.
+    let mut pending = Vec::new();
+    let mut current_sid = tree_root;
+    let mut budget = dir_entries.len();
+    loop {
+        while current_sid != NOSTREAM {
+            let Some((entry, _)) = node(current_sid) else {
+                break;
+            };
+            if budget == 0 {
+                return Err(OleError::StreamNotFound);
+            }
+            budget -= 1;
+            pending
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("sibling scan stack", source))?;
+            pending.push(current_sid);
+            current_sid = entry.sid_left;
+        }
+        let Some(sid) = pending.pop() else {
+            return Err(OleError::StreamNotFound);
+        };
+        let Some((entry, entry_name)) = node(sid) else {
+            return Err(OleError::StreamNotFound);
+        };
+        if compare(entry_name) == Ordering::Equal {
+            return Ok(entry);
+        }
+        current_sid = entry.sid_right;
+    }
 }
 
 fn next_chain_sector(
@@ -5133,6 +5212,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_count],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         }
     }
 
@@ -5188,6 +5268,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
 
         assert_eq!(file.read_stream_from_fat(0, 3).unwrap(), b"abc");
@@ -5211,6 +5292,7 @@ mod tests {
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         }
     }
 
@@ -5431,6 +5513,7 @@ mod tests {
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         }
     }
 
@@ -5497,6 +5580,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; bytes.len() / SECTOR_SIZE_V3],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         }
     }
 
@@ -5977,6 +6061,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_sectors],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         }
     }
 
@@ -6322,6 +6407,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 3],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
         let mut data = vec![0xFF; 2 * SECTOR_SIZE_V3];
 
@@ -6382,6 +6468,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 113],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
         assert!(matches!(
             file.load_fat(&header, 111, 109, 2),
@@ -6421,6 +6508,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
 
         assert!(matches!(
@@ -6449,6 +6537,7 @@ mod tests {
             sector_roles: vec![PhysicalSectorRole::Unclaimed],
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
 
         assert!(matches!(
@@ -6492,6 +6581,7 @@ mod tests {
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
         assert!(matches!(
             file.read_sector(0),
@@ -6520,6 +6610,7 @@ mod tests {
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
         let mut destination = [0xFF; SECTOR_SIZE_V3];
 
@@ -6613,6 +6704,7 @@ mod tests {
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
             tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
 
         let streams = file.list_streams();

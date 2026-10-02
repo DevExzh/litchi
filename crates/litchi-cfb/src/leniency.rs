@@ -185,8 +185,6 @@ pub enum DirectoryDefect {
     /// unique ownership are still enforced. Name lookups in the affected
     /// file fall back to an exhaustive, bounded scan of each sibling tree,
     /// returning the first match in tree order.
-    ///
-    /// Not yet repaired: the reader currently rejects this deviation.
     SiblingNameOrder,
     /// A non-empty directory entry was not reachable from the root (F7.4).
     ///

@@ -2829,31 +2829,13 @@ impl SharedOleFile {
     where
         C: Fn(&DirectoryNameData) -> Ordering,
     {
-        let mut current_sid = sid;
-        for _ in 0..self.index.dir_entries.len() {
-            if current_sid == ENDOFCHAIN {
-                return Err(OleError::StreamNotFound);
-            }
-            let index = usize::try_from(current_sid).map_err(|_error| OleError::StreamNotFound)?;
-            let entry = self
-                .index
-                .dir_entries
-                .get(index)
-                .and_then(Option::as_ref)
-                .ok_or(OleError::StreamNotFound)?;
-            let entry_name = self
-                .index
-                .dir_name_data
-                .get(index)
-                .and_then(Option::as_ref)
-                .ok_or(OleError::StreamNotFound)?;
-            current_sid = match compare(entry_name) {
-                Ordering::Less => entry.sid_left,
-                Ordering::Equal => return Ok(entry),
-                Ordering::Greater => entry.sid_right,
-            };
-        }
-        Err(OleError::StreamNotFound)
+        crate::file::find_sibling_by_name(
+            &self.index.dir_entries,
+            &self.index.dir_name_data,
+            sid,
+            self.index.misordered_siblings,
+            compare,
+        )
     }
 }
 

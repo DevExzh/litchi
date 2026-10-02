@@ -630,6 +630,7 @@ fn fresh_reader(file: &OleFile<Cursor<Vec<u8>>>) -> OleFile<Cursor<Vec<u8>>> {
         sector_roles: file.sector_roles.clone(),
         stream_chain: EndChainScratch::default(),
         tolerance: file.tolerance.clone(),
+        misordered_siblings: file.misordered_siblings,
     }
 }
 

@@ -20,7 +20,9 @@ fn valid_directory(count: u32) -> Vec<u8> {
 }
 
 fn validate(data: &[u8]) -> Result<(), crate::OleError> {
-    OleFile::<Cursor<Vec<u8>>>::validate_directory(data, 512)
+    let report = OleFile::<Cursor<Vec<u8>>>::validate_directory(data, 512)?;
+    assert!(report.is_clean(), "unexpected repair: {report:?}");
+    Ok(())
 }
 
 fn read_sid(data: &[u8], entry_sid: u32, offset: usize) -> u32 {
@@ -60,7 +62,7 @@ fn rejects_invalid_names_types_and_colors() {
 }
 
 #[test]
-fn accepts_non_black_tree_roots_but_rejects_invalid_ordering() {
+fn accepts_non_black_tree_roots_and_records_invalid_ordering() {
     let mut red_root = valid_directory(3);
     let tree_root = read_sid(&red_root, 0, 76);
     red_root[tree_root as usize * DIRENTRY_SIZE + 67] = 0;
@@ -73,7 +75,10 @@ fn accepts_non_black_tree_roots_but_rejects_invalid_ordering() {
     let root_offset = reversed_root as usize * DIRENTRY_SIZE;
     reversed[root_offset + 68..root_offset + 72].copy_from_slice(&right.to_le_bytes());
     reversed[root_offset + 72..root_offset + 76].copy_from_slice(&left.to_le_bytes());
-    assert!(validate(&reversed).is_err());
+    // A name-ordering violation is a recorded default repair (leniency
+    // audit F7.3), not a rejection.
+    let report = OleFile::<Cursor<Vec<u8>>>::validate_directory(&reversed, 512).unwrap();
+    assert!(report.contains(crate::DirectoryDefect::SiblingNameOrder));
 }
 
 #[test]
