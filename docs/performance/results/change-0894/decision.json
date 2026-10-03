@@ -1,0 +1,150 @@
+{
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "broad_non_iwork_goal_complete": false,
+  "capture": {
+    "allocator_children": 8,
+    "measured_samples": 3320,
+    "native_children": 64,
+    "retry_or_replacement": false
+  },
+  "corpus": {
+    "baseline_candidate_mismatches": 0,
+    "inputs": 180,
+    "legs_per_role": 1576,
+    "worksheets": 394
+  },
+  "decision": "reject",
+  "evidence": {
+    "attempts/quality-v9/quality-receipt.json": {
+      "bytes": 48873,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+      "sha256": "cc3cf5a150d1fd43b9151c7113d74e325deb8d7ca00741b737572cd9e0292a23"
+    },
+    "build.json": {
+      "bytes": 8119,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/build.json",
+      "sha256": "7c40bf94e3c317ec16719315f984a52bb5b4b2a2a17cd6db047a7bf785c8d888"
+    },
+    "candidate-build.json": {
+      "bytes": 10170,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-build.json",
+      "sha256": "0bb01d0e8d076dd19171b2ebc3258debd17bcebf1c6bc0b9e8a3fd95c95f4946"
+    },
+    "candidate-freeze.json": {
+      "bytes": 6752,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-freeze.json",
+      "sha256": "5d17efef3422a028477d0bfeca2efb63b22d9f7b3f61321c464cefddd0ea20d4"
+    },
+    "candidate-review.json": {
+      "bytes": 14605,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-review.json",
+      "sha256": "4f021f97fb3d60921a862c96b52a2f5d5ed976f6125a5e672ce7ea1b3833320f"
+    },
+    "capture-review.json": {
+      "bytes": 74660,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/capture-review.json",
+      "sha256": "c98380d0c38e5283ba4f644a5ea871346d555f2e250017bf924969509630ed2c"
+    },
+    "capture/experiment.json": {
+      "bytes": 26131,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/capture/experiment.json",
+      "sha256": "35486c693869c5ad9fd20df536d7ca1f49319dc3bd5668bb75183570279cd6b5"
+    },
+    "cleanup.json": {
+      "bytes": 36174,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/cleanup.json",
+      "sha256": "fc37a5ed1962f837868f01a4a09443bfbd40ab9050db73ea45d4790eea09173a"
+    },
+    "corpus-v1/corpus-review.json": {
+      "bytes": 12303,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/corpus-review.json",
+      "sha256": "9166ba0585c6109e6c308c7228ff6350d48e127d788cd3fb5c25b755942ece74"
+    },
+    "corpus-v1/run.json": {
+      "bytes": 73685,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/run.json",
+      "sha256": "836608257d45851fe9d74a66d6d76264d320445408c1d545164041dfa1355046"
+    },
+    "corpus-v1/verification-after-cleanup.json": {
+      "bytes": 11439,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/verification-after-cleanup.json",
+      "sha256": "869223e8aba6a6dec9c48c8701902d28649d44c6c0dca7f9ee96103509198b9f"
+    },
+    "early-quality-root-cleanup.json": {
+      "bytes": 3896,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/early-quality-root-cleanup.json",
+      "sha256": "1d51dc20f5e4a2f83ac717a8c23de160213ce7dc7d220226b77539ceda2f6bb3"
+    },
+    "methodology-review.json": {
+      "bytes": 6996,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/methodology-review.json",
+      "sha256": "e24add10d97bade2b0f3b2ba0b256ae4372f7e38234b7237e4f41799bbdecb3b"
+    },
+    "plan.json": {
+      "bytes": 21499,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/plan.json",
+      "sha256": "893213c8d854955cfde556fc1879069ad2584152d8cc1514cd269e5a9f0ed874"
+    },
+    "reduction.json": {
+      "bytes": 53740,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/reduction.json",
+      "sha256": "f34040c375709256e066496a073c2456f06bb66f6d3a60cf80bb7a79a95676a4"
+    },
+    "restoration.json": {
+      "bytes": 3055,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/restoration.json",
+      "sha256": "26564e5556b99d942faad8311d0f2c5637530ee67a580668d7a02a10c9ec4934"
+    },
+    "scratch-cleanup.json": {
+      "bytes": 1402,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/scratch-cleanup.json",
+      "sha256": "970b17fa80568b27de051a4f179a4fc6dee9b123fba2409a8363d2516c99cd1e"
+    },
+    "verification-after-cleanup.json": {
+      "bytes": 826,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/verification-after-cleanup.json",
+      "sha256": "a1506b5593bd3c2fd2fed28753cc04ddc6a224d3c62d388a5f78f2dd47ff2a1a"
+    },
+    "verification.json": {
+      "bytes": 826,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/verification.json",
+      "sha256": "a1506b5593bd3c2fd2fed28753cc04ddc6a224d3c62d388a5f78f2dd47ff2a1a"
+    }
+  },
+  "limitations": [
+    "Warm filesystem cache, CPU 12, pinned Rust 1.95 release, fixed generated producer corpus; no broader Office, cold-cache, or concurrency claim.",
+    "Reviewer artifact hashing overlapped active capture; overlap duration and timing effect are unquantified on the shared host.",
+    "RSS includes process residency and post-endpoint tolerance guards; no causal heap attribution.",
+    "No causal allocation profile collected; increased calls are an observed diagnostic signal."
+  ],
+  "next_investigation": "Profile per-event allocation in the selected semantic stream before optimizing it or reconsidering metadata admission.",
+  "owned_temporary_roots_remaining": [],
+  "primary_gate": {
+    "ci95_high": 1.9204038076205814,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 1.8972120877114294,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "primary_observation": {
+    "ci95_high": 1.9204038076205814,
+    "ci95_low": 1.874311145026162,
+    "median_ratio": 1.8972120877114294
+  },
+  "primary_observed_percent_change": 89.72120877114294,
+  "production_changed": false,
+  "quality": {
+    "focused_tests": 7,
+    "gates_passed": 9,
+    "harness_tests": 22,
+    "selector_tests": 1,
+    "xlsx_tests": 1397
+  },
+  "reason": "The frozen primary latency adoption gate fails; retain the evidence and restore production.",
+  "restoration_verified": true,
+  "schema": "litchi.xlsx-selected-metadata-decision-0894.v1",
+  "status": "complete",
+  "unrelated_dirty_worktrees_preserved": true,
+  "utc": "2026-10-03T22:46:45.436491+00:00",
+  "worktrees_created": []
+}

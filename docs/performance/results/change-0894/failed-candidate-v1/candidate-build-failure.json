@@ -1,0 +1,15 @@
+{
+  "error": "candidate native release build failed with exit code 101",
+  "exit_code": 101,
+  "finished_utc": "2026-10-03T21:34:54.039152+00:00",
+  "role": "native",
+  "schema": "litchi.xlsx-selected-metadata-candidate-build-failure-0894.v1",
+  "source_before": {
+    "bytes": 2085276,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-source-before.json",
+    "sha256": "b3164ca7ba50688930161f9ca0a4485c4d2ef3d1a584d0b63579d1456180da8a"
+  },
+  "status": "fail"
+}

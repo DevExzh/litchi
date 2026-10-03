@@ -1,0 +1,6 @@
+# Retained local executables and source archives are bound by tracked receipts.
+/binaries/
+*.tar.gz
+/failed-candidate-v1/probe/xlsx0894-probe
+/probe/retained/*/xlsx0894-probe
+/probe/retained/*/cargo-target/

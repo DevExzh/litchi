@@ -1,5 +1,22 @@
 # Performance program phase report
 
+## 0894 — selected worksheet metadata route rejected
+
+[0894](0894-selected-worksheet-metadata.md) completes quality-v9, the 180-input
+four-leg corpus differential, and the 72-child / 3,320-sample current-guard
+trial. The candidate-versus-baseline semantic comparison has zero differences,
+but the frozen primary native producer XLSX full-cell p50 gate fails: ratio
+**1.897212**, 95% interval **1.874311–1.920404**, against ≤0.98 and upper <1.0.
+The native p95/p99 ratios are **1.907545/1.903312**. Allocator calls and bytes
+increase substantially; RSS remains descriptive because executable residency
+confounds causal heap attribution. The shared host had no exclusive-host
+guarantee. The candidate is rejected and production is restored exactly. The
+next measured investigation is to profile selected semantic-stream per-event
+allocation before optimizing or reconsidering metadata admission; no causal
+profile is yet available. Reviewer artifact hashing overlapped capture, with
+unquantified effect. Independent capture/corpus replay and cleanup pass; the
+decision and final review retain all evidence.
+
 ## 0893 — force per-worksheet tolerance checks
 
 [0893](0893-forced-worksheet-tolerance-guard.md) strengthens the producer full-cell benchmark before a selected-route optimization: every worksheet report is forced after timing and metric endpoints, followed by aggregate and source-freshness checks. Versioned measured/warmup evidence rejects historical aggregate-only reports. Actual raw-scanner controls qualify the producer's metadata refusals. Production eligibility is unchanged; this is correctness evidence, with no new performance claim.

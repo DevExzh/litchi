@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "reason": "intentional interruption after quality-v4 fixture failures; source hashes unchanged; failed attempt retained before retry",
+  "source_files_rechecked": 10773,
+  "removed": [
+    {
+      "root": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-src",
+      "files": 10774,
+      "logical_bytes": 259432057,
+      "marker": "litchi 0894 frozen candidate source\n"
+    },
+    {
+      "root": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-build",
+      "files": 1710,
+      "logical_bytes": 1058511094,
+      "marker": "litchi 0894 frozen candidate build target\n"
+    },
+    {
+      "root": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate",
+      "files": 1021,
+      "logical_bytes": 495176924,
+      "marker": "litchi 0894 observable probe candidate\n"
+    }
+  ],
+  "utc": "2026-10-03T21:35:45.722740+00:00"
+}

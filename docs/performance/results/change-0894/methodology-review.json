@@ -1,0 +1,121 @@
+{
+  "findings_resolved": [
+    "The source archive is streamed through an explicit GzipFile while git archive stdout remains a pipe; the retained archive is bound to its exact 10771-file census, byte count, and SHA-256.",
+    "Source and build custody is role-aware: baseline and candidate source snapshots, candidate freeze and overlay, build receipts, binaries, depfiles, flags, quality receipts, reviews, and isolated quality-source preparation are linked by exact descriptors and receipt identities.",
+    "The transitive 0887 reducer, capture/verification helpers, quality runner, and isolated quality-source helper are included in the sealed helper set; sealed historical fixtures and the 0893 guard reference are descriptor-bound.",
+    "Candidate quality is pinned to the 506aa2eda baseline HEAD and to the isolated archive-plus-overlay source root; the private generated lock, support files, archive, overlays, and runner copy are checked against their bindings.",
+    "The child validator requires the fixed corpus, strict 0893 guard vectors, aligned sample indices, source freshness, static route/cold flags, role-specific binary identity, command/receipt equality, and ordered fresh-child schedule.",
+    "The fail-fast capture, complete-population requirement, paired reducer, allocator failed-call check, bootstrap protocol, and independent no-workload verifier reject incomplete or substituted child evidence."
+  ],
+  "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+  "guard_test_sha256": "645d9aeafc54d6a9febdc0cf86cfa8d43a66c378b1d3e466a47abc0d68accccd",
+  "helper_descriptors": {
+    "experiment.py": {
+      "bytes": 70842,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/experiment.py",
+      "sha256": "e290c4fb1522131382605c91305beb36293069b72653bd4d67193177e20f3f64"
+    },
+    "freeze.py": {
+      "bytes": 16226,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/freeze.py",
+      "sha256": "b2ab5654083e03640428b56be64b0e9da4fca64c612ca73dc2587a911fde97de"
+    },
+    "quality.py": {
+      "bytes": 29695,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/quality.py",
+      "sha256": "55bf268c9b6270995d36189b391af9bd2244f8cdf7008d527c0ee7f2e502c25f"
+    },
+    "quality_source.py": {
+      "bytes": 5244,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/quality_source.py",
+      "sha256": "138dd07b47a209157950c6d1bf0399af202add742ad426855f62da4504727b74"
+    },
+    "reduce-0887.py": {
+      "bytes": 13950,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/reduce.py",
+      "sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad"
+    },
+    "reduce.py": {
+      "bytes": 1843,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/reduce.py",
+      "sha256": "0a27d8bd7a40d03bacf81d79fdb91f72191eb55992ddd0aab1efdedc263b6415"
+    },
+    "verify.py": {
+      "bytes": 11554,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/verify.py",
+      "sha256": "82ebf22b3ded31a4914fbbba9c351a0aa0498d9462d57483f8a0fc36db15872b"
+    }
+  },
+  "helper_hashes": {
+    "experiment.py": "e290c4fb1522131382605c91305beb36293069b72653bd4d67193177e20f3f64",
+    "freeze.py": "b2ab5654083e03640428b56be64b0e9da4fca64c612ca73dc2587a911fde97de",
+    "quality.py": "55bf268c9b6270995d36189b391af9bd2244f8cdf7008d527c0ee7f2e502c25f",
+    "quality_source.py": "138dd07b47a209157950c6d1bf0399af202add742ad426855f62da4504727b74",
+    "reduce-0887.py": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad",
+    "reduce.py": "0a27d8bd7a40d03bacf81d79fdb91f72191eb55992ddd0aab1efdedc263b6415",
+    "verify.py": "82ebf22b3ded31a4914fbbba9c351a0aa0498d9462d57483f8a0fc36db15872b"
+  },
+  "limitations": [
+    "CPU 12 affinity is recorded without an exclusive-host guarantee; warm-cache timing variation remains possible.",
+    "RSS and allocator counters are descriptive observations and carry no automatic adoption gate; runtime route and physical-cold claims remain excluded.",
+    "The 0887 reducer is reused through the sealed 0894 adapter and is hash-bound, but it is not an independently implemented reducer.",
+    "At review time the actual 0894 quality receipt, candidate/baseline plan, builds, corpus capture, reduction, and independent verification were still pending; this receipt approves only the protocol for measurement."
+  ],
+  "negative_controls": [
+    "Read-only source inspection confirmed that changing helper bytes invalidates the plan helper set and methodology review hash set.",
+    "Read-only source inspection confirmed that candidate path omission, duplication, or unexpected paths are rejected by the freeze/quality/plan contracts.",
+    "Read-only source inspection confirmed that missing, nonzero, semantically invalid, or reordered children cannot yield a passing experiment receipt or reduction.",
+    "Read-only source inspection confirmed that baseline and candidate build role, binary lane, depfile, flags, source snapshot, quality, review, and archive links are checked before plan acceptance.",
+    "Read-only source inspection confirmed that the verifier launches no workload and replays command, receipt, artifact, interval, semantic, corpus, and guard checks."
+  ],
+  "performance_claim": null,
+  "protocol": {
+    "allocator": {
+      "children": 8,
+      "order": "AB/BA alternates by block parity",
+      "pairs": 4,
+      "primary_case": "xlsx_producer_medium_source_full_cell_scan",
+      "samples": 15,
+      "warmup": 3
+    },
+    "execution": "fresh sequential child per row pinned to CPU 12 with warm filesystem cache; fail-fast with no retry or replacement",
+    "native": {
+      "blocks": 8,
+      "cases_per_block": 4,
+      "children": 64,
+      "order": "AB/BA alternates by (block + case_index) parity; native lane completes before allocator lane",
+      "pairs_per_case": 8,
+      "samples": 50,
+      "warmup": 3
+    },
+    "statistics": {
+      "bootstrap_draws": 10000,
+      "bootstrap_indices": [
+        249,
+        9749
+      ],
+      "bootstrap_seed": 894,
+      "primary_gate": "native primary p50 paired median ratio <= 0.98 and bootstrap 95% upper endpoint < 1.0",
+      "unit": "whole paired child aggregate statistics"
+    },
+    "total_children": 72
+  },
+  "reviewer": "/root/selected_metadata_methodology_0894",
+  "schema": "litchi.xlsx-selected-metadata-methodology-review-0894.v1",
+  "scope": "protocol custody and methodology only; read-only review without builds, tests, workloads, captures, archives, or reducer execution",
+  "status": "approved_for_measurement"
+}

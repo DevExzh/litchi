@@ -1,0 +1,204 @@
+{"argv": ["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo", "test", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--locked", "--offline", "--lib", "producer_shape::", "--", "--nocapture"], "candidate_sources": ["crates/litchi-xlsx/src/raw/worksheet/selected.rs", "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs", "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs", "crates/litchi-xlsx/src/raw/worksheet/tests.rs", "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"], "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src", "environment": {"CARGO_BUILD_JOBS": "2", "CARGO_HOME": "/home/zhuhe/.cargo", "CARGO_INCREMENTAL": "0", "CARGO_NET_OFFLINE": "true", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_RELEASE_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0", "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality", "HOME": "/home/zhuhe", "LANG": "C", "LC_ALL": "C", "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin", "RUSTDOCFLAGS": "-D warnings", "RUSTFLAGS": "", "RUSTUP_HOME": "/home/zhuhe/.rustup", "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu", "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp", "TZ": "UTC"}, "tool_versions": {"cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n", "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"}}
+
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling zeroize v1.9.0
+   Compiling hybrid-array v0.4.14
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.119
+   Compiling syn v3.0.3
+   Compiling crypto-common v0.2.2
+   Compiling subtle v2.6.1
+   Compiling const-oid v0.9.6
+   Compiling block-buffer v0.12.1
+   Compiling cmov v0.5.4
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling ctutils v0.4.2
+   Compiling libm v0.2.16
+   Compiling zerocopy v0.8.56
+   Compiling cpufeatures v0.3.0
+   Compiling num-traits v0.2.19
+   Compiling digest v0.10.7
+   Compiling getrandom v0.2.17
+   Compiling thiserror v2.0.20
+   Compiling rand_core v0.6.4
+   Compiling thiserror-impl v2.0.20
+   Compiling base64ct v1.8.3
+   Compiling smallvec v1.15.2
+   Compiling digest v0.11.3
+   Compiling pem-rfc7468 v0.7.0
+   Compiling der_derive v0.7.3
+   Compiling zmij v1.0.23
+   Compiling flagset v0.4.7
+   Compiling serde_derive v1.0.229
+   Compiling der v0.7.10
+   Compiling serde_json v1.0.151
+   Compiling spki v0.7.3
+   Compiling chacha20 v0.10.1
+   Compiling serde v1.0.229
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling synstructure v0.13.2
+   Compiling fast-float2 v0.2.3
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-core)
+   Compiling pkcs8 v0.10.2
+   Compiling either v1.17.0
+   Compiling rayon v1.12.0
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling zerofrom v0.1.8
+   Compiling ff v0.13.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling base16ct v0.2.0
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling yoke v0.8.3
+   Compiling crypto-bigint v0.5.5
+   Compiling rand_chacha v0.3.1
+   Compiling sha2 v0.10.9
+   Compiling num-integer v0.1.46
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling elliptic-curve v0.13.8
+   Compiling zerovec-derive v0.11.3
+   Compiling zerocopy-derive v0.8.56
+   Compiling spin v0.9.9
+   Compiling num-bigint-dig v0.8.6
+   Compiling lazy_static v1.5.0
+   Compiling zerovec v0.11.6
+   Compiling rfc6979 v0.4.0
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.7
+   Compiling displaydoc v0.2.7
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling sha1 v0.10.7
+   Compiling pkcs1 v0.7.5
+   Compiling fixedbitset v0.5.7
+   Compiling rsa v0.9.10
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-cfb)
+   Compiling p256 v0.13.2
+   Compiling x509-cert v0.2.5
+   Compiling crc32fast v1.5.0
+   Compiling tinystr v0.8.3
+   Compiling block-padding v0.4.2
+   Compiling writeable v0.6.3
+   Compiling litemap v0.8.2
+   Compiling icu_locale_core v2.2.0
+   Compiling inout v0.2.2
+   Compiling zerotrie v0.2.4
+   Compiling potential_utf v0.1.5
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/xml-minifier-macros)
+   Compiling icu_normalizer_data v2.2.0
+   Compiling icu_properties_data v2.2.0
+   Compiling icu_collections v2.2.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/xml-minifier)
+   Compiling icu_provider v2.2.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/soapberry-zip)
+   Compiling rustix v1.1.4
+   Compiling cipher v0.5.2
+   Compiling icu_properties v2.2.0
+   Compiling icu_normalizer v2.2.0
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-sign)
+   Compiling cpubits v0.1.1
+   Compiling tempfile v3.27.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling siphasher v1.0.3
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-opc)
+   Compiling url v2.5.8
+   Compiling aes v0.9.2
+   Compiling hmac v0.13.0
+   Compiling encoding_rs v0.8.35
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-codepage)
+   Compiling phf_shared v0.14.0
+   Compiling cbc v0.2.1
+   Compiling sha1 v0.11.0
+   Compiling universal-hash v0.6.1
+   Compiling ryu v1.0.23
+   Compiling fastrand v2.5.0
+   Compiling phf_generator v0.14.0
+   Compiling polyval v0.7.3
+   Compiling bergshamra-core v0.7.0
+   Compiling inout v0.1.4
+   Compiling uppsala v0.9.0
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ooxml-common)
+   Compiling bergshamra-xml v0.7.0
+   Compiling cipher v0.4.4
+   Compiling ghash v0.6.0
+   Compiling phf_macros v0.14.0
+   Compiling ctr v0.10.1
+   Compiling aead v0.6.1
+   Compiling password-hash v0.5.0
+   Compiling blake2 v0.10.6
+   Compiling byteorder v1.5.0
+   Compiling blowfish v0.9.1
+   Compiling argon2 v0.5.3
+   Compiling aes-gcm v0.11.0
+   Compiling phf v0.14.0
+   Compiling bergshamra-c14n v0.7.0
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ole-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-drawingml)
+   Compiling pbkdf2 v0.13.0
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-odf-common)
+   Compiling rc4 v0.2.0
+   Compiling litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-odraw)
+   Compiling litchi-biff v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-biff)
+   Compiling md-5 v0.11.0
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-crypto)
+   Compiling litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ograph)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-vba)
+   Compiling litchi-xldm v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xldm)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-sheet)
+   Compiling spin v0.10.1
+   Compiling bumpalo v3.20.3
+   Compiling crc-fast v1.10.0
+   Compiling same-file v1.0.6
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-odt)
+   Compiling litchi-rtf v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-rtf)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-doc)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ppt)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ods)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-odp)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-docx)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-pptx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi)
+   Compiling litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsb)
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xls)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 1m 52s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/litchi-0894-quality/debug/deps/litchi_perf_baseline-04bc7697c8c199af)
+
+running 22 tests
+test producer_shape::tests::producer_full_cell_scan_rejects_incomplete_duplicate_and_out_of_order_callbacks ... ok
+test producer_shape::tests::real_file_corpus_refuses_a_missing_path ... ok
+test producer_shape::tests::docx_producer_document_carries_the_word_2013_namespace_set ... ok
+test producer_shape::tests::pptx_producer_slides_carry_alternate_content ... ok
+test producer_shape::tests::xlsx_producer_edit_variant_is_admitted_and_proves_nothing_else ... ok
+test producer_shape::tests::producer_edit_oracle_rejects_an_untouched_member_change ... ok
+test producer_shape::tests::xlsx_producer_shared_string_share_is_forty_percent ... ok
+test producer_shape::selected_route_tests::producer_malformed_prefix_remains_a_typed_scan_error ... ok
+test producer_shape::tests::xlsx_producer_read_variant_carries_shared_strings_and_relationships ... ok
+test producer_shape::tests::xlsx_producer_read_variant_records_the_value_editor_verdict_on_every_fact ... ok
+test producer_shape::tests::producer_edit_oracle_accepts_the_expected_semantic_and_package_change ... ok
+test producer_shape::tests::producer_full_cell_oracle_binds_the_reviewed_medium_read_contract ... ok
+test producer_shape::tests::producer_edit_oracle_rejects_a_wrong_target_value ... ok
+test producer_shape::tests::producer_edit_oracle_rejects_lexical_damage_outside_the_target ... ok
+test producer_shape::full_cell_guard_tests::forced_guard_propagates_malformed_worksheet_store_error ... ok
+test producer_shape::selected_route_tests::producer_medium_read_admits_complete_metadata_and_preserves_the_cell_oracle ... ok
+test producer_shape::tests::producer_read_and_edit_variants_are_distinct_corpora ... ok
+test producer_shape::tests::xlsx_producer_worksheets_carry_the_real_producer_signature ... ok
+test producer_shape::full_cell_guard_tests::forced_guard_rejects_unpublished_dirty_worksheet_after_clean_aggregate ... ok
+test producer_shape::selected_route_tests::producer_medium_read_metadata_removal_controls_preserve_eligibility ... ok
+0893_FULL_CELL_REPORT={"case":"xlsx_producer_medium_source_full_cell_scan","corpus":{"name":"xlsx-producer-medium-read","generator":"litchi-xlsx-producer-shape-v1","package_format":"XLSX/OPC/ZIP","shape":"producer-medium-read","payload_kind":"producer-shape-markup-compatibility-grid","compression":"deflate","entry_count":4096,"archive_member_count":12,"entry_bytes":4,"uncompressed_payload_bytes":127499,"archive_bytes":22739,"archive_sha256":"55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8","target_entry":"Bench01!D17","target_payload_bytes":37,"target_payload_sha256":"5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba","xlsx":{"sheet_count":4,"rows_per_sheet":32,"columns_per_sheet":32,"one_percent_update_count":0,"source_members":{"workbook":"xl/workbook.xml","worksheets":["xl/worksheets/sheet1.xml","xl/worksheets/sheet2.xml","xl/worksheets/sheet3.xml","xl/worksheets/sheet4.xml"],"shared_strings":"xl/sharedStrings.xml","styles":"xl/styles.xml"}}},"elapsed_ns":{"unit":"ns","samples":[59769803,60135596,60166935],"sample_order":[0,2,1],"min":59769803,"p50":60135596,"p95":60166935,"p99":60166935,"max":60166935,"mean":60024111.333333336,"standard_deviation":220794.20176339112,"confidence_interval_95":{"method":"two-sided Student's t interval for the mean","lower":59475583.861716375,"upper":60572638.8049503}},"sink":null,"source":{"read_calls":[],"read_bytes":[],"ordinary_payload_read_calls":[],"ordinary_payload_read_bytes":[],"max_in_flight_reads":[],"producer_full_cell_scan":{"guard_contract":"post-endpoint-per-worksheet-tolerance-v1","sample_indices":[0,2,1],"implementation":"litchi_xlsx::SourceBackedWorkbook + SourceWorksheet::visit_cells","scenario":"open_plus_full_stored_cell_scan","generator":"litchi-xlsx-producer-shape-v1","shape":"producer-medium","variant":"read","archive_sha256":"55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8","archive_bytes":22739,"expected_cell_count":4096,"observed_cell_counts":[4096,4096,4096],"expected_numeric_count":3686,"expected_text_count":410,"observed_numeric_counts":[3686,3686,3686],"observed_text_counts":[410,410,410],"oracle_digest_sha256":"8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b","observed_digest_sha256":["8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b","8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b","8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b"],"marker_refusal_census_sha256":"552c35c8b8f958de28792f00c1e9e831ae884471aa28b5b2a7a1479bd06c5207","worksheet_route_eligibility":[{"worksheet":"xl/worksheets/sheet1.xml","source_stream_eligible":false,"source_stream_ineligible_reasons":["markup-compatibility-namespace","x14ac-namespace","dy-descent"],"selected_cell_stream_ineligible_on_cols":true},{"worksheet":"xl/worksheets/sheet2.xml","source_stream_eligible":false,"source_stream_ineligible_reasons":["markup-compatibility-namespace","x14ac-namespace","dy-descent"],"selected_cell_stream_ineligible_on_cols":true},{"worksheet":"xl/worksheets/sheet3.xml","source_stream_eligible":false,"source_stream_ineligible_reasons":["markup-compatibility-namespace","x14ac-namespace","dy-descent"],"selected_cell_stream_ineligible_on_cols":true},{"worksheet":"xl/worksheets/sheet4.xml","source_stream_eligible":false,"source_stream_ineligible_reasons":["markup-compatibility-namespace","x14ac-namespace","dy-descent"],"selected_cell_stream_ineligible_on_cols":true}],"timing_scope":"fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; corpus/oracle preparation, archive and census hashes, digest comparison, process/allocation endpoint snapshots, post-timing per-worksheet tolerance guard, aggregate tolerance report, post-guard source-freshness fence, handle retention, and drops are outside","source_type":"owned_positional_read_at","source_version_stable":[true,true,true],"forced_worksheet_counts":[4,4,4],"forced_worksheet_tolerance_clean":[true,true,true],"warmup_forced_worksheet_counts":[4],"warmup_forced_worksheet_tolerance_clean":[true],"forced_worksheet_guard_iterations":4,"physical_cold_eligible":false,"runtime_route_observed":false}},"operation_metrics":{"sample_count":3,"sample_indices":[0,2,1],"alignment":"elapsed_ns.samples_by_elapsed_then_sample_index","latency_claim":"comparable_timed_operation","source":{"status":"not_applicable","counter_scope":"not_applicable_in_process_sink","logical_read_calls":{"status":"not_applicable","scope":"operation_logical_read_at"},"logical_read_requested_bytes":{"status":"not_applicable","scope":"operation_logical_read_at"},"logical_read_returned_bytes":{"status":"not_applicable","scope":"operation_logical_read_at"},"logical_read_largest_requested_bytes":{"status":"not_applicable","scope":"operation_logical_read_at"},"logical_read_largest_returned_bytes":{"status":"not_applicable","scope":"operation_logical_read_at"},"logical_read_pattern":{"status":"not_applicable","scope":"operation_logical_read_at_range_order_not_physical_io"},"compressed_bytes":{"status":"not_applicable","scope":"unavailable_read_at_has_no_compressed_member_boundary"},"decompressed_bytes":{"status":"not_applicable","scope":"unavailable_read_at_has_no_decompressed_byte_boundary"},"recompressed_bytes":{"status":"not_applicable","scope":"unavailable_atomic_save_has_no_recompressed_byte_boundary"},"max_concurrent_reads":{"status":"not_applicable","scope":"operation_logical_read_at"}},"process":{"status":"measured","user_cpu_ticks":{"values":[24,16,18],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"system_cpu_ticks":{"values":[0,0,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"clock_ticks_per_second":{"values":[100,100,100],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"minor_faults":{"values":[33,0,1],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"major_faults":{"values":[0,0,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"voluntary_context_switches":{"values":[2,2,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"nonvoluntary_context_switches":{"values":[0,0,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"rss_delta_bytes":{"values":[0,0,4096],"status":"measured","scope":"procfs_in_process_rss_delta_including_procfs_probe_overhead"},"peak_rss_bytes":{"values":[88457216,88965120,89120768],"status":"measured","scope":"process_lifetime_high_water_after_not_operation_peak"},"rchar":{"values":[1975,1976,1976],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"wchar":{"values":[94,118,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"read_bytes":{"values":[0,0,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"write_bytes":{"values":[0,0,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"cancelled_write_bytes":{"values":[0,0,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"syscr":{"values":[18,18,18],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"},"syscw":{"values":[3,3,0],"status":"measured","scope":"procfs_in_process_operation_delta_including_procfs_probe_overhead"}},"sink":{"status":"not_applicable","output_bytes":{"status":"not_applicable","scope":"post_operation_output_length_not_sink_write_volume"},"write_status":"not_applicable","accepted_bytes":{"status":"not_applicable","scope":"logical_sink_accepted_write_bytes"},"write_calls":{"status":"not_applicable","scope":"logical_sink_accepted_write_calls"},"largest_write":{"status":"not_applicable","scope":"logical_sink_largest_accepted_write"},"write_size_buckets":{"status":"not_applicable","bytes_0":{"status":"not_applicable","scope":"logical_sink_accepted_write_size_bucket_counts"},"bytes_1_to_512":{"status":"not_applicable","scope":"logical_sink_accepted_write_size_bucket_counts"},"bytes_513_to_4096":{"status":"not_applicable","scope":"logical_sink_accepted_write_size_bucket_counts"},"bytes_4097_to_16384":{"status":"not_applicable","scope":"logical_sink_accepted_write_size_bucket_counts"},"bytes_16385_to_65536":{"status":"not_applicable","scope":"logical_sink_accepted_write_size_bucket_counts"},"bytes_over_65536":{"status":"not_applicable","scope":"logical_sink_accepted_write_size_bucket_counts"}}},"publication":{"status":"not_applicable","changed_spans":{"status":"not_applicable","scope":"logical_publication_counter"},"published_bytes":{"status":"not_applicable","scope":"logical_publication_counter"}},"materialization":{"status":"not_applicable","opc_parts":{"status":"not_applicable","scope":"logical_materialization_counter"}},"cfb_phases":{"status":"not_applicable","open":{"elapsed_ns":{"status":"not_applicable","scope":"timed_cfb_phase_elapsed_ns"},"logical_read_calls":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"},"logical_read_requested_bytes":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"},"logical_read_returned_bytes":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"}},"plan":{"elapsed_ns":{"status":"not_applicable","scope":"timed_cfb_phase_elapsed_ns"},"logical_read_calls":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"},"logical_read_requested_bytes":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"},"logical_read_returned_bytes":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"}},"atomic_publication":{"elapsed_ns":{"status":"not_applicable","scope":"timed_cfb_phase_elapsed_ns"},"logical_read_calls":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"},"logical_read_requested_bytes":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"},"logical_read_returned_bytes":{"status":"not_applicable","scope":"timed_cfb_phase_logical_read_at"}}}}}
+test producer_shape::tests::producer_full_cell_scan_runner_visits_every_stored_cell ... ok
+test producer_shape::tests::producer_generation_is_byte_identical_across_runs ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 562 filtered out; finished in 0.77s
+

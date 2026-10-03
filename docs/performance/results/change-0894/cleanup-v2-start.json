@@ -1,0 +1,183 @@
+{
+  "active_processes": [],
+  "candidate_quality_binding": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+    "status": "pass"
+  },
+  "created_utc": "2026-10-03T22:38:37.269224+00:00",
+  "early_probe_target_cleanup": {
+    "bytes": 2265,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/early-probe-target-cleanup.json",
+    "sha256": "31e26738df8b1fa7a66f38e37c6f626a371a846cf8e32f25f3c1d67fd04a3eb6"
+  },
+  "helper": {
+    "bytes": 24774,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/cleanup-v2.py",
+    "sha256": "7261b9acce7df295f7914ce4c17e213d55d456f3d3f0fd7b1cb7c3db5feaca05"
+  },
+  "performance_claim": null,
+  "probe_retention_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/retained",
+  "roots": [
+    {
+      "kind": "source",
+      "marker": ".owner-litchi-0894-candidate",
+      "marker_descriptor": {
+        "bytes": 36,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/.owner-litchi-0894-candidate",
+        "sha256": "cd4915310b7b05425c35aafb5024ccaffeb414bb0ee3fbbcd7d738cf2524bed6"
+      },
+      "marker_text": "litchi 0894 frozen candidate source\n",
+      "name": "candidate-source",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-src",
+      "role": "candidate",
+      "status": "present"
+    },
+    {
+      "kind": "build",
+      "marker": ".owner-litchi-0894-candidate",
+      "marker_descriptor": {
+        "bytes": 42,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/.owner-litchi-0894-candidate",
+        "sha256": "d1b1c541b94aac87a9b9cac5e7575c16ce945f82a6569a8fb9c1342c36dd37d6"
+      },
+      "marker_text": "litchi 0894 frozen candidate build target\n",
+      "name": "candidate-build",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-build",
+      "role": "candidate",
+      "status": "present"
+    },
+    {
+      "kind": "source",
+      "marker": ".owner-litchi-0894-quality-src",
+      "marker_text": "litchi 0894 isolated quality source\n",
+      "name": "quality-source",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "role": "quality",
+      "status": "absent"
+    },
+    {
+      "kind": "build",
+      "marker": ".owner-0894-quality",
+      "marker_text": "litchi 0894 selected-metadata quality target\n",
+      "name": "quality-build",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+      "role": "quality",
+      "status": "absent"
+    },
+    {
+      "kind": "probe",
+      "marker": ".owner-litchi-0894-probe-baseline",
+      "marker_descriptor": {
+        "bytes": 38,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/.owner-litchi-0894-probe-baseline",
+        "sha256": "c1b2bd431bc37926f7be2fef9b017b77401c354c88c3a106d8f09f952280881a"
+      },
+      "marker_text": "litchi 0894 observable probe baseline\n",
+      "name": "probe-baseline",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline",
+      "role": "baseline",
+      "status": "present"
+    },
+    {
+      "kind": "probe",
+      "marker": ".owner-litchi-0894-probe-candidate",
+      "marker_descriptor": {
+        "bytes": 39,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/.owner-litchi-0894-probe-candidate",
+        "sha256": "993a32e339eaeaa4c36a1f850f0fca699dd20639d67480d5a6b56d9fbca62c56"
+      },
+      "marker_text": "litchi 0894 observable probe candidate\n",
+      "name": "probe-candidate",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate",
+      "role": "candidate",
+      "status": "present"
+    }
+  ],
+  "schema": "litchi.xlsx-0894-cleanup-start.v1",
+  "source_census": [
+    {
+      "actual": {
+        "census_sha256": "a0c60b276ccb59a25bf227b9c6b35de520f7de3666ad9c3cdfc8cbafe74dd927",
+        "file_count": 10773,
+        "logical_bytes": 259437445
+      },
+      "expected": {
+        "census_sha256": "a9731d9e93b1f99770f87d22f2c1e52e06b6f482f1aadb04e06cb14cc2a33d45",
+        "file_count": 10773,
+        "logical_bytes": 259437445
+      },
+      "label": "candidate-source",
+      "mismatch_count": 0,
+      "mismatches": [],
+      "references": [
+        {
+          "bytes": 2086151,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-source-before.json",
+          "sha256": "b87af1030ac79ef840b37c634b3ad130fb09d83d0cd3b6ebd6259bfb4ad81716"
+        },
+        {
+          "bytes": 2086150,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-source-after.json",
+          "sha256": "43eb45b1ebd3bccc9a692832d8c0d4c53a694c9c90d205efdc3c1286632fd64a"
+        }
+      ],
+      "root": "/home/zhuhe/code/litchi/target/litchi-0894-candidate-src",
+      "status": "pass",
+      "verified": true
+    },
+    {
+      "label": "quality-source",
+      "reason": "owned root was already removed before this cleanup helper ran",
+      "references": [
+        {
+          "bytes": 3325536,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+          "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+        },
+        {
+          "bytes": 7951,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/quality-source.json",
+          "sha256": "8ef4eba9f5eb4f56c987063c1bc0158a75d7e88be74d931995411e79cdcbbfb8"
+        },
+        {
+          "bytes": 2861,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/bindings.json",
+          "sha256": "798632c5d290d97d16ac09e1036439a0e877c3e36499d82635977990ba829793"
+        },
+        {
+          "bytes": 48873,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+          "sha256": "cc3cf5a150d1fd43b9151c7113d74e325deb8d7ca00741b737572cd9e0292a23"
+        }
+      ],
+      "root": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "status": "absent",
+      "verified": false
+    }
+  ],
+  "status": "building"
+}

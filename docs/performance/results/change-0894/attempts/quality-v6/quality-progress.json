@@ -1,0 +1,860 @@
+{
+  "build_inputs_before": {
+    "Cargo.lock": {
+      "bytes": 138457,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    "crates/litchi-xlsx/Cargo.toml": {
+      "bytes": 1392,
+      "executable": false,
+      "mode": 420,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/Cargo.toml",
+      "sha256": "8f3f5b6f05a744f35fd617171fbdcf81d102759dc37ef596f47587f0b5353a89"
+    },
+    "tools/perf-baseline/Cargo.toml": {
+      "bytes": 3286,
+      "executable": false,
+      "mode": 420,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/tools/perf-baseline/Cargo.toml",
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    }
+  },
+  "candidate_source_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+  ],
+  "candidate_sources_after": [
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "snapshot": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source-after/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      },
+      "source": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      }
+    },
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+      "snapshot": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source-after/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      },
+      "source": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      }
+    },
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+      "snapshot": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source-after/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      },
+      "source": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      }
+    },
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "snapshot": {
+        "bytes": 187211,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source-after/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+      },
+      "source": {
+        "bytes": 187211,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+      }
+    },
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "snapshot": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source-after/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      },
+      "source": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      }
+    }
+  ],
+  "candidate_sources_before": [
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "snapshot": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      },
+      "source": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      }
+    },
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+      "snapshot": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      },
+      "source": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      }
+    },
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+      "snapshot": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      },
+      "source": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      }
+    },
+    {
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "snapshot": {
+        "bytes": 187211,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+      },
+      "source": {
+        "bytes": 187211,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+      }
+    },
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "snapshot": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/source/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      },
+      "source": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      }
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "candidate_sources": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "elapsed_ns": 54691778,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T21:44:23.920637Z",
+      "log": "attempts/quality-v6/logs/rustfmt_candidate_sources.log",
+      "log_identity": {
+        "bytes": 1597,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/logs/rustfmt_candidate_sources.log",
+        "sha256": "45e6aa974aaeafb8db17b6b1d50ccea354b7c67e1a0ab1a883377d98282c5b06"
+      },
+      "name": "rustfmt_candidate_sources",
+      "pass": true,
+      "passed_count": null,
+      "returncode": 0,
+      "started_utc": "2026-10-03T21:44:23.865944Z",
+      "terminal_exit": 0,
+      "test_result_matches": [],
+      "tool_versions": {
+        "rustfmt": "rustfmt 1.9.0-stable (59807616e1 2026-04-14)\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_metadata",
+        "--",
+        "--nocapture"
+      ],
+      "candidate_sources": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "elapsed_ns": 41589478269,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T21:45:05.516485Z",
+      "log": "attempts/quality-v6/logs/focused_producer_metadata_tests.log",
+      "log_identity": {
+        "bytes": 4872,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/logs/focused_producer_metadata_tests.log",
+        "sha256": "c05b4d5b3041d4d464953d7ffee54f521dcb4181c5b213053e9087d47a3cc653"
+      },
+      "name": "focused_producer_metadata_tests",
+      "pass": true,
+      "passed_count": 5,
+      "returncode": 0,
+      "started_utc": "2026-10-03T21:44:23.927023Z",
+      "terminal_exit": 0,
+      "test_result_matches": [
+        5
+      ],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "--nocapture"
+      ],
+      "candidate_sources": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "elapsed_ns": 262585670793,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T21:49:28.107648Z",
+      "log": "attempts/quality-v6/logs/xlsx_lib_tests.log",
+      "log_identity": {
+        "bytes": 135208,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/logs/xlsx_lib_tests.log",
+        "sha256": "2250fc0f2b837ba3418de56b75cb8b32c9248fbfc487bd14b3f9ff29febe0245"
+      },
+      "name": "xlsx_lib_tests",
+      "pass": true,
+      "passed_count": 1395,
+      "returncode": 0,
+      "started_utc": "2026-10-03T21:45:05.521993Z",
+      "terminal_exit": 0,
+      "test_result_matches": [
+        1395
+      ],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--all-features",
+        "--lib"
+      ],
+      "candidate_sources": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "elapsed_ns": 26116919366,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T21:49:54.232021Z",
+      "log": "attempts/quality-v6/logs/xlsx_all_features_check.log",
+      "log_identity": {
+        "bytes": 7043,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/logs/xlsx_all_features_check.log",
+        "sha256": "dc43ac9423b23a52227ad8dfe193b0ff141bc9806a70b9fc7237ac49f76beed2"
+      },
+      "name": "xlsx_all_features_check",
+      "pass": true,
+      "passed_count": null,
+      "returncode": 0,
+      "started_utc": "2026-10-03T21:49:28.115119Z",
+      "terminal_exit": 0,
+      "test_result_matches": [],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "candidate_sources": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "elapsed_ns": 26145333732,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+        "TZ": "UTC"
+      },
+      "failures": [
+        "nonzero_exit"
+      ],
+      "finished_utc": "2026-10-03T21:50:20.382994Z",
+      "log": "attempts/quality-v6/logs/xlsx_clippy_all_features.log",
+      "log_identity": {
+        "bytes": 5899,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/logs/xlsx_clippy_all_features.log",
+        "sha256": "de97afd39ad5e70a63de8e4a4702d1e7ce14344bf00854afb3b9523a44fa76d5"
+      },
+      "name": "xlsx_clippy_all_features",
+      "pass": false,
+      "passed_count": null,
+      "returncode": 101,
+      "started_utc": "2026-10-03T21:49:54.237679Z",
+      "terminal_exit": 101,
+      "test_result_matches": [],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    }
+  ],
+  "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+    "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+    "TZ": "UTC"
+  },
+  "failures": [
+    "xlsx_clippy_all_features"
+  ],
+  "finished_utc": "2026-10-03T21:50:20.467369Z",
+  "git_diff_after": {
+    "bytes": 27220,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/git-diff-after.txt",
+    "sha256": "e2e43a145d6a51bf2a57ff49d405d14d683884ed01fe5c1bd5c36b2d7e1953c7"
+  },
+  "git_diff_before": {
+    "bytes": 27220,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/git-diff-before.txt",
+    "sha256": "e2e43a145d6a51bf2a57ff49d405d14d683884ed01fe5c1bd5c36b2d7e1953c7"
+  },
+  "live_candidate_sources_before": [
+    {
+      "identity": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      },
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs"
+    },
+    {
+      "identity": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      },
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs"
+    },
+    {
+      "identity": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      },
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs"
+    },
+    {
+      "identity": {
+        "bytes": 187211,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+      },
+      "relative_path": "crates/litchi-xlsx/src/raw/worksheet/tests.rs"
+    },
+    {
+      "identity": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      },
+      "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+    }
+  ],
+  "live_root": "/home/zhuhe/code/litchi",
+  "lockfile": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/Cargo.lock",
+  "manifest": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/Cargo.toml",
+  "next_gate": null,
+  "perf_manifest": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/tools/perf-baseline/Cargo.toml",
+  "performance_claim": false,
+  "planned_commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "name": "rustfmt_candidate_sources",
+      "tools": [
+        "rustfmt"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_metadata",
+        "--",
+        "--nocapture"
+      ],
+      "name": "focused_producer_metadata_tests",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "--nocapture"
+      ],
+      "name": "xlsx_lib_tests",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--all-features",
+        "--lib"
+      ],
+      "name": "xlsx_all_features_check",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "name": "xlsx_clippy_all_features",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "doc",
+        "--manifest-path",
+        "crates/litchi-xlsx/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--all-features",
+        "--no-deps",
+        "--lib"
+      ],
+      "name": "xlsx_rustdoc",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::",
+        "--",
+        "--nocapture"
+      ],
+      "name": "producer_shape_harness_tests",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_full_cell_scan_selector",
+        "--",
+        "--nocapture"
+      ],
+      "name": "producer_full_cell_selector_test",
+      "tools": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "name": "crate_boundaries",
+      "tools": [
+        "python3"
+      ]
+    }
+  ],
+  "private_tmp": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp",
+  "quality_source_root": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+  "quality_source_root_binding": {
+    "candidate_source_paths": [
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+    ],
+    "lockfile": {
+      "bytes": 138457,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    "manifest": {
+      "bytes": 1392,
+      "executable": false,
+      "mode": 420,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx/Cargo.toml",
+      "sha256": "8f3f5b6f05a744f35fd617171fbdcf81d102759dc37ef596f47587f0b5353a89"
+    },
+    "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+    "perf_manifest": {
+      "bytes": 3286,
+      "executable": false,
+      "mode": 420,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/tools/perf-baseline/Cargo.toml",
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    }
+  },
+  "runner": {
+    "bytes": 29695,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v6/quality.py",
+    "sha256": "55bf268c9b6270995d36189b391af9bd2244f8cdf7008d527c0ee7f2e502c25f"
+  },
+  "schema": "litchi.xlsx-selected-metadata-quality-progress-0894.v1",
+  "skipped_after_first_failure": [
+    "xlsx_rustdoc",
+    "producer_shape_harness_tests",
+    "producer_full_cell_selector_test",
+    "crate_boundaries"
+  ],
+  "source_head_after": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "source_head_before": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "started_utc": "2026-10-03T21:44:23.852728Z",
+  "status": "fail",
+  "target": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+  "target_marker": {
+    "private_tmp": {
+      "mode": 448,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp"
+    },
+    "target": {
+      "bytes": 45,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality/.owner-0894-quality",
+      "sha256": "2600806b2861a7df829b0bd030c17e27dff03225784734f3e87e26040f1c2efb"
+    }
+  },
+  "tool_versions": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+    "python3": "Python 3.14.4\n",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+    "rustfmt": "rustfmt 1.9.0-stable (59807616e1 2026-04-14)\n"
+  },
+  "toolchain": "1.95.0-x86_64-unknown-linux-gnu",
+  "updated_utc": "2026-10-03T21:50:20.383186Z"
+}

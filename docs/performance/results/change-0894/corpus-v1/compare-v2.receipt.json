@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/compare-v2.py",
+    "--baseline",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/baseline.jsonl",
+    "--candidate",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/candidate.jsonl",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/comparison-v2.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0894",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PYTHONHASHSEED": "0",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T22:24:43.376128+00:00",
+  "label": "compare-v2",
+  "schema": "litchi.xlsx-observable-probe-command-receipt-0894.v1",
+  "started_utc": "2026-10-03T22:24:43.019640+00:00",
+  "status": "pass",
+  "stderr": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare-v2.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 977846,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare-v2.stdout.txt",
+    "sha256": "f0293a8cae3f74e1ef58fe7f5879bc47478e9bb32b3811f0c6653c5165aa170d"
+  }
+}

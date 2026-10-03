@@ -1,0 +1,370 @@
+{
+  "schema": "litchi.xlsx-selected-metadata-final-review-0894.v1",
+  "status": "pass",
+  "reviewer": "/root/selected_metadata_review_0894",
+  "reviewed_without_build_or_workload": true,
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "decision": "reject",
+  "candidate_decision": "reject",
+  "adoption": "rejected; no optimization adopted",
+  "performance_claim": null,
+  "artifact_hashes": {
+    "documentation": [
+      {
+        "path": "docs/performance/0894-selected-worksheet-metadata.md",
+        "bytes": 15975,
+        "mode": 436,
+        "sha256": "54d95b5444380e66bd96666e32ee82417febedb360653de6ab5019e666168374"
+      },
+      {
+        "path": "docs/performance/BASELINE.md",
+        "bytes": 467818,
+        "mode": 436,
+        "sha256": "38c97ad9c400c2d58a5ecb01bc380f4cf90f6c6ad2b0f39c2b36fa5cb9561df5"
+      },
+      {
+        "path": "docs/performance/HOTSPOTS.md",
+        "bytes": 770136,
+        "mode": 436,
+        "sha256": "403a5f75ba617f42818648463557e15ef9d01cc3bb978985b5dac05e7b2f1b99"
+      },
+      {
+        "path": "docs/performance/REPORT.md",
+        "bytes": 782675,
+        "mode": 436,
+        "sha256": "9ef2ed2d9ec9c01ce85287c9eb8bd79de750130bf1771f361fe823a4e3db6253"
+      },
+      {
+        "path": "docs/performance/results/change-0894/README.md",
+        "bytes": 12179,
+        "mode": 436,
+        "sha256": "692b8ac7bda61b70f70c2f2eb9841054fe44bb2f1b8ec8991660e73ea9bc4f37"
+      }
+    ],
+    "evidence": [
+      {
+        "path": "docs/performance/results/change-0894/decision.json",
+        "bytes": 6643,
+        "mode": 436,
+        "sha256": "77508ecbef0aadab8f79300b4f925af281062cef545f08ed16a17ef9c1e33834"
+      },
+      {
+        "path": "docs/performance/results/change-0894/candidate-review.json",
+        "bytes": 14605,
+        "mode": 436,
+        "sha256": "4f021f97fb3d60921a862c96b52a2f5d5ed976f6125a5e672ce7ea1b3833320f"
+      },
+      {
+        "path": "docs/performance/results/change-0894/candidate-freeze.json",
+        "bytes": 6752,
+        "mode": 436,
+        "sha256": "5d17efef3422a028477d0bfeca2efb63b22d9f7b3f61321c464cefddd0ea20d4"
+      },
+      {
+        "path": "docs/performance/results/change-0894/candidate-source-review-protocol.json",
+        "bytes": 7122,
+        "mode": 436,
+        "sha256": "4e7c1bb36b09c6c1251e73a3f840d304cfe5ce5cced7aec21f34d98b3a37cf70"
+      },
+      {
+        "path": "docs/performance/results/change-0894/methodology-review.json",
+        "bytes": 6996,
+        "mode": 436,
+        "sha256": "e24add10d97bade2b0f3b2ba0b256ae4372f7e38234b7237e4f41799bbdecb3b"
+      },
+      {
+        "path": "docs/performance/results/change-0894/capture-review.json",
+        "bytes": 74660,
+        "mode": 436,
+        "sha256": "c98380d0c38e5283ba4f644a5ea871346d555f2e250017bf924969509630ed2c"
+      },
+      {
+        "path": "docs/performance/results/change-0894/reduction.json",
+        "bytes": 53740,
+        "mode": 436,
+        "sha256": "f34040c375709256e066496a073c2456f06bb66f6d3a60cf80bb7a79a95676a4"
+      },
+      {
+        "path": "docs/performance/results/change-0894/verification.json",
+        "bytes": 826,
+        "mode": 436,
+        "sha256": "a1506b5593bd3c2fd2fed28753cc04ddc6a224d3c62d388a5f78f2dd47ff2a1a"
+      },
+      {
+        "path": "docs/performance/results/change-0894/restoration.json",
+        "bytes": 3055,
+        "mode": 436,
+        "sha256": "26564e5556b99d942faad8311d0f2c5637530ee67a580668d7a02a10c9ec4934"
+      },
+      {
+        "path": "docs/performance/results/change-0894/cleanup.json",
+        "bytes": 36174,
+        "mode": 436,
+        "sha256": "fc37a5ed1962f837868f01a4a09443bfbd40ab9050db73ea45d4790eea09173a"
+      },
+      {
+        "path": "docs/performance/results/change-0894/cleanup-failure.json",
+        "bytes": 714,
+        "mode": 436,
+        "sha256": "5822f28ebf5e714ea788bdbe813b8ce52786e472b6c36acd7d4f261e0cea42b7"
+      },
+      {
+        "path": "docs/performance/results/change-0894/early-quality-root-cleanup.json",
+        "bytes": 3896,
+        "mode": 436,
+        "sha256": "1d51dc20f5e4a2f83ac717a8c23de160213ce7dc7d220226b77539ceda2f6bb3"
+      },
+      {
+        "path": "docs/performance/results/change-0894/verification-after-cleanup.json",
+        "bytes": 826,
+        "mode": 436,
+        "sha256": "a1506b5593bd3c2fd2fed28753cc04ddc6a224d3c62d388a5f78f2dd47ff2a1a"
+      },
+      {
+        "path": "docs/performance/results/change-0894/corpus-v1/corpus-review.json",
+        "bytes": 12303,
+        "mode": 436,
+        "sha256": "9166ba0585c6109e6c308c7228ff6350d48e127d788cd3fb5c25b755942ece74"
+      },
+      {
+        "path": "docs/performance/results/change-0894/corpus-v1/verification-after-cleanup.json",
+        "bytes": 11439,
+        "mode": 436,
+        "sha256": "869223e8aba6a6dec9c48c8701902d28649d44c6c0dca7f9ee96103509198b9f"
+      },
+      {
+        "path": "docs/performance/results/change-0894/plan.json",
+        "bytes": 21499,
+        "mode": 436,
+        "sha256": "893213c8d854955cfde556fc1879069ad2584152d8cc1514cd269e5a9f0ed874"
+      },
+      {
+        "path": "docs/performance/results/change-0894/capture/experiment.json",
+        "bytes": 26131,
+        "mode": 436,
+        "sha256": "35486c693869c5ad9fd20df536d7ca1f49319dc3bd5668bb75183570279cd6b5"
+      },
+      {
+        "path": "docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+        "bytes": 48873,
+        "mode": 436,
+        "sha256": "cc3cf5a150d1fd43b9151c7113d74e325deb8d7ca00741b737572cd9e0292a23"
+      },
+      {
+        "path": "docs/performance/results/change-0894/quality-source.json",
+        "bytes": 7951,
+        "mode": 436,
+        "sha256": "8ef4eba9f5eb4f56c987063c1bc0158a75d7e88be74d931995411e79cdcbbfb8"
+      }
+    ]
+  },
+  "decision_receipt": {
+    "path": "docs/performance/results/change-0894/decision.json",
+    "schema": "litchi.xlsx-selected-metadata-decision-0894.v1",
+    "status": "complete",
+    "decision": "reject",
+    "adopted_optimization": false,
+    "production_changed": false,
+    "restoration_verified": true,
+    "broad_non_iwork_goal_complete": false,
+    "primary_gate": {
+      "metric": "native primary p50 median ratio",
+      "median_ratio": 1.8972120877114294,
+      "ci95_low": 1.874311145026162,
+      "ci95_high": 1.9204038076205814,
+      "median_ratio_at_most": 0.98,
+      "ci95_upper_below": 1.0,
+      "pass": false
+    },
+    "measured_population": {
+      "native_children": 64,
+      "allocator_children": 8,
+      "measured_samples": 3320,
+      "retry_or_replacement_population": false
+    },
+    "observed_primary_percent_change": 89.72120877114294
+  },
+  "quality": {
+    "receipt": {
+      "path": "docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+      "status": "pass",
+      "gates_passed": 9,
+      "focused_tests": 7,
+      "xlsx_library_tests": 1397,
+      "producer_shape_tests": 22,
+      "selector_tests": 1
+    },
+    "source_head_before": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+    "source_head_after": "506aa2edae6666d9c76ae6827c2f5941a8e47896"
+  },
+  "performance_review": {
+    "receipt": {
+      "path": "docs/performance/results/change-0894/capture-review.json",
+      "schema": "litchi.xlsx-selected-metadata-capture-review-0894.v1",
+      "status": "pass",
+      "performance_claim": null
+    },
+    "raw_capture_replay": {
+      "expected_children": 72,
+      "observed_children": 72,
+      "raw_sample_total": 3320,
+      "receipt_rows": 72,
+      "artifact_hashes_checked": 288,
+      "binary_identities_checked": 72,
+      "semantic_receipts_checked": 72,
+      "no_retries_or_replacements": true,
+      "issues": []
+    },
+    "reduction_crosscheck": {
+      "reduction_exact_match": true,
+      "independently_recomputed_from_raw": true,
+      "numeric_mismatches": [],
+      "native_metric_summaries_checked": 16,
+      "allocator_metric_summaries_checked": 3
+    },
+    "primary_gate_pass": false,
+    "decision": "reject_candidate",
+    "host_activity_limitation": "One read-only experiment.load_plan descriptor/hash validation overlapped the live capture before the parent hold notice. It launched no workload, but may have consumed host CPU or I/O. The host was shared and not exclusive; no timing rerun was performed."
+  },
+  "corpus_review": {
+    "receipt": {
+      "path": "docs/performance/results/change-0894/corpus-v1/corpus-review.json",
+      "schema": "litchi.xlsx-observable-corpus-review-0894.v1",
+      "status": "pass"
+    },
+    "counts": {
+      "inputs": 180,
+      "worksheets": 394,
+      "legs_per_role": 1576,
+      "operation_errors": 12,
+      "source_open_errors": 0,
+      "discovery_errors": 0
+    },
+    "role_equality": {
+      "input_mismatches": 0,
+      "other_record_mismatches": 0,
+      "summary_mismatches": 0,
+      "status": "pass"
+    },
+    "comparison_mismatches": {
+      "input_mismatches": 0,
+      "leg_mismatches": 0,
+      "structural_mismatches": 0,
+      "summary_mismatches": 0,
+      "summary_shape_mismatches": 0,
+      "discovery_record_mismatches": 0
+    },
+    "post_cleanup": {
+      "path": "docs/performance/results/change-0894/corpus-v1/verification-after-cleanup.json",
+      "status": "pass",
+      "workload_launched": false,
+      "equal_to_existing_comparison_v2": true
+    }
+  },
+  "restoration": {
+    "receipt": {
+      "path": "docs/performance/results/change-0894/restoration.json",
+      "schema": "litchi.selected-metadata-restoration-0894.v1",
+      "status": "pass",
+      "decision": "reject"
+    },
+    "production_changed": false,
+    "tracked_candidate_files_restored": {
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+        "bytes": 86129,
+        "sha256": "f83cefd73e2cd5ab8f741fbd3e9eab9c2ee3793a211f5e2be63cfd7e39af1eb2"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+        "bytes": 187181,
+        "sha256": "44c5db3893ccde5bbbefa838417b0b8f20020effb71c9f6ef276319baa41f4c2"
+      },
+      "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+        "bytes": 14188,
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      }
+    },
+    "candidate_additions_absent": [
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs"
+    ],
+    "current_hash_check": "pass",
+    "unrelated_file_preserved": {
+      "path": "crates/litchi/examples/bench_word_parse.rs",
+      "bytes": 6390,
+      "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+    }
+  },
+  "cleanup": {
+    "receipt": {
+      "path": "docs/performance/results/change-0894/cleanup.json",
+      "schema": "litchi.xlsx-0894-cleanup.v1",
+      "status": "pass"
+    },
+    "owned_roots_absent": true,
+    "owned_roots": [
+      "target/litchi-0894-candidate-src",
+      "target/litchi-0894-candidate-build",
+      "target/litchi-0894-quality-src",
+      "target/litchi-0894-quality",
+      "target/litchi-0894-probe-baseline",
+      "target/litchi-0894-probe-candidate"
+    ],
+    "active_processes_after_retention": 0,
+    "worktrees_created": [],
+    "early_quality_root_cleanup_accepted": true,
+    "original_cleanup_failure_retained": {
+      "path": "docs/performance/results/change-0894/cleanup-failure.json",
+      "status": "retained"
+    },
+    "post_cleanup_verification": {
+      "path": "docs/performance/results/change-0894/verification-after-cleanup.json",
+      "status": "pass",
+      "workload_launched": false
+    }
+  },
+  "documentation_review": {
+    "status": "pass",
+    "documents_bound": 5,
+    "documentation_hash_sealed": true,
+    "claims_match_decision": true,
+    "primary_gate_matches_decision": true,
+    "semantic_zero_difference_claim_matches_corpus": true,
+    "restoration_claim_matches_receipt": true,
+    "cleanup_claim_matches_receipts": true,
+    "rejection_and_no_adoption_are_explicit": true,
+    "host_activity_overlap_disclosed": true,
+    "rss_and_allocator_limits_disclosed": true,
+    "current_0894_entries_have_no_pending_or_being_written_language": true,
+    "final_review_and_decision_links_resolve": true,
+    "unrelated_dirty_worktrees_preserved_is_stated": true
+  },
+  "source_state": {
+    "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+    "restored_source_matches_base": true,
+    "candidate_overlay_removed_from_production": true,
+    "unrelated_dirty_worktrees_preserved": true,
+    "worktrees_created_for_0894": 0
+  },
+  "scope": {
+    "build_rerun": false,
+    "cargo_rerun": false,
+    "workload_rerun": false,
+    "source_edits": false,
+    "documentation_claims_checked": true,
+    "documentation_hash_sealed": true,
+    "cleanup_authorized_by_owner": true,
+    "cleanup_executed_by_owner": true,
+    "post_cleanup_replay": "pass",
+    "static_review_only": true,
+    "worktrees_created_for_0894": 0
+  },
+  "goal_complete": false,
+  "goal_status": "active; broader performance program is not complete",
+  "limitations": [
+    "The rejection is scoped to the fixed warm-filesystem, CPU-12, Rust 1.95 release, shared-host population; it is not a universal Office or cold-cache claim.",
+    "One read-only load_plan descriptor/hash validation overlapped the active capture. Its duration and timing effect are unquantified, and no replacement population or recapture was introduced.",
+    "The observed 89.7212% candidate-over-baseline p50 increase is a fixed-protocol observation; this review makes no precise causal slowdown claim.",
+    "RSS includes process residency and post-endpoint tolerance work, and allocator counters are descriptive; neither supports a causal heap or adoption claim.",
+    "The differential corpus and retained quality evidence do not establish correctness outside their fixed coverage."
+  ]
+}

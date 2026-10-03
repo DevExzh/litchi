@@ -1,0 +1,53 @@
+{"argv": ["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo", "clippy", "--manifest-path", "crates/litchi-xlsx/Cargo.toml", "--locked", "--offline", "--all-features", "--lib", "--", "-D", "warnings"], "candidate_sources": ["crates/litchi-xlsx/src/raw/worksheet/selected.rs", "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs", "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs", "crates/litchi-xlsx/src/raw/worksheet/tests.rs", "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"], "cwd": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src", "environment": {"CARGO_BUILD_JOBS": "2", "CARGO_HOME": "/home/zhuhe/.cargo", "CARGO_INCREMENTAL": "0", "CARGO_NET_OFFLINE": "true", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_RELEASE_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0", "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality", "HOME": "/home/zhuhe", "LANG": "C", "LC_ALL": "C", "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin", "RUSTDOCFLAGS": "-D warnings", "RUSTFLAGS": "", "RUSTUP_HOME": "/home/zhuhe/.rustup", "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu", "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp", "TZ": "UTC"}, "tool_versions": {"cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n", "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"}}
+
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ole-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-crypto)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-vba)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-sheet)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xldm)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-quality-src/crates/litchi-xlsx)
+error: this boolean expression can be simplified
+  --> crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:93:12
+   |
+93 |         && !parse_u32(value).is_some_and(|value| value <= 255)
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `parse_u32(value).is_none_or(|value| value > 255)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#nonminimal_bool
+   = note: `-D clippy::nonminimal-bool` implied by `-D clippy::all`
+   = help: to override `-D clippy::all` add `#[allow(clippy::nonminimal_bool)]`
+
+error: this boolean expression can be simplified
+  --> crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:99:16
+   |
+99 |             && !parse_u32(value).is_some_and(|value| value <= 7)
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `parse_u32(value).is_none_or(|value| value > 7)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#nonminimal_bool
+
+error: this boolean expression can be simplified
+   --> crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:152:12
+    |
+152 |         && !parse_u32(value).is_some_and(|value| value <= 7)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `parse_u32(value).is_none_or(|value| value > 7)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#nonminimal_bool
+
+error: this boolean expression can be simplified
+   --> crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:190:12
+    |
+190 |         && !parse_u32(value).is_some_and(|value| crate::page_setup::Paper::try_from(value).is_ok())
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `parse_u32(value).is_none_or(|value| crate::page_setup::Paper::try_from(value).is_err())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#nonminimal_bool
+
+error: could not compile `litchi-xlsx` (lib) due to 4 previous errors

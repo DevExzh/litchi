@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0894 — selected worksheet metadata route rejected
+
+[0894](0894-selected-worksheet-metadata.md) measures the bounded metadata
+admission candidate against fresh current-guard binaries and rejects it: the
+producer XLSX full-cell primary p50 ratio is **1.897212** (95% interval
+**1.874311–1.920404**), with p95/p99 ratios **1.907545/1.903312**. Allocator
+calls rise **25,933→126,171** and allocated bytes **37,618,900→47,632,498**;
+RSS is large in every case but executable residency prevents a causal heap
+claim. The trial failed without a causal profile; the next step is to profile
+selected semantic-stream per-event allocation before optimizing or
+reconsidering metadata admission. Production is restored and the broader goal
+remains open. The shared host had no exclusive-host guarantee.
+
 ## 0893 — force per-worksheet tolerance checks
 
 [0893](0893-forced-worksheet-tolerance-guard.md) strengthens the producer full-cell benchmark before a selected-route optimization: every worksheet report is forced after timing and metric endpoints, followed by aggregate and source-freshness checks. Versioned measured/warmup evidence rejects historical aggregate-only reports. Actual raw-scanner controls qualify the producer's metadata refusals. Production eligibility is unchanged; this is correctness evidence, with no new performance claim.

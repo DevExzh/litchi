@@ -1,0 +1,22 @@
+{
+  "status": "fail",
+  "exit_code": 1,
+  "error": "archive mode mismatch: .cargo/config.toml",
+  "observed_archive_mode": "0o664",
+  "expected_git_mode": "0644",
+  "time": "2026-10-03T21:17:25.811144+00:00",
+  "artifacts": {
+    "source-start.json": {
+      "bytes": 1173,
+      "sha256": "29856eab78e6f02ab1a740ceba9847e9245bfa393321a5870314a4526828eac4"
+    },
+    "source.tar.gz": {
+      "bytes": 89047162,
+      "sha256": "7f81a290395933755dafb2ab6edd5f663c2a27386cabd90d7f3148298221bd22"
+    },
+    "source.executed.py": {
+      "bytes": 10604,
+      "sha256": "2a0986d48352b6d473422c31115c1475402ec22671aa2468e1bddfd636e8407b"
+    }
+  }
+}

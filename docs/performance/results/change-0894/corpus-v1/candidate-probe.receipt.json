@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/xlsx0894-probe",
+    "manifest",
+    "/home/zhuhe/code/litchi/test-data",
+    "--jsonl",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/candidate.jsonl"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PYTHONHASHSEED": "0",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TMPDIR": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/tmp",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T22:19:07.250238+00:00",
+  "label": "candidate-probe",
+  "schema": "litchi.xlsx-observable-probe-command-receipt-0894.v1",
+  "started_utc": "2026-10-03T22:17:55.871245+00:00",
+  "status": "pass",
+  "stderr": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/candidate-probe.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/candidate-probe.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

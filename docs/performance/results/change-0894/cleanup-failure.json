@@ -1,0 +1,21 @@
+{
+  "created_utc": "2026-10-03T22:37:33.387021+00:00",
+  "error": "final source census verification failed",
+  "helper": {
+    "bytes": 23518,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/cleanup.py",
+    "sha256": "55b8ccde26b805d610293653d64d8c47fbfd21ed1b502f2ab692d92064879e19"
+  },
+  "performance_claim": null,
+  "schema": "litchi.xlsx-0894-cleanup-failure.v1",
+  "start": {
+    "bytes": 6773,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/cleanup-start.json",
+    "sha256": "4318e0141258028d06f01741ae83bde7760295c1817b2da6580480636fa80491"
+  },
+  "status": "fail"
+}

@@ -1,0 +1,110 @@
+{
+  "helper": {
+    "bytes": 23518,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/cleanup.py",
+    "sha256": "55b8ccde26b805d610293653d64d8c47fbfd21ed1b502f2ab692d92064879e19"
+  },
+  "private_lock_retention": {
+    "retained": {
+      "bytes": 138457,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/quality-Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    "source": {
+      "bytes": 138457,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    }
+  },
+  "quality": {
+    "bytes": 48873,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+    "sha256": "cc3cf5a150d1fd43b9151c7113d74e325deb8d7ca00741b737572cd9e0292a23"
+  },
+  "reason": "all nine quality gates terminal PASS; reclaim completed owned roots during shared disk pressure",
+  "removed": [
+    {
+      "marker": {
+        "bytes": 36,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src/.owner-litchi-0894-quality-src",
+        "sha256": "2e06c300d53d479d0557514e911240535346ed0437909e488560205c3ed8dfe6"
+      },
+      "name": "quality-source",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+      "status": "removed"
+    },
+    {
+      "marker": {
+        "bytes": 45,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality/.owner-0894-quality",
+        "sha256": "2600806b2861a7df829b0bd030c17e27dff03225784734f3e87e26040f1c2efb"
+      },
+      "name": "quality-build",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-quality",
+      "status": "removed"
+    }
+  ],
+  "schema": "litchi.0894-early-quality-root-cleanup.v1",
+  "source_census": {
+    "actual": {
+      "census_sha256": "89fc3a1896c1f5f84cbd7662daa3f396704fd46ee62751378ce24609007b61fa",
+      "file_count": 10778,
+      "logical_bytes": 264680060
+    },
+    "expected": {
+      "census_sha256": "3139a0c059598ddfe265a9ae37454607adb08381076d1883bf99f3bada5a8b1a",
+      "file_count": 10778,
+      "logical_bytes": 264680060
+    },
+    "label": "quality-source",
+    "mismatch_count": 0,
+    "mismatches": [],
+    "references": [
+      {
+        "bytes": 3325536,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+        "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+      },
+      {
+        "bytes": 7951,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/quality-source.json",
+        "sha256": "8ef4eba9f5eb4f56c987063c1bc0158a75d7e88be74d931995411e79cdcbbfb8"
+      },
+      {
+        "bytes": 2853,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/bindings.json",
+        "sha256": "442b99ab0bd674f4001fd7539d63643ec57f8188a136e9572e4925e814293cc8"
+      },
+      {
+        "bytes": 48873,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+        "sha256": "cc3cf5a150d1fd43b9151c7113d74e325deb8d7ca00741b737572cd9e0292a23"
+      }
+    ],
+    "root": "/home/zhuhe/code/litchi/target/litchi-0894-quality-src",
+    "status": "pass",
+    "verified": true
+  },
+  "status": "pass",
+  "utc": "2026-10-03T22:27:11.082316+00:00"
+}

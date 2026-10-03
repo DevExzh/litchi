@@ -1,0 +1,58 @@
+{
+  "archive_argv": [
+    "git",
+    "-c",
+    "tar.umask=0022",
+    "archive",
+    "--format=tar",
+    "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+    "--",
+    ".cargo",
+    "Cargo.toml",
+    "README.md",
+    "clippy.toml",
+    "deny.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml",
+    "crates",
+    "test-data",
+    "tools/perf-baseline"
+  ],
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.py"
+  ],
+  "git_file_count": 10771,
+  "observed_head": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "root_generated_lock": {
+    "bytes": 138443,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.xlsx-source-freeze-start-0894.v1",
+  "selection": [
+    ".cargo",
+    "Cargo.toml",
+    "README.md",
+    "clippy.toml",
+    "deny.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml",
+    "crates",
+    "test-data",
+    "tools/perf-baseline"
+  ],
+  "standalone_lock_path": "tools/perf-baseline/Cargo.lock",
+  "started_utc": "2026-10-03T21:17:53.948550+00:00",
+  "status": "building",
+  "untracked_benchmark_excluded": true,
+  "untracked_selected": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+    "crates/litchi/examples/bench_word_parse.rs"
+  ]
+}

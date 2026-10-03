@@ -1,0 +1,61 @@
+{
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs"
+  ],
+  "root_generated_lock": {
+    "bytes": 138443,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "source": "ignored working-tree provenance; excluded from archive and standalone build source"
+  },
+  "root_generated_lock_observed": {
+    "bytes": 138465,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+  },
+  "schema": "litchi.xlsx-selected-metadata-candidate-freeze-start-0894.v1",
+  "source_archive": {
+    "bytes": 89047170,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.tar.gz",
+    "sha256": "f6f9d13813866ea24fd9cc108fc949aa42cdd042bacd3ca960897e8c88c63ce9"
+  },
+  "source_manifest": {
+    "bytes": 3325536,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "standalone_lock": {
+    "bytes": 56289,
+    "git_mode": "100644",
+    "git_oid": "adf5253fc6983e9737ca59ab756edf0c36674d45",
+    "git_type": "blob",
+    "mode": 420,
+    "path": "tools/perf-baseline/Cargo.lock",
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "source": "selected Git archive"
+  },
+  "started_utc": "2026-10-03T22:15:13.275396+00:00",
+  "status": "building",
+  "tracked_changed": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+  ],
+  "untracked_added": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs"
+  ]
+}

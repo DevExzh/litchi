@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/compare.py", line 304, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/compare.py", line 293, in main
+    result = compare(args.baseline, args.candidate)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/compare.py", line 254, in compare
+    summary_changes = _diff(normalize_input(baseline_summary), normalize_input(candidate_summary))
+                            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/compare.py", line 90, in normalize_input
+    value["legs"] = [normalize_leg(leg) for leg in value.get("legs", [])]
+                                                   ~~~~~~~~~^^^^^^^^^^^^
+TypeError: 'int' object is not iterable

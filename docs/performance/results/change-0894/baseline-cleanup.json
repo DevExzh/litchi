@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "utc": "2026-10-03T21:37:45.997005+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src",
+      "files": 10772,
+      "logical_bytes": 259391420,
+      "marker_text": "litchi 0894 frozen baseline source\n"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build",
+      "files": 1797,
+      "logical_bytes": 3038161276,
+      "marker_text": "litchi 0894 frozen baseline build target\n"
+    }
+  ],
+  "source_files_verified": 10771,
+  "retained_binaries_verified": 2,
+  "worktrees_created": []
+}

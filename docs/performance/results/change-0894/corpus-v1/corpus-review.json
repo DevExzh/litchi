@@ -1,0 +1,326 @@
+{
+  "baseline_internal_leg_diagnostics": {
+    "classification": "diagnostic-only; does not affect baseline/candidate role equality",
+    "diagnostic_groups": 394,
+    "expected_nullable_fields": {
+      "callback_records": {
+        "count": 788,
+        "reason": "visit legs expose callback count; cells and eager model legs have no callback stream"
+      },
+      "source_version_stable": {
+        "count": 394,
+        "reason": "source-backed legs fence SourceVersion; eager model legs have no source version"
+      }
+    },
+    "field_counts": {
+      "$.callback_records": 788,
+      "$.source_version_stable": 394,
+      "$.status": 3
+    },
+    "pair_comparisons": 1182,
+    "pair_counts": {
+      "cold_source_cells->cold_source_visit": 394,
+      "cold_source_cells->eager_model_cells": 394,
+      "cold_source_cells->warm_source_visit": 394
+    },
+    "semantic_status_labels": [
+      {
+        "changed_fields": [
+          "$.callback_records",
+          "$.status"
+        ],
+        "input": "/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SimpleScatterChart.xlsx",
+        "operation_errors": {
+          "cold_source_cells": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          },
+          "cold_source_visit": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          },
+          "eager_model_cells": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          },
+          "warm_source_visit": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          }
+        },
+        "pair": "cold_source_cells->warm_source_visit",
+        "sheet_name": "Chart1",
+        "sheet_position": 1,
+        "status_by_leg": {
+          "cold_source_cells": "operation_error",
+          "cold_source_visit": "operation_error",
+          "eager_model_cells": "operation_error",
+          "warm_source_visit": "warmup_or_operation_error"
+        }
+      },
+      {
+        "changed_fields": [
+          "$.callback_records",
+          "$.status"
+        ],
+        "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx",
+        "operation_errors": {
+          "cold_source_cells": {
+            "debug": "NotWorksheet { sheet: \"Chart2\" }",
+            "display": "sheet 'Chart2' is not a worksheet",
+            "source_chain": []
+          },
+          "cold_source_visit": {
+            "debug": "NotWorksheet { sheet: \"Chart2\" }",
+            "display": "sheet 'Chart2' is not a worksheet",
+            "source_chain": []
+          },
+          "eager_model_cells": {
+            "debug": "NotWorksheet { sheet: \"Chart2\" }",
+            "display": "sheet 'Chart2' is not a worksheet",
+            "source_chain": []
+          },
+          "warm_source_visit": {
+            "debug": "NotWorksheet { sheet: \"Chart2\" }",
+            "display": "sheet 'Chart2' is not a worksheet",
+            "source_chain": []
+          }
+        },
+        "pair": "cold_source_cells->warm_source_visit",
+        "sheet_name": "Chart2",
+        "sheet_position": 6,
+        "status_by_leg": {
+          "cold_source_cells": "operation_error",
+          "cold_source_visit": "operation_error",
+          "eager_model_cells": "operation_error",
+          "warm_source_visit": "warmup_or_operation_error"
+        }
+      },
+      {
+        "changed_fields": [
+          "$.callback_records",
+          "$.status"
+        ],
+        "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/chart_sheet.xlsx",
+        "operation_errors": {
+          "cold_source_cells": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          },
+          "cold_source_visit": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          },
+          "eager_model_cells": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          },
+          "warm_source_visit": {
+            "debug": "NotWorksheet { sheet: \"Chart1\" }",
+            "display": "sheet 'Chart1' is not a worksheet",
+            "source_chain": []
+          }
+        },
+        "pair": "cold_source_cells->warm_source_visit",
+        "sheet_name": "Chart1",
+        "sheet_position": 2,
+        "status_by_leg": {
+          "cold_source_cells": "operation_error",
+          "cold_source_visit": "operation_error",
+          "eager_model_cells": "operation_error",
+          "warm_source_visit": "warmup_or_operation_error"
+        }
+      }
+    ],
+    "status_label_explanation": "The three chart-sheet targets are public sheet entries but are not worksheets; all four legs retain the typed NotWorksheet error, while the warm leg includes its warmup phase in the status label."
+  },
+  "bindings": {
+    "baseline_build": {
+      "bytes": 6721,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/build.json",
+      "sha256": "c35a9d3be888efa6362b7b905750993c55217e9891161a01d08f67c34d8f3f8a"
+    },
+    "baseline_jsonl": {
+      "bytes": 2726198,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/baseline.jsonl",
+      "sha256": "ab34eb89705e76234b686e1157d847b2b8728d1a13254653b6e91aa89fc557f1"
+    },
+    "candidate_build": {
+      "bytes": 6346,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/build.json",
+      "sha256": "1ff3b8d4be2997f5b8c2101c53ad7fc0851971ee8ffa72909bd49de83193ef0c"
+    },
+    "candidate_jsonl": {
+      "bytes": 2726198,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/candidate.jsonl",
+      "sha256": "ab34eb89705e76234b686e1157d847b2b8728d1a13254653b6e91aa89fc557f1"
+    },
+    "census_after": {
+      "bytes": 64978,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/census-after.jsonl",
+      "sha256": "9af0c419b1be9e22f1c8379f95d8caf6733cc8fcb1ef8809aa416e8a8745aa0a"
+    },
+    "census_before": {
+      "bytes": 64978,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/census-before.jsonl",
+      "sha256": "9af0c419b1be9e22f1c8379f95d8caf6733cc8fcb1ef8809aa416e8a8745aa0a"
+    },
+    "comparison_v2": {
+      "bytes": 977846,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/comparison-v2.json",
+      "sha256": "f0293a8cae3f74e1ef58fe7f5879bc47478e9bb32b3811f0c6653c5165aa170d"
+    },
+    "corrected_comparator": {
+      "bytes": 13856,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/compare-v2.py",
+      "sha256": "b5f7c14b645cccfa3cba3badfad2812b99ff19398bb820308a13747c7bd45948"
+    },
+    "corrected_compare_receipt": {
+      "bytes": 1457,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare-v2.receipt.json",
+      "sha256": "661f132d00dc6442512974df4fd7eb8b39001a38d157838c5be425ede4c71ba0"
+    },
+    "original_compare_receipt": {
+      "bytes": 1543,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare.receipt.json",
+      "sha256": "28a17a3d78c86f8e58bb15d7938bcf43ff5e19923e8060bdf17348614be33fbd"
+    },
+    "original_compare_stderr": {
+      "bytes": 933,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare.stderr.txt",
+      "sha256": "754f1bb136b176dcf07d860a6010c37ebbf13fdf98de43e82ada6cb581ac925a"
+    },
+    "run": {
+      "bytes": 73685,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/run.json",
+      "sha256": "836608257d45851fe9d74a66d6d76264d320445408c1d545164041dfa1355046"
+    }
+  },
+  "comparison_v2": {
+    "baseline_input_count": 180,
+    "candidate_input_count": 180,
+    "inputs": 180,
+    "mismatch_array_counts": {
+      "discovery_record_mismatches": 0,
+      "input_mismatches": 0,
+      "leg_mismatches": 0,
+      "structural_mismatches": 0,
+      "summary_mismatches": 0,
+      "summary_shape_mismatches": 0
+    },
+    "preexisting_baseline_leg_groups": 394,
+    "preexisting_candidate_leg_groups": 394,
+    "status": "pass"
+  },
+  "corpus_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1",
+  "input_manifest": {
+    "counts": {
+      "discovery_errors": 0,
+      "inputs": 180,
+      "legs": 1576,
+      "operation_errors": 12,
+      "source_open_errors": 0,
+      "worksheets": 394
+    },
+    "historical_change_0642_probe_corpus": {
+      "reason": "retained change-0642 packet has probe sources but no XLSX corpus file",
+      "status": "not_included"
+    },
+    "root": "/home/zhuhe/code/litchi/test-data"
+  },
+  "method": "independent read-only reduction of completed probe JSONL and receipt artifacts; no probe/build rerun",
+  "recovery": {
+    "canonical_run": {
+      "bytes": 73685,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/run.json",
+      "sha256": "836608257d45851fe9d74a66d6d76264d320445408c1d545164041dfa1355046"
+    },
+    "corrected_comparator": {
+      "bytes": 13856,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/compare-v2.py",
+      "sha256": "b5f7c14b645cccfa3cba3badfad2812b99ff19398bb820308a13747c7bd45948"
+    },
+    "corrected_compare_receipt": {
+      "bytes": 1457,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare-v2.receipt.json",
+      "sha256": "661f132d00dc6442512974df4fd7eb8b39001a38d157838c5be425ede4c71ba0"
+    },
+    "original_compare_receipt": {
+      "bytes": 1543,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare.receipt.json",
+      "sha256": "28a17a3d78c86f8e58bb15d7938bcf43ff5e19923e8060bdf17348614be33fbd"
+    },
+    "original_compare_stderr": {
+      "bytes": 933,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/corpus-v1/compare.stderr.txt",
+      "sha256": "754f1bb136b176dcf07d860a6010c37ebbf13fdf98de43e82ada6cb581ac925a"
+    },
+    "original_failure": "compare.py normalized summary.legs as an iterable and raised TypeError; both probes and census passes had already exited successfully"
+  },
+  "reviewed_utc": "2026-10-03T22:28:32.068952+00:00",
+  "role_equality": {
+    "baseline_input_count": 180,
+    "baseline_legs": 1576,
+    "baseline_worksheets": 394,
+    "candidate_input_count": 180,
+    "candidate_legs": 1576,
+    "candidate_worksheets": 394,
+    "input_mismatches": 0,
+    "normalization": [
+      {
+        "field": "legs[*].source_version_before.id",
+        "reason": "SourceVersion.id is process-local opaque identity; revision remains compared"
+      },
+      {
+        "field": "legs[*].source_version_after.id",
+        "reason": "SourceVersion.id is process-local opaque identity; revision remains compared"
+      }
+    ],
+    "other_record_mismatches": 0,
+    "status": "pass",
+    "summary_mismatches": 0
+  },
+  "schema": "litchi.xlsx-observable-corpus-review-0894.v1",
+  "status": "pass"
+}

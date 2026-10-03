@@ -1,0 +1,1022 @@
+{
+  "allocator_children": 8,
+  "children": 72,
+  "native_children": 64,
+  "no_retries_or_replacements": true,
+  "performance_claim": null,
+  "plan": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/plan.json",
+  "plan_sha256": "893213c8d854955cfde556fc1879069ad2584152d8cc1514cd269e5a9f0ed874",
+  "rows": [
+    {
+      "path": "runs/000-native-native-b00-c00-before/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 0,
+        "pair": "native-b00-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/001-native-native-b00-c00-after/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 1,
+        "pair": "native-b00-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/002-native-native-b00-c01-after/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 2,
+        "pair": "native-b00-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/003-native-native-b00-c01-before/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 3,
+        "pair": "native-b00-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/004-native-native-b00-c02-before/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 4,
+        "pair": "native-b00-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/005-native-native-b00-c02-after/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 5,
+        "pair": "native-b00-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/006-native-native-b00-c03-after/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 6,
+        "pair": "native-b00-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/007-native-native-b00-c03-before/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 7,
+        "pair": "native-b00-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/008-native-native-b01-c00-after/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 8,
+        "pair": "native-b01-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/009-native-native-b01-c00-before/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 9,
+        "pair": "native-b01-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/010-native-native-b01-c01-before/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 10,
+        "pair": "native-b01-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/011-native-native-b01-c01-after/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 11,
+        "pair": "native-b01-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/012-native-native-b01-c02-after/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 12,
+        "pair": "native-b01-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/013-native-native-b01-c02-before/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 13,
+        "pair": "native-b01-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/014-native-native-b01-c03-before/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 14,
+        "pair": "native-b01-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/015-native-native-b01-c03-after/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 15,
+        "pair": "native-b01-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/016-native-native-b02-c00-before/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 16,
+        "pair": "native-b02-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/017-native-native-b02-c00-after/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 17,
+        "pair": "native-b02-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/018-native-native-b02-c01-after/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 18,
+        "pair": "native-b02-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/019-native-native-b02-c01-before/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 19,
+        "pair": "native-b02-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/020-native-native-b02-c02-before/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 20,
+        "pair": "native-b02-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/021-native-native-b02-c02-after/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 21,
+        "pair": "native-b02-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/022-native-native-b02-c03-after/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 22,
+        "pair": "native-b02-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/023-native-native-b02-c03-before/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 23,
+        "pair": "native-b02-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/024-native-native-b03-c00-after/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 24,
+        "pair": "native-b03-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/025-native-native-b03-c00-before/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 25,
+        "pair": "native-b03-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/026-native-native-b03-c01-before/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 26,
+        "pair": "native-b03-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/027-native-native-b03-c01-after/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 27,
+        "pair": "native-b03-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/028-native-native-b03-c02-after/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 28,
+        "pair": "native-b03-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/029-native-native-b03-c02-before/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 29,
+        "pair": "native-b03-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/030-native-native-b03-c03-before/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 30,
+        "pair": "native-b03-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/031-native-native-b03-c03-after/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 31,
+        "pair": "native-b03-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/032-native-native-b04-c00-before/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 32,
+        "pair": "native-b04-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/033-native-native-b04-c00-after/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 33,
+        "pair": "native-b04-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/034-native-native-b04-c01-after/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 34,
+        "pair": "native-b04-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/035-native-native-b04-c01-before/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 35,
+        "pair": "native-b04-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/036-native-native-b04-c02-before/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 36,
+        "pair": "native-b04-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/037-native-native-b04-c02-after/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 37,
+        "pair": "native-b04-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/038-native-native-b04-c03-after/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 38,
+        "pair": "native-b04-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/039-native-native-b04-c03-before/receipt.json",
+      "row": {
+        "block": 4,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 39,
+        "pair": "native-b04-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/040-native-native-b05-c00-after/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 40,
+        "pair": "native-b05-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/041-native-native-b05-c00-before/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 41,
+        "pair": "native-b05-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/042-native-native-b05-c01-before/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 42,
+        "pair": "native-b05-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/043-native-native-b05-c01-after/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 43,
+        "pair": "native-b05-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/044-native-native-b05-c02-after/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 44,
+        "pair": "native-b05-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/045-native-native-b05-c02-before/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 45,
+        "pair": "native-b05-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/046-native-native-b05-c03-before/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 46,
+        "pair": "native-b05-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/047-native-native-b05-c03-after/receipt.json",
+      "row": {
+        "block": 5,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 47,
+        "pair": "native-b05-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/048-native-native-b06-c00-before/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 48,
+        "pair": "native-b06-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/049-native-native-b06-c00-after/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 49,
+        "pair": "native-b06-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/050-native-native-b06-c01-after/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 50,
+        "pair": "native-b06-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/051-native-native-b06-c01-before/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 51,
+        "pair": "native-b06-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/052-native-native-b06-c02-before/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 52,
+        "pair": "native-b06-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/053-native-native-b06-c02-after/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 53,
+        "pair": "native-b06-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/054-native-native-b06-c03-after/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 54,
+        "pair": "native-b06-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/055-native-native-b06-c03-before/receipt.json",
+      "row": {
+        "block": 6,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 55,
+        "pair": "native-b06-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/056-native-native-b07-c00-after/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 56,
+        "pair": "native-b07-c00",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/057-native-native-b07-c00-before/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "native",
+        "ordinal": 57,
+        "pair": "native-b07-c00",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/058-native-native-b07-c01-before/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 58,
+        "pair": "native-b07-c01",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/059-native-native-b07-c01-after/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "xlsx_full_cell_scan",
+        "case_index": 1,
+        "lane": "native",
+        "ordinal": 59,
+        "pair": "native-b07-c01",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/060-native-native-b07-c02-after/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 60,
+        "pair": "native-b07-c02",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/061-native-native-b07-c02-before/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "docx_producer_source_selected_paragraph",
+        "case_index": 2,
+        "lane": "native",
+        "ordinal": 61,
+        "pair": "native-b07-c02",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/062-native-native-b07-c03-before/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 62,
+        "pair": "native-b07-c03",
+        "role": "before",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/063-native-native-b07-c03-after/receipt.json",
+      "row": {
+        "block": 7,
+        "case": "pptx_producer_source_selected_slide",
+        "case_index": 3,
+        "lane": "native",
+        "ordinal": 63,
+        "pair": "native-b07-c03",
+        "role": "after",
+        "samples": 50,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/064-allocator-allocator-b00-c00-before/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 64,
+        "pair": "allocator-b00-c00",
+        "role": "before",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/065-allocator-allocator-b00-c00-after/receipt.json",
+      "row": {
+        "block": 0,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 65,
+        "pair": "allocator-b00-c00",
+        "role": "after",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/066-allocator-allocator-b01-c00-after/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 66,
+        "pair": "allocator-b01-c00",
+        "role": "after",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/067-allocator-allocator-b01-c00-before/receipt.json",
+      "row": {
+        "block": 1,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 67,
+        "pair": "allocator-b01-c00",
+        "role": "before",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/068-allocator-allocator-b02-c00-before/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 68,
+        "pair": "allocator-b02-c00",
+        "role": "before",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/069-allocator-allocator-b02-c00-after/receipt.json",
+      "row": {
+        "block": 2,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 69,
+        "pair": "allocator-b02-c00",
+        "role": "after",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/070-allocator-allocator-b03-c00-after/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 70,
+        "pair": "allocator-b03-c00",
+        "role": "after",
+        "samples": 15,
+        "warmup": 3
+      }
+    },
+    {
+      "path": "runs/071-allocator-allocator-b03-c00-before/receipt.json",
+      "row": {
+        "block": 3,
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "case_index": 0,
+        "lane": "allocator",
+        "ordinal": 71,
+        "pair": "allocator-b03-c00",
+        "role": "before",
+        "samples": 15,
+        "warmup": 3
+      }
+    }
+  ],
+  "schedule": "native then allocator; fixed alternating AB/BA by (block + case_index) % 2",
+  "schema": "litchi.xlsx-selected-metadata-experiment-receipt-0894.v1",
+  "status": "pass"
+}

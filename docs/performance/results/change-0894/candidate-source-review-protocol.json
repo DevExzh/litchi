@@ -1,0 +1,157 @@
+{
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "blocking_findings": [],
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs"
+  ],
+  "candidate_source_hashes": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "3b5edcbde4a699eb5623183324244b9fd494236b5cf159666c7e97eb78612991",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs": "37def8f16a82b1d5099e6a4583453aa5d70c94c52f118f20af3909c9ae60de83",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs": "12c962cddacc3cd4e1dc8a9551338e55124541068a7155e7f3f666dbfe840407",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+  },
+  "candidate_source_identities": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "bytes": 95216,
+      "mode": 436,
+      "sha256": "3b5edcbde4a699eb5623183324244b9fd494236b5cf159666c7e97eb78612991"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs": {
+      "bytes": 12455,
+      "mode": 436,
+      "sha256": "37def8f16a82b1d5099e6a4583453aa5d70c94c52f118f20af3909c9ae60de83"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs": {
+      "bytes": 25944,
+      "mode": 436,
+      "sha256": "12c962cddacc3cd4e1dc8a9551338e55124541068a7155e7f3f666dbfe840407"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+      "bytes": 187211,
+      "mode": 436,
+      "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+    },
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+      "bytes": 12041,
+      "mode": 436,
+      "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+    }
+  },
+  "findings": [
+    {
+      "id": "bounded-metadata-admission",
+      "status": "pass",
+      "summary": "The selected scanner admits only the bounded, value-checked sheetViews, sheetFormatPr, cols/col, row-spans, pageMargins, and pageSetup subset described by the candidate contract; the budget precondition keeps the metadata path within the declared stream ceilings."
+    },
+    {
+      "id": "fail-closed-fallback",
+      "status": "pass",
+      "summary": "Unknown, duplicate, styled, repairable, ambiguous, malformed, out-of-order, or unsupported metadata remains ineligible and falls through to the authoritative worksheet parser; opaque metadata is not skipped to reach sheetData."
+    },
+    {
+      "id": "semantic-and-lifetime-guards",
+      "status": "pass",
+      "summary": "The candidate preserves the existing semantic-event stream, MCE dispatch, x14ac observation, XML depth and input/output limits, cancellation, source-version fences, typed failures, selected-cell dependency closure, and callback ordering."
+    },
+    {
+      "id": "source-integrity",
+      "status": "pass",
+      "summary": "The reviewed candidate inventory contains exactly the five frozen source paths and the identities above; no public API, dependency edge, unsafe code, or producer-template change is part of this packet."
+    }
+  ],
+  "guard_scope": {
+    "archive_bytes": 22739,
+    "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+    "contract": "post-endpoint-per-worksheet-tolerance-v1",
+    "expected_cell_count": 4096,
+    "expected_numeric_count": 3686,
+    "expected_text_count": 410,
+    "marker_refusal_census_sha256": "552c35c8b8f958de28792f00c1e9e831ae884471aa28b5b2a7a1479bd06c5207",
+    "oracle_digest_sha256": "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+    "post_endpoint_checks": [
+      "per-worksheet tolerance counts and clean reports",
+      "aggregate tolerance report",
+      "post-guard source-freshness fence"
+    ]
+  },
+  "limitations": [
+    "This packet records source and semantic review only; the quality-v9 receipt, candidate freeze, fresh baseline/candidate builds, capture, reduction, and retained-only verification remain required.",
+    "The candidate source hashes bind the current five files and must match the eventual candidate-freeze current identities before measurement."
+  ],
+  "performance_claim": null,
+  "reviewed_without_build_or_timing": true,
+  "reviewer": "/root/selected_metadata_protocol_0894",
+  "route_scope": {
+    "note": "The timed harness does not instrument route selection; raw-scanner tests provide candidate eligibility evidence separately.",
+    "physical_cold_eligible": false,
+    "runtime_route_observed": false,
+    "static_reference": "docs/performance/results/change-0893/qualification-after-cleanup/report.json",
+    "static_values_must_match_0893": true,
+    "worksheet_route_eligibility": [
+      {
+        "selected_cell_stream_ineligible_on_cols": true,
+        "source_stream_eligible": false,
+        "source_stream_ineligible_reasons": [
+          "markup-compatibility-namespace",
+          "x14ac-namespace",
+          "dy-descent"
+        ],
+        "worksheet": "xl/worksheets/sheet1.xml"
+      },
+      {
+        "selected_cell_stream_ineligible_on_cols": true,
+        "source_stream_eligible": false,
+        "source_stream_ineligible_reasons": [
+          "markup-compatibility-namespace",
+          "x14ac-namespace",
+          "dy-descent"
+        ],
+        "worksheet": "xl/worksheets/sheet2.xml"
+      },
+      {
+        "selected_cell_stream_ineligible_on_cols": true,
+        "source_stream_eligible": false,
+        "source_stream_ineligible_reasons": [
+          "markup-compatibility-namespace",
+          "x14ac-namespace",
+          "dy-descent"
+        ],
+        "worksheet": "xl/worksheets/sheet3.xml"
+      },
+      {
+        "selected_cell_stream_ineligible_on_cols": true,
+        "source_stream_eligible": false,
+        "source_stream_ineligible_reasons": [
+          "markup-compatibility-namespace",
+          "x14ac-namespace",
+          "dy-descent"
+        ],
+        "worksheet": "xl/worksheets/sheet4.xml"
+      }
+    ]
+  },
+  "schema": "litchi.xlsx-selected-metadata-candidate-review-0894.v1",
+  "scope": {
+    "dependencies_changed": false,
+    "focused_tests": [
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+    ],
+    "performance_claim": false,
+    "production_owners": [
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs"
+    ],
+    "public_api_changed": false,
+    "reviewer_builds": false,
+    "reviewer_source_edits": false,
+    "unsafe_code_added": false
+  },
+  "status": "approved_for_measurement"
+}

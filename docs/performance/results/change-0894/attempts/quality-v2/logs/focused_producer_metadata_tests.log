@@ -1,0 +1,33 @@
+{"argv": ["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo", "test", "--manifest-path", "crates/litchi-xlsx/Cargo.toml", "--locked", "--offline", "--lib", "producer_metadata", "--", "--nocapture"], "candidate_sources": ["crates/litchi-xlsx/src/raw/worksheet/selected.rs", "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs", "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs", "crates/litchi-xlsx/src/raw/worksheet/tests.rs", "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"], "cwd": "/home/zhuhe/code/litchi", "environment": {"CARGO_BUILD_JOBS": "2", "CARGO_HOME": "/home/zhuhe/.cargo", "CARGO_INCREMENTAL": "0", "CARGO_NET_OFFLINE": "true", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_RELEASE_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0", "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality", "HOME": "/home/zhuhe", "LANG": "C", "LC_ALL": "C", "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin", "RUSTDOCFLAGS": "-D warnings", "RUSTFLAGS": "", "RUSTUP_HOME": "/home/zhuhe/.rustup", "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu", "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-quality/private-tmp", "TZ": "UTC"}, "tool_versions": {"cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n", "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"}}
+
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized] target(s) in 26.86s
+     Running unittests src/lib.rs (target/litchi-0894-quality/debug/deps/litchi_xlsx-8119a1ae378e2ac4)
+
+running 5 tests
+
+thread 'raw::worksheet::selected::producer_metadata_tests::metadata_unknown_markup_and_style_inheritance_fall_back' (197062) panicked at crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs:275:5:
+assertion `left == right` failed: fixture mutation anchor is unique
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test raw::worksheet::selected::producer_metadata_tests::metadata_unknown_markup_and_style_inheritance_fall_back ... FAILED
+
+thread 'raw::worksheet::selected::producer_metadata_tests::malformed_extension_and_limits_remain_typed_stream_failures' (197060) panicked at crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs:275:5:
+assertion `left == right` failed: fixture mutation anchor is unique
+  left: 3
+ right: 1
+test raw::worksheet::selected::producer_metadata_tests::malformed_extension_and_limits_remain_typed_stream_failures ... FAILED
+test raw::worksheet::selected::producer_metadata_tests::repairable_duplicate_and_misordered_metadata_never_becomes_selected_success ... ok
+test raw::worksheet::selected::producer_metadata_tests::mce_metadata_branches_and_process_content_follow_the_authoritative_route ... ok
+test raw::worksheet::selected::producer_metadata_tests::clean_metadata_variants_match_authoritative_values_order_and_dependencies ... ok
+
+failures:
+
+failures:
+    raw::worksheet::selected::producer_metadata_tests::malformed_extension_and_limits_remain_typed_stream_failures
+    raw::worksheet::selected::producer_metadata_tests::metadata_unknown_markup_and_style_inheritance_fall_back
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 1390 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,258 @@
+{
+  "schema": "litchi.xlsx-selected-metadata-candidate-review-0894.v2",
+  "status": "approved_for_measurement",
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "reviewer": "/root/selected_metadata_review_0894",
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs"
+  ],
+  "candidate_source_hashes": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "3b5edcbde4a699eb5623183324244b9fd494236b5cf159666c7e97eb78612991",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs": "37def8f16a82b1d5099e6a4583453aa5d70c94c52f118f20af3909c9ae60de83",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs": "d6d92115edf91f65075e3c755327001022171ee9a43141a8e86bd2ad2cb6048f",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+  },
+  "candidate_source_identities": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "bytes": 95216,
+      "mode": 436,
+      "sha256": "3b5edcbde4a699eb5623183324244b9fd494236b5cf159666c7e97eb78612991"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs": {
+      "bytes": 12455,
+      "mode": 436,
+      "sha256": "37def8f16a82b1d5099e6a4583453aa5d70c94c52f118f20af3909c9ae60de83"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs": {
+      "bytes": 26635,
+      "mode": 436,
+      "sha256": "d6d92115edf91f65075e3c755327001022171ee9a43141a8e86bd2ad2cb6048f"
+    },
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+      "bytes": 12041,
+      "mode": 436,
+      "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+      "bytes": 187211,
+      "mode": 436,
+      "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+    }
+  },
+  "blocking_findings": [],
+  "findings": [
+    {
+      "id": "bounded-metadata-admission",
+      "status": "pass",
+      "summary": "The selected scanner admits only value-checked, inert worksheet metadata: sheetViews/sheetView/selection, sheetFormatPr, style-free cols/col records, row spans, pageMargins, and the bounded pageSetup subset.",
+      "source_locations": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:20-240",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1529-1648",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1808-1847"
+      ],
+      "semantic_guards": [
+        "Unknown attributes, duplicate attributes, invalid lexical values, invalid ranges, duplicate or out-of-order containers, styled columns, and unsupported child structure refuse the selected route.",
+        "Column intervals are strictly ordered and non-overlapping; page margins, page setup values, selection references, row spans, sheet view counts, and SpreadsheetML/x14ac/relationship namespaces are bounded and validated.",
+        "The selected route does not materialize layout, view, print, or column metadata, so accepted records are admitted only where those values cannot change selected cell values."
+      ],
+      "evidence": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ]
+    },
+    {
+      "id": "fail-closed-authoritative-fallback",
+      "status": "pass",
+      "summary": "Unsupported, opaque, repairable, ambiguous, malformed-semantic, styled, duplicate, or out-of-order metadata marks the scanner NotEligible and falls through to the authoritative worksheet parser; malformed XML and authoritative stream failures remain typed errors.",
+      "source_locations": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1350-1430",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1529-1648",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:2314-2338",
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:242-315"
+      ],
+      "semantic_guards": [
+        "Opaque MCE content, general references and CDATA in metadata, unknown namespaces, unsupported children, and style-bearing columns cannot be skipped to reach sheetData.",
+        "The ordinary worksheet parser remains the fallback owner for metadata it can repair or materialize, including page setup semantics outside the bounded projection.",
+        "Malformed recognized metadata is refused as a route decision where projection is unsafe; parser, XML, MCE, cancellation, and source failures are propagated as their existing typed errors."
+      ],
+      "evidence": [
+        "metadata eligibility and invalid-value cases in crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "duplicate/order/style fallback cases in crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "authoritative fallback and full-cell selector coverage in tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ]
+    },
+    {
+      "id": "resource-budget-and-first-divergence",
+      "status": "pass",
+      "summary": "New metadata admission is gated by declared input size against the authoritative stream ceilings, so a newly admitted metadata barrier cannot introduce a stricter late stream failure than the baseline path; pre-barrier typed failures remain errors.",
+      "source_locations": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs:20-36",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1217-1251",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1529-1648",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1814-1818"
+      ],
+      "proof_conditions": [
+        "processing.max_input_bytes is bounded by max_events, max_event_bytes, and max_attribute_bytes_per_event.",
+        "2 * processing.max_input_bytes is overflow-checked and bounded by max_name_bytes and max_context_bytes.",
+        "max_attributes_per_event is at least processing.max_attributes_per_element.",
+        "The same budget gate applies to sheetViews, sheetFormatPr, cols, pageMargins, pageSetup, and row spans; it does not convert an already-raised MCE or XML error into NotEligible."
+      ],
+      "evidence": [
+        "metadata_event_limit_before_new_metadata_remains_typed in crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "all six metadata barrier resource-limit cases in crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs"
+      ]
+    },
+    {
+      "id": "authoritative-codec-and-lifetime-fences",
+      "status": "pass",
+      "summary": "The candidate preserves the existing semantic-event stream, raw x14ac observation, MCE dispatch, source-version fences, cancellation, XML depth/input/output limits, selected-cell dependency closure, and callback ordering.",
+      "source_locations": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:286-300",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:1338-1368",
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs:2246-2282",
+        "crates/litchi-xlsx/src/workbook/source.rs:1034-1068"
+      ],
+      "semantic_guards": [
+        "Raw observers and the active MCE scanner remain behind the existing stream limits and callback fences.",
+        "The source callback still falls back only for NotEligible; typed stream, XML, cancellation, and source-version errors retain their existing propagation path.",
+        "The baseline full-cell Store path does not validate the separate Worksheet::page_setup accessor; the selected route's pageSetup projection is therefore limited to inert lexical checks and does not add accessor validation to the baseline contract."
+      ],
+      "evidence": [
+        "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ]
+    },
+    {
+      "id": "quality-gates",
+      "status": "pass",
+      "receipt": {
+        "path": "docs/performance/results/change-0894/attempts/quality-v9/quality-receipt.json",
+        "bytes": 48873,
+        "sha256": "cc3cf5a150d1fd43b9151c7113d74e325deb8d7ca00741b737572cd9e0292a23",
+        "status": "pass",
+        "source_head_before": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+        "source_head_after": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+        "commands": [
+          {"name": "rustfmt_candidate_sources", "pass": true},
+          {"name": "focused_producer_metadata_tests", "pass": true, "passed_count": 7},
+          {"name": "xlsx_lib_tests", "pass": true, "passed_count": 1397},
+          {"name": "xlsx_all_features_check", "pass": true},
+          {"name": "xlsx_clippy_all_features", "pass": true},
+          {"name": "xlsx_rustdoc", "pass": true},
+          {"name": "producer_shape_harness_tests", "pass": true, "passed_count": 22},
+          {"name": "producer_full_cell_selector_test", "pass": true, "passed_count": 1},
+          {"name": "crate_boundaries", "pass": true}
+        ]
+      }
+    },
+    {
+      "id": "differential-corpus",
+      "status": "pass",
+      "summary": "The baseline and candidate observable probes are identical over the retained corpus after normalizing only process-local SourceVersion.id fields.",
+      "comparison": {
+        "path": "docs/performance/results/change-0894/corpus-v1/comparison-v2.json",
+        "schema": "litchi.xlsx-observable-differential-comparison-0894.v1",
+        "status": "pass",
+        "bytes": 977846,
+        "sha256": "f0293a8cae3f74e1ef58fe7f5879bc47478e9bb32b3811f0c6653c5165aa170d",
+        "inputs": 180,
+        "worksheets": 394,
+        "legs": 1576,
+        "input_mismatches": 0,
+        "leg_mismatches": 0,
+        "structural_mismatches": 0,
+        "summary_mismatches": 0,
+        "summary_shape_mismatches": 0,
+        "discovery_record_mismatches": 0,
+        "preexisting_baseline_leg_mismatches": 394,
+        "preexisting_candidate_leg_mismatches": 394,
+        "ignored_fields": [
+          "legs[*].source_version_before.id",
+          "legs[*].source_version_after.id"
+        ]
+      },
+      "run": {
+        "path": "docs/performance/results/change-0894/corpus-v1/run.json",
+        "bytes": 73685,
+        "sha256": "836608257d45851fe9d74a66d6d76264d320445408c1d545164041dfa1355046",
+        "comparison_status": "pass",
+        "census_equal": true,
+        "baseline_jsonl_sha256": "ab34eb89705e76234b686e1157d847b2b8728d1a13254653b6e91aa89fc557f1",
+        "candidate_jsonl_sha256": "ab34eb89705e76234b686e1157d847b2b8728d1a13254653b6e91aa89fc557f1",
+        "census_before_sha256": "9af0c419b1be9e22f1c8379f95d8caf6733cc8fcb1ef8809aa416e8a8745aa0a",
+        "census_after_sha256": "9af0c419b1be9e22f1c8379f95d8caf6733cc8fcb1ef8809aa416e8a8745aa0a"
+      },
+      "comparison_receipt": {
+        "path": "docs/performance/results/change-0894/corpus-v1/compare-v2.receipt.json",
+        "bytes": 1457,
+        "sha256": "661f132d00dc6442512974df4fd7eb8b39001a38d157838c5be425ede4c71ba0",
+        "exit_code": 0,
+        "status": "pass"
+      }
+    },
+    {
+      "id": "source-integrity",
+      "status": "pass",
+      "summary": "The reviewed inventory is exactly the five frozen candidate paths, and each current identity matches candidate-freeze.json and the isolated quality-v9 source.",
+      "freeze": {
+        "path": "docs/performance/results/change-0894/candidate-freeze.json",
+        "bytes": 6752,
+        "sha256": "5d17efef3422a028477d0bfeca2efb63b22d9f7b3f61321c464cefddd0ea20d4",
+        "status": "frozen"
+      },
+      "quality_source": {
+        "path": "docs/performance/results/change-0894/quality-source.json",
+        "bytes": 7951,
+        "sha256": "8ef4eba9f5eb4f56c987063c1bc0158a75d7e88be74d931995411e79cdcbbfb8",
+        "status": "pass"
+      }
+    }
+  ],
+  "guard_scope": {
+    "contract": "post-endpoint-per-worksheet-tolerance-v1",
+    "archive_bytes": 22739,
+    "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+    "expected_cell_count": 4096,
+    "expected_numeric_count": 3686,
+    "expected_text_count": 410,
+    "oracle_digest_sha256": "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+    "post_endpoint_checks": [
+      "per-worksheet tolerance counts and clean reports",
+      "aggregate tolerance report",
+      "post-guard source-freshness fence"
+    ]
+  },
+  "route_scope": {
+    "runtime_route_observed": false,
+    "physical_cold_eligible": false,
+    "note": "The timed harness does not instrument selected-route eligibility. Raw scanner tests and the differential corpus provide correctness evidence; this review makes no runtime-route or physical-cold claim."
+  },
+  "scope": {
+    "dependencies_changed": false,
+    "public_api_changed": false,
+    "unsafe_code_added": false,
+    "reviewer_builds": false,
+    "reviewer_source_edits": false,
+    "performance_claim": false,
+    "focused_tests": [
+      "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+    ]
+  },
+  "limitations": [
+    "This is a source and semantic correctness review. It records quality-v9 and differential-corpus evidence but does not claim a speedup, memory reduction, allocator result, RSS result, runtime-route observation, or physical-cold eligibility.",
+    "Fresh release-build custody, paired timing, reduction, independent no-workload verification, and cleanup/freeze-plan checks remain separate measurement gates.",
+    "The differential comparator ignores only process-local SourceVersion.id fields; its 394 within-binary leg diagnostics are retained pre-existing differences and all baseline/candidate observable mismatches are zero.",
+    "The candidate source identities must continue to match candidate-freeze.json before measurement proceeds."
+  ],
+  "performance_claim": null,
+  "reviewed_without_build_or_timing": true
+}

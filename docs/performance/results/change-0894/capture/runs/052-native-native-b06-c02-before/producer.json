@@ -1,0 +1,44 @@
+{
+  "corpora": [
+    {
+      "generator": "litchi-docx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 40147,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "w14 w15 wp14",
+          "numeric_cells": 0,
+          "part": "word/document.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "add8dd1a6e5c2a8daf0fd194b3643f1baaea3995d0469ba65eb0be5d975f6809",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 100,
+      "selected_target": "paragraph:100",
+      "selected_target_text": "litchi-perf-baseline-docx-semantic-v1-source-00100",
+      "shape": "producer-medium",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": null,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [],
+      "variant": null
+    }
+  ],
+  "schema": "litchi.perf-baseline.producer-shape-evidence.v1"
+}

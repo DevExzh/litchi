@@ -1,0 +1,102 @@
+{
+  "debug": 0,
+  "environment": {
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/cargo-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/tmp"
+  },
+  "helpers": {
+    "Cargo.toml.template": {
+      "bytes": 606,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/Cargo.toml.template",
+      "sha256": "a455ae93750c5b96a231fbd99712e674658154c23beee8a4545716fba6d2754a"
+    },
+    "build.py": {
+      "bytes": 11964,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/build.py",
+      "sha256": "786b93f46c6c4e24d299f261095c56dad57c5fb3ed952041bde999dcf357db81"
+    },
+    "compare.py": {
+      "bytes": 13661,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/compare.py",
+      "sha256": "aa2592db9628211f2288a94e921de5a3861a522956647557c4615007238fbb55"
+    },
+    "input_census.py": {
+      "bytes": 5185,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/input_census.py",
+      "sha256": "03ec9d3c4365d7b1c004f5fb39335d62b044d1e9c1c9954a153be2abbfaa4884"
+    },
+    "probe.rs": {
+      "bytes": 27852,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/probe.rs",
+      "sha256": "f485f545898436b4671a03beb5ca622ab0a32366637f05ec45cadf278c016ac2"
+    }
+  },
+  "incremental": false,
+  "jobs": 2,
+  "lock_source": null,
+  "manifest": {
+    "bytes": 655,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/Cargo.toml",
+    "sha256": "5b3b733f7bc7bedada7697f7e452897ab595e51207c5c0f0c79459595eccbcd9"
+  },
+  "marker": {
+    "bytes": 38,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/.owner-litchi-0894-probe-baseline",
+    "sha256": "c1b2bd431bc37926f7be2fef9b017b77401c354c88c3a106d8f09f952280881a"
+  },
+  "probe_source": {
+    "bytes": 27852,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/probe.rs",
+    "sha256": "f485f545898436b4671a03beb5ca622ab0a32366637f05ec45cadf278c016ac2"
+  },
+  "profile": "dev",
+  "role": "baseline",
+  "schema": "litchi.xlsx-observable-probe-build-start-0894.v1",
+  "source_bindings": [
+    {
+      "bytes": 3325536,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+      "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+    },
+    {
+      "bytes": 2085018,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source-before.json",
+      "sha256": "2c058b7ed66860232834c675c03e278216d957d756f55e1b5b33c29863d8f718"
+    }
+  ],
+  "started_utc": "2026-10-03T21:27:06.221307+00:00",
+  "status": "building",
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline",
+  "template": {
+    "bytes": 606,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/probe/Cargo.toml.template",
+    "sha256": "a455ae93750c5b96a231fbd99712e674658154c23beee8a4545716fba6d2754a"
+  },
+  "tree": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src",
+  "tree_revision": null
+}

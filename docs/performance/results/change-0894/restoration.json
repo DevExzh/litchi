@@ -1,0 +1,62 @@
+{
+  "schema": "litchi.selected-metadata-restoration-0894.v1",
+  "status": "pass",
+  "decision": "reject",
+  "reason": "frozen primary native p50 adoption gate failed",
+  "utc": "2026-10-03T22:36:54.129954+00:00",
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "candidate_before": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "bytes": 95216,
+      "sha256": "3b5edcbde4a699eb5623183324244b9fd494236b5cf159666c7e97eb78612991"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+      "bytes": 12455,
+      "sha256": "37def8f16a82b1d5099e6a4583453aa5d70c94c52f118f20af3909c9ae60de83"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+      "bytes": 26635,
+      "sha256": "d6d92115edf91f65075e3c755327001022171ee9a43141a8e86bd2ad2cb6048f"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "bytes": 187211,
+      "sha256": "befda18215166b2173918583f265caf9b39709278eb78872b30a6a488c395595"
+    },
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "bytes": 12041,
+      "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+    }
+  },
+  "restored_after": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "bytes": 86129,
+      "sha256": "f83cefd73e2cd5ab8f741fbd3e9eab9c2ee3793a211f5e2be63cfd7e39af1eb2"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "bytes": 187181,
+      "sha256": "44c5db3893ccde5bbbefa838417b0b8f20020effb71c9f6ef276319baa41f4c2"
+    },
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "bytes": 14188,
+      "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+    }
+  },
+  "removed_candidate_additions": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs"
+  ],
+  "retained_overlay": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-overlay",
+  "unrelated_file_preserved": {
+    "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+    "bytes": 6390,
+    "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+  }
+}

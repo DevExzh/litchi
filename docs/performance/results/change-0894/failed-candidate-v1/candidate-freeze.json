@@ -1,0 +1,163 @@
+{
+  "added_files": 2,
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "baseline_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "baseline_file_count": 10771,
+  "candidate_file_count": 10773,
+  "candidate_overlay_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-overlay",
+  "candidate_patch": {
+    "bytes": 61975,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate.patch",
+    "sha256": "5cc44f0f5c10272da1b6826ac5e39c9e65fc2271fcd3abcda37c35db1d747387"
+  },
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs"
+  ],
+  "files": {
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "baseline": {
+        "bytes": 86129,
+        "git_mode": "100644",
+        "git_oid": "b969da8bb7658e5f323ce3d49b7a3423a3f38f7c",
+        "git_type": "blob",
+        "mode": 420,
+        "sha256": "f83cefd73e2cd5ab8f741fbd3e9eab9c2ee3793a211f5e2be63cfd7e39af1eb2"
+      },
+      "current": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      },
+      "overlay": {
+        "bytes": 94775,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+        "sha256": "dadd11685a89645381b67f83a649f40e98b6d5d0ab574863701b6f7ade722397"
+      },
+      "replacement": true
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs": {
+      "baseline": null,
+      "current": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      },
+      "overlay": {
+        "bytes": 11430,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata.rs",
+        "sha256": "0853ac628e1d69d53080eca8eca1655a9294ae45ee6218eed2b2d97328882948"
+      },
+      "replacement": false
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs": {
+      "baseline": null,
+      "current": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      },
+      "overlay": {
+        "bytes": 22697,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected/producer_metadata_tests.rs",
+        "sha256": "6b4ecb7e40797aac849763f9f42d67c0dc691ba65c3d8b1bee640959b7245df0"
+      },
+      "replacement": false
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+      "baseline": {
+        "bytes": 187181,
+        "git_mode": "100644",
+        "git_oid": "8716f1687ba4c982e2d96d4368cceaabc305f359",
+        "git_type": "blob",
+        "mode": 420,
+        "sha256": "44c5db3893ccde5bbbefa838417b0b8f20020effb71c9f6ef276319baa41f4c2"
+      },
+      "current": {
+        "bytes": 187191,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "bbbfa2b4a76804d1f9da50f015b6745b643604b4d0f7999bf5be21b7a85cf4c0"
+      },
+      "overlay": {
+        "bytes": 187191,
+        "executable": false,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+        "sha256": "bbbfa2b4a76804d1f9da50f015b6745b643604b4d0f7999bf5be21b7a85cf4c0"
+      },
+      "replacement": true
+    },
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+      "baseline": {
+        "bytes": 14188,
+        "git_mode": "100644",
+        "git_oid": "8abc2f1ec40fb66b5ef26eb4535c31cdc15b623b",
+        "git_type": "blob",
+        "mode": 420,
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      },
+      "current": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      },
+      "overlay": {
+        "bytes": 12041,
+        "executable": false,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "01806247e1a228811f6c92e3c2632d56701d7c864b3d9cc6f01be16350f459d6"
+      },
+      "replacement": true
+    }
+  },
+  "frozen_utc": "2026-10-03T21:32:11.482965+00:00",
+  "performance_claim": null,
+  "production_changes": true,
+  "replacement_files": 3,
+  "root_generated_lock": {
+    "bytes": 138443,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.xlsx-selected-metadata-candidate-freeze-0894.v1",
+  "source_archive": {
+    "bytes": 89047170,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.tar.gz",
+    "sha256": "f6f9d13813866ea24fd9cc108fc949aa42cdd042bacd3ca960897e8c88c63ce9"
+  },
+  "source_manifest": {
+    "bytes": 3325536,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "status": "frozen",
+  "timed_harness_guard_contract": "post-endpoint-per-worksheet-tolerance-v1"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "litchi.0894-early-quality-target-cleanup.v1",
+  "status": "pass",
+  "utc": "2026-10-03T22:22:59.711820+00:00",
+  "removed": "/home/zhuhe/code/litchi/target/litchi-0894-quality/debug",
+  "logical_bytes": 2328000171,
+  "files": 3673,
+  "reason": "completed Rust gates; only source-only crate-boundary gate remains; reclaim owned intermediate build files under shared disk pressure",
+  "retained": "quality marker, private TMPDIR, docs, source tree, logs and receipts"
+}

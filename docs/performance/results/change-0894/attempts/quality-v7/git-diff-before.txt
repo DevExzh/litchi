@@ -1,0 +1,677 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/selected.rs b/crates/litchi-xlsx/src/raw/worksheet/selected.rs
+index b969da8bb7..6bbe6d0b7a 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/selected.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/selected.rs
+@@ -51,7 +51,13 @@ use super::model::{
+ use super::{parse_a1, parse_one_based_row, x14ac};
+ use crate::cell::{Cell, ErrorValue, Number, Text, Value};
+ use crate::error::{Result, allocation, invalid};
++
++mod producer_metadata;
++#[cfg(test)]
++#[path = "selected/producer_metadata_tests.rs"]
++mod producer_metadata_tests;
+ use crate::formula::{Cache, Formula, Kind};
++use producer_metadata as metadata;
+ 
+ const MAX_XML_DEPTH: usize = 256;
+ const MAX_GENERAL_REFERENCE_TOKEN_BYTES: usize = 12;
+@@ -1027,6 +1033,12 @@ pub fn scan(
+ enum Frame {
+     Worksheet,
+     Dimension,
++    SheetViews,
++    SheetView,
++    Selection,
++    SheetFormat,
++    Cols,
++    Col,
+     SheetData,
+     MergeCells,
+     MergeCell,
+@@ -1036,6 +1048,8 @@ enum Frame {
+     Value,
+     Inline,
+     InlineText,
++    PageMargins,
++    PageSetup,
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+@@ -1186,11 +1200,20 @@ struct Scanner<'a> {
+     root_seen: bool,
+     root_closed: bool,
+     seen_dimension: bool,
++    seen_sheet_views: bool,
++    seen_sheet_format: bool,
++    seen_cols: bool,
+     seen_sheet_data: bool,
+     seen_merge_cells: bool,
+     merge_window_closed: bool,
+     merge_count: Option<u32>,
+     merges: Vec<Rect>,
++    sheet_view_count: usize,
++    selection_in_sheet_view: bool,
++    col_count: usize,
++    last_col_max: u32,
++    seen_page_margins: bool,
++    seen_page_setup: bool,
+     pending_cell: Option<PendingCell>,
+     numeric_value_scratch: String,
+     selected: Vec<SelectedRecord>,
+@@ -1210,11 +1233,20 @@ impl<'a> Scanner<'a> {
+             root_seen: false,
+             root_closed: false,
+             seen_dimension: false,
++            seen_sheet_views: false,
++            seen_sheet_format: false,
++            seen_cols: false,
+             seen_sheet_data: false,
+             seen_merge_cells: false,
+             merge_window_closed: false,
+             merge_count: None,
+             merges: Vec::new(),
++            sheet_view_count: 0,
++            selection_in_sheet_view: false,
++            col_count: 0,
++            last_col_max: 0,
++            seen_page_margins: false,
++            seen_page_setup: false,
+             pending_cell: None,
+             numeric_value_scratch: String::new(),
+             selected: Vec::new(),
+@@ -1310,10 +1342,15 @@ impl<'a> Scanner<'a> {
+             SemanticEvent::Start(element) => self.start(element, false),
+             SemanticEvent::Empty(element) => self.start(element, true),
+             SemanticEvent::End(element) => self.end(element),
+-            SemanticEvent::Text(text) | SemanticEvent::CData(text) => self.text(text.text()),
++            SemanticEvent::Text(text) => self.text(text.text()),
++            SemanticEvent::CData(text) => self.cdata(text.text()),
+             SemanticEvent::GeneralRef(reference) if self.in_payload() => {
+                 self.general_reference(reference)
+             },
++            SemanticEvent::GeneralRef(_) if self.in_metadata() => {
++                self.mark(NotEligibleReason::UnsupportedStructure);
++                Ok(())
++            },
+             SemanticEvent::GeneralRef(reference)
+                 if self.stack.last() == Some(&Frame::Dimension) =>
+             {
+@@ -1356,6 +1393,17 @@ impl<'a> Scanner<'a> {
+         let frame = match parent {
+             Frame::Worksheet => self.start_worksheet_child(element)?,
+             Frame::Dimension => self.start_dimension_child(element)?,
++            Frame::SheetViews => self.start_sheet_views_child(element)?,
++            Frame::SheetView => self.start_sheet_view_child(element)?,
++            Frame::Selection
++            | Frame::SheetFormat
++            | Frame::Col
++            | Frame::PageMargins
++            | Frame::PageSetup => {
++                self.mark(NotEligibleReason::UnsupportedStructure);
++                None
++            },
++            Frame::Cols => self.start_cols_child(element)?,
+             Frame::SheetData => self.start_sheet_data_child(element)?,
+             Frame::MergeCells => self.start_merge_cells_child(element)?,
+             Frame::MergeCell => self.start_merge_cell_child(element)?,
+@@ -1389,6 +1437,15 @@ impl<'a> Scanner<'a> {
+         if is_spreadsheetml_element(element, "dimension") {
+             return self.start_dimension(element);
+         }
++        if is_spreadsheetml_element(element, "sheetViews") {
++            return self.start_sheet_views(element);
++        }
++        if is_spreadsheetml_element(element, "sheetFormatPr") {
++            return self.start_sheet_format(element);
++        }
++        if is_spreadsheetml_element(element, "cols") {
++            return self.start_cols(element);
++        }
+         if is_spreadsheetml_element(element, "sheetData") {
+             if self.seen_sheet_data {
+                 return Err(invalid("worksheet has duplicate sheetData"));
+@@ -1417,8 +1474,12 @@ impl<'a> Scanner<'a> {
+         {
+             self.merge_window_closed = true;
+         }
+-        if is_spreadsheetml_element(element, "cols") || is_spreadsheetml_element(element, "col") {
++        if is_spreadsheetml_element(element, "col") {
+             self.mark(NotEligibleReason::Styles);
++        } else if is_spreadsheetml_element(element, "pageMargins") {
++            return self.start_page_margins(element);
++        } else if is_spreadsheetml_element(element, "pageSetup") {
++            return self.start_page_setup(element);
+         } else {
+             self.mark(NotEligibleReason::UnsupportedStructure);
+         }
+@@ -1429,7 +1490,12 @@ impl<'a> Scanner<'a> {
+     /// recorded by the materialized parser (audit finding 4.10); this scanner
+     /// never repairs, so it defers such a worksheet.
+     fn start_dimension(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+-        if self.seen_sheet_data || self.seen_dimension {
++        if self.seen_sheet_views
++            || self.seen_sheet_format
++            || self.seen_cols
++            || self.seen_sheet_data
++            || self.seen_dimension
++        {
+             self.mark(NotEligibleReason::UnsupportedStructure);
+             return Ok(None);
+         }
+@@ -1458,6 +1524,116 @@ impl<'a> Scanner<'a> {
+         Ok(None)
+     }
+ 
++    fn start_sheet_views(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if self.seen_sheet_views
++            || self.seen_sheet_format
++            || self.seen_cols
++            || self.seen_sheet_data
++            || !metadata::sheet_views(element)
++        {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        self.seen_sheet_views = true;
++        self.sheet_view_count = 0;
++        if self.not_eligible.is_none() {
++            Ok(Some(Frame::SheetViews))
++        } else {
++            Ok(None)
++        }
++    }
++
++    fn start_sheet_views_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if !is_spreadsheetml_element(element, "sheetView") {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        if self.sheet_view_count >= 16 || !metadata::sheet_view(element) {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        self.sheet_view_count += 1;
++        self.selection_in_sheet_view = false;
++        Ok(Some(Frame::SheetView))
++    }
++
++    fn start_sheet_view_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if !is_spreadsheetml_element(element, "selection") {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        if self.selection_in_sheet_view || !metadata::selection(element) {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        self.selection_in_sheet_view = true;
++        Ok(Some(Frame::Selection))
++    }
++
++    fn start_sheet_format(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if self.seen_sheet_format
++            || self.seen_cols
++            || self.seen_sheet_data
++            || !metadata::sheet_format(element)
++        {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        self.seen_sheet_format = true;
++        Ok(Some(Frame::SheetFormat))
++    }
++
++    fn start_cols(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if self.seen_cols || self.seen_sheet_data || !metadata::cols(element) {
++            self.mark(NotEligibleReason::Styles);
++            return Ok(None);
++        }
++        self.seen_cols = true;
++        self.col_count = 0;
++        self.last_col_max = 0;
++        Ok(Some(Frame::Cols))
++    }
++
++    fn start_cols_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if !is_spreadsheetml_element(element, "col") {
++            self.mark(NotEligibleReason::Styles);
++            return Ok(None);
++        }
++        let Some(max) = metadata::col(element, self.last_col_max) else {
++            self.mark(NotEligibleReason::Styles);
++            return Ok(None);
++        };
++        if self.col_count >= 16_384 {
++            self.mark(NotEligibleReason::Styles);
++            return Ok(None);
++        }
++        self.last_col_max = max;
++        self.col_count += 1;
++        Ok(Some(Frame::Col))
++    }
++
++    fn start_page_margins(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if !self.seen_sheet_data
++            || self.seen_page_margins
++            || self.seen_page_setup
++            || !metadata::page_margins(element)
++        {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        self.seen_page_margins = true;
++        Ok(Some(Frame::PageMargins))
++    }
++
++    fn start_page_setup(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
++        if !self.seen_sheet_data || self.seen_page_setup || !metadata::page_setup(element) {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(None);
++        }
++        self.seen_page_setup = true;
++        Ok(Some(Frame::PageSetup))
++    }
++
+     fn start_sheet_data_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+         if is_spreadsheetml_element(element, "row") {
+             self.start_row(element)
+@@ -1622,7 +1798,12 @@ impl<'a> Scanner<'a> {
+         {
+             self.mark(NotEligibleReason::Styles);
+         }
+-        self.validate_attributes(element, &["r"], true)?;
++        self.validate_attributes(element, &["r", "spans"], true)?;
++        if let Some(spans) = unqualified_attribute(element, "spans")
++            && !metadata::row_spans(spans)
++        {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++        }
+         let number = match unqualified_attribute(element, "r") {
+             Some(value) => parse_one_based_row(value)?,
+             None => self
+@@ -1783,6 +1964,14 @@ impl<'a> Scanner<'a> {
+         match frame {
+             Frame::Worksheet => self.root_closed = true,
+             Frame::Dimension => {},
++            Frame::SheetViews => self.finish_sheet_views(),
++            Frame::SheetView
++            | Frame::Selection
++            | Frame::SheetFormat
++            | Frame::Col
++            | Frame::PageMargins
++            | Frame::PageSetup => {},
++            Frame::Cols => self.finish_cols(),
+             Frame::SheetData => {},
+             Frame::MergeCells => self.finish_merge_cells(),
+             Frame::MergeCell => {},
+@@ -1797,6 +1986,14 @@ impl<'a> Scanner<'a> {
+         match frame {
+             Frame::Worksheet => self.root_closed = true,
+             Frame::Dimension => {},
++            Frame::SheetViews => self.finish_sheet_views(),
++            Frame::SheetView
++            | Frame::Selection
++            | Frame::SheetFormat
++            | Frame::Col
++            | Frame::PageMargins
++            | Frame::PageSetup => {},
++            Frame::Cols => self.finish_cols(),
+             Frame::SheetData => {},
+             Frame::MergeCells => self.finish_merge_cells(),
+             Frame::MergeCell => {},
+@@ -1815,6 +2012,18 @@ impl<'a> Scanner<'a> {
+         Ok(())
+     }
+ 
++    fn finish_sheet_views(&mut self) {
++        if self.sheet_view_count == 0 {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++        }
++    }
++
++    fn finish_cols(&mut self) {
++        if self.col_count == 0 {
++            self.mark(NotEligibleReason::Styles);
++        }
++    }
++
+     /// An empty `mergeCells` or a count disagreeing with its records is
+     /// repaired and recorded by the materialized parser (audit finding
+     /// 4.10); this scanner defers the worksheet.
+@@ -1993,6 +2202,12 @@ impl<'a> Scanner<'a> {
+             },
+             Frame::Worksheet
+             | Frame::Dimension
++            | Frame::SheetViews
++            | Frame::SheetView
++            | Frame::Selection
++            | Frame::SheetFormat
++            | Frame::Cols
++            | Frame::Col
+             | Frame::SheetData
+             | Frame::Row
+             | Frame::Cell
+@@ -2004,7 +2219,23 @@ impl<'a> Scanner<'a> {
+                     Ok(())
+                 }
+             },
++            Frame::PageMargins | Frame::PageSetup => {
++                if text.trim().is_empty() {
++                    Ok(())
++                } else {
++                    self.mark(NotEligibleReason::UnsupportedStructure);
++                    Ok(())
++                }
++            },
++        }
++    }
++
++    fn cdata(&mut self, text: &str) -> Result<()> {
++        if self.in_metadata() {
++            self.mark(NotEligibleReason::UnsupportedStructure);
++            return Ok(());
+         }
++        self.text(text)
+     }
+ 
+     fn general_reference(
+@@ -2051,6 +2282,22 @@ impl<'a> Scanner<'a> {
+         )
+     }
+ 
++    fn in_metadata(&self) -> bool {
++        matches!(
++            self.stack.last(),
++            Some(
++                Frame::SheetViews
++                    | Frame::SheetView
++                    | Frame::Selection
++                    | Frame::SheetFormat
++                    | Frame::Cols
++                    | Frame::Col
++                    | Frame::PageMargins
++                    | Frame::PageSetup
++            )
++        )
++    }
++
+     fn validate_attributes(
+         &mut self,
+         element: &SemanticElement<'_>,
+@@ -2184,6 +2431,12 @@ fn matches_frame(frame: Frame, element: &litchi_ooxml_common::mce::SemanticEnd<'
+     let expected = match frame {
+         Frame::Worksheet => "worksheet",
+         Frame::Dimension => "dimension",
++        Frame::SheetViews => "sheetViews",
++        Frame::SheetView => "sheetView",
++        Frame::Selection => "selection",
++        Frame::SheetFormat => "sheetFormatPr",
++        Frame::Cols => "cols",
++        Frame::Col => "col",
+         Frame::SheetData => "sheetData",
+         Frame::MergeCells => "mergeCells",
+         Frame::MergeCell => "mergeCell",
+@@ -2193,6 +2446,8 @@ fn matches_frame(frame: Frame, element: &litchi_ooxml_common::mce::SemanticEnd<'
+         Frame::Value => "v",
+         Frame::Inline => "is",
+         Frame::InlineText => "t",
++        Frame::PageMargins => "pageMargins",
++        Frame::PageSetup => "pageSetup",
+     };
+     (namespace == SPREADSHEETML_NAMESPACE || namespace == STRICT_SPREADSHEETML_NAMESPACE)
+         && local == expected
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+index 8716f1687b..4e3b1e8349 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+@@ -2090,7 +2090,7 @@ mod streaming_0362_selected_tests {
+             ),
+             (
+                 worksheet(
+-                    r#"<cols><col min="1" max="1" width="10" customWidth="1"/></cols><sheetData/>"#,
++                    r#"<cols><col min="1" max="1" width="10" style="1" customWidth="1"/></cols><sheetData/>"#,
+                 ),
+                 NotEligibleReason::Styles,
+             ),
+@@ -3690,7 +3690,7 @@ mod streaming_0367_merge_tests {
+         // worksheet, which the materialized parser accepts. The verdict must
+         // now be the ordinary style fallback.
+         let xml = worksheet(
+-            r#"<cols><col min="1" max="2" width="12"/></cols><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="B1:B2"/></mergeCells>"#,
++            r#"<cols><col min="1" max="2" width="12" style="1"/></cols><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="B1:B2"/></mergeCells>"#,
+         );
+         match scan_xml(&xml, "A1") {
+             Ok(ScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
+@@ -4575,7 +4575,7 @@ mod change_0658_ineligibility_gate_tests {
+             ),
+             (
+                 "styles",
+-                padded(r#"<cols><col min="1" max="1" width="10"/></cols><sheetData/>"#),
++                padded(r#"<cols><col min="1" max="1" width="10" style="1"/></cols><sheetData/>"#),
+                 NotEligibleReason::Styles,
+                 None,
+             ),
+diff --git a/tools/perf-baseline/src/producer_shape/selected_route_tests.rs b/tools/perf-baseline/src/producer_shape/selected_route_tests.rs
+index 8abc2f1ec4..b7f19e5321 100644
+--- a/tools/perf-baseline/src/producer_shape/selected_route_tests.rs
++++ b/tools/perf-baseline/src/producer_shape/selected_route_tests.rs
+@@ -4,8 +4,8 @@
+ //! source-backed worksheet route.  They do not observe the surrounding route,
+ //! time a read, or claim that a selected result was published.  The generated
+ //! archive stays the reviewed four-sheet producer fixture; the XML controls
+-//! are bounded copies that remove one earlier marker at a time so the next
+-//! scanner refusal is identified by an actual event.
++//! are bounded copies that remove one admitted metadata family at a time so
++//! the selected cell oracle is checked with and without each producer marker.
+ 
+ #![allow(clippy::unwrap_used, reason = "focused producer refusal assertions")]
+ 
+@@ -16,9 +16,7 @@ use std::{
+ 
+ use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+ use litchi_xlsx::Rect;
+-use litchi_xlsx::raw::selected_worksheet::{
+-    NotEligibleReason, RangeScanOutcome, SelectedPayload, scan_range,
+-};
++use litchi_xlsx::raw::selected_worksheet::{RangeScanOutcome, SelectedPayload, scan_range};
+ use soapberry_zip::office::ArchiveReader;
+ 
+ use super::*;
+@@ -47,21 +45,13 @@ enum Control {
+ impl Control {
+     const fn name(self) -> &'static str {
+         match self {
+-            Self::CompleteProducer => "producer-complete-first-child-sheetViews",
+-            Self::WithoutSheetViews => "remove-sheetViews-next-sheetFormatPr",
+-            Self::WithoutSheetViewsAndFormat => {
+-                "remove-sheetViews-and-sheetFormatPr-next-cols-styles"
+-            },
+-            Self::WithoutSheetViewsFormatAndCols => {
+-                "remove-sheetViews-format-and-cols-next-row-spans"
+-            },
+-            Self::WithoutMetadataThroughRowSpans => {
+-                "remove-sheetViews-format-cols-and-row-spans-next-pageMargins"
+-            },
+-            Self::WithoutPageMargins => "remove-through-pageMargins-next-pageSetup-or-eligible",
+-            Self::WithoutPageMarginsAndPageSetup => {
+-                "remove-pageMargins-and-pageSetup-next-eligible"
+-            },
++            Self::CompleteProducer => "producer-complete-metadata",
++            Self::WithoutSheetViews => "without-sheetViews",
++            Self::WithoutSheetViewsAndFormat => "without-sheetViews-and-sheetFormatPr",
++            Self::WithoutSheetViewsFormatAndCols => "without-sheetViews-format-and-cols",
++            Self::WithoutMetadataThroughRowSpans => "without-metadata-through-row-spans",
++            Self::WithoutPageMargins => "without-pageMargins",
++            Self::WithoutPageMarginsAndPageSetup => "without-pageMargins-and-pageSetup",
+         }
+     }
+ }
+@@ -220,24 +210,6 @@ fn scan_xml(xml: &str) -> litchi_xlsx::raw::selected_worksheet::StreamResult<Ran
+     scan_range(&mut input, &Capabilities::default(), &limits, Rect::ALL)
+ }
+ 
+-fn assert_reason(xml: &str, expected: NotEligibleReason, control: Control, sheet: usize) {
+-    match scan_xml(xml) {
+-        Ok(RangeScanOutcome::NotEligible(actual)) => assert_eq!(
+-            actual,
+-            expected,
+-            "{} disagreed for sheet {}",
+-            control.name(),
+-            sheet + 1
+-        ),
+-        other => panic!(
+-            "{} expected {:?} for sheet {}, got {other:?}",
+-            control.name(),
+-            expected,
+-            sheet + 1
+-        ),
+-    }
+-}
+-
+ fn assert_eligible_producer_sheet(xml: &str, sheet: usize) -> (usize, usize) {
+     let Ok(RangeScanOutcome::Eligible(selected)) = scan_xml(xml) else {
+         panic!(
+@@ -266,104 +238,63 @@ fn assert_eligible_producer_sheet(xml: &str, sheet: usize) -> (usize, usize) {
+ }
+ 
+ #[test]
+-fn producer_medium_read_reports_the_first_selected_scanner_refusal_per_sheet() {
++fn producer_medium_read_admits_complete_metadata_and_preserves_the_cell_oracle() {
+     let corpus = reviewed_read_corpus();
+     let worksheets = worksheet_xmls(&corpus.corpus.archive);
+     assert_eq!(worksheets.len(), REVIEWED_SHEETS);
+ 
+-    // The complete generated producer worksheet reaches ordinary
+-    // SpreadsheetML <sheetViews> before any later producer metadata.  The
+-    // scanner's public result is the exact current first refusal, while the
+-    // archive identity and semantic counts above bind this observation to the
+-    // reviewed 4 x 32 x 32 fixture.
++    // The candidate metadata profile admits every producer worksheet, including
++    // the shared-string and worksheet-relationship roles.  These direct scan
++    // results remain separate from the enclosing SourceWorksheet route: the
++    // archive identity and semantic counts bind the observation to the reviewed
++    // 4 x 32 x 32 fixture.
++    let mut numeric = 0;
++    let mut text = 0;
+     for (sheet, xml) in worksheets.iter().enumerate() {
+-        assert_reason(
+-            &controlled_xml(xml, Control::CompleteProducer),
+-            NotEligibleReason::UnsupportedStructure,
+-            Control::CompleteProducer,
+-            sheet,
+-        );
++        let (sheet_numeric, sheet_text) =
++            assert_eligible_producer_sheet(&controlled_xml(xml, Control::CompleteProducer), sheet);
++        numeric += sheet_numeric;
++        text += sheet_text;
+     }
++    assert_eq!(numeric, REVIEWED_NUMERIC_COUNT);
++    assert_eq!(text, REVIEWED_TEXT_COUNT);
+ }
+ 
+ #[test]
+-fn producer_medium_read_marker_removal_controls_reveal_downstream_refusals() {
++fn producer_medium_read_metadata_removal_controls_preserve_eligibility() {
+     let corpus = reviewed_read_corpus();
+     let worksheets = worksheet_xmls(&corpus.corpus.archive);
+ 
+-    let staged = [
+-        (
+-            Control::CompleteProducer,
+-            NotEligibleReason::UnsupportedStructure,
+-        ),
+-        (
+-            Control::WithoutSheetViews,
+-            NotEligibleReason::UnsupportedStructure,
+-        ),
+-        (
+-            Control::WithoutSheetViewsAndFormat,
+-            NotEligibleReason::Styles,
+-        ),
+-        (
+-            Control::WithoutSheetViewsFormatAndCols,
+-            NotEligibleReason::UnsupportedStructure,
+-        ),
+-        (
+-            Control::WithoutMetadataThroughRowSpans,
+-            NotEligibleReason::UnsupportedStructure,
+-        ),
++    // Each control removes one admitted metadata family.  The candidate must
++    // preserve the selected physical records regardless of which optional
++    // producer metadata is absent; the same exact aggregate cell oracle is
++    // asserted for every control rather than only the fully-populated shape.
++    let controls = [
++        Control::CompleteProducer,
++        Control::WithoutSheetViews,
++        Control::WithoutSheetViewsAndFormat,
++        Control::WithoutSheetViewsFormatAndCols,
++        Control::WithoutMetadataThroughRowSpans,
++        Control::WithoutPageMargins,
++        Control::WithoutPageMarginsAndPageSetup,
+     ];
+-    for (control, expected) in staged {
++    for control in controls {
++        let mut numeric = 0;
++        let mut text = 0;
+         for (sheet, xml) in worksheets.iter().enumerate() {
+-            assert_reason(&controlled_xml(xml, control), expected, control, sheet);
+-        }
+-    }
+-
+-    // Once pageMargins is removed as well, the three sheets without a
+-    // pageSetup become eligible.  The relationship-bearing third sheet still
+-    // reaches its later pageSetup child and records the same structural
+-    // refusal.  This distinguishes both post-sheetData controls without
+-    // claiming anything about the enclosing SourceWorksheet route.
+-    let mut numeric = 0;
+-    let mut text = 0;
+-    for (sheet, xml) in worksheets.iter().enumerate() {
+-        let controlled = controlled_xml(xml, Control::WithoutPageMargins);
+-        if sheet == RELATIONSHIP_SHEET {
+-            assert_reason(
+-                &controlled,
+-                NotEligibleReason::UnsupportedStructure,
+-                Control::WithoutPageMargins,
+-                sheet,
+-            );
+-        } else {
+-            let (sheet_numeric, sheet_text) = assert_eligible_producer_sheet(&controlled, sheet);
++            let (sheet_numeric, sheet_text) =
++                assert_eligible_producer_sheet(&controlled_xml(xml, control), sheet);
+             numeric += sheet_numeric;
+             text += sheet_text;
+         }
+-    }
+-    assert_eq!(
+-        numeric,
+-        REVIEWED_NUMERIC_COUNT - REVIEWED_ROWS * REVIEWED_COLUMNS
+-    );
+-    assert_eq!(text, REVIEWED_TEXT_COUNT);
+-
+-    // Removing the later pageSetup marker from its one relationship-bearing
+-    // sheet reaches the same eligible selected payload as the other three
+-    // sheets.  The aggregate vectors must still be the reviewed 4,096 / 3,686
+-    // / 410 contract, so this remains a corpus control rather than a timing
+-    // route claim.
+-    let mut all_numeric = 0;
+-    let mut all_text = 0;
+-    for (sheet, xml) in worksheets.iter().enumerate() {
+-        let (sheet_numeric, sheet_text) = assert_eligible_producer_sheet(
+-            &controlled_xml(xml, Control::WithoutPageMarginsAndPageSetup),
+-            sheet,
++        assert_eq!(
++            numeric,
++            REVIEWED_NUMERIC_COUNT,
++            "{} numeric",
++            control.name()
+         );
+-        all_numeric += sheet_numeric;
+-        all_text += sheet_text;
++        assert_eq!(text, REVIEWED_TEXT_COUNT, "{} text", control.name());
+     }
+-    assert_eq!(all_numeric, REVIEWED_NUMERIC_COUNT);
+-    assert_eq!(all_text, REVIEWED_TEXT_COUNT);
+ }
+ 
+ #[test]

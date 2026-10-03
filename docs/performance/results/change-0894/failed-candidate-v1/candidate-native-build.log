@@ -1,0 +1,207 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling zeroize v1.9.0
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling syn v2.0.119
+   Compiling syn v3.0.3
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling hybrid-array v0.4.14
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling crypto-common v0.2.2
+   Compiling subtle v2.6.1
+   Compiling const-oid v0.9.6
+   Compiling block-buffer v0.12.1
+   Compiling cmov v0.5.4
+   Compiling ctutils v0.4.2
+   Compiling crypto-common v0.1.6
+   Compiling serde_core v1.0.229
+   Compiling block-buffer v0.10.4
+   Compiling zerocopy v0.8.56
+   Compiling autocfg v1.5.1
+   Compiling cpufeatures v0.3.0
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling digest v0.10.7
+   Compiling getrandom v0.2.17
+   Compiling thiserror v2.0.20
+   Compiling rand_core v0.6.4
+   Compiling thiserror-impl v2.0.20
+   Compiling const-oid v0.10.2
+   Compiling smallvec v1.15.2
+   Compiling base64ct v1.8.3
+   Compiling digest v0.11.3
+   Compiling memchr v2.8.3
+   Compiling crossbeam-utils v0.8.22
+   Compiling pem-rfc7468 v0.7.0
+   Compiling der_derive v0.7.3
+   Compiling zmij v1.0.23
+   Compiling crossbeam-epoch v0.9.20
+   Compiling flagset v0.4.7
+   Compiling serde v1.0.229
+   Compiling der v0.7.10
+   Compiling serde_derive v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling crossbeam-deque v0.8.7
+   Compiling spki v0.7.3
+   Compiling chacha20 v0.10.1
+   Compiling iana-time-zone v0.1.65
+   Compiling itoa v1.0.18
+   Compiling rayon-core v1.13.0
+   Compiling once_cell v1.21.4
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling synstructure v0.13.2
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.3
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-core)
+   Compiling pkcs8 v0.10.2
+   Compiling either v1.17.0
+   Compiling rayon v1.12.0
+   Compiling zerofrom-derive v0.1.7
+   Compiling cpufeatures v0.2.17
+   Compiling yoke-derive v0.8.2
+   Compiling zerofrom v0.1.8
+   Compiling ff v0.13.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling base16ct v0.2.0
+   Compiling sec1 v0.7.3
+   Compiling yoke v0.8.3
+   Compiling group v0.13.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling quick-xml v0.41.0
+   Compiling crypto-bigint v0.5.5
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling sha2 v0.10.9
+   Compiling num-integer v0.1.46
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling zerocopy-derive v0.8.56
+   Compiling zerovec-derive v0.11.3
+   Compiling spin v0.9.9
+   Compiling num-bigint-dig v0.8.6
+   Compiling lazy_static v1.5.0
+   Compiling zerovec v0.11.6
+   Compiling rfc6979 v0.4.0
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.7
+   Compiling displaydoc v0.2.7
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling sha1 v0.10.7
+   Compiling pkcs1 v0.7.5
+   Compiling fixedbitset v0.5.7
+   Compiling rsa v0.9.10
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-cfb)
+   Compiling p256 v0.13.2
+   Compiling x509-cert v0.2.5
+   Compiling bitflags v2.13.1
+   Compiling crc32fast v1.5.0
+   Compiling tinystr v0.8.3
+   Compiling block-padding v0.4.2
+   Compiling zlib-rs v0.6.7
+   Compiling litemap v0.8.2
+   Compiling writeable v0.6.3
+   Compiling icu_locale_core v2.2.0
+   Compiling flate2 v1.1.10
+   Compiling inout v0.2.2
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/xml-minifier-macros)
+   Compiling zerotrie v0.2.4
+   Compiling potential_utf v0.1.5
+   Compiling icu_properties_data v2.2.0
+   Compiling icu_normalizer_data v2.2.0
+   Compiling utf8_iter v1.0.4
+   Compiling icu_collections v2.2.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/xml-minifier)
+   Compiling icu_provider v2.2.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/soapberry-zip)
+   Compiling rustversion v1.0.23
+   Compiling rustix v1.1.4
+   Compiling cipher v0.5.2
+   Compiling linux-raw-sys v0.12.1
+   Compiling icu_normalizer v2.2.0
+   Compiling icu_properties v2.2.0
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-sign)
+   Compiling cpubits v0.1.1
+   Compiling fastrand v2.5.0
+   Compiling debug_unsafe v0.1.4
+   Compiling atoi_simd v0.18.1
+   Compiling tempfile v3.27.0
+   Compiling idna_adapter v1.2.2
+   Compiling percent-encoding v2.3.2
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinyvec v1.12.0
+   Compiling form_urlencoded v1.2.2
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling unicode-normalization v0.1.25
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-opc)
+   Compiling aes v0.9.2
+   Compiling hmac v0.13.0
+   Compiling encoding_rs v0.8.35
+   Compiling siphasher v1.0.3
+   Compiling phf_shared v0.14.0
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-codepage)
+   Compiling caseless v0.2.2
+   Compiling cbc v0.2.1
+   Compiling sha1 v0.11.0
+   Compiling universal-hash v0.6.1
+   Compiling ryu v1.0.23
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-ooxml-common)
+   Compiling phf_generator v0.14.0
+   Compiling polyval v0.7.3
+   Compiling bergshamra-core v0.7.0
+   Compiling inout v0.1.4
+   Compiling uppsala v0.9.0
+   Compiling bergshamra-xml v0.7.0
+   Compiling cipher v0.4.4
+   Compiling ghash v0.6.0
+   Compiling phf_macros v0.14.0
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-drawingml)
+   Compiling ctr v0.10.1
+   Compiling aead v0.6.1
+   Compiling password-hash v0.5.0
+   Compiling blake2 v0.10.6
+   Compiling byteorder v1.5.0
+   Compiling blowfish v0.9.1
+   Compiling argon2 v0.5.3
+   Compiling aes-gcm v0.11.0
+   Compiling phf v0.14.0
+   Compiling bergshamra-c14n v0.7.0
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-ole-common)
+   Compiling pbkdf2 v0.13.0
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-odf-common)
+   Compiling rc4 v0.2.0
+   Compiling litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-odraw)
+   Compiling litchi-biff v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-biff)
+   Compiling md-5 v0.11.0
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-crypto)
+   Compiling litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-ograph)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-vba)
+   Compiling litchi-xldm v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-xldm)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-sheet)
+   Compiling bumpalo v3.20.3
+   Compiling spin v0.10.1
+   Compiling crc-fast v1.10.0
+   Compiling same-file v1.0.6
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-odt)
+   Compiling litchi-rtf v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-rtf)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-doc)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-xlsx)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-ppt)
+error: could not compile `litchi-ppt` (lib)
+
+Caused by:
+  process didn't exit successfully: `/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_ppt --edition=2024 /home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-ppt/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C linker-plugin-lto -C codegen-units=1 -C debuginfo=1 '--deny=clippy::all' --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs '--deny=rustdoc::unescaped_backticks' --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints '--deny=rustdoc::redundant_explicit_links' '--deny=rustdoc::private_intra_doc_links' --deny=non_ascii_idents '--allow=clippy::needless_return' '--allow=clippy::manual_saturating_arithmetic' '--allow=clippy::manual_is_multiple_of' '--deny=rustdoc::invalid_rust_codeblocks' '--deny=rustdoc::invalid_html_tags' '--deny=rustdoc::invalid_codeblock_attributes' '--allow=clippy::if_same_then_else' '--allow=clippy::disallowed_methods' '--allow=clippy::collapsible_match' '--allow=clippy::collapsible_if' '--deny=rustdoc::broken_intra_doc_links' '--deny=rustdoc::bare_urls' --cfg 'feature="default"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("automatic-fonts", "default", "encryption", "font-discovery", "font-subset", "fonts", "formula", "performance-diagnostics", "sign", "vba-inspection"))' -C metadata=e0d8358f5ed9c100 -C extra-filename=-0d99172d9f776621 --out-dir /home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps -L dependency=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps --extern bitflags=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libbitflags-99a6eea1164cc34e.rmeta --extern chrono=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libchrono-47cdc36da82cc282.rmeta --extern flate2=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libflate2-ae20f9d90aac10b3.rmeta --extern litchi_cfb=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_cfb-b14c3ad5ca9f4d9a.rmeta --extern litchi_codepage=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_codepage-8eb8d83317193578.rmeta --extern litchi_core=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_core-9b97e140fac09877.rmeta --extern litchi_odraw=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_odraw-7747ca44e469d5d1.rmeta --extern litchi_ograph=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_ograph-eb05e527e153a14e.rmeta --extern litchi_ole_common=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_ole_common-eab2b0d68ea85071.rmeta --extern litchi_opc=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_opc-c39ed4bf9b1ea390.rmeta --extern once_cell=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libonce_cell-aaa3c86345d2d5a3.rmeta --extern quick_xml=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libquick_xml-02d7ed9d49649c87.rmeta --extern serde_json=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libserde_json-9c477e356e728ee9.rmeta --extern url=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liburl-c225b84b8d0ef4b1.rmeta --extern zerocopy=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libzerocopy-9a5b7846992beacb.rmeta --extern zerocopy_derive=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libzerocopy_derive-6d8bb49650fc738c.so --extern zeroize=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libzeroize-4397cec355abb179.rmeta` (signal: 15, SIGTERM: termination signal)
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-xlsx` (lib)
+
+Caused by:
+  process didn't exit successfully: `/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_xlsx --edition=2024 /home/zhuhe/code/litchi/target/litchi-0894-candidate-src/crates/litchi-xlsx/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C linker-plugin-lto -C codegen-units=1 -C debuginfo=1 '--deny=clippy::all' --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs '--deny=rustdoc::unescaped_backticks' --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints '--deny=rustdoc::redundant_explicit_links' '--deny=rustdoc::private_intra_doc_links' --deny=non_ascii_idents '--allow=clippy::needless_return' '--allow=clippy::manual_saturating_arithmetic' '--allow=clippy::manual_is_multiple_of' '--deny=rustdoc::invalid_rust_codeblocks' '--deny=rustdoc::invalid_html_tags' '--deny=rustdoc::invalid_codeblock_attributes' '--allow=clippy::if_same_then_else' '--allow=clippy::disallowed_methods' '--allow=clippy::collapsible_match' '--allow=clippy::collapsible_if' '--deny=rustdoc::broken_intra_doc_links' '--deny=rustdoc::bare_urls' --cfg 'feature="default"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("default", "encryption", "vba-inspection"))' -C metadata=c9fd28f263304ae9 -C extra-filename=-65511b492e0efa2a --out-dir /home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps -L dependency=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps --extern base64=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libbase64-15544df1f10b52d0.rmeta --extern bitflags=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libbitflags-99a6eea1164cc34e.rmeta --extern caseless=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libcaseless-b59541c51f43582b.rmeta --extern chrono=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libchrono-47cdc36da82cc282.rmeta --extern itoa=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libitoa-5b9423a7444c41ab.rmeta --extern litchi_core=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_core-9b97e140fac09877.rmeta --extern litchi_drawingml=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_drawingml-878050ac896fa02c.rmeta --extern litchi_ooxml_common=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_ooxml_common-a9221445337388f4.rmeta --extern litchi_opc=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_opc-c39ed4bf9b1ea390.rmeta --extern litchi_sheet=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_sheet-9a72e0213153fe79.rmeta --extern litchi_spreadsheet_drawing=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_spreadsheet_drawing-c0f06dd3a11ba4dd.rmeta --extern litchi_xldm=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/liblitchi_xldm-fb1db0534c1a299f.rmeta --extern memchr=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libmemchr-1068499beab65841.rmeta --extern once_cell=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libonce_cell-aaa3c86345d2d5a3.rmeta --extern quick_xml=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libquick_xml-02d7ed9d49649c87.rmeta --extern ryu=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libryu-309aa8b0df9a1913.rmeta --extern serde_json=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libserde_json-9c477e356e728ee9.rmeta --extern smallvec=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libsmallvec-5b7d1e601f8e79b2.rmeta --extern thiserror=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libthiserror-83bcbc6bef472ea1.rmeta --extern unicode_normalization=/home/zhuhe/code/litchi/target/litchi-0894-candidate-build/release/deps/libunicode_normalization-c386b5f7d1164f40.rmeta` (signal: 15, SIGTERM: termination signal)

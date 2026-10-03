@@ -1,5 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0894 — selected worksheet metadata route rejected
+
+[0894](0894-selected-worksheet-metadata.md) completes the bounded selected
+worksheet metadata qualification but rejects the candidate on the frozen
+native primary gate. Quality-v9 passes all nine gates and the four-leg corpus
+replay covers 180 inputs, 394 worksheets, and 1,576 legs per role with zero
+candidate-versus-baseline differences; the matched current-guard trial covers
+72 children / 3,320 measured samples. The producer XLSX full-cell p50 ratio is
+**1.897212** (95% interval **1.874311–1.920404**), versus the required ≤0.98
+with upper endpoint <1.0. Native p50/p95/p99 ratios are 1.897212/1.907545/1.903312;
+RSS and allocator observations are descriptive, with executable residency
+preventing causal heap attribution. Production is restored exactly. The trial
+failed without a causal profile; the next step is to profile selected
+semantic-stream per-event allocation before optimizing or reconsidering
+metadata admission. Artifact hashing overlapped capture on a shared host; its
+effect is unquantified. Independent capture/corpus replay and cleanup pass;
+the decision and final review retain all evidence.
+
 ## 0893 — force per-worksheet tolerance checks
 
 [0893](0893-forced-worksheet-tolerance-guard.md) strengthens the producer full-cell benchmark before a selected-route optimization: every worksheet report is forced after timing and metric endpoints, followed by aggregate and source-freshness checks. Versioned measured/warmup evidence rejects historical aggregate-only reports. Actual raw-scanner controls qualify the producer's metadata refusals. Production eligibility is unchanged; this is correctness evidence, with no new performance claim.

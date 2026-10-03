@@ -1,0 +1,10 @@
+{
+  "status": "intentional-stop",
+  "reason": "quality-v4 existing fallback fixtures require test-only correction; candidate frozen source no longer final qualified inventory",
+  "cargo_pid": 228518,
+  "child_pids": [
+    237355,
+    237614
+  ],
+  "utc": "2026-10-03T21:34:53.804821+00:00"
+}

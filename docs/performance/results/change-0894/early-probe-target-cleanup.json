@@ -1,0 +1,57 @@
+{
+  "schema": "litchi.0894-early-probe-target-cleanup.v1",
+  "status": "pass",
+  "utc": "2026-10-03T22:20:45.962564+00:00",
+  "reason": "reclaim completed owned probe build intermediates during shared disk pressure",
+  "records": [
+    {
+      "role": "baseline",
+      "removed": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/cargo-target",
+      "files": 1008,
+      "logical_bytes": 483594770,
+      "original_binary": {
+        "bytes": 11365128,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/cargo-target/debug/xlsx0894-probe",
+        "sha256": "13076e1bc289344c7510802804bed65bdccd4ba983adc194af9d37d90d16d8c4"
+      },
+      "retained_identical_binary": {
+        "bytes": 11365128,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/xlsx0894-probe",
+        "sha256": "13076e1bc289344c7510802804bed65bdccd4ba983adc194af9d37d90d16d8c4"
+      },
+      "build_receipt": {
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-baseline/build.json",
+        "sha256": "c35a9d3be888efa6362b7b905750993c55217e9891161a01d08f67c34d8f3f8a"
+      }
+    },
+    {
+      "role": "candidate",
+      "removed": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/cargo-target",
+      "files": 1008,
+      "logical_bytes": 483709195,
+      "original_binary": {
+        "bytes": 11382568,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/cargo-target/debug/xlsx0894-probe",
+        "sha256": "bbec53a9709cbc89fcc1a18696b115e41ef0f5dcc8e79f8d1065d758fb11f95b"
+      },
+      "retained_identical_binary": {
+        "bytes": 11382568,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/xlsx0894-probe",
+        "sha256": "bbec53a9709cbc89fcc1a18696b115e41ef0f5dcc8e79f8d1065d758fb11f95b"
+      },
+      "build_receipt": {
+        "path": "/home/zhuhe/code/litchi/target/litchi-0894-probe-candidate/build.json",
+        "sha256": "1ff3b8d4be2997f5b8c2101c53ad7fc0851971ee8ffa72909bd49de83193ef0c"
+      }
+    }
+  ],
+  "worktrees_removed": []
+}

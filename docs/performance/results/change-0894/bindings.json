@@ -1,0 +1,111 @@
+{
+  "baseline_allocator_depfile": {
+    "binary_role": "allocator",
+    "build_binding": "baseline_build",
+    "kind": "depfile",
+    "path": "allocator.d",
+    "role": "baseline"
+  },
+  "baseline_build": {
+    "kind": "build_receipt",
+    "path": "build.json",
+    "role": "baseline"
+  },
+  "baseline_flags": {
+    "build_binding": "baseline_build",
+    "kind": "build_flags",
+    "path": "build.json",
+    "role": "baseline"
+  },
+  "baseline_native_depfile": {
+    "binary_role": "native",
+    "build_binding": "baseline_build",
+    "kind": "depfile",
+    "path": "native.d",
+    "role": "baseline"
+  },
+  "baseline_quality": {
+    "kind": "quality_receipt",
+    "path": "../change-0893/attempts/quality-v3/quality-receipt.json",
+    "review_binding": "source_review",
+    "role": "baseline"
+  },
+  "candidate_allocator_depfile": {
+    "binary_role": "allocator",
+    "build_binding": "candidate_build",
+    "kind": "depfile",
+    "path": "candidate-allocator.d",
+    "role": "candidate"
+  },
+  "candidate_build": {
+    "kind": "build_receipt",
+    "path": "candidate-build.json",
+    "role": "candidate"
+  },
+  "candidate_flags": {
+    "build_binding": "candidate_build",
+    "kind": "build_flags",
+    "path": "candidate-build.json",
+    "role": "candidate"
+  },
+  "candidate_freeze": {
+    "kind": "candidate_freeze",
+    "path": "candidate-freeze.json",
+    "role": "candidate"
+  },
+  "candidate_native_depfile": {
+    "binary_role": "native",
+    "build_binding": "candidate_build",
+    "kind": "depfile",
+    "path": "candidate-native.d",
+    "role": "candidate"
+  },
+  "candidate_quality": {
+    "build_binding": "candidate_build",
+    "candidate_binding": "candidate_freeze",
+    "kind": "quality_receipt",
+    "path": "attempts/quality-v9/quality-receipt.json",
+    "role": "candidate"
+  },
+  "candidate_review": {
+    "candidate_binding": "candidate_freeze",
+    "kind": "review",
+    "path": "candidate-review.json",
+    "review_scope": "candidate"
+  },
+  "methodology_review": {
+    "candidate_binding": "candidate_review",
+    "kind": "review",
+    "path": "methodology-review.json",
+    "review_scope": "methodology",
+    "source_binding": "source_review"
+  },
+  "quality_source": {
+    "archive_binding": "source_archive",
+    "candidate_binding": "candidate_freeze",
+    "kind": "quality_source",
+    "path": "quality-source.json",
+    "role": "candidate"
+  },
+  "source_archive": {
+    "kind": "source_archive",
+    "path": "source.tar.gz",
+    "role": "source"
+  },
+  "source_identity": {
+    "kind": "source_identity",
+    "path": "source.json",
+    "role": "source"
+  },
+  "source_manifest": {
+    "kind": "source_manifest",
+    "path": "source.json",
+    "role": "source"
+  },
+  "source_review": {
+    "kind": "review",
+    "path": "../change-0893/review.json",
+    "review_scope": "source",
+    "source_binding": "source_manifest"
+  }
+}

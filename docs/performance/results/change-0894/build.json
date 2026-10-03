@@ -1,0 +1,168 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline"
+  ],
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "baseline_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "binaries": {
+    "allocator": {
+      "build_receipt": {
+        "bytes": 3364,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/allocator-build.json",
+        "sha256": "292af6a86292251c2b6d7c8922dae6b85f3744de7428fe9d5faf0842db1b02ef"
+      },
+      "bytes": 267512200,
+      "depfile": {
+        "bytes": 399250,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/allocator.d",
+        "sha256": "3b96a9f21cc746e9bde9fbb9c8e35a573e15adbe7bba5ee61c103ad93ce638c8"
+      },
+      "elf_build_id": "a33a46680bcdc4b431e6a1a3211c49d411afa896",
+      "executable": true,
+      "features": [
+        "allocator-metrics"
+      ],
+      "mode": 509,
+      "name": "litchi-perf-baseline-alloc",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-allocator",
+      "role": "allocator",
+      "sha256": "b60ec2035e3cd60ff9159f62d355bb6042e1c75726e2c3333b5780cd3158f8ce"
+    },
+    "native": {
+      "build_receipt": {
+        "bytes": 3274,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/native-build.json",
+        "sha256": "85a55352328e47e3ae4366af4d6ac5515bf4b41dba896e167f0685f5340bdae5"
+      },
+      "bytes": 264489024,
+      "depfile": {
+        "bytes": 399104,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/native.d",
+        "sha256": "907c80303ce5ef1f04e9ec627a1650d2e3b1813c62e285b4d8582cc542621bbe"
+      },
+      "elf_build_id": "ca542f03f359d4ee60f94dad10093a9cf38868d0",
+      "executable": true,
+      "features": [],
+      "mode": 509,
+      "name": "litchi-perf-baseline",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+      "role": "native",
+      "sha256": "efcf6173bf71b3766aa84cc9a38023bf7b8ca0263f40cd80ec9c23acd4636e62"
+    }
+  },
+  "build_start": {
+    "bytes": 5170,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/build-start.json",
+    "sha256": "5779bf10c82ae1e97e990f312df035ca21ac24b70adbb3dc28d03f634586ea30"
+  },
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "compiler": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.codex/tmp/arg0/codex-arg0BCVfje:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0wWKwSX:/home/zhuhe/.codex/packages/standalone/releases/0.159.3-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0xsnRup:/home/zhuhe/.codex/packages/standalone/releases/0.159.2-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg01o3l0A:/home/zhuhe/.codex/packages/standalone/releases/0.159.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0tsWQwF:/home/zhuhe/.codex/packages/standalone/releases/0.159.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0wnCI9v:/home/zhuhe/.codex/packages/standalone/releases/0.159.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1165373_1789607052703/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1165242_1789607045932/bin:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/254956_1789243784750/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/2181_1789108381859/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TEMP": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build/tmp",
+    "TMP": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build/tmp",
+    "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build/tmp",
+    "TZ": "UTC"
+  },
+  "finished_utc": "2026-10-03T21:36:52.893550+00:00",
+  "flags": {
+    "codegen_units": 1,
+    "debug": 1,
+    "jobs": 2,
+    "lto": "fat",
+    "opt_level": 3,
+    "profile": "release",
+    "toolchain": "1.95.0"
+  },
+  "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+  "performance_claim": null,
+  "profile": "release",
+  "revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "root_generated_lock": {
+    "bytes": 138443,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.xlsx-baseline-build-0894.v1",
+  "source_after": {
+    "bytes": 2085017,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source-after.json",
+    "sha256": "de2998850d8648cea06fe199449449198f233bd5f866c44e658980c4adcad67a"
+  },
+  "source_archive": {
+    "bytes": 89047170,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.tar.gz",
+    "sha256": "f6f9d13813866ea24fd9cc108fc949aa42cdd042bacd3ca960897e8c88c63ce9"
+  },
+  "source_before": {
+    "bytes": 2085018,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source-before.json",
+    "sha256": "2c058b7ed66860232834c675c03e278216d957d756f55e1b5b33c29863d8f718"
+  },
+  "source_manifest": {
+    "bytes": 3325536,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "source_marker": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/.owner-litchi-0894-baseline",
+    "text": "litchi 0894 frozen baseline source\n"
+  },
+  "source_rechecked_files": 10771,
+  "source_revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "source_root": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src",
+  "standalone_lock": {
+    "bytes": 56289,
+    "git_mode": "100644",
+    "git_oid": "adf5253fc6983e9737ca59ab756edf0c36674d45",
+    "git_type": "blob",
+    "mode": 420,
+    "path": "tools/perf-baseline/Cargo.lock",
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "source": "selected Git archive"
+  },
+  "started_utc": "2026-10-03T21:18:19.873185+00:00",
+  "status": "pass",
+  "target_marker": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build/.owner-litchi-0894-baseline",
+    "text": "litchi 0894 frozen baseline build target\n"
+  },
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-build",
+  "timed_harness_guard_contract": "post-endpoint-per-worksheet-tolerance-v1"
+}
