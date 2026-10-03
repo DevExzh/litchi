@@ -1,0 +1,268 @@
+{
+  "adoption": "rejected; no optimization adopted",
+  "candidate_decision": "reject",
+  "cleanup_review": {
+    "corrected_helper": {
+      "bytes": 3100,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/cleanup.py",
+      "sha256": "ce818f9e327bb30fdd2580e64c8df62efd77138d080ac28531750222f685d086"
+    },
+    "dependency_counts": {
+      "allocator": 3847,
+      "native": 3846
+    },
+    "first_attempt": {
+      "correction": "Invoke the exact 0887 freeze.py CLI in a subprocess instead of importing the ambiguous module name.",
+      "descriptor": {
+        "bytes": 464,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/cleanup-attempt-1.json",
+        "sha256": "6edc8ae324dd3c44ba1c09ca3e5138b31e7d447bf5d6fda2c71ef5c4591e90e0"
+      },
+      "error": "AttributeError: module 'freeze' has no attribute '_verify_plan'",
+      "removed_paths": [],
+      "status": "failed_before_deletion"
+    },
+    "guards": {
+      "create_only_receipt": true,
+      "exact_candidate_freeze_cli": true,
+      "exact_owned_roots": true,
+      "exact_owner_marker": true,
+      "no_ambiguous_freeze_import": true,
+      "prerequisite_statuses": true,
+      "reject_decision": true,
+      "scope_statement": true
+    },
+    "owned_roots_absent": true,
+    "receipt": {
+      "bytes": 1286,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/cleanup.json",
+      "sha256": "66955208aed1e2ea4a3896dca2302f4df89c9446fcb85891afaaa3d59cb54df5"
+    },
+    "removed_paths": [
+      "/tmp/litchi-0887-source",
+      "/home/zhuhe/code/litchi/target/litchi-0887-build"
+    ],
+    "retained_artifacts": [
+      {
+        "bytes": 11054,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate.patch",
+        "sha256": "ce54f8de23fd74ed7e04bf48a23604e4293a8810096fa768521a7d1834b89e36"
+      },
+      {
+        "bytes": 264488120,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+        "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+      },
+      {
+        "bytes": 267522448,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/allocator",
+        "sha256": "1fd257a246c681840e23d61b1c7cb3d7efc1ad1403f6be909cd8c64f6615a097"
+      }
+    ],
+    "scope": "Only marked 0887 build/source roots; historical recovery and other teams worktrees preserved.",
+    "status": "pass"
+  },
+  "decision": "pass",
+  "documentation_review": {
+    "descriptor": {
+      "bytes": 12274,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0887-mce-inline-attribute-storage.md",
+      "sha256": "b8f551a720aa47f19ef1076e01fb8b4cf29410059ed957ebcacf20c382e31307"
+    },
+    "native_p50_spread_flags": [],
+    "production_restored": {
+      "crates/litchi-ooxml-common/src/mce/codec.rs": {
+        "actual_sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996",
+        "baseline_sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996",
+        "bytes": 65338,
+        "matches_baseline": true
+      },
+      "crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs": {
+        "actual_sha256": "f818e15cb653f6ef338db3b5962db14685beff087a31d02f77740d94c8e2303b",
+        "baseline_sha256": "f818e15cb653f6ef338db3b5962db14685beff087a31d02f77740d94c8e2303b",
+        "bytes": 8697,
+        "matches_baseline": true
+      }
+    },
+    "rejection_gate": {
+      "ci95_high": 1.0315652889370475,
+      "ci95_upper_below": 1.0,
+      "median_ratio": 1.0025209740406034,
+      "median_ratio_at_most": 0.98,
+      "pass": false
+    },
+    "rss_pairs_above_threshold_by_case": {
+      "docx_producer_source_selected_paragraph": 8,
+      "pptx_producer_source_selected_slide": 8,
+      "xlsx_full_cell_scan": 8,
+      "xlsx_producer_medium_source_full_cell_scan": 8
+    },
+    "status": "pass",
+    "tables_and_claims_checked_against": "reduction.json, verification.json, capture-review.json, quality-v2 logs, restored source"
+  },
+  "evidence": {
+    "build.json": {
+      "bytes": 3468,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/build.json",
+      "sha256": "39297520d08e1af649afcc96cac1a95c8e486afbbc7905970cb86987653963d3"
+    },
+    "candidate-source.json": {
+      "bytes": 1363,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate-source.json",
+      "sha256": "60edd358d85c44aa6b6cede2cb2e01db5b2dc99753317a295a13a998c49900e1"
+    },
+    "candidate.patch": {
+      "bytes": 11054,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate.patch",
+      "sha256": "ce54f8de23fd74ed7e04bf48a23604e4293a8810096fa768521a7d1834b89e36"
+    },
+    "capture-review.json": {
+      "bytes": 76116,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/capture-review.json",
+      "sha256": "882ca282a23906089e6009e92ef1fb03996726b1bf47947fb3f3561109b77643"
+    },
+    "cleanup-attempt-1.json": {
+      "bytes": 464,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/cleanup-attempt-1.json",
+      "sha256": "6edc8ae324dd3c44ba1c09ca3e5138b31e7d447bf5d6fda2c71ef5c4591e90e0"
+    },
+    "cleanup.json": {
+      "bytes": 1286,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/cleanup.json",
+      "sha256": "66955208aed1e2ea4a3896dca2302f4df89c9446fcb85891afaaa3d59cb54df5"
+    },
+    "cleanup.py": {
+      "bytes": 3100,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/cleanup.py",
+      "sha256": "ce818f9e327bb30fdd2580e64c8df62efd77138d080ac28531750222f685d086"
+    },
+    "decision.json": {
+      "bytes": 18413,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/decision.json",
+      "sha256": "4e7b31d6e489eb3ea3090819396a84e807cecde38dcc1111381b5d9757428300"
+    },
+    "docs/performance/0887-mce-inline-attribute-storage.md": {
+      "bytes": 12274,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0887-mce-inline-attribute-storage.md",
+      "sha256": "b8f551a720aa47f19ef1076e01fb8b4cf29410059ed957ebcacf20c382e31307"
+    },
+    "duplicate-export-cleanup.json": {
+      "bytes": 713,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/duplicate-export-cleanup.json",
+      "sha256": "c282f606111ffc3edf172653fad1f6aaca38008cb2c91e84faa3ca41e2c21445"
+    },
+    "plan.json": {
+      "bytes": 43333,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/plan.json",
+      "sha256": "4199d8bd59d9271bf2d47cca2a5486a5860ea3d0833061f2e32ca8c5d7ee3383"
+    },
+    "post-cleanup-verification.json": {
+      "bytes": 28459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/post-cleanup-verification.json",
+      "sha256": "06f1cefee14b433cd3d1bd08a10f30bd224e9094033dd02308063526d8eb6d88"
+    },
+    "reduction.json": {
+      "bytes": 49759,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/reduction.json",
+      "sha256": "50cb80400427a24037b19982eae31f8ee7b4fd389d2f714b3990d079ecc83be2"
+    },
+    "source-replay-preflight.json": {
+      "bytes": 1025,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/source-replay-preflight.json",
+      "sha256": "fbd5a492633c69ad10f3acddd2680e109d1e9f02b844d1b6885261f29569b038"
+    },
+    "verification.json": {
+      "bytes": 28459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/verification.json",
+      "sha256": "06f1cefee14b433cd3d1bd08a10f30bd224e9094033dd02308063526d8eb6d88"
+    }
+  },
+  "goal_complete": false,
+  "goal_status": "active; broader performance program is not complete",
+  "primary_gate": {
+    "ci95_high": 1.0315652889370475,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 1.0025209740406034,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "replay": {
+    "commands_checked": 72,
+    "post_cleanup": {
+      "bytes": 28459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/post-cleanup-verification.json",
+      "sha256": "06f1cefee14b433cd3d1bd08a10f30bd224e9094033dd02308063526d8eb6d88"
+    },
+    "pre_cleanup": {
+      "bytes": 28459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/verification.json",
+      "sha256": "06f1cefee14b433cd3d1bd08a10f30bd224e9094033dd02308063526d8eb6d88"
+    },
+    "reduction_recomputed": true,
+    "source_files_reconstructed": 10765
+  },
+  "required_followup": [
+    "Continue the broader performance program; this rejected candidate is not adopted."
+  ],
+  "reviewer": "/root/mce_attrs_review_0887",
+  "schema": "litchi.mce-inline-attribute-final-review-0887.v1",
+  "scope": {
+    "cargo_rerun": false,
+    "cleanup_approval": "pass",
+    "cleanup_executed_by_root": true,
+    "documentation_claims": "pass against retained reduction and receipts",
+    "documentation_hash_sealed": true,
+    "post_cleanup_replay": "pass",
+    "static_review_only": true,
+    "workload_rerun": false
+  },
+  "status": "pass"
+}

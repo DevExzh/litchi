@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0887 — MCE inline attribute candidate rejected
+
+[0887](0887-mce-inline-attribute-storage.md) rejects inline-four MCE attribute storage: 4,255 fewer allocation calls per primary scan do not produce a useful native p50 improvement, and process-RSS flags remain unresolved in every scenario. The patch is retained as rejected evidence, not adopted complexity. Qualify representative MCE parsing controls and investigate repeated name expansion next; the 0886 profile still motivates MCE work.
+
 ## 0886 — producer XLSX full-cell profile
 
 [0886](0886-producer-full-cell-profile.md) puts MCE processing first for the named producer XLSX full scan: MCE symbols account for 26.73–27.78% of whole-process sampled user-cycle periods, while the separate runner-scoped guest diagnostic places MCE processing at 44.10–44.19% of instructions. x14ac is secondary. Next investigate temporary attribute storage and repeated expansion in MCE start with matched before/after measurements and shared-owner semantic guards. Incomplete native call stacks, unresolved IPs, Valgrind warnings, and scope limits remain explicit; no speedup is claimed.

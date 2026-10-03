@@ -1,0 +1,28 @@
+{
+  "cargo_invoked": false,
+  "schema": "litchi.xlsx-mce-source-replay-preflight-0887.v1",
+  "status": "pass",
+  "verification": {
+    "baseline_archive": {
+      "bytes": 89024356,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.tar.gz",
+      "sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+    },
+    "candidate_patch": {
+      "bytes": 11054,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate.patch",
+      "sha256": "ce54f8de23fd74ed7e04bf48a23604e4293a8810096fa768521a7d1834b89e36"
+    },
+    "git_apply": "pass",
+    "git_apply_check": "pass",
+    "manifest": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.json",
+    "manifest_files": 10765,
+    "overlay_files": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs"
+    ],
+    "status": "pass",
+    "temporary_directory_cleaned": true
+  },
+  "workload_executed": false
+}

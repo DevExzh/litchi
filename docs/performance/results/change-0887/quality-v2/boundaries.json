@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "started_utc": "2026-10-03T16:14:45.916330+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T16:19:32.534620+00:00"
+}

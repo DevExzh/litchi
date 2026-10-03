@@ -1,0 +1,32 @@
+{
+  "baseline_archive": {
+    "bytes": 89024356,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.tar.gz",
+    "sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+  },
+  "baseline_manifest": {
+    "bytes": 2083420,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.json",
+    "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938"
+  },
+  "baseline_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+  "overlays": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 69461,
+      "path": "/tmp/litchi-0887-source/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "aaf7a1a4075d6360b7af905d12e2891f0e134a76add136eaa596b826c3f100f8"
+    },
+    "crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs": {
+      "bytes": 10208,
+      "path": "/tmp/litchi-0887-source/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs",
+      "sha256": "cab44be5ce109c37aea267a35930f50d058e35c8944250f9225cf06b5683ad02"
+    }
+  },
+  "patch": {
+    "bytes": 11054,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate.patch",
+    "sha256": "ce54f8de23fd74ed7e04bf48a23604e4293a8810096fa768521a7d1834b89e36"
+  },
+  "source_root": "/tmp/litchi-0887-source",
+  "verified_source_files": 10765
+}

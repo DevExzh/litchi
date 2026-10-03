@@ -1,0 +1,8 @@
+{
+  "status": "failed_before_deletion",
+  "recorded_utc": "2026-10-03T16:39:19.473078+00:00",
+  "error": "AttributeError: module 'freeze' has no attribute '_verify_plan'",
+  "cause": "experiment imports the baseline helpers by prepending change-0885 to sys.path; subsequent import freeze selected that baseline module.",
+  "removed_paths": [],
+  "correction": "Invoke the exact 0887 freeze.py CLI in a subprocess instead of importing the ambiguous module name."
+}

@@ -1,0 +1,24 @@
+{
+  "status": "pass",
+  "exact_duplicate_exports_removed": [
+    {
+      "removed_duplicate": "capture.log",
+      "retained": "capture/experiment.json",
+      "bytes": 26113,
+      "sha256": "429bc9466f2960e6e182b3b09d592ed2f754f024399dcd2ebe72d8526259b251"
+    },
+    {
+      "removed_duplicate": "reduction.log",
+      "retained": "reduction.json",
+      "bytes": 49759,
+      "sha256": "50cb80400427a24037b19982eae31f8ee7b4fd389d2f714b3990d079ecc83be2"
+    },
+    {
+      "removed_duplicate": "verification.log",
+      "retained": "verification.json",
+      "bytes": 28459,
+      "sha256": "06f1cefee14b433cd3d1bd08a10f30bd224e9094033dd02308063526d8eb6d88"
+    }
+  ],
+  "all_unique_evidence_retained": true
+}

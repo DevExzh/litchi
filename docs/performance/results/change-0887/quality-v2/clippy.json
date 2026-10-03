@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ooxml-common",
+    "--all-features",
+    "--all-targets",
+    "-j",
+    "2",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T16:12:36.732845+00:00",
+  "rustdocflags": "-D warnings",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T16:12:46.944518+00:00"
+}

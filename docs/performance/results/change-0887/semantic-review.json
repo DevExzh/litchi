@@ -1,0 +1,56 @@
+{
+  "schema": "litchi.mce-attrs-semantic-review-0887.v1",
+  "status": "pass",
+  "reviewer": "/root/mce_attrs_review_0887",
+  "scope": {
+    "function": "crates/litchi-ooxml-common/src/mce/codec.rs::start",
+    "candidate": "private initialized [Attr; 4] storage with a fallible Vec spill",
+    "reviewed_without_build_or_timing": true
+  },
+  "source_recheck": {
+    "status": "pass",
+    "checks": [
+      "The first four attributes stay in the initialized inline array; the fifth reserves the Vec before moving the inline values, and later attributes use the same fallible amortized reservation path.",
+      "prepare_push is called after the checked-attribute item is obtained but before key UTF-8 conversion or value normalization, preserving the legacy allocation-before-decode precedence at the spill boundary.",
+      "Spill failures retain Error::Allocation with the existing MCE attributes resource label and std TryReserveError source; no dependency or public API change is introduced.",
+      "as_slice and as_mut_slice expose one contiguous source-order view to namespace collection, duplicate checks, directives, filtering, and emission; the three start-loop consumers use the explicit slice view.",
+      "The representation uses no unsafe code and does not change limits, duplicate validation, branch selection, filtering, or output ordering.",
+      "git diff --check passed after the iterator and constant-lifetime fixes."
+    ]
+  },
+  "review_invariants": [
+    "len is at most INLINE_ATTRIBUTE_CAPACITY while the inline representation is active.",
+    "Once spilling begins, spilled remains non-empty and owns all attributes; subsequent pushes reserve before insertion.",
+    "push_prepared is reached only after prepare_push succeeds, so it cannot grow a Vec infallibly under the production call sequence.",
+    "The fixed capacity is four, matching the intended common OOXML start-tag shape while preserving the bounded per-element limit."
+  ],
+  "corpus_matrix": {
+    "primary_before_after": [
+      "xlsx_producer_medium_source_full_cell_scan",
+      "xlsx_full_cell_scan"
+    ],
+    "cross_format_guards": [
+      "docx_producer_source_selected_paragraph",
+      "pptx_producer_source_selected_slide"
+    ],
+    "ordinary_mce_controls": [
+      "mce_benign_worksheet",
+      "mce_benign_document"
+    ],
+    "required_oracles": [
+      "producer output, digest/count, refusal census, and report parity",
+      "four-attribute inline and five-attribute spill source-order cases",
+      "expanded duplicate refusal before an unknown MCE directive",
+      "external-process peak RSS where allocator metrics are unavailable"
+    ]
+  },
+  "validation": {
+    "source_review": "pass",
+    "owner_tests_after_final_fix": "pending",
+    "quality_and_clippy_after_final_fix": "pending",
+    "before_after_timing_and_allocator_capture": "pending"
+  },
+  "limitations": [
+    "This packet records semantic/source review only; it does not claim that the post-fix owner tests, Clippy, or before/after measurements have passed."
+  ]
+}

@@ -1,0 +1,652 @@
+{
+  "adopted_optimization": false,
+  "causal_rss_explanation": null,
+  "control_review_flags": [
+    {
+      "case": "xlsx_full_cell_scan",
+      "metric": "p99_ns",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.1039381670960617,
+        "ci95_low": 0.8473595471789005,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 0.9587668679303873,
+        "pairs": [
+          {
+            "after": 139991,
+            "before": 171851,
+            "pair": "native-b00-c01",
+            "ratio": 0.8146068396459724
+          },
+          {
+            "after": 149040,
+            "before": 142700,
+            "pair": "native-b01-c01",
+            "ratio": 1.0444288717589347
+          },
+          {
+            "after": 140721,
+            "before": 166070,
+            "pair": "native-b02-c01",
+            "ratio": 0.8473595471789005
+          },
+          {
+            "after": 152571,
+            "before": 166851,
+            "pair": "native-b03-c01",
+            "ratio": 0.9144146573889278
+          },
+          {
+            "after": 166701,
+            "before": 147481,
+            "pair": "native-b04-c01",
+            "ratio": 1.1303218719699486
+          },
+          {
+            "after": 154050,
+            "before": 153571,
+            "pair": "native-b05-c01",
+            "ratio": 1.003119078471847
+          },
+          {
+            "after": 149970,
+            "before": 135850,
+            "pair": "native-b06-c01",
+            "ratio": 1.1039381670960617
+          },
+          {
+            "after": 142270,
+            "before": 164761,
+            "pair": "native-b07-c01",
+            "ratio": 0.863493181031919
+          }
+        ],
+        "ratios": [
+          0.8146068396459724,
+          1.0444288717589347,
+          0.8473595471789005,
+          0.9144146573889278,
+          1.1303218719699486,
+          1.003119078471847,
+          1.1039381670960617,
+          0.863493181031919
+        ],
+        "seed": 887
+      }
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "metric": "peak_rss_kib",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.468110005851375,
+        "ci95_low": 1.4211347241177616,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 1.4353038238234423,
+        "pairs": [
+          {
+            "after": 29156,
+            "before": 20516,
+            "pair": "native-b00-c01",
+            "ratio": 1.4211347241177616
+          },
+          {
+            "after": 29632,
+            "before": 20396,
+            "pair": "native-b01-c01",
+            "ratio": 1.4528338889978427
+          },
+          {
+            "after": 30108,
+            "before": 20508,
+            "pair": "native-b02-c01",
+            "ratio": 1.468110005851375
+          },
+          {
+            "after": 28920,
+            "before": 20336,
+            "pair": "native-b03-c01",
+            "ratio": 1.422108575924469
+          },
+          {
+            "after": 29964,
+            "before": 18728,
+            "pair": "native-b04-c01",
+            "ratio": 1.5999572832123024
+          },
+          {
+            "after": 29324,
+            "before": 20328,
+            "pair": "native-b05-c01",
+            "ratio": 1.4425423061786697
+          },
+          {
+            "after": 29024,
+            "before": 20324,
+            "pair": "native-b06-c01",
+            "ratio": 1.428065341468215
+          },
+          {
+            "after": 29004,
+            "before": 20504,
+            "pair": "native-b07-c01",
+            "ratio": 1.4145532579008975
+          }
+        ],
+        "ratios": [
+          1.4211347241177616,
+          1.4528338889978427,
+          1.468110005851375,
+          1.422108575924469,
+          1.5999572832123024,
+          1.4425423061786697,
+          1.428065341468215,
+          1.4145532579008975
+        ],
+        "seed": 887
+      }
+    },
+    {
+      "case": "docx_producer_source_selected_paragraph",
+      "metric": "p95_ns",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.036599888850663,
+        "ci95_low": 0.9895400536275711,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 1.0144772143489527,
+        "pairs": [
+          {
+            "after": 110070,
+            "before": 115471,
+            "pair": "native-b00-c02",
+            "ratio": 0.9532263512050645
+          },
+          {
+            "after": 115510,
+            "before": 116731,
+            "pair": "native-b01-c02",
+            "ratio": 0.9895400536275711
+          },
+          {
+            "after": 114020,
+            "before": 112281,
+            "pair": "native-b02-c02",
+            "ratio": 1.0154879276101922
+          },
+          {
+            "after": 115171,
+            "before": 112370,
+            "pair": "native-b03-c02",
+            "ratio": 1.02492658182789
+          },
+          {
+            "after": 117510,
+            "before": 113361,
+            "pair": "native-b04-c02",
+            "ratio": 1.036599888850663
+          },
+          {
+            "after": 115070,
+            "before": 113541,
+            "pair": "native-b05-c02",
+            "ratio": 1.0134665010877129
+          },
+          {
+            "after": 117551,
+            "before": 109910,
+            "pair": "native-b06-c02",
+            "ratio": 1.0695205167864617
+          },
+          {
+            "after": 114870,
+            "before": 114931,
+            "pair": "native-b07-c02",
+            "ratio": 0.9994692467654506
+          }
+        ],
+        "ratios": [
+          0.9532263512050645,
+          0.9895400536275711,
+          1.0154879276101922,
+          1.02492658182789,
+          1.036599888850663,
+          1.0134665010877129,
+          1.0695205167864617,
+          0.9994692467654506
+        ],
+        "seed": 887
+      }
+    },
+    {
+      "case": "docx_producer_source_selected_paragraph",
+      "metric": "p99_ns",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.0666035865549248,
+        "ci95_low": 0.9907899188092016,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 1.0169857122788621,
+        "pairs": [
+          {
+            "after": 117370,
+            "before": 117330,
+            "pair": "native-b00-c02",
+            "ratio": 1.0003409187761017
+          },
+          {
+            "after": 117151,
+            "before": 118240,
+            "pair": "native-b01-c02",
+            "ratio": 0.9907899188092016
+          },
+          {
+            "after": 123490,
+            "before": 116191,
+            "pair": "native-b02-c02",
+            "ratio": 1.0628189790947664
+          },
+          {
+            "after": 117100,
+            "before": 113290,
+            "pair": "native-b03-c02",
+            "ratio": 1.0336305057816224
+          },
+          {
+            "after": 119570,
+            "before": 140250,
+            "pair": "native-b04-c02",
+            "ratio": 0.8525490196078431
+          },
+          {
+            "after": 144100,
+            "before": 118021,
+            "pair": "native-b05-c02",
+            "ratio": 1.2209691495581294
+          },
+          {
+            "after": 118361,
+            "before": 110970,
+            "pair": "native-b06-c02",
+            "ratio": 1.0666035865549248
+          },
+          {
+            "after": 116170,
+            "before": 116400,
+            "pair": "native-b07-c02",
+            "ratio": 0.9980240549828179
+          }
+        ],
+        "ratios": [
+          1.0003409187761017,
+          0.9907899188092016,
+          1.0628189790947664,
+          1.0336305057816224,
+          0.8525490196078431,
+          1.2209691495581294,
+          1.0666035865549248,
+          0.9980240549828179
+        ],
+        "seed": 887
+      }
+    },
+    {
+      "case": "docx_producer_source_selected_paragraph",
+      "metric": "peak_rss_kib",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.4522144522144522,
+        "ci95_low": 1.3853714285714285,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 1.440325290683846,
+        "pairs": [
+          {
+            "after": 24620,
+            "before": 17524,
+            "pair": "native-b00-c02",
+            "ratio": 1.4049303811915088
+          },
+          {
+            "after": 24244,
+            "before": 17500,
+            "pair": "native-b01-c02",
+            "ratio": 1.3853714285714285
+          },
+          {
+            "after": 25032,
+            "before": 17344,
+            "pair": "native-b02-c02",
+            "ratio": 1.4432656826568266
+          },
+          {
+            "after": 23888,
+            "before": 17556,
+            "pair": "native-b03-c02",
+            "ratio": 1.3606744133059923
+          },
+          {
+            "after": 24976,
+            "before": 17376,
+            "pair": "native-b04-c02",
+            "ratio": 1.4373848987108655
+          },
+          {
+            "after": 25156,
+            "before": 17148,
+            "pair": "native-b05-c02",
+            "ratio": 1.4669932353627244
+          },
+          {
+            "after": 25020,
+            "before": 17260,
+            "pair": "native-b06-c02",
+            "ratio": 1.4495944380069525
+          },
+          {
+            "after": 24920,
+            "before": 17160,
+            "pair": "native-b07-c02",
+            "ratio": 1.4522144522144522
+          }
+        ],
+        "ratios": [
+          1.4049303811915088,
+          1.3853714285714285,
+          1.4432656826568266,
+          1.3606744133059923,
+          1.4373848987108655,
+          1.4669932353627244,
+          1.4495944380069525,
+          1.4522144522144522
+        ],
+        "seed": 887
+      }
+    },
+    {
+      "case": "pptx_producer_source_selected_slide",
+      "metric": "p99_ns",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.0215369375944945,
+        "ci95_low": 0.9037051955168586,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 0.9514232893900749,
+        "pairs": [
+          {
+            "after": 195941,
+            "before": 191810,
+            "pair": "native-b00-c03",
+            "ratio": 1.0215369375944945
+          },
+          {
+            "after": 192951,
+            "before": 213511,
+            "pair": "native-b01-c03",
+            "ratio": 0.9037051955168586
+          },
+          {
+            "after": 188841,
+            "before": 190660,
+            "pair": "native-b02-c03",
+            "ratio": 0.9904594566243575
+          },
+          {
+            "after": 188660,
+            "before": 194751,
+            "pair": "native-b03-c03",
+            "ratio": 0.9687241657295727
+          },
+          {
+            "after": 196021,
+            "before": 217190,
+            "pair": "native-b04-c03",
+            "ratio": 0.902532344951425
+          },
+          {
+            "after": 191231,
+            "before": 207561,
+            "pair": "native-b05-c03",
+            "ratio": 0.9213243335694085
+          },
+          {
+            "after": 209160,
+            "before": 188081,
+            "pair": "native-b06-c03",
+            "ratio": 1.1120740532004827
+          },
+          {
+            "after": 197381,
+            "before": 211301,
+            "pair": "native-b07-c03",
+            "ratio": 0.9341224130505772
+          }
+        ],
+        "ratios": [
+          1.0215369375944945,
+          0.9037051955168586,
+          0.9904594566243575,
+          0.9687241657295727,
+          0.902532344951425,
+          0.9213243335694085,
+          1.1120740532004827,
+          0.9341224130505772
+        ],
+        "seed": 887
+      }
+    },
+    {
+      "case": "pptx_producer_source_selected_slide",
+      "metric": "peak_rss_kib",
+      "reason": "control pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.5892426435118185,
+        "ci95_low": 1.4528257823446988,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 1.5363472441382484,
+        "pairs": [
+          {
+            "after": 26356,
+            "before": 16584,
+            "pair": "native-b00-c03",
+            "ratio": 1.5892426435118185
+          },
+          {
+            "after": 24884,
+            "before": 17128,
+            "pair": "native-b01-c03",
+            "ratio": 1.4528257823446988
+          },
+          {
+            "after": 25256,
+            "before": 16636,
+            "pair": "native-b02-c03",
+            "ratio": 1.5181534022601586
+          },
+          {
+            "after": 26936,
+            "before": 17084,
+            "pair": "native-b03-c03",
+            "ratio": 1.5766799344415827
+          },
+          {
+            "after": 26652,
+            "before": 16640,
+            "pair": "native-b04-c03",
+            "ratio": 1.6016826923076923
+          },
+          {
+            "after": 25636,
+            "before": 17024,
+            "pair": "native-b05-c03",
+            "ratio": 1.505874060150376
+          },
+          {
+            "after": 24992,
+            "before": 17276,
+            "pair": "native-b06-c03",
+            "ratio": 1.4466311646214403
+          },
+          {
+            "after": 25880,
+            "before": 16648,
+            "pair": "native-b07-c03",
+            "ratio": 1.5545410860163382
+          }
+        ],
+        "ratios": [
+          1.5892426435118185,
+          1.4528257823446988,
+          1.5181534022601586,
+          1.5766799344415827,
+          1.6016826923076923,
+          1.505874060150376,
+          1.4466311646214403,
+          1.5545410860163382
+        ],
+        "seed": 887
+      }
+    }
+  ],
+  "decided_utc": "2026-10-03T16:36:40.330460+00:00",
+  "decision": "reject",
+  "evidence": {
+    "candidate.patch": {
+      "bytes": 11054,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate.patch",
+      "sha256": "ce54f8de23fd74ed7e04bf48a23604e4293a8810096fa768521a7d1834b89e36"
+    },
+    "capture-review.json": {
+      "bytes": 76116,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/capture-review.json",
+      "sha256": "882ca282a23906089e6009e92ef1fb03996726b1bf47947fb3f3561109b77643"
+    },
+    "plan.json": {
+      "bytes": 43333,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/plan.json",
+      "sha256": "4199d8bd59d9271bf2d47cca2a5486a5860ea3d0833061f2e32ca8c5d7ee3383"
+    },
+    "reduction.json": {
+      "bytes": 49759,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/reduction.json",
+      "sha256": "50cb80400427a24037b19982eae31f8ee7b4fd389d2f714b3990d079ecc83be2"
+    },
+    "verification.json": {
+      "bytes": 28459,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/verification.json",
+      "sha256": "06f1cefee14b433cd3d1bd08a10f30bd224e9094033dd02308063526d8eb6d88"
+    }
+  },
+  "goal_status": "active; broader performance program is not complete",
+  "native_p50_spread_flags": [],
+  "next_step": "Qualify representative MCE parsing controls and investigate repeated name expansion before another candidate.",
+  "primary_gate": {
+    "ci95_high": 1.0315652889370475,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 1.0025209740406034,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "primary_review_flags": [
+    {
+      "case": "xlsx_producer_medium_source_full_cell_scan",
+      "metric": "peak_rss_kib",
+      "reason": "primary pair ratio above 1.05",
+      "summary": {
+        "ci95_high": 1.4476894639556377,
+        "ci95_low": 1.3751371115173674,
+        "draws": 10000,
+        "high_index": 9749,
+        "low_index": 249,
+        "median_ratio": 1.40209709054909,
+        "pairs": [
+          {
+            "after": 30088,
+            "before": 21880,
+            "pair": "native-b00-c00",
+            "ratio": 1.3751371115173674
+          },
+          {
+            "after": 30320,
+            "before": 21624,
+            "pair": "native-b01-c00",
+            "ratio": 1.4021457639659638
+          },
+          {
+            "after": 30224,
+            "before": 22120,
+            "pair": "native-b02-c00",
+            "ratio": 1.366365280289331
+          },
+          {
+            "after": 31328,
+            "before": 21640,
+            "pair": "native-b03-c00",
+            "ratio": 1.4476894639556377
+          },
+          {
+            "after": 30116,
+            "before": 21480,
+            "pair": "native-b04-c00",
+            "ratio": 1.402048417132216
+          },
+          {
+            "after": 30340,
+            "before": 21628,
+            "pair": "native-b05-c00",
+            "ratio": 1.4028111707046422
+          },
+          {
+            "after": 29956,
+            "before": 21580,
+            "pair": "native-b06-c00",
+            "ratio": 1.3881371640407785
+          },
+          {
+            "after": 30428,
+            "before": 20336,
+            "pair": "native-b07-c00",
+            "ratio": 1.4962627852084973
+          }
+        ],
+        "ratios": [
+          1.3751371115173674,
+          1.4021457639659638,
+          1.366365280289331,
+          1.4476894639556377,
+          1.402048417132216,
+          1.4028111707046422,
+          1.3881371640407785,
+          1.4962627852084973
+        ],
+        "seed": 887
+      }
+    }
+  ],
+  "production_diff_empty": true,
+  "production_restored_to_baseline": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996",
+    "crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs": "f818e15cb653f6ef338db3b5962db14685beff087a31d02f77740d94c8e2303b"
+  },
+  "reason": [
+    "Primary paired native p50 fails the frozen practical and confidence thresholds.",
+    "All eight RSS pairs in all four native scenarios exceed the 1.05 review threshold; cause remains unresolved.",
+    "Allocation-call and allocated-byte reductions do not establish a native end-to-end latency benefit."
+  ],
+  "schema": "litchi.mce-inline-attribute-decision-0887.v1",
+  "source_head": "db1e0c3577cd6afb16fa21d20ffa7c6677849ca6",
+  "status": "complete"
+}

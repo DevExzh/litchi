@@ -1,0 +1,82 @@
+{
+  "schema": "litchi.xlsx-mce-inline4-helper-checks-0887.v1",
+  "status": "pass",
+  "exit_code": 0,
+  "scope": {
+    "workloads_launched": false,
+    "cargo_commands": false,
+    "mock_only": false
+  },
+  "files": {
+    "experiment.py": {
+      "bytes": 22587,
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    "reduce.py": {
+      "bytes": 13950,
+      "sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad"
+    },
+    "freeze.py": {
+      "bytes": 31813,
+      "sha256": "42d1e5615867a8add2b9e49052d99f5df33de6f99f24028cb47d11b735c87c6a"
+    }
+  },
+  "checks": {
+    "ast_parse": {
+      "status": "pass",
+      "method": "python3 -B ast.parse",
+      "files": [
+        "experiment.py",
+        "reduce.py",
+        "freeze.py"
+      ]
+    },
+    "schedule": {
+      "status": "pass",
+      "method": "experiment._schedule plus experiment.validate_schedule",
+      "total_children": 72,
+      "native_children": 64,
+      "allocator_children": 8,
+      "native_first": true,
+      "ordinals_contiguous": true,
+      "counterbalance": "AB/BA by (block + case_index) parity; allocator by block parity",
+      "fresh_processes": true
+    },
+    "bootstrap": {
+      "status": "pass",
+      "method": "deterministic reducer-equivalent resampling smoke check",
+      "seed": 887,
+      "draws": 10000,
+      "ci95_indices": [
+        249,
+        9749
+      ],
+      "unit": "paired child ratios",
+      "mock_only": true,
+      "mock_description": "synthetic eight-value ratio vector only; no workload result or adoption decision"
+    },
+    "primary_review_flags": {
+      "status": "pass",
+      "method": "synthetic reducer-equivalent four-metric ratio exercise",
+      "threshold": 1.05,
+      "metrics": [
+        "p50_ns",
+        "p95_ns",
+        "p99_ns",
+        "peak_rss_kib"
+      ],
+      "flagged_metrics": [
+        "p50_ns",
+        "p95_ns",
+        "p99_ns",
+        "peak_rss_kib"
+      ],
+      "mock_only": true,
+      "mock_description": "synthetic primary ratios above 1.05 only; no captured timing or adoption decision"
+    }
+  },
+  "mock_checks": {
+    "status": "not_run",
+    "description": "No child-process mock capture is used to qualify the experiment."
+  }
+}

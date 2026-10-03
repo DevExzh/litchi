@@ -1,0 +1,67 @@
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+error[E0599]: no method named `iter` found for struct `AttrBuffer<'a>` in the current scope
+    --> crates/litchi-ooxml-common/src/mce/codec.rs:1031:18
+     |
+ 729 | struct AttrBuffer<'a> {
+     | --------------------- method `iter` not found for this struct
+...
+1031 |     for a in raw.iter() {
+     |                  ^^^^ method not found in `AttrBuffer<'_>`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `iter`, perhaps you need to implement it:
+             candidate #1: `bitflags::traits::Flags`
+help: some of the expressions' fields have a method of the same name
+     |
+1031 |     for a in raw.spilled.iter() {
+     |                  ++++++++
+1031 |     for a in raw.values.iter() {
+     |                  +++++++
+
+error[E0599]: no method named `iter` found for struct `AttrBuffer<'a>` in the current scope
+    --> crates/litchi-ooxml-common/src/mce/codec.rs:1092:18
+     |
+ 729 | struct AttrBuffer<'a> {
+     | --------------------- method `iter` not found for this struct
+...
+1092 |     for a in raw.iter() {
+     |                  ^^^^ method not found in `AttrBuffer<'_>`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `iter`, perhaps you need to implement it:
+             candidate #1: `bitflags::traits::Flags`
+help: some of the expressions' fields have a method of the same name
+     |
+1092 |     for a in raw.spilled.iter() {
+     |                  ++++++++
+1092 |     for a in raw.values.iter() {
+     |                  +++++++
+
+error[E0599]: no method named `iter` found for struct `AttrBuffer<'a>` in the current scope
+    --> crates/litchi-ooxml-common/src/mce/codec.rs:1249:26
+     |
+ 729 | struct AttrBuffer<'a> {
+     | --------------------- method `iter` not found for this struct
+...
+1249 |             for a in raw.iter() {
+     |                          ^^^^ method not found in `AttrBuffer<'_>`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `iter`, perhaps you need to implement it:
+             candidate #1: `bitflags::traits::Flags`
+help: some of the expressions' fields have a method of the same name
+     |
+1249 |             for a in raw.spilled.iter() {
+     |                          ++++++++
+1249 |             for a in raw.values.iter() {
+     |                          +++++++
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `litchi-ooxml-common` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-ooxml-common` (lib test) due to 3 previous errors

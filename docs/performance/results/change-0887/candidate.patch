@@ -1,0 +1,292 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 2346289019..dda4e1f0ac 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -719,6 +719,137 @@ struct Attr<'a> {
+     keep: bool,
+ }
+ 
++/// The attributes of one start tag.
++///
++/// Most OOXML elements have only a few attributes. Keep those attributes in a
++/// fixed, contiguous stack buffer and retain the existing fallible `Vec`
++/// growth path for larger tags. The inline representation deliberately uses
++/// initialized placeholders instead of `MaybeUninit`, so the adapter remains
++/// safe and can expose the same slices as the old vector.
++struct AttrBuffer<'a> {
++    values: [Attr<'a>; INLINE_ATTRIBUTE_CAPACITY],
++    len: usize,
++    spilled: Vec<Attr<'a>>,
++}
++
++const INLINE_ATTRIBUTE_CAPACITY: usize = 4;
++const ATTRIBUTES_RESOURCE: &str = "MCE attributes";
++
++impl<'a> AttrBuffer<'a> {
++    fn new() -> Self {
++        Self {
++            values: std::array::from_fn(|_| Attr::vacant()),
++            len: 0,
++            spilled: Vec::new(),
++        }
++    }
++
++    /// Reserve the next slot before decoding the source attribute.
++    ///
++    /// The caller intentionally invokes this before UTF-8 and value
++    /// normalization, matching the old `Vec` path's error precedence.
++    fn prepare_push(&mut self) -> R<()> {
++        if !self.spilled.is_empty() {
++            reserve_amortized(&mut self.spilled, 1, ATTRIBUTES_RESOURCE)?;
++            return Ok(());
++        }
++        if self.len < INLINE_ATTRIBUTE_CAPACITY {
++            return Ok(());
++        }
++
++        // Reserve before moving the inline values. If reservation fails, the
++        // buffer remains intact and the allocator error keeps the old source
++        // and resource identity.
++        let inline_len = self.len;
++        reserve_amortized(&mut self.spilled, inline_len + 1, ATTRIBUTES_RESOURCE)?;
++        for value in &mut self.values[..inline_len] {
++            self.spilled.push(std::mem::replace(value, Attr::vacant()));
++        }
++        self.len = 0;
++        Ok(())
++    }
++
++    /// Insert an attribute after [`Self::prepare_push`] succeeded.
++    fn push_prepared(&mut self, attribute: Attr<'a>) {
++        if !self.spilled.is_empty() {
++            debug_assert!(self.spilled.len() < self.spilled.capacity());
++            self.spilled.push(attribute);
++        } else {
++            debug_assert!(self.len < INLINE_ATTRIBUTE_CAPACITY);
++            self.values[self.len] = attribute;
++            self.len += 1;
++        }
++    }
++
++    fn as_slice(&self) -> &[Attr<'a>] {
++        if self.spilled.is_empty() {
++            &self.values[..self.len]
++        } else {
++            &self.spilled
++        }
++    }
++
++    fn as_mut_slice(&mut self) -> &mut [Attr<'a>] {
++        if !self.spilled.is_empty() {
++            self.spilled.as_mut_slice()
++        } else {
++            &mut self.values[..self.len]
++        }
++    }
++}
++
++impl<'a> Attr<'a> {
++    fn vacant() -> Self {
++        Self {
++            key: "",
++            value: Cow::Borrowed(""),
++            keep: false,
++        }
++    }
++}
++
++#[cfg(test)]
++mod attr_buffer_tests {
++    use super::{Attr, AttrBuffer};
++    use std::borrow::Cow;
++
++    #[test]
++    fn keeps_zero_one_four_five_and_larger_tags_in_source_order() {
++        let mut attributes = AttrBuffer::new();
++        assert!(attributes.as_slice().is_empty());
++
++        for (index, key) in ["zero", "one", "two", "three", "four", "five"]
++            .into_iter()
++            .enumerate()
++        {
++            attributes
++                .prepare_push()
++                .expect("bounded attribute reserve");
++            attributes.push_prepared(Attr {
++                key,
++                value: Cow::Borrowed("value"),
++                keep: true,
++            });
++            assert_eq!(attributes.as_slice().len(), index + 1);
++            if index == 3 {
++                assert!(attributes.spilled.is_empty());
++            }
++            if index == 4 {
++                assert!(!attributes.spilled.is_empty());
++            }
++        }
++
++        assert_eq!(
++            attributes
++                .as_slice()
++                .iter()
++                .map(|attribute| attribute.key)
++                .collect::<Vec<_>>(),
++            ["zero", "one", "two", "three", "four", "five"]
++        );
++    }
++}
++
+ #[inline(never)]
+ fn contains_mce_namespace(mut remaining: &[u8]) -> bool {
+     let needle = NAMESPACE.as_bytes();
+@@ -869,7 +1000,7 @@ fn start(
+     }
+     let depth = st.len() + 1;
+     let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
+-    let mut raw = Vec::new();
++    let mut raw = AttrBuffer::new();
+     let max_attributes = lim
+         .max_attributes_per_element
+         .min(ATTRIBUTES_PER_ELEMENT_CEILING);
+@@ -886,8 +1017,8 @@ fn start(
+             return Err(limit("attributes per element"));
+         }
+         let a = a.map_err(xerr)?;
+-        reserve_amortized(&mut raw, 1, "MCE attributes")?;
+-        raw.push(Attr {
++        raw.prepare_push()?;
++        raw.push_prepared(Attr {
+             key: str::from_utf8(a.key.into_inner()).map_err(xerr)?,
+             value: a
+                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
+@@ -897,7 +1028,7 @@ fn start(
+     }
+     let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
+     let mut local_namespaces = Vec::new();
+-    for a in &raw {
++    for a in raw.as_slice().iter() {
+         if a.key == "xmlns" {
+             reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
+             local_namespaces.push((String::new(), a.value.as_ref().to_owned()));
+@@ -917,7 +1048,7 @@ fn start(
+         }
+     }
+     let (namespace, local) = expand_parts(q, resolver(scope, &c.ns), true)?;
+-    validate_expanded_attribute_duplicates(&raw, resolver(scope, &c.ns))?;
++    validate_expanded_attribute_duplicates(raw.as_slice(), resolver(scope, &c.ns))?;
+     let parent_active = st.last().is_none_or(|f| f.active);
+     if c.opaque {
+         let hoisted = if parent_active {
+@@ -935,7 +1066,7 @@ fn start(
+                     out,
+                     q,
+                     &c,
+-                    &mut raw,
++                    raw.as_mut_slice(),
+                     false,
+                     rep,
+                     e.as_ref(),
+@@ -958,7 +1089,7 @@ fn start(
+ 
+     let mut directives = Vec::new();
+     let mut tokens = 0usize;
+-    for a in &raw {
++    for a in raw.as_slice().iter() {
+         if a.key == "xmlns" || a.key.starts_with("xmlns:") {
+             continue;
+         }
+@@ -1000,13 +1131,13 @@ fn start(
+     if scope.is_mce(namespace.id) {
+         match local {
+             "AlternateContent" => {
+-                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Container)?;
++                validate_alternate_attributes(raw.as_slice(), &c, scope, AlternateKind::Container)?;
+             },
+             "Choice" => {
+-                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Choice)?;
++                validate_alternate_attributes(raw.as_slice(), &c, scope, AlternateKind::Choice)?;
+             },
+             "Fallback" => {
+-                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Fallback)?;
++                validate_alternate_attributes(raw.as_slice(), &c, scope, AlternateKind::Fallback)?;
+             },
+             _ => {},
+         }
+@@ -1036,8 +1167,8 @@ fn start(
+                     if *choices > lim.max_choices_per_alternate {
+                         return Err(limit("choices"));
+                     }
+-                    let req =
+-                        attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
++                    let req = attr(raw.as_slice(), "Requires")?
++                        .ok_or_else(|| bad("Choice lacks Requires"))?;
+                     let mut ok = true;
+                     let mut count = 0;
+                     for p in req.split_whitespace() {
+@@ -1115,7 +1246,7 @@ fn start(
+             rep.preserved_elements += 1;
+             Mode::Emit(q.to_owned())
+         } else if c.processes(namespace.id, local) {
+-            for a in &raw {
++            for a in raw.as_slice().iter() {
+                 let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
+                 if scope.is_xml(namespace.id) && matches!(local, "base" | "lang" | "space") {
+                     return Err(bad("xml context attribute on unwrapped element"));
+@@ -1143,7 +1274,7 @@ fn start(
+                 out,
+                 q,
+                 &c,
+-                &mut raw,
++                raw.as_mut_slice(),
+                 true,
+                 rep,
+                 e.as_ref(),
+diff --git a/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs b/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs
+index 3a3610ec69..dd7a1b7531 100644
+--- a/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs
+@@ -176,6 +176,43 @@ fn expanded_duplicate_validation_keeps_distinct_names_legal_at_each_size() {
+     }
+ }
+ 
++#[test]
++fn start_attribute_storage_keeps_inline_and_spilled_order_and_refusal_precedence() {
++    let inline = format!(
++        r#"<r xmlns:mc="{NAMESPACE}"><a first="1" second="x&#9;y" p:third="3" xmlns:p="urn:p"/></r>"#
++    );
++    let inline_output = String::from_utf8(tree_result(&inline).expect("inline attributes fit"))
++        .expect("tree output remains UTF-8");
++    assert_eq!(
++        inline_output,
++        format!(
++            r#"<r xmlns:mc="{NAMESPACE}"><a first="1" second="x&#x9;y" p:third="3" xmlns:p="urn:p"></a></r>"#
++        )
++    );
++
++    let spilled = format!(
++        r#"<r xmlns:mc="{NAMESPACE}"><a first="1" second="x&#9;y" p:third="3" xmlns:p="urn:p" p:fourth="4"/></r>"#
++    );
++    let spilled_output = String::from_utf8(tree_result(&spilled).expect("spilled attributes fit"))
++        .expect("tree output remains UTF-8");
++    assert_eq!(
++        spilled_output,
++        format!(
++            r#"<r xmlns:mc="{NAMESPACE}"><a first="1" second="x&#x9;y" p:third="3" xmlns:p="urn:p" p:fourth="4"></a></r>"#
++        )
++    );
++
++    // Five source attributes force the spill path. Expanded-name duplicate
++    // validation still runs before the later unknown-directive refusal.
++    let duplicate = format!(
++        r#"<r xmlns:mc="{NAMESPACE}"><a xmlns:x="urn:shared" xmlns:y="urn:shared" x:k="one" y:k="two" mc:NotARealDirective="1"/></r>"#
++    );
++    assert!(matches!(
++        tree_result(&duplicate),
++        Err(Error::NonConformant(message)) if message == "duplicate attribute"
++    ));
++}
++
+ #[test]
+ fn active_offsets_rejects_the_same_expanded_duplicate_input() {
+     let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a="urn:shared" xmlns:b="urn:shared" a:k="one" b:k="two"/>"#;

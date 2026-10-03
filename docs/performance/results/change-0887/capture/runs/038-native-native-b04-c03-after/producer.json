@@ -1,0 +1,45 @@
+{
+  "corpora": [
+    {
+      "generator": "litchi-pptx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 1,
+          "bytes": 4546,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "ppt/slides/slide7.xml",
+          "role": "producer-alternate-content",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "e6385d1b8501f2d74e404ab13dfc25663369748561f88000f0e25b09fb126dd5",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "alternate-content"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 6,
+      "selected_target": "slide:6",
+      "selected_target_text": "litchi-perf-baseline-pptx-semantic-v1-source-006-000\nlitchi-perf-baseline-pptx-semantic-v1-source-006-001\nlitchi-perf-baseline-pptx-semantic-v1-source-006-002\nlitchi-perf-baseline-pptx-semantic-v1-source-006-003\nlitchi-perf-baseline-pptx-semantic-v1-source-006-004\nlitchi-perf-baseline-pptx-semantic-v1-source-006-005\nlitchi-perf-baseline-pptx-semantic-v1-source-006-006\nlitchi-perf-baseline-pptx-semantic-v1-source-006-007\nlitchi-perf-baseline-pptx-semantic-v1-source-006-000",
+      "shape": "producer-medium",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": null,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [],
+      "variant": null
+    }
+  ],
+  "schema": "litchi.perf-baseline.producer-shape-evidence.v1"
+}

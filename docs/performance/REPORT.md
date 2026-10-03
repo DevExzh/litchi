@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0887 — MCE inline attribute candidate rejected
+
+[0887](0887-mce-inline-attribute-storage.md) rejects the inline-four MCE attribute candidate after all 72 processes / 3,320 measured iterations pass semantic checks. Primary paired p50 is +0.25% (95% interval −0.34% to +3.16%); all four scenarios have large process-RSS review flags. The 16.41% allocation-call reduction is insufficient to justify adoption. Candidate quality gates include 3,907 passing tests. Production is restored exactly; the patch, binaries, and complete evidence remain retained. Independent and post-cleanup replay pass; owned source/build scratch and duplicate exports were removed.
+
 ## 0886 — producer XLSX full-cell profile
 
 [0886](0886-producer-full-cell-profile.md) completes five diagnostic processes and semantic replay of 6,020 measured scans. Exact sampled-IP period totals reconcile with flat perf reports; all three native profiles report zero lost samples. Independent review supports self-symbol attribution and separate Callgrind instruction diagnostics, while rejecting inclusive native claims from incomplete DWARF stacks. Production is unchanged. Duplicate exports and replay scratch were cleaned; original evidence remains retained.

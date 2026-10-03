@@ -1,0 +1,38 @@
+{
+  "finished_utc": "2026-10-03T16:39:34.011911+00:00",
+  "production_restored_to_baseline": true,
+  "registered_worktrees_created": 0,
+  "removed_owned_scratch": [
+    "/tmp/litchi-0887-source",
+    "/home/zhuhe/code/litchi/target/litchi-0887-build"
+  ],
+  "retained_artifacts": [
+    {
+      "bytes": 11054,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/candidate.patch",
+      "sha256": "ce54f8de23fd74ed7e04bf48a23604e4293a8810096fa768521a7d1834b89e36"
+    },
+    {
+      "bytes": 264488120,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+    },
+    {
+      "bytes": 267522448,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/allocator",
+      "sha256": "1fd257a246c681840e23d61b1c7cb3d7efc1ad1403f6be909cd8c64f6615a097"
+    }
+  ],
+  "scope": "Only marked 0887 build/source roots; historical recovery and other teams worktrees preserved.",
+  "source_dependency_counts_verified": {
+    "allocator": 3847,
+    "native": 3846
+  },
+  "status": "pass"
+}

@@ -1,0 +1,108 @@
+{
+  "status": "pass",
+  "reviewer": "/root/mce_attrs_review_0887",
+  "protocol": "fixed 0887 paired MCE attribute-storage candidate capture",
+  "scope": {
+    "experiment_helper": {
+      "path": "docs/performance/results/change-0887/experiment.py",
+      "bytes": 22587,
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    "reduction_helper": {
+      "path": "docs/performance/results/change-0887/reduce.py",
+      "bytes": 13950,
+      "sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad"
+    },
+    "reviewed_without_workload_or_Cargo": true,
+    "performance_claim": null
+  },
+  "schedule": {
+    "total_children": 72,
+    "native": {
+      "blocks": 8,
+      "cases_per_block": 4,
+      "pairs_per_case": 8,
+      "children": 64,
+      "warmups_per_child": 3,
+      "samples_per_child": 50,
+      "order": "AB/BA alternates by (block + case_index) parity; each case has four before-first and four after-first pairs"
+    },
+    "allocator": {
+      "primary_case": "xlsx_producer_medium_source_full_cell_scan",
+      "pairs": 4,
+      "children": 8,
+      "warmups_per_child": 3,
+      "samples_per_child": 15,
+      "order": "AB/BA alternates by block parity"
+    },
+    "execution": "native lane completes before allocator lane; every row launches a fresh binary process pinned to CPU 12 with warm filesystem cache and fail-fast semantics"
+  },
+  "statistics": {
+    "unit": "whole-child aggregate statistics",
+    "native_metrics": [
+      "p50_ns",
+      "p95_ns",
+      "p99_ns",
+      "peak_rss_kib"
+    ],
+    "pairing": "after/before ratios are computed within each scheduled pair; samples are never pooled across children",
+    "bootstrap": {
+      "draws": 10000,
+      "seed": 887,
+      "confidence": "percentile 95% interval",
+      "indices": [
+        249,
+        9749
+      ],
+      "resampling_unit": "paired child ratios"
+    },
+    "primary_gate": "root gate must require native primary p50 median ratio <= 0.98 and bootstrap upper endpoint < 1.0",
+    "control_review": "retain every ordinary XLSX, DOCX, and PPTX control metric whose paired after/before ratio exceeds 1.05",
+    "spread_review": "retain every native p50 leg whose max/min ratio exceeds 1.20",
+    "primary_review": "retain every primary XLSX producer pair metric (p50, p95, p99, and peak RSS) whose after/before ratio exceeds 1.05; this is review evidence and does not change the primary p50 gate."
+  },
+  "semantic_artifacts": {
+    "primary": "The XLSX producer full-cell scan reuses the 0885 verifier: archive identity, counts, canonical digest, refusal census, source-version fence, route eligibility, sample alignment, producer sidecar, and allocator zero-failure checks are validated per child.",
+    "controls": "The ordinary XLSX corpus is pinned by its sealed baseline report; DOCX selected-paragraph and PPTX selected-slide runs validate the expected selected text on every sample and retain exact producer sidecars.",
+    "retained_per_child": [
+      "command.json",
+      "receipt.json",
+      "semantic.json",
+      "stdout.txt",
+      "stderr.txt",
+      "report.json",
+      "peak-rss-kib.txt",
+      "producer.json when emitted"
+    ],
+    "rss": "External /usr/bin/time %M is retained as process-lifetime peak RSS in KiB and is reduced separately from allocator operation counters."
+  },
+  "verified": [
+    "The frozen schedule is correctly counterbalanced within every native case and the allocator primary lane.",
+    "The reducer recomputes raw quantiles from sorted elapsed vectors and records every pair, ratio, bootstrap draw configuration, control flag, and spread flag without retries or replacement.",
+    "Allocator counters are summarized from per-child medians and remain a separate primary observation with adoption explicitly not evaluated.",
+    "The capture driver binds binary identity at launch, checks report identity and sealed corpus equality, preserves raw evidence, and stops on a child or semantic failure.",
+    "The reducer also records primary pair review flags for p50, p95, p99, and peak RSS when any pair ratio exceeds 1.05, separately from the adoption gate."
+  ],
+  "caveats": [
+    "The reducer's top-level status is an evidence-reduction status and is unconditionally pass; it must not be interpreted as candidate adoption. Root gate checks must inspect the primary gate, control flags, spread flags, build/quality receipts, and semantic receipts before any comparison claim.",
+    "Before capture, the root plan must bind the exact experiment/reduction helper hashes, retained 0885 binaries, candidate build/source receipts, all four sealed baseline-qualification report hashes, producer sidecars, and the taskset/environment descriptors.",
+    "CPU affinity is recorded without an exclusive-host guarantee. Warm-cache timings and external RSS are descriptive process observations, not native Office, cold-cache, or universal producer claims."
+  ],
+  "required_followups": [
+    "Freeze the plan only after the isolated candidate build and quality gates pass.",
+    "Run the 72-child capture once with no retries or replacements, then reduce from retained receipts and raw reports.",
+    "Review every emitted control and spread flag and retain the complete reduction output; do not infer a speedup from allocator counters or RSS alone."
+  ],
+  "hash_reconciliation": {
+    "experiment_helper": {
+      "previous_recorded_sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c8",
+      "recomputed_sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5",
+      "reason": "The review packet had a transcription error; the helper was rehashed from the reviewed file before freeze validation."
+    },
+    "reduction_helper": {
+      "previous_recorded_sha256": "b98a180bf1c89efcc0c46361333c61e977dc2def2d791fb73cde2ed5b2c531e5",
+      "recomputed_sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad",
+      "reason": "The reducer gained primary metric review flags; the helper was rehashed from the reviewed file before freeze validation."
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-pptx",
+    "--lib",
+    "-j",
+    "2"
+  ],
+  "started_utc": "2026-10-03T16:13:28.843824+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T16:19:52.030074+00:00"
+}

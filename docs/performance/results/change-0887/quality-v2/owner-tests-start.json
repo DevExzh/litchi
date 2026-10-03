@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ooxml-common",
+    "--all-features",
+    "-j",
+    "2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T16:12:24.031147+00:00",
+  "rustdocflags": "-D warnings"
+}

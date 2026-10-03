@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "cargo",
+    "fmt",
+    "-p",
+    "litchi-ooxml-common",
+    "--",
+    "--check"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T16:12:23.687529+00:00",
+  "rustdocflags": "-D warnings",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T16:12:24.030872+00:00"
+}

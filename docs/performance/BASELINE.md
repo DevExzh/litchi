@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0887 — MCE inline attribute candidate rejected
+
+[0887](0887-mce-inline-attribute-storage.md) retains 72 matched fresh processes / 3,320 measured iterations for a rejected MCE inline-attribute candidate. Primary paired p50 ratio is 1.0025 (95% interval 0.9966–1.0316), failing the frozen improvement gate. All four scenarios show process-RSS regression flags. Allocation calls decrease 16.41%, but that does not establish a latency improvement. Production is restored; 0885 remains the current-source baseline.
+
 ## 0886 — producer XLSX full-cell profile
 
 [0886](0886-producer-full-cell-profile.md) adds three native user-cycle profiles (6,000 measured scans) and two separate runner-scoped Callgrind diagnostics (twenty scans). All reports replay. Native MCE self-symbol shares are 26.73–27.78%; guest MCE inclusive instruction shares are 44.10–44.19%. These populations and scopes remain separate. Poor DWARF stacks prohibit native caller attribution; 0885 remains the latency baseline.
