@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--test",
+    "xlsx_filesystem",
+    "xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children",
+    "-j",
+    "2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:12:43.540163+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:13:51.850577+00:00",
+  "output_sha256": "12a5515adf64a9dd29302b2ac70a80e191c479eefb4ece7a46cc1ccb6c061223"
+}

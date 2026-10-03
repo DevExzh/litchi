@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--lib",
+    "xlsx_metadata_oracle_requires_clean_properties",
+    "-j",
+    "2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:10:14.713374+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:12:43.539892+00:00",
+  "output_sha256": "4e9f5c842e98d4a3f4fe2b02c0f3e7a59aff48be00847951eb365409edca04d7"
+}

@@ -1,0 +1,22 @@
+{
+  "base_revision": "ca2b1f5fdb95935252714fbba1c2e3113aa08929",
+  "command": [
+    "cargo",
+    "check",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--bins",
+    "-j",
+    "2"
+  ],
+  "observed_exit_code": 101,
+  "record_type": "summary of observed tool output, not a raw command log",
+  "errors": [
+    "E0423 and E0603 at src/filesystem.rs:6148: removed litchi_ooxml_common::properties::read",
+    "E0423 and E0603 at src/lib.rs:43184: removed litchi::ooxml_common::properties::read"
+  ],
+  "cause_commit": "8316b085fc",
+  "performance_claim": null
+}

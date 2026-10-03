@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0883 — restore report-aware benchmark metadata oracles
+
+[0883](0883-report-aware-metadata-oracles.md) repairs two harness calls removed by the core-properties API migration. Reported metadata repairs now reject deterministic oracle input. All-feature/all-target compilation, focused metadata and fresh-process filesystem tests, formatting, and warning-denied harness Clippy pass. Production and timer boundaries are unchanged; no new baseline or speedup is claimed.
+
 ## 0845 — retain indexed entry IDs through OPC publication
 
 [0845](0845-opc-indexed-entry-iteration.md) adopts direct entry iteration in two OPC scans. Across four synthetic 4,096-Part shapes, publication p50 improves 7.24–11.17% and lifecycle 2.31–4.18%, with unchanged owner allocation counts/bytes. All 512 main reports / 211,328 samples validate; no frozen latency, tail, RSS, allocation or spread flag fires. The separate instruction population and additive Callgrind reader repair preserve original captures and failure evidence. Candidate quality gates include 6,935 passing affected-owner tests. Current semantic DOCX/XLSX/PPTX mixed-catalog publication and durability diagnosis is next; the broader goal remains open.

@@ -1,0 +1,41 @@
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0369]: binary operation `==` cannot be applied to type `litchi_core::Metadata`
+     --> src/lib.rs:60964:9
+      |
+60964 | /         assert_eq!(
+60965 | |             super::xlsx_root_metadata_oracle(&package).unwrap(),
+60966 | |             litchi_core::Metadata::default()
+60967 | |         );
+      | |         ^
+      | |         |
+      | |_________litchi_core::Metadata
+      |           litchi_core::Metadata
+      |
+note: `litchi_core::Metadata` does not implement `PartialEq`
+     --> /home/zhuhe/code/litchi/crates/litchi-core/src/metadata.rs:18:1
+      |
+   18 | pub struct Metadata {
+      | ^^^^^^^^^^^^^^^^^^^ `litchi_core::Metadata` is defined in another crate
+
+error[E0369]: binary operation `==` cannot be applied to type `litchi_core::Metadata`
+     --> src/lib.rs:60975:9
+      |
+60975 | /         assert_eq!(
+60976 | |             super::xlsx_root_metadata_oracle(&package).unwrap(),
+60977 | |             expected
+60978 | |         );
+      | |         ^
+      | |         |
+      | |_________litchi_core::Metadata
+      |           litchi_core::Metadata
+      |
+note: `litchi_core::Metadata` does not implement `PartialEq`
+     --> /home/zhuhe/code/litchi/crates/litchi-core/src/metadata.rs:18:1
+      |
+   18 | pub struct Metadata {
+      | ^^^^^^^^^^^^^^^^^^^ `litchi_core::Metadata` is defined in another crate
+
+For more information about this error, try `rustc --explain E0369`.
+error: could not compile `litchi-perf-baseline` (lib test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

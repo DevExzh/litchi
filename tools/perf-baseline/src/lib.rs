@@ -43134,6 +43134,22 @@ fn run_xlsx_source_narrow_column_range_scan(
     )
 }
 
+// Deterministic benchmark fixtures must not need lenient metadata repair.
+// This eager oracle runs outside the measured source/facade operation.
+fn xlsx_root_metadata_oracle(
+    package: &OpcPackage,
+) -> Result<litchi_core::Metadata, Box<dyn Error>> {
+    let mut report = litchi_ooxml_common::leniency::ToleranceReport::default();
+    let properties = litchi_ooxml_common::properties::read_with_report(package, &mut report)
+        .map_err(|error| error.to_string())?;
+    if !report.is_clean() {
+        return Err(format!("XLSX metadata oracle required tolerance repairs: {report:?}").into());
+    }
+    Ok(properties
+        .map(litchi_core::Metadata::from)
+        .unwrap_or_default())
+}
+
 fn xlsx_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, Box<dyn Error>> {
     Ok(sha256_hex(&serde_json::to_vec(metadata)?))
 }
@@ -43181,10 +43197,7 @@ fn run_xlsx_bytes_root_access(
     // Read metadata through an independently opened eager OPC/property path;
     // the facade workbook is never used to manufacture its own oracle.
     let package = OpcPackage::from_bytes(&corpus.archive)?;
-    let expected_metadata = litchi::ooxml_common::properties::read(&package)
-        .map_err(|error| error.to_string())?
-        .map(litchi_core::Metadata::from)
-        .unwrap_or_default();
+    let expected_metadata = xlsx_root_metadata_oracle(&package)?;
     let expected_metadata_sha256 = xlsx_root_metadata_digest(&expected_metadata)?;
     drop(expected_metadata);
     drop(package);
@@ -60945,6 +60958,45 @@ fn write_report(report: &Report, output: Option<&PathBuf>) -> Result<(), Box<dyn
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn xlsx_metadata_oracle_requires_clean_properties() {
+        let mut package = litchi_opc::OpcPackage::new();
+        assert_eq!(
+            super::xlsx_root_metadata_digest(&super::xlsx_root_metadata_oracle(&package).unwrap())
+                .unwrap(),
+            super::xlsx_root_metadata_digest(&litchi_core::Metadata::default()).unwrap()
+        );
+        litchi_ooxml_common::properties::write(
+            &mut package,
+            litchi_ooxml_common::Props::new().title("Benchmark title"),
+        )
+        .unwrap();
+        let expected =
+            litchi_core::Metadata::from(litchi_ooxml_common::Props::new().title("Benchmark title"));
+        assert_eq!(
+            super::xlsx_root_metadata_digest(&super::xlsx_root_metadata_oracle(&package).unwrap())
+                .unwrap(),
+            super::xlsx_root_metadata_digest(&expected).unwrap()
+        );
+
+        // The lenient reader can adopt an orphaned core-properties part, but
+        // silently repairing a benchmark fixture would weaken its oracle.
+        let mut orphan = litchi_opc::OpcPackage::new();
+        let name = litchi_opc::PackURI::new("/docProps/core.xml").unwrap();
+        let part = package.get_part(&name).unwrap();
+        orphan.add_part(Box::new(litchi_opc::part::BlobPart::new(
+            name,
+            litchi_opc::constants::content_type::OPC_CORE_PROPERTIES.to_owned(),
+            part.blob().to_vec(),
+        )));
+        assert!(
+            super::xlsx_root_metadata_oracle(&orphan)
+                .unwrap_err()
+                .to_string()
+                .contains("required tolerance repairs")
+        );
+    }
+
     use std::{
         collections::{BTreeMap, BTreeSet},
         io::{Read, Write},

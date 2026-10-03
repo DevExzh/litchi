@@ -1,0 +1,9 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 38.44s
+     Running tests/xlsx_filesystem.rs (tools/perf-baseline/target/debug/deps/xlsx_filesystem-4eff0bb0fdfe95bd)
+
+running 1 test
+test xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 29.83s
+

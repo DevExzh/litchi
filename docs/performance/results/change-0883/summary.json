@@ -1,0 +1,22 @@
+{
+  "base_revision": "ca2b1f5fdb95935252714fbba1c2e3113aa08929",
+  "filesystem_child_samples_checked": 4,
+  "filesystem_integration_tests_passed": 1,
+  "focused_unit_tests_passed": 1,
+  "performance_claim": null,
+  "production_changes": false,
+  "quality_commands": [
+    "fmt",
+    "check",
+    "metadata-test",
+    "filesystem-test",
+    "clippy"
+  ],
+  "schema": "litchi.performance-harness-compatibility-0883.v1",
+  "scope": "Harness compatibility and core-properties metadata oracle validation; no new performance baseline or full-workspace quality claim.",
+  "source_sha256": {
+    "tools/perf-baseline/src/filesystem.rs": "8f75bd8357b45ade1653a83f793d423beb22471973fc378d4f18be627309aaf4",
+    "tools/perf-baseline/src/lib.rs": "2ff37227799a654c0629908311f6b9782f8cd1119901b901116c62e9ceccee77"
+  },
+  "status": "pass"
+}

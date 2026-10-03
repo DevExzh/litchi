@@ -6145,10 +6145,7 @@ fn xlsx_typed_semantic_oracle(
     }
 
     let package = OpcPackage::from_bytes(&corpus.archive)?;
-    let metadata = litchi_ooxml_common::properties::read(&package)
-        .map_err(|error| error.to_string())?
-        .map(litchi_core::Metadata::from)
-        .unwrap_or_default();
+    let metadata = super::xlsx_root_metadata_oracle(&package)?;
     let metadata_sha256 = super::xlsx_root_metadata_digest(&metadata)?;
     Ok(XlsxRootSemanticProjection {
         worksheet_names,
