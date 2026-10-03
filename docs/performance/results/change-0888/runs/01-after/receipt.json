@@ -1,0 +1,52 @@
+{
+  "files": {
+    "command.json": {
+      "bytes": 1202,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/command.json",
+      "sha256": "363b17176ea37037bfcbe5c5f14f70bfb75959d2d0cef6dbb2ff8c1018a0a85c"
+    },
+    "observations.json": {
+      "bytes": 16774,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/observations.json",
+      "sha256": "07990a49554921f6ec56d356c568e52572c5095839837339a85df34913fa4e5a"
+    },
+    "peak-rss-kib.txt": {
+      "bytes": 6,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/peak-rss-kib.txt",
+      "sha256": "e6d95747ad819bfd78e7321992c34a8295864dd6d875124cfae6a8ae9399d35c"
+    },
+    "producer.json": {
+      "bytes": 7376,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/producer.json",
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "report.json": {
+      "bytes": 118982,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/report.json",
+      "sha256": "1d01e2bbd368d60dc8de4a130db6d3ffd740c8a37822db07d47f245e284eaaab"
+    },
+    "snapshots.jsonl.gz": {
+      "bytes": 144421,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/snapshots.jsonl.gz",
+      "sha256": "259706fb86769d0c23752e9b214f9d9e8dd1d4786c455b05c06a21581b776538"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "peak_rss_kib": 24280,
+  "row": {
+    "block": 0,
+    "ordinal": 1,
+    "role": "after"
+  },
+  "snapshots": 90,
+  "status": "pass"
+}

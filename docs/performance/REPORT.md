@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0888 — executable residency and MCE control audit
+
+[0888](0888-executable-residency-and-mce-controls.md) completes 24 mapping diagnostics and verifies 4,800 measured iterations / 2,181 snapshots with two readers. Fresh-inode byte-identical copies change RSS substantially while anonymous memory remains much closer; no precise kernel causality or speedup is claimed. The 0887 rejection stands. Temporary executable copies were removed and post-cleanup replay passes; production is unchanged.
+
 ## 0887 — MCE inline attribute candidate rejected
 
 [0887](0887-mce-inline-attribute-storage.md) rejects the inline-four MCE attribute candidate after all 72 processes / 3,320 measured iterations pass semantic checks. Primary paired p50 is +0.25% (95% interval −0.34% to +3.16%); all four scenarios have large process-RSS review flags. The 16.41% allocation-call reduction is insufficient to justify adoption. Candidate quality gates include 3,907 passing tests. Production is restored exactly; the patch, binaries, and complete evidence remain retained. Independent and post-cleanup replay pass; owned source/build scratch and duplicate exports were removed.

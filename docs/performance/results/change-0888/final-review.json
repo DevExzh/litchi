@@ -1,0 +1,259 @@
+{
+  "artifact_hashes": {
+    "docs/performance/0888-executable-residency-and-mce-controls.md": {
+      "bytes": 9906,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0888-executable-residency-and-mce-controls.md",
+      "sha256": "ea54a02337d6719646162c5f6dbbfb0a2c283fa24d5adf02afbdb3370abac431"
+    },
+    "docs/performance/results/change-0887/decision.json": {
+      "bytes": 18413,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/decision.json",
+      "sha256": "4e7b31d6e489eb3ea3090819396a84e807cecde38dcc1111381b5d9757428300"
+    },
+    "docs/performance/results/change-0887/reduction.json": {
+      "bytes": 49759,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/reduction.json",
+      "sha256": "50cb80400427a24037b19982eae31f8ee7b4fd389d2f714b3990d079ecc83be2"
+    },
+    "docs/performance/results/change-0888/analysis-verification.json": {
+      "bytes": 1259,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/analysis-verification.json",
+      "sha256": "7a28a9d44c9335a35c2fdc79217f73d1001f860250c2a16e897e6a6725678e24"
+    },
+    "docs/performance/results/change-0888/cleanup.json": {
+      "bytes": 1763,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/cleanup.json",
+      "sha256": "ebc59d2a704c59a486d6551c7e248449cdf0ced6e2f1015c1c55351054ef6218"
+    },
+    "docs/performance/results/change-0888/diagnostic-methodology-review.json": {
+      "bytes": 3898,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/diagnostic-methodology-review.json",
+      "sha256": "a7bd558b6296cf759dbc6d9078df6415498030fd91c48b46b6aa6a90d5417a19"
+    },
+    "docs/performance/results/change-0888/post-cleanup-verification.json": {
+      "bytes": 1259,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/post-cleanup-verification.json",
+      "sha256": "7a28a9d44c9335a35c2fdc79217f73d1001f860250c2a16e897e6a6725678e24"
+    },
+    "docs/performance/results/change-0888/quickmonitor-review.json": {
+      "bytes": 3640,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/quickmonitor-review.json",
+      "sha256": "59ca6abd9526baf1faef1fdb0d90cd4c2f7d41902154480c2f7efab2685f6bb0"
+    },
+    "docs/performance/results/change-0888/rss-review.json": {
+      "bytes": 304478,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/rss-review.json",
+      "sha256": "05f59c0b21d0bd6dc5a735d4e2c7d7b6731aedd1e2ef7dead303cf1cf18be00e"
+    },
+    "docs/performance/results/change-0888/rss-static-audit.json": {
+      "bytes": 11803,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/rss-static-audit.json",
+      "sha256": "5d529aa78d344e7219ab5e89370b46a2371f6a94bb85fadf3583ab9beeb41954"
+    },
+    "docs/performance/results/change-0888/verification.json": {
+      "bytes": 20777,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/verification.json",
+      "sha256": "a038414026da3f0193ad57c643a1ba541415b91ef879644cdd9065cefac67f2c"
+    }
+  },
+  "decision": {
+    "broader_goal": "active",
+    "candidate_adoption": "rejected; no optimization adopted",
+    "candidate_gate": "0887 native primary gate remains failed",
+    "rss_evidence_role": "diagnostic interpretation only"
+  },
+  "documentation_review": {
+    "adoption_overclaim": false,
+    "copy_control_confounds_stated": true,
+    "heap_regression_overclaim": false,
+    "kernel_causality_overclaim": false,
+    "mapping_accounting_separated": true,
+    "mce_control_panel_marked_static_only": true,
+    "non_atomic_sampling_and_host_limits_stated": true,
+    "table_checks": {
+      "Before copy:copy": {
+        "document": {
+          "anon": 2664,
+          "exe": 15588,
+          "gnu": 19748,
+          "gnu_max": 19948,
+          "gnu_min": 19684
+        },
+        "expected": {
+          "anon": 2664,
+          "exe": 15588,
+          "gnu": 19748,
+          "gnu_max": 19948,
+          "gnu_min": 19684
+        },
+        "pass": true
+      },
+      "Before original:copy": {
+        "document": {
+          "anon": 2644,
+          "exe": 17560,
+          "gnu": 21812,
+          "gnu_max": 21908,
+          "gnu_min": 21644
+        },
+        "expected": {
+          "anon": 2644,
+          "exe": 17560,
+          "gnu": 21812,
+          "gnu_max": 21908,
+          "gnu_min": 21644
+        },
+        "pass": true
+      },
+      "Before original:first": {
+        "document": {
+          "anon": 2684,
+          "exe": 17496,
+          "gnu": 21644,
+          "gnu_max": 22204,
+          "gnu_min": 20368,
+          "heap": 1706,
+          "stack": 632
+        },
+        "expected": {
+          "anon": 2684,
+          "exe": 17496,
+          "gnu": 21644,
+          "gnu_max": 22204,
+          "gnu_min": 20368,
+          "heap": 1706,
+          "stack": 632
+        },
+        "pass": true
+      },
+      "Rejected candidate copy:copy": {
+        "document": {
+          "anon": 2588,
+          "exe": 15180,
+          "gnu": 19400,
+          "gnu_max": 19624,
+          "gnu_min": 19176
+        },
+        "expected": {
+          "anon": 2588,
+          "exe": 15180,
+          "gnu": 19400,
+          "gnu_max": 19624,
+          "gnu_min": 19176
+        },
+        "pass": true
+      },
+      "Rejected candidate original:copy": {
+        "document": {
+          "anon": 2666,
+          "exe": 20382,
+          "gnu": 24568,
+          "gnu_max": 24992,
+          "gnu_min": 24132
+        },
+        "expected": {
+          "anon": 2666,
+          "exe": 20382,
+          "gnu": 24568,
+          "gnu_max": 24992,
+          "gnu_min": 24132
+        },
+        "pass": true
+      },
+      "Rejected candidate original:first": {
+        "document": {
+          "anon": 2542,
+          "exe": 20242,
+          "gnu": 24310,
+          "gnu_max": 24852,
+          "gnu_min": 23680,
+          "heap": 1566,
+          "stack": 632
+        },
+        "expected": {
+          "anon": 2542,
+          "exe": 20242,
+          "gnu": 24310,
+          "gnu_max": 24852,
+          "gnu_min": 23680,
+          "heap": 1566,
+          "stack": 632
+        },
+        "pass": true
+      }
+    },
+    "table_values_match_recomputed_analysis": true
+  },
+  "evidence_checks": {
+    "0887_gate": {
+      "ci95_high": 1.0315652889370475,
+      "decision": "reject",
+      "median_ratio": 1.0025209740406034,
+      "pass": false,
+      "reduction_status": "pass"
+    },
+    "analysis_verification": {
+      "full_analysis_recomputed": true,
+      "independent_vma_maxima_match": true,
+      "snapshots": 2181,
+      "status": "pass"
+    },
+    "cleanup": {
+      "original_binaries_unchanged": true,
+      "removed_owned_paths": [
+        "/tmp/litchi-0888-copies"
+      ],
+      "status": "pass"
+    },
+    "post_cleanup": {
+      "matches_analysis_verification": true,
+      "status": "pass"
+    },
+    "rss_review": {
+      "adoption_claim": null,
+      "latency_claim": null,
+      "status": "pass"
+    },
+    "verification": {
+      "copy_children": 16,
+      "initial_children": 8,
+      "status": "pass"
+    }
+  },
+  "limitations": [
+    "RSS and smaps evidence is descriptive: non-atomic polling, possible missed transients, observer perturbation, and no exclusive-host guarantee remain.",
+    "Fresh-inode copies change pathname, inode, cache history, and loading conditions together; they do not identify a single kernel mechanism.",
+    "RSS and executable mapping categories do not establish physical page-cache folio size or prove heap causality.",
+    "rss-static-audit.json contains a redundant monitor helper descriptor with the current 6363-byte size but a malformed 63-character SHA-256 missing the trailing 0; its monitor_descriptor_reconciliation carries the full current SHA and confirms the plan helper match, and quickmonitor-review.json independently binds the same helper."
+  ],
+  "reviewer_scope": {
+    "builds_run": false,
+    "source_edits": false,
+    "static_table_recomputation": true,
+    "workloads_run": false
+  },
+  "schema": "litchi.mce-executable-residency-final-review-0888.v1",
+  "status": "pass"
+}

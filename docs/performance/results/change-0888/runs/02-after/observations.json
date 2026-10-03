@@ -1,0 +1,550 @@
+{
+  "proc_races": [
+    {
+      "monotonic_ns": 1937665120027053,
+      "reason": "FileNotFoundError"
+    }
+  ],
+  "snapshots": [
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 0,
+      "monotonic_ns": 1937664158479308,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 1,
+      "monotonic_ns": 1937664168756029,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 2,
+      "monotonic_ns": 1937664179041740,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 3,
+      "monotonic_ns": 1937664189291931,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 4,
+      "monotonic_ns": 1937664199539411,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 5,
+      "monotonic_ns": 1937664209834152,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 6,
+      "monotonic_ns": 1937664220142213,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 7,
+      "monotonic_ns": 1937664230433114,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 8,
+      "monotonic_ns": 1937664240694845,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 9,
+      "monotonic_ns": 1937664250992356,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 10,
+      "monotonic_ns": 1937664261301187,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 11,
+      "monotonic_ns": 1937664271598778,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 12,
+      "monotonic_ns": 1937664281896219,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 13,
+      "monotonic_ns": 1937664292195630,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 14,
+      "monotonic_ns": 1937664302493231,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 15,
+      "monotonic_ns": 1937664312791112,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 16,
+      "monotonic_ns": 1937664329862500,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 17,
+      "monotonic_ns": 1937664340133741,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 18,
+      "monotonic_ns": 1937664350440172,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 19,
+      "monotonic_ns": 1937664360739453,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 20,
+      "monotonic_ns": 1937664371050564,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 21,
+      "monotonic_ns": 1937664381348815,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 22,
+      "monotonic_ns": 1937664391647296,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 23,
+      "monotonic_ns": 1937664401946967,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 24,
+      "monotonic_ns": 1937664412245017,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 25,
+      "monotonic_ns": 1937664422541008,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 26,
+      "monotonic_ns": 1937664432840229,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 27,
+      "monotonic_ns": 1937664443147940,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 28,
+      "monotonic_ns": 1937664453445551,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 29,
+      "monotonic_ns": 1937664463741912,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 30,
+      "monotonic_ns": 1937664474048523,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 31,
+      "monotonic_ns": 1937664491316742,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 32,
+      "monotonic_ns": 1937664501615143,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 33,
+      "monotonic_ns": 1937664511912624,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 34,
+      "monotonic_ns": 1937664522209565,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 35,
+      "monotonic_ns": 1937664532506046,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 36,
+      "monotonic_ns": 1937664542803437,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 37,
+      "monotonic_ns": 1937664553110168,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 38,
+      "monotonic_ns": 1937664563409459,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 39,
+      "monotonic_ns": 1937664573706690,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 40,
+      "monotonic_ns": 1937664584014321,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 41,
+      "monotonic_ns": 1937664594311162,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 42,
+      "monotonic_ns": 1937664604607753,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 43,
+      "monotonic_ns": 1937664614908704,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 44,
+      "monotonic_ns": 1937664625208205,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 45,
+      "monotonic_ns": 1937664635507516,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 46,
+      "monotonic_ns": 1937664652735054,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 47,
+      "monotonic_ns": 1937664663045335,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 48,
+      "monotonic_ns": 1937664673343366,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 49,
+      "monotonic_ns": 1937664683639587,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 50,
+      "monotonic_ns": 1937664693937398,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 51,
+      "monotonic_ns": 1937664704232899,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 52,
+      "monotonic_ns": 1937664714529290,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 53,
+      "monotonic_ns": 1937664724831841,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 54,
+      "monotonic_ns": 1937664735136662,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 55,
+      "monotonic_ns": 1937664745434953,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 56,
+      "monotonic_ns": 1937664755720714,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 57,
+      "monotonic_ns": 1937664766032415,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 58,
+      "monotonic_ns": 1937664776328956,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 59,
+      "monotonic_ns": 1937664786625347,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 60,
+      "monotonic_ns": 1937664796925478,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 61,
+      "monotonic_ns": 1937664814201917,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 62,
+      "monotonic_ns": 1937664824517318,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 63,
+      "monotonic_ns": 1937664834814829,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 64,
+      "monotonic_ns": 1937664845136760,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 65,
+      "monotonic_ns": 1937664855434171,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 66,
+      "monotonic_ns": 1937664865743942,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 67,
+      "monotonic_ns": 1937664876065323,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 68,
+      "monotonic_ns": 1937664886402484,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 69,
+      "monotonic_ns": 1937664896718875,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 70,
+      "monotonic_ns": 1937664907079066,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 71,
+      "monotonic_ns": 1937664917378587,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 72,
+      "monotonic_ns": 1937664927809419,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 73,
+      "monotonic_ns": 1937664938193450,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 74,
+      "monotonic_ns": 1937664948504051,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 75,
+      "monotonic_ns": 1937664958819162,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 76,
+      "monotonic_ns": 1937664976293471,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 77,
+      "monotonic_ns": 1937664986598503,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 78,
+      "monotonic_ns": 1937664996914194,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 79,
+      "monotonic_ns": 1937665007199874,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 80,
+      "monotonic_ns": 1937665017516595,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 81,
+      "monotonic_ns": 1937665027829277,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 82,
+      "monotonic_ns": 1937665038138067,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 83,
+      "monotonic_ns": 1937665048427108,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 84,
+      "monotonic_ns": 1937665058687589,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 85,
+      "monotonic_ns": 1937665068937570,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 86,
+      "monotonic_ns": 1937665079158591,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 87,
+      "monotonic_ns": 1937665089404391,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 88,
+      "monotonic_ns": 1937665099652492,
+      "pid": 3652849
+    },
+    {
+      "exe": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "index": 89,
+      "monotonic_ns": 1937665109899863,
+      "pid": 3652849
+    }
+  ]
+}

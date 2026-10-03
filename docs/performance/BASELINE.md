@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0888 — executable residency and MCE control audit
+
+[0888](0888-executable-residency-and-mce-controls.md) adds 24 monitored diagnostic processes / 4,800 measured iterations and 2,181 raw mapping snapshots. Byte-identical executable copies materially change process RSS; executable-file residency dominates the observed difference. These are separate diagnostics, not replacement latency baselines or proof of a kernel mechanism. The 0887 candidate remains rejected on its failed native latency gate.
+
 ## 0887 — MCE inline attribute candidate rejected
 
 [0887](0887-mce-inline-attribute-storage.md) retains 72 matched fresh processes / 3,320 measured iterations for a rejected MCE inline-attribute candidate. Primary paired p50 ratio is 1.0025 (95% interval 0.9966–1.0316), failing the frozen improvement gate. All four scenarios show process-RSS regression flags. Allocation calls decrease 16.41%, but that does not establish a latency improvement. Production is restored; 0885 remains the current-source baseline.

@@ -1,0 +1,24 @@
+{
+  "analysis_v1_note": null,
+  "artifacts": {
+    "analysis_final": {
+      "bytes": 151253,
+      "decompressed_bytes": 11719189,
+      "decompressed_sha256": "79ce62890cdd66dd2cc0fd3bfa331466ea17a825c670b7e2a61cb37b6ec9235f",
+      "path": "docs/performance/results/change-0888/copy-probe/analysis.json.gz",
+      "sha256": "126c6dcd01d82ac830b436d028c532ee29be9e00c72d607053c95ea3315196cb"
+    }
+  },
+  "gzip_writer": {
+    "compresslevel": 9,
+    "filename_header": "",
+    "mtime": 0
+  },
+  "packet": "change-0888/copy-probe",
+  "reader": {
+    "bytes": 20654,
+    "path": "docs/performance/results/change-0888/analyze.py",
+    "sha256": "3e60da0b112bc47ee0facf60ad6e8037f6ec96dbe28637fc8832bae938317256"
+  },
+  "schema": "litchi.live-mapping-analysis-export-0888.v1"
+}

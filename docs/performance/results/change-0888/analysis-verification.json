@@ -1,0 +1,31 @@
+{
+  "helpers": {
+    "analyze.py": "3e60da0b112bc47ee0facf60ad6e8037f6ec96dbe28637fc8832bae938317256",
+    "check_analysis.py": "84f41205e958a625152d605beae8d94d3b23449259220d98d25dbfd0dc6b324d",
+    "verify.py": "5cb8d6bb6c948df6b5fdd99cd97d3d0ebf0cea9827f427e9b2d9cc0af5956d6b"
+  },
+  "latency_or_adoption_claim": null,
+  "packets": [
+    {
+      "analysis_sha256": "8058927db2e9c4947a80e36b3d56975a10dd70bf11676e4fbac25c7981776eba",
+      "children": 8,
+      "custody_and_semantics": "pass",
+      "full_analysis_recomputed": true,
+      "independent_vma_maxima_match": true,
+      "packet": "/home/zhuhe/code/litchi/docs/performance/results/change-0888",
+      "plan_sha256": "aa41b23a4d1dd2ff9f12a0810ae91817e13e8ed60529f4a6554d93c656e33a9c",
+      "snapshots": 726
+    },
+    {
+      "analysis_sha256": "126c6dcd01d82ac830b436d028c532ee29be9e00c72d607053c95ea3315196cb",
+      "children": 16,
+      "custody_and_semantics": "pass",
+      "full_analysis_recomputed": true,
+      "independent_vma_maxima_match": true,
+      "packet": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe",
+      "plan_sha256": "fdd3e67694543a136d96622da6182b65e64ab54f003ec3cf455d4f981da8ede4",
+      "snapshots": 1455
+    }
+  ],
+  "status": "pass"
+}

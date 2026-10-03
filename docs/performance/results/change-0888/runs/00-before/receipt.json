@@ -1,0 +1,52 @@
+{
+  "files": {
+    "command.json": {
+      "bytes": 1206,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/command.json",
+      "sha256": "f452f6d24a8f61f90a9c46f54f6ce8d333e7b9b17983e3f7b1528e19e6cbaf7f"
+    },
+    "observations.json": {
+      "bytes": 17051,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/observations.json",
+      "sha256": "1df115a2b3b604d7165e380d70c9cbc5d4c9dafccacbd80fdc9a48951be9ddac"
+    },
+    "peak-rss-kib.txt": {
+      "bytes": 6,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/peak-rss-kib.txt",
+      "sha256": "fa0607f6752de4c29007702c4ec482bc2edb1c8714a57bcd92958b8fdd8e6e6a"
+    },
+    "producer.json": {
+      "bytes": 7376,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/producer.json",
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "report.json": {
+      "bytes": 119001,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/report.json",
+      "sha256": "fce6f7dc28d5a6a12170fa9972a450c421435b625d3e83676b46d482505b31cc"
+    },
+    "snapshots.jsonl.gz": {
+      "bytes": 147306,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/snapshots.jsonl.gz",
+      "sha256": "ce28bf09b23db9850345bae6b114a9ac4ce46b20ed22c949dbc924085a04b40d"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/00-before/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "peak_rss_kib": 21724,
+  "row": {
+    "block": 0,
+    "ordinal": 0,
+    "role": "before"
+  },
+  "snapshots": 91,
+  "status": "pass"
+}

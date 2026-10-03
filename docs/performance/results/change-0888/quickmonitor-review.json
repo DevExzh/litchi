@@ -1,0 +1,87 @@
+{
+  "bindings": {
+    "blocks": 4,
+    "capture": {
+      "bytes": 316,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/capture.json",
+      "sha256": "6f8383c03f42edec788562777c005b04c6e52083d5628d4ff8bbfd65e661ec15"
+    },
+    "case": "xlsx_producer_medium_source_full_cell_scan",
+    "child_cpu": "12",
+    "child_cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0887",
+    "children": 8,
+    "current_source_head": "b1f142e1f994f05306d656645e492ded0069c4d8",
+    "existing_command_cwds": [
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0887"
+    ],
+    "observer_affinity": [
+      13
+    ],
+    "plan": {
+      "bytes": 3813,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/plan.json",
+      "sha256": "aa41b23a4d1dd2ff9f12a0810ae91817e13e8ed60529f4a6554d93c656e33a9c"
+    },
+    "poll_interval_seconds": 0.01,
+    "samples": 200,
+    "schedule": "AB/BA by block",
+    "warmup": 3
+  },
+  "blockers": [],
+  "builds_run_by_reviewer": false,
+  "current_helpers": {
+    "copy_probe": {
+      "bytes": 7348,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy_probe.py",
+      "sha256": "9b04355f40883b7819b7cb1ace93eb083bf3dadf549617fda61b792e4e4e14a8"
+    },
+    "monitor": {
+      "bytes": 6363,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/monitor.py",
+      "sha256": "4e102f70716a65af1097f5c50ab9dc5ed4d24ae49e5dc65677c9ba9ab29236d0"
+    }
+  },
+  "custody_note": {
+    "current_monitor": {
+      "bytes": 6363,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/monitor.py",
+      "sha256": "4e102f70716a65af1097f5c50ab9dc5ed4d24ae49e5dc65677c9ba9ab29236d0"
+    },
+    "finding": "rss-static-audit.json retains the earlier pre-correction monitor descriptor; this receipt binds the current corrected monitor hash.",
+    "recorded_pre_correction_monitor": {
+      "bytes": 6363,
+      "sha256": "4e102f70716a65af1097f5c50ab9dc5ed4d24ae49e5dc65677c9ba9ab29236d"
+    },
+    "related_file": {
+      "bytes": 11021,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/rss-static-audit.json",
+      "sha256": "1eafdb782f714a5cbfab4d2f780a7b2a8f88458b05fa2c5f6f8185ff04b520bd"
+    }
+  },
+  "findings": [
+    "Corrected monitor launches children with cwd equal to the formal 0887 experiment packet; every retained command receipt has that cwd and the frozen plan hash.",
+    "The benchmark child is taskset-pinned to CPU 12 by experiment._command; the monitor process records observer affinity [13].",
+    "GNU time and sampled executable-child /proc status/smaps are separate observations; sampling is non-atomic, can miss short peaks, and perturbs execution.",
+    "The monitor is diagnostic RSS evidence only and makes no latency or adoption claim; capture receipt is pass with eight successful children."
+  ],
+  "helper_ast": {
+    "copy_probe.py": "pass",
+    "monitor.py": "pass"
+  },
+  "schema": "litchi.live-mapping-diagnostic-review-0888.v1",
+  "scope": "External GNU time process peak RSS plus sampled /proc status/smaps of its taskset/executable child. Polling is non-atomic and perturbs execution; sampled maxima can miss exit or transient peaks. No native latency or adoption claim.",
+  "status": "static_review_pass",
+  "workloads_run_by_reviewer": false
+}

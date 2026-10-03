@@ -1,0 +1,198 @@
+{
+  "schema": "litchi.rss-static-audit-0888.v1",
+  "status": "pass",
+  "scope": "Read-only audit of the retained 0885 baseline and 0887 candidate native ELF files, the RSS reporting boundaries, and the 0888 monitor launch path. This records evidence and bounded observations; it does not assign a causal RSS explanation.",
+  "source_revisions": {
+    "baseline_0885_build": "335a40350bf06f49691745c14d310fd7a3ca9117",
+    "candidate_0887_evaluation": "db1e0c3577cd6afb16fa21d20ffa7c6677849ca6",
+    "current_worktree": "b1f142e1f994f05306d656645e492ded0069c4d8"
+  },
+  "commands": [
+    "sha256sum <retained-binary> <helper>",
+    "file docs/performance/results/change-0885/binaries/native docs/performance/results/change-0887/binaries/native",
+    "readelf -lW <retained-binary> | rg 'LOAD|INTERP|GNU_RELRO|GNU_STACK'",
+    "size -A -d <retained-binary> | rg '^\\.(text|rodata|gcc_except_table|eh_frame_hdr|eh_frame|data.rel.ro|relro_padding)\\s'",
+    "nm -C -S --defined-only <retained-binary> | rg 'litchi_perf_baseline::run$| main$|current_executable_identity|litchi_ooxml_common::mce::codec::start$|print_usage'",
+    "objdump -d -C --disassemble=<function> <retained-binary> | sed -n '1,48p'",
+    "uname -a; cat /sys/kernel/mm/transparent_hugepage/enabled; cat /sys/kernel/mm/transparent_hugepage/shmem_enabled"
+  ],
+  "helpers": {
+    "docs/performance/results/change-0885/capture.py": {
+      "bytes": 17203,
+      "sha256": "f751f1d5dd367b856f3e83b03d360dd86c99c33d3d1c0ebd7e8305575a63a27f"
+    },
+    "docs/performance/results/change-0885/verify.py": {
+      "bytes": 23498,
+      "sha256": "f4de053621d078e249c5d549eeba2ebab1a4b0b7e58edeb5c952c2bbf1980fb9"
+    },
+    "docs/performance/results/change-0887/experiment.py": {
+      "bytes": 22587,
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    "docs/performance/results/change-0888/monitor.py": {
+      "bytes": 6363,
+      "sha256": "4e102f70716a65af1097f5c50ab9dc5ed4d24ae49e5dc65677c9ba9ab29236d"
+    },
+    "tools/perf-baseline/src/process_metrics.rs": {
+      "sha256": "07ee04303cd16e85e0d4581cd940aa3531b5475f70da01dd73c7f80debec3c51"
+    },
+    "tools/perf-baseline/src/producer_shape.rs": {
+      "sha256": "8dc0a09d046dc44c3e29f820228b87eb4d3a4d2de63b1b67bf2e4d7cff6085de"
+    },
+    "tools/perf-baseline/src/lib.rs": {
+      "sha256": "04ac6f200c59bc51cb7656c8979bc49031a9bd8f5bbf6c23748bd6e49bf99faf"
+    }
+  },
+  "monitor_descriptor_reconciliation": {
+    "monitor_bytes": 6363,
+    "monitor_sha256": "4e102f70716a65af1097f5c50ab9dc5ed4d24ae49e5dc65677c9ba9ab29236d0",
+    "plan_helper_descriptor_matches": true,
+    "child_cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0887",
+    "note": "The initial static audit observed an earlier 6327-byte monitor draft; this record uses the final 6363-byte helper and reconciles it to change-0888/plan.json before interpreting snapshots."
+  },
+  "binaries": {
+    "before": {
+      "path": "docs/performance/results/change-0885/binaries/native",
+      "bytes": 264440648,
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d",
+      "file": "ELF 64-bit LSB pie executable, x86-64, dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=a22b6b50bdd55286eb910734840d57dff9a6e107, with debug_info, not stripped"
+    },
+    "after": {
+      "path": "docs/performance/results/change-0887/binaries/native",
+      "bytes": 264488120,
+      "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436",
+      "file": "ELF 64-bit LSB pie executable, x86-64, dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=519bd555ae08cad6bfb972273176df856eb894f0, with debug_info, not stripped"
+    }
+  },
+  "elf_layout": {
+    "tool_output": {
+      "before": [
+        "LOAD 0x000000 0x0000000000000000 0x0000000000000000 0x89a1c0 0x89a1c0 R 0x1000",
+        "LOAD 0x89a1c0 0x000000000089b1c0 0x000000000089b1c0 0x2637390 0x2637390 R E 0x1000",
+        "LOAD 0x2ed1550 0x0000000002ed3550 0x0000000002ed3550 0x03b0a8 0x03bab0 RW 0x1000",
+        "LOAD 0x2f0c5f8 0x0000000002f0f5f8 0x0000000002f0f5f8 0x000be0 0x000d74 RW 0x1000"
+      ],
+      "after": [
+        "LOAD 0x000000 0x0000000000000000 0x0000000000000000 0x89a6c0 0x89a6c0 R 0x1000",
+        "LOAD 0x89a6c0 0x000000000089b6c0 0x000000000089b6c0 0x2639900 0x2639900 R E 0x1000",
+        "LOAD 0x2ed3fc0 0x0000000002ed5fc0 0x0000000002ed5fc0 0x03b118 0x03c040 RW 0x1000",
+        "LOAD 0x2f0f0d8 0x0000000002f120d8 0x0000000002f120d8 0x000be0 0x000d74 RW 0x1000"
+      ]
+    },
+    "text_load_filesz_delta_bytes": 9584,
+    "text_load_memsz_delta_bytes": 9584,
+    "all_load_segment_alignments": "0x1000",
+    "read_only_to_text_offset_shift_bytes": 1280,
+    "rw_load_filesz_delta_bytes": 112,
+    "rw_load_memsz_delta_bytes": 1424
+  },
+  "sections": {
+    "tool": "size -A -d",
+    "before": {
+      ".text": 40071977,
+      ".rodata": 4613928,
+      ".gcc_except_table": 1254900,
+      ".eh_frame_hdr": 265892,
+      ".eh_frame": 2567000,
+      ".data.rel.ro": 239840,
+      ".relro_padding": 2568
+    },
+    "after": {
+      ".text": 40081561,
+      ".rodata": 4613992,
+      ".gcc_except_table": 1255052,
+      ".eh_frame_hdr": 266004,
+      ".eh_frame": 2567888,
+      ".data.rel.ro": 239936,
+      ".relro_padding": 3880
+    },
+    "delta": {
+      ".text": 9584,
+      ".rodata": 64,
+      ".gcc_except_table": 152,
+      ".eh_frame_hdr": 112,
+      ".eh_frame": 888,
+      ".data.rel.ro": 96,
+      ".relro_padding": 1312
+    }
+  },
+  "symbols": {
+    "tool": "nm -C -S --defined-only",
+    "before": {
+      "litchi_perf_baseline::run": {"address": "0x17c9860", "size": "0xe5ca"},
+      "main": {"address": "0x8df0e0", "size": "0x71f"},
+      "litchi_perf_baseline::current_executable_identity": {"address": "0x15570e0", "size": "0xc4b"},
+      "litchi_perf_baseline::print_usage": {"address": "0x20d3ba0", "size": "0xea"},
+      "litchi_ooxml_common::mce::codec::start": {"address": "0x1363890", "size": "0x2d40"}
+    },
+    "after": {
+      "litchi_perf_baseline::run": {"address": "0x17cf930", "size": "0xe5ca"},
+      "main": {"address": "0x8df520", "size": "0x71f"},
+      "litchi_perf_baseline::current_executable_identity": {"address": "0x155be00", "size": "0xc4b"},
+      "litchi_perf_baseline::print_usage": {"address": "0x20d6580", "size": "0xea"},
+      "litchi_ooxml_common::mce::codec::start": {"address": "0x13669b0", "size": "0x3105"}
+    }
+  },
+  "prologs": {
+    "litchi_perf_baseline::run": {
+      "before": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0x76000,%r11", "probe: sub $0x1000,%rsp; movq $0,(%rsp); cmp %r11,%rsp; jne probe", "sub $0xcb8,%rsp"],
+      "after": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0x76000,%r11", "probe: sub $0x1000,%rsp; movq $0,(%rsp); cmp %r11,%rsp; jne probe", "sub $0xcb8,%rsp"],
+      "comparison": "same frame setup and symbol size; only relocated addresses/branch targets differ"
+    },
+    "main": {
+      "before": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0xc8,%rsp"],
+      "after": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0xc8,%rsp"],
+      "comparison": "same frame setup and symbol size"
+    },
+    "litchi_perf_baseline::current_executable_identity": {
+      "before": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0x10000,%r11", "probe: sub $0x1000,%rsp; movq $0,(%rsp); cmp %r11,%rsp; jne probe", "sub $0x228,%rsp"],
+      "after": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0x10000,%r11", "probe: sub $0x1000,%rsp; movq $0,(%rsp); cmp %r11,%rsp; jne probe", "sub $0x228,%rsp"],
+      "comparison": "same fixed 64KiB stack probe and symbol size"
+    },
+    "litchi_ooxml_common::mce::codec::start": {
+      "before": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0x438,%rsp"],
+      "after": ["push rbp; push r15; push r14; push r13; push r12; push rbx", "sub $0x4c8,%rsp"],
+      "comparison": "candidate frame is 0x90 (144) bytes larger; function text is 965 bytes larger"
+    }
+  },
+  "reporting_and_launch": {
+    "process_metrics_source": {
+      "lines": "tools/perf-baseline/src/process_metrics.rs:85-86,89-112,115-148",
+      "quoted": ["The after-sample VmHWM value (not a delta).", "peak_rss_bytes: vm_hwm_bytes(&status_text)?", "peak_rss_bytes: self.peak_rss_bytes"]
+    },
+    "producer_timing_source": {
+      "lines": "tools/perf-baseline/src/producer_shape.rs:2421-2431,2482-2487",
+      "quoted": ["let process_before = process_metrics::Snapshot::read().ok();", "let started = std::time::Instant::now();", "let duration = started.elapsed();", "let process_after = process_metrics::Snapshot::read().ok();", "map(|(before, after)| after.delta(before))"]
+    },
+    "identity_source": {
+      "lines": "tools/perf-baseline/src/lib.rs:60807-60824",
+      "quoted": ["Capture the exact executable identity outside all benchmark timing.", "This intentionally reads the current process executable only once, after all measured cases have finished.", "let mut buffer = [0_u8; 64 * 1024];"]
+    },
+    "experiment_command": {
+      "lines": "docs/performance/results/change-0887/experiment.py:214-240",
+      "child_cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0887",
+      "argv_shape": ["/usr/bin/time", "-f", "%M", "-o", "<peak>", "/usr/bin/taskset", "-c", "12", "<binary>", "--case", "<case>", "--xlsx-shape", "medium", "--warmup", "<warmup>", "--samples", "<samples>", "--filesystem-cache", "warm", "--json", "<report>", "--producer-evidence", "<producer>"]
+    },
+    "monitor_source": {
+      "lines": "docs/performance/results/change-0888/monitor.py:72-107",
+      "quoted": ["Taskset execs the benchmark in the same PID.", "status = (base / 'status').read_text()", "smaps = (base / 'smaps').read_text()", "Polling is non-atomic and perturbs execution; sampled maxima can miss exit or transient peaks."]
+    }
+  },
+  "kernel": {
+    "uname": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux",
+    "transparent_hugepage_enabled": "always [madvise] never",
+    "transparent_hugepage_shmem_enabled": "always within_size advise [never] deny force"
+  },
+  "findings": [
+    "The retained candidate does not add a large run or main stack frame: run, main, current_executable_identity, and print_usage have identical symbol sizes and relevant frame setup before and after.",
+    "The changed MCE start function has 965 more text bytes and a 144-byte larger frame. This is materially smaller than the approximately 8 MiB process high-water shift and does not establish causation.",
+    "The executable R-E LOAD segment grows by 9,584 bytes and all LOAD p_align values are 0x1000. The observed THP mode is madvise. Static ELF data therefore does not demonstrate an executable large-folio or huge-page residency effect; live smaps is required.",
+    "The benchmark process RSS field is a post-operation process-lifetime VmHWM, and GNU time %M is also a command high-water value. Both include setup that precedes process_before; operation allocation metrics have a narrower begin/finish interval.",
+    "The 0888 monitor snapshots status and smaps from the executable child while it is live. They are non-atomic samples and sampled maxima must remain separate from GNU time peaks."
+  ],
+  "limits": [
+    "This audit does not run a workload, build a binary, or claim a latency result.",
+    "ELF section and prolog differences alone cannot distinguish file-backed executable residency from anonymous setup allocations.",
+    "The retained binaries are compared by static layout; a clean rebuild need not be byte-identical without the retained files."
+  ]
+}

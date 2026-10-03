@@ -1,0 +1,227 @@
+{
+  "build_recipe": {
+    "artifacts": [
+      "separate native and allocator binaries",
+      "exact argv/cwd/environment/toolchain/binary/dependency receipts",
+      "unique target directory marker and retained source/target ownership"
+    ],
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "TZ": "UTC",
+      "cpu_affinity": "12"
+    },
+    "reconstruct": "extract archive into a unique temporary source root; verify every manifest hash; apply candidate patch/overlays; verify changed overlays and git/apply status; remove only after replay receipts pass",
+    "release": {
+      "codegen_units": 1,
+      "debug": 1,
+      "incremental": 0,
+      "jobs": 2,
+      "locked": true,
+      "lto": "fat",
+      "offline": true,
+      "opt_level": 3,
+      "rust": "1.95.0"
+    },
+    "scope_limit": "Rebuilt executables are not promised byte-identical; retained 0885 native/allocator binaries are the baseline artifacts.",
+    "source_archive": {
+      "bytes": 89024356,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.tar.gz",
+      "sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+    },
+    "source_file_count": 10765,
+    "source_manifest": {
+      "bytes": 2083420,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.json",
+      "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938"
+    }
+  },
+  "builds_run": false,
+  "fixtures": [
+    {
+      "bytes": 1558391,
+      "mce_namespace_marker_count": 1,
+      "member": "xl/worksheets/sheet3.xml",
+      "package": "/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+      "sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+      "zip_compressed_bytes": 149983
+    },
+    {
+      "bytes": 288070,
+      "mce_namespace_marker_count": 1,
+      "member": "word/document.xml",
+      "package": "/home/zhuhe/code/litchi/test-data/ooxml/docx/drawing.docx",
+      "sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+      "zip_compressed_bytes": 55346
+    },
+    {
+      "bytes": 173620,
+      "mce_namespace_marker_count": 1,
+      "member": "word/styles.xml",
+      "package": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "abaa5f800e916cfcb11b0dae7f27c7a27df7e3f980d9439c8d309c6d6062e862",
+      "zip_compressed_bytes": 16794
+    }
+  ],
+  "limitations": [
+    "No timings, RSS, Cargo builds, or workloads were run for this static review.",
+    "The real worksheet/document controls cover codec and stream MCE paths but are not a complete OOXML package differential.",
+    "The existing differential command itself does not compare two binaries; an external verifier must enforce full equality and coverage."
+  ],
+  "limits": {
+    "codec": {
+      "attribute_ceiling": 4096,
+      "default_max_attributes_per_element": 1024,
+      "max_choices_per_alternate": 1024,
+      "max_depth": 256,
+      "max_directive_tokens": 4096,
+      "max_input_bytes": 268435456,
+      "max_namespace_bindings": 4096,
+      "max_output_bytes": 536870912
+    },
+    "semantics": [
+      "Codec and stream count namespace declarations among per-tag/per-event attributes.",
+      "Namespace binding budget counts previously unseen in-scope prefixes; a same-prefix shadowing rebind does not add a binding.",
+      "Stream applies the tighter processing and per-event attribute limit and validates public bounds before input.",
+      "Codec uses checked attribute iteration; duplicate/error precedence and source order are observable."
+    ],
+    "stream_defaults": {
+      "max_attribute_bytes_per_event": 4194304,
+      "max_attributes_per_event": 4096,
+      "max_context_bytes": 16777216,
+      "max_event_bytes": 8388608,
+      "max_events": 1000000,
+      "max_name_bytes": 1048576
+    },
+    "stream_hard_ceilings": {
+      "max_attribute_bytes_per_event": 268435456,
+      "max_attributes_per_event": 4096,
+      "max_context_bytes": 536870912,
+      "max_event_bytes": 268435456,
+      "max_events": 16777216,
+      "max_name_bytes": 16777216
+    }
+  },
+  "monitor_review": {
+    "ast_parse": "pass",
+    "blockers": [],
+    "file": {
+      "bytes": 6327,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/monitor.py",
+      "sha256": "5fec47722f8078f851811a8790738bbcf92eea8a3c8d5a604aaf769f571880fa"
+    },
+    "static_findings": [
+      "Uses exact 0885 native and 0887 native retained binary paths and verifies hashes against 0887 plan.",
+      "Uses fresh create-only run folders and stops on first child failure; no retries/replacements.",
+      "Snapshots are explicitly non-atomic and can miss short-lived peaks; polling perturbs the run, so this is diagnostic RSS evidence only.",
+      "The script writes plan.json before running and uses the repository root as benchmark cwd; this should remain recorded in the packet."
+    ],
+    "workload_protocol": "4 AB/BA blocks, warmup 3, samples 200, CPU 12, observer CPU 13, /usr/bin/time plus sampled /proc status/smaps, no latency/adoption claim"
+  },
+  "oracle": {
+    "correctness": [
+      "Codec: output SHA-256 plus Report and exact typed/displayed error; differential mce_baseline/mce_bare records both.",
+      "Stream: semantic event SHA-256, raw observer SHA-256, Report, counts, and exact error/precedence.",
+      "Compare complete before/after JSON with fixed package/member/generated/aliasing counts; timing JSON is not semantic evidence."
+    ],
+    "harness_notes": [
+      "adversarial builds input before timing and times only Case.run, but deduplicates outcomes; assert every retained sample has the same outcome and retain a count.",
+      "differential uses deterministic BTreeMap output and seeded generated/aliasing corpora, but silently skips unreadable package/member/archive errors; fail or record those skips and bind expected counts.",
+      "Existing benign adversarial wrappers return only codec output SHA/error and omit Report; use differential or a separate correctness replay for reports.",
+      "Observer callbacks are part of stream timing; use identical callbacks in both legs and keep callback-free/control counts separate."
+    ]
+  },
+  "recommended_panel": {
+    "allocation_boundary": [
+      "For an inline-four storage change, assert 4-to-5 transition with fallible spill and preserve typed Error::Allocation/source behavior under injected allocation failure; this is outside the wall-time harness."
+    ],
+    "boundaries": [
+      "total raw attributes including xmlns: 0, 1, 4, 5, 1024, 1025, 4096, 4097",
+      "distinct namespace prefixes at exact max_namespace_bindings and one over, plus same-prefix shadowing",
+      "directive token counts at exact max_directive_tokens and one over",
+      "depth, input/output bytes, stream event/attribute bytes, context bytes, and expanded-name bytes exact and one over",
+      "keep declaration/long-URI/shadowed-chain/hoisting floods as separate safety controls, not primary latency cases"
+    ],
+    "primary_real": [
+      "mce_benign_worksheet: XLSX sheet3 through codec with OOXML baseline capabilities",
+      "mce_benign_document: DOCX word/document.xml through codec with OOXML baseline capabilities",
+      "mce_stream_benign_worksheet and mce_stream_benign_document: matching stream paths"
+    ],
+    "synthetic_semantic": [
+      "no MCE marker fast path",
+      "Ignorable, ProcessContent, PreserveElements, PreserveAttributes",
+      "AlternateContent Choice/Fallback under bare, OOXML baseline, and one explicitly understood extension namespace",
+      "default-namespace reset, shadowing, aliased prefixes, duplicate names, and source-order retention"
+    ]
+  },
+  "review_scope": {
+    "comparison_runtime_commit": "335a40350bf06f49691745c14d310fd7a3ca9117",
+    "current_head": "b1f142e1f994f05306d656645e492ded0069c4d8",
+    "files": [
+      {
+        "bytes": 43301,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "sha256": "70c961b848bd7b9b7f6e8b8c7950fe13f2765e1cc8b8cf6604576b7049a4847e"
+      },
+      {
+        "bytes": 65338,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs",
+        "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+      },
+      {
+        "bytes": 26295,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/model.rs",
+        "sha256": "44169877f7c689b9266583610f6dfb84138b2a1039c7edc22b5d82ce75eed070"
+      },
+      {
+        "bytes": 125424,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/stream.rs",
+        "sha256": "1e194cae9ec2f2b559543656011c198fb67c84f52dc47894dba44f18e4f9710f"
+      },
+      {
+        "bytes": 16424,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/bounds_tests.rs",
+        "sha256": "42cf32228095eae5b4ce43a44c0f3bba71b8ca87507fd409d2e38dd3aa30dded"
+      },
+      {
+        "bytes": 27570,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/scope.rs",
+        "sha256": "579513e80008bd4dddea4f8e0f603a963e0646fd6e24db4f558459c5b48cbfc2"
+      },
+      {
+        "bytes": 4892,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/patterns.rs",
+        "sha256": "b982c0c1e31ac83b4ae8fb75ddb101f1f73b5b4ee8de01c508947d330fe1f15d"
+      }
+    ],
+    "runtime_diff_335a_to_head": "empty for the reviewed MCE/harness paths",
+    "runtime_paths": [
+      "crates/litchi-ooxml-common/src/mce",
+      "tools/perf-baseline/src/bin/xml_attribute_bounds.rs"
+    ]
+  },
+  "schema": "litchi.mce-control-audit-0888.v1",
+  "source_edits": false,
+  "status": "static_review_pass",
+  "workloads_run": false
+}

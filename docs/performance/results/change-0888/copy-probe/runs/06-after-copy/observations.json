@@ -1,0 +1,569 @@
+{
+  "proc_races": [],
+  "snapshots": [
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 0,
+      "monotonic_ns": 1938014982071628,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 1,
+      "monotonic_ns": 1938014992346500,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 2,
+      "monotonic_ns": 1938015002602081,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 3,
+      "monotonic_ns": 1938015012845062,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 4,
+      "monotonic_ns": 1938015023088103,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 5,
+      "monotonic_ns": 1938015033334604,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 6,
+      "monotonic_ns": 1938015043575035,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 7,
+      "monotonic_ns": 1938015053828716,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 8,
+      "monotonic_ns": 1938015064075677,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 9,
+      "monotonic_ns": 1938015074357648,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 10,
+      "monotonic_ns": 1938015084659639,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 11,
+      "monotonic_ns": 1938015095520153,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 12,
+      "monotonic_ns": 1938015106513577,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 13,
+      "monotonic_ns": 1938015117480141,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 14,
+      "monotonic_ns": 1938015128462205,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 15,
+      "monotonic_ns": 1938015139432099,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 16,
+      "monotonic_ns": 1938015150464723,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 17,
+      "monotonic_ns": 1938015167532731,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 18,
+      "monotonic_ns": 1938015177966753,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 19,
+      "monotonic_ns": 1938015188309824,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 20,
+      "monotonic_ns": 1938015198592895,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 21,
+      "monotonic_ns": 1938015208901257,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 22,
+      "monotonic_ns": 1938015219183628,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 23,
+      "monotonic_ns": 1938015229497339,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 24,
+      "monotonic_ns": 1938015239807100,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 25,
+      "monotonic_ns": 1938015250124682,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 26,
+      "monotonic_ns": 1938015260436423,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 27,
+      "monotonic_ns": 1938015270745354,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 28,
+      "monotonic_ns": 1938015281066486,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 29,
+      "monotonic_ns": 1938015291377907,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 30,
+      "monotonic_ns": 1938015301700278,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 31,
+      "monotonic_ns": 1938015311968509,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 32,
+      "monotonic_ns": 1938015322229260,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 33,
+      "monotonic_ns": 1938015339018168,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 34,
+      "monotonic_ns": 1938015349259219,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 35,
+      "monotonic_ns": 1938015359501880,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 36,
+      "monotonic_ns": 1938015369736341,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 37,
+      "monotonic_ns": 1938015380013532,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 38,
+      "monotonic_ns": 1938015390274503,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 39,
+      "monotonic_ns": 1938015400553614,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 40,
+      "monotonic_ns": 1938015410853755,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 41,
+      "monotonic_ns": 1938015421165957,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 42,
+      "monotonic_ns": 1938015431447828,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 43,
+      "monotonic_ns": 1938015441731289,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 44,
+      "monotonic_ns": 1938015452025110,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 45,
+      "monotonic_ns": 1938015462261761,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 46,
+      "monotonic_ns": 1938015472545222,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 47,
+      "monotonic_ns": 1938015482835134,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 48,
+      "monotonic_ns": 1938015493133855,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 49,
+      "monotonic_ns": 1938015509927212,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 50,
+      "monotonic_ns": 1938015520212003,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 51,
+      "monotonic_ns": 1938015530497274,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 52,
+      "monotonic_ns": 1938015540782706,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 53,
+      "monotonic_ns": 1938015551071707,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 54,
+      "monotonic_ns": 1938015561358298,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 55,
+      "monotonic_ns": 1938015571642659,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 56,
+      "monotonic_ns": 1938015581932750,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 57,
+      "monotonic_ns": 1938015592219781,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 58,
+      "monotonic_ns": 1938015602503803,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 59,
+      "monotonic_ns": 1938015612786694,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 60,
+      "monotonic_ns": 1938015623073685,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 61,
+      "monotonic_ns": 1938015633358516,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 62,
+      "monotonic_ns": 1938015643642707,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 63,
+      "monotonic_ns": 1938015653928419,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 64,
+      "monotonic_ns": 1938015664213780,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 65,
+      "monotonic_ns": 1938015680988587,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 66,
+      "monotonic_ns": 1938015691254218,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 67,
+      "monotonic_ns": 1938015701492189,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 68,
+      "monotonic_ns": 1938015711770640,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 69,
+      "monotonic_ns": 1938015722075281,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 70,
+      "monotonic_ns": 1938015732375433,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 71,
+      "monotonic_ns": 1938015742672204,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 72,
+      "monotonic_ns": 1938015752969415,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 73,
+      "monotonic_ns": 1938015763263576,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 74,
+      "monotonic_ns": 1938015773566038,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 75,
+      "monotonic_ns": 1938015783864449,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 76,
+      "monotonic_ns": 1938015794172920,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 77,
+      "monotonic_ns": 1938015804470941,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 78,
+      "monotonic_ns": 1938015814758752,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 79,
+      "monotonic_ns": 1938015825067254,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 80,
+      "monotonic_ns": 1938015835357765,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 81,
+      "monotonic_ns": 1938015852268393,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 82,
+      "monotonic_ns": 1938015862556714,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 83,
+      "monotonic_ns": 1938015872855505,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 84,
+      "monotonic_ns": 1938015883159906,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 85,
+      "monotonic_ns": 1938015893457248,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 86,
+      "monotonic_ns": 1938015903753409,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 87,
+      "monotonic_ns": 1938015914075060,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 88,
+      "monotonic_ns": 1938015924365491,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 89,
+      "monotonic_ns": 1938015934667083,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 90,
+      "monotonic_ns": 1938015944967124,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 91,
+      "monotonic_ns": 1938015955274135,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 92,
+      "monotonic_ns": 1938015965572956,
+      "pid": 3662602
+    },
+    {
+      "exe": "/tmp/litchi-0888-copies/after",
+      "index": 93,
+      "monotonic_ns": 1938015975867548,
+      "pid": 3662602
+    }
+  ]
+}

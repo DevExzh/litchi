@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/peak-rss-kib.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--xlsx-shape",
+    "medium",
+    "--warmup",
+    "3",
+    "--samples",
+    "200",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0888/runs/01-after/producer.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0887",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T16:46:46.868258+00:00",
+  "launcher_pid": 3652784,
+  "plan_sha256": "aa41b23a4d1dd2ff9f12a0810ae91817e13e8ed60529f4a6554d93c656e33a9c",
+  "row": {
+    "block": 0,
+    "ordinal": 1,
+    "role": "after"
+  },
+  "started_utc": "2026-10-03T16:46:45.890423+00:00"
+}

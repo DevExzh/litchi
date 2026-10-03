@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "children": 8,
+  "fields_compared": [
+    "row",
+    "gnu_time_peak_rss_kib",
+    "snapshot_count",
+    "sampled_max",
+    "snapshots",
+    "first_snapshot",
+    "last_snapshot"
+  ],
+  "role_summaries_identical": true,
+  "capture_repeated": false,
+  "compressed_export_sha256": {
+    "analysis-v1.json.gz": "259b71d61cbe9a4579285c5574413e40822411175fa21c912e748d9d4ebb28fd",
+    "analysis.json.gz": "8058927db2e9c4947a80e36b3d56975a10dd70bf11676e4fbac25c7981776eba"
+  }
+}

@@ -1,0 +1,719 @@
+{
+  "copy_probe": {
+    "children": [
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2524,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17476,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1540,
+          "rss_kib": 21748,
+          "stack_rss_kib": 636
+        },
+        "gnu_time_peak_rss_kib": 21796,
+        "row": {
+          "block": 0,
+          "ordinal": 0,
+          "role": "before-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2524,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17476,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1540,
+          "rss_kib": 21748,
+          "stack_rss_kib": 636
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2572,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 19752,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1596,
+          "rss_kib": 24080,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 24132,
+        "row": {
+          "block": 0,
+          "ordinal": 1,
+          "role": "after-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2572,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 19752,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1596,
+          "rss_kib": 24080,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 90
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2732,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15620,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1752,
+          "rss_kib": 20104,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 19684,
+        "row": {
+          "block": 0,
+          "ordinal": 2,
+          "role": "before-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2732,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15620,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1752,
+          "rss_kib": 20104,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 90
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2576,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15180,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1604,
+          "rss_kib": 19512,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 19368,
+        "row": {
+          "block": 0,
+          "ordinal": 3,
+          "role": "after-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2576,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15180,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1604,
+          "rss_kib": 19512,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 93
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2672,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20428,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1700,
+          "rss_kib": 24856,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 24552,
+        "row": {
+          "block": 1,
+          "ordinal": 4,
+          "role": "after-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2672,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20428,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1700,
+          "rss_kib": 24856,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 89
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2644,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15508,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1668,
+          "rss_kib": 19904,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 19756,
+        "row": {
+          "block": 1,
+          "ordinal": 5,
+          "role": "before-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2644,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15508,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1668,
+          "rss_kib": 19904,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2660,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15180,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1688,
+          "rss_kib": 19596,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 19432,
+        "row": {
+          "block": 1,
+          "ordinal": 6,
+          "role": "after-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2660,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15180,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1688,
+          "rss_kib": 19596,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 94
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2604,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17780,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1628,
+          "rss_kib": 22144,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 21908,
+        "row": {
+          "block": 1,
+          "ordinal": 7,
+          "role": "before-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2604,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17780,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1628,
+          "rss_kib": 22144,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2684,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15556,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1708,
+          "rss_kib": 19992,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 19740,
+        "row": {
+          "block": 2,
+          "ordinal": 8,
+          "role": "before-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2684,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15556,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1708,
+          "rss_kib": 19992,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 92
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2532,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15180,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1556,
+          "rss_kib": 19468,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 19176,
+        "row": {
+          "block": 2,
+          "ordinal": 9,
+          "role": "after-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2532,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15180,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1556,
+          "rss_kib": 19468,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2700,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17452,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1716,
+          "rss_kib": 21900,
+          "stack_rss_kib": 636
+        },
+        "gnu_time_peak_rss_kib": 21644,
+        "row": {
+          "block": 2,
+          "ordinal": 10,
+          "role": "before-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2700,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17452,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1716,
+          "rss_kib": 21900,
+          "stack_rss_kib": 636
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2672,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20336,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1696,
+          "rss_kib": 24760,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 24584,
+        "row": {
+          "block": 2,
+          "ordinal": 11,
+          "role": "after-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2672,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20336,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1696,
+          "rss_kib": 24760,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 89
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2600,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15436,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1620,
+          "rss_kib": 19792,
+          "stack_rss_kib": 636
+        },
+        "gnu_time_peak_rss_kib": 19624,
+        "row": {
+          "block": 3,
+          "ordinal": 12,
+          "role": "after-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2600,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 15436,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1620,
+          "rss_kib": 19792,
+          "stack_rss_kib": 636
+        },
+        "snapshots": 93
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2684,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17644,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1704,
+          "rss_kib": 22080,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 21828,
+        "row": {
+          "block": 3,
+          "ordinal": 13,
+          "role": "before-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2684,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17644,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1704,
+          "rss_kib": 22080,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 90
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2660,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20804,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1688,
+          "rss_kib": 25220,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 24992,
+        "row": {
+          "block": 3,
+          "ordinal": 14,
+          "role": "after-original"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2660,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20804,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1688,
+          "rss_kib": 25220,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 90
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2644,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15748,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1664,
+          "rss_kib": 20152,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 19948,
+        "row": {
+          "block": 3,
+          "ordinal": 15,
+          "role": "before-copy"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2644,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 15748,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1664,
+          "rss_kib": 20152,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 90
+      }
+    ],
+    "copy_binaries_required_for_replay": false,
+    "packet": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe",
+    "plan_sha256": "fdd3e67694543a136d96622da6182b65e64ab54f003ec3cf455d4f981da8ede4",
+    "scope": "Sampled mapping maxima remain separate from GNU time high-water; no latency or adoption claim.",
+    "semantics_pass": true,
+    "status": "pass"
+  },
+  "initial": {
+    "children": [
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2680,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17596,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1700,
+          "rss_kib": 22028,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 21724,
+        "row": {
+          "block": 0,
+          "ordinal": 0,
+          "role": "before"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2680,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17596,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1700,
+          "rss_kib": 22028,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2524,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20148,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1548,
+          "rss_kib": 24436,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 24280,
+        "row": {
+          "block": 0,
+          "ordinal": 1,
+          "role": "after"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2524,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20148,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1548,
+          "rss_kib": 24436,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 90
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2556,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20668,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1584,
+          "rss_kib": 24976,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 24852,
+        "row": {
+          "block": 1,
+          "ordinal": 2,
+          "role": "after"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2560,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20668,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1584,
+          "rss_kib": 24976,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 90
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2756,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17780,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1776,
+          "rss_kib": 22260,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 22204,
+        "row": {
+          "block": 1,
+          "ordinal": 3,
+          "role": "before"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2756,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17780,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1776,
+          "rss_kib": 22260,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2688,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 16060,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1712,
+          "rss_kib": 20484,
+          "stack_rss_kib": 628
+        },
+        "gnu_time_peak_rss_kib": 20368,
+        "row": {
+          "block": 2,
+          "ordinal": 4,
+          "role": "before"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2688,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 16060,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1712,
+          "rss_kib": 20484,
+          "stack_rss_kib": 628
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2488,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20336,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1512,
+          "rss_kib": 24588,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 24340,
+        "row": {
+          "block": 2,
+          "ordinal": 5,
+          "role": "after"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2488,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 20336,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1512,
+          "rss_kib": 24588,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2588,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 19424,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1612,
+          "rss_kib": 23772,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 23680,
+        "row": {
+          "block": 3,
+          "ordinal": 6,
+          "role": "after"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2588,
+          "exe_anonymous_kib": 244,
+          "exe_rss_kib": 19424,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1612,
+          "rss_kib": 23772,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 91
+      },
+      {
+        "at_sampled_total_rss_peak": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2580,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17396,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1600,
+          "rss_kib": 21700,
+          "stack_rss_kib": 632
+        },
+        "gnu_time_peak_rss_kib": 21564,
+        "row": {
+          "block": 3,
+          "ordinal": 7,
+          "role": "before"
+        },
+        "sampled_maxima_separate_not_simultaneous": {
+          "anon_huge_pages_kib": 0,
+          "anonymous_kib": 2580,
+          "exe_anonymous_kib": 248,
+          "exe_rss_kib": 17396,
+          "file_pmd_mapped_kib": 0,
+          "heap_rss_kib": 1600,
+          "rss_kib": 21700,
+          "stack_rss_kib": 632
+        },
+        "snapshots": 91
+      }
+    ],
+    "copy_binaries_required_for_replay": false,
+    "packet": "/home/zhuhe/code/litchi/docs/performance/results/change-0888",
+    "plan_sha256": "aa41b23a4d1dd2ff9f12a0810ae91817e13e8ed60529f4a6554d93c656e33a9c",
+    "scope": "Sampled mapping maxima remain separate from GNU time high-water; no latency or adoption claim.",
+    "semantics_pass": true,
+    "status": "pass"
+  },
+  "status": "pass"
+}

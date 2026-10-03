@@ -1,0 +1,12 @@
+{
+  "children": 8,
+  "latency_claim": null,
+  "measured_iterations": 1600,
+  "plan": {
+    "bytes": 3813,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/plan.json",
+    "sha256": "aa41b23a4d1dd2ff9f12a0810ae91817e13e8ed60529f4a6554d93c656e33a9c"
+  },
+  "status": "pass",
+  "warmups": 24
+}

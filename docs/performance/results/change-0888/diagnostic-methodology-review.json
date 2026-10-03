@@ -1,0 +1,100 @@
+{
+  "blockers": [],
+  "builds_run_by_reviewer": false,
+  "custody": {
+    "current_monitor_descriptor_is_bound_above": true,
+    "monitor_capture": {
+      "bytes": 316,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/capture.json",
+      "sha256": "6f8383c03f42edec788562777c005b04c6e52083d5628d4ff8bbfd65e661ec15"
+    },
+    "previous_rss_audit": {
+      "bytes": 11021,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/rss-static-audit.json",
+      "sha256": "1eafdb782f714a5cbfab4d2f780a7b2a8f88458b05fa2c5f6f8185ff04b520bd"
+    },
+    "previous_rss_audit_monitor_descriptor_is_stale": true
+  },
+  "limitations": [
+    "Copying and pre-capture SHA reads do not evict page cache; cache histories remain a confounder.",
+    "Live /proc polling is non-atomic, can miss process exit or transient peaks, and perturbs execution.",
+    "No exclusive-host guarantee; results remain diagnostic evidence and cannot establish causation alone."
+  ],
+  "method": {
+    "child_cpu": "12",
+    "child_cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0887",
+    "children": 16,
+    "claim_scope": "mapping/inode RSS diagnosis only; no latency or adoption claim",
+    "identity_checks_before_capture": [
+      "retained source SHA-256 equals 0887 plan native identity",
+      "shutil.copy2 writes ordinary fresh files under /tmp/litchi-0888-copies",
+      "source and copy device/inode pairs differ",
+      "source and copy SHA-256, size, and permission bits match",
+      "owner marker .owner-0888 is written in scratch"
+    ],
+    "measured_iterations": 3200,
+    "observations": "external GNU time peak RSS plus sampled executable-child /proc status/smaps snapshots",
+    "observer_affinity": [
+      13
+    ],
+    "samples": 200,
+    "schedule": "four variants across four rotated Latin blocks",
+    "semantic_gate": "reuse 0887 primary corpus/report/producer validation; fail-fast with no retries or replacements",
+    "source_files": [
+      "retained 0885 native binary",
+      "retained 0887 native binary"
+    ],
+    "variants": [
+      "before-original",
+      "after-original",
+      "before-copy",
+      "after-copy"
+    ],
+    "warmup": 3,
+    "warmup_iterations": 48
+  },
+  "schema": "litchi.copy-mapping-diagnostic-methodology-review-0888.v1",
+  "scripts": {
+    "copy_probe": {
+      "bytes": 7348,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy_probe.py",
+      "sha256": "9b04355f40883b7819b7cb1ace93eb083bf3dadf549617fda61b792e4e4e14a8"
+    },
+    "monitor": {
+      "bytes": 6363,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/monitor.py",
+      "sha256": "4e102f70716a65af1097f5c50ab9dc5ed4d24ae49e5dc65677c9ba9ab29236d0"
+    },
+    "plan": {
+      "bytes": 3813,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/plan.json",
+      "sha256": "aa41b23a4d1dd2ff9f12a0810ae91817e13e8ed60529f4a6554d93c656e33a9c"
+    }
+  },
+  "static_checks": {
+    "copy_probe_ast": "pass",
+    "copy_probe_paths_absent_at_review": {
+      "packet_copy_probe_dir": true,
+      "scratch": true
+    },
+    "monitor_ast": "pass",
+    "target_execution": "not run by reviewer"
+  },
+  "status": "static_review_pass",
+  "strengths": [
+    "Byte-identical copies with fresh inodes separate executable file identity from retained original inode history.",
+    "Rotated four-way order reduces fixed position confounding while retaining paired variants.",
+    "The same child CPU, observer CPU, warmups, samples, command, semantic corpus, and raw snapshot method apply to all variants."
+  ],
+  "workloads_run_by_reviewer": false
+}

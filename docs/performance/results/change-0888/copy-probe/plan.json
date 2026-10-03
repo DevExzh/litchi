@@ -1,0 +1,218 @@
+{
+  "binaries": {
+    "after-copy": {
+      "bytes": 264488120,
+      "path": "/tmp/litchi-0888-copies/after",
+      "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+    },
+    "after-original": {
+      "bytes": 264488120,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+      "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+    },
+    "before-copy": {
+      "bytes": 264440648,
+      "path": "/tmp/litchi-0888-copies/before",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "before-original": {
+      "bytes": 264440648,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    }
+  },
+  "cache_preparation": "Complete SHA-256 reads of all four files before capture; no cache eviction or exclusive-host guarantee.",
+  "case": "xlsx_producer_medium_source_full_cell_scan",
+  "child_cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0887",
+  "copy_proof": {
+    "after": {
+      "copy": {
+        "bytes": 264488120,
+        "path": "/tmp/litchi-0888-copies/after",
+        "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+      },
+      "copy_device_inode": [
+        36,
+        18833836
+      ],
+      "mechanism": "shutil.copy2 into new ordinary file; no hard link",
+      "mode": 509,
+      "source": {
+        "bytes": 264488120,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+        "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+      },
+      "source_device_inode": [
+        66305,
+        35196353
+      ]
+    },
+    "before": {
+      "copy": {
+        "bytes": 264440648,
+        "path": "/tmp/litchi-0888-copies/before",
+        "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+      },
+      "copy_device_inode": [
+        36,
+        18833835
+      ],
+      "mechanism": "shutil.copy2 into new ordinary file; no hard link",
+      "mode": 509,
+      "source": {
+        "bytes": 264440648,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+        "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+      },
+      "source_device_inode": [
+        66305,
+        31864761
+      ]
+    }
+  },
+  "cpu": "12",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "frozen_utc": "2026-10-03T16:52:30.545314+00:00",
+  "helpers": [
+    {
+      "bytes": 7348,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy_probe.py",
+      "sha256": "9b04355f40883b7819b7cb1ace93eb083bf3dadf549617fda61b792e4e4e14a8"
+    },
+    {
+      "bytes": 22587,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/experiment.py",
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    {
+      "bytes": 23498,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/verify.py",
+      "sha256": "f4de053621d078e249c5d549eeba2ebab1a4b0b7e58edeb5c952c2bbf1980fb9"
+    },
+    {
+      "bytes": 17203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture.py",
+      "sha256": "f751f1d5dd367b856f3e83b03d360dd86c99c33d3d1c0ebd7e8305575a63a27f"
+    }
+  ],
+  "no_retries_or_replacements": true,
+  "observer_affinity": [
+    13
+  ],
+  "poll_interval_seconds": 0.01,
+  "previous_plan": {
+    "bytes": 43333,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/plan.json",
+    "sha256": "4199d8bd59d9271bf2d47cca2a5486a5860ea3d0833061f2e32ca8c5d7ee3383"
+  },
+  "rows": [
+    {
+      "block": 0,
+      "ordinal": 0,
+      "role": "before-original"
+    },
+    {
+      "block": 0,
+      "ordinal": 1,
+      "role": "after-original"
+    },
+    {
+      "block": 0,
+      "ordinal": 2,
+      "role": "before-copy"
+    },
+    {
+      "block": 0,
+      "ordinal": 3,
+      "role": "after-copy"
+    },
+    {
+      "block": 1,
+      "ordinal": 4,
+      "role": "after-original"
+    },
+    {
+      "block": 1,
+      "ordinal": 5,
+      "role": "before-copy"
+    },
+    {
+      "block": 1,
+      "ordinal": 6,
+      "role": "after-copy"
+    },
+    {
+      "block": 1,
+      "ordinal": 7,
+      "role": "before-original"
+    },
+    {
+      "block": 2,
+      "ordinal": 8,
+      "role": "before-copy"
+    },
+    {
+      "block": 2,
+      "ordinal": 9,
+      "role": "after-copy"
+    },
+    {
+      "block": 2,
+      "ordinal": 10,
+      "role": "before-original"
+    },
+    {
+      "block": 2,
+      "ordinal": 11,
+      "role": "after-original"
+    },
+    {
+      "block": 3,
+      "ordinal": 12,
+      "role": "after-copy"
+    },
+    {
+      "block": 3,
+      "ordinal": 13,
+      "role": "before-original"
+    },
+    {
+      "block": 3,
+      "ordinal": 14,
+      "role": "after-original"
+    },
+    {
+      "block": 3,
+      "ordinal": 15,
+      "role": "before-copy"
+    }
+  ],
+  "samples": 200,
+  "schema": "litchi.copy-mapping-diagnostic-0888.v1",
+  "scope": "Fresh-inode byte-identical copies versus originals in four rotated Latin-square blocks. Non-atomic live /proc snapshots and GNU time maximum RSS. Different file/cache histories remain; no latency or adoption claim.",
+  "scratch": "/tmp/litchi-0888-copies",
+  "source_head": "b1f142e1f994f05306d656645e492ded0069c4d8",
+  "tools": [
+    {
+      "bytes": 27232,
+      "path": "/usr/bin/time",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"
+    },
+    {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    }
+  ],
+  "warmup": 3
+}

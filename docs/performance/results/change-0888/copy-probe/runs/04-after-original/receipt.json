@@ -1,0 +1,52 @@
+{
+  "files": {
+    "command.json": {
+      "bytes": 1271,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/command.json",
+      "sha256": "d33b2f366bf6403c28e1f41a28a362a10c7d9efee76380af6addfcdce0d0ec81"
+    },
+    "observations.json": {
+      "bytes": 16588,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/observations.json",
+      "sha256": "8c9fdb0fae319311cc7b2ce61b62ff1fe9e6ce4e331de1694ebb930576929570"
+    },
+    "peak-rss-kib.txt": {
+      "bytes": 6,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/peak-rss-kib.txt",
+      "sha256": "a0d61215388671d670046547484d9e42102b0176bd8499648d1026666f498dad"
+    },
+    "producer.json": {
+      "bytes": 7376,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/producer.json",
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "report.json": {
+      "bytes": 119016,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/report.json",
+      "sha256": "2ea1ebaf8384995ba601604556fa183a788b77ec42b956b65109e6ae3a0c1827"
+    },
+    "snapshots.jsonl.gz": {
+      "bytes": 144638,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/snapshots.jsonl.gz",
+      "sha256": "fc6c0bfa7e7cadf72fbc1f6f07c0326493f8ae3d0126db9bdedeeeccbd5858a3"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/04-after-original/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "peak_rss_kib": 24552,
+  "row": {
+    "block": 1,
+    "ordinal": 4,
+    "role": "after-original"
+  },
+  "snapshots": 89,
+  "status": "pass"
+}

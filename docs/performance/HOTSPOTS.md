@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0888 — executable residency and MCE control audit
+
+[0888](0888-executable-residency-and-mce-controls.md) separates the 0887 process-RSS flags from a claimed library heap regression: identical executable bytes under different file/loading conditions produce materially different peaks, mainly in executable-file mappings. Future RSS reviews need equal-content execution-file controls and separate anonymous/file evidence. A static MCE audit identifies real producer parts, boundary cases, incomplete timing oracles, and differential skip handling to qualify before the next candidate.
+
 ## 0887 — MCE inline attribute candidate rejected
 
 [0887](0887-mce-inline-attribute-storage.md) rejects inline-four MCE attribute storage: 4,255 fewer allocation calls per primary scan do not produce a useful native p50 improvement, and process-RSS flags remain unresolved in every scenario. The patch is retained as rejected evidence, not adopted complexity. Qualify representative MCE parsing controls and investigate repeated name expansion next; the 0886 profile still motivates MCE work.

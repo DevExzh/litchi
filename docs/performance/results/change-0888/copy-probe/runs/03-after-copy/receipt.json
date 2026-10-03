@@ -1,0 +1,52 @@
+{
+  "files": {
+    "command.json": {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/command.json",
+      "sha256": "064097aa06983c5d4b6bcaab08d50cc48947fcc580e7d05992e2c3773dc9bb59"
+    },
+    "observations.json": {
+      "bytes": 12961,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/observations.json",
+      "sha256": "248a3763128ff00643e45158e2911dc32f3e234e33edc26d1da6131f0c2d673d"
+    },
+    "peak-rss-kib.txt": {
+      "bytes": 6,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/peak-rss-kib.txt",
+      "sha256": "9669ab2fca270b16c4e0aea32175843bc0f32eb29d70acb3be1e618af0868d73"
+    },
+    "producer.json": {
+      "bytes": 7376,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/producer.json",
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "report.json": {
+      "bytes": 118951,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/report.json",
+      "sha256": "cf841c3875a975a4176479eacb4b4e61694a458b7b76bfee390054f0b521e4bc"
+    },
+    "snapshots.jsonl.gz": {
+      "bytes": 149494,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/snapshots.jsonl.gz",
+      "sha256": "ddb3677e66f352b384e695f1a7fbe337d0bc29240051645885fb2420d4036070"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0888/copy-probe/runs/03-after-copy/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "peak_rss_kib": 19368,
+  "row": {
+    "block": 0,
+    "ordinal": 3,
+    "role": "after-copy"
+  },
+  "snapshots": 93,
+  "status": "pass"
+}

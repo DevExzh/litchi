@@ -1,0 +1,33 @@
+{
+  "analysis_v1_note": "Compressed byte-for-byte from the first plain analysis.json before the final reader tightening/export revision; its decompressed bytes were verified before the plain duplicate was removed.",
+  "artifacts": {
+    "analysis_final": {
+      "bytes": 76809,
+      "decompressed_bytes": 5870217,
+      "decompressed_sha256": "7b628288097ea14a6ef6c63aa67a56865604128a7350620e964a3cf2fcb99f99",
+      "path": "docs/performance/results/change-0888/analysis.json.gz",
+      "sha256": "8058927db2e9c4947a80e36b3d56975a10dd70bf11676e4fbac25c7981776eba"
+    },
+    "analysis_v1": {
+      "bytes": 76665,
+      "decompressed_bytes": 5869466,
+      "decompressed_sha256": "39083cfa3c5cc0202473c2c47d280b7c4a5dbb48720e9830cbf14f9227f3e369",
+      "origin_uncompressed_removed": true,
+      "origin_uncompressed_sha256": "39083cfa3c5cc0202473c2c47d280b7c4a5dbb48720e9830cbf14f9227f3e369",
+      "path": "docs/performance/results/change-0888/analysis-v1.json.gz",
+      "sha256": "259b71d61cbe9a4579285c5574413e40822411175fa21c912e748d9d4ebb28fd"
+    }
+  },
+  "gzip_writer": {
+    "compresslevel": 9,
+    "filename_header": "",
+    "mtime": 0
+  },
+  "packet": "change-0888",
+  "reader": {
+    "bytes": 20654,
+    "path": "docs/performance/results/change-0888/analyze.py",
+    "sha256": "3e60da0b112bc47ee0facf60ad6e8037f6ec96dbe28637fc8832bae938317256"
+  },
+  "schema": "litchi.live-mapping-analysis-export-0888.v1"
+}

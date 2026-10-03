@@ -1,0 +1,57 @@
+{
+  "build_directories_created": 0,
+  "copies_verified_before_removal": [
+    {
+      "copy": {
+        "bytes": 264488120,
+        "path": "/tmp/litchi-0888-copies/after",
+        "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+      },
+      "copy_device_inode": [
+        36,
+        18833836
+      ],
+      "mechanism": "shutil.copy2 into new ordinary file; no hard link",
+      "mode": 509,
+      "source": {
+        "bytes": 264488120,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/binaries/native",
+        "sha256": "8a376585276a646e2c2b5853aebd445f916f39fce7c25fd1238247394cbcb436"
+      },
+      "source_device_inode": [
+        66305,
+        35196353
+      ]
+    },
+    {
+      "copy": {
+        "bytes": 264440648,
+        "path": "/tmp/litchi-0888-copies/before",
+        "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+      },
+      "copy_device_inode": [
+        36,
+        18833835
+      ],
+      "mechanism": "shutil.copy2 into new ordinary file; no hard link",
+      "mode": 509,
+      "source": {
+        "bytes": 264440648,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+        "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+      },
+      "source_device_inode": [
+        66305,
+        31864761
+      ]
+    }
+  ],
+  "finished_utc": "2026-10-03T16:59:00.495074+00:00",
+  "removed_owned_paths": [
+    "/tmp/litchi-0888-copies"
+  ],
+  "retained_original_binaries_unchanged": true,
+  "scope": "Only marked temporary executable copies removed. Original binaries, captures, source archives, and unrelated worktrees retained.",
+  "status": "pass",
+  "worktrees_created": 0
+}
