@@ -155,6 +155,12 @@
         "bytes": 7951,
         "mode": 436,
         "sha256": "8ef4eba9f5eb4f56c987063c1bc0158a75d7e88be74d931995411e79cdcbbfb8"
+      },
+      {
+        "path": "docs/performance/results/change-0894/staging-whitespace-check.json",
+        "bytes": 38714,
+        "mode": 436,
+        "sha256": "2587ffdd2ae89ec21f2bef9f066b66fea5fd5a2514907a75214167271ed21ca0"
       }
     ]
   },
@@ -337,6 +343,15 @@
     "current_0894_entries_have_no_pending_or_being_written_language": true,
     "final_review_and_decision_links_resolve": true,
     "unrelated_dirty_worktrees_preserved_is_stated": true
+  },
+  "staging_review": {
+    "path": "docs/performance/results/change-0894/staging-whitespace-check.json",
+    "schema": "litchi.0894-staging-whitespace-check.v1",
+    "status": "pass",
+    "scoped_exit_code": 0,
+    "immutable_evidence_warning_count": 348,
+    "source_and_docs_warnings": 0,
+    "sealed_diff_context_and_verbatim_log_warnings_preserved": true
   },
   "source_state": {
     "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
