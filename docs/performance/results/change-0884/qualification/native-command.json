@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "cargo",
+    "run",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "-j",
+    "2",
+    "--bin",
+    "litchi-perf-baseline",
+    "--",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "1",
+    "--samples",
+    "3",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native-producer.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:24:18.107773+00:00",
+  "purpose": "debug-profile semantic/report qualification only",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:24:56.950196+00:00",
+  "output_sha256": "599e3465721816e4c25a63cec4fa2b421dfef59461632a8a2553cf6db93704f4"
+}

@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--all-features",
+    "--all-targets",
+    "-j",
+    "2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:22:11.529229+00:00",
+  "exit_code": 101,
+  "finished_utc": "2026-10-03T15:22:24.681883+00:00",
+  "output_sha256": "2709e253a0a098b9b2369ec1cfe7c48cf68eb8cdfb9d45cb7c1b93db23bfb966"
+}

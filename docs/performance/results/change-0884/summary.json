@@ -1,0 +1,25 @@
+{
+  "base_revision": "c83595e36368296e8751461d50589852816ea186",
+  "default_matrix_changed": false,
+  "focused_tests_passed": 4,
+  "next_step": "Fresh release-profile baseline on the committed source before testing any x14ac production candidate.",
+  "performance_claim": null,
+  "production_changes": false,
+  "qualification_measured_samples": 6,
+  "qualification_profiles": [
+    "debug-native",
+    "debug-allocator"
+  ],
+  "quality_commands": [
+    "fmt",
+    "check",
+    "scan-tests",
+    "clippy"
+  ],
+  "schema": "litchi.producer-full-cell-harness-0884.v1",
+  "source_sha256": {
+    "tools/perf-baseline/src/lib.rs": "04ac6f200c59bc51cb7656c8979bc49031a9bd8f5bbf6c23748bd6e49bf99faf",
+    "tools/perf-baseline/src/producer_shape.rs": "8dc0a09d046dc44c3e29f820228b87eb4d3a4d2de63b1b67bf2e4d7cff6085de"
+  },
+  "status": "qualified"
+}

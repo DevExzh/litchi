@@ -1,0 +1,112 @@
+{
+  "timestamp_utc": "2026-10-03T15:23:19.839146+00:00",
+  "force_used": false,
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0761-before-src",
+      "head": "1d1044e3aca5437079fabdf458082a527842d997",
+      "retained_branches": [
+        "refs/heads/feat/office-format-completeness",
+        "refs/heads/fix/0774-xls-writer-integration",
+        "refs/heads/fix/0776-mce-expanded-duplicates",
+        "refs/heads/perf/0760-pptx-slide-root-memo-reapply",
+        "refs/heads/perf/0761-save-durability-policy",
+        "refs/heads/perf/0762-streaming-compression-and-leases",
+        "refs/heads/perf/0764-w1",
+        "refs/heads/perf/0764-w2",
+        "refs/heads/perf/0764-w3",
+        "refs/heads/perf/0764-w4",
+        "refs/heads/perf/0764-xml-attribute-dos-hardening",
+        "refs/heads/perf/0765-bom-prefixed-part-editing",
+        "refs/heads/perf/0766-xls-writer-length-fields",
+        "refs/heads/perf/0767-cfb-reparse-linear",
+        "refs/heads/perf/0768-doc-protection-classification",
+        "refs/heads/perf/0769-cfb-mini-sector-open-read-agreement",
+        "refs/heads/perf/0770-quick-xml-fail-fast-attribute-checks",
+        "refs/heads/perf/0771-mce-stream-shared-namespace-names",
+        "refs/heads/perf/0773-durability-integration",
+        "refs/heads/perf/0775-mce-stream-integration"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0766-before-src",
+      "head": "1d1044e3aca5437079fabdf458082a527842d997",
+      "retained_branches": [
+        "refs/heads/feat/office-format-completeness",
+        "refs/heads/fix/0774-xls-writer-integration",
+        "refs/heads/fix/0776-mce-expanded-duplicates",
+        "refs/heads/perf/0760-pptx-slide-root-memo-reapply",
+        "refs/heads/perf/0761-save-durability-policy",
+        "refs/heads/perf/0762-streaming-compression-and-leases",
+        "refs/heads/perf/0764-w1",
+        "refs/heads/perf/0764-w2",
+        "refs/heads/perf/0764-w3",
+        "refs/heads/perf/0764-w4",
+        "refs/heads/perf/0764-xml-attribute-dos-hardening",
+        "refs/heads/perf/0765-bom-prefixed-part-editing",
+        "refs/heads/perf/0766-xls-writer-length-fields",
+        "refs/heads/perf/0767-cfb-reparse-linear",
+        "refs/heads/perf/0768-doc-protection-classification",
+        "refs/heads/perf/0769-cfb-mini-sector-open-read-agreement",
+        "refs/heads/perf/0770-quick-xml-fail-fast-attribute-checks",
+        "refs/heads/perf/0771-mce-stream-shared-namespace-names",
+        "refs/heads/perf/0773-durability-integration",
+        "refs/heads/perf/0775-mce-stream-integration"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0766-xls-writer-length-fields",
+      "head": "d9bec8ef2bc974d72fa70c389a8c7d7e418762c2",
+      "retained_branches": [
+        "refs/heads/perf/0766-xls-writer-length-fields"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0771-mce-stream-shared-namespace-names",
+      "head": "6154a063984dc4076ecb7738137a309cc116534d",
+      "retained_branches": [
+        "refs/heads/perf/0771-mce-stream-shared-namespace-names"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0770-before-src",
+      "head": "c81b7bbea7b026b4a138d9394bac64c7885b5d9b",
+      "retained_tag": "archive/performance/0770-before-src",
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0771-before-src",
+      "head": "563cf6f3b90fddb240f1e621a666f929a54584da",
+      "retained_tag": "archive/performance/0771-before-src",
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0771-preid-src",
+      "head": "bdea6e8b86d2acec6dcc37788b9c844858590c63",
+      "retained_tag": "archive/performance/0771-preid-src",
+      "exit_code": 0,
+      "stderr": "",
+      "absent": true
+    }
+  ],
+  "retained_for_review": [
+    "0761-save-durability-policy: untracked evidence",
+    "0770-quick-xml-fail-fast-attribute-checks: modified tracked files and untracked evidence"
+  ]
+}

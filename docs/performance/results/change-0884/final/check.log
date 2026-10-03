@@ -1,0 +1,75 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error[E0433]: cannot find module or crate `producer_shape` in this scope
+     --> src/lib.rs:62329:18
+      |
+62329 |             Some(producer_shape::Scenario::FullCellScan)
+      |                  ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `producer_shape`
+      |
+note: enum `crate::pptx_cache_retention::Scenario` exists but is inaccessible
+     --> src/pptx_cache_retention.rs:39:1
+      |
+   39 | enum Scenario {
+      | ^^^^^^^^^^^^^ not accessible
+help: to make use of source file src/producer_shape.rs, use `mod producer_shape` in this file to declare the module
+      |
+    9 + mod producer_shape;
+      |
+help: consider importing one of these enums
+      |
+61014 +     use crate::facade_ole2::Scenario;
+      |
+61014 +     use crate::marker_shape::Scenario;
+      |
+61014 +     use crate::ole2_range_source::Scenario;
+      |
+61014 +     use crate::producer_shape::Scenario;
+      |
+help: if you import `Scenario`, refer to it directly
+      |
+62329 -             Some(producer_shape::Scenario::FullCellScan)
+62329 +             Some(Scenario::FullCellScan)
+      |
+
+error[E0433]: cannot find module or crate `producer_shape` in this scope
+     --> src/lib.rs:62334:17
+      |
+62334 |                 producer_shape::XlsxProducerShape::Medium,
+      |                 ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `producer_shape`
+      |
+help: to make use of source file src/producer_shape.rs, use `mod producer_shape` in this file to declare the module
+      |
+    9 + mod producer_shape;
+      |
+help: consider importing this enum
+      |
+61014 +     use crate::producer_shape::XlsxProducerShape;
+      |
+help: if you import `XlsxProducerShape`, refer to it directly
+      |
+62334 -                 producer_shape::XlsxProducerShape::Medium,
+62334 +                 XlsxProducerShape::Medium,
+      |
+
+error[E0433]: cannot find module or crate `producer_shape` in this scope
+     --> src/lib.rs:62335:17
+      |
+62335 |                 producer_shape::XlsxProducerVariant::Read
+      |                 ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `producer_shape`
+      |
+help: to make use of source file src/producer_shape.rs, use `mod producer_shape` in this file to declare the module
+      |
+    9 + mod producer_shape;
+      |
+help: consider importing this enum
+      |
+61014 +     use crate::producer_shape::XlsxProducerVariant;
+      |
+help: if you import `XlsxProducerVariant`, refer to it directly
+      |
+62335 -                 producer_shape::XlsxProducerVariant::Read
+62335 +                 XlsxProducerVariant::Read
+      |
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `litchi-perf-baseline` (lib test) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

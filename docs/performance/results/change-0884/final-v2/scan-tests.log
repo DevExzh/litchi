@@ -1,0 +1,12 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.60s
+     Running unittests src/lib.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-8fb54a160ae47866)
+
+running 4 tests
+test tests::producer_full_cell_scan_selector_is_explicit_only ... ok
+test producer_shape::tests::producer_full_cell_scan_rejects_incomplete_duplicate_and_out_of_order_callbacks ... ok
+test producer_shape::tests::producer_full_cell_oracle_binds_the_reviewed_medium_read_contract ... ok
+test producer_shape::tests::producer_full_cell_scan_runner_visits_every_stored_cell ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 575 filtered out; finished in 0.48s
+

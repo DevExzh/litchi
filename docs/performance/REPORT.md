@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0884 — qualify producer XLSX full-cell scanning
+
+[0884](0884-producer-full-cell-scan-harness.md) adds an explicit generated-producer scan across 4,096 stored cells with a fixed ordered-value oracle and post-timer source/tolerance checks. Four focused tests and normal/allocator debug report qualification pass. Production, corpus generation, and the default matrix are unchanged. A fresh release baseline is next; no performance improvement is claimed. Seven completed performance worktrees and applied agent patch files were cleaned.
+
 ## 0883 — restore report-aware benchmark metadata oracles
 
 [0883](0883-report-aware-metadata-oracles.md) repairs two harness calls removed by the core-properties API migration. Reported metadata repairs now reject deterministic oracle input. All-feature/all-target compilation, focused metadata and fresh-process filesystem tests, formatting, and warning-denied harness Clippy pass. Production and timer boundaries are unchanged; no new baseline or speedup is claimed.

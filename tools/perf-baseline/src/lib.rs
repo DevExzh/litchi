@@ -1404,6 +1404,7 @@ enum Case {
     XlsxBytesOpenLifecycle,
     XlsxProducerMediumSourceOpen,
     XlsxProducerMediumSourceSelectedCell,
+    XlsxProducerMediumSourceFullCellScan,
     XlsxProducerMediumSourcePlanning,
     XlsxProducerMediumSourceOneEditSave,
     XlsxProducerDenseSourceOpen,
@@ -2095,6 +2096,9 @@ impl Case {
             Self::XlsxProducerMediumSourceOpen => "xlsx_producer_medium_source_open",
             Self::XlsxProducerMediumSourceSelectedCell => {
                 "xlsx_producer_medium_source_selected_cell"
+            },
+            Self::XlsxProducerMediumSourceFullCellScan => {
+                "xlsx_producer_medium_source_full_cell_scan"
             },
             Self::XlsxProducerMediumSourcePlanning => "xlsx_producer_medium_source_planning",
             Self::XlsxProducerMediumSourceOneEditSave => {
@@ -3741,6 +3745,9 @@ impl Case {
             | Self::XlsxProducerMediumControlSelectedCell
             | Self::XlsxProducerDenseControlSelectedCell
             | Self::XlsxRealFileSourceSelectedCell => Some(producer_shape::Scenario::SelectedCell),
+            Self::XlsxProducerMediumSourceFullCellScan => {
+                Some(producer_shape::Scenario::FullCellScan)
+            },
             Self::XlsxProducerMediumSourcePlanning
             | Self::XlsxProducerDenseSourcePlanning
             | Self::XlsxProducerMediumControlPlanning
@@ -3769,9 +3776,9 @@ impl Case {
     )> {
         use producer_shape::{XlsxProducerShape as Shape, XlsxProducerVariant as Variant};
         match self {
-            Self::XlsxProducerMediumSourceOpen | Self::XlsxProducerMediumSourceSelectedCell => {
-                Some((Shape::Medium, Variant::Read))
-            },
+            Self::XlsxProducerMediumSourceOpen
+            | Self::XlsxProducerMediumSourceSelectedCell
+            | Self::XlsxProducerMediumSourceFullCellScan => Some((Shape::Medium, Variant::Read)),
             Self::XlsxProducerMediumSourcePlanning | Self::XlsxProducerMediumSourceOneEditSave => {
                 Some((Shape::Medium, Variant::Edit))
             },
@@ -5491,6 +5498,8 @@ struct SourceSummary {
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    producer_full_cell_scan: Option<Box<producer_shape::ProducerFullCellScanSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xls: Option<XlsSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -13605,6 +13614,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_producer_medium_source_selected_cell" => {
             Some(Case::XlsxProducerMediumSourceSelectedCell)
         },
+        "xlsx_producer_medium_source_full_cell_scan" => {
+            Some(Case::XlsxProducerMediumSourceFullCellScan)
+        },
         "xlsx_producer_medium_source_planning" => Some(Case::XlsxProducerMediumSourcePlanning),
         "xlsx_producer_medium_source_one_edit_save" => {
             Some(Case::XlsxProducerMediumSourceOneEditSave)
@@ -14290,6 +14302,7 @@ fn usage_text() -> String {
                                        xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
                                        xlsx_producer_medium_source_open,\n\
                                        xlsx_producer_medium_source_selected_cell,\n\
+                                       xlsx_producer_medium_source_full_cell_scan,\n\
                                        xlsx_producer_medium_source_planning,\n\
                                        xlsx_producer_medium_source_one_edit_save,\n\
                                        xlsx_producer_dense_source_open,\n\
@@ -25369,6 +25382,7 @@ fn run_case_with_config(
         },
         Case::XlsxProducerMediumSourceOpen
         | Case::XlsxProducerMediumSourceSelectedCell
+        | Case::XlsxProducerMediumSourceFullCellScan
         | Case::XlsxProducerMediumSourcePlanning
         | Case::XlsxProducerMediumSourceOneEditSave
         | Case::XlsxProducerDenseSourceOpen
@@ -62276,7 +62290,7 @@ mod tests {
         // four provider-axis controls below are deliberately opt-in: they
         // increase the selectable registry without changing the default
         // cases or the separate default allocator contract.
-        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 533;
+        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 534;
         let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")
@@ -62304,6 +62318,25 @@ mod tests {
         ] {
             assert!(!Case::DEFAULT.contains(&case));
         }
+    }
+
+    #[test]
+    fn producer_full_cell_scan_selector_is_explicit_only() {
+        let case = Case::XlsxProducerMediumSourceFullCellScan;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert_eq!(
+            case.producer_shape_scenario(),
+            Some(crate::producer_shape::Scenario::FullCellScan)
+        );
+        assert_eq!(
+            case.producer_xlsx_corpus(),
+            Some((
+                crate::producer_shape::XlsxProducerShape::Medium,
+                crate::producer_shape::XlsxProducerVariant::Read
+            ))
+        );
+        assert!(!Case::DEFAULT.contains(&case));
+        assert_eq!(Case::DEFAULT.len(), 41);
     }
 
     #[test]

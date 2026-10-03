@@ -1,0 +1,15 @@
+{
+  "removed": [
+    {
+      "path": "/tmp/producer_scan_baseline_lib.apply.patch",
+      "sha256": "235680e3a7af36cc103ada947b9e98f97abeca5b7367391e30d7ee1e5f49c1ab",
+      "absent": true
+    },
+    {
+      "path": "/tmp/producer_scan_baseline_producer_shape.apply.patch",
+      "sha256": "9f72145fc11039ef2ccbba373334fefc39b9b50b8cf83f483edc3df5c3ca92d6",
+      "absent": true
+    }
+  ],
+  "reason": "Applied source is retained in the worktree and validated; assembly patches are no longer needed."
+}

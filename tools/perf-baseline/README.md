@@ -2837,6 +2837,15 @@ existing corpus identity):
   `xlsx_producer_dense_source_selected_cell`: one middle cell of the
   shared-strings worksheet. Opening the owner and resolving the worksheet are
   outside timing; only `SourceWorksheet::cell` is timed.
+- `xlsx_producer_medium_source_full_cell_scan`: fresh source-backed open,
+  worksheet enumeration, and ordered `Rect::ALL` visits across all four
+  32×32 sheets. The callback hashes every address, value type, and value;
+  the post-timer oracle requires exactly 4,096 cells (3,686 numbers and
+  410 strings) and a fixed canonical digest. Source construction, the extra
+  source-version check, tolerance-report validation, endpoint observations,
+  digest finalization/comparison, and handle destruction are outside timing.
+  This is an in-memory generated-producer workload; it is not a physical-cold
+  or native Office corpus claim. See [0884](../../docs/performance/0884-producer-full-cell-scan-harness.md).
 - `xlsx_producer_medium_source_planning` /
   `xlsx_producer_dense_source_planning`: exactly the interval
   `xlsx_planning_guard` measures — `SourceBackedEditor::edit_sheets` over the

@@ -32,12 +32,14 @@ use std::{
 
 use litchi_core::{OwnedSource, ReadAt};
 use serde::Serialize;
+use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 use crate::{
     Case, CaseResult, Corpus, CorpusManifest, CountingSink, SemanticShape, XlsxCorpus,
-    XlsxManifest, iteration_count, record_elapsed, semantic_docx_bytes, semantic_pptx_bytes,
-    sha256_hex, statistics, xlsx_source_layout,
+    XlsxManifest, allocation_metrics, elapsed_ns, iteration_count, operation_metrics,
+    process_metrics, record_elapsed, semantic_docx_bytes, semantic_pptx_bytes, sha256_hex,
+    statistics, xlsx_source_layout,
 };
 
 /// Generator identity of the producer-shape XLSX family.
@@ -49,6 +51,25 @@ pub(crate) const PPTX_PRODUCER_SHAPE_GENERATOR: &str = "litchi-pptx-producer-sha
 /// Generator identity used when `--real-file` supplies the bytes.  The family
 /// is deliberately distinct: nothing about such a corpus is generated.
 pub(crate) const XLSX_REAL_FILE_GENERATOR: &str = "litchi-xlsx-real-file-v1";
+
+/// Version tag for the canonical full-cell callback digest.  Changing the
+/// record framing or value tags requires a new version so retained evidence
+/// cannot be compared across schemas accidentally.
+const XLSX_PRODUCER_FULL_CELL_DIGEST_DOMAIN: &[u8] = b"litchi/xlsx/producer-full-cell-oracle\0";
+const XLSX_PRODUCER_FULL_CELL_DIGEST_VERSION: u8 = 1;
+const XLSX_PRODUCER_FULL_CELL_NUMERIC_TAG: u8 = 1;
+const XLSX_PRODUCER_FULL_CELL_TEXT_TAG: u8 = 2;
+const XLSX_PRODUCER_FULL_CELL_FIELD_BYTES: usize = 4 + 4 + 4 + 1 + 8;
+/// Reviewed output of the fixed producer-medium/read corpus.  These values
+/// are intentionally independent of the generator helpers below: changing a
+/// generator value or shared-string placement must fail the runtime oracle.
+const XLSX_PRODUCER_FULL_CELL_REVIEWED_COUNT: u64 = 4_096;
+const XLSX_PRODUCER_FULL_CELL_REVIEWED_NUMERIC_COUNT: u64 = 3_686;
+const XLSX_PRODUCER_FULL_CELL_REVIEWED_TEXT_COUNT: u64 = 410;
+const XLSX_PRODUCER_FULL_CELL_REVIEWED_DIGEST_SHA256: &str =
+    "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b";
+const XLSX_PRODUCER_FULL_CELL_TIMING_SCOPE: &str = "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; corpus/oracle preparation, archive and census hashes, digest comparison, harness source-version checks, process/allocation endpoint snapshots, handle retention, and drops are outside";
+const XLSX_PRODUCER_FULL_CELL_SOURCE_TYPE: &str = "owned_positional_read_at";
 
 /// Largest `--real-file` input this harness will read.  A caller-named file is
 /// still a bounded resource; the limit matches the XLSX planning guard's.
@@ -489,6 +510,44 @@ pub(crate) struct RealFileProvenance {
 pub(crate) struct ProducerCorpus {
     pub(crate) corpus: Corpus,
     pub(crate) evidence: ProducerEvidence,
+}
+
+/// Retained metadata for the opt-in producer-shaped full-cell scan.  The
+/// vectors are sorted to the same elapsed-time order as `Statistics`; the
+/// original retained sample identities remain explicit in `sample_indices`.
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ProducerFullCellScanSummary {
+    pub(crate) sample_indices: Vec<usize>,
+    pub(crate) implementation: &'static str,
+    pub(crate) scenario: &'static str,
+    pub(crate) generator: &'static str,
+    pub(crate) shape: &'static str,
+    pub(crate) variant: &'static str,
+    pub(crate) archive_sha256: String,
+    pub(crate) archive_bytes: u64,
+    pub(crate) expected_cell_count: u64,
+    pub(crate) observed_cell_counts: Vec<u64>,
+    pub(crate) expected_numeric_count: u64,
+    pub(crate) expected_text_count: u64,
+    pub(crate) observed_numeric_counts: Vec<u64>,
+    pub(crate) observed_text_counts: Vec<u64>,
+    pub(crate) oracle_digest_sha256: String,
+    pub(crate) observed_digest_sha256: Vec<String>,
+    pub(crate) marker_refusal_census_sha256: String,
+    pub(crate) worksheet_route_eligibility: Vec<ProducerWorksheetRouteEligibility>,
+    pub(crate) timing_scope: &'static str,
+    pub(crate) source_type: &'static str,
+    pub(crate) source_version_stable: Vec<bool>,
+    pub(crate) physical_cold_eligible: bool,
+    pub(crate) runtime_route_observed: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ProducerWorksheetRouteEligibility {
+    pub(crate) worksheet: String,
+    pub(crate) source_stream_eligible: bool,
+    pub(crate) source_stream_ineligible_reasons: Vec<&'static str>,
+    pub(crate) selected_cell_stream_ineligible_on_cols: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -1879,6 +1938,8 @@ pub(crate) enum Scenario {
     Open,
     /// One selected cell of the shared-string worksheet.
     SelectedCell,
+    /// Open a fresh producer-shaped source and visit every stored cell.
+    FullCellScan,
     /// Value-only multi-sheet planning, exactly the interval the XLSX planning
     /// guard measures.
     Planning,
@@ -1900,6 +1961,7 @@ pub(crate) fn run_case(
     match scenario {
         Scenario::Open => run_xlsx_open(case, corpus, warmup_iterations, samples),
         Scenario::SelectedCell => run_xlsx_selected_cell(case, corpus, warmup_iterations, samples),
+        Scenario::FullCellScan => run_xlsx_full_cell_scan(case, corpus, warmup_iterations, samples),
         Scenario::Planning => run_xlsx_planning(case, corpus, warmup_iterations, samples),
         Scenario::OneEditSave => run_xlsx_one_edit_save(case, corpus, warmup_iterations, samples),
         Scenario::SelectedParagraph => {
@@ -1989,6 +2051,581 @@ fn run_xlsx_selected_cell(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(plain_result(case, corpus, elapsed))
+}
+
+#[derive(Clone, Debug)]
+struct FullCellScanOracle {
+    expected_cell_count: u64,
+    expected_numeric_count: u64,
+    expected_text_count: u64,
+    digest_sha256: String,
+    marker_refusal_census_sha256: String,
+    worksheet_route_eligibility: Vec<ProducerWorksheetRouteEligibility>,
+}
+
+#[derive(Debug)]
+struct FullCellScanIterationFailure {
+    iteration: usize,
+    phase: &'static str,
+    source: Box<dyn Error>,
+}
+
+impl std::fmt::Display for FullCellScanIterationFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "producer full-cell scan iteration {} ({}) failed: {}",
+            self.iteration, self.phase, self.source
+        )
+    }
+}
+
+impl Error for FullCellScanIterationFailure {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+
+fn full_cell_scan_iteration_failure(
+    iteration: usize,
+    warmup_iterations: usize,
+    source: Box<dyn Error>,
+) -> Box<dyn Error> {
+    Box::new(FullCellScanIterationFailure {
+        iteration,
+        phase: if iteration < warmup_iterations {
+            "warmup"
+        } else {
+            "measured"
+        },
+        source,
+    })
+}
+
+fn full_cell_scan_error(message: impl Into<String>) -> litchi_xlsx::Error {
+    litchi_xlsx::Error::Invalid(message.into())
+}
+
+fn digest_hex(bytes: impl AsRef<[u8]>) -> String {
+    let mut output = String::with_capacity(bytes.as_ref().len().saturating_mul(2));
+    for byte in bytes.as_ref() {
+        use std::fmt::Write as _;
+        write!(&mut output, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    output
+}
+
+fn producer_marker_refusal_census_sha256(
+    evidence: &ProducerEvidence,
+) -> Result<String, Box<dyn Error>> {
+    let bytes = serde_json::to_vec(evidence)?;
+    Ok(sha256_hex(&bytes))
+}
+
+fn full_cell_scan_oracle(corpus: &ProducerCorpus) -> Result<FullCellScanOracle, Box<dyn Error>> {
+    let spec = corpus
+        .corpus
+        .xlsx
+        .as_ref()
+        .ok_or("producer XLSX corpus has no specification")?;
+    if spec.sheet_count != XlsxProducerShape::Medium.sheet_count()
+        || spec.row_count != XlsxProducerShape::Medium.row_count()
+        || spec.column_count != XlsxProducerShape::Medium.column_count()
+        || corpus.evidence.generator != XLSX_PRODUCER_SHAPE_GENERATOR
+        || corpus.evidence.shape != "producer-medium-read"
+        || corpus.evidence.variant != Some("read")
+    {
+        return Err("full-cell scan requires the producer medium/read corpus".into());
+    }
+
+    let expected_cell_count = spec
+        .sheet_count
+        .checked_mul(spec.row_count)
+        .and_then(|count| count.checked_mul(spec.column_count))
+        .ok_or("producer full-cell corpus count overflows usize")?;
+    if u64::try_from(expected_cell_count)? != XLSX_PRODUCER_FULL_CELL_REVIEWED_COUNT {
+        return Err(format!(
+            "producer full-cell corpus has {expected_cell_count} cells, reviewed oracle expects {}",
+            XLSX_PRODUCER_FULL_CELL_REVIEWED_COUNT
+        )
+        .into());
+    }
+    let marker_refusal_census_sha256 = producer_marker_refusal_census_sha256(&corpus.evidence)?;
+    let worksheet_route_eligibility = corpus
+        .evidence
+        .parts
+        .iter()
+        .filter(|part| part.part.starts_with("xl/worksheets/sheet") && part.part.ends_with(".xml"))
+        .map(|part| ProducerWorksheetRouteEligibility {
+            worksheet: part.part.clone(),
+            source_stream_eligible: part.source_stream_eligible,
+            source_stream_ineligible_reasons: part.source_stream_ineligible_reasons.clone(),
+            selected_cell_stream_ineligible_on_cols: part.selected_cell_stream_ineligible_on_cols,
+        })
+        .collect::<Vec<_>>();
+    if worksheet_route_eligibility.len() != spec.sheet_count
+        || worksheet_route_eligibility
+            .iter()
+            .any(|part| part.source_stream_eligible)
+    {
+        return Err(
+            "producer full-cell oracle route census is incomplete or unexpectedly eligible".into(),
+        );
+    }
+    Ok(FullCellScanOracle {
+        expected_cell_count: XLSX_PRODUCER_FULL_CELL_REVIEWED_COUNT,
+        expected_numeric_count: XLSX_PRODUCER_FULL_CELL_REVIEWED_NUMERIC_COUNT,
+        expected_text_count: XLSX_PRODUCER_FULL_CELL_REVIEWED_TEXT_COUNT,
+        digest_sha256: XLSX_PRODUCER_FULL_CELL_REVIEWED_DIGEST_SHA256.to_owned(),
+        marker_refusal_census_sha256,
+        worksheet_route_eligibility,
+    })
+}
+
+fn set_full_cell_record_prefix(
+    field: &mut [u8; XLSX_PRODUCER_FULL_CELL_FIELD_BYTES],
+    sheet: u32,
+    row: u32,
+    column: u32,
+    tag: u8,
+) {
+    field[..4].copy_from_slice(&sheet.to_le_bytes());
+    field[4..8].copy_from_slice(&row.to_le_bytes());
+    field[8..12].copy_from_slice(&column.to_le_bytes());
+    field[12] = tag;
+}
+
+fn append_numeric_record(
+    hasher: &mut Sha256,
+    field: &mut [u8; XLSX_PRODUCER_FULL_CELL_FIELD_BYTES],
+    sheet: u32,
+    row: u32,
+    column: u32,
+    value: f64,
+) -> Result<(), Box<dyn Error>> {
+    if !value.is_finite() {
+        return Err("producer full-cell numeric oracle encountered a non-finite value".into());
+    }
+    set_full_cell_record_prefix(
+        field,
+        sheet,
+        row,
+        column,
+        XLSX_PRODUCER_FULL_CELL_NUMERIC_TAG,
+    );
+    field[13..21].copy_from_slice(&value.to_bits().to_le_bytes());
+    hasher.update(&field[..]);
+    Ok(())
+}
+
+fn append_text_record(
+    hasher: &mut Sha256,
+    field: &mut [u8; XLSX_PRODUCER_FULL_CELL_FIELD_BYTES],
+    sheet: u32,
+    row: u32,
+    column: u32,
+    value: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let length = u64::try_from(value.len())?;
+    set_full_cell_record_prefix(field, sheet, row, column, XLSX_PRODUCER_FULL_CELL_TEXT_TAG);
+    field[13..21].copy_from_slice(&length.to_le_bytes());
+    hasher.update(&field[..]);
+    hasher.update(value);
+    Ok(())
+}
+
+struct FullCellScanState {
+    hasher: Sha256,
+    field: [u8; XLSX_PRODUCER_FULL_CELL_FIELD_BYTES],
+    sheet: Option<usize>,
+    next_row: u32,
+    next_column: u32,
+    cell_count: u64,
+    numeric_count: u64,
+    text_count: u64,
+}
+
+impl FullCellScanState {
+    fn new() -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(XLSX_PRODUCER_FULL_CELL_DIGEST_DOMAIN);
+        hasher.update([XLSX_PRODUCER_FULL_CELL_DIGEST_VERSION]);
+        Self {
+            hasher,
+            field: [0_u8; XLSX_PRODUCER_FULL_CELL_FIELD_BYTES],
+            sheet: None,
+            next_row: 0,
+            next_column: 0,
+            cell_count: 0,
+            numeric_count: 0,
+            text_count: 0,
+        }
+    }
+
+    fn start_sheet(&mut self, sheet: usize) -> litchi_xlsx::Result<()> {
+        if self.sheet.is_some() {
+            return Err(full_cell_scan_error(
+                "producer full-cell scan started a worksheet before finishing the prior one",
+            ));
+        }
+        self.sheet = Some(sheet);
+        self.next_row = 0;
+        self.next_column = 0;
+        Ok(())
+    }
+
+    fn visit(
+        &mut self,
+        address: litchi_xlsx::Address,
+        cell: &litchi_xlsx::Cell,
+    ) -> litchi_xlsx::Result<()> {
+        let sheet = self.sheet.ok_or_else(|| {
+            full_cell_scan_error("producer full-cell callback ran without an active worksheet")
+        })?;
+        let expected =
+            litchi_xlsx::Address::at(self.next_row, self.next_column).map_err(|error| {
+                full_cell_scan_error(format!(
+                    "producer full-cell expected address is invalid: {error}"
+                ))
+            })?;
+        if address != expected {
+            return Err(full_cell_scan_error(format!(
+                "producer full-cell address order mismatch on sheet {sheet}: expected {expected}, observed {address}"
+            )));
+        }
+        match cell {
+            litchi_xlsx::Cell::Value(litchi_xlsx::Value::Number(number)) => {
+                let value = number.as_f64().ok_or_else(|| {
+                    full_cell_scan_error(format!(
+                        "producer full-cell numeric value at {address} is non-finite or not parseable"
+                    ))
+                })?;
+                append_numeric_record(
+                    &mut self.hasher,
+                    &mut self.field,
+                    u32::try_from(sheet)
+                        .map_err(|_| full_cell_scan_error("sheet ordinal overflows u32"))?,
+                    self.next_row,
+                    self.next_column,
+                    value,
+                )
+                .map_err(|error| full_cell_scan_error(error.to_string()))?;
+                self.numeric_count = self.numeric_count.checked_add(1).ok_or_else(|| {
+                    full_cell_scan_error("producer full-cell numeric count overflows u64")
+                })?;
+            },
+            litchi_xlsx::Cell::Value(litchi_xlsx::Value::Text(text)) => {
+                append_text_record(
+                    &mut self.hasher,
+                    &mut self.field,
+                    u32::try_from(sheet)
+                        .map_err(|_| full_cell_scan_error("sheet ordinal overflows u32"))?,
+                    self.next_row,
+                    self.next_column,
+                    text.as_str().as_bytes(),
+                )
+                .map_err(|error| full_cell_scan_error(error.to_string()))?;
+                self.text_count = self.text_count.checked_add(1).ok_or_else(|| {
+                    full_cell_scan_error("producer full-cell text count overflows u64")
+                })?;
+            },
+            litchi_xlsx::Cell::Value(_) => {
+                return Err(full_cell_scan_error(format!(
+                    "producer full-cell type at {address} does not match the generator"
+                )));
+            },
+            _ => {
+                return Err(full_cell_scan_error(format!(
+                    "producer full-cell callback observed a non-value cell at {address}"
+                )));
+            },
+        }
+        self.cell_count = self
+            .cell_count
+            .checked_add(1)
+            .ok_or_else(|| full_cell_scan_error("producer full-cell count overflows u64"))?;
+        if self.next_column + 1 == XlsxProducerShape::Medium.column_count() as u32 {
+            self.next_column = 0;
+            self.next_row = self
+                .next_row
+                .checked_add(1)
+                .ok_or_else(|| full_cell_scan_error("producer full-cell row overflows u32"))?;
+        } else {
+            self.next_column = self
+                .next_column
+                .checked_add(1)
+                .ok_or_else(|| full_cell_scan_error("producer full-cell column overflows u32"))?;
+        }
+        Ok(())
+    }
+
+    fn finish_sheet(&mut self) -> litchi_xlsx::Result<()> {
+        let sheet = self.sheet.take().ok_or_else(|| {
+            full_cell_scan_error("producer full-cell scan finished without an active worksheet")
+        })?;
+        if self.next_row != XlsxProducerShape::Medium.row_count() as u32 || self.next_column != 0 {
+            return Err(full_cell_scan_error(format!(
+                "producer full-cell scan ended sheet {sheet} before A1:AF32"
+            )));
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> (u64, u64, u64, String) {
+        (
+            self.cell_count,
+            self.numeric_count,
+            self.text_count,
+            digest_hex(self.hasher.finalize()),
+        )
+    }
+}
+
+fn producer_sheet_name(index: usize) -> Option<&'static str> {
+    match index {
+        0 => Some("Sheet1"),
+        1 => Some("Bench01"),
+        2 => Some("Bench02"),
+        3 => Some("Bench03"),
+        _ => None,
+    }
+}
+
+fn run_xlsx_full_cell_scan(
+    case: Case,
+    corpus: &ProducerCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if case != Case::XlsxProducerMediumSourceFullCellScan {
+        return Err("non-full-cell producer case passed to full-cell runner".into());
+    }
+    let oracle = full_cell_scan_oracle(corpus)?;
+    let spec = corpus
+        .corpus
+        .xlsx
+        .as_ref()
+        .ok_or("producer XLSX corpus has no specification")?;
+    let archive_sha256 = corpus.corpus.manifest.archive_sha256.clone();
+    let archive_bytes = u64::try_from(corpus.corpus.archive.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+    let mut observed_cell_counts = Vec::with_capacity(samples);
+    let mut observed_numeric_counts = Vec::with_capacity(samples);
+    let mut observed_text_counts = Vec::with_capacity(samples);
+    let mut observed_digests = Vec::with_capacity(samples);
+    let mut sample_indices = Vec::with_capacity(samples);
+    let mut source_version_stable = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // The owned source and its identity are prepared before the clock.
+        // The scanner has only fixed-size state; all callback digest work is
+        // deliberately inside the timed open-and-visit interval below.
+        let source = source_of(corpus);
+        let source_version_before = source.version().map_err(|error| {
+            full_cell_scan_iteration_failure(iteration, warmup_iterations, Box::new(error))
+        })?;
+        let mut scanner = FullCellScanState::new();
+        let process_before = process_metrics::Snapshot::read().ok();
+        let allocation_region = allocation_metrics::begin();
+        let started = std::time::Instant::now();
+        let timed = (|| {
+            let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+            let sheets = workbook.sheets().collect::<Vec<_>>();
+            if sheets.len() != spec.sheet_count {
+                return Err(format!(
+                    "producer full-cell scan observed {} worksheets instead of {}",
+                    sheets.len(),
+                    spec.sheet_count
+                )
+                .into());
+            }
+            for (index, sheet) in sheets.iter().enumerate() {
+                let expected_name = producer_sheet_name(index)
+                    .ok_or("producer full-cell scan has an unexpected worksheet ordinal")?;
+                if sheet.name() != expected_name {
+                    return Err(format!(
+                        "producer full-cell scan worksheet {index} is {:?}, expected {expected_name:?}",
+                        sheet.name()
+                    )
+                    .into());
+                }
+                scanner.start_sheet(index)?;
+                let callbacks_before = scanner.cell_count;
+                let visited = sheet.visit_cells(litchi_xlsx::Rect::ALL, |address, cell| {
+                    scanner.visit(address, cell)
+                })?;
+                let callback_count = scanner
+                    .cell_count
+                    .checked_sub(callbacks_before)
+                    .ok_or_else(|| {
+                        full_cell_scan_error(
+                            "producer full-cell callback count decreased during a worksheet visit",
+                        )
+                    })?;
+                if u64::try_from(visited)? != callback_count {
+                    return Err(full_cell_scan_error(format!(
+                        "producer full-cell worksheet {index} returned {visited} visits but invoked {callback_count} callbacks"
+                    )).into());
+                }
+                if visited != spec.row_count * spec.column_count {
+                    return Err(format!(
+                        "producer full-cell scan worksheet {index} visited {visited} cells instead of {}",
+                        spec.row_count * spec.column_count
+                    )
+                    .into());
+                }
+                scanner.finish_sheet()?;
+            }
+            Ok::<_, Box<dyn Error>>((workbook, sheets, scanner))
+        })();
+        let duration = started.elapsed();
+        let allocation = allocation_region.finish();
+        let process_after = process_metrics::Snapshot::read().ok();
+        let process = process_before
+            .zip(process_after)
+            .map(|(before, after)| after.delta(before));
+        let (workbook, sheets, scanner) = timed.map_err(|error| {
+            full_cell_scan_iteration_failure(iteration, warmup_iterations, error)
+        })?;
+        // The source-version fence and aggregate tolerance report are
+        // harness checks after the timed workload. `visit_cells` already
+        // performs the production freshness fences around each worksheet.
+        let source_version_after = workbook.source_version().map_err(|error| {
+            full_cell_scan_iteration_failure(iteration, warmup_iterations, Box::new(error))
+        })?;
+        if source_version_after != source_version_before {
+            return Err(full_cell_scan_iteration_failure(
+                iteration,
+                warmup_iterations,
+                Box::new(std::io::Error::other(format!(
+                    "producer full-cell scan source version changed from {:?} to {:?}",
+                    source_version_before, source_version_after
+                ))),
+            ));
+        }
+        let tolerance = workbook.tolerance_report();
+        if !tolerance.is_clean() {
+            return Err(full_cell_scan_iteration_failure(
+                iteration,
+                warmup_iterations,
+                Box::new(std::io::Error::other(format!(
+                    "producer full-cell scan required leniency repairs: {tolerance:?}"
+                ))),
+            ));
+        }
+        // Keep the source-backed handles alive across endpoint observations and
+        // the complete post-timer oracle before releasing them.
+        std::hint::black_box(&workbook);
+        std::hint::black_box(&sheets);
+        let (observed_count, observed_numeric, observed_text, observed_digest) = scanner.finish();
+        if observed_count != oracle.expected_cell_count
+            || observed_numeric != oracle.expected_numeric_count
+            || observed_text != oracle.expected_text_count
+            || observed_digest != oracle.digest_sha256
+        {
+            return Err(full_cell_scan_iteration_failure(
+                iteration,
+                warmup_iterations,
+                Box::new(std::io::Error::other(format!(
+                    "independent oracle mismatch: count {observed_count}/{}, numeric {observed_numeric}/{}, text {observed_text}/{}, digest {observed_digest}/{}",
+                    oracle.expected_cell_count,
+                    oracle.expected_numeric_count,
+                    oracle.expected_text_count,
+                    oracle.digest_sha256
+                ))),
+            ));
+        }
+        if archive_sha256 != corpus.corpus.manifest.archive_sha256
+            || archive_bytes != u64::try_from(corpus.corpus.archive.len())?
+        {
+            return Err(full_cell_scan_iteration_failure(
+                iteration,
+                warmup_iterations,
+                Box::new(std::io::Error::other(
+                    "producer full-cell scan archive identity changed during the run",
+                )),
+            ));
+        }
+        if iteration >= warmup_iterations {
+            sample_indices.push(iteration - warmup_iterations);
+            observed_cell_counts.push(observed_count);
+            observed_numeric_counts.push(observed_numeric);
+            observed_text_counts.push(observed_text);
+            observed_digests.push(observed_digest);
+            source_version_stable.push(true);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics: process,
+                allocation_metrics: allocation,
+            });
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        drop(sheets);
+        drop(workbook);
+    }
+    if let Some((sample_index, digest)) = observed_digests
+        .iter()
+        .enumerate()
+        .find(|(_sample_index, digest)| *digest != &oracle.digest_sha256)
+    {
+        return Err(full_cell_scan_iteration_failure(
+            sample_index + warmup_iterations,
+            warmup_iterations,
+            Box::new(std::io::Error::other(format!(
+                "producer full-cell scan digest changed across measured samples: {digest}"
+            ))),
+        ));
+    }
+    let elapsed_ns = statistics(elapsed);
+    let sample_order = elapsed_ns.sample_order.clone();
+    crate::reorder_sample_vector(&mut sample_indices, &sample_order)?;
+    crate::reorder_sample_vector(&mut observed_cell_counts, &sample_order)?;
+    crate::reorder_sample_vector(&mut observed_numeric_counts, &sample_order)?;
+    crate::reorder_sample_vector(&mut observed_text_counts, &sample_order)?;
+    crate::reorder_sample_vector(&mut observed_digests, &sample_order)?;
+    crate::reorder_sample_vector(&mut source_version_stable, &sample_order)?;
+    let operation_metrics =
+        Some(operation_metrics::from_in_process_observations_without_sink(&observations)?);
+    let source = crate::SourceSummary {
+        producer_full_cell_scan: Some(Box::new(ProducerFullCellScanSummary {
+            sample_indices,
+            implementation: "litchi_xlsx::SourceBackedWorkbook + SourceWorksheet::visit_cells",
+            scenario: "open_plus_full_stored_cell_scan",
+            generator: XLSX_PRODUCER_SHAPE_GENERATOR,
+            shape: "producer-medium",
+            variant: "read",
+            archive_sha256,
+            archive_bytes,
+            expected_cell_count: oracle.expected_cell_count,
+            observed_cell_counts,
+            expected_numeric_count: oracle.expected_numeric_count,
+            expected_text_count: oracle.expected_text_count,
+            observed_numeric_counts,
+            observed_text_counts,
+            oracle_digest_sha256: oracle.digest_sha256,
+            observed_digest_sha256: observed_digests,
+            marker_refusal_census_sha256: oracle.marker_refusal_census_sha256,
+            worksheet_route_eligibility: oracle.worksheet_route_eligibility,
+            timing_scope: XLSX_PRODUCER_FULL_CELL_TIMING_SCOPE,
+            source_type: XLSX_PRODUCER_FULL_CELL_SOURCE_TYPE,
+            source_version_stable,
+            physical_cold_eligible: false,
+            runtime_route_observed: false,
+        })),
+        ..Default::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.corpus.manifest.clone(),
+        elapsed_ns,
+        sink: None,
+        source: Some(Box::new(source)),
+        execution: None,
+        output_sha256: None,
+        operation_metrics,
+    })
 }
 
 fn run_xlsx_planning(
@@ -2537,6 +3174,85 @@ mod tests {
                 .iter()
                 .all(|part| part.worksheet_relationship_part.is_none())
         );
+    }
+
+    #[test]
+    fn producer_full_cell_oracle_binds_the_reviewed_medium_read_contract() {
+        let corpus = xlsx_medium(XlsxProducerVariant::Read);
+        let oracle = full_cell_scan_oracle(&corpus).expect("full-cell oracle builds");
+        assert_eq!(oracle.expected_cell_count, 4 * 32 * 32);
+        assert_eq!(oracle.expected_numeric_count, 3_686);
+        assert_eq!(oracle.expected_text_count, 410);
+        assert_eq!(
+            oracle.digest_sha256,
+            "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b"
+        );
+        assert_eq!(oracle.worksheet_route_eligibility.len(), 4);
+        assert!(
+            oracle
+                .worksheet_route_eligibility
+                .iter()
+                .all(|part| !part.source_stream_eligible)
+        );
+    }
+
+    #[test]
+    fn producer_full_cell_scan_runner_visits_every_stored_cell() {
+        let corpus = xlsx_medium(XlsxProducerVariant::Read);
+        let result = run_case(
+            Case::XlsxProducerMediumSourceFullCellScan,
+            Scenario::FullCellScan,
+            &corpus,
+            1,
+            3,
+        )
+        .expect("producer full-cell scan runs");
+        assert_eq!(result.case, "xlsx_producer_medium_source_full_cell_scan");
+        assert_eq!(result.elapsed_ns.samples.len(), 3);
+        let metrics = result
+            .operation_metrics
+            .as_ref()
+            .expect("operation metrics");
+        assert_eq!(metrics.sample_indices, result.elapsed_ns.sample_order);
+        let scan = result
+            .source
+            .as_ref()
+            .expect("source summary")
+            .producer_full_cell_scan
+            .as_ref()
+            .expect("full-cell summary");
+        assert_eq!(scan.sample_indices, result.elapsed_ns.sample_order);
+        assert_eq!(scan.observed_cell_counts, vec![4_096; 3]);
+        assert_eq!(scan.observed_numeric_counts, vec![3_686; 3]);
+        assert_eq!(scan.observed_text_counts, vec![410; 3]);
+        assert_eq!(
+            scan.observed_digest_sha256,
+            vec![scan.oracle_digest_sha256.clone(); 3]
+        );
+        assert_eq!(scan.source_version_stable, vec![true; 3]);
+        assert!(!scan.physical_cold_eligible);
+        assert!(!scan.runtime_route_observed);
+    }
+
+    #[test]
+    fn producer_full_cell_scan_rejects_incomplete_duplicate_and_out_of_order_callbacks() {
+        let cell = litchi_xlsx::Cell::Value(litchi_xlsx::Value::from(0_i32));
+        let first = litchi_xlsx::Address::at(0, 0).expect("A1 address");
+
+        let mut incomplete = FullCellScanState::new();
+        incomplete.start_sheet(0).expect("start sheet");
+        incomplete.visit(first, &cell).expect("visit A1");
+        assert!(incomplete.finish_sheet().is_err());
+
+        let mut duplicate = FullCellScanState::new();
+        duplicate.start_sheet(0).expect("start sheet");
+        duplicate.visit(first, &cell).expect("visit A1");
+        assert!(duplicate.visit(first, &cell).is_err());
+
+        let mut out_of_order = FullCellScanState::new();
+        out_of_order.start_sheet(0).expect("start sheet");
+        let second = litchi_xlsx::Address::at(0, 1).expect("B1 address");
+        assert!(out_of_order.visit(second, &cell).is_err());
     }
 
     #[test]

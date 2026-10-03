@@ -1,0 +1,3 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.55s
+     Running `tools/perf-baseline/target/debug/litchi-perf-baseline --case xlsx_producer_medium_source_full_cell_scan --warmup 1 --samples 3 --filesystem-cache warm --json /home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native.json --producer-evidence /home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native-producer.json`

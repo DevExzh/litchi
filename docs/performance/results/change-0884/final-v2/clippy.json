@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--lib",
+    "-j",
+    "2",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:23:41.755319+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:23:55.839798+00:00",
+  "output_sha256": "557e0aff5e15c93a96aec4a6536f5b7e35d4779dfd83b9ac075436ff2b5e98e0"
+}

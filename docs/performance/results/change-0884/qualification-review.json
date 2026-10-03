@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "profile": "debug",
+  "measured_samples": 6,
+  "warmups": 2,
+  "cells_per_scan": 4096,
+  "reports": {
+    "native": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native.json",
+      "sha256": "cfaa9e63d85dbb83bb91bb6770588859774323ade3795c68ae4405493ad1661a"
+    },
+    "allocator": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/allocator.json",
+      "sha256": "56940de4bfa9b4b1a9c22b575f4298c3e8f4c6c8ab31ab1344b175b7d8bc2b7e"
+    }
+  },
+  "performance_claim": null
+}
