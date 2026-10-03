@@ -1,0 +1,18 @@
+{
+  "schema": "litchi.guard-post-cleanup-custody-0893.v1",
+  "status": "pass",
+  "review_sha256": "faf09db1f5cdd8bd8e29ee55a5bbadbf505719f0b6750e7908339b66429f76c2",
+  "retained_descriptors_verified": 29,
+  "expected_removed_marker_references": [
+    "/home/zhuhe/code/litchi/target/litchi-0893-quality/.owner-0893-quality"
+  ],
+  "removed_marker_authority": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/cleanup.json",
+    "sha256": "b3b412ae62eb926d0765d69b6a8f42a0c1e8eb5a2134e38d27ecf9623f82bb52"
+  },
+  "report_links_resolve": true,
+  "prior_check_failure": "A generic recursive descriptor check attempted to read the intentionally removed owned-target marker and raised FileNotFoundError. The shell continued to the commit before this corrected custody replay; the eight quality gates and independent review had already passed.",
+  "resolution": "Only a descriptor exactly equal to cleanup.target_marker may be absent, and its entire recorded removed_root must be absent. Every other bound artifact is byte/hash checked.",
+  "production_or_guard_changes": false,
+  "utc": "2026-10-03T21:03:33.847234+00:00"
+}
