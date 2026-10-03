@@ -1,0 +1,33 @@
+{
+  "schema": "litchi.mce-bytecode-cleanup-0890.v1",
+  "status": "pass",
+  "removed": [
+    {
+      "path": "docs/performance/results/change-0890/__pycache__/verify_packet.cpython-314.pyc",
+      "bytes": 12202,
+      "sha256": "9623a40a8e313d80c1ad41b2edb2265874e4169c735cb35ef767f418ccd79321"
+    },
+    {
+      "path": "docs/performance/results/change-0890/__pycache__/freeze.cpython-314.pyc",
+      "bytes": 72988,
+      "sha256": "0c7a33834e8e7ba3df86334d4d7d20fa2eaee0566b5eec4800a2c53f560aff09"
+    },
+    {
+      "path": "docs/performance/results/change-0890/__pycache__/owner_continuation_runner.cpython-314.pyc",
+      "bytes": 19975,
+      "sha256": "547dce8f42255f2fee77c22b1773e4b92f3f4a874e8ae5734d7dabd5d85729c3"
+    },
+    {
+      "path": "docs/performance/results/change-0890/__pycache__/experiment.cpython-314.pyc",
+      "bytes": 12186,
+      "sha256": "fa6fedfdd429cbf6bc415d56fe7110d657ae4b03bd35d108e20c9ec87aad05cb"
+    },
+    {
+      "path": "docs/performance/results/change-0890/__pycache__/reduce.cpython-314.pyc",
+      "bytes": 1621,
+      "sha256": "7429a4fc727ff4424a146bdd2046c3bad270b4f15c652a5669883e6a22f236b0"
+    }
+  ],
+  "observed_utc": "2026-10-03T18:48:24.945728+00:00",
+  "scope": "task-owned generated Python bytecode only; original source/evidence retained"
+}

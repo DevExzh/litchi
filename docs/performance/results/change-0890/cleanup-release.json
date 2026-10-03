@@ -1,0 +1,27 @@
+{
+  "error": "RuntimeError('identity mismatch for /home/zhuhe/code/litchi/.gitattributes: bytes')",
+  "finished_utc": "2026-10-03T18:53:59.660364Z",
+  "performance_claim": false,
+  "pre_removal_receipt": {
+    "bytes": 2637810,
+    "mode": "0o664",
+    "path": "cleanup-release-pre-removal.json",
+    "sha256": "cf20514872f8ed0dcb1a3d51cd5a18a9782e48d68497a0910baa9537afb8800b"
+  },
+  "protected_paths_not_in_cleanup_scope": [
+    "/tmp/litchi-0890-correctness-source",
+    "/home/zhuhe/code/litchi/target/litchi-0890-correctness",
+    "/tmp/litchi-0890-correctness-baseline",
+    "/tmp/litchi-0890-correctness-root-lock",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/correctness-before",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/correctness-after"
+  ],
+  "purpose": "remove_only_owned_release_scratch",
+  "removed": [
+    "/tmp/litchi-0890-source",
+    "/home/zhuhe/code/litchi/target/litchi-0890-build",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables"
+  ],
+  "schema": "litchi.mce-0890-release-cleanup.v1",
+  "status": "fail"
+}

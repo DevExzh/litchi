@@ -1,0 +1,28 @@
+{
+  "schema": "litchi.mce-candidate-freeze-0890.v1",
+  "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+  "supersedes": "candidate-freeze.json",
+  "reason": "Add normal emitted malformed unprefixed name error-order coverage requested in source review; production code unchanged.",
+  "candidate_paths": [
+    "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "files": [
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "bytes": 67996,
+      "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+      "bytes": 133696,
+      "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+    }
+  ],
+  "patch": {
+    "path": "docs/performance/results/change-0890/candidate-v2.patch",
+    "bytes": 9345,
+    "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4"
+  },
+  "performance_claim": false
+}

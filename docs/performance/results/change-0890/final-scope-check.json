@@ -1,0 +1,35 @@
+{
+  "schema": "litchi.mce-final-scope-0890.v1",
+  "status": "pass",
+  "checked_utc": "2026-10-03T18:59:41.547491+00:00",
+  "restored_source": [
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "bytes": 65338,
+      "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996",
+      "equals_base": true
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+      "bytes": 129836,
+      "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76",
+      "equals_base": true
+    }
+  ],
+  "unrelated_file_unchanged": {
+    "bytes": 6390,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+    "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+  },
+  "syntax_counts_before_this_receipt": {
+    "json": 398,
+    "python": 26
+  },
+  "new_worktrees_created": false,
+  "owned_scratch_removed": true,
+  "cleanup_custody_status": "pass",
+  "post_cleanup_packet_status": "pass",
+  "post_cleanup_plan_status": "pass",
+  "scope": "Performance documentation and retained evidence only; no production or harness code adoption."
+}

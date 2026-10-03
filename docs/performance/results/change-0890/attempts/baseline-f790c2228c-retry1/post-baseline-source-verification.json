@@ -1,0 +1,49 @@
+{
+  "baseline_copy": {
+    "bytes": 7432688,
+    "mode": "0o775",
+    "path": "/tmp/litchi-0890-correctness-baseline/xml_attribute_bounds",
+    "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+  },
+  "baseline_copy_rechecked": true,
+  "baseline_receipt": {
+    "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+    "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a"
+  },
+  "binary": {
+    "bytes": 7432688,
+    "mode": "0o775",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+    "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+  },
+  "binary_rechecked": true,
+  "fixtures": [
+    {
+      "bytes": 325446,
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+      "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be"
+    },
+    {
+      "bytes": 95247,
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/docx/drawing.docx",
+      "sha256": "5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8"
+    },
+    {
+      "bytes": 55519,
+      "path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    }
+  ],
+  "fixtures_rechecked": true,
+  "root_lock_custody": {
+    "path": "attempts/baseline-f790c2228c-retry1/root-lock-custody.json",
+    "sha256": "61eea7167d139f1d6bde45358f86a5b94a2eab131cd6aa61b96639e74a1a475f"
+  },
+  "root_lock_custody_rechecked": true,
+  "schema": "litchi.mce-0890-post-baseline-source-verification.v1",
+  "source_files": 9411,
+  "source_manifest_rechecked": true,
+  "source_root": "/tmp/litchi-0890-correctness-source",
+  "status": "pass",
+  "target": "/home/zhuhe/code/litchi/target/litchi-0890-correctness"
+}

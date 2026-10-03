@@ -1,0 +1,69 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/030-native-native-b03-c03-before/peak-rss-kib.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native",
+    "--case",
+    "pptx_producer_source_selected_slide",
+    "--xlsx-shape",
+    "medium",
+    "--warmup",
+    "3",
+    "--samples",
+    "50",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/030-native-native-b03-c03-before/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/030-native-native-b03-c03-before/producer.json"
+  ],
+  "binary": {
+    "declared": {
+      "bytes": 264440648,
+      "device": 66305,
+      "executable": true,
+      "inode": 35440240,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "identity": {
+      "bytes": 264440648,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0890",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T18:44:45.244331+00:00",
+  "plan_sha256": "346c63950f0241b3c7b74c610aae08a2ae9773434fed87233c4b56dca491d364",
+  "row": {
+    "block": 3,
+    "case": "pptx_producer_source_selected_slide",
+    "case_index": 3,
+    "lane": "native",
+    "ordinal": 30,
+    "pair": "native-b03-c03",
+    "role": "before",
+    "samples": 50,
+    "warmup": 3
+  },
+  "schema": "litchi.xlsx-mce-expanded-name-cache-child-command-0890.v1",
+  "started_utc": "2026-10-03T18:44:45.072404+00:00"
+}

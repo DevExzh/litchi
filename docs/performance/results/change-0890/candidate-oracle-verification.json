@@ -1,0 +1,40 @@
+{
+  "packages": 3,
+  "members": 67,
+  "generated": 20000,
+  "aliasing": 20000,
+  "controls": 10,
+  "oracle_records": 200201,
+  "legacy_results": 200405,
+  "distinct_generated_inputs": {
+    "generated": 13811,
+    "aliasing": 19418
+  },
+  "outcomes": {
+    "codec_refusal": 48804,
+    "codec_success": 51330,
+    "stream_refusal": 48133,
+    "stream_success": 51934
+  },
+  "schema": "litchi.mce-oracle-verification-0889.v1",
+  "status": "pass",
+  "repeat_byte_equal": true,
+  "missing_oracle_refused": true,
+  "missing_controls_refused": true,
+  "reports": [
+    {
+      "path": "docs/performance/results/change-0890/attempts/candidate-diagnostic-f790c2228c-v2-retry1/differential-first.json.gz",
+      "bytes": 12319811,
+      "sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "json_bytes": 226180145,
+      "json_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57"
+    },
+    {
+      "path": "docs/performance/results/change-0890/attempts/candidate-diagnostic-f790c2228c-v2-retry1/differential-second.json.gz",
+      "bytes": 12319811,
+      "sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "json_bytes": 226180145,
+      "json_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57"
+    }
+  ]
+}

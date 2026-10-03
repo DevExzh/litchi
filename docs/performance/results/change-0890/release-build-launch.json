@@ -1,0 +1,20 @@
+{
+  "schema": "litchi.mce-release-build-launch-0890.v1",
+  "started_utc": "2026-10-03T18:11:51.857854+00:00",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0890/build-executed.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "runner": {
+    "path": "docs/performance/results/change-0890/build-executed.py",
+    "bytes": 13197,
+    "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c"
+  },
+  "source_preflight": "pass: _load_frozen_candidate against retained0885manifest",
+  "source_review": "source-review-v2.json",
+  "focused_mce_tests_passed": 151,
+  "cross_variant_oracle": "root-oracle-comparison.json",
+  "timings_authorized": false
+}

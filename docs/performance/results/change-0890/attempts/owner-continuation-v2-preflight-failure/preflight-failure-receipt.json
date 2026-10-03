@@ -1,0 +1,54 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0890/owner_continuation_runner.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "failure": {
+    "cargo_started": false,
+    "cause": "source_manifest(expected) was called inside a 9411-item generator, recomputing and rehashing the complete source manifest once per item",
+    "correction": "compute the source manifest once and reuse its paths before the new create-only attempt",
+    "diagnostic_runtime_performed": false,
+    "phase": "preflight",
+    "source_overlay_performed": false
+  },
+  "finished_utc": "2026-10-03T18:28:55.437698Z",
+  "log": {
+    "bytes": 457,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/attempts/owner-continuation-v2-preflight-failure/logs/preflight.log",
+    "sha256": "e38c2b553b22ee85c525b95c61b1840748b004cd6d6cb9756bfbc84f6caf71be"
+  },
+  "performance_claim": false,
+  "pid": 3923635,
+  "prior_owner_attempt": {
+    "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+    "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d"
+  },
+  "purpose": "preserve_aborted_continuation_preflight",
+  "returncode": 143,
+  "runner": {
+    "bytes": 12156,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/attempts/owner-continuation-v2-preflight-failure/owner_continuation_runner.py",
+    "sha256": "fdc9255a0217c9ad94e1e5f0e3aa754472d2c7a4b6e571ef661ca36e02d94470"
+  },
+  "schema": "litchi.mce-0890-owner-continuation-preflight-failure.v1",
+  "source_marker": {
+    "bytes": 39,
+    "mode": "0o664",
+    "path": "/tmp/litchi-0890-correctness-source/.owner-0890-source",
+    "sha256": "240847ee4de01621bdef5e902623ba8c1867f168d17efb057d3a6d9a950c321f"
+  },
+  "source_root": "/tmp/litchi-0890-correctness-source",
+  "started_utc": "2026-10-03T18:27:00Z",
+  "status": "fail",
+  "target_dir": "/home/zhuhe/code/litchi/target/litchi-0890-correctness",
+  "target_marker": {
+    "bytes": 31,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/.owner-0890-target",
+    "sha256": "09dc5f5924ed207b753014034aa6e9c0ba42720b6840e2f858f55a74aa9f9392"
+  }
+}

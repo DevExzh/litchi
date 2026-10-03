@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0890 — MCE validated-name reuse rejected
+
+[0890](0890-mce-validated-name-reuse.md) rejects per-start reuse of validated unprefixed attribute names and recognized MCE directive filtering. Eliminating these repeated validations does not meet the producer XLSX native gate: paired p50 ratio 0.99381, interval 0.98861–1.01112. The 0886 profile still motivates broader work-elimination investigation; it does not establish that this small reuse path is sufficient. Three control metric flags and the DOCX p50 increase remain explicit.
+
 ## 0889 — MCE control qualification
 
 [0889](0889-mce-control-qualification.md) adds explicit input-failure accounting, framed raw/semantic stream oracles, typed refusals, and focused semantic/resource-boundary controls. Repeated name expansion in the legacy MCE codec remains the next bounded hypothesis from 0886. The new qualification evidence supports evaluating that hypothesis; it does not establish a speedup or revive the rejected 0887 storage change.

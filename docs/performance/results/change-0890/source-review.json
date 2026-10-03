@@ -1,0 +1,107 @@
+{
+  "schema": "litchi.mce-expanded-attribute-name-reuse-source-review-0890.v1",
+  "status": "approved_for_measurement",
+  "reviewer": "/root/mce_cache_review_0890",
+  "reviewed_without_build_or_timing": true,
+  "base_head": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+  "scope": {
+    "production_owner": "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "focused_tests": "crates/litchi-ooxml-common/src/mce/tests.rs",
+    "public_api_changed": false,
+    "dependencies_changed": false,
+    "unsafe_code_added": false,
+    "reviewer_source_edits": false,
+    "reviewer_builds": false,
+    "performance_claim": false
+  },
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "before": {
+        "bytes": 65338,
+        "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+      },
+      "after": {
+        "bytes": 67996,
+        "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+      }
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "before": {
+        "bytes": 129836,
+        "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76"
+      },
+      "after": {
+        "bytes": 133540,
+        "sha256": "b464c225834599eec8489ac3ac22bbaf6254f6d70846070701d740af8eb6b186"
+      }
+    }
+  },
+  "patch": {
+    "path": "docs/performance/results/change-0890/candidate.patch",
+    "base": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "paths": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ],
+    "bytes": 9187,
+    "sha256": "6cfe6e59581f4022c8e4bdbf3e3f930de247a6fa6f5adfe5f4bfdd65ffc91589"
+  },
+  "findings": [
+    {
+      "id": "directive-before-reuse",
+      "severity": "pass",
+      "summary": "The existing directive pass still expands every non-namespace attribute in source order before directive token accounting and application; the unprefixed marker is set only after successful expansion, so malformed and unbound names retain the original refusal phase."
+    },
+    {
+      "id": "no-namespace-implication",
+      "severity": "pass",
+      "summary": "An unprefixed attribute resolves to NO_NAMESPACE regardless of the element default namespace. Existing start-tag validation rejects prefixed bindings to the empty URI, so the marker cannot classify a prefixed name as unprefixed."
+    },
+    {
+      "id": "opaque-inherited-path",
+      "severity": "pass",
+      "summary": "Inherited opaque starts return before directive scanning and therefore receive no reuse markers; their filter=false writer path still expands and preserves malformed, MCE, and ordinary attributes."
+    },
+    {
+      "id": "directive-filter-report",
+      "severity": "pass",
+      "summary": "Recognized MCE attributes are marked only after QName and local-name recognition, then counted and skipped once by active emitted starts. Inactive and opaque paths retain their prior report behavior, and ProcessContent validation remains in apply_directives and the unwrap checks."
+    },
+    {
+      "id": "allocation-and-limits",
+      "severity": "pass",
+      "summary": "The candidate adds only infallible bit stores, keeps the existing raw/directive reservations and checked limits, and does not introduce a new allocation or typed-error path."
+    },
+    {
+      "id": "attr-layout",
+      "severity": "advisory",
+      "summary": "The focused test compares Attr size with the former three-field layout on the compiling target. The source comment should be read as target evidence rather than a cross-target repr(Rust) guarantee; no performance or universal layout claim is approved."
+    },
+    {
+      "id": "focused-order-coverage",
+      "severity": "advisory",
+      "summary": "The added order test covers an invalid prefixed QName against an unknown MCE directive, while the marker specifically targets valid unprefixed names. Before sealed final review, add or retain one ordinary emitted case with a valid unprefixed attribute followed by malformed bad!name and the reversed unknown-directive order."
+    },
+    {
+      "id": "clippy-shape",
+      "severity": "advisory",
+      "summary": "The nested !keep/filter condition is semantically sound but should be collapsed to filter && !a.keep if the repository Clippy profile enables collapsible_if."
+    }
+  ],
+  "blocking_findings": [],
+  "required_before_sealed_final": [
+    "Target build/test evidence for Attr layout equality",
+    "Focused malformed-unprefixed source-order case",
+    "Clippy/fmt/diff-check evidence after any final source wording or condition cleanup"
+  ],
+  "semantic_matrix": {
+    "default_namespace_attributes": true,
+    "default_namespace_reset": true,
+    "inherited_opaque_attributes": true,
+    "malformed_opaque_attribute": true,
+    "expanded_duplicate_guard": true,
+    "directive_token_limit": true,
+    "process_content_validation": true,
+    "empty_prefixed_namespace_refusal": "source-reviewed; focused test still recommended"
+  }
+}

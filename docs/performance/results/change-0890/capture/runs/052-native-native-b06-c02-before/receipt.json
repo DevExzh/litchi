@@ -1,0 +1,113 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/peak-rss-kib.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native",
+    "--case",
+    "docx_producer_source_selected_paragraph",
+    "--xlsx-shape",
+    "medium",
+    "--warmup",
+    "3",
+    "--samples",
+    "50",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/producer.json"
+  ],
+  "artifacts": {
+    "peak-rss-kib.txt": {
+      "bytes": 6,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/peak-rss-kib.txt",
+      "sha256": "06d3ef02738148ae2e4973822d88888ca81cf2468dcb2b4415560077ebd1e6d9"
+    },
+    "producer.json": {
+      "bytes": 1473,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/producer.json",
+      "sha256": "f7209f277ce7654138b66d6bde615d4b4a87293d5507eb096f91d1b0f3144e80"
+    },
+    "report.json": {
+      "bytes": 7163,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/report.json",
+      "sha256": "fe9e2e797337c69a99f8d51c8849a7dae08c59a42141b4f5bd547ee6e6d0a814"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "declared": {
+      "bytes": 264440648,
+      "device": 66305,
+      "executable": true,
+      "inode": 35440240,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "identity": {
+      "bytes": 264440648,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/before-native"
+  },
+  "command": {
+    "bytes": 2250,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/052-native-native-b06-c02-before/command.json",
+    "sha256": "858c6f8446ba51d9598c80b5dc970429bf9f848f9ef02d99f92fb47788cd4cd9"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0890",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T18:44:50.144646+00:00",
+  "plan_sha256": "346c63950f0241b3c7b74c610aae08a2ae9773434fed87233c4b56dca491d364",
+  "row": {
+    "block": 6,
+    "case": "docx_producer_source_selected_paragraph",
+    "case_index": 2,
+    "lane": "native",
+    "ordinal": 52,
+    "pair": "native-b06-c02",
+    "role": "before",
+    "samples": 50,
+    "warmup": 3
+  },
+  "schema": "litchi.xlsx-mce-expanded-name-cache-child-receipt-0890.v1",
+  "started_utc": "2026-10-03T18:44:49.977755+00:00"
+}

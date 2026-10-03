@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0890 — MCE validated-name reuse rejected
+
+[0890](0890-mce-validated-name-reuse.md) retains 72 matched fresh processes / 3,320 measured iterations for a rejected validated-name reuse candidate. Primary paired p50 ratio is 0.99381 (95% interval 0.98861–1.01112), failing the frozen improvement gate. Allocation calls and allocated bytes are unchanged. Production is restored; 0885 remains the current-source release reference.
+
 ## 0889 — MCE control qualification
 
 [0889](0889-mce-control-qualification.md) strengthens differential input accounting and codec/stream semantic evidence. The independent real-input census contains three packages and 67 XML, relationship, and VML members. This is correctness qualification for the next MCE experiment, not a new latency baseline; 0885 remains the native reference.

@@ -1,0 +1,25 @@
+{
+  "schema": "litchi.mce-0890-source-preparation-retrospective.v1",
+  "status": "recorded",
+  "purpose": "preserve_historical_source_custody_preparation_outcome",
+  "performance_claim": false,
+  "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+  "event": {
+    "operation": "initial full committed-tree archive extraction",
+    "outcome": "failed_during_extraction",
+    "observed_cause": "the full committed docs/performance content consumed approximately 8.4 GiB and exhausted the available /tmp quota",
+    "partial_root": "/tmp/litchi-0890-correctness-source",
+    "partial_root_cleanup": "the owned partial extraction was removed before the bounded retry",
+    "cargo_started": false,
+    "tests_started": false,
+    "workload_started": false
+  },
+  "recovery": {
+    "operation": "bounded exact-base source selection plus two compile-time fixture files",
+    "successful_source_file_count": 9411,
+    "successful_baseline_receipt": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+    "successful_candidate_receipt": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json"
+  },
+  "evidence_scope": "retrospective preparation note; it does not replace or rewrite a sealed command log or execution receipt",
+  "timing": "no timestamp or duration is asserted because the failed preparation attempt had no retained execution log"
+}

@@ -1,0 +1,5 @@
+   Compiling litchi-perf-baseline v0.1.0 (/tmp/litchi-0890-correctness-source/tools/perf-baseline)
+    Finished `dev` profile [unoptimized] target(s) in 18.63s
+cwd=/tmp/litchi-0890-correctness-source
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","build","--manifest-path","/tmp/litchi-0890-correctness-source/tools/perf-baseline/Cargo.toml","--locked","--offline","--bin","xml_attribute_bounds"]
+

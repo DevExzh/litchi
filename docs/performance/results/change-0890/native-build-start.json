@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "-j",
+    "2"
+  ],
+  "cwd": "/tmp/litchi-0890-source",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0890-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.codex/tmp/arg0/codex-arg0BCVfje:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0wWKwSX:/home/zhuhe/.codex/packages/standalone/releases/0.159.3-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0xsnRup:/home/zhuhe/.codex/packages/standalone/releases/0.159.2-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg01o3l0A:/home/zhuhe/.codex/packages/standalone/releases/0.159.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0tsWQwF:/home/zhuhe/.codex/packages/standalone/releases/0.159.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0wnCI9v:/home/zhuhe/.codex/packages/standalone/releases/0.159.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1165373_1789607052703/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1165242_1789607045932/bin:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/254956_1789243784750/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/2181_1789108381859/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+    "TZ": "UTC"
+  },
+  "started_utc": "2026-10-03T18:11:53.307162+00:00"
+}

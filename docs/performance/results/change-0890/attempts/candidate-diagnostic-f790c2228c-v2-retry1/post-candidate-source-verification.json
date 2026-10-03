@@ -1,0 +1,108 @@
+{
+  "baseline_binary": {
+    "bytes": 7432688,
+    "mode": "0o775",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+    "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+  },
+  "baseline_copy": {
+    "bytes": 7432688,
+    "mode": "0o775",
+    "path": "/tmp/litchi-0890-correctness-baseline/xml_attribute_bounds",
+    "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+  },
+  "candidate_binary": {
+    "bytes": 7433288,
+    "mode": "0o775",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+    "sha256": "1284f70709f460ff35aa38da06dd897e0ac6319b32ac4afafb48013da28fc9fb"
+  },
+  "candidate_freeze": {
+    "path": "candidate-freeze-v2.json",
+    "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+  },
+  "candidate_receipt": {
+    "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+    "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268"
+  },
+  "diagnostic_tests": {
+    "count": 24,
+    "cwd": "/home/zhuhe/code/litchi",
+    "failed": 0,
+    "log": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/logs/cargo-test-diagnostic.log",
+    "passed": 24
+  },
+  "fixtures": [
+    {
+      "bytes": 325446,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+      "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be"
+    },
+    {
+      "bytes": 95247,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/docx/drawing.docx",
+      "sha256": "5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8"
+    },
+    {
+      "bytes": 55519,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    }
+  ],
+  "isolated_source_rechecked": true,
+  "overlay_receipt": {
+    "path": "candidate-diagnostic-overlay.json",
+    "sha256": "26151a62d2fcd667fe97b022a6ed8f7ce5a133a876e7b245c7a5e64920ef9db0"
+  },
+  "root_candidates": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 67996,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 133696,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+    }
+  },
+  "root_diagnostic_harness": {
+    "tools/perf-baseline/src/bin/xml_attribute_bounds.rs": {
+      "bytes": 79021,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+      "sha256": "b4e905eed58e7146c298439a9284bbdf9922074a733882ff947febcce4492d04"
+    },
+    "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs": {
+      "bytes": 11272,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+      "sha256": "2dab5d4b9821241a1222fde42ff6b908c0105468f8428b80d268530105c76223"
+    },
+    "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs": {
+      "bytes": 4320,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+      "sha256": "28fada3ae337131f3e0e29879b90536b859a12fa1e370ac38919ab418aa4616c"
+    },
+    "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs": {
+      "bytes": 20413,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+      "sha256": "504f444c3f4805d7d730cc56b2c8b92894f410c0f4b6f8e3439f4406d12a0505"
+    }
+  },
+  "root_lock_custody": {
+    "path": "attempts/baseline-f790c2228c-retry1/root-lock-custody.json",
+    "sha256": "61eea7167d139f1d6bde45358f86a5b94a2eab131cd6aa61b96639e74a1a475f"
+  },
+  "schema": "litchi.mce-0890-post-candidate-source-verification.v1",
+  "source_files": 9411,
+  "source_root": "/tmp/litchi-0890-correctness-source",
+  "status": "pass"
+}

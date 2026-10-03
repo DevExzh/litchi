@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0890 — MCE validated-name reuse rejected
+
+[0890](0890-mce-validated-name-reuse.md) completes semantic qualification and a 72-process matched trial, then rejects the candidate on its failed primary latency gate. All four broad diagnostic reports are byte-identical; owner, format, lint, documentation, and boundary gates pass, with an unrelated untracked-file formatting failure retained and scoped formatting verified. Production is restored exactly. The complete candidate patch, binaries, measurements, and failure history remain available for replay. Owned scratch is removed; independent post-cleanup replay passes. A cleanup path-resolution check failure and its corrected read-only custody verification are retained.
+
 ## 0889 — MCE control qualification
 
 [0889](0889-mce-control-qualification.md) strengthens the diagnostic harness before another MCE optimization: explicit package/member coverage, complete report fields, framed callback transcripts, typed primary/prior errors, and focused expected-output and resource-limit tests. Production is unchanged. Broad repeat equality is a determinism check, not proof against an independent complete MCE implementation.

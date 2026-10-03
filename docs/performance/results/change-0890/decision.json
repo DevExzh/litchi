@@ -1,0 +1,86 @@
+{
+  "schema": "litchi.mce-decision-0890.v1",
+  "status": "complete",
+  "decision": "reject",
+  "adopted_optimization": false,
+  "decided_utc": "2026-10-03T18:46:21.856921+00:00",
+  "reason": "Primary paired native p50 gate fails both median ratio <=0.98 and bootstrap CI upper <1.0. No recapture or replacement population.",
+  "primary_gate": {
+    "ci95_high": 1.0111150075640545,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 0.993810428607121,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "flags": {
+    "primary_review_flags": 0,
+    "control_review_flags": 3,
+    "native_p50_spread_flags": 0
+  },
+  "evidence": {
+    "plan.json": {
+      "path": "docs/performance/results/change-0890/plan.json",
+      "bytes": 59333,
+      "sha256": "346c63950f0241b3c7b74c610aae08a2ae9773434fed87233c4b56dca491d364"
+    },
+    "candidate-freeze-v2.json": {
+      "path": "docs/performance/results/change-0890/candidate-freeze-v2.json",
+      "bytes": 1016,
+      "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+    },
+    "candidate-v2.patch": {
+      "path": "docs/performance/results/change-0890/candidate-v2.patch",
+      "bytes": 9345,
+      "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4"
+    },
+    "capture/experiment.json": {
+      "path": "docs/performance/results/change-0890/capture/experiment.json",
+      "bytes": 26125,
+      "sha256": "02a20174225902c16655a15d91591f23576aceadf0bbff5ae58c22eb9b253e58"
+    },
+    "reduction.json": {
+      "path": "docs/performance/results/change-0890/reduction.json",
+      "bytes": 39565,
+      "sha256": "89327d694a1379712b38741597074f1ef10449f838902f9800069b1e8960e99e"
+    },
+    "verification.json": {
+      "path": "docs/performance/results/change-0890/verification.json",
+      "bytes": 35020,
+      "sha256": "098c5b10436c7e29349e9f0ae275e619dfa4773f4a0b72e1564cdf1f9e0cfb03"
+    },
+    "correctness-review.json": {
+      "path": "docs/performance/results/change-0890/correctness-review.json",
+      "bytes": 29152,
+      "sha256": "deafca142b455c3776c08ae629491e77ea99ba7ef776be22d00ede30a63a0241"
+    },
+    "methodology-review-v3.json": {
+      "path": "docs/performance/results/change-0890/methodology-review-v3.json",
+      "bytes": 36216,
+      "sha256": "39cc4ba0a52d05be8efbd9e0525a88d501cc0980118ed4718ddf325c899fcccd"
+    }
+  },
+  "restored_files": [
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "candidate_sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c",
+      "restored": {
+        "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+        "bytes": 65338,
+        "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+      },
+      "equals_base_commit": true
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+      "candidate_sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb",
+      "restored": {
+        "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+        "bytes": 129836,
+        "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76"
+      },
+      "equals_base_commit": true
+    }
+  ],
+  "control_review": "Three metric-level flags (five individual pairs) remain retained: ordinary XLSX p99, DOCX RSS, PPTX p99. No causal dismissal or universal performance claim.",
+  "scope": "Warm-cache CPU12 shared-host matched trial; allocator observation separate; candidate source and tests retained as patch, not adopted."
+}

@@ -1,0 +1,13 @@
+   Compiling litchi-ooxml-common v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-xlsx)
+   Compiling litchi-pptx v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-pptx)
+   Compiling litchi-docx v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-docx)
+   Compiling litchi-xlsb v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi-xlsb)
+   Compiling litchi v0.0.1 (/tmp/litchi-0890-correctness-source/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/tmp/litchi-0890-correctness-source/tools/perf-baseline)
+    Finished `dev` profile [unoptimized] target(s) in 51.44s
+cwd=/tmp/litchi-0890-correctness-source
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","build","--manifest-path","/tmp/litchi-0890-correctness-source/tools/perf-baseline/Cargo.toml","--locked","--offline","--bin","xml_attribute_bounds"]
+

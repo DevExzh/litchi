@@ -1,0 +1,207 @@
+{
+  "schema": "litchi.mce-expanded-attribute-name-reuse-methodology-review-0890.v1",
+  "status": "pass",
+  "reviewer": "/root/mce_cache_measurement_review_0890",
+  "reviewed_without_build_or_workload": true,
+  "performance_claim": null,
+  "scope": {
+    "candidate": "per-start reuse of a successfully expanded unprefixed MCE attribute name",
+    "production_owner": "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "focused_tests": "crates/litchi-ooxml-common/src/mce/tests.rs",
+    "public_api_changed": false,
+    "dependencies_changed": false,
+    "unsafe_code_added": false,
+    "base_head": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "retained_baseline_revision": "335a40350bf06f49691745c14d310fd7a3ca9117"
+  },
+  "helpers": {
+    "build": {
+      "path": "docs/performance/results/change-0890/build.py",
+      "bytes": 11848,
+      "sha256": "36719e57af2e1b668dcc3b2b47b3b1735437561d7cecae91490dec767557d12d"
+    },
+    "experiment": {
+      "path": "docs/performance/results/change-0890/experiment.py",
+      "bytes": 7535,
+      "sha256": "356344d1d6e4eab1ad38d6d6d05bada74e8950eb2a09241ba30acf3f538d8f7e"
+    },
+    "reducer": {
+      "path": "docs/performance/results/change-0890/reduce.py",
+      "bytes": 1031,
+      "sha256": "251d0343fdffa6ff90d3504c13dd60627e0f3217e45ffd58a3c538cd4afdd43b"
+    },
+    "managed_executable_preparation": {
+      "path": "docs/performance/results/change-0890/prepare_exec.py",
+      "bytes": 3695,
+      "sha256": "d8e67639b33c40a75af83e51f804350b2d2e713eb3dbc88eb09b1bd75b9afa77"
+    },
+    "packet_verifier": {
+      "path": "docs/performance/results/change-0890/verify_packet.py",
+      "bytes": 6550,
+      "sha256": "eb4a67f955ad7dcfb7a7c7f28ae91f34dc1f95165b883743d104f9a51b27b369"
+    },
+    "baseline_source_verifier": {
+      "path": "docs/performance/results/change-0890/verify_baseline_source.py",
+      "bytes": 4127,
+      "sha256": "a6cd7248461f45357a02c1183fc7b2026366c360441f0d1fb8c87177c42685b1"
+    },
+    "correctness_baseline_runner": {
+      "path": "docs/performance/results/change-0890/baseline_runner.py",
+      "bytes": 15461,
+      "sha256": "a4b1e61d5cca897a0a5fb42eb565329cf380d648604be30c54e9e696bcc33a0"
+    }
+  },
+  "static_checks": {
+    "python_ast": "pass for all seven 0890 helpers",
+    "helper_imports": "pass for build, prepare_exec, baseline_runner, experiment, reduce, and verify_packet",
+    "schedule": {
+      "status": "pass",
+      "children": 72,
+      "native_children": 64,
+      "allocator_children": 8,
+      "bootstrap_seed": 890
+    },
+    "synthetic_full_load_plan": {
+      "status": "pass",
+      "workload_launched": false,
+      "purpose": "exercise the managed-copy identity seam and all original plan gates with retained executable descriptors"
+    },
+    "source_review": {
+      "path": "docs/performance/results/change-0890/source-review.json",
+      "status": "approved_for_measurement",
+      "blocking_findings": 0
+    }
+  },
+  "source_custody": {
+    "candidate_freeze": {
+      "path": "docs/performance/results/change-0890/candidate-freeze.json",
+      "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+      "candidate_paths": [
+        "crates/litchi-ooxml-common/src/mce/codec.rs",
+        "crates/litchi-ooxml-common/src/mce/tests.rs"
+      ],
+      "patch": {
+        "path": "docs/performance/results/change-0890/candidate.patch",
+        "bytes": 9187,
+        "sha256": "6cfe6e59581f4022c8e4bdbf3e3f930de247a6fa6f5adfe5f4bfdd65ffc91589"
+      }
+    },
+    "retained_baseline": {
+      "revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+      "archive": {
+        "path": "docs/performance/results/change-0885/source.tar.gz",
+        "bytes": 89024356,
+        "sha256": "bdf6e1c815bbf33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+      },
+      "manifest": {
+        "path": "docs/performance/results/change-0885/source.json",
+        "bytes": 2083420,
+        "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938",
+        "files": 10765
+      },
+      "diagnostic_exclusions": [
+        "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs"
+      ]
+    },
+    "baseline_correctness_replay": {
+      "receipt": "docs/performance/results/change-0890/attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+      "status": "pass",
+      "source_files": 9411,
+      "generated_records": 20000,
+      "aliasing_records": 20000,
+      "packages": 3,
+      "selected_members": 67,
+      "repeat_report_bytes": 226180145,
+      "repeat_report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "repeat_compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29"
+    },
+    "historical_failure": {
+      "receipt": "docs/performance/results/change-0890/attempts/baseline-f790c2228c/baseline-receipt.json",
+      "status": "retained_failed_attempt",
+      "reason": "baseline build failed before differential execution"
+    }
+  },
+  "schedule": {
+    "cases": [
+      "xlsx_producer_medium_source_full_cell_scan",
+      "xlsx_full_cell_scan",
+      "docx_producer_source_selected_paragraph",
+      "pptx_producer_source_selected_slide"
+    ],
+    "native": {
+      "blocks": 8,
+      "pairs_per_case": 8,
+      "children": 64,
+      "warmup_per_child": 3,
+      "samples_per_child": 50
+    },
+    "allocator": {
+      "primary_case": "xlsx_producer_medium_source_full_cell_scan",
+      "blocks": 4,
+      "pairs": 4,
+      "children": 8,
+      "warmup_per_child": 3,
+      "samples_per_child": 15
+    },
+    "ordering": "native lane then allocator lane; AB/BA alternates by block plus case parity",
+    "execution": "fresh process per child, fail-fast, no retries or replacements, warm filesystem cache, CPU affinity 12"
+  },
+  "statistics": {
+    "unit": "whole-child aggregate statistics",
+    "native_metrics": [
+      "p50_ns",
+      "p95_ns",
+      "p99_ns",
+      "peak_rss_kib"
+    ],
+    "pairing": "after/before ratios within each scheduled pair; samples are never pooled across children",
+    "bootstrap": {
+      "draws": 10000,
+      "seed": 890,
+      "confidence": "percentile 95% interval",
+      "indices": [249, 9749],
+      "resampling_unit": "paired child ratios"
+    },
+    "primary_gate": {
+      "metric": "native primary p50",
+      "median_ratio_at_most": 0.98,
+      "bootstrap_upper_below": 1.0
+    },
+    "review_flags": {
+      "control_or_primary_pair_ratio_above": 1.05,
+      "native_p50_leg_spread_above": 1.2,
+      "allocator_adoption": "not evaluated"
+    }
+  },
+  "rss_and_residency": {
+    "measurement": "process-lifetime peak RSS from /usr/bin/time in KiB",
+    "managed_copies": "one byte- and mode-verified fresh copy per role and lane",
+    "interpretation": "copy control narrows pathname/inode history differences but does not remove executable file-mapping residency confounding",
+    "adoption": "RSS is review evidence only and is excluded from the primary adoption gate",
+    "prior_evidence": "0888 showed byte-identical executable copies can have different RSS through executable mappings"
+  },
+  "verified": [
+    "The candidate freeze contains exactly the two reviewed MCE owner paths and a path-bound patch.",
+    "The release builder reconstructs the retained 0885 source archive and rejects source changes outside the candidate paths and the four explicitly excluded diagnostic files.",
+    "The experiment retains source binary descriptors separately from managed executable copies and checks copy byte identity before timed children.",
+    "The wrapper preserves the reviewed 0887 semantic fences, four-case native controls, primary allocator observation, fresh-child schedule, and fail-fast custody.",
+    "The reducer uses paired whole-child statistics and a fixed seeded bootstrap; its pass status is evidence reduction, not candidate adoption.",
+    "The packet verifier reconstructs the source and replays receipts without rebuilding or launching a workload."
+  ],
+  "caveats": [
+    "This receipt authorizes measurement methodology only; it contains no optimization, latency, allocation, RSS, or adoption claim.",
+    "The retained 0885 baseline is reusable only after the final plan binds its source archive, binary/build receipts, toolchain, flags, environment, and the newly built candidate receipts as an exact match.",
+    "The actual plan must pass the full load_plan check after all four managed executable copies and their custody receipt exist, before any capture child launches.",
+    "Warm-cache CPU-affinity measurements have no exclusive-host or physical-cold-cache guarantee."
+  ],
+  "required_followups": [
+    "Complete candidate-source.json from the frozen patch and run the source/quality gates, including the focused malformed source-order test and Clippy/fmt checks identified by source-review.json.",
+    "Record a plan binding every source, build, binary, managed-copy, lock-custody, helper, corpus, and environment descriptor; run full load_plan successfully before capture.",
+    "Run the correctness equality check for the candidate against the retained baseline differential oracle with no performance claim.",
+    "Capture the single 72-child packet, reduce it, inspect all control/spread/RSS flags, and retain any failed attempt without retry replacement.",
+    "After aggregate and final review, remove only marked 0890 source, target, correctness, baseline-copy, and managed-executable roots, then replay packet verification with cleanup required."
+  ]
+}

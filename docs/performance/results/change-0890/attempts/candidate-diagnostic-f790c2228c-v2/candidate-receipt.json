@@ -1,0 +1,157 @@
+{
+  "baseline_binary": {
+    "bytes": 7432688,
+    "mode": "0o775",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+    "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+  },
+  "baseline_receipt": {
+    "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+    "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a"
+  },
+  "binary_differs_from_baseline": true,
+  "candidate_binary": {
+    "bytes": 7433288,
+    "mode": "0o775",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+    "sha256": "1284f70709f460ff35aa38da06dd897e0ac6319b32ac4afafb48013da28fc9fb"
+  },
+  "commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "--manifest-path",
+        "/tmp/litchi-0890-correctness-source/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds"
+      ],
+      "cwd": "/tmp/litchi-0890-correctness-source",
+      "elapsed_ns": 51464201743,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T18:03:57.569724Z",
+      "log": "attempts/candidate-diagnostic-f790c2228c-v2/logs/cargo-build-candidate.log",
+      "log_bytes": 1190,
+      "log_sha256": "e97849133ff084b00fd97cc741ce9490e4f3203e7db384d536939393cb038df5",
+      "name": "cargo-build-candidate",
+      "pass": true,
+      "returncode": 0,
+      "started_utc": "2026-10-03T18:03:06.105541Z"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/tmp/litchi-0890-correctness-source/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/tmp/litchi-0890-correctness-source",
+      "elapsed_ns": 642171677,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T18:03:58.216254Z",
+      "log": "attempts/candidate-diagnostic-f790c2228c-v2/logs/cargo-test-diagnostic.log",
+      "log_bytes": 3348,
+      "log_sha256": "c2b5744ce1f36563721b73276e6d15eabe5720f319145cbf924d0a88274b5a7f",
+      "name": "cargo-test-diagnostic",
+      "pass": false,
+      "returncode": 101,
+      "started_utc": "2026-10-03T18:03:57.574103Z"
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0890-correctness",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-C debuginfo=0",
+    "RUSTFLAGS": "-C debuginfo=0",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "TMPDIR": "/tmp",
+    "TZ": "UTC"
+  },
+  "failures": [
+    "candidate_diagnostic_tests"
+  ],
+  "finished_utc": "2026-10-03T18:03:58.216639Z",
+  "fixtures": [
+    {
+      "bytes": 325446,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+      "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be"
+    },
+    {
+      "bytes": 95247,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/docx/drawing.docx",
+      "sha256": "5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8"
+    },
+    {
+      "bytes": 55519,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    }
+  ],
+  "last_command": {
+    "argv": [
+      "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+      "test",
+      "--manifest-path",
+      "/tmp/litchi-0890-correctness-source/tools/perf-baseline/Cargo.toml",
+      "--locked",
+      "--offline",
+      "--bin",
+      "xml_attribute_bounds",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/tmp/litchi-0890-correctness-source",
+    "elapsed_ns": 642171677,
+    "expected": "pass",
+    "finished_utc": "2026-10-03T18:03:58.216254Z",
+    "log": "attempts/candidate-diagnostic-f790c2228c-v2/logs/cargo-test-diagnostic.log",
+    "log_bytes": 3348,
+    "log_sha256": "c2b5744ce1f36563721b73276e6d15eabe5720f319145cbf924d0a88274b5a7f",
+    "name": "cargo-test-diagnostic",
+    "pass": false,
+    "returncode": 101,
+    "started_utc": "2026-10-03T18:03:57.574103Z"
+  },
+  "manifest": "/tmp/litchi-0890-correctness-source/tools/perf-baseline/Cargo.toml",
+  "overlay_receipt": {
+    "path": "candidate-diagnostic-overlay.json",
+    "sha256": "26151a62d2fcd667fe97b022a6ed8f7ce5a133a876e7b245c7a5e64920ef9db0"
+  },
+  "performance_claim": false,
+  "purpose": "candidate_differential_and_focused_test_qualification",
+  "runner": {
+    "bytes": 10605,
+    "path": "attempts/candidate-diagnostic-f790c2228c-v2/candidate_diagnostic_runner.py",
+    "sha256": "69de7becc4b8e15638efe319a023bd3fcee2157607b004e7624f3b513bbbeecd"
+  },
+  "schema": "litchi.mce-0890-correctness-candidate.v1",
+  "source_root": "/tmp/litchi-0890-correctness-source",
+  "started_utc": "2026-10-03T18:03:06.103392Z",
+  "status": "fail",
+  "target_dir": "/home/zhuhe/code/litchi/target/litchi-0890-correctness",
+  "target_marker": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/.owner-0890-target",
+  "toolchain": {
+    "cargo": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo"
+  }
+}

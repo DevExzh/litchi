@@ -1,0 +1,48 @@
+{
+  "aliasing": 20000,
+  "baseline_attempt": "attempts/baseline-f790c2228c-retry1",
+  "candidate_attempt": "attempts/candidate-diagnostic-f790c2228c-v2-retry1",
+  "cross_version_byte_identical": true,
+  "generated": 20000,
+  "packages": 3,
+  "repeat_byte_identical": true,
+  "reports": {
+    "first": {
+      "baseline": {
+        "bytes": 12319811,
+        "decompressed_bytes": 226180145,
+        "decompressed_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+        "path": "attempts/baseline-f790c2228c-retry1/differential-first.json.gz",
+        "sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29"
+      },
+      "byte_identical": true,
+      "candidate": {
+        "bytes": 12319811,
+        "decompressed_bytes": 226180145,
+        "decompressed_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/differential-first.json.gz",
+        "sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29"
+      }
+    },
+    "second": {
+      "baseline": {
+        "bytes": 12319811,
+        "decompressed_bytes": 226180145,
+        "decompressed_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+        "path": "attempts/baseline-f790c2228c-retry1/differential-second.json.gz",
+        "sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29"
+      },
+      "byte_identical": true,
+      "candidate": {
+        "bytes": 12319811,
+        "decompressed_bytes": 226180145,
+        "decompressed_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/differential-second.json.gz",
+        "sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29"
+      }
+    }
+  },
+  "schema": "litchi.mce-0890-cross-version-diagnostic-comparison.v1",
+  "selected_members": 67,
+  "status": "pass"
+}

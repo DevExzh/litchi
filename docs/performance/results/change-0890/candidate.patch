@@ -1,0 +1,239 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 2346289019..332e22423f 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -12,7 +12,7 @@ use super::model::{
+     Output, Report, XML_NS,
+ };
+ use super::patterns::{NamePattern, Patterns};
+-use super::scope::{Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
++use super::scope::{NO_NAMESPACE, Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
+ use crate::xml::attributes::BytesStartExt as _;
+ use crate::xml_name;
+ 
+@@ -717,6 +717,13 @@ struct Attr<'a> {
+     key: &'a str,
+     value: Cow<'a, str>,
+     keep: bool,
++    /// The directive pass has already validated an unprefixed name. Such an
++    /// attribute is necessarily in no namespace and cannot be filtered by
++    /// the MCE writer, so the later output pass can reuse that fact without
++    /// another QName validation. The marker is intended to occupy existing
++    /// padding after `keep`; the layout regression checks that relationship
++    /// for the current compiler.
++    unprefixed_name_validated: bool,
+ }
+ 
+ #[inline(never)]
+@@ -893,6 +900,7 @@ fn start(
+                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
+                 .map_err(xerr)?,
+             keep: true,
++            unprefixed_name_validated: false,
+         });
+     }
+     let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
+@@ -958,12 +966,15 @@ fn start(
+ 
+     let mut directives = Vec::new();
+     let mut tokens = 0usize;
+-    for a in &raw {
++    for a in &mut raw {
+         if a.key == "xmlns" || a.key.starts_with("xmlns:") {
+             continue;
+         }
+         let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
+         if !scope.is_mce(namespace.id) {
++            if namespace.id == NO_NAMESPACE {
++                a.unprefixed_name_validated = true;
++            }
+             continue;
+         }
+         if !matches!(
+@@ -976,6 +987,14 @@ fn start(
+         ) {
+             return Err(bad("unknown MCE attribute"));
+         }
++        // The active writer will discard every MCE attribute.  Keep that
++        // result in the existing per-start bit so `write_start` does not
++        // resolve this same name a second time.  This is deliberately done
++        // before directive application: the directive pass already owns the
++        // required QName/error ordering, while the bit is only consumed if
++        // this start is later emitted.  Inactive branches never reach the
++        // writer and therefore retain their existing report behavior.
++        a.keep = false;
+         tokens = tokens
+             .checked_add(a.value.split_whitespace().count())
+             .ok_or_else(|| limit("directive tokens"))?;
+@@ -1545,7 +1564,16 @@ fn write_start(
+     // every source attribute survives unchanged.
+     let mut rewrite = false;
+     for a in raw.iter_mut() {
+-        a.keep = true;
++        if !a.keep && filter {
++            // Recognized MCE attributes were resolved by the directive pass
++            // above. They are always filtered from an active output start,
++            // so consuming this marker preserves the report without another
++            // namespace lookup. The inherited-opaque path returns before
++            // the directive pass and therefore cannot arrive here marked.
++            rep.ignored_attributes += 1;
++            rewrite = true;
++            continue;
++        }
+         if a.key == "xmlns" {
+             continue;
+         }
+@@ -1559,6 +1587,13 @@ fn write_start(
+             }
+             continue;
+         }
++        if a.unprefixed_name_validated {
++            debug_assert!(!a.key.contains(':'));
++            // Unprefixed attributes never use the element's default
++            // namespace, so they cannot be MCE or effectively ignorable.
++            // The directive pass already performed the QName validation.
++            continue;
++        }
+         let (namespace, local) = expand_parts(a.key, resolver(scope, &ctx.ns), false)?;
+         if filter && scope.is_mce(namespace.id) {
+             rep.ignored_attributes += 1;
+@@ -1865,3 +1900,27 @@ mod marker_exhaustion_test {
+         ));
+     }
+ }
++
++#[cfg(test)]
++mod attr_layout_tests {
++    use super::Attr;
++    use std::{borrow::Cow, mem::size_of};
++
++    // Keep the former field sequence in the test so the current compiler can
++    // compare the candidate against the pre-reuse representation directly.
++    #[allow(dead_code)]
++    struct AttrBeforeReuse<'a> {
++        key: &'a str,
++        value: Cow<'a, str>,
++        keep: bool,
++    }
++
++    #[test]
++    fn validated_name_marker_does_not_grow_attr_storage() {
++        assert_eq!(
++            size_of::<Attr<'static>>(),
++            size_of::<AttrBeforeReuse<'static>>(),
++            "the reuse marker must fit existing Attr padding"
++        );
++    }
++}
+diff --git a/crates/litchi-ooxml-common/src/mce/tests.rs b/crates/litchi-ooxml-common/src/mce/tests.rs
+index 1b239ccb96..550a8e07ae 100644
+--- a/crates/litchi-ooxml-common/src/mce/tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/tests.rs
+@@ -425,6 +425,107 @@ mod preservation_tests {
+             Err(Error::NonConformant(message)) if message == "unbound prefix xmlns"
+         ));
+     }
++
++    #[test]
++    fn unprefixed_attributes_reuse_validation_inside_a_default_namespace() {
++        let source = format!(
++            r#"<r xmlns:mc="{MC}" xmlns="urn:default" xmlns:x="urn:ext" mc:Ignorable="x"><item plain="ok" x:drop="no"/></r>"#
++        );
++        let (actual, report) = run(&source).expect("default namespace attributes remain valid");
++        assert_eq!(
++            actual,
++            format!(
++                r#"<r xmlns:mc="{MC}" xmlns="urn:default" xmlns:x="urn:ext"><item plain="ok"></item></r>"#
++            )
++        );
++        assert_eq!(
++            report,
++            Report {
++                ignored_attributes: 2,
++                ..Report::default()
++            }
++        );
++    }
++
++    #[test]
++    fn inherited_opaque_paths_still_validate_malformed_attribute_names() {
++        let source = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:e="urn:ext"><e:opaque><child bad!name="1"/></e:opaque></r>"#
++        );
++        let mut capabilities = Capabilities::new();
++        capabilities.preserve_extension_element(Name {
++            namespace: "urn:ext".to_owned(),
++            local_name: "opaque".to_owned(),
++        });
++
++        assert!(matches!(
++            run_with(&source, &capabilities, &Limits::default()),
++            Err(Error::NonConformant(message))
++                if message == "invalid QName: invalid XML QName 'bad!name'"
++        ));
++    }
++
++    #[test]
++    fn inactive_choice_attributes_do_not_change_report_counters() {
++        let source = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u" mc:Ignorable="u" u:flag="discarded"/><mc:Fallback><kept/></mc:Fallback></mc:AlternateContent></r>"#
++        );
++        let (actual, report) = run(&source).expect("inactive choice remains well formed");
++        assert_eq!(
++            actual,
++            format!(r#"<r xmlns:mc="{MC}" xmlns:u="urn:unsupported"><kept></kept></r>"#)
++        );
++        assert_eq!(
++            report,
++            Report {
++                alternate_content_count: 1,
++                selected_fallbacks: 1,
++                ..Report::default()
++            }
++        );
++    }
++
++    #[test]
++    fn directive_and_malformed_attribute_errors_follow_source_order() {
++        let malformed_first = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" x:bad:attr="1" mc:NotARealDirective="1"/>"#
++        );
++        assert!(matches!(
++            run(&malformed_first),
++            Err(Error::NonConformant(message))
++                if message == "invalid QName: invalid XML QName 'x:bad:attr'"
++        ));
++
++        let directive_first = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" mc:NotARealDirective="1" x:bad:attr="1"/>"#
++        );
++        assert!(matches!(
++            run(&directive_first),
++            Err(Error::NonConformant(message)) if message == "unknown MCE attribute"
++        ));
++    }
++
++    #[test]
++    fn name_reuse_does_not_bypass_duplicate_or_directive_token_limits() {
++        let duplicate = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:a="urn:same" xmlns:b="urn:same" a:value="1" b:value="2"/>"#
++        );
++        assert!(matches!(
++            run(&duplicate),
++            Err(Error::NonConformant(message)) if message == "duplicate attribute"
++        ));
++
++        let token_limited =
++            format!(r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:y="urn:y" mc:Ignorable="x y"/>"#);
++        let limits = Limits {
++            max_directive_tokens: 1,
++            ..Limits::default()
++        };
++        assert!(matches!(
++            run_with(&token_limited, &Capabilities::new(), &limits),
++            Err(Error::LimitExceeded(message)) if message == "directive tokens"
++        ));
++    }
+ }
+ 
+ #[cfg(test)]

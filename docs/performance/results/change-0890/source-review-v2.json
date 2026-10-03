@@ -1,0 +1,124 @@
+{
+  "schema": "litchi.mce-expanded-attribute-name-reuse-source-review-0890.v2",
+  "status": "approved_for_measurement",
+  "reviewer": "/root/mce_cache_review_0890",
+  "reviewed_without_build_or_timing": true,
+  "base_head": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+  "supersedes": "docs/performance/results/change-0890/source-review.json",
+  "freeze": {
+    "path": "docs/performance/results/change-0890/candidate-freeze-v2.json",
+    "schema": "litchi.mce-candidate-freeze-0890.v1",
+    "reason": "v2 adds focused normal-emitted malformed unprefixed QName ordering coverage; production codec is unchanged"
+  },
+  "scope": {
+    "production_owner": "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "focused_tests": "crates/litchi-ooxml-common/src/mce/tests.rs",
+    "candidate_paths": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ],
+    "public_api_changed": false,
+    "dependencies_changed": false,
+    "unsafe_code_added": false,
+    "reviewer_source_edits": false,
+    "reviewer_builds": false,
+    "performance_claim": false
+  },
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "before": {
+        "bytes": 65338,
+        "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+      },
+      "after": {
+        "bytes": 67996,
+        "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+      }
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "before": {
+        "bytes": 129836,
+        "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76"
+      },
+      "after": {
+        "bytes": 133696,
+        "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+      }
+    }
+  },
+  "patch": {
+    "path": "docs/performance/results/change-0890/candidate-v2.patch",
+    "base": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "bytes": 9345,
+    "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4",
+    "paths": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ]
+  },
+  "findings": [
+    {
+      "id": "directive-before-reuse",
+      "severity": "pass",
+      "summary": "The directive pass still expands every non-namespace attribute in source order before token accounting and application. The unprefixed marker is set only after successful expansion, preserving malformed and unbound-name refusal ordering."
+    },
+    {
+      "id": "no-namespace-implication",
+      "severity": "pass",
+      "summary": "Unprefixed attributes resolve to NO_NAMESPACE regardless of the element default namespace. Existing start-tag validation rejects prefixed bindings to the empty URI, so the marker cannot classify a prefixed name as unprefixed."
+    },
+    {
+      "id": "opaque-inherited-path",
+      "severity": "pass",
+      "summary": "Inherited opaque starts return before directive scanning and receive no reuse markers; their filter=false writer path continues to expand and preserve malformed, MCE, and ordinary attributes."
+    },
+    {
+      "id": "directive-filter-report",
+      "severity": "pass",
+      "summary": "Recognized MCE attributes are marked only after QName and local-name recognition, then counted and skipped once by active emitted starts. Inactive and opaque paths retain their report behavior, and ProcessContent validation remains in apply_directives and unwrap checks."
+    },
+    {
+      "id": "allocation-and-limits",
+      "severity": "pass",
+      "summary": "The candidate adds only infallible bit stores, retains existing fallible reservations and checked limits, and introduces no new allocation or typed-error path."
+    },
+    {
+      "id": "attr-layout",
+      "severity": "pass",
+      "summary": "The focused layout test compares Attr with the former three-field representation on the current compiler target, and the source comment scopes the padding statement to that regression check rather than asserting a universal repr(Rust) guarantee."
+    },
+    {
+      "id": "focused-order-coverage",
+      "severity": "pass",
+      "summary": "The v2 test covers both prefixed and unprefixed malformed names, places each after a valid unprefixed attribute, and checks both malformed-first and unknown-directive-first source orders."
+    },
+    {
+      "id": "clippy-shape",
+      "severity": "pass",
+      "summary": "The active MCE marker condition is collapsed to !a.keep && filter, avoiding the prior nested-if collapsible_if warning while retaining the same invariant and report behavior."
+    },
+    {
+      "id": "source-integrity",
+      "severity": "pass",
+      "summary": "The v2 freeze contains exactly codec.rs and tests.rs; the production codec identity is unchanged from v1 and the patch hash, byte count, base commit, and file hashes are bound above."
+    }
+  ],
+  "blocking_findings": [],
+  "semantic_matrix": {
+    "default_namespace_attributes": true,
+    "default_namespace_reset": true,
+    "inherited_opaque_attributes": true,
+    "malformed_opaque_attribute": true,
+    "malformed_unprefixed_ordering": true,
+    "expanded_duplicate_guard": true,
+    "directive_token_limit": true,
+    "process_content_validation": true,
+    "empty_prefixed_namespace_refusal": "preserved by existing start-tag validation",
+    "layout_regression": true
+  },
+  "owner_reported_checks": {
+    "rustfmt": "pass",
+    "git_diff_check": "pass",
+    "baseline_fullcontrols_exact_same_0889_hash": "pass"
+  }
+}

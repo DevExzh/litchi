@@ -1,0 +1,10 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Finished `dev` profile [unoptimized] target(s) in 3.40s
+   Generated /home/zhuhe/code/litchi/target/litchi-0890-correctness/doc/litchi_ooxml_common/index.html
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","rustdoc","--manifest-path","/home/zhuhe/code/litchi/Cargo.toml","--locked","--offline","-p","litchi-ooxml-common","--lib","--","-D","warnings"]
+

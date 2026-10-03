@@ -1,0 +1,265 @@
+{
+  "basis": "Aggregate correctness and owner-quality qualification from completed retained receipts; this artifact performs no rerun and makes no performance or adoption claim.",
+  "diagnostic_qualification": {
+    "baseline_retry": {
+      "bytes": 2753320,
+      "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+      "performance_claim": false,
+      "schema": "litchi.mce-0890-correctness-baseline.v1",
+      "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+      "status": "pass"
+    },
+    "candidate_retry": {
+      "bytes": 9538,
+      "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+      "performance_claim": false,
+      "schema": "litchi.mce-0890-correctness-candidate.v1",
+      "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+      "status": "pass"
+    },
+    "cross_version_comparison": {
+      "bytes": 1998,
+      "path": "cross-version-diagnostic-comparison.json",
+      "schema": "litchi.mce-0890-cross-version-diagnostic-comparison.v1",
+      "sha256": "08680c6f0a6d6c9b53bb63f0a2923082e9afe31ec3904168c9339fbc204d86cd",
+      "status": "pass"
+    },
+    "exact_report": {
+      "aliasing": 20000,
+      "compressed_bytes": 12319811,
+      "compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "cross_version_byte_identical": true,
+      "generated": 20000,
+      "legacy_results": 200405,
+      "missing_controls_refused": true,
+      "missing_oracle_refused": true,
+      "oracle_records": 200201,
+      "packages": 3,
+      "repeat_byte_equal": true,
+      "report_bytes": 226180145,
+      "report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "selected_members": 67
+    },
+    "focused_diagnostic_tests": {
+      "failed": 0,
+      "passed": 24
+    },
+    "root_oracle_comparison": {
+      "bytes": 1295,
+      "path": "root-oracle-comparison.json",
+      "schema": "litchi.mce-oracle-verification-0889.v1",
+      "sha256": "7880115aca56edc943ca2b79c2606b3ba3d5821bb535482e214421f54059d0bd",
+      "status": "pass"
+    }
+  },
+  "limits": {
+    "adoption_claim": false,
+    "latency_rss_claim": false,
+    "performance_claim": false,
+    "rerun_performed": false
+  },
+  "owner_quality_gates": {
+    "continuation": {
+      "isolated_workspace_fmt": true,
+      "mce_owner_unfiltered_tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 399
+      },
+      "receipt": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "performance_claim": false,
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "root_owner_fmt": true,
+      "status": "pass"
+    },
+    "fmt_failure_resolution": {
+      "failed_log": {
+        "bytes": 3668,
+        "path": "attempts/owner-gates-v2/logs/fmt_check.log",
+        "sha256": "6297d05d93a243af888f4e835096a7d7e7eab31e75152ef639aed0a05c804e8b"
+      },
+      "resolution_logs": [
+        {
+          "bytes": 219,
+          "path": "attempts/owner-continuation-v2/logs/isolated_workspace_fmt.log",
+          "sha256": "e500f70a31d05da6bda9f9e1f09b77ba2164d11fb448a7173a28bbed0440eeb6"
+        },
+        {
+          "bytes": 221,
+          "path": "attempts/owner-continuation-v2/logs/root_owner_fmt.log",
+          "sha256": "9a86a2462477e9d4848a3ff695b0dbad4a47870311f13cecf7301555b6f592b4"
+        }
+      ],
+      "scope": "only unrelated untracked crates/litchi/examples/bench_word_parse.rs"
+    },
+    "initial_receipt": {
+      "bytes": 3701491,
+      "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+      "performance_claim": false,
+      "schema": "litchi.mce-0890-owner-gates.v1",
+      "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+      "status": "fail"
+    },
+    "initial_receipt_failures": [
+      "fmt_check"
+    ],
+    "initial_receipt_status": "fail",
+    "passed_commands": {
+      "crate_boundary_check": true,
+      "docx_shared_tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1230
+      },
+      "mce_owner_clippy": true,
+      "mce_owner_rustdoc": true,
+      "mce_owner_tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 151
+      },
+      "pptx_shared_tests": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 851
+      },
+      "xlsx_shared_tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1381
+      }
+    }
+  },
+  "performance_claim": false,
+  "qualified_utc": "2026-10-03T18:40:08.128437Z",
+  "retained_failed_history": [
+    {
+      "id": "initial-baseline-include-bytes-omission",
+      "log": {
+        "bytes": 9268,
+        "path": "attempts/baseline-f790c2228c/logs/cargo-build-baseline.log",
+        "sha256": "038cf7aab8a6390eb4e883622c3a19d2926f1defa4c51ba1c3ddaa4068ed79df"
+      },
+      "receipt": {
+        "bytes": 2748153,
+        "path": "attempts/baseline-f790c2228c/baseline-receipt.json",
+        "performance_claim": false,
+        "schema": "litchi.mce-0890-correctness-baseline.v1",
+        "sha256": "84e6db9716f78c571fa4ffc8d0d0850f6957d8427906e62d0452a9ba7a946e9b",
+        "status": "fail"
+      },
+      "resolved_by": {
+        "bytes": 2753320,
+        "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+        "performance_claim": false,
+        "schema": "litchi.mce-0890-correctness-baseline.v1",
+        "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+        "status": "pass"
+      }
+    },
+    {
+      "id": "initial-candidate-test-fixture-manifest-failure",
+      "log": {
+        "bytes": 3348,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2/logs/cargo-test-diagnostic.log",
+        "sha256": "c2b5744ce1f36563721b73276e6d15eabe5720f319145cbf924d0a88274b5a7f"
+      },
+      "receipt": {
+        "bytes": 5770,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2/candidate-receipt.json",
+        "performance_claim": false,
+        "schema": "litchi.mce-0890-correctness-candidate.v1",
+        "sha256": "010dfd3370b2c0fd2e018202718d390fb02638ab682fad638dda46334c765e66",
+        "status": "fail"
+      },
+      "resolved_by": {
+        "bytes": 9538,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+        "performance_claim": false,
+        "schema": "litchi.mce-0890-correctness-candidate.v1",
+        "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+        "status": "pass"
+      },
+      "result": "23 passed; 1 failed",
+      "test": "input_tests::package_discovery_deduplicates_overlapping_input_paths"
+    },
+    {
+      "cause": "Known N^2 source-manifest recomputation; no Cargo gate or diagnostic runtime started.",
+      "id": "owner-continuation-preflight-pid-3923635-single-event",
+      "observers": [
+        {
+          "bytes": 666,
+          "path": "attempts/owner-continuation-preflight-1/preflight-stop.json",
+          "schema": "litchi.mce-owner-continuation-preflight-stop-0890.v1",
+          "sha256": "9f088d575b2d033ea0d57cf32f7e4f9258f69ea571d261327b48f2880db27838",
+          "status": "termination_requested"
+        },
+        {
+          "bytes": 2209,
+          "path": "attempts/owner-continuation-v2-preflight-failure/preflight-failure-receipt.json",
+          "performance_claim": false,
+          "schema": "litchi.mce-0890-owner-continuation-preflight-failure.v1",
+          "sha256": "510cbd56c92189dc9e2c6388f3e8e90d9bdddbc1b245c710e62a1bd8a41b312e",
+          "status": "fail"
+        }
+      ],
+      "pid": 3923635,
+      "resolved_by": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "performance_claim": false,
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      }
+    }
+  ],
+  "reviewer": "/root/mce_cache_review_0890",
+  "schema": "litchi.mce-0890-quality-qualification.v1",
+  "source": {
+    "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "candidate_build": {
+      "bytes": 4805,
+      "path": "build.json",
+      "schema": "litchi.mce-candidate-build-0890.v1",
+      "sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881",
+      "status": "pass"
+    },
+    "candidate_freeze": {
+      "bytes": 1016,
+      "path": "candidate-freeze-v2.json",
+      "performance_claim": false,
+      "schema": "litchi.mce-candidate-freeze-0890.v1",
+      "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+    },
+    "correctness_review": {
+      "bytes": 29152,
+      "path": "correctness-review.json",
+      "performance_claim": false,
+      "schema": "litchi.mce-expanded-attribute-name-reuse-correctness-review-0890.v1",
+      "sha256": "deafca142b455c3776c08ae629491e77ea99ba7ef776be22d00ede30a63a0241",
+      "status": "pass"
+    },
+    "methodology_review_v2": {
+      "bytes": 20943,
+      "path": "methodology-review-v2.json",
+      "performance_claim": null,
+      "schema": "litchi.mce-expanded-attribute-name-reuse-methodology-review-0890.v2",
+      "sha256": "b0207ba46f3c7d3ab926bb5251b8cf214568409c2382eb494a05759c41233135",
+      "status": "pass"
+    },
+    "source_review_v2": {
+      "bytes": 5526,
+      "path": "source-review-v2.json",
+      "schema": "litchi.mce-expanded-attribute-name-reuse-source-review-0890.v2",
+      "sha256": "54270e65163db13be0e7142954966c8c0924c1389bcce2d2f3a136ab55834366",
+      "status": "approved_for_measurement"
+    }
+  },
+  "status": "pass"
+}

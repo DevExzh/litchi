@@ -1,0 +1,69 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/070-allocator-allocator-b03-c00-after/peak-rss-kib.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/after-allocator",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--xlsx-shape",
+    "medium",
+    "--warmup",
+    "3",
+    "--samples",
+    "15",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/070-allocator-allocator-b03-c00-after/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0890/capture/runs/070-allocator-allocator-b03-c00-after/producer.json"
+  ],
+  "binary": {
+    "declared": {
+      "bytes": 267441624,
+      "device": 66305,
+      "executable": true,
+      "inode": 35440243,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/after-allocator",
+      "sha256": "949df20eba814bac2306bb1a43941294f8157946da0abc064604f707b8b2864f"
+    },
+    "identity": {
+      "bytes": 267441624,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/after-allocator",
+      "sha256": "949df20eba814bac2306bb1a43941294f8157946da0abc064604f707b8b2864f"
+    },
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/executables/after-allocator"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0890",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T18:44:54.272850+00:00",
+  "plan_sha256": "346c63950f0241b3c7b74c610aae08a2ae9773434fed87233c4b56dca491d364",
+  "row": {
+    "block": 3,
+    "case": "xlsx_producer_medium_source_full_cell_scan",
+    "case_index": 0,
+    "lane": "allocator",
+    "ordinal": 70,
+    "pair": "allocator-b03-c00",
+    "role": "after",
+    "samples": 15,
+    "warmup": 3
+  },
+  "schema": "litchi.xlsx-mce-expanded-name-cache-child-command-0890.v1",
+  "started_utc": "2026-10-03T18:44:54.015275+00:00"
+}

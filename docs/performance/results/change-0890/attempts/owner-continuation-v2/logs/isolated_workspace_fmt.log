@@ -1,0 +1,3 @@
+cwd=/tmp/litchi-0890-correctness-source
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","fmt","--manifest-path","/tmp/litchi-0890-correctness-source/Cargo.toml","--all","--","--check"]
+

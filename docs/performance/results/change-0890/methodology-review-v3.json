@@ -1,0 +1,734 @@
+{
+  "baseline_reuse": {
+    "build_context_gate": {
+      "candidate_allocator_sha256": "949df20eba814bac2306bb1a43941294f8157946da0abc064604f707b8b2864f",
+      "candidate_binaries": "pass: both native and allocator release artifacts and per-role receipts are present and exit zero",
+      "candidate_build_json_sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881",
+      "candidate_native_sha256": "972639a5995d420809d5cfb46b91e280e41f3fdfe675e40f5f87ef183fcd999b",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "matching_build_argv": true,
+      "matching_fixed_environment": true,
+      "matching_release_flags": true
+    },
+    "candidate_build_runner": {
+      "allocator_binary": {
+        "bytes": 267441624,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/allocator",
+        "sha256": "949df20eba814bac2306bb1a43941294f8157946da0abc064604f707b8b2864f"
+      },
+      "allocator_build": {
+        "bytes": 2876,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/allocator-build.json",
+        "sha256": "a80f79a8f791f5156fda0456d491c2172aab68311fa70609ed8460a47adb4b98"
+      },
+      "allocator_depfile": {
+        "bytes": 276137,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/allocator.d",
+        "sha256": "f7db8772cf3787c4a62f8d3e29a34b2bc4a18f69221d1dd558af3e5ff7b25670"
+      },
+      "build_receipt": {
+        "bytes": 4805,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build.json",
+        "sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881"
+      },
+      "build_start": {
+        "bytes": 3005,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build-start.json",
+        "sha256": "f495d680c3080434e8b6c7b167b45442bba841a55d2cf60a70103d68ca584ff3"
+      },
+      "launch_receipt": {
+        "path": "docs/performance/results/change-0890/release-build-launch.json",
+        "sha256": "f7ea61fb8372f629ded273543057f96265f9f5ea512a6889b3ed17990fb2db81",
+        "timings_authorized": false
+      },
+      "native_binary": {
+        "bytes": 264424280,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/native",
+        "sha256": "972639a5995d420809d5cfb46b91e280e41f3fdfe675e40f5f87ef183fcd999b"
+      },
+      "native_build": {
+        "bytes": 2825,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/native-build.json",
+        "sha256": "90210b17cb7cc757af79e559c58bb05b8fdd1fa26cb128f43d1e2f1019be706e"
+      },
+      "native_depfile": {
+        "bytes": 276023,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/native.d",
+        "sha256": "0abeba7d69d3cf0c50daf115e67f754a28540d57d934b260759820d7184d309a"
+      },
+      "path": "docs/performance/results/change-0890/build-executed.py",
+      "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c",
+      "source_equivalence": "pass: retained 0885 archive plus exactly the two frozen MCE overlays; current-tree differences are limited to the four explicitly excluded xml_attribute_bounds diagnostic paths",
+      "source_rechecked_files": 10765,
+      "source_root": "/tmp/litchi-0890-source",
+      "status": "pass",
+      "target_root": "/home/zhuhe/code/litchi/target/litchi-0890-build"
+    },
+    "retained_build": {
+      "allocator": {
+        "binary_bytes": 267473328,
+        "binary_sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16",
+        "build_receipt_sha256": "1a4e67d157bbf337d343cd5f63455965c2d7d716425a48a4dcf5864fdbb8ad4d3"
+      },
+      "build": {
+        "path": "docs/performance/results/change-0885/build.json",
+        "sha256": "4975fd1635267abd98cb0a756a39c948ceb048d31a2bb08972569f786f5e4d8d",
+        "status": "pass"
+      },
+      "build_start": {
+        "path": "docs/performance/results/change-0885/build-start.json",
+        "sha256": "e3026d9211fa0e4c8a4d20efb32f902746d14919bddf4df5442512a139e950e0"
+      },
+      "native": {
+        "binary_bytes": 264440648,
+        "binary_sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d",
+        "build_receipt_sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+      },
+      "toolchain": "rustc/cargo 1.95.0; release opt-level 3, debug 1, fat LTO, codegen-units 1; offline, incremental 0, jobs 2"
+    }
+  },
+  "caveats": [
+    "This receipt authorizes methodology and release artifact custody only; it contains no latency, allocation, RSS, or adoption claim.",
+    "The accepted protocol covers all four scenarios in the native lane and the declared primary producer scenario in the allocator lane; allocator counters are observational and have no automatic adoption gate.",
+    "The final aggregate quality qualification and create-only frozen plan, followed by the actual full load_plan check, remain required before capture.",
+    "The initial full-workspace fmt failure remains retained because it is caused only by the unrelated untracked crates/litchi/examples/bench_word_parse.rs; the continuation provides the bounded tracked-owner and isolated-source checks.",
+    "Warm-cache CPU-affinity measurements have no exclusive-host or physical-cold-cache guarantee, and executable-mapping residency can confound RSS comparisons."
+  ],
+  "correctness_custody": {
+    "baseline_retry": {
+      "aliasing": 20000,
+      "compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "generated": 20000,
+      "packages": 3,
+      "path": "docs/performance/results/change-0890/attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+      "report_bytes": 226180145,
+      "report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "selected_members": 67,
+      "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+      "status": "pass"
+    },
+    "candidate_retry": {
+      "focused_tests": "24 passed, 0 failed",
+      "path": "docs/performance/results/change-0890/attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+      "performance_claim": false,
+      "report_bytes": 226180145,
+      "report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+      "status": "pass"
+    },
+    "candidate_source_verification": {
+      "path": "docs/performance/results/change-0890/attempts/candidate-diagnostic-f790c2228c-v2-retry1/post-candidate-source-verification.json",
+      "sha256": "f111b3d328a7907928db165c3275756f52994521e7a7e5658d55281eab58509e",
+      "status": "pass"
+    },
+    "cross_version_comparison": {
+      "byte_identical": true,
+      "path": "docs/performance/results/change-0890/cross-version-diagnostic-comparison.json",
+      "sha256": "08680c6f0a6d6c9b53bb63f0a2923082e9afe31ec3904168c9339fbc204d86cd",
+      "status": "pass"
+    },
+    "historical_failure": {
+      "path": "docs/performance/results/change-0890/attempts/baseline-f790c2228c/baseline-receipt.json",
+      "reason": "baseline build failed before differential execution",
+      "status": "retained_failed_attempt"
+    },
+    "oracle_verification": {
+      "baseline": "docs/performance/results/change-0890/baseline-oracle-verification.json",
+      "candidate": "docs/performance/results/change-0890/candidate-oracle-verification.json",
+      "missing_controls_refused": true,
+      "missing_oracle_refused": true,
+      "oracle_records": 200201,
+      "root_comparison": "docs/performance/results/change-0890/root-oracle-comparison.json",
+      "status": "pass"
+    }
+  },
+  "helpers": {
+    "baseline_source_verifier": {
+      "bytes": 4127,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/verify_baseline_source.py",
+      "sha256": "a6cd7248461f45357a02c1183fc7b2026366c360441f0d1fb8c87177c42685b1"
+    },
+    "build": {
+      "bytes": 13197,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build.py",
+      "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c"
+    },
+    "build_executed": {
+      "bytes": 13197,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build-executed.py",
+      "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c"
+    },
+    "candidate_source_verifier": {
+      "bytes": 6689,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/verify_candidate_source.py",
+      "sha256": "1c9b0014712d5aa5a629687d0a6d799db3750020a10ca40df9fd22485675e020"
+    },
+    "cleanup_correctness": {
+      "bytes": 15372,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/cleanup_correctness.py",
+      "sha256": "b2c8350cca14bd66325e2ad4775c0d7cbdc29ee695fffa46b5baf51470f8616e"
+    },
+    "correctness_baseline_runner": {
+      "bytes": 15461,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/baseline_runner.py",
+      "sha256": "a4b1e61d5cca8970a5a2fb42eb565329cf380d648604be30c54e9e696bcc33a0"
+    },
+    "diagnostic_comparator": {
+      "bytes": 3096,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/compare_diagnostic_reports.py",
+      "sha256": "8c26c74326fe8f4d727a1f9119ce98bc13c9fb72a7c516b0871e6bfe19efeee8"
+    },
+    "diagnostic_overlay": {
+      "bytes": 5319,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/overlay_candidate_diagnostic.py",
+      "sha256": "9ec9af0f560d055a039f047489c74e14030de7286575abc777c42dd2cf15ce69"
+    },
+    "diagnostic_runner": {
+      "bytes": 10759,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/candidate_diagnostic_runner.py",
+      "sha256": "c4e7de69f9937d6dfa7a723ca050c45be5e9cd5128fb7c9fc5c90f08bbadf505"
+    },
+    "experiment": {
+      "bytes": 7535,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/experiment.py",
+      "sha256": "356344d1d6e4eab1ad38d6d6d05bada74e8950eb2a09241ba30acf3f538d8f7e"
+    },
+    "freeze": {
+      "bytes": 53374,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/freeze.py",
+      "sha256": "66f8c11ae324d285eab61e86dfbd978861fc2298537f8f305649f536e9cf8657"
+    },
+    "imported_0885_capture": {
+      "bytes": 17203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture.py",
+      "sha256": "f751f1d5dd367b856f3e83b03d360dd86c99c33d3d1c0ebd7e8305575a63a27f"
+    },
+    "imported_0885_test_helpers": {
+      "bytes": 12516,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/test_helpers.py",
+      "sha256": "57df4f8a6cc7ca2ebe5a1766894b534d6cde0e7f46882a55aadc1a9a3b86e045"
+    },
+    "imported_0885_verify": {
+      "bytes": 23498,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/verify.py",
+      "sha256": "f4de053621d078e249c5d549eeba2ebab1a4b0b7e58edeb5c952c2bbf1980fb9"
+    },
+    "imported_0887_experiment": {
+      "bytes": 22587,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/experiment.py",
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    "imported_0887_packet_verifier": {
+      "bytes": 16934,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/verify_packet.py",
+      "sha256": "da804225162f3d106406c8644dce6dbfda2934e1b20e02c0c3d3675298cc98f2"
+    },
+    "imported_0887_reducer": {
+      "bytes": 13950,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0887/reduce.py",
+      "sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad"
+    },
+    "managed_executable_preparation": {
+      "bytes": 3902,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/prepare_exec.py",
+      "sha256": "d8e67639b33c40a75af83e51f804350b2d2e713eb3dbc88eb09b1bd75b9afa77"
+    },
+    "owner_continuation_runner": {
+      "bytes": 12170,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/owner_continuation_runner.py",
+      "sha256": "74753444da9af205c78592e6126f4e37a44756fc27d1568b2b1f1dd5fe887d29"
+    },
+    "owner_gates_runner": {
+      "bytes": 8716,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/owner_gates_runner.py",
+      "sha256": "fde80bef2cc1d1ba0e7442979d2305eb5873c50345d066dd940dfa80d362c32e"
+    },
+    "packet_verifier": {
+      "bytes": 7138,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/verify_packet.py",
+      "sha256": "29f119b5348c46b7be6f148ea536d5366e312de74aad0b35805ed35c892ef156"
+    },
+    "reducer": {
+      "bytes": 1031,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/reduce.py",
+      "sha256": "251d0343fdffa6ff90d3504c13dd60627e0f3217e45ffd58a3c538cd4afdd43b"
+    }
+  },
+  "performance_claim": null,
+  "quality_and_cleanup": {
+    "actual_plan_load": "required after candidate binaries and all four managed copies exist, before any capture child",
+    "cleanup": "remove only marked 0890 source, release target, correctness roots, baseline correctness copy, and managed executable directory; preserve retained binaries, archives, receipts, and failed attempts",
+    "managed_copy_custody": "execution-files.json passes for all four role/mode pairs with distinct source/copy inodes and equal byte/hash/mode identities",
+    "managed_copy_gate": "four one-time byte/mode/inode-verified copies and execution-files.json are required before plan creation",
+    "owner_gate_receipt": "initial eight-command receipt has only fmt_check failure; corrected continuation passes isolated full-source fmt, root owner fmt, and unfiltered MCE owner tests",
+    "owner_gates": "MCE owner/shared tests, Clippy, rustdoc, and boundary checks are required; the initial full-workspace fmt check is known to flag only the unrelated untracked bench_word_parse.rs and must be resolved by an unfiltered continuation receipt",
+    "plan_gate": "actual experiment.load_plan(plan.json) must pass with all four managed copies present before any timed child",
+    "quality_qualification": "quality-qualification.json passes the diagnostic, owner, continuation, and retained-failure inventory without rerunning or making a performance claim",
+    "release_build": "both candidate native and allocator builds pass with source recheck and matched retained 0885 toolchain/flags/environment",
+    "release_build_completion": "release-build-completion.json binds the immutable launch, runner, build.json, and both role receipts; both candidate binaries are terminal and passing",
+    "replay": "run freeze.py --verify --retained-only and verify_packet.py with cleanup required; neither rebuilds nor launches a workload"
+  },
+  "quality_custody": {
+    "initial_owner_gates": {
+      "commands_all_checked": true,
+      "failures": [
+        "fmt_check"
+      ],
+      "non_fmt_commands_passed": true,
+      "receipt": {
+        "bytes": 3701491,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/attempts/owner-gates-v2/owner-gates-receipt.json",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d"
+      },
+      "schema": "litchi.mce-0890-owner-gates.v1",
+      "status": "fail"
+    },
+    "owner_continuation": {
+      "commands_all_passed": true,
+      "diagnostic_binary_unchanged": true,
+      "receipt": {
+        "bytes": 3724209,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e"
+      },
+      "schema": "litchi.mce-0890-owner-continuation.v1",
+      "source_manifest_unchanged": true,
+      "status": "pass"
+    },
+    "performance_claim": false,
+    "quality_qualification": {
+      "bytes": 9791,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/quality-qualification.json",
+      "performance_claim": false,
+      "schema": "litchi.mce-0890-quality-qualification.v1",
+      "sha256": "0a495dc6576b0ce72884bfa9478d58549eb794652ec72e230a57878233ba0eca",
+      "status": "pass"
+    },
+    "status": "pass"
+  },
+  "release_build": {
+    "allocator": {
+      "build_receipt": {
+        "bytes": 2876,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/allocator-build.json",
+        "sha256": "a80f79a8f791f5156fda0456d491c2172aab68311fa70609ed8460a47adb4b98"
+      },
+      "bytes": 267441624,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/allocator",
+      "sha256": "949df20eba814bac2306bb1a43941294f8157946da0abc064604f707b8b2864f"
+    },
+    "build": {
+      "bytes": 4805,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build.json",
+      "sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881"
+    },
+    "completion": {
+      "bytes": 1619,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/release-build-completion.json",
+      "sha256": "0367ba94fa611c563104efcf6f8b9de18f53c1a51b9be01c1e83df4003ef0d96"
+    },
+    "launch": {
+      "bytes": 690,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/release-build-launch.json",
+      "sha256": "f7ea61fb8372f629ded273543057f96265f9f5ea512a6889b3ed17990fb2db81"
+    },
+    "managed_copy_preparation": {
+      "bytes": 3215,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/execution-files.json",
+      "records": 4,
+      "sha256": "3a9f9881cd787296f3baff3786c0038aba418a9ea6997e6a41526ee015e23600",
+      "status": "pass"
+    },
+    "native": {
+      "build_receipt": {
+        "bytes": 2825,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/native-build.json",
+        "sha256": "90210b17cb7cc757af79e559c58bb05b8fdd1fa26cb128f43d1e2f1019be706e"
+      },
+      "bytes": 264424280,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/native",
+      "sha256": "972639a5995d420809d5cfb46b91e280e41f3fdfe675e40f5f87ef183fcd999b"
+    },
+    "runner": {
+      "bytes": 13197,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build-executed.py",
+      "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c"
+    },
+    "status": "pass",
+    "timings_authorized": false
+  },
+  "required_followups": [
+    "Update the final freeze helper constant to bind methodology-review-v3.json, add the final cleanup helper custody, and refresh the methodology helper hash after that helper is stable.",
+    "Create the plan with the final methodology/helper hashes and run the full actual experiment.load_plan check successfully before any timed child launches.",
+    "Capture exactly the single 72-child packet, reduce it, inspect all control, spread, allocator, and RSS flags, and retain any failed attempt without retry replacement.",
+    "After aggregate and final review, remove only marked 0890 scratch roots and replay packet verification with cleanup required; preserve retained binaries, archives, receipts, and failed attempts."
+  ],
+  "review_stage": "final_pre_capture_methodology",
+  "reviewed_utc": "2026-10-03T18:41:30Z",
+  "reviewed_without_build_or_workload": true,
+  "reviewer": "/root/mce_cache_measurement_review_0890",
+  "rss_and_residency": {
+    "adoption": "RSS is review evidence only and is excluded from the primary adoption gate",
+    "interpretation": "managed copies narrow pathname and inode history differences but do not remove executable file-mapping residency confounding",
+    "managed_copies": "one byte-, mode-, and inode-verified fresh copy per role/mode, reused by scheduled children",
+    "measurement": "process-lifetime peak RSS from /usr/bin/time in KiB",
+    "prior_evidence": "0888 showed byte-identical executable copies can have different RSS through executable mappings",
+    "review_gate": "RSS may trigger review flags but cannot establish adoption because executable mapping/file-history residency remains a confound even with managed copies."
+  },
+  "schedule": {
+    "allocator": {
+      "blocks": 4,
+      "children": 8,
+      "pairs": 4,
+      "primary_case": "xlsx_producer_medium_source_full_cell_scan",
+      "samples_per_child": 15,
+      "warmup_per_child": 3
+    },
+    "cases": [
+      "xlsx_producer_medium_source_full_cell_scan",
+      "xlsx_full_cell_scan",
+      "docx_producer_source_selected_paragraph",
+      "pptx_producer_source_selected_slide"
+    ],
+    "coverage_note": "Native lane pairs all four retained scenarios; allocator lane pairs the declared primary producer scenario, matching the accepted 0887 protocol. Both roles are matched within every scheduled pair.",
+    "execution": "fresh process per child, fail-fast, no retries or replacements, warm filesystem cache, CPU affinity 12",
+    "native": {
+      "blocks": 8,
+      "children": 64,
+      "pairs_per_case": 8,
+      "samples_per_child": 50,
+      "warmup_per_child": 3
+    },
+    "ordering": "native lane then allocator lane; AB/BA alternates by block plus case parity"
+  },
+  "schema": "litchi.mce-expanded-attribute-name-reuse-methodology-review-0890.v3",
+  "scope": {
+    "base_head": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "candidate": "per-start reuse of a successfully expanded unprefixed MCE attribute name",
+    "candidate_paths": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ],
+    "dependencies_changed": false,
+    "focused_tests": "crates/litchi-ooxml-common/src/mce/tests.rs",
+    "production_owner": "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "public_api_changed": false,
+    "retained_baseline_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+    "source_review": "docs/performance/results/change-0890/source-review-v2.json",
+    "unsafe_code_added": false
+  },
+  "source_custody": {
+    "candidate_files": {
+      "crates/litchi-ooxml-common/src/mce/codec.rs": {
+        "bytes": 67996,
+        "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+      },
+      "crates/litchi-ooxml-common/src/mce/tests.rs": {
+        "bytes": 133696,
+        "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+      }
+    },
+    "candidate_freeze": {
+      "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+      "bytes": 1016,
+      "path": "docs/performance/results/change-0890/candidate-freeze-v2.json",
+      "schema": "litchi.mce-candidate-freeze-0890.v1",
+      "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+    },
+    "candidate_patch": {
+      "bytes": 9345,
+      "path": "docs/performance/results/change-0890/candidate-v2.patch",
+      "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4"
+    },
+    "correctness_review": {
+      "bytes": 29152,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/correctness-review.json",
+      "sha256": "deafca142b455c3776c08ae629491e77ea99ba7ef776be22d00ede30a63a0241"
+    },
+    "execution_files": {
+      "bytes": 3215,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/execution-files.json",
+      "sha256": "3a9f9881cd787296f3baff3786c0038aba418a9ea6997e6a41526ee015e23600"
+    },
+    "quality_qualification": {
+      "bytes": 9791,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/quality-qualification.json",
+      "sha256": "0a495dc6576b0ce72884bfa9478d58549eb794652ec72e230a57878233ba0eca"
+    },
+    "release_build_completion": {
+      "bytes": 1619,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/release-build-completion.json",
+      "sha256": "0367ba94fa611c563104efcf6f8b9de18f53c1a51b9be01c1e83df4003ef0d96"
+    },
+    "retained_baseline": {
+      "archive": {
+        "bytes": 89024356,
+        "path": "docs/performance/results/change-0885/source.tar.gz",
+        "sha256": "bdf6e1c815bbf33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+      },
+      "archive_replay": {
+        "path": "docs/performance/results/change-0885/source-archive-replay.json",
+        "regular_files_verified": 10765,
+        "sha256": "b0814e26d1f169f316ea36322c94e7767df622510f86f6dd8f218b02fd6f27e6",
+        "status": "pass"
+      },
+      "diagnostic_exclusions": [
+        "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs"
+      ],
+      "manifest": {
+        "bytes": 2083420,
+        "files": 10765,
+        "path": "docs/performance/results/change-0885/source.json",
+        "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938"
+      },
+      "revision": "335a40350bf06f49691745c14d310fd7a3ca9117"
+    },
+    "root_lock_custody": {
+      "byte_identical": true,
+      "path": "docs/performance/results/change-0890/attempts/baseline-f790c2228c-retry1/root-lock-custody.json",
+      "sha256": "61eea7167d139f1d6bde45358f86a5b94a2eab131cd6aa61b96639e74a1a475f",
+      "sha256_of_lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    },
+    "source_review": {
+      "blocking_findings": 0,
+      "bytes": 5526,
+      "path": "docs/performance/results/change-0890/source-review-v2.json",
+      "sha256": "54270e65163db13be0e7142954966c8c0924c1389bcce2d2f3a136ab55834366",
+      "status": "approved_for_measurement"
+    }
+  },
+  "static_checks": {
+    "candidate_diagnostic_equality": {
+      "comparison": "docs/performance/results/change-0890/cross-version-diagnostic-comparison.json",
+      "compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "cross_version_byte_identical": true,
+      "decompressed_bytes": 226180145,
+      "decompressed_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "performance_claim": false,
+      "repeat_byte_identical": true,
+      "status": "pass"
+    },
+    "candidate_source_union": {
+      "archive": "docs/performance/results/change-0885/source.tar.gz",
+      "archive_git_apply_check": "pass",
+      "candidate_patch": "docs/performance/results/change-0890/candidate-v2.patch",
+      "expected_baseline_overlay_union_files": 10765,
+      "reconstructed_regular_files": 10765,
+      "status": "pass",
+      "workload_launched": false
+    },
+    "helper_imports": {
+      "helpers_checked": [
+        "baseline_source_verifier",
+        "build",
+        "build_executed",
+        "candidate_source_verifier",
+        "cleanup_correctness",
+        "correctness_baseline_runner",
+        "diagnostic_comparator",
+        "diagnostic_overlay",
+        "diagnostic_runner",
+        "experiment",
+        "freeze",
+        "managed_executable_preparation",
+        "owner_continuation_runner",
+        "owner_gates_runner",
+        "packet_verifier",
+        "reducer"
+      ],
+      "status": "pass",
+      "workload_launched": false
+    },
+    "managed_executable_custody": {
+      "receipt": {
+        "bytes": 3215,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/execution-files.json",
+        "sha256": "3a9f9881cd787296f3baff3786c0038aba418a9ea6997e6a41526ee015e23600"
+      },
+      "records": 4,
+      "source_copy_inode_distinct": true,
+      "source_copy_mode_equal": true,
+      "source_copy_sha_equal": true,
+      "status": "pass",
+      "workload_launched": false
+    },
+    "oracle_checks": {
+      "baseline": "docs/performance/results/change-0890/baseline-oracle-verification.json",
+      "candidate": "docs/performance/results/change-0890/candidate-oracle-verification.json",
+      "comparison": "docs/performance/results/change-0890/root-oracle-comparison.json",
+      "missing_controls_refused": true,
+      "missing_oracle_refused": true,
+      "oracle_records": 200201,
+      "repeat_byte_equal": true,
+      "status": "pass"
+    },
+    "owner_quality_receipts": {
+      "continuation": {
+        "bytes": 3724209,
+        "command_count": 3,
+        "commands": [
+          "isolated_workspace_fmt",
+          "root_owner_fmt",
+          "mce_owner_unfiltered_tests"
+        ],
+        "failures": [],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "initial": {
+        "all_other_commands_passed": true,
+        "bytes": 3701491,
+        "command_count": 8,
+        "failures": [
+          "fmt_check"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/attempts/owner-gates-v2/owner-gates-receipt.json",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "performance_claim": false,
+      "status": "pass",
+      "unrelated_fmt_file_preserved": "crates/litchi/examples/bench_word_parse.rs",
+      "workload_launched": false
+    },
+    "python_ast": {
+      "helpers_checked": 16,
+      "status": "pass",
+      "workload_launched": false
+    },
+    "quality_qualification": {
+      "continuation_commands_checked": true,
+      "initial_commands_checked": true,
+      "performance_claim": false,
+      "receipt": {
+        "bytes": 9791,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/quality-qualification.json",
+        "sha256": "0a495dc6576b0ce72884bfa9478d58549eb794652ec72e230a57878233ba0eca"
+      },
+      "rerun_performed": false,
+      "schema": "litchi.mce-0890-quality-qualification.v1",
+      "status": "pass"
+    },
+    "release_build_preflight": {
+      "helper": "docs/performance/results/change-0890/build.py",
+      "helper_sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c",
+      "source_preflight": "_load_frozen_candidate against retained 0885 manifest",
+      "status": "pass",
+      "timing_authorized": false,
+      "workload_launched": false
+    },
+    "release_build_receipts": {
+      "allocator_binary": {
+        "bytes": 267441624,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/allocator",
+        "sha256": "949df20eba814bac2306bb1a43941294f8157946da0abc064604f707b8b2864f"
+      },
+      "allocator_build": {
+        "bytes": 2876,
+        "exit_code": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/allocator-build.json",
+        "sha256": "a80f79a8f791f5156fda0456d491c2172aab68311fa70609ed8460a47adb4b98"
+      },
+      "candidate_build": {
+        "bytes": 4805,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/build.json",
+        "sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881"
+      },
+      "matching_context": true,
+      "native_binary": {
+        "bytes": 264424280,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/native",
+        "sha256": "972639a5995d420809d5cfb46b91e280e41f3fdfe675e40f5f87ef183fcd999b"
+      },
+      "native_build": {
+        "bytes": 2825,
+        "exit_code": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/native-build.json",
+        "sha256": "90210b17cb7cc757af79e559c58bb05b8fdd1fa26cb128f43d1e2f1019be706e"
+      },
+      "release_completion": {
+        "bytes": 1619,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/release-build-completion.json",
+        "sha256": "0367ba94fa611c563104efcf6f8b9de18f53c1a51b9be01c1e83df4003ef0d96",
+        "status": "pass"
+      },
+      "source_rechecked_files": 10765,
+      "status": "pass",
+      "timings_authorized": false,
+      "workload_launched": false
+    },
+    "schedule": {
+      "allocator_blocks": 4,
+      "allocator_children": 8,
+      "bootstrap_seed": 890,
+      "children": 72,
+      "native_blocks": 8,
+      "native_children": 64,
+      "status": "pass"
+    },
+    "synthetic_full_load_plan": {
+      "purpose": "exercise all original plan gates and the managed-copy identity seam with retained executable descriptors",
+      "retained_only": false,
+      "schema": "litchi.xlsx-mce-expanded-name-cache-experiment-0890.v1",
+      "status": "pass",
+      "workload_launched": false
+    }
+  },
+  "statistics": {
+    "adoption": {
+      "allocator_adoption_gate": "not evaluated; allocator counters remain a separate observation",
+      "control_and_spread_flags_required_for_review": true,
+      "native_primary_gate_only_after_capture": true,
+      "status": "not_evaluated"
+    },
+    "bootstrap": {
+      "confidence": "percentile 95% interval",
+      "draws": 10000,
+      "indices": [
+        249,
+        9749
+      ],
+      "resampling_unit": "paired child ratios",
+      "seed": 890
+    },
+    "native_metrics": [
+      "p50_ns",
+      "p95_ns",
+      "p99_ns",
+      "peak_rss_kib"
+    ],
+    "pairing": "after/before ratios within each scheduled pair; samples are never pooled across children",
+    "primary_gate": {
+      "bootstrap_upper_below": 1.0,
+      "median_ratio_at_most": 0.98,
+      "metric": "native primary p50"
+    },
+    "review_flags": {
+      "allocator_adoption": "not evaluated",
+      "control_or_primary_pair_ratio_above": 1.05,
+      "native_p50_leg_spread_above": 1.2
+    },
+    "unit": "whole-child aggregate statistics"
+  },
+  "status": "pass",
+  "supersedes": "docs/performance/results/change-0890/methodology-review-v2.json",
+  "verified": [
+    "The v2 candidate freeze contains exactly the two reviewed MCE owner paths and binds candidate-v2.patch, source review, and current file hashes.",
+    "The release builder reconstructs the retained 0885 archive, overlays only the frozen candidate files, checks the complete 10,765-file materialized source union, and uses the exact immutable helper recorded by release-build-launch.json.",
+    "The retained native and allocator binaries are bound to their 0885 source archive, manifest, build receipts, depfiles, Rust/Cargo versions, release flags, and fixed build environment; candidate release custody now has passing build, per-role receipts, depfiles, and binary hashes.",
+    "The experiment wrapper preserves the reviewed 0887 semantic fences, four-case native controls, primary allocator observation, fresh-child schedule, managed executable-copy identity checks, and fail-fast no-retry custody.",
+    "The reducer uses paired whole-child statistics and a fixed seeded bootstrap; its pass status is evidence reduction, not candidate adoption.",
+    "The diagnostic candidate matches the retained baseline differential oracle byte-for-byte and passes the focused 24-test qualification plus cross-variant oracle checks without a performance claim.",
+    "The packet verifier reconstructs source and replays retained receipts without rebuilding or launching a workload.",
+    "The candidate native and allocator release builds completed with zero exit codes, exact retained-context checks, source recheck of all 10,765 materialized files, retained per-role receipts, depfiles, and binary hashes.",
+    "The initial owner receipt validates every command: all seven non-format commands pass; the sole fmt failure is retained and explained by the unrelated untracked benchmark file.",
+    "The owner-continuation.v1 receipt passes isolated workspace formatting, root owner formatting, and unfiltered MCE owner tests while preserving source and diagnostic binary identities.",
+    "The aggregate quality-qualification.v1 receipt passes and inventories every initial command, the passing continuation, diagnostic equality, and retained failed attempts without a timing or adoption claim."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "litchi.mce-owner-continuation-preflight-terminal-observer-0890.v1",
+  "status": "observed_terminal",
+  "event": "same_preflight_stop",
+  "preflight_stop": {
+    "path": "attempts/owner-continuation-preflight-1/preflight-stop.json",
+    "sha256": "9f088d575b2d033ea0d57cf32f7e4f9258f69ea571d261327b48f2880db27838"
+  },
+  "pid": 3923635,
+  "session_id": 38094,
+  "agent_terminal_returncode": 143,
+  "commands_started": 0,
+  "cargo_started": false,
+  "runtime_capture_started": false,
+  "observed_utc": "2026-10-03T18:28:55.437698Z",
+  "note": "Observer records terminal state for the already retained preflight stop; it does not describe a new attempt."
+}

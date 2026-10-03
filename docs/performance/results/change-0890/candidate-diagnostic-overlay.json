@@ -1,0 +1,72 @@
+{
+  "after": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 67996,
+      "mode": "0o664",
+      "path": "/tmp/litchi-0890-correctness-source/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 133696,
+      "mode": "0o664",
+      "path": "/tmp/litchi-0890-correctness-source/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+    }
+  },
+  "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+  "baseline_receipt": {
+    "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+    "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a"
+  },
+  "before": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 65338,
+      "mode": "0o664",
+      "path": "/tmp/litchi-0890-correctness-source/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 129836,
+      "mode": "0o664",
+      "path": "/tmp/litchi-0890-correctness-source/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76"
+    }
+  },
+  "candidate_freeze": {
+    "path": "candidate-freeze-v2.json",
+    "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+  },
+  "candidate_patch": {
+    "bytes": 9345,
+    "path": "candidate-v2.patch",
+    "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4"
+  },
+  "candidate_paths": [
+    "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "root_candidate": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 67996,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 133696,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+    }
+  },
+  "schema": "litchi.mce-0890-diagnostic-overlay.v1",
+  "source_marker": {
+    "bytes": 39,
+    "mode": "0o664",
+    "path": "/tmp/litchi-0890-correctness-source/.owner-0890-source",
+    "sha256": "240847ee4de01621bdef5e902623ba8c1867f168d17efb057d3a6d9a950c321f"
+  },
+  "source_root": "/tmp/litchi-0890-correctness-source",
+  "status": "pass",
+  "unchanged_non_candidate_sources": true
+}

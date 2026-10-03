@@ -1,0 +1,786 @@
+{
+  "conclusion": "The frozen v2 candidate passes the recorded correctness, semantic, source-continuity, owner-quality, and diagnostic-equivalence gates. Retained failed attempts are qualified below and do not alter the final pass.",
+  "diagnostic": {
+    "baseline_and_candidate": {
+      "aliasing": 20000,
+      "baseline_first_second_byte_identical": true,
+      "candidate_first_second_byte_identical": true,
+      "compressed_bytes": 12319811,
+      "compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "cross_version_byte_identical": true,
+      "focused_tests": {
+        "count": 24,
+        "failed": 0,
+        "passed": 24
+      },
+      "generated": 20000,
+      "packages": 3,
+      "repeat_byte_identical": true,
+      "report_bytes": 226180145,
+      "report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "selected_members": 67
+    },
+    "baseline_retry": {
+      "bytes": 2753320,
+      "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+      "schema": "litchi.mce-0890-correctness-baseline.v1",
+      "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+      "status": "pass"
+    },
+    "binary_custody": {
+      "bytes": 2876,
+      "path": "binaries/correctness-binaries-receipt-v2.json",
+      "schema": "litchi.mce-0890-correctness-binaries.v2",
+      "sha256": "0ba53b7796728e81c732925417bd1d7ccde2e04da1055da182b4a2029fc192ce",
+      "status": "pass"
+    },
+    "candidate_retry": {
+      "bytes": 9538,
+      "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+      "schema": "litchi.mce-0890-correctness-candidate.v1",
+      "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+      "status": "pass"
+    },
+    "cross_version_comparison": {
+      "bytes": 1998,
+      "path": "cross-version-diagnostic-comparison.json",
+      "schema": "litchi.mce-0890-cross-version-diagnostic-comparison.v1",
+      "sha256": "08680c6f0a6d6c9b53bb63f0a2923082e9afe31ec3904168c9339fbc204d86cd",
+      "status": "pass"
+    },
+    "performance_claim": false,
+    "post_candidate_test_check": {
+      "bytes": 4432,
+      "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/post-candidate-source-verification.json",
+      "schema": "litchi.mce-0890-post-candidate-source-verification.v1",
+      "sha256": "f111b3d328a7907928db165c3275756f52994521e7a7e5658d55281eab58509e",
+      "status": "pass"
+    },
+    "root_oracle_comparison": {
+      "aliasing": 20000,
+      "controls": 10,
+      "distinct_generated_inputs": {
+        "aliasing": 19418,
+        "generated": 13811
+      },
+      "generated": 20000,
+      "legacy_results": 200405,
+      "members": 67,
+      "missing_controls_refused": true,
+      "missing_oracle_refused": true,
+      "oracle_records": 200201,
+      "outcomes": {
+        "codec_refusal": 48804,
+        "codec_success": 51330,
+        "stream_refusal": 48133,
+        "stream_success": 51934
+      },
+      "packages": 3,
+      "receipt": {
+        "bytes": 1295,
+        "path": "root-oracle-comparison.json",
+        "schema": "litchi.mce-oracle-verification-0889.v1",
+        "sha256": "7880115aca56edc943ca2b79c2606b3ba3d5821bb535482e214421f54059d0bd",
+        "status": "pass"
+      },
+      "repeat_byte_equal": true
+    },
+    "status": "pass"
+  },
+  "failed_history": [
+    {
+      "cause": "The initial archived baseline source omitted files referenced by include_bytes!.",
+      "failure": "baseline_build",
+      "id": "initial-baseline-include-bytes-omission",
+      "log": {
+        "bytes": 9268,
+        "path": "attempts/baseline-f790c2228c/logs/cargo-build-baseline.log",
+        "sha256": "038cf7aab8a6390eb4e883622c3a19d2926f1defa4c51ba1c3ddaa4068ed79df"
+      },
+      "missing_include_bytes": [
+        "test-data/poi/test-data/spreadsheet/54016.xls",
+        "test-data/rtf/watermark.rtf"
+      ],
+      "receipt": {
+        "bytes": 2748153,
+        "path": "attempts/baseline-f790c2228c/baseline-receipt.json",
+        "schema": "litchi.mce-0890-correctness-baseline.v1",
+        "sha256": "84e6db9716f78c571fa4ffc8d0d0850f6957d8427906e62d0452a9ba7a946e9b",
+        "status": "fail"
+      },
+      "resolved_by": {
+        "postcheck": {
+          "bytes": 1908,
+          "path": "attempts/baseline-f790c2228c-retry1/post-baseline-source-verification.json",
+          "schema": "litchi.mce-0890-post-baseline-source-verification.v1",
+          "sha256": "92b1b28b8c4d0fcbbc37523aade1006dbb04e921101170883f2aef9dc422d9d2",
+          "status": "pass"
+        },
+        "receipt": {
+          "bytes": 2753320,
+          "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+          "schema": "litchi.mce-0890-correctness-baseline.v1",
+          "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+          "status": "pass"
+        }
+      },
+      "returncode": 101,
+      "runtime_differential_started": false,
+      "status": "retained_failed_attempt"
+    },
+    {
+      "build_passed_before_test_failure": true,
+      "cause": "The initial candidate test fixture manifest/discovery check found zero packages where one was expected.",
+      "failure": "candidate_diagnostic_tests",
+      "id": "initial-candidate-test-fixture-manifest-failure",
+      "log": {
+        "bytes": 3348,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2/logs/cargo-test-diagnostic.log",
+        "sha256": "c2b5744ce1f36563721b73276e6d15eabe5720f319145cbf924d0a88274b5a7f"
+      },
+      "receipt": {
+        "bytes": 5770,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2/candidate-receipt.json",
+        "schema": "litchi.mce-0890-correctness-candidate.v1",
+        "sha256": "010dfd3370b2c0fd2e018202718d390fb02638ab682fad638dda46334c765e66",
+        "status": "fail"
+      },
+      "resolved_by": {
+        "postcheck": {
+          "bytes": 4432,
+          "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/post-candidate-source-verification.json",
+          "schema": "litchi.mce-0890-post-candidate-source-verification.v1",
+          "sha256": "f111b3d328a7907928db165c3275756f52994521e7a7e5658d55281eab58509e",
+          "status": "pass"
+        },
+        "receipt": {
+          "bytes": 9538,
+          "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+          "schema": "litchi.mce-0890-correctness-candidate.v1",
+          "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+          "status": "pass"
+        }
+      },
+      "returncode": 101,
+      "status": "retained_failed_attempt",
+      "test": "input_tests::package_discovery_deduplicates_overlapping_input_paths",
+      "test_result": "23 passed; 1 failed; 0 ignored; assertion left 0, right 1"
+    },
+    {
+      "cause": "The root-wide fmt check failed solely on the unrelated untracked bench_word_parse.rs; the frozen candidate paths were checked independently.",
+      "continuation_resolution": {
+        "isolated_workspace_fmt": {
+          "bytes": 219,
+          "path": "attempts/owner-continuation-v2/logs/isolated_workspace_fmt.log",
+          "sha256": "e500f70a31d05da6bda9f9e1f09b77ba2164d11fb448a7173a28bbed0440eeb6"
+        },
+        "receipt": {
+          "bytes": 3724209,
+          "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+          "schema": "litchi.mce-0890-owner-continuation.v1",
+          "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+          "status": "pass"
+        },
+        "root_owner_fmt": {
+          "bytes": 221,
+          "path": "attempts/owner-continuation-v2/logs/root_owner_fmt.log",
+          "sha256": "9a86a2462477e9d4848a3ff695b0dbad4a47870311f13cecf7301555b6f592b4"
+        },
+        "unfiltered_owner_tests": {
+          "bytes": 37603,
+          "path": "attempts/owner-continuation-v2/logs/mce_owner_unfiltered_tests.log",
+          "sha256": "d25967d31be482229a22ff1a8b6d80ec8127b2c8f3777c35dbc9627bc9627e5e"
+        }
+      },
+      "failed_gate": "fmt_check",
+      "fmt_log": {
+        "bytes": 3668,
+        "path": "attempts/owner-gates-v2/logs/fmt_check.log",
+        "sha256": "6297d05d93a243af888f4e835096a7d7e7eab31e75152ef639aed0a05c804e8b"
+      },
+      "id": "initial-global-fmt-unrelated-untracked-benchmark",
+      "only_reported_source": {
+        "bytes": 6390,
+        "mode": "0o664",
+        "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+        "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+      },
+      "receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "status": "retained_failed_gate_resolved_by_continuation"
+    },
+    {
+      "cargo_started": false,
+      "cause": "Known runner N^2 manifest bug: source_manifest(expected) recomputed and rehashed the complete 9411-file manifest inside a 9411-item generator.",
+      "correction": "Compute the source manifest once and reuse its paths before the create-only continuation attempt.",
+      "diagnostic_runtime_performed": false,
+      "id": "owner-continuation-preflight-pid-3923635",
+      "observers": [
+        {
+          "bytes": 666,
+          "path": "attempts/owner-continuation-preflight-1/preflight-stop.json",
+          "schema": "litchi.mce-owner-continuation-preflight-stop-0890.v1",
+          "sha256": "9f088d575b2d033ea0d57cf32f7e4f9258f69ea571d261327b48f2880db27838",
+          "status": "termination_requested"
+        },
+        {
+          "bytes": 2209,
+          "path": "attempts/owner-continuation-v2-preflight-failure/preflight-failure-receipt.json",
+          "schema": "litchi.mce-0890-owner-continuation-preflight-failure.v1",
+          "sha256": "510cbd56c92189dc9e2c6388f3e8e90d9bdddbc1b245c710e62a1bd8a41b312e",
+          "status": "fail"
+        }
+      ],
+      "pid": 3923635,
+      "resolved_by": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "returncode": 143,
+      "same_event_basis": "Both retained observer receipts identify PID 3923635 and the same runner/cause; they are one stopped preflight, not two independent failures.",
+      "signal": "SIGTERM",
+      "source_overlay_performed": false,
+      "status": "retained_single_interrupted_preflight_event"
+    }
+  ],
+  "passed_gates": {
+    "baseline_differential_retry": {
+      "postcheck": {
+        "bytes": 1908,
+        "path": "attempts/baseline-f790c2228c-retry1/post-baseline-source-verification.json",
+        "schema": "litchi.mce-0890-post-baseline-source-verification.v1",
+        "sha256": "92b1b28b8c4d0fcbbc37523aade1006dbb04e921101170883f2aef9dc422d9d2",
+        "status": "pass"
+      },
+      "receipt": {
+        "bytes": 2753320,
+        "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+        "schema": "litchi.mce-0890-correctness-baseline.v1",
+        "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+        "status": "pass"
+      }
+    },
+    "candidate_diagnostic_retry": {
+      "postcheck": {
+        "bytes": 4432,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/post-candidate-source-verification.json",
+        "schema": "litchi.mce-0890-post-candidate-source-verification.v1",
+        "sha256": "f111b3d328a7907928db165c3275756f52994521e7a7e5658d55281eab58509e",
+        "status": "pass"
+      },
+      "receipt": {
+        "bytes": 9538,
+        "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+        "schema": "litchi.mce-0890-correctness-candidate.v1",
+        "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+        "status": "pass"
+      }
+    },
+    "candidate_release_build": {
+      "allocator_build_receipt": {
+        "bytes": 2876,
+        "path": "allocator-build.json",
+        "sha256": "a80f79a8f791f5156fda0456d491c2172aab68311fa70609ed8460a47adb4b98"
+      },
+      "native_build_receipt": {
+        "bytes": 2825,
+        "path": "native-build.json",
+        "sha256": "90210b17cb7cc757af79e559c58bb05b8fdd1fa26cb128f43d1e2f1019be706e"
+      },
+      "receipt": {
+        "bytes": 4805,
+        "path": "build.json",
+        "schema": "litchi.mce-candidate-build-0890.v1",
+        "sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881",
+        "status": "pass"
+      },
+      "source_rechecked_files": 10765
+    },
+    "crate_boundary_check": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 650,
+        "path": "attempts/owner-gates-v2/logs/crate_boundary_check.log",
+        "sha256": "3bd9a9c7e409c67a2a067e93ef56743cc17cea53a2d1c5526140b97e709594ba"
+      },
+      "name": "crate_boundary_check",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "returncode": 0
+    },
+    "docx_shared_tests": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-docx",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 108769,
+        "path": "attempts/owner-gates-v2/logs/docx_shared_tests.log",
+        "sha256": "424ebe86110dc40ba7020522dab02918ba65b1e6b61962bcca8f7a6754e52d46"
+      },
+      "name": "docx_shared_tests",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "result": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1230
+      },
+      "returncode": 0
+    },
+    "isolated_workspace_fmt": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "fmt",
+        "--manifest-path",
+        "/tmp/litchi-0890-correctness-source/Cargo.toml",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 219,
+        "path": "attempts/owner-continuation-v2/logs/isolated_workspace_fmt.log",
+        "sha256": "e500f70a31d05da6bda9f9e1f09b77ba2164d11fb448a7173a28bbed0440eeb6"
+      },
+      "name": "isolated_workspace_fmt",
+      "recorded_receipt": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "returncode": 0
+    },
+    "mce_owner_clippy": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ooxml-common",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 3390,
+        "path": "attempts/owner-gates-v2/logs/mce_owner_clippy.log",
+        "sha256": "47eb57009c07bb662be64be7673fb80976aad1908fa3f555ee8f4b2cac03c405"
+      },
+      "name": "mce_owner_clippy",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "returncode": 0
+    },
+    "mce_owner_rustdoc": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "rustdoc",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ooxml-common",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 823,
+        "path": "attempts/owner-gates-v2/logs/mce_owner_rustdoc.log",
+        "sha256": "33ca4a1a6959d8cde104d8c672e5f1e38bb5e8a635c7babef38d042b31ffd31e"
+      },
+      "name": "mce_owner_rustdoc",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "returncode": 0
+    },
+    "mce_owner_tests": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ooxml-common",
+        "--lib",
+        "mce",
+        "--",
+        "--test-threads=1"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 18637,
+        "path": "attempts/owner-gates-v2/logs/mce_owner_tests.log",
+        "sha256": "36f7fef4fbe04126bce477094b171c0b493a258067c275961a8ab8382cad5173"
+      },
+      "name": "mce_owner_tests",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "result": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 151
+      },
+      "returncode": 0
+    },
+    "mce_owner_unfiltered_tests": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ooxml-common",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 37603,
+        "path": "attempts/owner-continuation-v2/logs/mce_owner_unfiltered_tests.log",
+        "sha256": "d25967d31be482229a22ff1a8b6d80ec8127b2c8f3777c35dbc9627bc9627e5e"
+      },
+      "name": "mce_owner_unfiltered_tests",
+      "recorded_receipt": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "result": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 399
+      },
+      "returncode": 0
+    },
+    "pptx_shared_tests": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-pptx",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 85247,
+        "path": "attempts/owner-gates-v2/logs/pptx_shared_tests.log",
+        "sha256": "86ded8df85626b8a6f598a452c9a32aea5c5ec7b7ba75df3b780f7db23caaac2"
+      },
+      "name": "pptx_shared_tests",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "result": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 851
+      },
+      "returncode": 0
+    },
+    "root_owner_fmt": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "fmt",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--package",
+        "litchi-ooxml-common",
+        "--",
+        "--check"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 221,
+        "path": "attempts/owner-continuation-v2/logs/root_owner_fmt.log",
+        "sha256": "9a86a2462477e9d4848a3ff695b0dbad4a47870311f13cecf7301555b6f592b4"
+      },
+      "name": "root_owner_fmt",
+      "recorded_receipt": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "returncode": 0
+    },
+    "xlsx_shared_tests": {
+      "command": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "command_pass": true,
+      "log": {
+        "bytes": 132033,
+        "path": "attempts/owner-gates-v2/logs/xlsx_shared_tests.log",
+        "sha256": "675963a9089dc67dc2212093671a4583e7f4c03c8131015707f5cbaed08ca88a"
+      },
+      "name": "xlsx_shared_tests",
+      "recorded_receipt": {
+        "bytes": 3701491,
+        "path": "attempts/owner-gates-v2/owner-gates-receipt.json",
+        "schema": "litchi.mce-0890-owner-gates.v1",
+        "sha256": "015ec165accc849c0b0ff3a0b0bd4bacd2ef275284bd3c31cfb70de7e6db294d",
+        "status": "fail"
+      },
+      "result": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1381
+      },
+      "returncode": 0
+    }
+  },
+  "performance_claim": false,
+  "review_limits": {
+    "failed_attempts_retained": true,
+    "no_adoption_claim": true,
+    "no_latency_or_rss_claim": true,
+    "no_performance_claim": true,
+    "reviewer_modified_helpers": false,
+    "reviewer_modified_production_sources": false,
+    "reviewer_ran_builds": false,
+    "reviewer_ran_workloads": false
+  },
+  "reviewed_utc": "2026-10-03T18:39:08.111297Z",
+  "reviewed_without_build_or_workload": true,
+  "reviewer": "/root/mce_cache_review_0890",
+  "schema": "litchi.mce-expanded-attribute-name-reuse-correctness-review-0890.v1",
+  "scope": {
+    "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "candidate": "lazy per-start reuse of a successfully expanded unprefixed MCE attribute name",
+    "candidate_freeze": {
+      "bytes": 1016,
+      "path": "candidate-freeze-v2.json",
+      "schema": "litchi.mce-candidate-freeze-0890.v1",
+      "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+    },
+    "candidate_patch": {
+      "bytes": 9345,
+      "path": "candidate-v2.patch",
+      "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4"
+    },
+    "candidate_paths": [
+      {
+        "after": {
+          "bytes": 67996,
+          "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+        },
+        "before": {
+          "bytes": 65338,
+          "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+        },
+        "freeze": {
+          "bytes": 67996,
+          "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+          "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+        },
+        "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+        "production": true
+      },
+      {
+        "after": {
+          "bytes": 133696,
+          "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+        },
+        "before": {
+          "bytes": 129836,
+          "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76"
+        },
+        "freeze": {
+          "bytes": 133696,
+          "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+          "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+        },
+        "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+        "production": false
+      }
+    ],
+    "dependencies_changed": false,
+    "production_code_unchanged_by_v2": true,
+    "public_api_changed": false,
+    "source_review": {
+      "bytes": 5526,
+      "path": "source-review-v2.json",
+      "schema": "litchi.mce-expanded-attribute-name-reuse-source-review-0890.v2",
+      "sha256": "54270e65163db13be0e7142954966c8c0924c1389bcce2d2f3a136ab55834366",
+      "status": "approved_for_measurement"
+    },
+    "unsafe_code_added": false
+  },
+  "semantic_review": {
+    "blocking_findings": [],
+    "checks": {
+      "allocation_and_checked_limit_paths_unchanged": true,
+      "attr_layout_regression_is_target_scoped": true,
+      "clippy_collapsible_if_shape_resolved": true,
+      "directive_expansion_precedes_reuse_and_preserves_error_order": true,
+      "empty_uri_prefixed_bindings_remain_refused": true,
+      "malformed_unprefixed_ordering_coverage": true,
+      "opaque_inherited_starts_bypass_marker_creation": true,
+      "process_content_validation_preserved": true,
+      "recognized_mce_attributes_are_filtered_and_counted_once": true,
+      "unprefixed_names_resolve_to_no_namespace_even_under_default_namespace": true
+    },
+    "reviewed_without_build_or_timing": true,
+    "source_review_receipt": {
+      "bytes": 5526,
+      "path": "source-review-v2.json",
+      "schema": "litchi.mce-expanded-attribute-name-reuse-source-review-0890.v2",
+      "sha256": "54270e65163db13be0e7142954966c8c0924c1389bcce2d2f3a136ab55834366",
+      "status": "approved_for_measurement"
+    },
+    "status": "pass"
+  },
+  "source_continuity": {
+    "baseline_postcheck": {
+      "bytes": 1908,
+      "path": "attempts/baseline-f790c2228c-retry1/post-baseline-source-verification.json",
+      "schema": "litchi.mce-0890-post-baseline-source-verification.v1",
+      "sha256": "92b1b28b8c4d0fcbbc37523aade1006dbb04e921101170883f2aef9dc422d9d2",
+      "status": "pass"
+    },
+    "candidate_overlay": {
+      "bytes": 2825,
+      "path": "candidate-diagnostic-overlay.json",
+      "schema": "litchi.mce-0890-diagnostic-overlay.v1",
+      "sha256": "26151a62d2fcd667fe97b022a6ed8f7ce5a133a876e7b245c7a5e64920ef9db0",
+      "status": "pass"
+    },
+    "candidate_postcheck": {
+      "bytes": 4432,
+      "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/post-candidate-source-verification.json",
+      "schema": "litchi.mce-0890-post-candidate-source-verification.v1",
+      "sha256": "f111b3d328a7907928db165c3275756f52994521e7a7e5658d55281eab58509e",
+      "status": "pass"
+    },
+    "candidate_postcheck_details": {
+      "diagnostic_binary_distinct_from_baseline": true,
+      "isolated_source_rechecked": true,
+      "root_candidates_match_freeze": true,
+      "source_files": 9411,
+      "status": "pass"
+    },
+    "current_head": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "expected_production_diff_scope": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ],
+    "git_diff_name_only_head": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ],
+    "owner_continuation_source": {
+      "missing_files_after": [],
+      "missing_files_before": [],
+      "receipt": {
+        "bytes": 3724209,
+        "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+        "schema": "litchi.mce-0890-owner-continuation.v1",
+        "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e",
+        "status": "pass"
+      },
+      "source_after_file_count": 9411,
+      "source_before_file_count": 9411,
+      "unchanged": true,
+      "unexpected_files_after": [],
+      "unexpected_files_before": []
+    },
+    "production_codec_hash_matches_v2_freeze": true,
+    "unrelated_untracked_file_preserved": {
+      "bytes": 6390,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+      "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+    }
+  },
+  "status": "pass"
+}

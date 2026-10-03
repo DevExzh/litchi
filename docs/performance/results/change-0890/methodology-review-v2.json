@@ -1,0 +1,434 @@
+{
+  "schema": "litchi.mce-expanded-attribute-name-reuse-methodology-review-0890.v2",
+  "status": "pass",
+  "reviewer": "/root/mce_cache_measurement_review_0890",
+  "reviewed_without_build_or_workload": true,
+  "performance_claim": null,
+  "scope": {
+    "candidate": "per-start reuse of a successfully expanded unprefixed MCE attribute name",
+    "production_owner": "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "focused_tests": "crates/litchi-ooxml-common/src/mce/tests.rs",
+    "candidate_paths": [
+      "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "crates/litchi-ooxml-common/src/mce/tests.rs"
+    ],
+    "public_api_changed": false,
+    "dependencies_changed": false,
+    "unsafe_code_added": false,
+    "base_head": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+    "retained_baseline_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+    "source_review": "docs/performance/results/change-0890/source-review-v2.json"
+  },
+  "helpers": {
+    "build": {
+      "path": "docs/performance/results/change-0890/build.py",
+      "bytes": 13197,
+      "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c"
+    },
+    "experiment": {
+      "path": "docs/performance/results/change-0890/experiment.py",
+      "bytes": 7535,
+      "sha256": "356344d1d6e4eab1ad38d6d6d05bada74e8950eb2a09241ba30acf3f538d8f7e"
+    },
+    "reducer": {
+      "path": "docs/performance/results/change-0890/reduce.py",
+      "bytes": 1031,
+      "sha256": "251d0343fdffa6ff90d3504c13dd60627e0f3217e45ffd58a3c538cd4afdd43b"
+    },
+    "managed_executable_preparation": {
+      "path": "docs/performance/results/change-0890/prepare_exec.py",
+      "bytes": 3902,
+      "sha256": "d8e67639b33c40a75af83e51f804350b2d2e713eb3dbc88eb09b1bd75b9afa77"
+    },
+    "packet_verifier": {
+      "path": "docs/performance/results/change-0890/verify_packet.py",
+      "bytes": 7138,
+      "sha256": "29f119b5348c46b7be6f148ea536d5366e312de74aad0b35805ed35c892ef156"
+    },
+    "baseline_source_verifier": {
+      "path": "docs/performance/results/change-0890/verify_baseline_source.py",
+      "bytes": 4127,
+      "sha256": "a6cd7248461f45357a02c1183fc7b2026366c360441f0d1fb8c87177c42685b1"
+    },
+    "correctness_baseline_runner": {
+      "path": "docs/performance/results/change-0890/baseline_runner.py",
+      "bytes": 15461,
+      "sha256": "a4b1e61d5cca8970a5a2fb42eb565329cf380d648604be30c54e9e696bcc33a0"
+    },
+    "diagnostic_overlay": {
+      "path": "docs/performance/results/change-0890/overlay_candidate_diagnostic.py",
+      "bytes": 5319,
+      "sha256": "9ec9af0f560d055a039f047489c74e14030de7286575abc777c42dd2cf15ce69"
+    },
+    "diagnostic_runner": {
+      "path": "docs/performance/results/change-0890/candidate_diagnostic_runner.py",
+      "bytes": 10759,
+      "sha256": "c4e7de69f9937d6dfa7a723ca050c45be5e9cd5128fb7c9fc5c90f08bbadf505"
+    },
+    "diagnostic_comparator": {
+      "path": "docs/performance/results/change-0890/compare_diagnostic_reports.py",
+      "bytes": 3096,
+      "sha256": "8c26c74326fe8f4d727a1f9119ce98bc13c9fb72a7c516b0871e6bfe19efeee8"
+    },
+    "candidate_source_verifier": {
+      "path": "docs/performance/results/change-0890/verify_candidate_source.py",
+      "bytes": 6689,
+      "sha256": "1c9b0014712d5aa5a629687d0a6d799db3750020a10ca40df9fd22485675e020"
+    },
+    "freeze": {
+      "path": "docs/performance/results/change-0890/freeze.py",
+      "bytes": 39766,
+      "sha256": "aa1f53beddf0cf5c6da210462c7d69e2e20d6a33280173fe126624789dd96bb1"
+    },
+    "owner_gates_runner": {
+      "path": "docs/performance/results/change-0890/owner_gates_runner.py",
+      "bytes": 8716,
+      "sha256": "fde80bef2cc1d1ba0e7442979d2305eb5873c50345d066dd940dfa80d362c32e"
+    },
+    "imported_0887_experiment": {
+      "path": "docs/performance/results/change-0887/experiment.py",
+      "bytes": 22587,
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    "imported_0887_reducer": {
+      "path": "docs/performance/results/change-0887/reduce.py",
+      "bytes": 13950,
+      "sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad"
+    },
+    "imported_0887_packet_verifier": {
+      "path": "docs/performance/results/change-0887/verify_packet.py",
+      "bytes": 16934,
+      "sha256": "da804225162f3d106406c8644dce6dbfda2934e1b20e02c0c3d3675298cc98f2"
+    },
+    "imported_0885_capture": {
+      "path": "docs/performance/results/change-0885/capture.py",
+      "bytes": 17203,
+      "sha256": "f751f1d5dd367b856f3e83b03d360dd86c99c33d3d1c0ebd7e8305575a63a27f"
+    },
+    "imported_0885_verify": {
+      "path": "docs/performance/results/change-0885/verify.py",
+      "bytes": 23498,
+      "sha256": "f4de053621d078e249c5d549eeba2ebab1a4b0b7e58edeb5c952c2bbf1980fb9"
+    },
+    "imported_0885_test_helpers": {
+      "path": "docs/performance/results/change-0885/test_helpers.py",
+      "bytes": 12516,
+      "sha256": "57df4f8a6cc7ca2ebe5a1766894b534d6cde0e7f46882a55aadc1a9a3b86e045"
+    }
+  },
+  "static_checks": {
+    "python_ast": {
+      "status": "pass",
+      "helpers_checked": 13,
+      "workload_launched": false
+    },
+    "helper_imports": {
+      "status": "pass",
+      "helpers_checked": [
+        "build",
+        "prepare_exec",
+        "baseline_runner",
+        "experiment",
+        "reduce",
+        "verify_packet",
+        "verify_baseline_source",
+        "overlay_candidate_diagnostic",
+        "candidate_diagnostic_runner",
+        "compare_diagnostic_reports",
+        "verify_candidate_source",
+        "freeze"
+      ],
+      "workload_launched": false
+    },
+    "schedule": {
+      "status": "pass",
+      "children": 72,
+      "native_children": 64,
+      "allocator_children": 8,
+      "native_blocks": 8,
+      "allocator_blocks": 4,
+      "bootstrap_seed": 890
+    },
+    "synthetic_full_load_plan": {
+      "status": "pass",
+      "schema": "litchi.xlsx-mce-expanded-name-cache-experiment-0890.v1",
+      "retained_only": false,
+      "workload_launched": false,
+      "purpose": "exercise all original plan gates and the managed-copy identity seam with retained executable descriptors"
+    },
+    "candidate_source_union": {
+      "status": "pass",
+      "archive_git_apply_check": "pass",
+      "archive": "docs/performance/results/change-0885/source.tar.gz",
+      "candidate_patch": "docs/performance/results/change-0890/candidate-v2.patch",
+      "reconstructed_regular_files": 10765,
+      "expected_baseline_overlay_union_files": 10765,
+      "workload_launched": false
+    },
+    "candidate_diagnostic_equality": {
+      "status": "pass",
+      "comparison": "docs/performance/results/change-0890/cross-version-diagnostic-comparison.json",
+      "cross_version_byte_identical": true,
+      "repeat_byte_identical": true,
+      "decompressed_bytes": 226180145,
+      "decompressed_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29",
+      "performance_claim": false
+    },
+    "oracle_checks": {
+      "status": "pass",
+      "baseline": "docs/performance/results/change-0890/baseline-oracle-verification.json",
+      "candidate": "docs/performance/results/change-0890/candidate-oracle-verification.json",
+      "comparison": "docs/performance/results/change-0890/root-oracle-comparison.json",
+      "oracle_records": 200201,
+      "missing_oracle_refused": true,
+      "missing_controls_refused": true,
+      "repeat_byte_equal": true
+    },
+    "release_build_preflight": {
+      "status": "pass",
+      "helper": "docs/performance/results/change-0890/build.py",
+      "helper_sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c",
+      "source_preflight": "_load_frozen_candidate against retained 0885 manifest",
+      "timing_authorized": false,
+      "workload_launched": false
+    }
+  },
+  "source_custody": {
+    "candidate_freeze": {
+      "path": "docs/performance/results/change-0890/candidate-freeze-v2.json",
+      "schema": "litchi.mce-candidate-freeze-0890.v1",
+      "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+      "bytes": 1016,
+      "sha256": "c9c0667211f6c995adcf7b9fb28b60cab1b718e18c45139d5d2f72e1cd50afa8"
+    },
+    "candidate_patch": {
+      "path": "docs/performance/results/change-0890/candidate-v2.patch",
+      "bytes": 9345,
+      "sha256": "dd40d8e3507e165c64b446dcd4a885f930a0ea4463f6aa75cb282cade70800c4"
+    },
+    "candidate_files": {
+      "crates/litchi-ooxml-common/src/mce/codec.rs": {
+        "bytes": 67996,
+        "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+      },
+      "crates/litchi-ooxml-common/src/mce/tests.rs": {
+        "bytes": 133696,
+        "sha256": "e0e7b3840f79c9bbe052466a47221721c55933d5dba296c9257199ef06ae64bb"
+      }
+    },
+    "source_review": {
+      "path": "docs/performance/results/change-0890/source-review-v2.json",
+      "status": "approved_for_measurement",
+      "bytes": 5526,
+      "sha256": "54270e65163db13be0e7142954966c8c0924c1389bcce2d2f3a136ab55834366",
+      "blocking_findings": 0
+    },
+    "retained_baseline": {
+      "revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+      "archive": {
+        "path": "docs/performance/results/change-0885/source.tar.gz",
+        "bytes": 89024356,
+        "sha256": "bdf6e1c815bbf33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+      },
+      "manifest": {
+        "path": "docs/performance/results/change-0885/source.json",
+        "bytes": 2083420,
+        "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938",
+        "files": 10765
+      },
+      "archive_replay": {
+        "path": "docs/performance/results/change-0885/source-archive-replay.json",
+        "sha256": "b0814e26d1f169f316ea36322c94e7767df622510f86f6dd8f218b02fd6f27e6",
+        "status": "pass",
+        "regular_files_verified": 10765
+      },
+      "diagnostic_exclusions": [
+        "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs"
+      ]
+    },
+    "root_lock_custody": {
+      "path": "docs/performance/results/change-0890/attempts/baseline-f790c2228c-retry1/root-lock-custody.json",
+      "sha256": "61eea7167d139f1d6bde45358f86a5b94a2eab131cd6aa61b96639e74a1a475f",
+      "byte_identical": true,
+      "sha256_of_lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    }
+  },
+  "baseline_reuse": {
+    "retained_build": {
+      "build": {
+        "path": "docs/performance/results/change-0885/build.json",
+        "sha256": "4975fd1635267abd98cb0a756a39c948ceb048d31a2bb08972569f786f5e4d8d",
+        "status": "pass"
+      },
+      "build_start": {
+        "path": "docs/performance/results/change-0885/build-start.json",
+        "sha256": "e3026d9211fa0e4c8a4d20efb32f902746d14919bddf4df5442512a139e950e0"
+      },
+      "native": {
+        "binary_bytes": 264440648,
+        "binary_sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d",
+        "build_receipt_sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+      },
+      "allocator": {
+        "binary_bytes": 267473328,
+        "binary_sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16",
+        "build_receipt_sha256": "1a4e67d157bbf337d343cd5f63455965c2d7d716425a48a4dcf5864fdbb8ad4d3"
+      },
+      "toolchain": "rustc/cargo 1.95.0; release opt-level 3, debug 1, fat LTO, codegen-units 1; offline, incremental 0, jobs 2"
+    },
+    "candidate_build_runner": {
+      "path": "docs/performance/results/change-0890/build-executed.py",
+      "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c",
+      "launch_receipt": {
+        "path": "docs/performance/results/change-0890/release-build-launch.json",
+        "sha256": "f7ea61fb8372f629ded273543057f96265f9f5ea512a6889b3ed17990fb2db81",
+        "timings_authorized": false
+      },
+      "source_root": "/tmp/litchi-0890-source",
+      "target_root": "/home/zhuhe/code/litchi/target/litchi-0890-build",
+      "source_equivalence": "reconstructed 0885 archive plus exactly the two frozen MCE overlays; only the four xml_attribute_bounds diagnostic paths are tolerated as current-tree exclusions"
+    },
+    "build_context_gate": {
+      "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "matching_release_flags": true,
+      "matching_build_argv": true,
+      "matching_fixed_environment": true,
+      "candidate_binaries": "pending build completion; no binary identity or timing claim is made here"
+    }
+  },
+  "correctness_custody": {
+    "baseline_retry": {
+      "path": "docs/performance/results/change-0890/attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+      "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a",
+      "status": "pass",
+      "generated": 20000,
+      "aliasing": 20000,
+      "packages": 3,
+      "selected_members": 67,
+      "report_bytes": 226180145,
+      "report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "compressed_sha256": "d49d3cb8cfddc3c4fab6e9870b2eb28c9ae0d934e22c68a143e0716724a56f29"
+    },
+    "candidate_retry": {
+      "path": "docs/performance/results/change-0890/attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+      "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268",
+      "status": "pass",
+      "focused_tests": "24 passed, 0 failed",
+      "report_bytes": 226180145,
+      "report_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+      "performance_claim": false
+    },
+    "candidate_source_verification": {
+      "path": "docs/performance/results/change-0890/attempts/candidate-diagnostic-f790c2228c-v2-retry1/post-candidate-source-verification.json",
+      "sha256": "f111b3d328a7907928db165c3275756f52994521e7a7e5658d55281eab58509e",
+      "status": "pass"
+    },
+    "cross_version_comparison": {
+      "path": "docs/performance/results/change-0890/cross-version-diagnostic-comparison.json",
+      "sha256": "08680c6f0a6d6c9b53bb63f0a2923082e9afe31ec3904168c9339fbc204d86cd",
+      "status": "pass",
+      "byte_identical": true
+    },
+    "oracle_verification": {
+      "baseline": "docs/performance/results/change-0890/baseline-oracle-verification.json",
+      "candidate": "docs/performance/results/change-0890/candidate-oracle-verification.json",
+      "root_comparison": "docs/performance/results/change-0890/root-oracle-comparison.json",
+      "status": "pass",
+      "oracle_records": 200201,
+      "missing_oracle_refused": true,
+      "missing_controls_refused": true
+    },
+    "historical_failure": {
+      "path": "docs/performance/results/change-0890/attempts/baseline-f790c2228c/baseline-receipt.json",
+      "status": "retained_failed_attempt",
+      "reason": "baseline build failed before differential execution"
+    }
+  },
+  "schedule": {
+    "cases": [
+      "xlsx_producer_medium_source_full_cell_scan",
+      "xlsx_full_cell_scan",
+      "docx_producer_source_selected_paragraph",
+      "pptx_producer_source_selected_slide"
+    ],
+    "native": {
+      "blocks": 8,
+      "pairs_per_case": 8,
+      "children": 64,
+      "warmup_per_child": 3,
+      "samples_per_child": 50
+    },
+    "allocator": {
+      "primary_case": "xlsx_producer_medium_source_full_cell_scan",
+      "blocks": 4,
+      "pairs": 4,
+      "children": 8,
+      "warmup_per_child": 3,
+      "samples_per_child": 15
+    },
+    "ordering": "native lane then allocator lane; AB/BA alternates by block plus case parity",
+    "execution": "fresh process per child, fail-fast, no retries or replacements, warm filesystem cache, CPU affinity 12"
+  },
+  "statistics": {
+    "unit": "whole-child aggregate statistics",
+    "native_metrics": ["p50_ns", "p95_ns", "p99_ns", "peak_rss_kib"],
+    "pairing": "after/before ratios within each scheduled pair; samples are never pooled across children",
+    "bootstrap": {
+      "draws": 10000,
+      "seed": 890,
+      "confidence": "percentile 95% interval",
+      "indices": [249, 9749],
+      "resampling_unit": "paired child ratios"
+    },
+    "primary_gate": {
+      "metric": "native primary p50",
+      "median_ratio_at_most": 0.98,
+      "bootstrap_upper_below": 1.0
+    },
+    "review_flags": {
+      "control_or_primary_pair_ratio_above": 1.05,
+      "native_p50_leg_spread_above": 1.2,
+      "allocator_adoption": "not evaluated"
+    }
+  },
+  "rss_and_residency": {
+    "measurement": "process-lifetime peak RSS from /usr/bin/time in KiB",
+    "managed_copies": "one byte-, mode-, and inode-verified fresh copy per role/mode, reused by scheduled children",
+    "interpretation": "managed copies narrow pathname and inode history differences but do not remove executable file-mapping residency confounding",
+    "adoption": "RSS is review evidence only and is excluded from the primary adoption gate",
+    "prior_evidence": "0888 showed byte-identical executable copies can have different RSS through executable mappings"
+  },
+  "quality_and_cleanup": {
+    "owner_gates": "MCE owner/shared tests, Clippy, rustdoc, and boundary checks are required; the initial full-workspace fmt check is known to flag only the unrelated untracked bench_word_parse.rs and must be resolved by an unfiltered continuation receipt",
+    "actual_plan_load": "required after candidate binaries and all four managed copies exist, before any capture child",
+    "cleanup": "remove only marked 0890 source, release target, correctness roots, baseline correctness copy, and managed executable directory; preserve retained binaries, archives, receipts, and failed attempts",
+    "replay": "run freeze.py --verify --retained-only and verify_packet.py with cleanup required; neither rebuilds nor launches a workload"
+  },
+  "verified": [
+    "The v2 candidate freeze contains exactly the two reviewed MCE owner paths and binds candidate-v2.patch, source review, and current file hashes.",
+    "The release builder reconstructs the retained 0885 archive, overlays only the frozen candidate files, checks the complete 10,765-file materialized source union, and uses the exact immutable helper recorded by release-build-launch.json.",
+    "The retained native and allocator binaries are bound to their 0885 source archive, manifest, build receipts, depfiles, Rust/Cargo versions, release flags, and fixed build environment; candidate build custody remains pending its receipts.",
+    "The experiment wrapper preserves the reviewed 0887 semantic fences, four-case native controls, primary allocator observation, fresh-child schedule, managed executable-copy identity checks, and fail-fast no-retry custody.",
+    "The reducer uses paired whole-child statistics and a fixed seeded bootstrap; its pass status is evidence reduction, not candidate adoption.",
+    "The diagnostic candidate matches the retained baseline differential oracle byte-for-byte and passes the focused 24-test qualification plus cross-variant oracle checks without a performance claim.",
+    "The packet verifier reconstructs source and replays retained receipts without rebuilding or launching a workload."
+  ],
+  "caveats": [
+    "This receipt authorizes measurement methodology only; it contains no optimization, latency, allocation, RSS, or adoption claim.",
+    "The current release build is still running; no candidate release binary identity is asserted until both native and allocator build receipts pass and are bound into plan.json.",
+    "The initial owner gate receipt records a workspace-wide fmt failure caused solely by the unrelated untracked bench_word_parse.rs; the final plan must use a passing unfiltered continuation receipt and retain the failure.",
+    "Warm-cache CPU-affinity measurements have no exclusive-host or physical-cold-cache guarantee."
+  ],
+  "required_followups": [
+    "Complete the candidate native and allocator release builds, retain build.json, per-role receipts, logs, depfiles, and binary hashes, and verify their compiler, argv, flags, and fixed environment against 0885.",
+    "Complete the unfiltered owner-gate continuation after the unrelated workspace fmt finding, then freeze the quality receipt and all helper hashes.",
+    "Prepare the four managed executable copies and create the plan; run the full experiment.load_plan check successfully before any timed child launches.",
+    "Capture exactly the single 72-child packet, reduce it, inspect all control, spread, allocator, and RSS flags, and retain any failed attempt without retry replacement.",
+    "After aggregate and final review, remove only marked 0890 scratch roots and replay packet verification with cleanup required."
+  ]
+}

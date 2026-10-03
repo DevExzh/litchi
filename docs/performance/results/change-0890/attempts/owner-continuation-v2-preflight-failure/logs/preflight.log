@@ -1,0 +1,6 @@
+owner_continuation_runner.py was launched before any Cargo command.
+The process performed an exact isolated-source preflight.
+Observed defect: source_manifest(expected) was called inside a 9411-item generator, recomputing and rehashing the complete 9411-file source manifest once per item.
+The owned process was terminated after diagnosis before any Cargo child was started.
+terminal_exit=143
+no runtime gate or source overlay was performed by this attempt

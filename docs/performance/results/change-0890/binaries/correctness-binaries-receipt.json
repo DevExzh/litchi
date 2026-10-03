@@ -1,0 +1,65 @@
+{
+  "after": {
+    "copy": {
+      "bytes": 7433288,
+      "mode": "0o775",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/correctness-after/xml_attribute_bounds",
+      "sha256": "1284f70709f460ff35aa38da06dd897e0ac6319b32ac4afafb48013da28fc9fb"
+    },
+    "same_identity": false,
+    "source": {
+      "bytes": 7433288,
+      "mode": "0o775",
+      "path": "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+      "sha256": "1284f70709f460ff35aa38da06dd897e0ac6319b32ac4afafb48013da28fc9fb"
+    }
+  },
+  "baseline_receipt": {
+    "path": "attempts/baseline-f790c2228c-retry1/baseline-receipt.json",
+    "sha256": "506748e0cc6872c82ec649496af6b08a681c348bec25a9764ac626c407863d6a"
+  },
+  "before": {
+    "copy": {
+      "bytes": 7432688,
+      "mode": "0o775",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/correctness-before/xml_attribute_bounds",
+      "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+    },
+    "same_identity": false,
+    "source": {
+      "bytes": 7432688,
+      "mode": "0o775",
+      "path": "/tmp/litchi-0890-correctness-baseline/xml_attribute_bounds",
+      "sha256": "9f08422bd427461fb1e9600ae54707d6cadabce800de3d1842c492aa77eb764d"
+    }
+  },
+  "candidate_receipt": {
+    "path": "attempts/candidate-diagnostic-f790c2228c-v2-retry1/candidate-receipt.json",
+    "sha256": "760675c59771735d51c182c948f27614363714d8d77faf3748c44a5d43e6f268"
+  },
+  "copy_commands": [
+    [
+      "cp",
+      "-p",
+      "/tmp/litchi-0890-correctness-baseline/xml_attribute_bounds",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/correctness-before/xml_attribute_bounds"
+    ],
+    [
+      "cp",
+      "-p",
+      "/home/zhuhe/code/litchi/target/litchi-0890-correctness/debug/xml_attribute_bounds",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0890/binaries/correctness-after/xml_attribute_bounds"
+    ]
+  ],
+  "created_utc": "2026-10-03T18:30:06.105054Z",
+  "distinct_before_after": true,
+  "ignored_by_packet_gitattributes": true,
+  "owner_continuation_receipt": {
+    "path": "attempts/owner-continuation-v2/owner-continuation-receipt.json",
+    "sha256": "1aae5620de3c4a58fc8ccb6d0ad217d03f0485871d9b43a8534737bc9fdccf3e"
+  },
+  "performance_claim": false,
+  "purpose": "retain_qualified_diagnostic_executables_for_reproduction",
+  "schema": "litchi.mce-0890-correctness-binaries.v1",
+  "status": "pass"
+}

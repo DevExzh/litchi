@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.mce-candidate-freeze-0890.v1",
+  "base_commit": "f790c2228cbd9e89c2892ba3ffaeb49802fac43b",
+  "candidate_paths": [
+    "crates/litchi-ooxml-common/src/mce/codec.rs",
+    "crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "files": [
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/codec.rs",
+      "bytes": 67996,
+      "sha256": "916750605687a92676a4d76fadbe14c526be33044da94e1df1917717b68a123c"
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/mce/tests.rs",
+      "bytes": 133540,
+      "sha256": "b464c225834599eec8489ac3ac22bbaf6254f6d70846070701d740af8eb6b186"
+    }
+  ],
+  "patch": {
+    "path": "docs/performance/results/change-0890/candidate.patch",
+    "bytes": 9187,
+    "sha256": "6cfe6e59581f4022c8e4bdbf3e3f930de247a6fa6f5adfe5f4bfdd65ffc91589"
+  },
+  "performance_claim": false
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "litchi.mce-release-build-completion-0890.v1",
+  "status": "pass",
+  "exit_code": 0,
+  "session_id": 7052,
+  "finished_observed_utc": "2026-10-03T18:36:57.815903+00:00",
+  "launch": {
+    "path": "docs/performance/results/change-0890/release-build-launch.json",
+    "bytes": 690,
+    "sha256": "f7ea61fb8372f629ded273543057f96265f9f5ea512a6889b3ed17990fb2db81"
+  },
+  "runner": {
+    "path": "docs/performance/results/change-0890/build-executed.py",
+    "bytes": 13197,
+    "sha256": "b08dd9887d3646e98873dd641fe3260b989264595d2c14ae5d2881047fb35e0c"
+  },
+  "build": {
+    "path": "docs/performance/results/change-0890/build.json",
+    "bytes": 4805,
+    "sha256": "2e340748fbf884ccc77a37cb0c47a9e4e8c8df6ea2fbf3b46721bf4aecd72881"
+  },
+  "receipts": {
+    "native-build.json": {
+      "path": "docs/performance/results/change-0890/native-build.json",
+      "bytes": 2825,
+      "sha256": "90210b17cb7cc757af79e559c58bb05b8fdd1fa26cb128f43d1e2f1019be706e"
+    },
+    "allocator-build.json": {
+      "path": "docs/performance/results/change-0890/allocator-build.json",
+      "bytes": 2876,
+      "sha256": "a80f79a8f791f5156fda0456d491c2172aab68311fa70609ed8460a47adb4b98"
+    },
+    "native-build.log": {
+      "path": "docs/performance/results/change-0890/native-build.log",
+      "bytes": 7946,
+      "sha256": "bdfac13bc8ca4a6bfac8c91721b76dd9f1ca5769c5c63d3a441602f470ffe36a"
+    },
+    "allocator-build.log": {
+      "path": "docs/performance/results/change-0890/allocator-build.log",
+      "bytes": 162,
+      "sha256": "32cd81870076173c386d3a6dce32bfb7a9b777fdb3123a15d16b364babe95e4c"
+    }
+  }
+}

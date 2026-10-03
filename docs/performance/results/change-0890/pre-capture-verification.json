@@ -1,0 +1,7 @@
+{
+  "mutated": false,
+  "plan": "/home/zhuhe/code/litchi/docs/performance/results/change-0890/plan.json",
+  "plan_sha256": "346c63950f0241b3c7b74c610aae08a2ae9773434fed87233c4b56dca491d364",
+  "retained_only": false,
+  "status": "pass"
+}

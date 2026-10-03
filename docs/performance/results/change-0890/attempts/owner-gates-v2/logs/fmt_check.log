@@ -1,0 +1,81 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:61:
+             let document = package.document().expect("doc document failed");
+             let text = document.text().expect("doc text failed");
+             text.len()
+-        }
++        },
+         "docx" => {
+             let package = litchi_docx::Package::open(path).expect("docx open failed");
+             let document = package.document().expect("docx document failed");
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:68:
+             let text = document.text().expect("docx text failed");
+             text.len()
+-        }
++        },
+         other => panic!("unknown kind {other}"),
+     };
+     (text_len, start.elapsed().as_secs_f64() * 1000.0)
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:75:
+ 
+ fn main() {
+     let args: Vec<String> = std::env::args().collect();
+-    let path = args.get(1).expect("usage: bench_word_parse <file> <doc|docx> [iterations]");
++    let path = args
++        .get(1)
++        .expect("usage: bench_word_parse <file> <doc|docx> [iterations]");
+     let kind = args.get(2).map(String::as_str).unwrap_or("docx");
+     let iterations: usize = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(30);
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:82:
+-    let file_bytes = std::fs::metadata(path).map(|m| m.len() as usize).unwrap_or(0);
++    let file_bytes = std::fs::metadata(path)
++        .map(|m| m.len() as usize)
++        .unwrap_or(0);
+ 
+     // ---- Cold parse (first in this process) ----
+     let live_baseline = CURRENT.load(Ordering::Relaxed);
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:125:
+                 let live = CURRENT.load(Ordering::Relaxed).saturating_sub(base);
+                 std::hint::black_box((&package, &document));
+                 live
+-            }
++            },
+             _ => {
+                 let package = litchi_docx::Package::open(path).expect("docx open failed");
+                 let document = package.document().expect("docx document failed");
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:134:
+                 let live = CURRENT.load(Ordering::Relaxed).saturating_sub(base);
+                 std::hint::black_box((&package, &document));
+                 live
+-            }
++            },
+         }
+     };
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:141:
+     println!("file            : {path}");
+     println!("kind            : {kind}");
+-    println!("file size       : {:.2} MiB ({} bytes)", mib(file_bytes), file_bytes);
++    println!(
++        "file size       : {:.2} MiB ({} bytes)",
++        mib(file_bytes),
++        file_bytes
++    );
+     println!("text extracted  : {} bytes", text_len);
+     println!("iterations      : {iterations}");
+     println!("cold parse      : {:.2} ms", cold_ms);
+Diff in /home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs:154:
+     );
+     println!("heap peak cold  : {:.2} MiB", mib(cold_peak_delta));
+     println!("heap peak warm  : {:.2} MiB", mib(warm_peak_delta));
+-    println!("heap live held  : {:.2} MiB (package+document+text alive)", mib(held_live));
++    println!(
++        "heap live held  : {:.2} MiB (package+document+text alive)",
++        mib(held_live)
++    );
+     println!("process VmHWM   : {:.2} MiB", mib(vm_hwm_kb() * 1024));
+ }
+ 
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","fmt","--manifest-path","/home/zhuhe/code/litchi/Cargo.toml","--all","--","--check"]
+
