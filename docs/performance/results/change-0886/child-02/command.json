@@ -1,0 +1,70 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "record",
+    "--no-buildid-cache",
+    "-e",
+    "cycles:u",
+    "-F",
+    "499",
+    "--call-graph",
+    "dwarf,16384",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-02/perf.data",
+    "--",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "10",
+    "--samples",
+    "2000",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-02/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-02/producer.json"
+  ],
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0886",
+  "plan_sha256": "f1423dfe5d883c813191182fefffaef317d0d9d09e00ce9be2b257027a109e2c",
+  "capture_helper_sha256": "0f0421bf1d33e59f5cbe32b81f06048d168888f3d931e326b124cca16bb5343a",
+  "started_utc": "2026-10-03T15:54:47.157745+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:54:55.420151+00:00",
+  "artifacts": {
+    "producer.json": {
+      "bytes": 7376,
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "command-start.json": {
+      "bytes": 1190,
+      "sha256": "a628f25e76cda2aaa384a467082b726f9136e69de4bbffbec05fb8f12c49f3cc"
+    },
+    "report.json": {
+      "bytes": 1025704,
+      "sha256": "3d20b2700e78cfc97edfe8d52631ecee8e53a992596ff2eabed62ebdf0c939eb"
+    },
+    "stderr.txt": {
+      "bytes": 176,
+      "sha256": "6a61abc1138fb5126fc2b06b1f81f25a07c67a749463c789ab89fe60a2b1d771"
+    },
+    "perf.data": {
+      "bytes": 68071072,
+      "sha256": "950fce4f9335d9001f12ac9b4d7600d91c9e395cb7ee15cb4c216e07c83f2c96"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

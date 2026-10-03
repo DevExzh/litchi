@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "stat",
+    "-e",
+    "cycles:u",
+    "--",
+    "/usr/bin/true"
+  ],
+  "started_utc": "2026-10-03T15:53:31.855984+00:00",
+  "exit_code": 0
+}

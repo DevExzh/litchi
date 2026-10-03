@@ -1,0 +1,140 @@
+[
+  {
+    "child": "child-00",
+    "sample_count": 4141,
+    "total_period": 33293121404,
+    "lost_samples": 0,
+    "self_groups": {
+      "unresolved_sampled_ip": {
+        "period": 275400962,
+        "percent": 0.8272007861867585
+      },
+      "other_resolved": {
+        "period": 9941147484,
+        "percent": 29.859463651268282
+      },
+      "zlib": {
+        "period": 1345949619,
+        "percent": 4.042725831163104
+      },
+      "x14ac": {
+        "period": 2116763762,
+        "percent": 6.357961262669956
+      },
+      "other_worksheet_parser": {
+        "period": 3373870300,
+        "percent": 10.1338359328322
+      },
+      "xml_namespace_resolver": {
+        "period": 2287739852,
+        "percent": 6.871509055096106
+      },
+      "mce": {
+        "period": 9000339121,
+        "percent": 27.03362959508703
+      },
+      "other_quick_xml": {
+        "period": 3242876609,
+        "percent": 9.740380211422245
+      },
+      "xml_namespace_reader": {
+        "period": 1709033695,
+        "percent": 5.133293674274315
+      }
+    },
+    "empty_stack_percent": 87.18741730089778,
+    "any_unknown_stack_percent": 2.4242297776952535
+  },
+  {
+    "child": "child-01",
+    "sample_count": 4133,
+    "total_period": 33298745036,
+    "lost_samples": 0,
+    "self_groups": {
+      "unresolved_sampled_ip": {
+        "period": 306678734,
+        "percent": 0.9209918682173847
+      },
+      "other_resolved": {
+        "period": 10292391169,
+        "percent": 30.90924645320018
+      },
+      "zlib": {
+        "period": 1283800572,
+        "percent": 3.855402270001633
+      },
+      "xml_namespace_reader": {
+        "period": 1569437914,
+        "percent": 4.713204393448602
+      },
+      "xml_namespace_resolver": {
+        "period": 2308131613,
+        "percent": 6.9315873931724115
+      },
+      "other_quick_xml": {
+        "period": 3536989330,
+        "percent": 10.621989886333804
+      },
+      "other_worksheet_parser": {
+        "period": 3204268659,
+        "percent": 9.622791055746381
+      },
+      "mce": {
+        "period": 8900900861,
+        "percent": 26.7304393945689
+      },
+      "x14ac": {
+        "period": 1896146184,
+        "percent": 5.694347285310707
+      }
+    },
+    "empty_stack_percent": 86.75279334331968,
+    "any_unknown_stack_percent": 2.25847047745178
+  },
+  {
+    "child": "child-02",
+    "sample_count": 4096,
+    "total_period": 34184616855,
+    "lost_samples": 0,
+    "self_groups": {
+      "unresolved_sampled_ip": {
+        "period": 206634527,
+        "percent": 0.6044664121188671
+      },
+      "other_resolved": {
+        "period": 9555636240,
+        "percent": 27.953030102785398
+      },
+      "zlib": {
+        "period": 1276527933,
+        "percent": 3.7342174651674913
+      },
+      "mce": {
+        "period": 9497915500,
+        "percent": 27.7841800605432
+      },
+      "other_worksheet_parser": {
+        "period": 3491430688,
+        "percent": 10.213455668698908
+      },
+      "xml_namespace_resolver": {
+        "period": 3473681777,
+        "percent": 10.161534914181503
+      },
+      "x14ac": {
+        "period": 2069389193,
+        "percent": 6.053568486017188
+      },
+      "other_quick_xml": {
+        "period": 3245360544,
+        "percent": 9.493628545745478
+      },
+      "xml_namespace_reader": {
+        "period": 1368040453,
+        "percent": 4.001918344741968
+      }
+    },
+    "empty_stack_percent": 69.47116276813394,
+    "any_unknown_stack_percent": 12.706771611408776
+  }
+]

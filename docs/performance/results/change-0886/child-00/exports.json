@@ -1,0 +1,68 @@
+[
+  {
+    "argv": [
+      "/usr/bin/perf",
+      "script",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-00/perf.data",
+      "-G",
+      "-F",
+      "pid,tid,time,period,event,ip,sym,dso"
+    ],
+    "exit_code": 0,
+    "output": "leaf-samples.txt",
+    "sha256": "c349b691d247bbf1e00fd7d4f98df4dd1a46f5e8df35d3d9796b3ad88ed63db2"
+  },
+  {
+    "argv": [
+      "/usr/bin/perf",
+      "script",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-00/perf.data",
+      "-F",
+      "pid,tid,time,period,event,ip,sym,dso",
+      "--inline"
+    ],
+    "exit_code": 0,
+    "output": "call-stacks.txt",
+    "sha256": "efd299a4b723a736aad9edf894bf80b4ba2928346d84cf0d8c04b1d3be334c98"
+  },
+  {
+    "argv": [
+      "/usr/bin/perf",
+      "report",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-00/perf.data",
+      "--stdio",
+      "--no-children",
+      "--call-graph",
+      "none",
+      "--sort",
+      "dso,symbol",
+      "--show-nr-samples",
+      "--show-total-period",
+      "--percent-limit",
+      "0",
+      "--stdio-color",
+      "never",
+      "--field-separator",
+      "|"
+    ],
+    "exit_code": 0,
+    "output": "self-symbols.txt",
+    "sha256": "d5c2487e94d022667a7eb01aa262a079ae87b5943909c4e8da2d362d23766d49"
+  },
+  {
+    "argv": [
+      "/usr/bin/perf",
+      "report",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0886/child-00/perf.data",
+      "--header-only",
+      "--stdio"
+    ],
+    "exit_code": 0,
+    "output": "header.txt",
+    "sha256": "2b6d994889041381720ddd9139627b5fcf85a27b7860c941c86d95af7fdb7dfb"
+  }
+]

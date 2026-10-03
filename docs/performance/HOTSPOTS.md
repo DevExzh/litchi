@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0886 — producer XLSX full-cell profile
+
+[0886](0886-producer-full-cell-profile.md) puts MCE processing first for the named producer XLSX full scan: MCE symbols account for 26.73–27.78% of whole-process sampled user-cycle periods, while the separate runner-scoped guest diagnostic places MCE processing at 44.10–44.19% of instructions. x14ac is secondary. Next investigate temporary attribute storage and repeated expansion in MCE start with matched before/after measurements and shared-owner semantic guards. Incomplete native call stacks, unresolved IPs, Valgrind warnings, and scope limits remain explicit; no speedup is claimed.
+
 ## 0885 — producer XLSX full-cell release baseline
 
 [0885](0885-producer-full-cell-release-baseline.md) establishes a current-source 4,096-cell XLSX full-scan baseline: native p50 median 3.574367 ms; separate allocator medians of 25,933 allocation calls and 37,618,900 allocated bytes. A read-only source audit identifies repeated namespace resolution in x14ac capture as a hypothesis. Current runtime attribution and representative controls are required before implementation; marker-based streaming ineligibility is not a measured hotspot.

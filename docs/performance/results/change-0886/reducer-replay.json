@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "ast_parsed": [
+    "capture.py",
+    "callgrind.py",
+    "reduce.py",
+    "analyze_callgrind.py",
+    "export.py"
+  ],
+  "self_exact_match": true,
+  "callgrind_rows_exact_match": true,
+  "temporary_replay_directory_removed": true,
+  "initial_reducer_failure": "Direct-IP taskset unresolved samples used [unknown], while perf report used raw0x IP names. The three unit-period samples now normalize to one unresolved-symbol bucket. No timing or profile capture was repeated."
+}

@@ -1,0 +1,68 @@
+{
+  "schema": "litchi.xlsx-scan-runner-ir-0886.v1",
+  "status": "pass",
+  "rows": [
+    {
+      "child": "callgrind-00",
+      "total_ir": 755248408,
+      "selected_inclusive_rows": {
+        "runner": {
+          "inclusive_ir": 755248408,
+          "percent_of_runner": 100.0,
+          "selector": "tools/perf-baseline/src/producer_shape.rs:litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan ["
+        },
+        "mce_process": {
+          "inclusive_ir": 333751393,
+          "percent_of_runner": 44.19094293542688,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility ["
+        },
+        "mce_start": {
+          "inclusive_ir": 217884663,
+          "percent_of_runner": 28.849403810990886,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start ["
+        },
+        "x14ac_capture": {
+          "inclusive_ir": 145048571,
+          "percent_of_runner": 19.20541234692679,
+          "selector": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner ["
+        }
+      },
+      "parent_pid": 3489982,
+      "brk_warning": true,
+      "callgrind_sha256": "8fc881a8c340fe55a14e3d8e5a5b2d8445c80c12137ba52b41a1d4bb7cf9c8c5",
+      "annotation_sha256": "351379878d05db71e575c66d0f5cd6f04d1ddd6886da3083b46ffab54056c0d9"
+    },
+    {
+      "child": "callgrind-01",
+      "total_ir": 754020187,
+      "selected_inclusive_rows": {
+        "runner": {
+          "inclusive_ir": 754020187,
+          "percent_of_runner": 100.0,
+          "selector": "tools/perf-baseline/src/producer_shape.rs:litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan ["
+        },
+        "mce_process": {
+          "inclusive_ir": 332510756,
+          "percent_of_runner": 44.0983891058609,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility ["
+        },
+        "mce_start": {
+          "inclusive_ir": 217235662,
+          "percent_of_runner": 28.810324411115534,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start ["
+        },
+        "x14ac_capture": {
+          "inclusive_ir": 145049900,
+          "percent_of_runner": 19.23687223509309,
+          "selector": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner ["
+        }
+      },
+      "parent_pid": 3490106,
+      "brk_warning": true,
+      "callgrind_sha256": "29208c7e2bfc68ccea3024a529fb5a9ea831094758bf4c7a0ee7a21a670e109b",
+      "annotation_sha256": "aa97ed86dac907b1153cc90a978c4f1b95184d7569760e95911ae22f3adec97d"
+    }
+  ],
+  "scope": "Two separately captured10-sample/zero-warmup runner-scoped guest instruction diagnostics. Inclusive rows overlap (MCE start is inside MCE processing); never sum rows. No native instruction count, time fraction, allocation cost or speedup estimate.",
+  "warnings": "Valgrind brk segment overflow reported; preserve warning. Child process diagnostic echoes collected count; final raw header matches original parent PID, and totals are read once from that file."
+}

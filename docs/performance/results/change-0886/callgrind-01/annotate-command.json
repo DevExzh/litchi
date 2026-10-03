@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "/usr/bin/callgrind_annotate",
+    "--inclusive=yes",
+    "--threshold=100",
+    "--auto=no",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0886/callgrind-01/callgrind.out"
+  ],
+  "exit_code": 0,
+  "output_sha256": "aa97ed86dac907b1153cc90a978c4f1b95184d7569760e95911ae22f3adec97d"
+}

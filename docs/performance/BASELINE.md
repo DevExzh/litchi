@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0886 — producer XLSX full-cell profile
+
+[0886](0886-producer-full-cell-profile.md) adds three native user-cycle profiles (6,000 measured scans) and two separate runner-scoped Callgrind diagnostics (twenty scans). All reports replay. Native MCE self-symbol shares are 26.73–27.78%; guest MCE inclusive instruction shares are 44.10–44.19%. These populations and scopes remain separate. Poor DWARF stacks prohibit native caller attribution; 0885 remains the latency baseline.
+
 ## 0885 — producer XLSX full-cell release baseline
 
 [0885](0885-producer-full-cell-release-baseline.md) retains eighteen release reports and 450 measured iterations of the generated 4,096-cell XLSX full scan. Native child p50 median is 3.574367 ms (range 3.544454–3.638469); no frozen p50 spread flag fires. Native process peak RSS median is 21,106,688 bytes. The separate allocator population has 25,933 allocation calls and 37,618,900 allocated bytes per operation at the median, with zero failed calls. This is a current-source descriptive baseline, not an optimization comparison; the broader non-iWork program remains open.

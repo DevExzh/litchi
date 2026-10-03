@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0886 — producer XLSX full-cell profile
+
+[0886](0886-producer-full-cell-profile.md) completes five diagnostic processes and semantic replay of 6,020 measured scans. Exact sampled-IP period totals reconcile with flat perf reports; all three native profiles report zero lost samples. Independent review supports self-symbol attribution and separate Callgrind instruction diagnostics, while rejecting inclusive native claims from incomplete DWARF stacks. Production is unchanged. Duplicate exports and replay scratch were cleaned; original evidence remains retained.
+
 ## 0885 — producer XLSX full-cell release baseline
 
 [0885](0885-producer-full-cell-release-baseline.md) validates eighteen fresh release processes / 450 measured iterations from committed source `335a40350b`. Native p50 median is 3.574367 ms and the native p50 spread ratio is 1.0265, below the frozen 1.20 flag. All scan oracles and allocation checks pass; no production change or speedup is claimed. Retained build identities, raw reports, and replay helpers support the next profiling step. Independent and post-cleanup replay pass; owned source/build scratch was removed.

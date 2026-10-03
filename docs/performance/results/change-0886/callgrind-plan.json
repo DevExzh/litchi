@@ -1,0 +1,29 @@
+{
+  "schema": "litchi.xlsx-scan-callgrind-diagnostic-0886.v1",
+  "created_utc": "2026-10-03T15:57:30.576160+00:00",
+  "reason": "Perf sampled-IP evidence resolves, but DWARF call stacks are incomplete. Separate guest-instruction diagnostic; do not combine with native cycles.",
+  "children": 2,
+  "samples": 10,
+  "warmup": 0,
+  "cpu": 12,
+  "toggle_function": "litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan",
+  "scope": "Entire producer full-cell runner, including oracle setup and timer-excluded work; not exact timer scope.",
+  "binary": {
+    "build_receipt": {
+      "bytes": 2783,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native-build.json",
+      "sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+    },
+    "bytes": 264440648,
+    "depfile": {
+      "bytes": 276023,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native.d",
+      "sha256": "53c0719314519d61fa806cab74968fda6520d847d019ffa776e05debdfa0d1de"
+    },
+    "executable": true,
+    "features": [],
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+  },
+  "failure_policy": "stop on command/semantic/zero-collection failure; preserve every attempt"
+}

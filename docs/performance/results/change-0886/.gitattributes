@@ -1,0 +1,5 @@
+# Profiler output is retained byte-for-byte and bound by SHA-256 receipts.
+# Tool formatting includes trailing spaces; do not normalize captured evidence.
+*.out -text -whitespace
+*.txt -text -whitespace
+*.log -text -whitespace

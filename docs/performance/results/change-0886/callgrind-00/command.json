@@ -1,0 +1,60 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0886/callgrind-00/callgrind.out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "0",
+    "--samples",
+    "10",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0886/callgrind-00/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0886/callgrind-00/producer.json"
+  ],
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "started_utc": "2026-10-03T15:57:30.839763+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:57:39.891260+00:00",
+  "artifacts": {
+    "producer.json": {
+      "bytes": 7376,
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "command-start.json": {
+      "bytes": 967,
+      "sha256": "52ed9b945282dcbc171462e2adbb0c26ff5490546e794d818c5924602f5e5737"
+    },
+    "callgrind.out": {
+      "bytes": 601741,
+      "sha256": "8fc881a8c340fe55a14e3d8e5a5b2d8445c80c12137ba52b41a1d4bb7cf9c8c5"
+    },
+    "report.json": {
+      "bytes": 24004,
+      "sha256": "3f3674ddc526d7f96f5bad5010ee687c49a67c773396ff4fb0cb6d652b5c47df"
+    },
+    "stderr.txt": {
+      "bytes": 1143,
+      "sha256": "4b8223d2312053c6568e090ff4de99fa3b1708c1ecf83122a2471fab00a0962a"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "status": "pass",
+  "children": [
+    {
+      "child": "child-00",
+      "measured_samples": 2000,
+      "warmups": 10
+    },
+    {
+      "child": "child-01",
+      "measured_samples": 2000,
+      "warmups": 10
+    },
+    {
+      "child": "child-02",
+      "measured_samples": 2000,
+      "warmups": 10
+    },
+    {
+      "child": "callgrind-00",
+      "measured_samples": 10,
+      "warmups": 0
+    },
+    {
+      "child": "callgrind-01",
+      "measured_samples": 10,
+      "warmups": 0
+    }
+  ],
+  "profiled_measured_scans": 6000,
+  "callgrind_measured_scans": 20,
+  "production_changes": false,
+  "scope": "Custody and semantic replay only; counter and IR reductions remain separate."
+}

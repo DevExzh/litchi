@@ -1,0 +1,120 @@
+{
+  "schema": "litchi.xlsx-scan-profile-review-0886.v1",
+  "status": "pass",
+  "reviewer": "/root/scan_profile_review_0886",
+  "reviewed_without_build_or_new_capture": true,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+  },
+  "perf_self_review": {
+    "method": "Exact period-weighted direct sampled-IP attribution from perf report --no-children --call-graph none; no caller or inclusive cost inferred.",
+    "event": "cycles:u",
+    "scope": "Whole-process user-cycle samples, including launcher/startup, corpus and oracle work, setup, timer-excluded checks, destruction and reporting; not operation-exclusive.",
+    "children": [
+      {
+        "child": "child-00",
+        "sample_count": 4141,
+        "total_period": 33293121404,
+        "lost_samples": 0,
+        "unresolved_sampled_ip_period": 275400962,
+        "unresolved_sampled_ip_percent": 0.8272007861867585,
+        "empty_stack_percent": 87.18741730089778,
+        "any_unknown_stack_percent": 2.4242297776952535
+      },
+      {
+        "child": "child-01",
+        "sample_count": 4133,
+        "total_period": 33298745036,
+        "lost_samples": 0,
+        "unresolved_sampled_ip_period": 306678734,
+        "unresolved_sampled_ip_percent": 0.9209918682173847,
+        "empty_stack_percent": 86.75279334331968,
+        "any_unknown_stack_percent": 2.25847047745178
+      },
+      {
+        "child": "child-02",
+        "sample_count": 4096,
+        "total_period": 34184616855,
+        "lost_samples": 0,
+        "unresolved_sampled_ip_period": 206634527,
+        "unresolved_sampled_ip_percent": 0.6044664121188671,
+        "empty_stack_percent": 69.47116276813394,
+        "any_unknown_stack_percent": 12.706771611408776
+      }
+    ],
+    "limits": [
+      "Use period weights rather than sample counts; the reducer reconciles flat report periods to raw leaf samples and the header total.",
+      "Keep unresolved sampled IPs separate and do not interpret them as kernel or application work.",
+      "DWARF stacks are too incomplete for caller, ancestry or inclusive attribution; the runner's small self row is not a total runner-cost estimate.",
+      "Resolved symbols are whole-process hotspot observations, not timer-exclusive scan costs or optimization proof."
+    ]
+  },
+  "callgrind_review": {
+    "toggle_function": "litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan",
+    "scope": "Two separately captured 10-sample/zero-warmup guest-instruction diagnostics for the toggle function, including oracle/setup and timer-excluded work; not exact timer scope.",
+    "rows": [
+      {
+        "child": "callgrind-00",
+        "parent_pid": 3489982,
+        "total_ir": 755248408,
+        "mce_process": {
+          "ir": 333751393,
+          "percent_of_runner": 44.19094293542688
+        },
+        "mce_start": {
+          "ir": 217884663,
+          "percent_of_runner": 28.849403810990886
+        },
+        "x14ac_capture_inner": {
+          "ir": 145048571,
+          "percent_of_runner": 19.20541234692679
+        },
+        "brk_warning": true
+      },
+      {
+        "child": "callgrind-01",
+        "parent_pid": 3490106,
+        "total_ir": 754020187,
+        "mce_process": {
+          "ir": 332510756,
+          "percent_of_runner": 44.0983891058609
+        },
+        "mce_start": {
+          "ir": 217235662,
+          "percent_of_runner": 28.810324411115534
+        },
+        "x14ac_capture_inner": {
+          "ir": 145049900,
+          "percent_of_runner": 19.23687223509309
+        },
+        "brk_warning": true
+      }
+    ],
+    "limits": [
+      "Inclusive rows overlap; mce_start is inside MCE processing and rows must not be summed.",
+      "Ir counts are Valgrind-instrumented guest instructions and cannot be compared with native cycle periods, wall time, allocation cost or speedup.",
+      "The brk segment overflow warning is retained as an environment limitation.",
+      "The child diagnostic echo is not a second run: totals are read from the final raw file whose parent PID is recorded above.",
+      "The timed closure in run_xlsx_full_cell_scan is inlined in the retained binary, so exact timer-only Callgrind attribution would require a rebuild or an in-code client marker."
+    ]
+  },
+  "source_scope": {
+    "function": "tools/perf-baseline/src/producer_shape.rs::run_xlsx_full_cell_scan",
+    "oracle_before_timer": "full_cell_scan_oracle and source/archive identity setup occur before the iteration loop; source and scanner setup then occur before each iteration's clock.",
+    "timed_region": "SourceBackedWorkbook::from_read_at, sheet enumeration, and all sheet cell visits through the scanner callback.",
+    "after_timer": "source-version/tolerance checks, digest/count/oracle checks, observation recording, drops and result handling.",
+    "exact_timer_attribution_available_from_retained_binary": false
+  },
+  "summary_file_hashes": {
+    "plan.json": "f1423dfe5d883c813191182fefffaef317d0d9d09e00ce9be2b257027a109e2c",
+    "callgrind-plan.json": "9ecd3a5570e07a592e1f079a2dda074506568278bfcc4875d1a1d0f9516e3c35",
+    "callgrind-analysis.json": "a23e4644d86452fe69633801931de9019b5af899f14ca8f1fad4566adcfcdd30",
+    "self-analysis.json": "472c17e8a14641e601a02fc5e24df526cb403bcd1129be27850018bb9265e89b",
+    "callgrind-00/inclusive-canonical.txt": "351379878d05db71e575c66d0f5cd6f04d1ddd6886da3083b46ffab54056c0d9",
+    "callgrind-01/inclusive-canonical.txt": "aa97ed86dac907b1153cc90a978c4f1b95184d7569760e95911ae22f3adec97d",
+    "child-00/self-symbols.txt": "d5c2487e94d022667a7eb01aa262a079ae87b5943909c4e8da2d362d23766d49",
+    "child-01/self-symbols.txt": "1c87c24d8fe11adf50d1ec333565559a144df9ebb79b0a6a0086f7eb463fba92",
+    "child-02/self-symbols.txt": "a9029d6cf32baa0a0a8494889dcd5d37fa9b1cbb0414c806dbae8c5dfce97ca8"
+  }
+}

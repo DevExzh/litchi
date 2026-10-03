@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.xlsx-scan-cycle-profile-0886.v1",
+  "created_utc": "2026-10-03T15:54:30.086120+00:00",
+  "source_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+  "binary": {
+    "build_receipt": {
+      "bytes": 2783,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native-build.json",
+      "sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+    },
+    "bytes": 264440648,
+    "depfile": {
+      "bytes": 276023,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native.d",
+      "sha256": "53c0719314519d61fa806cab74968fda6520d847d019ffa776e05debdfa0d1de"
+    },
+    "executable": true,
+    "features": [],
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+  },
+  "baseline_commit": "205a8a34e6fd61ae113251a2670f2480e2687110",
+  "children": 3,
+  "warmup": 10,
+  "samples": 2000,
+  "cpu": 12,
+  "event": "cycles:u",
+  "frequency_hz": 499,
+  "call_graph": "dwarf,16384",
+  "case": "xlsx_producer_medium_source_full_cell_scan",
+  "scope": "Whole-process user-cycle samples, including setup, timer-excluded checks, destruction and reporting; not operation-exclusive. Profiled elapsed values are not native baseline.",
+  "schedule": "sequential; no retry or slow-row replacement",
+  "perf_version": "perf version 7.0.14"
+}
