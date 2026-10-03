@@ -1,0 +1,214 @@
+{
+  "comparison_to_0886": {
+    "baseline": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0886/callgrind-analysis.json",
+      "sha256": "a23e4644d86452fe69633801931de9019b5af899f14ca8f1fad4566adcfcdd30"
+    },
+    "interpretation": "Guest instruction attribution only; no native inclusive time, allocation, latency, or speedup claim.",
+    "overlap": [
+      "mce_start is nested in mce_process; selected inclusive rows must not be summed"
+    ],
+    "rows": [
+      {
+        "baseline_0886_total_ir": 755248408,
+        "child": "callgrind-00",
+        "current_total_ir": 717244483,
+        "rows": {
+          "mce_process": {
+            "baseline_0886_inclusive_ir": 333751393,
+            "baseline_0886_percent_of_runner": 44.19094293542688,
+            "current_inclusive_ir": 333250371,
+            "current_percent_of_runner": 46.46259105488303,
+            "percent_delta": 2.2716481194561453
+          },
+          "mce_start": {
+            "baseline_0886_inclusive_ir": 217884663,
+            "baseline_0886_percent_of_runner": 28.849403810990886,
+            "current_inclusive_ir": 217621270,
+            "current_percent_of_runner": 30.341295772643818,
+            "percent_delta": 1.4918919616529323
+          },
+          "runner": {
+            "baseline_0886_inclusive_ir": 755248408,
+            "baseline_0886_percent_of_runner": 100.0,
+            "current_inclusive_ir": 717244483,
+            "current_percent_of_runner": 100.0,
+            "percent_delta": 0.0
+          },
+          "x14ac_capture": {
+            "baseline_0886_inclusive_ir": 145048571,
+            "baseline_0886_percent_of_runner": 19.20541234692679,
+            "current_inclusive_ir": 107567302,
+            "current_percent_of_runner": 14.997299323946141,
+            "percent_delta": -4.208113022980648
+          }
+        }
+      },
+      {
+        "baseline_0886_total_ir": 754020187,
+        "child": "callgrind-01",
+        "current_total_ir": 717348440,
+        "rows": {
+          "mce_process": {
+            "baseline_0886_inclusive_ir": 332510756,
+            "baseline_0886_percent_of_runner": 44.0983891058609,
+            "current_inclusive_ir": 333315243,
+            "current_percent_of_runner": 46.46490107373761,
+            "percent_delta": 2.366511967876704
+          },
+          "mce_start": {
+            "baseline_0886_inclusive_ir": 217235662,
+            "baseline_0886_percent_of_runner": 28.810324411115534,
+            "current_inclusive_ir": 217686503,
+            "current_percent_of_runner": 30.345992388301564,
+            "percent_delta": 1.53566797718603
+          },
+          "runner": {
+            "baseline_0886_inclusive_ir": 754020187,
+            "baseline_0886_percent_of_runner": 100.0,
+            "current_inclusive_ir": 717348440,
+            "current_percent_of_runner": 100.0,
+            "percent_delta": 0.0
+          },
+          "x14ac_capture": {
+            "baseline_0886_inclusive_ir": 145049900,
+            "baseline_0886_percent_of_runner": 19.23687223509309,
+            "current_inclusive_ir": 107567742,
+            "current_percent_of_runner": 14.99518727607465,
+            "percent_delta": -4.241684959018441
+          }
+        }
+      }
+    ]
+  },
+  "performance_claim": false,
+  "rows": [
+    {
+      "annotation_command": {
+        "argv": [
+          "/usr/bin/callgrind_annotate",
+          "--inclusive=yes",
+          "--threshold=100",
+          "--auto=no",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/callgrind.out"
+        ],
+        "exit_code": 0,
+        "helper": {
+          "bytes": 7859,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/analyze_callgrind.py",
+          "sha256": "af811918f40bb1efe68a7514884f9fd09dfb2ddb956ee80a7656748ab3d072bd"
+        },
+        "output": {
+          "bytes": 756350,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/inclusive-canonical.txt",
+          "sha256": "e6d8693722aaff6c276c043e1291446b69a447c47dcfb685b95685cc9041c6bb"
+        },
+        "schema": "litchi.xlsx-scan-callgrind-annotate-command-0892.v1",
+        "stderr": {
+          "bytes": 0,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/annotate.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "annotation_sha256": "e6d8693722aaff6c276c043e1291446b69a447c47dcfb685b95685cc9041c6bb",
+      "brk_warning": true,
+      "callgrind_sha256": "029f332d8a2f036f744d6fddd69348ce7c73a1b9fde483fc75ff90ba71783381",
+      "child": "callgrind-00",
+      "parent_pid": 4190370,
+      "selected_inclusive_rows": {
+        "mce_process": {
+          "inclusive_ir": 333250371,
+          "percent_of_runner": 46.46259105488303,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility ["
+        },
+        "mce_start": {
+          "inclusive_ir": 217621270,
+          "percent_of_runner": 30.341295772643818,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start ["
+        },
+        "runner": {
+          "inclusive_ir": 717244483,
+          "percent_of_runner": 100.0,
+          "selector": "tools/perf-baseline/src/producer_shape.rs:litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan ["
+        },
+        "x14ac_capture": {
+          "inclusive_ir": 107567302,
+          "percent_of_runner": 14.997299323946141,
+          "selector": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner ["
+        }
+      },
+      "total_ir": 717244483
+    },
+    {
+      "annotation_command": {
+        "argv": [
+          "/usr/bin/callgrind_annotate",
+          "--inclusive=yes",
+          "--threshold=100",
+          "--auto=no",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/callgrind.out"
+        ],
+        "exit_code": 0,
+        "helper": {
+          "bytes": 7859,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/analyze_callgrind.py",
+          "sha256": "af811918f40bb1efe68a7514884f9fd09dfb2ddb956ee80a7656748ab3d072bd"
+        },
+        "output": {
+          "bytes": 756965,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/inclusive-canonical.txt",
+          "sha256": "4ca8721c227dd46a8cb3d65a2c50228f63ede9ff50d275882b9380499dd29f4f"
+        },
+        "schema": "litchi.xlsx-scan-callgrind-annotate-command-0892.v1",
+        "stderr": {
+          "bytes": 0,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/annotate.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "annotation_sha256": "4ca8721c227dd46a8cb3d65a2c50228f63ede9ff50d275882b9380499dd29f4f",
+      "brk_warning": true,
+      "callgrind_sha256": "9535567fb567534534714c9121d3dada776979332437fe872d10d5559cd792ed",
+      "child": "callgrind-01",
+      "parent_pid": 4190485,
+      "selected_inclusive_rows": {
+        "mce_process": {
+          "inclusive_ir": 333315243,
+          "percent_of_runner": 46.46490107373761,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility ["
+        },
+        "mce_start": {
+          "inclusive_ir": 217686503,
+          "percent_of_runner": 30.345992388301564,
+          "selector": "crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start ["
+        },
+        "runner": {
+          "inclusive_ir": 717348440,
+          "percent_of_runner": 100.0,
+          "selector": "tools/perf-baseline/src/producer_shape.rs:litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan ["
+        },
+        "x14ac_capture": {
+          "inclusive_ir": 107567742,
+          "percent_of_runner": 14.99518727607465,
+          "selector": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner ["
+        }
+      },
+      "total_ir": 717348440
+    }
+  ],
+  "schema": "litchi.xlsx-scan-current-runner-ir-0892.v1",
+  "scope": "Two separately captured 10-sample/zero-warmup runner-scoped guest instruction diagnostics. Inclusive rows overlap; never sum rows or combine with native cycles.",
+  "status": "pass"
+}

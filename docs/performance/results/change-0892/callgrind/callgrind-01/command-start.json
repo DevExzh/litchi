@@ -1,0 +1,45 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/callgrind.out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "0",
+    "--samples",
+    "10",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/producer.json"
+  ],
+  "binary": {
+    "bytes": 264443336,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+  },
+  "child_index": 1,
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0892",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "mode": "callgrind",
+  "plan_sha256": "98e482c42387bb2cab615859b61e7d75d3362cadca289e6acf288e81df4f29c5",
+  "profile": "release",
+  "schema": "litchi.xlsx-scan-callgrind-command-start-0892.v1",
+  "started_utc": "2026-10-03T20:25:23.229635+00:00"
+}

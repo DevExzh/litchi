@@ -1,0 +1,52 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "record",
+    "--no-buildid-cache",
+    "-e",
+    "cycles:u",
+    "-F",
+    "499",
+    "--call-graph",
+    "dwarf,16384",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-01/perf.data",
+    "--",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "10",
+    "--samples",
+    "2000",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-01/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-01/producer.json"
+  ],
+  "binary": {
+    "bytes": 264443336,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+  },
+  "child_index": 1,
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0892",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "mode": "native",
+  "plan_sha256": "582281aeb918d9efb177c0e70c6de7b0e00cc95b293163b641745fe112adefc1",
+  "profile": "release",
+  "schema": "litchi.xlsx-scan-cycle-profile-command-start-0892.v1",
+  "started_utc": "2026-10-03T20:23:13.011869+00:00"
+}

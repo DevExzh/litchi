@@ -1,0 +1,818 @@
+{
+  "comparison_to_0886": {
+    "baseline": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0886/self-analysis.json",
+      "sha256": "472c17e8a14641e601a02fc5e24df526cb403bcd1129be27850018bb9265e89b"
+    },
+    "groups": {
+      "mce": {
+        "baseline_0886": {
+          "max_percent": 27.7841800605432,
+          "mean_percent": 27.18274968339971,
+          "min_percent": 26.7304393945689
+        },
+        "current": {
+          "max_percent": 29.70478610292624,
+          "mean_percent": 29.289238369682995,
+          "min_percent": 28.654484810836482
+        },
+        "mean_delta_percentage_points": 2.106488686283285
+      },
+      "other_quick_xml": {
+        "baseline_0886": {
+          "max_percent": 10.621989886333804,
+          "mean_percent": 9.951999547833843,
+          "min_percent": 9.493628545745478
+        },
+        "current": {
+          "max_percent": 10.93961498811358,
+          "mean_percent": 10.595920329893161,
+          "min_percent": 9.92837055382503
+        },
+        "mean_delta_percentage_points": 0.6439207820593182
+      },
+      "other_resolved": {
+        "baseline_0886": {
+          "max_percent": 30.90924645320018,
+          "mean_percent": 29.573913402417954,
+          "min_percent": 27.953030102785398
+        },
+        "current": {
+          "max_percent": 33.026109267763296,
+          "mean_percent": 32.87383750642121,
+          "min_percent": 32.605589566793036
+        },
+        "mean_delta_percentage_points": 3.2999241040032565
+      },
+      "other_worksheet_parser": {
+        "baseline_0886": {
+          "max_percent": 10.213455668698908,
+          "mean_percent": 9.990027552425829,
+          "min_percent": 9.622791055746381
+        },
+        "current": {
+          "max_percent": 11.158037603810772,
+          "mean_percent": 10.809898333897122,
+          "min_percent": 10.236752642232403
+        },
+        "mean_delta_percentage_points": 0.8198707814712929
+      },
+      "unresolved_sampled_ip": {
+        "baseline_0886": {
+          "max_percent": 0.9209918682173847,
+          "mean_percent": 0.7842196888410035,
+          "min_percent": 0.6044664121188671
+        },
+        "current": {
+          "max_percent": 0.9842171032892606,
+          "mean_percent": 0.9029910276464247,
+          "min_percent": 0.7845323486698683
+        },
+        "mean_delta_percentage_points": 0.11877133880542123
+      },
+      "x14ac": {
+        "baseline_0886": {
+          "max_percent": 6.357961262669956,
+          "mean_percent": 6.03529234466595,
+          "min_percent": 5.694347285310707
+        },
+        "current": {
+          "max_percent": 5.109360782830786,
+          "mean_percent": 4.792298141225541,
+          "min_percent": 4.535588353657706
+        },
+        "mean_delta_percentage_points": -1.242994203440409
+      },
+      "xml_namespace_reader": {
+        "baseline_0886": {
+          "max_percent": 5.133293674274315,
+          "mean_percent": 4.616138804154962,
+          "min_percent": 4.001918344741968
+        },
+        "current": {
+          "max_percent": 4.34271621370107,
+          "mean_percent": 4.089363905366007,
+          "min_percent": 3.63853185773992
+        },
+        "mean_delta_percentage_points": -0.5267748987889549
+      },
+      "xml_namespace_resolver": {
+        "baseline_0886": {
+          "max_percent": 10.161534914181503,
+          "mean_percent": 7.988210454150007,
+          "min_percent": 6.871509055096106
+        },
+        "current": {
+          "max_percent": 2.9789855952328983,
+          "mean_percent": 2.7850940585540314,
+          "min_percent": 2.6001711922481596
+        },
+        "mean_delta_percentage_points": -5.203116395595975
+      },
+      "zlib": {
+        "baseline_0886": {
+          "max_percent": 4.042725831163104,
+          "mean_percent": 3.877448522110743,
+          "min_percent": 3.7342174651674913
+        },
+        "current": {
+          "max_percent": 4.397026998362312,
+          "mean_percent": 3.86135832731351,
+          "min_percent": 3.4685931716354403
+        },
+        "mean_delta_percentage_points": -0.016090194797232726
+      }
+    },
+    "interpretation": "Descriptive disjoint sampled-IP self shares only; incomplete stacks prevent caller or native-inclusive attribution. No profiler speedup claim."
+  },
+  "performance_claim": false,
+  "rows": [
+    {
+      "any_unknown_stack_percent": 3.4200007257519247,
+      "child": "child-00",
+      "empty_stack_percent": 83.9620298778084,
+      "input_sha256": {
+        "call-stacks.txt": "e18b0534084964888fad3d12949ae41896698253952c0809df49cf2eb9eecc8a",
+        "leaf-samples.txt": "f7561aa9ae92be3026887dd9b980afaa632e1652782bc573e645484718fd10dc",
+        "self-symbols.txt": "53dcdcbddc8c3b68ecfaf3c2cec761318c46e14d0fbb97c9978c3516e091e91f"
+      },
+      "lost_samples": 0,
+      "sample_count": 3817,
+      "self_groups": {
+        "mce": {
+          "percent": 29.70478610292624,
+          "period": 9362809143
+        },
+        "other_quick_xml": {
+          "percent": 9.92837055382503,
+          "period": 3129375794
+        },
+        "other_resolved": {
+          "percent": 33.026109267763296,
+          "period": 10409674614
+        },
+        "other_worksheet_parser": {
+          "percent": 11.158037603810772,
+          "period": 3516961076
+        },
+        "unresolved_sampled_ip": {
+          "percent": 0.9402236309801449,
+          "period": 296354075
+        },
+        "x14ac": {
+          "percent": 5.109360782830786,
+          "period": 1610446535
+        },
+        "xml_namespace_reader": {
+          "percent": 3.63853185773992,
+          "period": 1146848162
+        },
+        "xml_namespace_resolver": {
+          "percent": 2.776125388181035,
+          "period": 875021691
+        },
+        "zlib": {
+          "percent": 3.718454811942778,
+          "period": 1172039502
+        }
+      },
+      "top_self_symbols": [
+        {
+          "dso": "native",
+          "percent": 12.993706407034807,
+          "period": 4095555266,
+          "samples": 468,
+          "symbol": "litchi_ooxml_common::mce::codec::start"
+        },
+        {
+          "dso": "native",
+          "percent": 9.604791010968873,
+          "period": 3027385041,
+          "samples": 346,
+          "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+        },
+        {
+          "dso": "native",
+          "percent": 3.61077357633258,
+          "period": 1138098882,
+          "samples": 130,
+          "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "dso": "native",
+          "percent": 3.5545515874032847,
+          "period": 1120377975,
+          "samples": 128,
+          "symbol": "litchi_xlsx::raw::worksheet::x14ac::capture_inner"
+        },
+        {
+          "dso": "native",
+          "percent": 3.4980396512625833,
+          "period": 1102565678,
+          "samples": 126,
+          "symbol": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body::{{closure}}"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 3.4421250209715053,
+          "period": 1084941649,
+          "samples": 124,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 3.3866470976916507,
+          "period": 1067455268,
+          "samples": 122,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "dso": "native",
+          "percent": 3.3308759086230495,
+          "period": 1049876451,
+          "samples": 120,
+          "symbol": "litchi_ooxml_common::mce::codec::expand_parts"
+        },
+        {
+          "dso": "native",
+          "percent": 2.582608879989503,
+          "period": 814026196,
+          "samples": 93,
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+        },
+        {
+          "dso": "native",
+          "percent": 2.581770288820677,
+          "period": 813761876,
+          "samples": 93,
+          "symbol": "quick_xml::name::NamespaceResolver::push"
+        },
+        {
+          "dso": "native",
+          "percent": 2.358023425604701,
+          "period": 743237915,
+          "samples": 95,
+          "symbol": "sha2::sha256::x86_sha::compress"
+        },
+        {
+          "dso": "native",
+          "percent": 2.2655114514339907,
+          "period": 714078575,
+          "samples": 82,
+          "symbol": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "dso": "native",
+          "percent": 1.9985929776501412,
+          "period": 629947125,
+          "samples": 72,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+        },
+        {
+          "dso": "native",
+          "percent": 1.888100967312781,
+          "period": 595120562,
+          "samples": 68,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_start"
+        },
+        {
+          "dso": "native",
+          "percent": 1.8606662408508496,
+          "period": 586473265,
+          "samples": 67,
+          "symbol": "quick_xml::events::attributes::Attribute::decoded_and_normalized_value"
+        },
+        {
+          "dso": "native",
+          "percent": 1.8319790528433768,
+          "period": 577431198,
+          "samples": 66,
+          "symbol": "litchi_ooxml_common::xml_name::validation::is_ncname"
+        },
+        {
+          "dso": "native",
+          "percent": 1.6661552603619436,
+          "period": 525164317,
+          "samples": 60,
+          "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value"
+        },
+        {
+          "dso": "native",
+          "percent": 1.553964189188519,
+          "period": 489802218,
+          "samples": 56,
+          "symbol": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body"
+        },
+        {
+          "dso": "native",
+          "percent": 1.444169660685028,
+          "period": 455195498,
+          "samples": 52,
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match"
+        },
+        {
+          "dso": "native",
+          "percent": 1.4436415912725913,
+          "period": 455029053,
+          "samples": 52,
+          "symbol": "quick_xml::events::attributes::IterState::next"
+        },
+        {
+          "dso": "native",
+          "percent": 1.3881744898544077,
+          "period": 437546083,
+          "samples": 50,
+          "symbol": "litchi_xlsx::raw::worksheet::x14ac::capture"
+        },
+        {
+          "dso": "native",
+          "percent": 1.3606303074476955,
+          "period": 428864286,
+          "samples": 49,
+          "symbol": "litchi_perf_baseline::producer_shape::append_numeric_record"
+        },
+        {
+          "dso": "native",
+          "percent": 1.2217607964559627,
+          "period": 385093268,
+          "samples": 44,
+          "symbol": "litchi_xlsx::raw::worksheet::lane::recognize"
+        },
+        {
+          "dso": "native",
+          "percent": 1.2214535996221858,
+          "period": 384996441,
+          "samples": 44,
+          "symbol": "litchi_ooxml_common::mce::codec::write_start"
+        },
+        {
+          "dso": "native",
+          "percent": 1.1938526714465354,
+          "period": 376296758,
+          "samples": 43,
+          "symbol": "litchi_xlsx::raw::worksheet::semantic::materialize"
+        }
+      ],
+      "total_period": 31519530592
+    },
+    {
+      "any_unknown_stack_percent": 45.73061708623299,
+      "child": "child-01",
+      "empty_stack_percent": 0.0,
+      "input_sha256": {
+        "call-stacks.txt": "71e816e97265f8bdf44e0fcb2c0313265b7430dc78a2c31fb346be7dfd5e0ea8",
+        "leaf-samples.txt": "0078a0d18690611ae8613c0ea64309c66a6026fa10d83c80a65c07e5158627bc",
+        "self-symbols.txt": "f563c58864b7242012c7bd644db70fe7dd6dc61e98821e1e53267759cba11664"
+      },
+      "lost_samples": 0,
+      "sample_count": 3814,
+      "self_groups": {
+        "mce": {
+          "percent": 29.508444195286266,
+          "period": 9344130959
+        },
+        "other_quick_xml": {
+          "percent": 10.919775447740877,
+          "period": 3457851290
+        },
+        "other_resolved": {
+          "percent": 32.605589566793036,
+          "period": 10324871650
+        },
+        "other_worksheet_parser": {
+          "percent": 11.034904755648187,
+          "period": 3494308086
+        },
+        "unresolved_sampled_ip": {
+          "percent": 0.9842171032892606,
+          "period": 311661755
+        },
+        "x14ac": {
+          "percent": 4.535588353657706,
+          "period": 1436237413
+        },
+        "xml_namespace_reader": {
+          "percent": 4.34271621370107,
+          "period": 1375162606
+        },
+        "xml_namespace_resolver": {
+          "percent": 2.6001711922481596,
+          "period": 823369066
+        },
+        "zlib": {
+          "percent": 3.4685931716354403,
+          "period": 1098363188
+        }
+      },
+      "top_self_symbols": [
+        {
+          "dso": "native",
+          "percent": 13.136588171512157,
+          "period": 4159826232,
+          "samples": 475,
+          "symbol": "litchi_ooxml_common::mce::codec::start"
+        },
+        {
+          "dso": "native",
+          "percent": 9.707131291845643,
+          "period": 3073855925,
+          "samples": 351,
+          "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+        },
+        {
+          "dso": "native",
+          "percent": 4.34271621370107,
+          "period": 1375162606,
+          "samples": 157,
+          "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "dso": "native",
+          "percent": 3.7339011855969004,
+          "period": 1182375507,
+          "samples": 135,
+          "symbol": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body::{{closure}}"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 3.678382451241359,
+          "period": 1164794969,
+          "samples": 133,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "dso": "native",
+          "percent": 3.429408408052411,
+          "period": 1085954958,
+          "samples": 124,
+          "symbol": "litchi_xlsx::raw::worksheet::x14ac::capture_inner"
+        },
+        {
+          "dso": "native",
+          "percent": 2.9315613197305557,
+          "period": 928306918,
+          "samples": 106,
+          "symbol": "litchi_ooxml_common::mce::codec::expand_parts"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 2.87532282185388,
+          "period": 910498460,
+          "samples": 104,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "dso": "native",
+          "percent": 2.566363083010577,
+          "period": 812663405,
+          "samples": 93,
+          "symbol": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "dso": "native",
+          "percent": 2.4334824462070475,
+          "period": 770585481,
+          "samples": 88,
+          "symbol": "quick_xml::events::attributes::Attribute::decoded_and_normalized_value"
+        },
+        {
+          "dso": "native",
+          "percent": 2.3789738818898547,
+          "period": 753324823,
+          "samples": 86,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_start"
+        },
+        {
+          "dso": "native",
+          "percent": 2.3786469913959833,
+          "period": 753221310,
+          "samples": 86,
+          "symbol": "quick_xml::name::NamespaceResolver::push"
+        },
+        {
+          "dso": "native",
+          "percent": 2.2699648471213205,
+          "period": 718806070,
+          "samples": 93,
+          "symbol": "sha2::sha256::x86_sha::compress"
+        },
+        {
+          "dso": "native",
+          "percent": 2.157063730271026,
+          "period": 683054852,
+          "samples": 78,
+          "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value"
+        },
+        {
+          "dso": "native",
+          "percent": 2.101253711483831,
+          "period": 665382076,
+          "samples": 76,
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+        },
+        {
+          "dso": "native",
+          "percent": 1.7142144540880186,
+          "period": 542822395,
+          "samples": 62,
+          "symbol": "litchi_perf_baseline::producer_shape::append_numeric_record"
+        },
+        {
+          "dso": "native",
+          "percent": 1.6032164978426102,
+          "period": 507673831,
+          "samples": 58,
+          "symbol": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body"
+        },
+        {
+          "dso": "native",
+          "percent": 1.4666065941901174,
+          "period": 464414999,
+          "samples": 53,
+          "symbol": "litchi_xlsx::raw::worksheet::lane::recognize"
+        },
+        {
+          "dso": "native",
+          "percent": 1.4102475346604657,
+          "period": 446568364,
+          "samples": 51,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+        },
+        {
+          "dso": "native",
+          "percent": 1.3270826146145067,
+          "period": 420233397,
+          "samples": 48,
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match"
+        },
+        {
+          "dso": "native",
+          "percent": 1.2729636200925523,
+          "period": 403096100,
+          "samples": 46,
+          "symbol": "quick_xml::events::attributes::IterState::next"
+        },
+        {
+          "dso": "native",
+          "percent": 1.2717426463760433,
+          "period": 402709467,
+          "samples": 46,
+          "symbol": "litchi_ooxml_common::mce::codec::write_start"
+        },
+        {
+          "dso": "native",
+          "percent": 1.2163524349047734,
+          "period": 385169627,
+          "samples": 44,
+          "symbol": "litchi_xlsx::raw::worksheet::lane::start_tag"
+        },
+        {
+          "dso": "native",
+          "percent": 1.051456601731243,
+          "period": 332953785,
+          "samples": 38,
+          "symbol": "litchi_ooxml_common::xml_name::validation::is_ncname"
+        },
+        {
+          "dso": "native",
+          "percent": 1.0510874166039978,
+          "period": 332836879,
+          "samples": 38,
+          "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+        }
+      ],
+      "total_period": 31665956013
+    },
+    {
+      "any_unknown_stack_percent": 6.141742826539329,
+      "child": "child-02",
+      "empty_stack_percent": 78.22105860760453,
+      "input_sha256": {
+        "call-stacks.txt": "9effe3e66ffef4f90ac491caa7edf7f057306f70b469ca326729d5371e17ea38",
+        "leaf-samples.txt": "013334bd52729ed6d19dbcf6f011adde13713ba5827bb8251dc94bff1601392e",
+        "self-symbols.txt": "c84c388198c00019d06b778cffe99a5d85393a1c48d12bfd1e4f488cde73d3b4"
+      },
+      "lost_samples": 0,
+      "sample_count": 3800,
+      "self_groups": {
+        "mce": {
+          "percent": 28.654484810836482,
+          "period": 9012703887
+        },
+        "other_quick_xml": {
+          "percent": 10.93961498811358,
+          "period": 3440840454
+        },
+        "other_resolved": {
+          "percent": 32.98981368470729,
+          "period": 10376296206
+        },
+        "other_worksheet_parser": {
+          "percent": 10.236752642232403,
+          "period": 3219768945
+        },
+        "unresolved_sampled_ip": {
+          "percent": 0.7845323486698683,
+          "period": 246759200
+        },
+        "x14ac": {
+          "percent": 4.7319452871881325,
+          "period": 1488340201
+        },
+        "xml_namespace_reader": {
+          "percent": 4.28684364465703,
+          "period": 1348342245
+        },
+        "xml_namespace_resolver": {
+          "percent": 2.9789855952328983,
+          "period": 936981252
+        },
+        "zlib": {
+          "percent": 4.397026998362312,
+          "period": 1382998249
+        }
+      },
+      "top_self_symbols": [
+        {
+          "dso": "native",
+          "percent": 13.497031461687376,
+          "period": 4245225441,
+          "samples": 485,
+          "symbol": "litchi_ooxml_common::mce::codec::start"
+        },
+        {
+          "dso": "native",
+          "percent": 8.311232224339678,
+          "period": 2614134418,
+          "samples": 299,
+          "symbol": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+        },
+        {
+          "dso": "native",
+          "percent": 4.28684364465703,
+          "period": 1348342245,
+          "samples": 154,
+          "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "dso": "native",
+          "percent": 3.947390600448269,
+          "period": 1241573975,
+          "samples": 142,
+          "symbol": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body::{{closure}}"
+        },
+        {
+          "dso": "native",
+          "percent": 3.6181679185754345,
+          "period": 1138023464,
+          "samples": 130,
+          "symbol": "litchi_ooxml_common::mce::codec::expand_parts"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 3.479470031237647,
+          "period": 1094398775,
+          "samples": 125,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "dso": "native",
+          "percent": 3.4515764425380526,
+          "period": 1085625396,
+          "samples": 124,
+          "symbol": "litchi_xlsx::raw::worksheet::x14ac::capture_inner"
+        },
+        {
+          "dso": "native",
+          "percent": 3.340234411933928,
+          "period": 1050604953,
+          "samples": 120,
+          "symbol": "zlib_rs::inflate::inflate_fast_help_avx2"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 3.198620799206986,
+          "period": 1006063180,
+          "samples": 115,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "dso": "native",
+          "percent": 2.783980803154299,
+          "period": 875646335,
+          "samples": 100,
+          "symbol": "quick_xml::name::NamespaceResolver::push"
+        },
+        {
+          "dso": "native",
+          "percent": 2.588659771279473,
+          "period": 814211951,
+          "samples": 93,
+          "symbol": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "dso": "native",
+          "percent": 2.5882693573908737,
+          "period": 814089154,
+          "samples": 93,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_start"
+        },
+        {
+          "dso": "native",
+          "percent": 2.3377634271219394,
+          "period": 735297447,
+          "samples": 84,
+          "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value"
+        },
+        {
+          "dso": "native",
+          "percent": 2.3258497866114007,
+          "period": 731550246,
+          "samples": 94,
+          "symbol": "sha2::sha256::x86_sha::compress"
+        },
+        {
+          "dso": "native",
+          "percent": 2.143812031149435,
+          "period": 674293855,
+          "samples": 77,
+          "symbol": "quick_xml::events::attributes::Attribute::decoded_and_normalized_value"
+        },
+        {
+          "dso": "native",
+          "percent": 1.7809338833804964,
+          "period": 560157680,
+          "samples": 64,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+        },
+        {
+          "dso": "native",
+          "percent": 1.4753798523459352,
+          "period": 464051677,
+          "samples": 53,
+          "symbol": "quick_xml::events::attributes::IterState::next"
+        },
+        {
+          "dso": "native",
+          "percent": 1.4194706867019882,
+          "period": 446466550,
+          "samples": 51,
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match"
+        },
+        {
+          "dso": "native",
+          "percent": 1.419388831314838,
+          "period": 446440804,
+          "samples": 51,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2"
+        },
+        {
+          "dso": "native",
+          "percent": 1.4192559697140605,
+          "period": 446399015,
+          "samples": 51,
+          "symbol": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body"
+        },
+        {
+          "dso": "native",
+          "percent": 1.2247849990084385,
+          "period": 385232001,
+          "samples": 44,
+          "symbol": "litchi_ooxml_common::mce::codec::write_start"
+        },
+        {
+          "dso": "native",
+          "percent": 1.1969546919691347,
+          "period": 376478526,
+          "samples": 43,
+          "symbol": "litchi_perf_baseline::producer_shape::append_numeric_record"
+        },
+        {
+          "dso": "native",
+          "percent": 1.1411709037505064,
+          "period": 358932834,
+          "samples": 41,
+          "symbol": "litchi_xlsx::raw::worksheet::lane::recognize"
+        },
+        {
+          "dso": "libc.so.6",
+          "percent": 1.002049515092516,
+          "period": 315174941,
+          "samples": 36,
+          "symbol": "_int_malloc"
+        },
+        {
+          "dso": "native",
+          "percent": 1.0019500207056025,
+          "period": 315143647,
+          "samples": 36,
+          "symbol": "litchi_xlsx::workbook::source::SourceWorksheet::store"
+        }
+      ],
+      "total_period": 31453030639
+    }
+  ],
+  "schema": "litchi.xlsx-scan-current-self-analysis-0892.v1",
+  "scope": "Exact period-weighted sampled-IP self attribution; categories are disjoint. No inclusive or caller cost inferred from incomplete stacks. Guest instructions remain separate.",
+  "status": "pass"
+}

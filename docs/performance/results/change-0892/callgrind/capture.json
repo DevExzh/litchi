@@ -1,0 +1,32 @@
+{
+  "binary": {
+    "bytes": 264443336,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+  },
+  "children": 2,
+  "cpu": 12,
+  "no_retries": true,
+  "performance_claim": false,
+  "plan": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind-plan.json",
+  "plan_sha256": "98e482c42387bb2cab615859b61e7d75d3362cadca289e6acf288e81df4f29c5",
+  "profile": "release",
+  "records": [
+    {
+      "command_sha256": "65512af5615ff94ae66927e04f54bc9711d2f56447e1f6c013efeeccbdd33001",
+      "path": "callgrind-00/command.json"
+    },
+    {
+      "command_sha256": "04c789d326e416555f93e002922a0b4fdb0927b9d9a07cc56f633e0e98c022c7",
+      "path": "callgrind-01/command.json"
+    }
+  ],
+  "samples": 10,
+  "schedule": "sequential",
+  "schema": "litchi.xlsx-scan-callgrind-capture-0892.v1",
+  "status": "pass",
+  "toggle_function": "litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan",
+  "warmup": 0
+}

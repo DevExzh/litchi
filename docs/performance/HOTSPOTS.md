@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0892 — current producer XLSX profile and route audit
+
+[0892](0892-current-producer-full-cell-profile.md) refreshes five diagnostic processes / 6,020 measured scans after 0891. MCE accounts for 28.65–29.70% of native sampled-IP self periods and, separately, 46.46% of runner-scoped inclusive guest instructions. The static selected-route audit identifies `<sheetViews>` as the predicted first refusal and requires forced per-sheet tolerance checks before a streaming candidate. All captures and semantic replay pass; production is unchanged and no new latency claim is made.
+
 ## 0891 — remove discarded x14ac namespace resolution
 
 [0891](0891-x14ac-namespace-resolution.md) adopts the bounded x14ac

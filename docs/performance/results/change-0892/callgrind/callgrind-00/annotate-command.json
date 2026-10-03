@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "/usr/bin/callgrind_annotate",
+    "--inclusive=yes",
+    "--threshold=100",
+    "--auto=no",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/callgrind.out"
+  ],
+  "exit_code": 0,
+  "helper": {
+    "bytes": 7859,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/analyze_callgrind.py",
+    "sha256": "af811918f40bb1efe68a7514884f9fd09dfb2ddb956ee80a7656748ab3d072bd"
+  },
+  "output": {
+    "bytes": 756350,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/inclusive-canonical.txt",
+    "sha256": "e6d8693722aaff6c276c043e1291446b69a447c47dcfb685b95685cc9041c6bb"
+  },
+  "schema": "litchi.xlsx-scan-callgrind-annotate-command-0892.v1",
+  "stderr": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/annotate.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

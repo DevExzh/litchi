@@ -1,0 +1,17 @@
+{
+  "schema": "litchi.xlsx-scan-profile-helper-checks-0892.v1",
+  "status": "pass",
+  "checks": [
+    "ast_parse_8_helpers",
+    "0886_native_periods_and_groups_exact",
+    "0886_callgrind_totals_and_rows_exact",
+    "baseline_comparison_replayable",
+    "native_plan_protocol_and_live_source_binary_binding",
+    "callgrind_plan_protocol_and_live_source_binary_binding",
+    "export_inventory_5_unique_views",
+    "report_binary_identity_6_fields",
+    "command_json_path_normalization"
+  ],
+  "no_workload_or_build": true,
+  "scope": "Readonly helper compatibility and protocol preflight; no profile artifacts were captured."
+}

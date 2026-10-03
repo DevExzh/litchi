@@ -1,0 +1,19 @@
+{
+  "schema": "litchi.profile-cleanup-0892.v1",
+  "status": "pass",
+  "checked_utc": "2026-10-03T20:27:46.238938+00:00",
+  "owned_worktrees_created": [],
+  "owned_source_checkouts_created": [],
+  "owned_build_targets_created": [],
+  "remaining_packet_pycache": [],
+  "removed_paths": [],
+  "retained_evidence": [
+    "capture/child-*/perf.data (ignored raw evidence)",
+    "capture text exports and receipts",
+    "callgrind raw and canonical evidence",
+    "0891 retained native binary (ignored, reused unchanged)"
+  ],
+  "unrelated_worktrees": "untouched",
+  "unrelated_untracked_file": "crates/litchi/examples/bench_word_parse.rs",
+  "production_changes": false
+}

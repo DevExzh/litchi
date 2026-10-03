@@ -1,0 +1,2 @@
+[ perf record: Woken up 242 times to write data ]
+[ perf record: Captured and wrote 60.348 MB /home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data ]

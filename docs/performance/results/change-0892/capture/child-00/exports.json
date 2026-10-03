@@ -1,0 +1,169 @@
+{
+  "child": "child-00",
+  "helper": {
+    "bytes": 3999,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/export.py",
+    "sha256": "262c9db6390bd5f717940c42f60844c8e48a770fd61494aab409c726dbd10a77"
+  },
+  "perf_data": {
+    "bytes": 63319936,
+    "executable": false,
+    "mode": 384,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data",
+    "sha256": "928ee218f616712224a68632269ce4f1165700d82a1836f63960c4c1fb6fec1e"
+  },
+  "performance_claim": false,
+  "records": [
+    {
+      "argv": [
+        "/usr/bin/perf",
+        "script",
+        "-G",
+        "-F",
+        "pid,tid,time,period,event,ip,sym,dso",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data"
+      ],
+      "exit_code": 0,
+      "output": "leaf-samples.txt",
+      "output_identity": {
+        "bytes": 727369,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/leaf-samples.txt",
+        "sha256": "f7561aa9ae92be3026887dd9b980afaa632e1652782bc573e645484718fd10dc"
+      },
+      "stderr": "leaf-samples.txt.stderr",
+      "stderr_identity": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/leaf-samples.txt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/perf",
+        "script",
+        "-F",
+        "pid,tid,time,period,event,ip,sym,dso",
+        "--inline",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data"
+      ],
+      "exit_code": 0,
+      "output": "call-stacks.txt",
+      "output_identity": {
+        "bytes": 381948,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/call-stacks.txt",
+        "sha256": "e18b0534084964888fad3d12949ae41896698253952c0809df49cf2eb9eecc8a"
+      },
+      "stderr": "call-stacks.txt.stderr",
+      "stderr_identity": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/call-stacks.txt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/perf",
+        "report",
+        "--stdio",
+        "--no-children",
+        "--call-graph",
+        "none",
+        "--sort",
+        "dso,symbol",
+        "--show-nr-samples",
+        "--show-total-period",
+        "--percent-limit",
+        "0",
+        "--stdio-color",
+        "never",
+        "--field-separator",
+        "|",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data"
+      ],
+      "exit_code": 0,
+      "output": "self-symbols.txt",
+      "output_identity": {
+        "bytes": 54146,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/self-symbols.txt",
+        "sha256": "53dcdcbddc8c3b68ecfaf3c2cec761318c46e14d0fbb97c9978c3516e091e91f"
+      },
+      "stderr": "self-symbols.txt.stderr",
+      "stderr_identity": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/self-symbols.txt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/perf",
+        "report",
+        "--header-only",
+        "--stdio",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data"
+      ],
+      "exit_code": 0,
+      "output": "header.txt",
+      "output_identity": {
+        "bytes": 1971,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/header.txt",
+        "sha256": "4778ec23f268885a76ca3e18c4dd607da2dbf57a8e609df1cbaf0b046f66f878"
+      },
+      "stderr": "header.txt.stderr",
+      "stderr_identity": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/header.txt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/perf",
+        "buildid-list",
+        "-i",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/perf.data"
+      ],
+      "exit_code": 0,
+      "output": "buildids.txt",
+      "output_identity": {
+        "bytes": 407,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/buildids.txt",
+        "sha256": "bb0a71e42d98d62d5cc6c8735b4a64d2615502de61461750d3a1b7cd7fc4b645"
+      },
+      "stderr": "buildids.txt.stderr",
+      "stderr_identity": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/buildids.txt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "schema": "litchi.xlsx-scan-cycle-profile-export-0892.v1",
+  "status": "pass"
+}

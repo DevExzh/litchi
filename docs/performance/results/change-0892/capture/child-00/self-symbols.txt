@@ -1,0 +1,288 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:u'
+# Event count (approx.): 31519530592
+#
+# Overhead|     Samples|      Period|Shared Object       |Symbol                                                                                                                |IPC   [IPC Coverage]
+ 12.99% | 468        | 4095555266 |native              |[.] litchi_ooxml_common::mce::codec::start                                                                            |-      -            
+ 9.60%  | 346        | 3027385041 |native              |[.] litchi_ooxml_common::mce::codec::process_markup_compatibility                                                     |-      -            
+ 3.61%  | 130        | 1138098882 |native              |[.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                                          |-      -            
+ 3.55%  | 128        | 1120377975 |native              |[.] litchi_xlsx::raw::worksheet::x14ac::capture_inner                                                                 |-      -            
+ 3.50%  | 126        | 1102565678 |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body::{{closure}}     |-      -            
+ 3.44%  | 124        | 1084941649 |libc.so.6           |[.] __memcmp_evex_movbe                                                                                               |-      -            
+ 3.39%  | 122        | 1067455268 |libc.so.6           |[.] __memmove_avx512_unaligned_erms                                                                                   |-      -            
+ 3.33%  | 120        | 1049876451 |native              |[.] litchi_ooxml_common::mce::codec::expand_parts                                                                     |-      -            
+ 2.58%  | 93         | 814026196  |native              |[.] zlib_rs::inflate::inflate_fast_help_avx2                                                                          |-      -            
+ 2.58%  | 93         | 813761876  |native              |[.] quick_xml::name::NamespaceResolver::push                                                                          |-      -            
+ 2.36%  | 95         | 743237915  |native              |[.] sha2::sha256::x86_sha::compress                                                                                   |-      -            
+ 2.00%  | 72         | 629947125  |native              |[.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2                                                          |-      -            
+ 1.89%  | 68         | 595231975  |native              |[.] quick_xml::reader::Reader<R>::read_event_impl                                                                     |-      -            
+ 1.89%  | 68         | 595120562  |native              |[.] quick_xml::reader::state::ReaderState::emit_start                                                                 |-      -            
+ 1.86%  | 67         | 586473265  |native              |[.] quick_xml::events::attributes::Attribute::decoded_and_normalized_value                                            |-      -            
+ 1.83%  | 66         | 577431198  |native              |[.] litchi_ooxml_common::xml_name::validation::is_ncname                                                              |-      -            
+ 1.67%  | 60         | 525164317  |native              |[.] litchi_ooxml_common::xml::unqualified_attribute_value                                                             |-      -            
+ 1.55%  | 56         | 489802218  |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body                  |-      -            
+ 1.44%  | 52         | 455195498  |native              |[.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match                                    |-      -            
+ 1.44%  | 52         | 455029053  |native              |[.] quick_xml::events::attributes::IterState::next                                                                    |-      -            
+ 1.39%  | 50         | 437546083  |native              |[.] litchi_xlsx::raw::worksheet::x14ac::capture                                                                       |-      -            
+ 1.36%  | 49         | 428864286  |native              |[.] litchi_perf_baseline::producer_shape::append_numeric_record                                                       |-      -            
+ 1.22%  | 44         | 385093268  |native              |[.] litchi_xlsx::raw::worksheet::lane::recognize                                                                      |-      -            
+ 1.22%  | 44         | 384996441  |native              |[.] litchi_ooxml_common::mce::codec::write_start                                                                      |-      -            
+ 1.19%  | 43         | 376296758  |native              |[.] litchi_xlsx::raw::worksheet::semantic::materialize                                                                |-      -            
+ 1.11%  | 40         | 350009293  |native              |[.] litchi_xlsx::raw::worksheet::lane::start_tag                                                                      |-      -            
+ 1.08%  | 39         | 341315633  |native              |[.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2                                                            |-      -            
+ 1.08%  | 39         | 341263578  |native              |[.] litchi_ooxml_common::mce::codec::BoundedOutput::reserve                                                           |-      -            
+ 1.03%  | 37         | 323850377  |libc.so.6           |[.] _int_malloc                                                                                                       |-      -            
+ 1.03%  | 37         | 323636136  |native              |[.] litchi_xlsx::workbook::source::SourceWorksheet::store                                                             |-      -            
+ 0.88%  | 32         | 278120683  |native              |[.] core::hash::BuildHasher::hash_one                                                                                 |-      -            
+ 0.83%  | 30         | 262476194  |native              |[.] quick_xml::events::attributes::IterState::check_for_duplicates                                                    |-      -            
+ 0.80%  | 29         | 253672689  |native              |[.] quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with|-      -            
+ 0.78%  | 28         | 244906759  |libc.so.6           |[.] malloc                                                                                                            |-      -            
+ 0.67%  | 25         | 210233822  |libc.so.6           |[.] _int_free_merge_chunk                                                                                             |-      -            
+ 0.61%  | 23         | 192726968  |[unknown]           |[k] 0xffffffff9e800ef0                                                                                                |-      -            
+ 0.61%  | 22         | 192607687  |native              |[.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next                       |-      -            
+ 0.61%  | 22         | 192588255  |native              |[.] core::str::converts::from_utf8                                                                                    |-      -            
+ 0.61%  | 22         | 192432250  |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::open_lane_cell             |-      -            
+ 0.58%  | 21         | 183794627  |native              |[.] zlib_rs::stable::Inflate::decompress                                                                              |-      -            
+ 0.56%  | 20         | 175031973  |native              |[.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2                                                              |-      -            
+ 0.56%  | 20         | 174981909  |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::close_lane_cell            |-      -            
+ 0.53%  | 19         | 166352420  |native              |[.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2                                                              |-      -            
+ 0.53%  | 19         | 166245790  |native              |[.] litchi_ooxml_common::xml_name::validation::is_qualified_name                                                      |-      -            
+ 0.50%  | 18         | 157540789  |native              |[.] quick_xml::reader::state::ReaderState::emit_end                                                                   |-      -            
+ 0.47%  | 17         | 148753345  |native              |[.] litchi_xlsx::raw::worksheet::validation::parse_a1                                                                 |-      -            
+ 0.44%  | 16         | 140092453  |native              |[.] zlib_rs::inflate::inftrees::inflate_table                                                                         |-      -            
+ 0.39%  | 14         | 122516073  |native              |[.] alloc::raw_vec::RawVecInner<A>::try_allocate_in                                                                   |-      -            
+ 0.39%  | 14         | 122484439  |native              |[.] litchi_ooxml_common::mce::codec::Ctx::is_ignorable                                                                |-      -            
+ 0.36%  | 13         | 113783250  |native              |[.] crc32fast::specialized::pclmulqdq::calculate                                                                      |-      -            
+ 0.36%  | 13         | 113766991  |native              |[.] <f64 as core::str::traits::FromStr>::from_str                                                                     |-      -            
+ 0.35%  | 13         | 110121590  |native              |[.] quick_xml::reader::Reader<R>::read_event_impl                                                                     |-      -            
+ 0.33%  | 12         | 104771977  |native              |[.] litchi_xlsx::cell::Store::from_unsorted                                                                           |-      -            
+ 0.31%  | 11         | 96299856   |native              |[.] litchi_xlsx::cell::Number::as_f64                                                                                 |-      -            
+ 0.31%  | 11         | 96294348   |native              |[.] litchi_xlsx::raw::worksheet::codec::parse_cell_u32                                                                |-      -            
+ 0.31%  | 13         | 96248486   |libc.so.6           |[.] cfree@GLIBC_2.2.5                                                                                                 |-      -            
+ 0.28%  | 10         | 87478204   |native              |[.] quick_xml::XmlVersion::normalize_attribute_value                                                                  |-      -            
+ 0.28%  | 10         | 87474162   |native              |[.] litchi_ooxml_common::xml_name::validation::is_name_character                                                      |-      -            
+ 0.28%  | 10         | 87474016   |native              |[.] litchi_xlsx::raw::worksheet::semantic::parse_value                                                                |-      -            
+ 0.25%  | 9          | 78780804   |libc.so.6           |[.] unlink_chunk.isra.0                                                                                               |-      -            
+ 0.22%  | 8          | 70046662   |native              |[.] core::ptr::drop_in_place<litchi_xlsx::cell::Cell>                                                                 |-      -            
+ 0.22%  | 8          | 70016359   |native              |[.] memchr::arch::x86_64::avx2::memchr::Three::find_raw                                                               |-      -            
+ 0.19%  | 7          | 61265039   |native              |[.] litchi_xlsx::cell::Number::validate_lexical                                                                       |-      -            
+ 0.19%  | 7          | 61253407   |native              |[.] core::ptr::drop_in_place<litchi_xlsx::cell::Value>                                                                |-      -            
+ 0.17%  | 6          | 52542422   |native              |[.] litchi_xlsx::raw::worksheet::validation::optional_bool                                                            |-      -            
+ 0.17%  | 6          | 52527076   |native              |[.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write                                                         |-      -            
+ 0.17%  | 6          | 52522477   |native              |[.] litchi_xlsx::raw::worksheet::x14ac::descent                                                                       |-      -            
+ 0.17%  | 6          | 52513555   |native              |[.] quick_xml::name::NamespaceResolver::resolve_event                                                                 |-      -            
+ 0.17%  | 6          | 52485054   |native              |[.] core::num::dec2flt::parse::parse_number                                                                           |-      -            
+ 0.14%  | 5          | 43816771   |libc.so.6           |[.] __memset_avx512_unaligned_erms                                                                                    |-      -            
+ 0.14%  | 5          | 43783162   |native              |[.] alloc::raw_vec::RawVecInner<A>::finish_grow                                                                       |-      -            
+ 0.14%  | 5          | 43782694   |native              |[.] litchi_ooxml_common::mce::codec::Resolver::resolve                                                                |-      -            
+ 0.14%  | 5          | 43776257   |native              |[.] litchi_ooxml_common::mce::codec::esc                                                                              |-      -            
+ 0.14%  | 5          | 43760217   |native              |[.] alloc::collections::btree::map::BTreeMap<K,V,A>::remove                                                           |-      -            
+ 0.14%  | 5          | 43758162   |libc.so.6           |[.] _int_realloc                                                                                                      |-      -            
+ 0.11%  | 4          | 35040897   |native              |[.] litchi_xlsx::raw::strings::parse_with                                                                             |-      -            
+ 0.11%  | 4          | 35012013   |native              |[.] litchi_ooxml_common::mce::scope::Scope<T>::is_mce                                                                 |-      -            
+ 0.11%  | 4          | 35003643   |native              |[.] litchi_xlsx::workbook::source::SourceInner::repair_styles                                                         |-      -            
+ 0.11%  | 4          | 34974725   |native              |[.] alloc::collections::btree::map::BTreeMap<K,V,A>::insert                                                           |-      -            
+ 0.08%  | 3          | 26274227   |native              |[.] memchr::arch::x86_64::avx2::memchr::Two::find_raw                                                                 |-      -            
+ 0.08%  | 3          | 26270309   |native              |[.] litchi_xlsx::workbook::source::SourceWorksheet::visit_one                                                         |-      -            
+ 0.08%  | 3          | 26266574   |libc.so.6           |[.] realloc                                                                                                           |-      -            
+ 0.08%  | 3          | 26263578   |native              |[.] litchi_xlsx::raw::worksheet::validation::optional_u32                                                             |-      -            
+ 0.08%  | 3          | 26263172   |native              |[.] litchi_opc::packuri::PackURI::new                                                                                 |-      -            
+ 0.08%  | 3          | 26254286   |native              |[.] <litchi_xlsx::cell::Cells as core::iter::traits::iterator::Iterator>::next                                        |-      -            
+ 0.08%  | 3          | 26247448   |native              |[.] core::slice::sort::unstable::ipnsort                                                                              |-      -            
+ 0.08%  | 3          | 26246292   |native              |[.] core::iter::traits::iterator::Iterator::try_fold                                                                  |-      -            
+ 0.08%  | 3          | 26220319   |libc.so.6           |[.] _int_free_maybe_trim                                                                                              |-      -            
+ 0.08%  | 3          | 26171725   |libc.so.6           |[.] _int_free_chunk                                                                                                   |-      -            
+ 0.08%  | 3          | 24433186   |native              |[.] zlib_rs::deflate::longest_match::longest_match                                                                    |-      -            
+ 0.06%  | 4          | 18016756   |[unknown]           |[k] 0xffffffff9e80008b                                                                                                |-      -            
+ 0.06%  | 2          | 17524452   |native              |[.] litchi_ooxml_common::mce::stream::invoke_active                                                                   |-      -            
+ 0.06%  | 2          | 17524004   |native              |[.] litchi_perf_baseline::producer_shape::append_text_record                                                          |-      -            
+ 0.06%  | 2          | 17511781   |native              |[.] core::ptr::drop_in_place<litchi_ooxml_common::mce::stream::Frame>                                                 |-      -            
+ 0.06%  | 2          | 17511489   |native              |[.] litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan                                                     |-      -            
+ 0.06%  | 2          | 17509323   |native              |[.] core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>                                                       |-      -            
+ 0.06%  | 2          | 17506463   |native              |[.] quick_xml::reader::state::ReaderState::emit_question_mark                                                         |-      -            
+ 0.06%  | 2          | 17504311   |native              |[.] <alloc::raw_vec::RawVecInner>::finish_grow                                                                        |-      -            
+ 0.06%  | 2          | 17502771   |native              |[.] crc32fast::baseline::update_fast_16                                                                               |-      -            
+ 0.06%  | 2          | 17502550   |native              |[.] litchi_ooxml_common::mce::stream::clone_shared_name                                                               |-      -            
+ 0.06%  | 2          | 17502118   |native              |[.] alloc::fmt::format::format_inner                                                                                  |-      -            
+ 0.06%  | 2          | 17493682   |native              |[.] core::iter::traits::iterator::Iterator::try_fold                                                                  |-      -            
+ 0.06%  | 2          | 17478982   |native              |[.] litchi_ooxml_common::mce::codec::validate_expanded_attribute_duplicates                                           |-      -            
+ 0.06%  | 2          | 17478627   |native              |[.] litchi_ooxml_common::mce::stream::Processor::parse_element                                                        |-      -            
+ 0.06%  | 2          | 17478188   |native              |[.] litchi_ooxml_common::mce::stream::collect_directives                                                              |-      -            
+ 0.06%  | 2          | 17476876   |native              |[.] litchi_ooxml_common::mce::stream::Processor::start                                                                |-      -            
+ 0.06%  | 2          | 17469096   |native              |[.] litchi_ooxml_common::mce::codec::hoisted_if_any                                                                   |-      -            
+ 0.03%  | 1          | 8778461    |native              |[.] litchi_ooxml_common::mce::scope::Facts::of                                                                        |-      -            
+ 0.03%  | 1          | 8771151    |native              |[.] core::str::count::do_count_chars                                                                                  |-      -            
+ 0.03%  | 1          | 8768371    |native              |[.] memchr::arch::x86_64::avx2::packedpair::Finder::with_pair_impl                                                    |-      -            
+ 0.03%  | 1          | 8767647    |native              |[.] memchr::memmem::FinderBuilder::build_forward_with_ranker                                                          |-      -            
+ 0.03%  | 1          | 8765939    |native              |[.] core::hash::BuildHasher::hash_one                                                                                 |-      -            
+ 0.03%  | 1          | 8763580    |native              |[.] litchi_ooxml_common::mce::scope::Scope<T>::remove_from                                                            |-      -            
+ 0.03%  | 1          | 8763011    |native              |[.] litchi_perf_baseline::process_metrics::stat_field                                                                 |-      -            
+ 0.03%  | 1          | 8762966    |native              |[.] <quick_xml::name::NamespaceResolver as core::default::Default>::default                                           |-      -            
+ 0.03%  | 1          | 8760317    |native              |[.] litchi_perf_baseline::process_metrics::kib_bytes                                                                  |-      -            
+ 0.03%  | 1          | 8759933    |[unknown]           |[k] 0xffffffff9ff30b07                                                                                                |-      -            
+ 0.03%  | 1          | 8759532    |native              |[.] litchi_ooxml_common::mce::stream::Namespaces::with_local                                                          |-      -            
+ 0.03%  | 1          | 8758836    |native              |[.] smallvec::SmallVec<A>::push                                                                                       |-      -            
+ 0.03%  | 1          | 8758830    |native              |[.] soapberry_zip::archive::validate_borrowed_wayfinder_metadata                                                      |-      -            
+ 0.03%  | 1          | 8758201    |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition                 |-      -            
+ 0.03%  | 1          | 8757784    |native              |[.] core::hash::BuildHasher::hash_one                                                                                 |-      -            
+ 0.03%  | 1          | 8757410    |native              |[.] litchi_perf_baseline::process_metrics::Snapshot::read                                                             |-      -            
+ 0.03%  | 1          | 8757006    |native              |[.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2                                                               |-      -            
+ 0.03%  | 1          | 8756667    |native              |[.] litchi_ooxml_common::mce::codec::Namespaces::with_local                                                           |-      -            
+ 0.03%  | 1          | 8756147    |native              |[.] litchi_xlsx::workbook::source::SourceWorksheet::select_cells                                                      |-      -            
+ 0.03%  | 1          | 8754509    |native              |[.] soapberry_zip::archive::DataDescriptor::parse_complete_with_width                                                 |-      -            
+ 0.03%  | 1          | 8754010    |native              |[.] <&T as core::fmt::Display>::fmt                                                                                   |-      -            
+ 0.03%  | 1          | 8753084    |native              |[.] litchi_xlsx::raw::catalog::optional_u32                                                                           |-      -            
+ 0.03%  | 1          | 8752862    |native              |[.] litchi_opc::pkgreader::read_structural_member                                                                     |-      -            
+ 0.03%  | 1          | 8752554    |native              |[.] litchi_ooxml_common::mce::scope::Scope<T>::has_extensions                                                         |-      -            
+ 0.03%  | 1          | 8752345    |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row                  |-      -            
+ 0.03%  | 1          | 8751836    |native              |[.] core::fmt::write                                                                                                  |-      -            
+ 0.03%  | 1          | 8751457    |[vdso]              |[.] 0x00000000000009ec                                                                                                |-      -            
+ 0.03%  | 1          | 8750978    |native              |[.] core::hash::BuildHasher::hash_one                                                                                 |-      -            
+ 0.03%  | 1          | 8750248    |native              |[.] core::iter::traits::iterator::Iterator::try_fold                                                                  |-      -            
+ 0.03%  | 1          | 8749337    |native              |[.] memchr::arch::x86_64::avx2::memchr::One::find_raw                                                                 |-      -            
+ 0.03%  | 1          | 8749280    |native              |[.] quick_xml::reader::ns_reader::NsReader<R>::read_event_impl                                                        |-      -            
+ 0.03%  | 1          | 8748586    |native              |[.] litchi_opc::pkgreader::indexed_archive_with_limits                                                                |-      -            
+ 0.03%  | 1          | 8748496    |native              |[.] core::ptr::drop_in_place<litchi_opc::error::OpcError>                                                             |-      -            
+ 0.03%  | 1          | 8748433    |native              |[.] litchi_ooxml_common::mce::stream::local_namespaces                                                                |-      -            
+ 0.03%  | 1          | 8747977    |native              |[.] hashbrown::map::HashMap<K,V,S,A>::insert                                                                          |-      -            
+ 0.03%  | 1          | 8747974    |native              |[.] alloc::sync::Arc<T,A>::drop_slow                                                                                  |-      -            
+ 0.03%  | 1          | 8747382    |libc.so.6           |[.] clock_gettime@@GLIBC_2.17                                                                                         |-      -            
+ 0.03%  | 1          | 8747348    |native              |[.] <litchi_ooxml_common::mce::stream::PrefixReader as std::io::BufRead>::fill_buf                                    |-      -            
+ 0.03%  | 1          | 8746866    |native              |[.] litchi_ooxml_common::mce::stream::expand_attribute                                                                |-      -            
+ 0.03%  | 1          | 8746760    |native              |[.] litchi_ooxml_common::mce::scope::Scope<T>::push                                                                   |-      -            
+ 0.03%  | 1          | 8746497    |native              |[.] <core::fmt::Formatter>::pad_integral                                                                              |-      -            
+ 0.03%  | 1          | 8746260    |native              |[.] quick_xml::name::NamespaceResolver::add                                                                           |-      -            
+ 0.03%  | 1          | 8746073    |native              |[.] core::ptr::drop_in_place<alloc::vec::into_iter::IntoIter<litchi_xlsx::raw::DefinedName>>                          |-      -            
+ 0.03%  | 1          | 8746057    |native              |[.] core::ptr::drop_in_place<litchi_ooxml_common::mce::stream::RawAttribute>                                          |-      -            
+ 0.03%  | 1          | 8746015    |native              |[.] soapberry_zip::office::IndexedReadSession<R>::read_entry_with_accounting                                          |-      -            
+ 0.03%  | 1          | 8745520    |native              |[.] core::hash::BuildHasher::hash_one                                                                                 |-      -            
+ 0.03%  | 1          | 8745398    |[unknown]           |[k] 0xffffffff9f0f14e0                                                                                                |-      -            
+ 0.03%  | 1          | 8744497    |native              |[.] litchi_opc::pkgreader::inspect_relationship_element                                                               |-      -            
+ 0.03%  | 1          | 8743354    |native              |[.] hashbrown::map::HashMap<K,V,S,A>::insert                                                                          |-      -            
+ 0.03%  | 1          | 8742154    |native              |[.] litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::{{closure}}                                     |-      -            
+ 0.03%  | 1          | 8741442    |libc.so.6           |[.] __memset_avx512_unaligned                                                                                         |-      -            
+ 0.03%  | 1          | 8740887    |native              |[.] sha2::sha256::compress256                                                                                         |-      -            
+ 0.03%  | 1          | 8740885    |native              |[.] <soapberry_zip::archive::ZipVerifier<Decompressor,Reader> as std::io::Read>::read                                 |-      -            
+ 0.03%  | 1          | 8740809    |native              |[.] litchi_opc::source_backed::read_source_at_with_context                                                            |-      -            
+ 0.03%  | 1          | 8740418    |native              |[.] soapberry_zip::office::normalize_str_fallibly                                                                     |-      -            
+ 0.03%  | 1          | 8739919    |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::drive                      |-      -            
+ 0.03%  | 1          | 8739903    |native              |[.] litchi_ooxml_common::mce::stream::SemanticEvent::from_element                                                     |-      -            
+ 0.03%  | 1          | 8739878    |native              |[.] litchi_ooxml_common::mce::stream::expand                                                                          |-      -            
+ 0.03%  | 1          | 8739679    |native              |[.] soapberry_zip::office::IndexedArchive<R>::build_strict_layout_proof::{{closure}}                                  |-      -            
+ 0.03%  | 1          | 8735558    |native              |[.] litchi_ooxml_common::mce::codec::apply_directives                                                                 |-      -            
+ 0.03%  | 1          | 8735313    |native              |[.] <std::sys::pal::unix::time::Timespec>::sub_timespec                                                               |-      -            
+ 0.03%  | 1          | 8734377    |native              |[.] litchi_opc::content_type::is_token                                                                                |-      -            
+ 0.03%  | 1          | 8732356    |native              |[.] alloc::raw_vec::RawVec<T,A>::grow_one                                                                             |-      -            
+ 0.03%  | 1          | 8725010    |native              |[.] quick_xml::reader::Reader<R>::read_event_impl                                                                     |-      -            
+ 0.03%  | 1          | 8716353    |native              |[.] hashbrown::raw::RawTable<T,A>::reserve_rehash                                                                     |-      -            
+ 0.03%  | 1          | 8716275    |native              |[.] alloc::raw_vec::RawVecInner<A>::finish_grow                                                                       |-      -            
+ 0.03%  | 1          | 8712455    |native              |[.] litchi_opc::source_backed::remove_flight                                                                          |-      -            
+ 0.03%  | 1          | 8703801    |native              |[.] hashbrown::raw::RawTable<T,A>::reserve_rehash                                                                     |-      -            
+ 0.03%  | 1          | 8698165    |native              |[.] hashbrown::map::HashMap<K,V,S,A>::insert                                                                          |-      -            
+ 0.03%  | 1          | 8201528    |native              |[.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell                 |-      -            
+ 0.03%  | 3          | 8108273    |[unknown]           |[k] 0xffffffff9f11c199                                                                                                |-      -            
+ 0.03%  | 1          | 7974947    |native              |[.] <core::fmt::Formatter>::pad_integral::write_prefix                                                                |-      -            
+ 0.02%  | 1          | 6101121    |native              |[.] zlib_rs::deflate::flush_block_only                                                                                |-      -            
+ 0.01%  | 1          | 4143877    |native              |[.] litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture                               |-      -            
+ 0.01%  | 1          | 3591919    |native              |[.] zlib_rs::deflate::BitWriter::send_bits_overflow                                                                   |-      -            
+ 0.01%  | 10         | 2875378    |[unknown]           |[k] 0xffffffff9f11c1b2                                                                                                |-      -            
+ 0.01%  | 1          | 2779492    |native              |[.] soapberry_zip::path::ZipFilePath<()>::from_str.3432                                                               |-      -            
+ 0.01%  | 8          | 2208487    |[unknown]           |[k] 0xffffffff9f3a96c4                                                                                                |-      -            
+ 0.01%  | 8          | 2153703    |[unknown]           |[k] 0xffffffff9f2036a8                                                                                                |-      -            
+ 0.01%  | 5          | 2134485    |[unknown]           |[k] 0xffffffff9f2036ac                                                                                                |-      -            
+ 0.01%  | 7          | 1988002    |[unknown]           |[k] 0xffffffff9e800080                                                                                                |-      -            
+ 0.01%  | 7          | 1966271    |[unknown]           |[k] 0xffffffff9f11c1a9                                                                                                |-      -            
+ 0.01%  | 7          | 1916562    |[unknown]           |[k] 0xffffffff9e8000a7                                                                                                |-      -            
+ 0.01%  | 6          | 1704883    |[unknown]           |[k] 0xffffffff9f11c1d7                                                                                                |-      -            
+ 0.01%  | 6          | 1610329    |[unknown]           |[k] 0xffffffff9f3a96af                                                                                                |-      -            
+ 0.00%  | 6          | 1573828    |[unknown]           |[k] 0xffffffff9f11c18c                                                                                                |-      -            
+ 0.00%  | 5          | 1384810    |[unknown]           |[k] 0xffffffff9f11c1a2                                                                                                |-      -            
+ 0.00%  | 5          | 1252546    |[unknown]           |[k] 0xffffffff9f0e7c1e                                                                                                |-      -            
+ 0.00%  | 4          | 1191107    |[unknown]           |[k] 0xffffffff9f2036a5                                                                                                |-      -            
+ 0.00%  | 4          | 1147111    |[unknown]           |[k] 0xffffffff9e800083                                                                                                |-      -            
+ 0.00%  | 4          | 1134124    |[unknown]           |[k] 0xffffffff9f11c185                                                                                                |-      -            
+ 0.00%  | 4          | 1045995    |[unknown]           |[k] 0xffffffff9f11c175                                                                                                |-      -            
+ 0.00%  | 3          | 1035428    |[unknown]           |[k] 0xffffffff9f11c176                                                                                                |-      -            
+ 0.00%  | 4          | 1013844    |[unknown]           |[k] 0xffffffff9f11c18e                                                                                                |-      -            
+ 0.00%  | 3          | 833050     |[unknown]           |[k] 0xffffffff9ff15ab0                                                                                                |-      -            
+ 0.00%  | 3          | 824697     |[unknown]           |[k] 0xffffffff9f0e7b4a                                                                                                |-      -            
+ 0.00%  | 3          | 777214     |native              |[.] serde_core::ser::impls::<impl serde_core::ser::Serialize for alloc::vec::Vec<T>>::serialize                       |-      -            
+ 0.00%  | 3          | 767640     |[unknown]           |[k] 0xffffffff9f11c1b4                                                                                                |-      -            
+ 0.00%  | 3          | 753516     |[unknown]           |[k] 0xffffffff9f32b31f                                                                                                |-      -            
+ 0.00%  | 3          | 752656     |[unknown]           |[k] 0xffffffff9f3a96c0                                                                                                |-      -            
+ 0.00%  | 2          | 662774     |[unknown]           |[k] 0xffffffff9f32b2e2                                                                                                |-      -            
+ 0.00%  | 2          | 617474     |[unknown]           |[k] 0xffffffff9e8000a9                                                                                                |-      -            
+ 0.00%  | 2          | 585990     |[unknown]           |[k] 0xffffffff9f3b1b71                                                                                                |-      -            
+ 0.00%  | 2          | 585270     |[unknown]           |[k] 0xffffffff9f2036b0                                                                                                |-      -            
+ 0.00%  | 2          | 547941     |[unknown]           |[k] 0xffffffff9f0e8280                                                                                                |-      -            
+ 0.00%  | 2          | 525929     |[unknown]           |[k] 0xffffffff9f0e7dcd                                                                                                |-      -            
+ 0.00%  | 2          | 525462     |[unknown]           |[k] 0xffffffff9f0e7db5                                                                                                |-      -            
+ 0.00%  | 2          | 505334     |[unknown]           |[k] 0xffffffff9f0e3bd1                                                                                                |-      -            
+ 0.00%  | 2          | 503828     |[unknown]           |[k] 0xffffffff9e8000be                                                                                                |-      -            
+ 0.00%  | 2          | 499904     |[unknown]           |[k] 0xffffffff9f3b1b60                                                                                                |-      -            
+ 0.00%  | 1          | 351127     |[unknown]           |[k] 0xffffffff9e8000d4                                                                                                |-      -            
+ 0.00%  | 1          | 350625     |[unknown]           |[k] 0xffffffff9e8000ce                                                                                                |-      -            
+ 0.00%  | 1          | 330870     |[unknown]           |[k] 0xffffffff9f3aa56c                                                                                                |-      -            
+ 0.00%  | 1          | 304483     |[unknown]           |[k] 0xffffffff9f0e82a0                                                                                                |-      -            
+ 0.00%  | 1          | 302548     |[unknown]           |[k] 0xffffffff9ff15a71                                                                                                |-      -            
+ 0.00%  | 1          | 299983     |[unknown]           |[k] 0xffffffff9e8000e2                                                                                                |-      -            
+ 0.00%  | 1          | 299604     |[unknown]           |[k] 0xffffffff9f0e7bfd                                                                                                |-      -            
+ 0.00%  | 1          | 298890     |[unknown]           |[k] 0xffffffff9f3a96bc                                                                                                |-      -            
+ 0.00%  | 1          | 292265     |[unknown]           |[k] 0xffffffff9f2036b7                                                                                                |-      -            
+ 0.00%  | 1          | 291981     |[unknown]           |[k] 0xffffffff9f0e7b39                                                                                                |-      -            
+ 0.00%  | 1          | 291502     |[unknown]           |[k] 0xffffffff9f11c1dc                                                                                                |-      -            
+ 0.00%  | 1          | 291328     |[unknown]           |[k] 0xffffffff9eb48dfe                                                                                                |-      -            
+ 0.00%  | 1          | 291215     |[unknown]           |[k] 0xffffffff9f0e7b4e                                                                                                |-      -            
+ 0.00%  | 1          | 290957     |[unknown]           |[k] 0xffffffff9f0e8380                                                                                                |-      -            
+ 0.00%  | 1          | 288660     |[unknown]           |[k] 0xffffffff9f0e7ccd                                                                                                |-      -            
+ 0.00%  | 1          | 286956     |[unknown]           |[k] 0xffffffff9ff15a86                                                                                                |-      -            
+ 0.00%  | 1          | 283498     |[unknown]           |[k] 0xffffffff9f0e3bc6                                                                                                |-      -            
+ 0.00%  | 1          | 277914     |[unknown]           |[k] 0xffffffff9f32b308                                                                                                |-      -            
+ 0.00%  | 1          | 276154     |[unknown]           |[k] 0xffffffff9f2036ce                                                                                                |-      -            
+ 0.00%  | 1          | 274118     |[unknown]           |[k] 0xffffffff9ff2aebc                                                                                                |-      -            
+ 0.00%  | 1          | 273151     |[unknown]           |[k] 0xffffffff9f0e7cca                                                                                                |-      -            
+ 0.00%  | 1          | 272504     |native              |[.] <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str                             |-      -            
+ 0.00%  | 1          | 270783     |[unknown]           |[k] 0xffffffff9e8000c0                                                                                                |-      -            
+ 0.00%  | 1          | 256976     |[unknown]           |[k] 0xffffffff9f3aa500                                                                                                |-      -            
+ 0.00%  | 1          | 256277     |[unknown]           |[k] 0xffffffff9f3b1d17                                                                                                |-      -            
+ 0.00%  | 1          | 255702     |[unknown]           |[k] 0xffffffff9f3b1d41                                                                                                |-      -            
+ 0.00%  | 1          | 254477     |[unknown]           |[k] 0xffffffff9f32b2db                                                                                                |-      -            
+ 0.00%  | 1          | 252793     |[unknown]           |[k] 0xffffffff9f11c19c                                                                                                |-      -            
+ 0.00%  | 1          | 252672     |[unknown]           |[k] 0xffffffff9f0e7dd4                                                                                                |-      -            
+ 0.00%  | 1          | 252252     |[unknown]           |[k] 0xffffffff9f0e7bf8                                                                                                |-      -            
+ 0.00%  | 1          | 251681     |[unknown]           |[k] 0xffffffff9f32b2d6                                                                                                |-      -            
+ 0.00%  | 1          | 251533     |native              |[.] <serde_json::ser::PrettyFormatter as serde_json::ser::Formatter>::begin_object_key                                |-      -            
+ 0.00%  | 1          | 251445     |[unknown]           |[k] 0xffffffff9f0e82b7                                                                                                |-      -            
+ 0.00%  | 1          | 250756     |[unknown]           |[k] 0xffffffff9f0e7c84                                                                                                |-      -            
+ 0.00%  | 1          | 250654     |[unknown]           |[k] 0xffffffff9e8000c8                                                                                                |-      -            
+ 0.00%  | 1          | 249973     |[unknown]           |[k] 0xffffffff9f0e7acc                                                                                                |-      -            
+ 0.00%  | 1          | 249866     |[unknown]           |[k] 0xffffffff9f3b1d3f                                                                                                |-      -            
+ 0.00%  | 1          | 249757     |[unknown]           |[k] 0xffffffff9e8000cc                                                                                                |-      -            
+ 0.00%  | 1          | 249754     |[unknown]           |[k] 0xffffffff9f11c17d                                                                                                |-      -            
+ 0.00%  | 1          | 249548     |[unknown]           |[k] 0xffffffff9f0e3bcb                                                                                                |-      -            
+ 0.00%  | 1          | 249439     |[unknown]           |[k] 0xffffffff9f0e82e1                                                                                                |-      -            
+ 0.00%  | 1          | 247462     |[unknown]           |[k] 0xffffffff9f3aa54e                                                                                                |-      -            
+ 0.00%  | 1          | 247252     |[unknown]           |[k] 0xffffffff9f3b1d19                                                                                                |-      -            
+ 0.00%  | 1          | 246792     |[unknown]           |[k] 0xffffffff9f0e7b19                                                                                                |-      -            
+ 0.00%  | 1          | 246688     |[unknown]           |[k] 0xffffffff9f3aa506                                                                                                |-      -            
+ 0.00%  | 1          | 246321     |[unknown]           |[k] 0xffffffff9f0e7cd7                                                                                                |-      -            
+ 0.00%  | 1          | 246126     |[unknown]           |[k] 0xffffffff9f0e7b1c                                                                                                |-      -            
+ 0.00%  | 1          | 132442     |ld-linux-x86-64.so.2|[.] version_check_doit                                                                                                |-      -            
+ 0.00%  | 1          | 127690     |[unknown]           |[k] 0xffffffff9fee6d7a                                                                                                |-      -            
+ 0.00%  | 1          | 5772       |ld-linux-x86-64.so.2|[.] _dl_sysdep_start                                                                                                  |-      -            
+ 0.00%  | 3          | 5680       |[unknown]           |[k] 0xffffffff9e800b90                                                                                                |-      -            
+ 0.00%  | 1          | 284        |[unknown]           |[k] 0xffffffff9ff1e793                                                                                                |-      -            
+ 0.00%  | 1          | 13         |ld-linux-x86-64.so.2|[.] _dl_start                                                                                                         |-      -            
+ 0.00%  | 1          | 1          |ld-linux-x86-64.so.2|[.] _start                                                                                                            |-      -            
+ 0.00%  | 1          | 1          |taskset             |[.] 0x0000000000003055                                                                                                |-      -            
+ 0.00%  | 1          | 1          |taskset             |[.] 0x0000000000004443                                                                                                |-      -            
+ 0.00%  | 1          | 1          |taskset             |[.] 0x000000000000446d                                                                                                |-      -            
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

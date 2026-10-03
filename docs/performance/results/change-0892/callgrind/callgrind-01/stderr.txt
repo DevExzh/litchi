@@ -1,0 +1,19 @@
+==4190485== Callgrind, a call-graph generating cache profiler
+==4190485== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==4190485== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==4190485== Command: /home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native --case xlsx_producer_medium_source_full_cell_scan --warmup 0 --samples 10 --filesystem-cache warm --json /home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/report.json --producer-evidence /home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/producer.json
+==4190485== 
+==4190485== For interactive control, run 'callgrind_control -h'.
+==4190485== brk segment overflow in thread #1: can't grow to 0x7816000
+==4190485== (see section Limitations in user manual)
+==4190485== NOTE: further instances of this message will not be shown
+==4190624== 
+==4190624== Events    : Ir
+==4190624== Collected : 717348440
+==4190624== 
+==4190624== I   refs:      717,348,440
+==4190485== 
+==4190485== Events    : Ir
+==4190485== Collected : 717348440
+==4190485== 
+==4190485== I   refs:      717,348,440

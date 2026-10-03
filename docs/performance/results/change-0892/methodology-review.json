@@ -1,0 +1,129 @@
+{
+  "compatibility_replays": {
+    "callgrind_0886_children": [
+      {
+        "brk_warning": true,
+        "child": "callgrind-00",
+        "parent_pid": 3489982,
+        "total_ir": 755248408
+      },
+      {
+        "brk_warning": true,
+        "child": "callgrind-01",
+        "parent_pid": 3490106,
+        "total_ir": 754020187
+      }
+    ],
+    "helper_checks": "docs/performance/results/change-0892/helper-checks.json",
+    "native_reducer_0886_children": [
+      {
+        "child": "child-00",
+        "empty_stack_percent": 87.18741730089778,
+        "sample_count": 4141,
+        "total_period": 33293121404
+      },
+      {
+        "child": "child-01",
+        "empty_stack_percent": 86.75279334331968,
+        "sample_count": 4133,
+        "total_period": 33298745036
+      },
+      {
+        "child": "child-02",
+        "empty_stack_percent": 69.47116276813394,
+        "sample_count": 4096,
+        "total_period": 34184616855
+      }
+    ],
+    "plan_fixture": "freeze.main read-only preflight with methodology read/descriptor and plan writes intercepted in memory"
+  },
+  "corpus": {
+    "archive_bytes": 22739,
+    "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+    "case": "xlsx_producer_medium_source_full_cell_scan",
+    "cells": 4096,
+    "marker_refusal_census_sha256": "552c35c8b8f958de28792f00c1e9e831ae884471aa28b5b2a7a1479bd06c5207",
+    "numeric": 3686,
+    "oracle_sha256": "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+    "text": 410
+  },
+  "helper_hashes": {
+    "analyze_callgrind.py": "af811918f40bb1efe68a7514884f9fd09dfb2ddb956ee80a7656748ab3d072bd",
+    "capture.py": "635d4ce7c3b8fdea8fd6be44704c5c99acb9ff10dfbae11b03b21b71263d16a0",
+    "capture_callgrind.py": "25f5aeabf0b84aba5aba4e45f0a9f0fc2fec923830f97277131740c7b0a6f46a",
+    "export.py": "262c9db6390bd5f717940c42f60844c8e48a770fd61494aab409c726dbd10a77",
+    "freeze.py": "53426f8a83078648d0ae444b928f977b386ef513be0b4c7121b82491bc6fca0b",
+    "reduce.py": "8067d6f763c9c3bdc6bbac797b2c541fe97a5e5648383ed5c0bf6e3f8c5d2696",
+    "source_identity.py": "dcf2d0fc2e152c800ff4116ad92ea28e0414bdfee9e8380a6711766dd4d7b66c",
+    "verify.py": "ab1c016ec29221eae0313ca1ff2789e6938151c356cdc27e9b8359c9b695e3f3"
+  },
+  "limitations": [
+    "DWARF stacks are mostly empty/incomplete; no caller or native-inclusive conclusion is admissible.",
+    "Callgrind Ir is instrumented guest instruction count, independent from native cycles and latency; retained brk segment overflow warning applies.",
+    "CPU affinity is recorded without an exclusive-host or physical-cold-cache guarantee.",
+    "The reviewed 0885 semantic verifier is reused through an adapter; it is not an independent parser implementation.",
+    "iWork remains outside this XLSX profile and the goal scope."
+  ],
+  "performance_claim": null,
+  "production_changes": false,
+  "protocol": {
+    "callgrind": {
+      "children": 2,
+      "cpu": 12,
+      "filesystem_cache": "warm",
+      "fresh_child": true,
+      "samples": 10,
+      "toggle_function": "litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan",
+      "warmup": 0
+    },
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "TZ": "UTC"
+    },
+    "native": {
+      "call_graph": "dwarf,16384",
+      "children": 3,
+      "cpu": 12,
+      "event": "cycles:u",
+      "filesystem_cache": "warm",
+      "frequency_hz": 499,
+      "fresh_child": true,
+      "samples": 2000,
+      "warmup": 10
+    },
+    "profile": "release",
+    "schedule": "sequential; no retry or slow-row replacement"
+  },
+  "required_gates": [
+    "Bind every plan to source identity, retained binary/build receipt, ELF build ID, fixed tools, corpus/oracle census, and all eight helper SHA-256 values.",
+    "Validate each report binary_identity against retained path, binary_sha256, binary_bytes, mode_bits, executable, and release profile.",
+    "Validate frozen argv, environment, plan digest, child order, command receipts, artifact hashes, perf build IDs, zero Callgrind collection failures, and zero native lost samples.",
+    "Replay the reviewed 0885 semantic producer oracle and retain all failed attempts without retry or replacement."
+  ],
+  "reviewed_without_build_or_new_capture": true,
+  "reviewer": "/root/profile_review_0892",
+  "schema": "litchi.xlsx-scan-profile-methodology-review-0892.v1",
+  "scope": {
+    "callgrind": "Runner-scoped inclusive guest instructions including oracle/setup and timer-excluded work; selected rows overlap and must not be summed.",
+    "claims_excluded": [
+      "native inclusive attribution",
+      "latency or wall-clock speedup",
+      "allocation improvement",
+      "end-to-end performance claim",
+      "production adoption decision"
+    ],
+    "native": "Whole-process user-cycle sampled-IP self periods including setup, timer-excluded checks, destruction, and reporting; direct self attribution only."
+  },
+  "source_binary_reuse": {
+    "binary_bytes": 264443336,
+    "binary_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "binary_sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710",
+    "elf_build_id": "22608b8f45f6d0d2a8e2a71dc14435bd67f8a320",
+    "equivalence": "Current selected source audit and retained 0891 binary/build receipt agree; four unrelated xml_attribute_bounds diagnostic files are excluded and the untracked bench_word_parse example is untouched.",
+    "source_identity": "docs/performance/results/change-0892/source-identity.json",
+    "source_revision": "0a0957ef7249b4b16ec26ed81d1fb32b7288bb0b"
+  },
+  "status": "pass"
+}

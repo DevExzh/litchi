@@ -1,0 +1,73 @@
+{
+  "schema": "litchi.current-profile-source-0892.v1",
+  "status": "pass",
+  "source_revision": "0a0957ef7249b4b16ec26ed81d1fb32b7288bb0b",
+  "observed_head": "0a0957ef7249b4b16ec26ed81d1fb32b7288bb0b",
+  "retained_source_union_files": 10766,
+  "current_tracked_selected_files": 10769,
+  "live_files_hash_checked": 10765,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "bytes": 264443336,
+    "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+  },
+  "diagnostic_exceptions": [
+    "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+    "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+    "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+    "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs"
+  ],
+  "exception_reason": "Only the separate xml_attribute_bounds diagnostic changed after 0885; it is not linked into the profiled binary.",
+  "untracked_excluded": [
+    "crates/litchi/examples/bench_word_parse.rs"
+  ],
+  "evidence": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.json",
+      "bytes": 2083420,
+      "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.tar.gz",
+      "bytes": 89024356,
+      "sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-freeze-v3.json",
+      "bytes": 1346,
+      "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-v3.patch",
+      "bytes": 27742,
+      "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/build.json",
+      "bytes": 6113,
+      "sha256": "ccd137fe2b9b6e5fbe338ad3bce0ac79b46d1334d39a022dc6a09dac4756613f"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/native-build.json",
+      "bytes": 2920,
+      "sha256": "8f499cc51fcf3a4ef2397833cc739060325def695bfebfaf50d0c23c889b7b5b"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/native.d",
+      "bytes": 276023,
+      "sha256": "8caec39bddef41733b399e0728e6db95f6e7818877820023c6f8f0beb83d393b"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/decision.json",
+      "bytes": 6936,
+      "sha256": "ee931c95454ffb69313b8195f2293bf358750b05342a3b00f0fdde0445bc0722"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/quality.json",
+      "bytes": 15079,
+      "sha256": "9469575384e667dbe8a87a0d7c123dd109cc180d4c39f8278d193b6396cee514"
+    }
+  ],
+  "production_changes": false,
+  "performance_claim": null
+}

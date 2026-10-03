@@ -1,0 +1,38 @@
+{
+  "binary": {
+    "bytes": 264443336,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+    "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+  },
+  "call_graph": "dwarf,16384",
+  "children": 3,
+  "cpu": 12,
+  "event": "cycles:u",
+  "frequency_hz": 499,
+  "no_retries": true,
+  "performance_claim": false,
+  "plan": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/plan.json",
+  "plan_sha256": "582281aeb918d9efb177c0e70c6de7b0e00cc95b293163b641745fe112adefc1",
+  "profile": "release",
+  "records": [
+    {
+      "command_sha256": "68a65793e56d9a91eb7742f71a8d8e6a3a44672b61410ebf9b19793f8f3f8c6a",
+      "path": "child-00/command.json"
+    },
+    {
+      "command_sha256": "d2fc0e5f19e3bb93c45a492d9ab4da78d600ee778acc48183491f82130cb7190",
+      "path": "child-01/command.json"
+    },
+    {
+      "command_sha256": "caf18a816bdb0e12767aac743ad5e1b41e8f926b695e717eebed00a2ea442a47",
+      "path": "child-02/command.json"
+    }
+  ],
+  "samples": 2000,
+  "schedule": "sequential",
+  "schema": "litchi.xlsx-scan-cycle-profile-capture-0892.v1",
+  "status": "pass",
+  "warmup": 10
+}
