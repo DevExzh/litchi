@@ -1,0 +1,750 @@
+{
+  "affected_source_paths": [
+    "tools/perf-baseline/src/producer_shape.rs",
+    "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+  ],
+  "affected_sources_after": [
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+      "snapshot": {
+        "bytes": 142118,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/source-after/tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      },
+      "source": {
+        "bytes": 142118,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      }
+    },
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+      "snapshot": {
+        "bytes": 4493,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/source-after/tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+      },
+      "source": {
+        "bytes": 4493,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+      }
+    },
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "snapshot": {
+        "bytes": 14188,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/source-after/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      },
+      "source": {
+        "bytes": 14188,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      }
+    }
+  ],
+  "affected_sources_before": [
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+      "snapshot": {
+        "bytes": 142118,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/source/tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      },
+      "source": {
+        "bytes": 142118,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      }
+    },
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+      "snapshot": {
+        "bytes": 4493,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/source/tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+      },
+      "source": {
+        "bytes": 4493,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+      }
+    },
+    {
+      "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "snapshot": {
+        "bytes": 14188,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/source/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      },
+      "source": {
+        "bytes": 14188,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      }
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "tools/perf-baseline/src/producer_shape.rs",
+        "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 32057633,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:47:10.781137Z",
+      "log": "attempts/quality-v2/logs/rustfmt_changed_sources.log",
+      "log_identity": {
+        "bytes": 1087,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/rustfmt_changed_sources.log",
+        "sha256": "b4bea350ee832b159234b6d35f6e132dc586debf9fbd62541d39783057dfa50f"
+      },
+      "name": "rustfmt_changed_sources",
+      "pass": true,
+      "passed_count": null,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:47:10.749076Z",
+      "terminal_exit": 0,
+      "test_result_matches": [],
+      "tool_versions": {
+        "rustfmt": "rustfmt 1.9.0-stable (59807616e1 2026-04-14)\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_full_cell",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 67192475635,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:48:17.979281Z",
+      "log": "attempts/quality-v2/logs/producer_full_cell.log",
+      "log_identity": {
+        "bytes": 20349,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/producer_full_cell.log",
+        "sha256": "ec43769a8451cb44b5a64e84309125cb69f6ce090612f6bfa0bd36de11f4a851"
+      },
+      "name": "producer_full_cell",
+      "pass": true,
+      "passed_count": 4,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:47:10.786820Z",
+      "terminal_exit": 0,
+      "test_result_matches": [
+        4
+      ],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::selected_route_tests",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 762641547,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:48:18.747367Z",
+      "log": "attempts/quality-v2/logs/producer_shape_selected_route_tests.log",
+      "log_identity": {
+        "bytes": 2184,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/producer_shape_selected_route_tests.log",
+        "sha256": "4d9a3b9a435f86ca03543f16f7805392559840cbd4918eb6a9d0899c2d41db81"
+      },
+      "name": "producer_shape_selected_route_tests",
+      "pass": true,
+      "passed_count": 3,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:48:17.984743Z",
+      "terminal_exit": 0,
+      "test_result_matches": [
+        3
+      ],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::full_cell_guard_tests",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 312221426,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:48:19.065378Z",
+      "log": "attempts/quality-v2/logs/producer_shape_full_cell_guard_tests.log",
+      "log_identity": {
+        "bytes": 2065,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/producer_shape_full_cell_guard_tests.log",
+        "sha256": "c4fbf925548ace38f15356d49bc0302c088de201343d35bff95f451e26323847"
+      },
+      "name": "producer_shape_full_cell_guard_tests",
+      "pass": true,
+      "passed_count": 2,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:48:18.753169Z",
+      "terminal_exit": 0,
+      "test_result_matches": [
+        2
+      ],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::tests",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 829955917,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:48:19.900923Z",
+      "log": "attempts/quality-v2/logs/producer_shape_tests.log",
+      "log_identity": {
+        "bytes": 13723,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/producer_shape_tests.log",
+        "sha256": "4f253ab4366985052a0be2633efc0427c2db7951281095f94992e10212f290cf"
+      },
+      "name": "producer_shape_tests",
+      "pass": true,
+      "passed_count": 17,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:48:19.070993Z",
+      "terminal_exit": 0,
+      "test_result_matches": [
+        17
+      ],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 37930352692,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:48:57.840134Z",
+      "log": "attempts/quality-v2/logs/cargo_clippy.log",
+      "log_identity": {
+        "bytes": 8734,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/cargo_clippy.log",
+        "sha256": "26ad4ffddc0b1c58784979d96fed326a805937ccf650822bc3215c90d475f9cf"
+      },
+      "name": "cargo_clippy",
+      "pass": true,
+      "passed_count": null,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:48:19.909797Z",
+      "terminal_exit": 0,
+      "test_result_matches": [],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "doc",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--no-deps",
+        "--lib"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 3675013455,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:49:01.523730Z",
+      "log": "attempts/quality-v2/logs/cargo_doc.log",
+      "log_identity": {
+        "bytes": 1745,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/cargo_doc.log",
+        "sha256": "a03656ceaa89e5843be28d3963aa1066cf576f743a2dbccce6d60c5f12e0cdd1"
+      },
+      "name": "cargo_doc",
+      "pass": true,
+      "passed_count": null,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:48:57.848732Z",
+      "terminal_exit": 0,
+      "test_result_matches": [],
+      "tool_versions": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 273266346030,
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+        "RUSTDOCFLAGS": "-D warnings",
+        "RUSTFLAGS": "",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+        "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+        "TZ": "UTC"
+      },
+      "failures": [],
+      "finished_utc": "2026-10-03T20:53:34.796227Z",
+      "log": "attempts/quality-v2/logs/crate_boundaries.log",
+      "log_identity": {
+        "bytes": 1385,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/crate_boundaries.log",
+        "sha256": "f0f497e4ecbc33c8483502026045603dc51c00227c242d0985390f7267594063"
+      },
+      "name": "crate_boundaries",
+      "pass": true,
+      "passed_count": null,
+      "returncode": 0,
+      "started_utc": "2026-10-03T20:49:01.529903Z",
+      "terminal_exit": 0,
+      "test_result_matches": [],
+      "tool_versions": {
+        "python3": "Python 3.14.4\n"
+      }
+    }
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+    "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp",
+    "TZ": "UTC"
+  },
+  "failures": [],
+  "finished_utc": "2026-10-03T20:53:34.870429Z",
+  "git_diff_after": {
+    "bytes": 14780,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/git-diff-after.txt",
+    "sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a"
+  },
+  "git_diff_before": {
+    "bytes": 14780,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/git-diff-before.txt",
+    "sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a"
+  },
+  "manifest": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+  "performance_claim": false,
+  "planned_commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "tools/perf-baseline/src/producer_shape.rs",
+        "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "name": "rustfmt_changed_sources"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_full_cell",
+        "--",
+        "--nocapture"
+      ],
+      "name": "producer_full_cell"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::selected_route_tests",
+        "--",
+        "--nocapture"
+      ],
+      "name": "producer_shape_selected_route_tests"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::full_cell_guard_tests",
+        "--",
+        "--nocapture"
+      ],
+      "name": "producer_shape_full_cell_guard_tests"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "producer_shape::tests",
+        "--",
+        "--nocapture"
+      ],
+      "name": "producer_shape_tests"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "name": "cargo_clippy"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "doc",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--no-deps",
+        "--lib"
+      ],
+      "name": "cargo_doc"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "name": "crate_boundaries"
+    }
+  ],
+  "progress": {
+    "bytes": 29901,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/quality-progress.json",
+    "sha256": "a8a7c9c54a4fe7aeae00fbe49b9705f57ad9192efebfc7a37fea3234eb077f59"
+  },
+  "runner": {
+    "bytes": 20746,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/validate.py",
+    "sha256": "ee2c3f8fd9aec8ac39b4887e697aee6ca8934081251d871fa93929216f80ab96"
+  },
+  "schema": "litchi.xlsx-producer-shape-quality-0893.v1",
+  "skipped_after_first_failure": [],
+  "source_head_after": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+  "source_head_before": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+  "started_utc": "2026-10-03T20:47:10.737797Z",
+  "status": "pass",
+  "stop_after_first_failure": true,
+  "target": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+  "target_marker": {
+    "bytes": 42,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0893-quality/.owner-0893-quality",
+    "sha256": "6040b2ac0a21b1bcbe097f83fee6f587d0e369bb05c03b5b7665fcd9bd067d0c"
+  },
+  "tool_versions": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+    "python3": "Python 3.14.4\n",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+    "rustfmt": "rustfmt 1.9.0-stable (59807616e1 2026-04-14)\n"
+  },
+  "toolchain": "1.95.0-x86_64-unknown-linux-gnu"
+}

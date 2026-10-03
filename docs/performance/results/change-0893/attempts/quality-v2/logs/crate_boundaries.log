@@ -1,0 +1,15 @@
+{"argv": ["python3", "-B", "tools/check_crate_boundaries.py"], "cwd": "/home/zhuhe/code/litchi", "environment": {"CARGO_BUILD_JOBS": "4", "CARGO_HOME": "/home/zhuhe/.cargo", "CARGO_INCREMENTAL": "0", "CARGO_NET_OFFLINE": "true", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_RELEASE_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0", "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality", "HOME": "/home/zhuhe", "LANG": "C", "LC_ALL": "C", "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin", "RUSTDOCFLAGS": "-D warnings", "RUSTFLAGS": "", "RUSTUP_HOME": "/home/zhuhe/.rustup", "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu", "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp", "TZ": "UTC"}, "tool_versions": {"python3": "Python 3.14.4\n"}}
+
+crate boundaries valid for 65 workspace packages and 244 internal dependency declarations (11 explicit debt items)
+ordered migration debt:
+  [001] litchi-iwa -> litchi-core
+  [002] litchi-iwa -> litchi-iwa-archive
+  [004] litchi-iwa -> litchi-iwa-common
+  [008] litchi-iwa -> litchi-iwa-index
+  [010] litchi-iwa -> litchi-iwa-protos
+  [012] litchi-iwa -> litchi-iwa-text
+  [013] litchi-iwa -> litchi-iwa-text-wire
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages

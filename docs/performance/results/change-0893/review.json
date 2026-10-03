@@ -1,0 +1,609 @@
+{
+  "cleanup": {
+    "failed_attempt_cleanup": {
+      "reason": "terminal dependency compilation failure: tmpfs user quota exceeded",
+      "receipt": {
+        "bytes": 511,
+        "mode": 436,
+        "path": "docs/performance/results/change-0893/failed-target-cleanup.json",
+        "sha256": "21b4886db8bed0a888dcfe85c0e14769b23c6a7a4c772f290174ee143c12da4d"
+      },
+      "removed": "/tmp/litchi-0893-quality",
+      "shared_targets_removed": false,
+      "source_changed": false,
+      "status": "pass"
+    },
+    "failed_tmp_target_absent": true,
+    "live_source_hashes_match": true,
+    "owned_worktrees_created": [],
+    "packet_pycache_absent": true,
+    "quality_gates_passed": 8,
+    "receipt": {
+      "bytes": 1052,
+      "mode": 436,
+      "path": "docs/performance/results/change-0893/cleanup.json",
+      "sha256": "b3b412ae62eb926d0765d69b6a8f42a0c1e8eb5a2134e38d27ecf9623f82bb52"
+    },
+    "removed_files": 3108,
+    "removed_logical_bytes": 1731254517,
+    "removed_root": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+    "shared_targets": "untouched",
+    "status": "pass",
+    "target_marker": {
+      "bytes": 42,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0893-quality/.owner-0893-quality",
+      "sha256": "6040b2ac0a21b1bcbe097f83fee6f587d0e369bb05c03b5b7665fcd9bd067d0c"
+    },
+    "terminal_quality_receipt": {
+      "bytes": 30139,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v3/quality-receipt.json",
+      "sha256": "0729e6fee3af916953ee1ee8dce0e7e635f76fbc50184ec11f4c6fee74d950b4"
+    },
+    "unrelated_worktrees": "untouched"
+  },
+  "documents": {
+    "docs/performance/0893-forced-worksheet-tolerance-guard.md": {
+      "bytes": 6071,
+      "mode": 436,
+      "path": "docs/performance/0893-forced-worksheet-tolerance-guard.md",
+      "sha256": "c17bac579f8ce6bad9dea8eef4cb2c5000a0067c29739c8e1eb3921a9ac3d4d5"
+    },
+    "docs/performance/BASELINE.md": {
+      "bytes": 466638,
+      "mode": 436,
+      "path": "docs/performance/BASELINE.md",
+      "sha256": "103fee96b402fe3be1839d18c41ebf7e5bd28bf52db0da0b459b55521077b6e7"
+    },
+    "docs/performance/HOTSPOTS.md": {
+      "bytes": 769335,
+      "mode": 436,
+      "path": "docs/performance/HOTSPOTS.md",
+      "sha256": "c2c2dd3b4b8a395aef9362f748b836d9949e583638856da75232d8bdc22301c4"
+    },
+    "docs/performance/REPORT.md": {
+      "bytes": 781563,
+      "mode": 436,
+      "path": "docs/performance/REPORT.md",
+      "sha256": "a36bafd17c71fde21591fc4483694abd596413b0b2e4a7df4b32a52b3dffab32"
+    },
+    "docs/performance/results/change-0893/README.md": {
+      "bytes": 4099,
+      "mode": 436,
+      "path": "docs/performance/results/change-0893/README.md",
+      "sha256": "e3f466d69d0a34a222d249a48ac8cd49fa02d0b09197fb8c16e13f41f8c7791e"
+    }
+  },
+  "findings": {
+    "blocking_findings": [],
+    "concrete_limitations": [
+      "The worksheet guard is outside timer, allocation-region, and process endpoint observations, but it can change whole-process RSS, profiler totals, and later allocator/high-water state.",
+      "Future paired candidate/base trials must use identical guard contracts and schedules; historical 0885/0891/0892 profiles remain old-contract evidence.",
+      "Selected-route controls exercise the public raw scanner and refusal ladder; they do not observe the enclosing SourceWorksheet runtime route, whose report keeps runtime_route_observed false.",
+      "The v1 quality failure was environmental tmpfs user-quota exhaustion before tests; v2 and v3 provide the passing formal gates."
+    ],
+    "performance_claim": null,
+    "production_eligibility": "unchanged"
+  },
+  "guard_evidence": {
+    "contract": "post-endpoint-per-worksheet-tolerance-v1",
+    "forced_worksheet_counts": [
+      4,
+      4,
+      4
+    ],
+    "forced_worksheet_guard_iterations": 4,
+    "forced_worksheet_tolerance_clean": [
+      true,
+      true,
+      true
+    ],
+    "measured_sample_indices": [
+      2,
+      0,
+      1
+    ],
+    "measured_sample_order": [
+      2,
+      0,
+      1
+    ],
+    "physical_cold_eligible": false,
+    "runtime_route_observed": false,
+    "source_version_stable": [
+      true,
+      true,
+      true
+    ],
+    "timing_scope": "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; corpus/oracle preparation, archive and census hashes, digest comparison, process/allocation endpoint snapshots, post-timing per-worksheet tolerance guard, aggregate tolerance report, post-guard source-freshness fence, handle retention, and drops are outside",
+    "warmup_forced_worksheet_counts": [
+      4
+    ],
+    "warmup_forced_worksheet_tolerance_clean": [
+      true
+    ]
+  },
+  "qualification": {
+    "historical_0892_immutable_input": "docs/performance/results/change-0892/capture/child-00/report.json",
+    "serialized_v3_report": {
+      "bytes": 14762,
+      "mode": 436,
+      "path": "docs/performance/results/change-0893/qualification-v3/report.json",
+      "sha256": "4a07f89b1c2d6a4769eb93cbbcb9da55cea70781894235ff68a2445afa539401"
+    },
+    "verifications": {
+      "qualification-after-cleanup": {
+        "historical_0892_guard_rejected": true,
+        "log": {
+          "bytes": 12581,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v3/logs/producer_full_cell.log",
+          "sha256": "d7aa69df27261737c8e82bffdca20a3fa0bd03e2bac3fa3f3714f690e4cc928b"
+        },
+        "negative_controls_rejected": [
+          "old_guard_contract",
+          "missing_guard_contract",
+          "short_measured_counts",
+          "unchecked_sheet",
+          "dirty_measured_report",
+          "nonboolean_clean",
+          "missing_warmup",
+          "dirty_warmup_report",
+          "wrong_guard_iterations",
+          "unstable_source",
+          "wrong_digest",
+          "invalid_sample_alignment"
+        ],
+        "performance_claim": null,
+        "report": {
+          "bytes": 14762,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-after-cleanup/report.json",
+          "sha256": "4a07f89b1c2d6a4769eb93cbbcb9da55cea70781894235ff68a2445afa539401"
+        },
+        "schema": "litchi.full-cell-guard-qualification-0893.v1",
+        "status": "pass",
+        "verification": {
+          "bytes": 1493,
+          "mode": 436,
+          "path": "docs/performance/results/change-0893/qualification-after-cleanup/verification.json",
+          "sha256": "8ead1684a3d8be8b3b318d4db46d8ae22c4011acbdf78f52c87d862fefeab3ae"
+        },
+        "verifier": {
+          "bytes": 6732,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/verify_guard.py",
+          "sha256": "a5e0f7e57abfeabf95b3bfe59765a50a23f3e121c6f31ba957ff990229fade83"
+        }
+      },
+      "qualification-v2": {
+        "historical_0892_guard_rejected": true,
+        "log": {
+          "bytes": 20349,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v2/logs/producer_full_cell.log",
+          "sha256": "ec43769a8451cb44b5a64e84309125cb69f6ce090612f6bfa0bd36de11f4a851"
+        },
+        "negative_controls_rejected": [
+          "old_guard_contract",
+          "missing_guard_contract",
+          "short_measured_counts",
+          "unchecked_sheet",
+          "dirty_measured_report",
+          "nonboolean_clean",
+          "missing_warmup",
+          "dirty_warmup_report",
+          "wrong_guard_iterations",
+          "unstable_source",
+          "wrong_digest",
+          "invalid_sample_alignment"
+        ],
+        "performance_claim": null,
+        "report": {
+          "bytes": 14747,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-v2/report.json",
+          "sha256": "2c3f5af94b5472093b115c006f0f9b8f22f8b170393a5f25b85d89b07a7eb060"
+        },
+        "schema": "litchi.full-cell-guard-qualification-0893.v1",
+        "status": "pass",
+        "verification": {
+          "bytes": 1482,
+          "mode": 436,
+          "path": "docs/performance/results/change-0893/qualification-v2/verification.json",
+          "sha256": "ba264450e610f2db9f85d4c42780bdff2aadc98aa5d5a029b7bf476e18ba9967"
+        },
+        "verifier": {
+          "bytes": 6732,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/verify_guard.py",
+          "sha256": "a5e0f7e57abfeabf95b3bfe59765a50a23f3e121c6f31ba957ff990229fade83"
+        }
+      },
+      "qualification-v3": {
+        "historical_0892_guard_rejected": true,
+        "log": {
+          "bytes": 12581,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v3/logs/producer_full_cell.log",
+          "sha256": "d7aa69df27261737c8e82bffdca20a3fa0bd03e2bac3fa3f3714f690e4cc928b"
+        },
+        "negative_controls_rejected": [
+          "old_guard_contract",
+          "missing_guard_contract",
+          "short_measured_counts",
+          "unchecked_sheet",
+          "dirty_measured_report",
+          "nonboolean_clean",
+          "missing_warmup",
+          "dirty_warmup_report",
+          "wrong_guard_iterations",
+          "unstable_source",
+          "wrong_digest",
+          "invalid_sample_alignment"
+        ],
+        "performance_claim": null,
+        "report": {
+          "bytes": 14762,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-v3/report.json",
+          "sha256": "4a07f89b1c2d6a4769eb93cbbcb9da55cea70781894235ff68a2445afa539401"
+        },
+        "schema": "litchi.full-cell-guard-qualification-0893.v1",
+        "status": "pass",
+        "verification": {
+          "bytes": 1482,
+          "mode": 436,
+          "path": "docs/performance/results/change-0893/qualification-v3/verification.json",
+          "sha256": "8fc95a8579817a9340cbaec31b045326353a6e4e327f01ce2fafd30de8c4b034"
+        },
+        "verifier": {
+          "bytes": 6732,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/verify_guard.py",
+          "sha256": "a5e0f7e57abfeabf95b3bfe59765a50a23f3e121c6f31ba957ff990229fade83"
+        }
+      }
+    }
+  },
+  "quality": {
+    "quality-v1": {
+      "affected_source_paths": [
+        "tools/perf-baseline/src/producer_shape.rs",
+        "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "affected_sources_after": [
+        {
+          "bytes": 142118,
+          "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+          "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+        },
+        {
+          "bytes": 4493,
+          "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+          "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+        },
+        {
+          "bytes": 14188,
+          "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+          "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+        }
+      ],
+      "affected_sources_before": [
+        {
+          "bytes": 142118,
+          "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+          "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+        },
+        {
+          "bytes": 4493,
+          "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+          "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+        },
+        {
+          "bytes": 14188,
+          "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+          "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+        }
+      ],
+      "commands": [
+        {
+          "failures": [],
+          "name": "rustfmt_changed_sources",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [
+            "nonzero_exit",
+            "no_positive_test_count"
+          ],
+          "name": "producer_full_cell",
+          "pass": false,
+          "passed_count": 0,
+          "returncode": 101
+        }
+      ],
+      "failures": [
+        "producer_full_cell"
+      ],
+      "git_diff_after_sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a",
+      "git_diff_before_sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a",
+      "receipt": {
+        "bytes": 15601,
+        "mode": 436,
+        "path": "docs/performance/results/change-0893/attempts/quality-v1/quality-receipt.json",
+        "sha256": "4d672f988c014e94d2b0b034868e3b7141ab4c630c30b8f655cc3677059048e8"
+      },
+      "source_head_after": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+      "source_head_before": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+      "status": "fail"
+    },
+    "quality-v2": {
+      "affected_source_paths": [
+        "tools/perf-baseline/src/producer_shape.rs",
+        "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "affected_sources_after": [
+        {
+          "bytes": 142118,
+          "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+          "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+        },
+        {
+          "bytes": 4493,
+          "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+          "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+        },
+        {
+          "bytes": 14188,
+          "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+          "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+        }
+      ],
+      "affected_sources_before": [
+        {
+          "bytes": 142118,
+          "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+          "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+        },
+        {
+          "bytes": 4493,
+          "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+          "sha256": "454bce76d4f4fb915a7a89e543ac44ed1957bf373b6b8e1fa1dee15251852178"
+        },
+        {
+          "bytes": 14188,
+          "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+          "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+        }
+      ],
+      "commands": [
+        {
+          "failures": [],
+          "name": "rustfmt_changed_sources",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_full_cell",
+          "pass": true,
+          "passed_count": 4,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_shape_selected_route_tests",
+          "pass": true,
+          "passed_count": 3,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_shape_full_cell_guard_tests",
+          "pass": true,
+          "passed_count": 2,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_shape_tests",
+          "pass": true,
+          "passed_count": 17,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "cargo_clippy",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "cargo_doc",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "crate_boundaries",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        }
+      ],
+      "failures": [],
+      "git_diff_after_sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a",
+      "git_diff_before_sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a",
+      "receipt": {
+        "bytes": 30141,
+        "mode": 436,
+        "path": "docs/performance/results/change-0893/attempts/quality-v2/quality-receipt.json",
+        "sha256": "55bc8acd2ee23825fec778b41c9f3193b7a23356bbb01025a574d6c9ed6ef591"
+      },
+      "source_head_after": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+      "source_head_before": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+      "status": "pass"
+    },
+    "quality-v3": {
+      "affected_source_paths": [
+        "tools/perf-baseline/src/producer_shape.rs",
+        "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+      ],
+      "affected_sources_after": [
+        {
+          "bytes": 142118,
+          "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+          "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+        },
+        {
+          "bytes": 4882,
+          "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+          "sha256": "645d9aeafc54d6a9febdc0cf86cfa8d43a66c378b1d3e466a47abc0d68accccd"
+        },
+        {
+          "bytes": 14188,
+          "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+          "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+        }
+      ],
+      "affected_sources_before": [
+        {
+          "bytes": 142118,
+          "relative_path": "tools/perf-baseline/src/producer_shape.rs",
+          "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+        },
+        {
+          "bytes": 4882,
+          "relative_path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+          "sha256": "645d9aeafc54d6a9febdc0cf86cfa8d43a66c378b1d3e466a47abc0d68accccd"
+        },
+        {
+          "bytes": 14188,
+          "relative_path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+          "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+        }
+      ],
+      "commands": [
+        {
+          "failures": [],
+          "name": "rustfmt_changed_sources",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_full_cell",
+          "pass": true,
+          "passed_count": 4,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_shape_selected_route_tests",
+          "pass": true,
+          "passed_count": 3,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_shape_full_cell_guard_tests",
+          "pass": true,
+          "passed_count": 2,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "producer_shape_tests",
+          "pass": true,
+          "passed_count": 17,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "cargo_clippy",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "cargo_doc",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        },
+        {
+          "failures": [],
+          "name": "crate_boundaries",
+          "pass": true,
+          "passed_count": null,
+          "returncode": 0
+        }
+      ],
+      "failures": [],
+      "git_diff_after_sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a",
+      "git_diff_before_sha256": "3f255bcc21c28218b417eab70672813cd065b1f34bcb20ec222043852ed0b57a",
+      "receipt": {
+        "bytes": 30139,
+        "mode": 436,
+        "path": "docs/performance/results/change-0893/attempts/quality-v3/quality-receipt.json",
+        "sha256": "0729e6fee3af916953ee1ee8dce0e7e635f76fbc50184ec11f4c6fee74d950b4"
+      },
+      "source_head_after": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+      "source_head_before": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+      "status": "pass"
+    }
+  },
+  "reviewed_without_new_workload_or_build": true,
+  "reviewer": "/root/guard_review_0893",
+  "schema": "litchi.full-cell-guard-independent-review-0893.v1",
+  "source": {
+    "affected_rust_sources": [
+      "tools/perf-baseline/src/producer_shape.rs",
+      "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+      "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+    ],
+    "expected_head_from_quality": "1e5120f0818b754c31f25d6c1b033269600e38f6",
+    "files": {
+      "docs/performance/results/change-0893/validate.py": {
+        "bytes": 20746,
+        "mode": 436,
+        "path": "docs/performance/results/change-0893/validate.py",
+        "sha256": "ee2c3f8fd9aec8ac39b4887e697aee6ca8934081251d871fa93929216f80ab96"
+      },
+      "docs/performance/results/change-0893/verify_guard.py": {
+        "bytes": 6732,
+        "mode": 436,
+        "path": "docs/performance/results/change-0893/verify_guard.py",
+        "sha256": "a5e0f7e57abfeabf95b3bfe59765a50a23f3e121c6f31ba957ff990229fade83"
+      },
+      "tools/perf-baseline/src/producer_shape.rs": {
+        "bytes": 142118,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      },
+      "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs": {
+        "bytes": 4882,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+        "sha256": "645d9aeafc54d6a9febdc0cf86cfa8d43a66c378b1d3e466a47abc0d68accccd"
+      },
+      "tools/perf-baseline/src/producer_shape/selected_route_tests.rs": {
+        "bytes": 14188,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+        "sha256": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a"
+      }
+    },
+    "head_matches_quality": true,
+    "helper_sources": [
+      "docs/performance/results/change-0893/validate.py",
+      "docs/performance/results/change-0893/verify_guard.py"
+    ],
+    "observed_head": "1e5120f0818b754c31f25d6c1b033269600e38f6"
+  },
+  "status": "pass"
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "litchi.guard-exploration-note-0893.v1",
+  "status": "reported-not-qualification",
+  "agent": "/root/full_scan_guard_0893",
+  "coordination_deviation": "Agent ran exploratory dev Cargo commands despite root no-build instruction; no result is used as a sealed quality gate.",
+  "workdir": "/home/zhuhe/code/litchi",
+  "environment": "agent reports no overrides; full environment and timestamps not retained",
+  "target": "tools/perf-baseline/target (shared; untouched by cleanup)",
+  "commands_reported": [
+    "cargo test --manifest-path tools/perf-baseline/Cargo.toml producer_full_cell_scan_runner_visits_every_stored_cell -- --nocapture",
+    "cargo test --manifest-path tools/perf-baseline/Cargo.toml forced_guard_rejects_unpublished_dirty_worksheet_after_clean_aggregate -- --nocapture",
+    "cargo test --manifest-path tools/perf-baseline/Cargo.toml forced_guard_propagates_malformed_worksheet_store_error -- --nocapture",
+    "cargo fmt --manifest-path tools/perf-baseline/Cargo.toml -- --check",
+    "cargo test --manifest-path tools/perf-baseline/Cargo.toml producer_shape::tests -- --test-threads=1",
+    "cargo test --manifest-path tools/perf-baseline/Cargo.toml full_cell_guard_tests -- --test-threads=1",
+    "cargo test --manifest-path tools/perf-baseline/Cargo.toml producer_shape:: -- --test-threads=1",
+    "cargo clippy --manifest-path tools/perf-baseline/Cargo.toml --lib --tests --no-deps -- -D warnings",
+    "rustfmt --edition 2024 tools/perf-baseline/src/producer_shape.rs tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs"
+  ],
+  "reported_sessions": {
+    "50747": "runner pass",
+    "34886": "existing producer 17 passed",
+    "40804": "full producer 21 passed, one failed",
+    "84955": "clippy passed"
+  },
+  "failed_test": "producer_shape::selected_route_tests::producer_prefix_malformed_dimension_remains_a_typed_scan_error",
+  "failure_text": "malformed prefix was converted into a selected result",
+  "resolution": "Test assumption was too strong: malformed dimension can be a capability refusal. Final test instead corrupts root XML and requires a typed MCE/XML error; formal fresh-source gates follow.",
+  "external_logs_retained": false,
+  "evidence_limit": "Agent report and conversation output only; no exact failed source snapshot or immutable log was retained. Formal attempts provide authoritative qualification.",
+  "owned_scratch_reported": [],
+  "performance_claim": null
+}

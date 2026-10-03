@@ -1,0 +1,28 @@
+{
+  "schema": "litchi.full-cell-guard-cleanup-0893.v1",
+  "status": "pass",
+  "removed_root": "/home/zhuhe/code/litchi/target/litchi-0893-quality",
+  "files": 3108,
+  "logical_bytes": 1731254517,
+  "target_marker": {
+    "bytes": 42,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0893-quality/.owner-0893-quality",
+    "sha256": "6040b2ac0a21b1bcbe097f83fee6f587d0e369bb05c03b5b7665fcd9bd067d0c"
+  },
+  "terminal_quality_receipt": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v3/quality-receipt.json",
+    "bytes": 30139,
+    "sha256": "0729e6fee3af916953ee1ee8dce0e7e635f76fbc50184ec11f4c6fee74d950b4"
+  },
+  "quality_gates_passed": 8,
+  "live_source_hashes_match": true,
+  "owned_worktrees_created": [],
+  "failed_tmp_target_absent": true,
+  "packet_pycache_absent": true,
+  "shared_targets": "untouched",
+  "unrelated_worktrees": "untouched",
+  "evidence": "logs/source snapshots/reports/receipts retained",
+  "utc": "2026-10-03T21:00:00.258276+00:00"
+}

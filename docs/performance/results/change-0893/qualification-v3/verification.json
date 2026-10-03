@@ -1,0 +1,42 @@
+{
+  "checked": {
+    "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+    "measured_iterations": 3,
+    "warmup_iterations": 1,
+    "worksheets_per_iteration": 4
+  },
+  "historical_0892_guard_rejected": true,
+  "log": {
+    "bytes": 12581,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/attempts/quality-v3/logs/producer_full_cell.log",
+    "sha256": "d7aa69df27261737c8e82bffdca20a3fa0bd03e2bac3fa3f3714f690e4cc928b"
+  },
+  "negative_controls_rejected": [
+    "old_guard_contract",
+    "missing_guard_contract",
+    "short_measured_counts",
+    "unchecked_sheet",
+    "dirty_measured_report",
+    "nonboolean_clean",
+    "missing_warmup",
+    "dirty_warmup_report",
+    "wrong_guard_iterations",
+    "unstable_source",
+    "wrong_digest",
+    "invalid_sample_alignment"
+  ],
+  "performance_claim": null,
+  "report": {
+    "bytes": 14762,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-v3/report.json",
+    "sha256": "4a07f89b1c2d6a4769eb93cbbcb9da55cea70781894235ff68a2445afa539401"
+  },
+  "schema": "litchi.full-cell-guard-qualification-0893.v1",
+  "scope": "Debug test report semantic/guard evidence; elapsed and process values are not performance measurements.",
+  "status": "pass",
+  "verifier": {
+    "bytes": 6732,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/verify_guard.py",
+    "sha256": "a5e0f7e57abfeabf95b3bfe59765a50a23f3e121c6f31ba957ff990229fade83"
+  }
+}

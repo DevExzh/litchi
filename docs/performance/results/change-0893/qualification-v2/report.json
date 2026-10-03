@@ -1,0 +1,501 @@
+{
+  "case": "xlsx_producer_medium_source_full_cell_scan",
+  "corpus": {
+    "archive_bytes": 22739,
+    "archive_member_count": 12,
+    "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+    "compression": "deflate",
+    "entry_bytes": 4,
+    "entry_count": 4096,
+    "generator": "litchi-xlsx-producer-shape-v1",
+    "name": "xlsx-producer-medium-read",
+    "package_format": "XLSX/OPC/ZIP",
+    "payload_kind": "producer-shape-markup-compatibility-grid",
+    "shape": "producer-medium-read",
+    "target_entry": "Bench01!D17",
+    "target_payload_bytes": 37,
+    "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba",
+    "uncompressed_payload_bytes": 127499,
+    "xlsx": {
+      "columns_per_sheet": 32,
+      "one_percent_update_count": 0,
+      "rows_per_sheet": 32,
+      "sheet_count": 4,
+      "source_members": {
+        "shared_strings": "xl/sharedStrings.xml",
+        "styles": "xl/styles.xml",
+        "workbook": "xl/workbook.xml",
+        "worksheets": [
+          "xl/worksheets/sheet1.xml",
+          "xl/worksheets/sheet2.xml",
+          "xl/worksheets/sheet3.xml",
+          "xl/worksheets/sheet4.xml"
+        ]
+      }
+    }
+  },
+  "elapsed_ns": {
+    "confidence_interval_95": {
+      "lower": 55803808.98618674,
+      "method": "two-sided Student's t interval for the mean",
+      "upper": 55948609.01381326
+    },
+    "max": 55907736,
+    "mean": 55876209.0,
+    "min": 55850256,
+    "p50": 55870635,
+    "p95": 55907736,
+    "p99": 55907736,
+    "sample_order": [
+      2,
+      0,
+      1
+    ],
+    "samples": [
+      55850256,
+      55870635,
+      55907736
+    ],
+    "standard_deviation": 29142.57550389121,
+    "unit": "ns"
+  },
+  "operation_metrics": {
+    "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+    "cfb_phases": {
+      "atomic_publication": {
+        "elapsed_ns": {
+          "scope": "timed_cfb_phase_elapsed_ns",
+          "status": "not_applicable"
+        },
+        "logical_read_calls": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        },
+        "logical_read_requested_bytes": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        },
+        "logical_read_returned_bytes": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        }
+      },
+      "open": {
+        "elapsed_ns": {
+          "scope": "timed_cfb_phase_elapsed_ns",
+          "status": "not_applicable"
+        },
+        "logical_read_calls": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        },
+        "logical_read_requested_bytes": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        },
+        "logical_read_returned_bytes": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        }
+      },
+      "plan": {
+        "elapsed_ns": {
+          "scope": "timed_cfb_phase_elapsed_ns",
+          "status": "not_applicable"
+        },
+        "logical_read_calls": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        },
+        "logical_read_requested_bytes": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        },
+        "logical_read_returned_bytes": {
+          "scope": "timed_cfb_phase_logical_read_at",
+          "status": "not_applicable"
+        }
+      },
+      "status": "not_applicable"
+    },
+    "latency_claim": "comparable_timed_operation",
+    "materialization": {
+      "opc_parts": {
+        "scope": "logical_materialization_counter",
+        "status": "not_applicable"
+      },
+      "status": "not_applicable"
+    },
+    "process": {
+      "cancelled_write_bytes": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "clock_ticks_per_second": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          100,
+          100,
+          100
+        ]
+      },
+      "major_faults": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "minor_faults": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          8,
+          0
+        ]
+      },
+      "nonvoluntary_context_switches": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "peak_rss_bytes": {
+        "scope": "process_lifetime_high_water_after_not_operation_peak",
+        "status": "measured",
+        "values": [
+          53968896,
+          53911552,
+          53968896
+        ]
+      },
+      "rchar": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          1954,
+          1953,
+          1954
+        ]
+      },
+      "read_bytes": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "rss_delta_bytes": {
+        "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          32768,
+          0
+        ]
+      },
+      "status": "measured",
+      "syscr": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          18,
+          18,
+          18
+        ]
+      },
+      "syscw": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "system_cpu_ticks": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "user_cpu_ticks": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          5,
+          6,
+          6
+        ]
+      },
+      "voluntary_context_switches": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "wchar": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "write_bytes": {
+        "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead",
+        "status": "measured",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "publication": {
+      "changed_spans": {
+        "scope": "logical_publication_counter",
+        "status": "not_applicable"
+      },
+      "published_bytes": {
+        "scope": "logical_publication_counter",
+        "status": "not_applicable"
+      },
+      "status": "not_applicable"
+    },
+    "sample_count": 3,
+    "sample_indices": [
+      2,
+      0,
+      1
+    ],
+    "sink": {
+      "accepted_bytes": {
+        "scope": "logical_sink_accepted_write_bytes",
+        "status": "not_applicable"
+      },
+      "largest_write": {
+        "scope": "logical_sink_largest_accepted_write",
+        "status": "not_applicable"
+      },
+      "output_bytes": {
+        "scope": "post_operation_output_length_not_sink_write_volume",
+        "status": "not_applicable"
+      },
+      "status": "not_applicable",
+      "write_calls": {
+        "scope": "logical_sink_accepted_write_calls",
+        "status": "not_applicable"
+      },
+      "write_size_buckets": {
+        "bytes_0": {
+          "scope": "logical_sink_accepted_write_size_bucket_counts",
+          "status": "not_applicable"
+        },
+        "bytes_16385_to_65536": {
+          "scope": "logical_sink_accepted_write_size_bucket_counts",
+          "status": "not_applicable"
+        },
+        "bytes_1_to_512": {
+          "scope": "logical_sink_accepted_write_size_bucket_counts",
+          "status": "not_applicable"
+        },
+        "bytes_4097_to_16384": {
+          "scope": "logical_sink_accepted_write_size_bucket_counts",
+          "status": "not_applicable"
+        },
+        "bytes_513_to_4096": {
+          "scope": "logical_sink_accepted_write_size_bucket_counts",
+          "status": "not_applicable"
+        },
+        "bytes_over_65536": {
+          "scope": "logical_sink_accepted_write_size_bucket_counts",
+          "status": "not_applicable"
+        },
+        "status": "not_applicable"
+      },
+      "write_status": "not_applicable"
+    },
+    "source": {
+      "compressed_bytes": {
+        "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+        "status": "not_applicable"
+      },
+      "counter_scope": "not_applicable_in_process_sink",
+      "decompressed_bytes": {
+        "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+        "status": "not_applicable"
+      },
+      "logical_read_calls": {
+        "scope": "operation_logical_read_at",
+        "status": "not_applicable"
+      },
+      "logical_read_largest_requested_bytes": {
+        "scope": "operation_logical_read_at",
+        "status": "not_applicable"
+      },
+      "logical_read_largest_returned_bytes": {
+        "scope": "operation_logical_read_at",
+        "status": "not_applicable"
+      },
+      "logical_read_pattern": {
+        "scope": "operation_logical_read_at_range_order_not_physical_io",
+        "status": "not_applicable"
+      },
+      "logical_read_requested_bytes": {
+        "scope": "operation_logical_read_at",
+        "status": "not_applicable"
+      },
+      "logical_read_returned_bytes": {
+        "scope": "operation_logical_read_at",
+        "status": "not_applicable"
+      },
+      "max_concurrent_reads": {
+        "scope": "operation_logical_read_at",
+        "status": "not_applicable"
+      },
+      "recompressed_bytes": {
+        "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+        "status": "not_applicable"
+      },
+      "status": "not_applicable"
+    }
+  },
+  "sink": null,
+  "source": {
+    "max_in_flight_reads": [],
+    "ordinary_payload_read_bytes": [],
+    "ordinary_payload_read_calls": [],
+    "producer_full_cell_scan": {
+      "archive_bytes": 22739,
+      "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+      "expected_cell_count": 4096,
+      "expected_numeric_count": 3686,
+      "expected_text_count": 410,
+      "forced_worksheet_counts": [
+        4,
+        4,
+        4
+      ],
+      "forced_worksheet_guard_iterations": 4,
+      "forced_worksheet_tolerance_clean": [
+        true,
+        true,
+        true
+      ],
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+      "implementation": "litchi_xlsx::SourceBackedWorkbook + SourceWorksheet::visit_cells",
+      "marker_refusal_census_sha256": "552c35c8b8f958de28792f00c1e9e831ae884471aa28b5b2a7a1479bd06c5207",
+      "observed_cell_counts": [
+        4096,
+        4096,
+        4096
+      ],
+      "observed_digest_sha256": [
+        "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+        "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+        "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b"
+      ],
+      "observed_numeric_counts": [
+        3686,
+        3686,
+        3686
+      ],
+      "observed_text_counts": [
+        410,
+        410,
+        410
+      ],
+      "oracle_digest_sha256": "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+      "physical_cold_eligible": false,
+      "runtime_route_observed": false,
+      "sample_indices": [
+        2,
+        0,
+        1
+      ],
+      "scenario": "open_plus_full_stored_cell_scan",
+      "shape": "producer-medium",
+      "source_type": "owned_positional_read_at",
+      "source_version_stable": [
+        true,
+        true,
+        true
+      ],
+      "timing_scope": "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; corpus/oracle preparation, archive and census hashes, digest comparison, process/allocation endpoint snapshots, post-timing per-worksheet tolerance guard, aggregate tolerance report, post-guard source-freshness fence, handle retention, and drops are outside",
+      "variant": "read",
+      "warmup_forced_worksheet_counts": [
+        4
+      ],
+      "warmup_forced_worksheet_tolerance_clean": [
+        true
+      ],
+      "worksheet_route_eligibility": [
+        {
+          "selected_cell_stream_ineligible_on_cols": true,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet": "xl/worksheets/sheet1.xml"
+        },
+        {
+          "selected_cell_stream_ineligible_on_cols": true,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet": "xl/worksheets/sheet2.xml"
+        },
+        {
+          "selected_cell_stream_ineligible_on_cols": true,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet": "xl/worksheets/sheet3.xml"
+        },
+        {
+          "selected_cell_stream_ineligible_on_cols": true,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet": "xl/worksheets/sheet4.xml"
+        }
+      ]
+    },
+    "read_bytes": [],
+    "read_calls": []
+  }
+}

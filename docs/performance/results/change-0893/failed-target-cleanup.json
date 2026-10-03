@@ -1,0 +1,13 @@
+{
+  "schema": "litchi.guard-failed-target-cleanup-0893.v1",
+  "status": "pass",
+  "removed": "/tmp/litchi-0893-quality",
+  "files": 1738,
+  "logical_bytes": 908676653,
+  "marker_sha256": "6040b2ac0a21b1bcbe097f83fee6f587d0e369bb05c03b5b7665fcd9bd067d0c",
+  "terminal_receipt": "attempts/quality-v1/quality-receipt.json",
+  "reason": "terminal dependency compilation failure: tmpfs user quota exceeded",
+  "source_changed": false,
+  "shared_targets_removed": false,
+  "utc": "2026-10-03T20:47:10.598239+00:00"
+}

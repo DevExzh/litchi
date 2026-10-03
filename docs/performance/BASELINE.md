@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0893 — force per-worksheet tolerance checks
+
+[0893](0893-forced-worksheet-tolerance-guard.md) strengthens the producer full-cell benchmark before a selected-route optimization: every worksheet report is forced after timing and metric endpoints, followed by aggregate and source-freshness checks. Versioned measured/warmup evidence rejects historical aggregate-only reports. Actual raw-scanner controls qualify the producer's metadata refusals. Production eligibility is unchanged; this is correctness evidence, with no new performance claim.
+
 ## 0892 — current producer XLSX profile and route audit
 
 [0892](0892-current-producer-full-cell-profile.md) refreshes five diagnostic processes / 6,020 measured scans after 0891. MCE accounts for 28.65–29.70% of native sampled-IP self periods and, separately, 46.46% of runner-scoped inclusive guest instructions. The static selected-route audit identifies `<sheetViews>` as the predicted first refusal and requires forced per-sheet tolerance checks before a streaming candidate. All captures and semantic replay pass; production is unchanged and no new latency claim is made.

@@ -68,8 +68,13 @@ const XLSX_PRODUCER_FULL_CELL_REVIEWED_NUMERIC_COUNT: u64 = 3_686;
 const XLSX_PRODUCER_FULL_CELL_REVIEWED_TEXT_COUNT: u64 = 410;
 const XLSX_PRODUCER_FULL_CELL_REVIEWED_DIGEST_SHA256: &str =
     "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b";
-const XLSX_PRODUCER_FULL_CELL_TIMING_SCOPE: &str = "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; corpus/oracle preparation, archive and census hashes, digest comparison, harness source-version checks, process/allocation endpoint snapshots, handle retention, and drops are outside";
+const XLSX_PRODUCER_FULL_CELL_TIMING_SCOPE: &str = "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; corpus/oracle preparation, archive and census hashes, digest comparison, process/allocation endpoint snapshots, post-timing per-worksheet tolerance guard, aggregate tolerance report, post-guard source-freshness fence, handle retention, and drops are outside";
 const XLSX_PRODUCER_FULL_CELL_SOURCE_TYPE: &str = "owned_positional_read_at";
+/// Version of the post-timing worksheet-tolerance guard recorded with every
+/// full-cell report.  A verifier must require this exact tag before accepting
+/// the report: older reports checked only the workbook aggregate, which can be
+/// clean before a lazily parsed worksheet store has been published.
+const XLSX_PRODUCER_FULL_CELL_GUARD_CONTRACT: &str = "post-endpoint-per-worksheet-tolerance-v1";
 
 /// Largest `--real-file` input this harness will read.  A caller-named file is
 /// still a bounded resource; the limit matches the XLSX planning guard's.
@@ -517,6 +522,8 @@ pub(crate) struct ProducerCorpus {
 /// original retained sample identities remain explicit in `sample_indices`.
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct ProducerFullCellScanSummary {
+    /// Explicit contract version for the post-timing worksheet guard.
+    pub(crate) guard_contract: &'static str,
     pub(crate) sample_indices: Vec<usize>,
     pub(crate) implementation: &'static str,
     pub(crate) scenario: &'static str,
@@ -538,6 +545,17 @@ pub(crate) struct ProducerFullCellScanSummary {
     pub(crate) timing_scope: &'static str,
     pub(crate) source_type: &'static str,
     pub(crate) source_version_stable: Vec<bool>,
+    /// Number of worksheet tolerance reports forced for each measured sample,
+    /// reordered with `sample_indices` and `elapsed_ns.sample_order`.
+    pub(crate) forced_worksheet_counts: Vec<u64>,
+    /// Every measured sample must have clean forced worksheet reports.
+    pub(crate) forced_worksheet_tolerance_clean: Vec<bool>,
+    /// The same guard evidence for warmups, retained in execution order so a
+    /// report proves the guard also ran before the measured samples.
+    pub(crate) warmup_forced_worksheet_counts: Vec<u64>,
+    pub(crate) warmup_forced_worksheet_tolerance_clean: Vec<bool>,
+    /// Total successful worksheet-guard completions, including warmups.
+    pub(crate) forced_worksheet_guard_iterations: usize,
     pub(crate) physical_cold_eligible: bool,
     pub(crate) runtime_route_observed: bool,
 }
@@ -2391,6 +2409,71 @@ fn producer_sheet_name(index: usize) -> Option<&'static str> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FullCellWorksheetGuardEvidence {
+    forced_worksheet_count: u64,
+    forced_worksheet_tolerance_clean: bool,
+}
+
+#[derive(Debug)]
+struct FullCellWorksheetToleranceFailure {
+    index: usize,
+    source: Box<dyn Error>,
+}
+
+impl std::fmt::Display for FullCellWorksheetToleranceFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "producer full-cell worksheet {} tolerance report failed: {}",
+            self.index, self.source
+        )
+    }
+}
+
+impl Error for FullCellWorksheetToleranceFailure {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+
+/// Materialize and inspect every worksheet tolerance report after the timed
+/// scan and its endpoint observations have completed.
+///
+/// `SourceBackedWorkbook::tolerance_report` is an aggregate over stores that
+/// have already been published.  A lazy worksheet can therefore be dirty
+/// while that aggregate is still clean.  The full-cell runner has already
+/// visited the cells, but this explicit pass makes the contract independent
+/// of the selected route and rejects both a report error and any recorded
+/// repair before the aggregate check and final source-version fence.
+fn force_full_cell_worksheet_tolerance_reports(
+    sheets: &[litchi_xlsx::SourceWorksheet],
+) -> Result<FullCellWorksheetGuardEvidence, Box<dyn Error>> {
+    let mut forced_worksheet_count = 0_u64;
+    for (index, sheet) in sheets.iter().enumerate() {
+        let report =
+            sheet
+                .tolerance_report()
+                .map_err(|error| FullCellWorksheetToleranceFailure {
+                    index,
+                    source: Box::new(error),
+                })?;
+        forced_worksheet_count = forced_worksheet_count
+            .checked_add(1)
+            .ok_or("producer full-cell worksheet guard count overflow")?;
+        if !report.is_clean() {
+            return Err(format!(
+                "producer full-cell worksheet {index} required leniency repairs: {report:?}"
+            )
+            .into());
+        }
+    }
+    Ok(FullCellWorksheetGuardEvidence {
+        forced_worksheet_count,
+        forced_worksheet_tolerance_clean: true,
+    })
+}
+
 fn run_xlsx_full_cell_scan(
     case: Case,
     corpus: &ProducerCorpus,
@@ -2416,6 +2499,11 @@ fn run_xlsx_full_cell_scan(
     let mut observed_digests = Vec::with_capacity(samples);
     let mut sample_indices = Vec::with_capacity(samples);
     let mut source_version_stable = Vec::with_capacity(samples);
+    let mut forced_worksheet_counts = Vec::with_capacity(samples);
+    let mut forced_worksheet_tolerance_clean = Vec::with_capacity(samples);
+    let mut warmup_forced_worksheet_counts = Vec::with_capacity(warmup_iterations);
+    let mut warmup_forced_worksheet_tolerance_clean = Vec::with_capacity(warmup_iterations);
+    let mut forced_worksheet_guard_iterations = 0_usize;
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         // The owned source and its identity are prepared before the clock.
@@ -2488,9 +2576,47 @@ fn run_xlsx_full_cell_scan(
         let (workbook, sheets, scanner) = timed.map_err(|error| {
             full_cell_scan_iteration_failure(iteration, warmup_iterations, error)
         })?;
-        // The source-version fence and aggregate tolerance report are
-        // harness checks after the timed workload. `visit_cells` already
-        // performs the production freshness fences around each worksheet.
+        // Keep the source-backed handles alive across endpoint observations and
+        // the complete post-timer oracle before releasing them.  The explicit
+        // worksheet guard is deliberately after the allocation/process
+        // endpoint snapshots above.
+        std::hint::black_box(&workbook);
+        std::hint::black_box(&sheets);
+        let worksheet_guard =
+            force_full_cell_worksheet_tolerance_reports(&sheets).map_err(|error| {
+                full_cell_scan_iteration_failure(iteration, warmup_iterations, error)
+            })?;
+        forced_worksheet_guard_iterations = forced_worksheet_guard_iterations
+            .checked_add(1)
+            .ok_or_else(|| {
+                full_cell_scan_iteration_failure(
+                    iteration,
+                    warmup_iterations,
+                    Box::new(std::io::Error::other(
+                        "producer full-cell worksheet guard iteration count overflow",
+                    )),
+                )
+            })?;
+        if iteration < warmup_iterations {
+            warmup_forced_worksheet_counts.push(worksheet_guard.forced_worksheet_count);
+            warmup_forced_worksheet_tolerance_clean
+                .push(worksheet_guard.forced_worksheet_tolerance_clean);
+        } else {
+            forced_worksheet_counts.push(worksheet_guard.forced_worksheet_count);
+            forced_worksheet_tolerance_clean.push(worksheet_guard.forced_worksheet_tolerance_clean);
+        }
+        let tolerance = workbook.tolerance_report();
+        if !tolerance.is_clean() {
+            return Err(full_cell_scan_iteration_failure(
+                iteration,
+                warmup_iterations,
+                Box::new(std::io::Error::other(format!(
+                    "producer full-cell scan required leniency repairs after worksheet guard: {tolerance:?}"
+                ))),
+            ));
+        }
+        // This final fence is intentionally after every forced worksheet report
+        // and the aggregate check, so source freshness covers the whole guard.
         let source_version_after = workbook.source_version().map_err(|error| {
             full_cell_scan_iteration_failure(iteration, warmup_iterations, Box::new(error))
         })?;
@@ -2499,25 +2625,11 @@ fn run_xlsx_full_cell_scan(
                 iteration,
                 warmup_iterations,
                 Box::new(std::io::Error::other(format!(
-                    "producer full-cell scan source version changed from {:?} to {:?}",
+                    "producer full-cell scan source version changed from {:?} to {:?} after worksheet guard",
                     source_version_before, source_version_after
                 ))),
             ));
         }
-        let tolerance = workbook.tolerance_report();
-        if !tolerance.is_clean() {
-            return Err(full_cell_scan_iteration_failure(
-                iteration,
-                warmup_iterations,
-                Box::new(std::io::Error::other(format!(
-                    "producer full-cell scan required leniency repairs: {tolerance:?}"
-                ))),
-            ));
-        }
-        // Keep the source-backed handles alive across endpoint observations and
-        // the complete post-timer oracle before releasing them.
-        std::hint::black_box(&workbook);
-        std::hint::black_box(&sheets);
         let (observed_count, observed_numeric, observed_text, observed_digest) = scanner.finish();
         if observed_count != oracle.expected_cell_count
             || observed_numeric != oracle.expected_numeric_count
@@ -2585,10 +2697,13 @@ fn run_xlsx_full_cell_scan(
     crate::reorder_sample_vector(&mut observed_text_counts, &sample_order)?;
     crate::reorder_sample_vector(&mut observed_digests, &sample_order)?;
     crate::reorder_sample_vector(&mut source_version_stable, &sample_order)?;
+    crate::reorder_sample_vector(&mut forced_worksheet_counts, &sample_order)?;
+    crate::reorder_sample_vector(&mut forced_worksheet_tolerance_clean, &sample_order)?;
     let operation_metrics =
         Some(operation_metrics::from_in_process_observations_without_sink(&observations)?);
     let source = crate::SourceSummary {
         producer_full_cell_scan: Some(Box::new(ProducerFullCellScanSummary {
+            guard_contract: XLSX_PRODUCER_FULL_CELL_GUARD_CONTRACT,
             sample_indices,
             implementation: "litchi_xlsx::SourceBackedWorkbook + SourceWorksheet::visit_cells",
             scenario: "open_plus_full_stored_cell_scan",
@@ -2610,6 +2725,11 @@ fn run_xlsx_full_cell_scan(
             timing_scope: XLSX_PRODUCER_FULL_CELL_TIMING_SCOPE,
             source_type: XLSX_PRODUCER_FULL_CELL_SOURCE_TYPE,
             source_version_stable,
+            forced_worksheet_counts,
+            forced_worksheet_tolerance_clean,
+            warmup_forced_worksheet_counts,
+            warmup_forced_worksheet_tolerance_clean,
+            forced_worksheet_guard_iterations,
             physical_cold_eligible: false,
             runtime_route_observed: false,
         })),
@@ -3230,8 +3350,45 @@ mod tests {
             vec![scan.oracle_digest_sha256.clone(); 3]
         );
         assert_eq!(scan.source_version_stable, vec![true; 3]);
+        assert_eq!(scan.guard_contract, XLSX_PRODUCER_FULL_CELL_GUARD_CONTRACT);
+        assert_eq!(scan.forced_worksheet_counts, vec![4; 3]);
+        assert_eq!(scan.forced_worksheet_tolerance_clean, vec![true; 3]);
+        assert_eq!(scan.warmup_forced_worksheet_counts, vec![4]);
+        assert_eq!(scan.warmup_forced_worksheet_tolerance_clean, vec![true]);
+        assert_eq!(scan.forced_worksheet_guard_iterations, 4);
         assert!(!scan.physical_cold_eligible);
         assert!(!scan.runtime_route_observed);
+        let serialized = serde_json::to_value(&result).expect("full-cell result serializes");
+        let serialized_scan = serialized
+            .get("source")
+            .and_then(|source| source.get("producer_full_cell_scan"))
+            .expect("serialized full-cell summary");
+        assert_eq!(
+            serialized_scan
+                .get("guard_contract")
+                .and_then(|value| value.as_str()),
+            Some(XLSX_PRODUCER_FULL_CELL_GUARD_CONTRACT)
+        );
+        assert_eq!(
+            serialized_scan
+                .get("forced_worksheet_counts")
+                .and_then(|value| value.as_array())
+                .map(Vec::len),
+            Some(3)
+        );
+        assert_eq!(
+            serialized_scan
+                .get("warmup_forced_worksheet_counts")
+                .and_then(|value| value.as_array())
+                .map(Vec::len),
+            Some(1)
+        );
+        // Keep one compact, independently consumable report in focused test
+        // output for the packet checker; the normal runner remains silent.
+        println!(
+            "0893_FULL_CELL_REPORT={}",
+            serde_json::to_string(&result).expect("full-cell result serializes compactly")
+        );
     }
 
     #[test]
@@ -3301,3 +3458,11 @@ mod tests {
         assert!(error.to_string().contains("--real-file"));
     }
 }
+
+#[cfg(test)]
+#[path = "producer_shape/full_cell_guard_tests.rs"]
+mod full_cell_guard_tests;
+
+#[cfg(test)]
+#[path = "producer_shape/selected_route_tests.rs"]
+mod selected_route_tests;

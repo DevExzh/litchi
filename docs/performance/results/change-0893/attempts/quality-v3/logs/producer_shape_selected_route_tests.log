@@ -1,0 +1,12 @@
+{"argv": ["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo", "test", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--locked", "--offline", "--lib", "producer_shape::selected_route_tests", "--", "--nocapture"], "cwd": "/home/zhuhe/code/litchi", "environment": {"CARGO_BUILD_JOBS": "4", "CARGO_HOME": "/home/zhuhe/.cargo", "CARGO_INCREMENTAL": "0", "CARGO_NET_OFFLINE": "true", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_RELEASE_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0", "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality", "HOME": "/home/zhuhe", "LANG": "C", "LC_ALL": "C", "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin", "RUSTDOCFLAGS": "-D warnings", "RUSTFLAGS": "", "RUSTUP_HOME": "/home/zhuhe/.rustup", "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu", "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0893-quality/tmp", "TZ": "UTC"}, "tool_versions": {"cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n", "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"}}
+
+    Finished `test` profile [unoptimized] target(s) in 0.07s
+     Running unittests src/lib.rs (target/litchi-0893-quality/debug/deps/litchi_perf_baseline-6df1e0eff5983357)
+
+running 3 tests
+test producer_shape::selected_route_tests::producer_malformed_prefix_remains_a_typed_scan_error ... ok
+test producer_shape::selected_route_tests::producer_medium_read_reports_the_first_selected_scanner_refusal_per_sheet ... ok
+test producer_shape::selected_route_tests::producer_medium_read_marker_removal_controls_reveal_downstream_refusals ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 581 filtered out; finished in 0.36s
+
