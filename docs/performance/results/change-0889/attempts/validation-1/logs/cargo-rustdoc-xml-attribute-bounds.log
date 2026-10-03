@@ -1,0 +1,6 @@
+ Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `dev` profile [unoptimized] target(s) in 4.24s
+   Generated /home/zhuhe/code/litchi/target/litchi-0889-validation/doc/xml_attribute_bounds/index.html
+cwd=/home/zhuhe/code/litchi
+argv=["cargo","rustdoc","--manifest-path","/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml","--locked","--offline","--bin","xml_attribute_bounds","--","-D","warnings"]
+

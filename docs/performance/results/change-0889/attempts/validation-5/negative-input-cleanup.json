@@ -1,0 +1,32 @@
+{
+  "archive": {
+    "bytes": 325446,
+    "member": "[Content_Types].xml",
+    "mutated_byte": 205,
+    "offset": 569,
+    "original_byte": 204,
+    "path": "attempts/validation-5/runtime/corrupt-member.xlsx",
+    "raw_read_error": null,
+    "sha256": "0a05b0607bf562ae0048695c460b36e1e4bda5cff78d784467a9fd6bb1fa393a"
+  },
+  "attempt": "attempts/validation-5",
+  "finished_utc": "2026-10-03T17:40:30.141417Z",
+  "removed": true,
+  "retained": {
+    "json": "attempts/validation-5/runtime/corrupt.json",
+    "json_bytes": 215735,
+    "json_sha256": "b270b0c3d772c48a3a8f9bb1c47ee47ddfebadda2df385a0e14f684b0f543c3c",
+    "log": "attempts/validation-5/logs/negative-corrupt-member.log",
+    "log_sha256": "97f1b298ceec76c5954662919ccc54fc0d9fde48f02604192a90b22650f8e948"
+  },
+  "schema": "litchi.mce-0889-negative-input-cleanup.v1",
+  "started_utc": "2026-10-03T17:40:30.131182Z",
+  "status": "pass",
+  "unreadable_archive": {
+    "bytes": 325446,
+    "path": "attempts/validation-5/runtime/unreadable/fixture.xlsx",
+    "restored_mode": "0o600",
+    "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be",
+    "source_fixture": "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx"
+  }
+}

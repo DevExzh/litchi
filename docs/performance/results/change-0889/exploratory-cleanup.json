@@ -1,0 +1,18 @@
+{
+  "schema": "litchi.mce-exploratory-cleanup-0889.v1",
+  "status": "pass",
+  "verified_absent": [
+    "/tmp/litchi-0889-controls.json",
+    "/tmp/litchi-0889-controls.err",
+    "/tmp/litchi-0889-runner-help.txt"
+  ],
+  "roles": [
+    "exploratory zero-generated control output",
+    "exploratory control stderr",
+    "runner help text"
+  ],
+  "verified_utc": "2026-10-03T17:31:03.064200+00:00",
+  "worktrees_created": 0,
+  "shared_build_cache_removed": false,
+  "canonical_packet_removed": false
+}

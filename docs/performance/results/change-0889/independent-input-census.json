@@ -1,0 +1,369 @@
+{
+  "schema": "litchi.mce-independent-input-census-0889.v1",
+  "reader": "Python zipfile; reads and CRC-validates each selected member",
+  "extensions": [
+    ".xml",
+    ".rels",
+    ".vml"
+  ],
+  "packages": [
+    {
+      "path": "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+      "bytes": 325446,
+      "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be",
+      "members": [
+        {
+          "name": "[Content_Types].xml",
+          "bytes": 3423,
+          "sha256": "89ad744dca7264143ff96d3b59300fcdfc7d0f924c73af771e2fa4dd05de6d3b"
+        },
+        {
+          "name": "_rels/.rels",
+          "bytes": 588,
+          "sha256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497"
+        },
+        {
+          "name": "docProps/app.xml",
+          "bytes": 1200,
+          "sha256": "f18c2d5f0b76905ba1649f7f69a4824685e1a92eedde504815e5ed50c66773dc"
+        },
+        {
+          "name": "docProps/core.xml",
+          "bytes": 658,
+          "sha256": "52fff6ad7ee953d7d7e3fb7bea44fb10502abf861a04eebde616b10ba7846018"
+        },
+        {
+          "name": "xl/_rels/workbook.xml.rels",
+          "bytes": 1688,
+          "sha256": "c247bc322852d0eca1b2f8e45935fa0f0b921380c999d673256bfeda52e79d8c"
+        },
+        {
+          "name": "xl/calcChain.xml",
+          "bytes": 160010,
+          "sha256": "691b46e412bb08faaa1060a197bfdda2a5e27577702d79ee411c1164c0ad0293"
+        },
+        {
+          "name": "xl/charts/_rels/chart1.xml.rels",
+          "bytes": 308,
+          "sha256": "a6ea7de414b2f73b71f981dc73b2d43b455b8e8028e4f28515529a57c4d697b3"
+        },
+        {
+          "name": "xl/charts/chart1.xml",
+          "bytes": 6881,
+          "sha256": "7de5d9944efda8f7f285335cef059ebec949b39a7ef94335b367602624696689"
+        },
+        {
+          "name": "xl/connections.xml",
+          "bytes": 620,
+          "sha256": "c1861d80663888d2c167d8ac5d0ecfb85aab25b85d4f9612813df19380b0fbb6"
+        },
+        {
+          "name": "xl/drawings/_rels/drawing1.xml.rels",
+          "bytes": 293,
+          "sha256": "b81851df8558c606f8f94bc8454fe26b5c88c6d0c0b0ae0ae4ba02e650793dc8"
+        },
+        {
+          "name": "xl/drawings/drawing1.xml",
+          "bytes": 1074,
+          "sha256": "c0eb223447302e7a6140e33a118b8c5e1dda619f6e0c50c976d0c62687ab78bf"
+        },
+        {
+          "name": "xl/externalLinks/_rels/externalLink1.xml.rels",
+          "bytes": 380,
+          "sha256": "a68cbe0f42719005c653f1448ce7cbdadd6e659a8cc09816af12fc8f1a91e081"
+        },
+        {
+          "name": "xl/externalLinks/externalLink1.xml",
+          "bytes": 984,
+          "sha256": "123bcf3846767bb8f9bacb268c6bd356610765bc0255b531718ee3f9702d7df3"
+        },
+        {
+          "name": "xl/queryTables/queryTable1.xml",
+          "bytes": 915,
+          "sha256": "d6e270940fbdba61d5569380549e8c3809b394322b224774359c88b9d31f1c4c"
+        },
+        {
+          "name": "xl/queryTables/queryTable2.xml",
+          "bytes": 1077,
+          "sha256": "3460d060ba6772e2e145ad5c7cf693b19cb13d5db128fa03b252442933cdc71e"
+        },
+        {
+          "name": "xl/queryTables/queryTable3.xml",
+          "bytes": 940,
+          "sha256": "64d1a336c5b18b9746131883b4ad20c6d0446af1e4d5b21127b35b68eeee5cca"
+        },
+        {
+          "name": "xl/sharedStrings.xml",
+          "bytes": 140145,
+          "sha256": "7fbf196495dd47b87e34d5bdb0784d6130ad2700b4c28d6f74d9e2cca0782137"
+        },
+        {
+          "name": "xl/styles.xml",
+          "bytes": 32927,
+          "sha256": "c57f06ee812d4e44932c4357877b33441bc1dcbb18208410e16cc4813541b2ca"
+        },
+        {
+          "name": "xl/tables/_rels/table1.xml.rels",
+          "bytes": 308,
+          "sha256": "765d562639d7f0520e3d17229f067ed341e02e72dba03ded4642da66ce789f83"
+        },
+        {
+          "name": "xl/tables/_rels/table2.xml.rels",
+          "bytes": 308,
+          "sha256": "6ab94e90383770ffcf059143b87a2e861f68774e348539971d08abccfb0b896c"
+        },
+        {
+          "name": "xl/tables/_rels/table3.xml.rels",
+          "bytes": 308,
+          "sha256": "8594f0b1372d98c7e7ded37434901174ead70cc827fb06da52fa04b26cd730dd"
+        },
+        {
+          "name": "xl/tables/table1.xml",
+          "bytes": 1373,
+          "sha256": "073dba02055ba115605e6587776d92dc229604b277a6e0cefeff092aed953902"
+        },
+        {
+          "name": "xl/tables/table2.xml",
+          "bytes": 1195,
+          "sha256": "1318b4cdfc9590147f5f240afd91835a5628b7c919f7e6276ed763d651266e57"
+        },
+        {
+          "name": "xl/tables/table3.xml",
+          "bytes": 1032,
+          "sha256": "43a8a95d28fdc85f248fdc46a2a6b8dcae70a262216fcb0bbf98e8179f6e0db9"
+        },
+        {
+          "name": "xl/theme/theme1.xml",
+          "bytes": 7139,
+          "sha256": "86ec2470fa58614325ef1b0480fcbf0eeb4f27a208e5c762df49166a71947988"
+        },
+        {
+          "name": "xl/theme/themeOverride1.xml",
+          "bytes": 6915,
+          "sha256": "6ebe6058fc93bb579a59fc86080cf716365a7807931eb77814d5da0cee60cf9f"
+        },
+        {
+          "name": "xl/workbook.xml",
+          "bytes": 2399,
+          "sha256": "d594c3b7bcb0c5ac9c48a25b7c941d1e1801f308087ab26c2b91b90fbdb76243"
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet1.xml.rels",
+          "bytes": 464,
+          "sha256": "046f319d2b01bf9529da901ae33cb1cf8c7c7d06395167875fa0c4add6bf34c3"
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet2.xml.rels",
+          "bytes": 322,
+          "sha256": "fe0fffb5ec78558e2b46557177888c220c2b7d2389c24965089ed5618d66be54"
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet3.xml.rels",
+          "bytes": 293,
+          "sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327"
+        },
+        {
+          "name": "xl/worksheets/_rels/sheet5.xml.rels",
+          "bytes": 429,
+          "sha256": "64b5cb68011ec21ca0ea50de220147ebe64cef3edfbddfcfeb82d62d0a59af4a"
+        },
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 40610,
+          "sha256": "fbb1565b99e115984b59555730b173211b7e31f04309a5f68c8d0a1714726644"
+        },
+        {
+          "name": "xl/worksheets/sheet2.xml",
+          "bytes": 455209,
+          "sha256": "1727aa57c9c3c621347e47f7e31cbaeb51b5ce4a75203df47647aed3dcb9f77b"
+        },
+        {
+          "name": "xl/worksheets/sheet3.xml",
+          "bytes": 1558391,
+          "sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce"
+        },
+        {
+          "name": "xl/worksheets/sheet4.xml",
+          "bytes": 7848,
+          "sha256": "aed9087a39fad1b0b327de8455be9a732978d23495a9ee5b625f2f6f2ba3a744"
+        },
+        {
+          "name": "xl/worksheets/sheet5.xml",
+          "bytes": 252504,
+          "sha256": "0b8f7f61be8d1603ce481e27623bead2bb916c7987b8155f3c325d329c76797e"
+        }
+      ]
+    },
+    {
+      "path": "test-data/ooxml/docx/drawing.docx",
+      "bytes": 95247,
+      "sha256": "5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8",
+      "members": [
+        {
+          "name": "[Content_Types].xml",
+          "bytes": 1560,
+          "sha256": "955da8074737d2fece42308082c058e90b457b5659456af4ddf7dfbacb242126"
+        },
+        {
+          "name": "_rels/.rels",
+          "bytes": 590,
+          "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"
+        },
+        {
+          "name": "docProps/app.xml",
+          "bytes": 5032,
+          "sha256": "60b68c3b134ed7f98e78f2dfcad2b60eda589fa0c9f12c0d164b860580ec8de1"
+        },
+        {
+          "name": "docProps/core.xml",
+          "bytes": 703,
+          "sha256": "d3154e2b99200dfb5b2c6232b76af9745e852ca99c53d652c55975863665195c"
+        },
+        {
+          "name": "word/_rels/document.xml.rels",
+          "bytes": 4546,
+          "sha256": "586fdd27576b082781160d07cc8fab344f71d4d328b1727364c0147fa321de1a"
+        },
+        {
+          "name": "word/document.xml",
+          "bytes": 288070,
+          "sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee"
+        },
+        {
+          "name": "word/fontTable.xml",
+          "bytes": 3012,
+          "sha256": "d5ed6e119ecbcb19aa5d72b82990dee3e6e98d1b1419a1c3809471947c61c731"
+        },
+        {
+          "name": "word/settings.xml",
+          "bytes": 2401,
+          "sha256": "43fcd4aa15f4074aab71884635d04d39120cdbec50d4712fe49dbfc2230ec53a"
+        },
+        {
+          "name": "word/styles.xml",
+          "bytes": 24719,
+          "sha256": "fa2dd70226c16fe9278aafa286ddc1344143d0ae1f756ee881b5cc15a815f1c5"
+        },
+        {
+          "name": "word/theme/theme1.xml",
+          "bytes": 7043,
+          "sha256": "705585663ba72fb917a0b66645256049e8a554fd77b0e06ab53131acddb5ec3e"
+        },
+        {
+          "name": "word/webSettings.xml",
+          "bytes": 11072,
+          "sha256": "82251f5a5bc89c524e1caeebfaceac628f28c234dab73c76de3017244b07ae7c"
+        }
+      ]
+    },
+    {
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88",
+      "members": [
+        {
+          "name": "[Content_Types].xml",
+          "bytes": 2079,
+          "sha256": "0ef4fbe7f84036b4963be096cc139f5cfd0124848c4fb892eeb1dc3f32f5d610"
+        },
+        {
+          "name": "_rels/.rels",
+          "bytes": 590,
+          "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"
+        },
+        {
+          "name": "customXml/_rels/item1.xml.rels",
+          "bytes": 296,
+          "sha256": "80482f86e196171d66001e0e74d1900408a3aaf2463e54005d251b5f2db9a0b0"
+        },
+        {
+          "name": "customXml/item1.xml",
+          "bytes": 3177,
+          "sha256": "683bcb920b3549f8e91115bbe83a35af0479922ec22748ec9c8c74a6a1626649"
+        },
+        {
+          "name": "customXml/itemProps1.xml",
+          "bytes": 333,
+          "sha256": "2cdb70037edb05582017b71de18d4db5094dd341f48f961c6455c5f525b324f9"
+        },
+        {
+          "name": "docProps/app.xml",
+          "bytes": 970,
+          "sha256": "c0771716099c45c6ecf9e96446e8b1c744c1859359ed8145a7c725258952a188"
+        },
+        {
+          "name": "docProps/core.xml",
+          "bytes": 621,
+          "sha256": "61c6b50a90567e5325669e09f0df22b5e7b2be7cf5246d04d0cbe61e5cfb91fe"
+        },
+        {
+          "name": "word/_rels/document.xml.rels",
+          "bytes": 1622,
+          "sha256": "a0bac0323ead9628a837cdad689cc559a1e8e5cbddb2f80156a59dab0447d8bf"
+        },
+        {
+          "name": "word/_rels/settings.xml.rels",
+          "bytes": 373,
+          "sha256": "48f4f74a2b747f121de78c6bf3c096b2aae16ab95af5f0f782afbbb8f37883f4"
+        },
+        {
+          "name": "word/document.xml",
+          "bytes": 4563,
+          "sha256": "6d1e81da3f65b54e676c4f21d9fcab8a7a716f84f40243a753129b9670a2982f"
+        },
+        {
+          "name": "word/endnotes.xml",
+          "bytes": 1530,
+          "sha256": "810a35859563fe6a4feb406e19791f70a6c487e4332c0e415fa72cc6c2abe741"
+        },
+        {
+          "name": "word/fontTable.xml",
+          "bytes": 3153,
+          "sha256": "ddf62b3345aeff04a2dbb36c4abe637f91e56098eaf4d1fa23f88ac5cd9948e1"
+        },
+        {
+          "name": "word/footer1.xml",
+          "bytes": 2001,
+          "sha256": "ce2f4fd30421f880e2d38d20013c8141e6e0403650dd8268051201d7e40abeab"
+        },
+        {
+          "name": "word/footnotes.xml",
+          "bytes": 1536,
+          "sha256": "c630c3ba2c6b4430b9024e5a17e87d5e5dc54997170edf833a0689c700addebe"
+        },
+        {
+          "name": "word/numbering.xml",
+          "bytes": 46532,
+          "sha256": "504f4220ee9ec6f124fd3ec18daf763873e0a12ddf6bc87c84a1741939c94982"
+        },
+        {
+          "name": "word/settings.xml",
+          "bytes": 17262,
+          "sha256": "7673c424e5caf93de822959d7ecceabb0a468addf775fb9d5d756699c711224b"
+        },
+        {
+          "name": "word/styles.xml",
+          "bytes": 173620,
+          "sha256": "abaa5f800e916cfcb11b0dae7f27c7a27df7e3f980d9439c8d309c6d6062e862"
+        },
+        {
+          "name": "word/stylesWithEffects.xml",
+          "bytes": 174373,
+          "sha256": "dab72c42614cea6d89751165d37ebe83d56e5a91ef2c0d63f58ad7d7f62433f1"
+        },
+        {
+          "name": "word/theme/theme1.xml",
+          "bytes": 6992,
+          "sha256": "bf4992e3fa7832e5c68fdbc4ec5189c8e5d347fef03c5ba2522ad704bde5078f"
+        },
+        {
+          "name": "word/webSettings.xml",
+          "bytes": 832,
+          "sha256": "adc66c7c59549a52898013b74e050600d5ee77d62bac6efebda080f884dcd9c2"
+        }
+      ]
+    }
+  ],
+  "package_count": 3,
+  "member_count": 67
+}

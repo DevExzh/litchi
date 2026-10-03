@@ -25,10 +25,12 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use litchi_ooxml_common::mce::{
-    Capabilities, Limits as MceLimits, SemanticEvent, StreamLimits, process_markup_compatibility,
-    process_markup_compatibility_stream, process_markup_compatibility_stream_with_observers,
+    Capabilities, Error as MceError, Limits as MceLimits, SemanticEvent, StreamError, StreamLimits,
+    process_markup_compatibility, process_markup_compatibility_stream,
+    process_markup_compatibility_stream_with_observers,
 };
 use litchi_opc::{BlobPart, PackURI};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::ArchiveReader;
 use xml_minifier::audit;
@@ -53,8 +55,12 @@ fn option<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
+    digest_hex(Sha256::digest(bytes).as_ref())
+}
+
+fn digest_hex(bytes: &[u8]) -> String {
     let mut output = String::with_capacity(64);
-    for byte in Sha256::digest(bytes) {
+    for byte in bytes {
         let _ = write!(output, "{byte:02x}");
     }
     output
@@ -508,6 +514,430 @@ fn run_audit_source(input: &[u8]) -> String {
 }
 
 // --------------------------------------------------------------------------
+// Qualification oracles
+// --------------------------------------------------------------------------
+
+/// The timing wrappers above intentionally keep their small, historical
+/// outcome strings.  Differential qualification uses the records below so a
+/// result is independently checkable: every byte-bearing field is length
+/// framed before hashing, reports are represented by named counters, and
+/// failures retain their public error category instead of only a Display
+/// string.  This avoids treating a timing digest as a complete semantic
+/// oracle.
+fn mce_limits_value(limits: &MceLimits) -> Value {
+    json!({
+        "max_input_bytes": limits.max_input_bytes,
+        "max_output_bytes": limits.max_output_bytes,
+        "max_depth": limits.max_depth,
+        "max_namespace_bindings": limits.max_namespace_bindings,
+        "max_directive_tokens": limits.max_directive_tokens,
+        "max_choices_per_alternate": limits.max_choices_per_alternate,
+        "max_attributes_per_element": limits.max_attributes_per_element,
+    })
+}
+
+fn stream_limits_value(limits: &StreamLimits) -> Value {
+    json!({
+        "processing": mce_limits_value(&limits.processing),
+        "max_events": limits.max_events,
+        "max_event_bytes": limits.max_event_bytes,
+        "max_attributes_per_event": limits.max_attributes_per_event,
+        "max_attribute_bytes_per_event": limits.max_attribute_bytes_per_event,
+        "max_context_bytes": limits.max_context_bytes,
+        "max_name_bytes": limits.max_name_bytes,
+    })
+}
+
+fn mce_report_value(report: &litchi_ooxml_common::mce::Report) -> Value {
+    json!({
+        "alternate_content_count": report.alternate_content_count,
+        "selected_choices": report.selected_choices,
+        "selected_fallbacks": report.selected_fallbacks,
+        "ignored_elements": report.ignored_elements,
+        "ignored_attributes": report.ignored_attributes,
+        "preserved_elements": report.preserved_elements,
+        "preserved_attributes": report.preserved_attributes,
+        "unwrapped_elements": report.unwrapped_elements,
+    })
+}
+
+fn stream_report_value(report: &litchi_ooxml_common::mce::StreamReport) -> Value {
+    json!({
+        "alternate_content_count": report.alternate_content_count,
+        "selected_choices": report.selected_choices,
+        "selected_fallbacks": report.selected_fallbacks,
+        "ignored_elements": report.ignored_elements,
+        "ignored_attributes": report.ignored_attributes,
+        "preserved_elements": report.preserved_elements,
+        "preserved_attributes": report.preserved_attributes,
+        "unwrapped_elements": report.unwrapped_elements,
+        "events": report.events,
+    })
+}
+
+fn mce_error_value(error: &MceError) -> Value {
+    match error {
+        MceError::NonConformant(message) => {
+            json!({"kind": "non_conformant", "message": message})
+        },
+        MceError::MustUnderstand(message) => {
+            json!({"kind": "must_understand", "message": message})
+        },
+        MceError::LimitExceeded(message) => {
+            json!({"kind": "limit_exceeded", "message": message})
+        },
+        MceError::Xml(message) => json!({"kind": "xml", "message": message}),
+        MceError::Allocation { resource, source } => json!({
+            "kind": "allocation",
+            "resource": resource,
+            "message": source.to_string(),
+        }),
+        _ => json!({
+            "kind": "unknown",
+            "message": error.to_string(),
+        }),
+    }
+}
+
+fn stream_error_value(error: &StreamError<Infallible, Infallible>) -> Value {
+    match error {
+        StreamError::Input {
+            error,
+            prior_mce_error,
+            raw_error,
+            active_error,
+        } => json!({
+            "kind": "input",
+            "error_kind": format!("{:?}", error.kind()),
+            "message": error.to_string(),
+            "prior_mce_error": prior_mce_error.as_ref().map(mce_error_value),
+            "raw_callback_error": raw_error.is_some(),
+            "active_callback_error": active_error.is_some(),
+        }),
+        StreamError::Mce {
+            error,
+            prior_mce_error,
+            raw_error,
+            active_error,
+        } => json!({
+            "kind": "mce",
+            "error": mce_error_value(error),
+            "prior_mce_error": prior_mce_error.as_ref().map(mce_error_value),
+            "raw_callback_error": raw_error.is_some(),
+            "active_callback_error": active_error.is_some(),
+        }),
+        StreamError::Callback {
+            raw_error,
+            active_error,
+        } => json!({
+            "kind": "callback",
+            "raw_callback_error": raw_error.is_some(),
+            "active_callback_error": active_error.is_some(),
+        }),
+        _ => json!({
+            "kind": "unknown",
+            "message": format!("{error}"),
+        }),
+    }
+}
+
+fn error_value_is_complete(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    if object.get("kind").and_then(Value::as_str) == Some("unknown") {
+        return false;
+    }
+    ["error", "prior_mce_error"].into_iter().all(|field| {
+        object
+            .get(field)
+            .is_none_or(|nested| nested.is_null() || error_value_is_complete(nested))
+    })
+}
+
+/// Add one unambiguous field to a digest.  A delimiter-concatenated textual
+/// signature can make `("a", "bc")` and `(“ab”, “c”)` collide; the length
+/// prefix makes every event field and every record boundary observable.
+fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
+fn hash_tag(hasher: &mut Sha256, tag: &'static [u8]) {
+    hash_field(hasher, tag);
+}
+
+fn hash_count(hasher: &mut Sha256, count: usize) {
+    hasher.update((count as u64).to_be_bytes());
+}
+
+fn hash_expanded_name(
+    hasher: &mut Sha256,
+    qualified_name: &[u8],
+    namespace: &str,
+    local_name: &str,
+) {
+    hash_field(hasher, qualified_name);
+    hash_field(hasher, namespace.as_bytes());
+    hash_field(hasher, local_name.as_bytes());
+}
+
+fn hash_raw_element(
+    hasher: &mut Sha256,
+    element: &litchi_ooxml_common::mce::RawElement<'_>,
+) -> bool {
+    let (kind, unknown) = match element.kind {
+        litchi_ooxml_common::mce::RawElementKind::Start => (b"start" as &[u8], false),
+        litchi_ooxml_common::mce::RawElementKind::Empty => (b"empty" as &[u8], false),
+        _ => (b"unknown" as &[u8], true),
+    };
+    hash_tag(hasher, kind);
+    hash_expanded_name(
+        hasher,
+        element.name(),
+        element.expanded_name.namespace.as_ref(),
+        &element.expanded_name.local_name,
+    );
+    hash_count(hasher, element.attrs().len());
+    for attribute in element.attrs() {
+        hash_expanded_name(
+            hasher,
+            attribute.name(),
+            attribute.expanded_name.namespace.as_ref(),
+            &attribute.expanded_name.local_name,
+        );
+        hash_field(hasher, attribute.value());
+        hash_field(hasher, attribute.decoded().as_bytes());
+    }
+    unknown
+}
+
+fn hash_semantic_element(
+    hasher: &mut Sha256,
+    element: &litchi_ooxml_common::mce::SemanticElement<'_>,
+) {
+    hash_expanded_name(
+        hasher,
+        element.name(),
+        element.expanded_name.namespace.as_ref(),
+        &element.expanded_name.local_name,
+    );
+    hash_count(hasher, element.attrs().len());
+    for attribute in element.attrs() {
+        hash_expanded_name(
+            hasher,
+            attribute.name(),
+            attribute.expanded_name.namespace.as_ref(),
+            &attribute.expanded_name.local_name,
+        );
+        hash_field(hasher, attribute.raw_value.as_ref());
+        hash_field(hasher, attribute.value().as_bytes());
+    }
+}
+
+fn hash_semantic_event(hasher: &mut Sha256, event: &SemanticEvent<'_>) -> bool {
+    match event {
+        SemanticEvent::Start(element) => {
+            hash_tag(hasher, b"start");
+            hash_semantic_element(hasher, element);
+        },
+        SemanticEvent::Empty(element) => {
+            hash_tag(hasher, b"empty");
+            hash_semantic_element(hasher, element);
+        },
+        SemanticEvent::End(element) => {
+            hash_tag(hasher, b"end");
+            hash_expanded_name(
+                hasher,
+                element.name(),
+                element.expanded_name.namespace.as_ref(),
+                &element.expanded_name.local_name,
+            );
+        },
+        SemanticEvent::Text(text) => {
+            hash_tag(hasher, b"text");
+            hash_field(hasher, text.raw.as_ref());
+            hash_field(hasher, text.text().as_bytes());
+        },
+        SemanticEvent::CData(text) => {
+            hash_tag(hasher, b"cdata");
+            hash_field(hasher, text.raw.as_ref());
+            hash_field(hasher, text.text().as_bytes());
+        },
+        SemanticEvent::Comment(text) => {
+            hash_tag(hasher, b"comment");
+            hash_field(hasher, text.raw.as_ref());
+            hash_field(hasher, text.text().as_bytes());
+        },
+        SemanticEvent::Decl(decl) => {
+            hash_tag(hasher, b"decl");
+            hash_field(hasher, decl.raw.as_ref());
+        },
+        SemanticEvent::GeneralRef(reference) => {
+            hash_tag(hasher, b"general_ref");
+            hash_field(hasher, reference.name.as_ref());
+        },
+        // SemanticEvent is non-exhaustive.  Keep a visible count and a stable
+        // record marker if a future library adds a variant before this
+        // harness is rebuilt to understand its fields.
+        _ => {
+            hash_tag(hasher, b"unknown");
+            return true;
+        },
+    }
+    false
+}
+
+fn codec_oracle(input: &[u8], capabilities: &Capabilities, capability_id: &str) -> (String, Value) {
+    codec_oracle_with_limits(input, capabilities, capability_id, MceLimits::default())
+}
+
+fn codec_oracle_with_limits(
+    input: &[u8],
+    capabilities: &Capabilities,
+    capability_id: &str,
+    limits: MceLimits,
+) -> (String, Value) {
+    let input_sha256 = sha256_hex(input);
+    match process_markup_compatibility(input, capabilities, &limits) {
+        Ok(output) => {
+            let output_sha256 = sha256_hex(output.xml.as_ref());
+            let legacy = format!("ok:{output_sha256}:{:?}", output.report);
+            let record = json!({
+                "kind": "mce_codec",
+                "capabilities": capability_id,
+                "limits": mce_limits_value(&limits),
+                "input": {"bytes": input.len(), "sha256": input_sha256},
+                "success": true,
+                "qualification_complete": true,
+                "output": {"bytes": output.xml.len(), "sha256": output_sha256},
+                "report": mce_report_value(&output.report),
+                "error": Value::Null,
+            });
+            (legacy, record)
+        },
+        Err(error) => {
+            let typed_error = mce_error_value(&error);
+            let legacy = format!("err:{error}");
+            let qualification_complete = error_value_is_complete(&typed_error);
+            let record = json!({
+                "kind": "mce_codec",
+                "capabilities": capability_id,
+                "limits": mce_limits_value(&limits),
+                "input": {"bytes": input.len(), "sha256": input_sha256},
+                "success": false,
+                "output": Value::Null,
+                "report": Value::Null,
+                "error": typed_error,
+                "qualification_complete": qualification_complete,
+            });
+            (legacy, record)
+        },
+    }
+}
+
+fn stream_oracle(
+    input: &[u8],
+    capabilities: &Capabilities,
+    capability_id: &str,
+) -> (String, Value) {
+    stream_oracle_with_limits(input, capabilities, capability_id, StreamLimits::default())
+}
+
+fn stream_oracle_with_limits(
+    input: &[u8],
+    capabilities: &Capabilities,
+    capability_id: &str,
+    limits: StreamLimits,
+) -> (String, Value) {
+    let mut raw_hasher = Sha256::new();
+    let mut semantic_hasher = Sha256::new();
+    let mut legacy_raw_hasher = Sha256::new();
+    let mut legacy_semantic_hasher = Sha256::new();
+    let mut raw_events = 0usize;
+    let mut semantic_events = 0usize;
+    let mut unknown_semantic_events = 0usize;
+    let mut unknown_raw_kinds = 0usize;
+    let mut cursor = Cursor::new(input);
+    let result = process_markup_compatibility_stream_with_observers(
+        &mut cursor,
+        capabilities,
+        &limits,
+        |element| {
+            raw_events += 1;
+            if hash_raw_element(&mut raw_hasher, &element) {
+                unknown_raw_kinds += 1;
+            }
+            let mut line = format!(
+                "{:?}|{}",
+                element.kind,
+                String::from_utf8_lossy(element.name())
+            );
+            let _ = write!(
+                line,
+                "|{}|{}",
+                element.expanded_name.namespace, element.expanded_name.local_name
+            );
+            for attribute in element.attrs() {
+                let _ = write!(
+                    line,
+                    "|{}={}|{}:{}",
+                    String::from_utf8_lossy(attribute.name()),
+                    attribute.decoded(),
+                    attribute.expanded_name.namespace,
+                    attribute.expanded_name.local_name
+                );
+            }
+            legacy_raw_hasher.update(line.as_bytes());
+            legacy_raw_hasher.update(b"\n");
+            Ok::<(), Infallible>(())
+        },
+        |event| {
+            semantic_events += 1;
+            if hash_semantic_event(&mut semantic_hasher, &event) {
+                unknown_semantic_events += 1;
+            }
+            legacy_semantic_hasher.update(event_signature(&event).as_bytes());
+            legacy_semantic_hasher.update(b"\n");
+            Ok::<(), Infallible>(())
+        },
+    );
+    let raw_sha256 = digest_hex(raw_hasher.finalize().as_ref());
+    let semantic_sha256 = digest_hex(semantic_hasher.finalize().as_ref());
+    // Preserve the historical timing-result strings exactly.  `stream_digest`
+    // predates the structured oracle and intentionally hashes the 32-byte
+    // digest once more; only the new framed fields use the direct digest.
+    let legacy_raw_sha256 = sha256_hex(legacy_raw_hasher.finalize().as_ref());
+    let legacy_semantic_sha256 = sha256_hex(legacy_semantic_hasher.finalize().as_ref());
+    let legacy = match &result {
+        Ok(report) => format!("ok:{legacy_semantic_sha256}:{legacy_raw_sha256}:{report:?}"),
+        Err(error) => format!("err:{error}:{legacy_semantic_sha256}:{legacy_raw_sha256}"),
+    };
+    let error_value = result.as_ref().err().map(stream_error_value);
+    let qualification_complete = unknown_raw_kinds == 0
+        && unknown_semantic_events == 0
+        && error_value.as_ref().is_none_or(error_value_is_complete);
+    let record = json!({
+        "kind": "mce_stream",
+        "capabilities": capability_id,
+        "limits": stream_limits_value(&limits),
+        "input": {"bytes": input.len(), "sha256": sha256_hex(input)},
+        "success": result.is_ok(),
+        "qualification_complete": qualification_complete,
+        "raw": {"events": raw_events, "sha256": raw_sha256},
+        "raw_unknown_kinds": unknown_raw_kinds,
+        "semantic": {
+            "events": semantic_events,
+            "unknown_events": unknown_semantic_events,
+            "sha256": semantic_sha256,
+        },
+        "report": result.as_ref().ok().map(stream_report_value),
+        "error": error_value,
+    });
+    (legacy, record)
+}
+
+// --------------------------------------------------------------------------
 // Differential
 // --------------------------------------------------------------------------
 
@@ -647,7 +1077,343 @@ fn audit_digest(input: &[u8]) -> [String; 3] {
     ]
 }
 
+struct PackageCandidate {
+    path: PathBuf,
+    first_scan_bytes: usize,
+    first_scan_sha256: String,
+}
+
+impl PackageCandidate {
+    fn identity_matches(&self, bytes: &[u8]) -> bool {
+        bytes.len() == self.first_scan_bytes && sha256_hex(bytes) == self.first_scan_sha256
+    }
+}
+
+struct PackageInput {
+    path: String,
+    bytes: usize,
+    sha256: String,
+    archive_member_count: usize,
+    selected_member_count: usize,
+    read_member_count: usize,
+    members: Vec<Value>,
+    member_receipts: Vec<Value>,
+}
+
+#[derive(Default)]
+struct InputAccounting {
+    packages: Vec<PackageInput>,
+    failures: Vec<Value>,
+    selected_member_count: usize,
+    read_member_count: usize,
+    seen_packages: std::collections::BTreeSet<PathBuf>,
+    scanned_file_count: usize,
+    excluded_files: Vec<Value>,
+}
+
+impl InputAccounting {
+    fn record_failure(
+        &mut self,
+        stage: &'static str,
+        path: &Path,
+        member: Option<&str>,
+        error: impl std::fmt::Display,
+    ) {
+        self.failures.push(json!({
+            "stage": stage,
+            "path": path.display().to_string(),
+            "member": member,
+            "error": error.to_string(),
+        }));
+    }
+
+    fn value(&self, roots: &[PathBuf]) -> Value {
+        let mut failure_counts = BTreeMap::<String, usize>::new();
+        for failure in &self.failures {
+            if let Some(stage) = failure.get("stage").and_then(Value::as_str) {
+                *failure_counts.entry(stage.to_owned()).or_default() += 1;
+            }
+        }
+        json!({
+            "roots": roots.iter().map(|root| root.display().to_string()).collect::<Vec<_>>(),
+            "packages": self.packages.iter().map(|package| json!({
+                "path": package.path,
+                "bytes": package.bytes,
+                "sha256": package.sha256,
+                "archive_member_count": package.archive_member_count,
+                "selected_member_count": package.selected_member_count,
+                "read_member_count": package.read_member_count,
+                "members": package.members,
+                "member_receipts": package.member_receipts,
+            })).collect::<Vec<_>>(),
+            "package_count": self.packages.len(),
+            "scanned_file_count": self.scanned_file_count,
+            "excluded_file_count": self.excluded_files.len(),
+            "excluded_files": self.excluded_files,
+            "selected_member_count": self.selected_member_count,
+            "read_member_count": self.read_member_count,
+            "read_failure_count": self.failures.len(),
+            "failure_counts": failure_counts,
+            "complete": self.failures.is_empty(),
+            "failures": self.failures,
+        })
+    }
+
+    fn record_excluded(&mut self, path: &Path, bytes: &[u8], reason: &'static str) {
+        self.excluded_files.push(json!({
+            "path": path.display().to_string(),
+            "bytes": bytes.len(),
+            "sha256": sha256_hex(bytes),
+            "reason": reason,
+        }));
+    }
+}
+
+fn is_xml_member(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.ends_with(".xml") || lower.ends_with(".rels") || lower.ends_with(".vml")
+}
+
+fn root_has_package(root: &Path, packages: &[PackageCandidate]) -> bool {
+    packages
+        .iter()
+        .any(|package| package.path == root || package.path.starts_with(root))
+}
+
+fn attribute_boundary_document(attribute_count: usize) -> String {
+    if attribute_count == 0 {
+        return "<r/>".to_owned();
+    }
+    let mut xml = format!(r#"<r xmlns:mc="{MC}""#);
+    for index in 0..attribute_count.saturating_sub(1) {
+        let _ = write!(xml, r#" a{index}="v""#);
+    }
+    xml.push_str("/>");
+    xml
+}
+
+fn semantic_control_document() -> String {
+    format!(
+        r#"<r xmlns:mc="{MC}" xmlns:i="urn:i" xmlns:w="urn:w"
+        mc:Ignorable="i" mc:ProcessContent="i:u"
+        mc:PreserveElements="i:keep" mc:PreserveAttributes="i:keep">
+        <mc:AlternateContent>
+          <mc:Choice Requires="i"><i:keep i:keep="v"/></mc:Choice>
+          <mc:Fallback><w:fallback/></mc:Fallback>
+        </mc:AlternateContent>
+        <i:u><i:child/></i:u>
+        <i:keep i:keep="v"/>
+        </r>"#
+    )
+}
+
+fn qualification_controls() -> (Vec<Value>, usize) {
+    let mut controls = Vec::new();
+    let mut failures = 0usize;
+    let attribute_cases = [
+        ("no_mce_zero_attributes", 0usize, 1024usize, "success"),
+        ("attributes_exact_one", 1, 1024, "success"),
+        ("attributes_exact_four", 4, 1024, "success"),
+        ("attributes_exact_five", 5, 1024, "success"),
+        ("attributes_exact_1024", 1024, 1024, "success"),
+        ("attributes_over_1024", 1025, 1024, "limit"),
+        ("attributes_exact_4096", 4096, 4096, "success"),
+        ("attributes_over_4096", 4097, 4096, "limit"),
+    ];
+    for (name, attribute_count, configured_limit, expectation) in attribute_cases {
+        let document = attribute_boundary_document(attribute_count);
+        let processing = MceLimits {
+            max_attributes_per_element: configured_limit,
+            ..MceLimits::default()
+        };
+        let (codec_legacy, codec) = codec_oracle_with_limits(
+            document.as_bytes(),
+            &Capabilities::new(),
+            "bare",
+            processing.clone(),
+        );
+        let stream_limits = StreamLimits::new(processing);
+        let (stream_legacy, stream) = stream_oracle_with_limits(
+            document.as_bytes(),
+            &Capabilities::new(),
+            "bare",
+            stream_limits,
+        );
+        let codec_expected = match expectation {
+            "success" => codec.get("success") == Some(&Value::Bool(true)),
+            "limit" => {
+                codec.get("success") == Some(&Value::Bool(false))
+                    && codec.get("error").and_then(|error| error.get("kind"))
+                        == Some(&Value::String("limit_exceeded".to_owned()))
+            },
+            _ => false,
+        };
+        let stream_expected = match expectation {
+            "success" => stream.get("success") == Some(&Value::Bool(true)),
+            "limit" => {
+                stream.get("success") == Some(&Value::Bool(false))
+                    && stream.get("error").and_then(|error| error.get("kind"))
+                        == Some(&Value::String("mce".to_owned()))
+                    && stream
+                        .get("error")
+                        .and_then(|error| error.get("error"))
+                        .and_then(|error| error.get("kind"))
+                        == Some(&Value::String("limit_exceeded".to_owned()))
+            },
+            _ => false,
+        };
+        let expected_codec_error_message = if expectation == "limit" {
+            Some("attributes per element")
+        } else {
+            None
+        };
+        let expected_stream_error_message = if expectation == "limit" {
+            Some(if configured_limit == 4096 {
+                "stream attributes per event"
+            } else {
+                "attributes per element"
+            })
+        } else {
+            None
+        };
+        let codec_error_message = codec
+            .get("error")
+            .and_then(|error| error.get("message"))
+            .and_then(Value::as_str);
+        let stream_error_message = stream
+            .get("error")
+            .and_then(|error| error.get("error"))
+            .and_then(|error| error.get("message"))
+            .and_then(Value::as_str);
+        let expectation_met = codec_expected
+            && stream_expected
+            && codec.get("qualification_complete") == Some(&Value::Bool(true))
+            && stream.get("qualification_complete") == Some(&Value::Bool(true))
+            && codec_error_message == expected_codec_error_message
+            && stream_error_message == expected_stream_error_message;
+        if !expectation_met {
+            failures += 1;
+        }
+        controls.push(json!({
+            "name": name,
+            "family": "attribute_cardinality",
+            "attribute_count_including_xmlns": attribute_count,
+            "configured_limit": configured_limit,
+            "expectation": expectation,
+            "expectation_met": expectation_met,
+            "codec_legacy": codec_legacy,
+            "stream_legacy": stream_legacy,
+            "codec": codec,
+            "stream": stream,
+        }));
+    }
+
+    let semantic_document = semantic_control_document();
+    for (name, capabilities, capability_id) in [
+        ("semantic_bare", Capabilities::new(), "bare"),
+        (
+            "semantic_understood_extension",
+            understanding("urn:i"),
+            "understood:urn:i",
+        ),
+    ] {
+        let (codec_legacy, codec) =
+            codec_oracle(semantic_document.as_bytes(), &capabilities, capability_id);
+        let (stream_legacy, stream) =
+            stream_oracle(semantic_document.as_bytes(), &capabilities, capability_id);
+        let understood = capability_id == "understood:urn:i";
+        let selected_choices = if understood { 1 } else { 0 };
+        let selected_fallbacks = if understood { 0 } else { 1 };
+        let ignored_elements = if understood { 0 } else { 1 };
+        let preserved_elements = if understood { 0 } else { 2 };
+        let unwrapped_elements = if understood { 0 } else { 1 };
+        let expectation_met = codec.get("qualification_complete") == Some(&Value::Bool(true))
+            && stream.get("qualification_complete") == Some(&Value::Bool(true))
+            && codec
+                .get("report")
+                .and_then(|report| report.get("selected_choices"))
+                == Some(&json!(selected_choices))
+            && codec
+                .get("report")
+                .and_then(|report| report.get("selected_fallbacks"))
+                == Some(&json!(selected_fallbacks))
+            && codec
+                .get("report")
+                .and_then(|report| report.get("ignored_elements"))
+                == Some(&json!(ignored_elements))
+            && codec
+                .get("report")
+                .and_then(|report| report.get("preserved_elements"))
+                == Some(&json!(preserved_elements))
+            && codec
+                .get("report")
+                .and_then(|report| report.get("unwrapped_elements"))
+                == Some(&json!(unwrapped_elements))
+            && stream
+                .get("report")
+                .and_then(|report| report.get("selected_choices"))
+                == Some(&json!(selected_choices))
+            && stream
+                .get("report")
+                .and_then(|report| report.get("selected_fallbacks"))
+                == Some(&json!(selected_fallbacks))
+            && stream
+                .get("report")
+                .and_then(|report| report.get("ignored_elements"))
+                == Some(&json!(ignored_elements))
+            && stream
+                .get("report")
+                .and_then(|report| report.get("preserved_elements"))
+                == Some(&json!(preserved_elements))
+            && stream
+                .get("report")
+                .and_then(|report| report.get("unwrapped_elements"))
+                == Some(&json!(unwrapped_elements));
+        if !expectation_met {
+            failures += 1;
+        }
+        controls.push(json!({
+            "name": name,
+            "family": "semantic_selection",
+            "expectation": "path_specific_codec_and_stream_records",
+            "expectation_met": expectation_met,
+            "codec_legacy": codec_legacy,
+            "stream_legacy": stream_legacy,
+            "codec": codec,
+            "stream": stream,
+        }));
+    }
+    (controls, failures)
+}
+
+fn validate_differential_args(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut index = 0usize;
+    let mut seen_options = std::collections::BTreeSet::new();
+    while index < args.len() {
+        let arg = &args[index];
+        if !arg.starts_with("--") {
+            index += 1;
+            continue;
+        }
+        if !matches!(arg.as_str(), "--json" | "--generated" | "--aliasing") {
+            return Err(format!("unknown differential option {arg}").into());
+        }
+        if !seen_options.insert(arg.as_str()) {
+            return Err(format!("duplicate differential option {arg}").into());
+        }
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| format!("differential option {arg} requires a value"))?;
+        if value.starts_with("--") {
+            return Err(format!("differential option {arg} requires a value").into());
+        }
+        index += 2;
+    }
+    Ok(())
+}
+
 fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
+    validate_differential_args(args)?;
     let json = option(args, "--json").ok_or("--json is required")?;
     let generated: usize = option(args, "--generated").unwrap_or("20000").parse()?;
     let mut roots = Vec::new();
@@ -667,69 +1433,155 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
     let baseline = Capabilities::ooxml_baseline();
     let bare = Capabilities::new();
     let mut packages = Vec::new();
+    let mut input = InputAccounting::default();
     for root in &roots {
-        collect_packages(root, &mut packages)?;
+        collect_packages(root, &mut packages, &mut input)?;
     }
-    packages.sort();
+    for root in &roots {
+        if !root_has_package(root, &packages) {
+            input.record_failure(
+                "no_ooxml_package",
+                root,
+                None,
+                "root contained no OOXML package",
+            );
+        }
+    }
+    packages.sort_by(|left, right| left.path.cmp(&right.path));
     let mut members = 0usize;
-    for path in &packages {
-        let Ok(bytes) = std::fs::read(path) else {
-            continue;
+    let mut oracles = BTreeMap::new();
+    for package in packages {
+        let path = package.path.clone();
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                input.record_failure("package_read", &path, None, error);
+                continue;
+            },
         };
-        let Ok(archive) = ArchiveReader::new(&bytes) else {
+        if !package.identity_matches(&bytes) {
+            input.record_failure(
+                "package_changed",
+                &path,
+                None,
+                format!(
+                    "package content changed after discovery (first scan {} bytes / {}, current {} bytes / {})",
+                    package.first_scan_bytes,
+                    package.first_scan_sha256,
+                    bytes.len(),
+                    sha256_hex(&bytes),
+                ),
+            );
             continue;
+        }
+        let archive = match ArchiveReader::new(&bytes) {
+            Ok(archive) => archive,
+            Err(error) => {
+                input.record_failure("package_open", &path, None, error);
+                continue;
+            },
         };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
+        let mut package_input = PackageInput {
+            path: path.display().to_string(),
+            bytes: bytes.len(),
+            sha256: sha256_hex(&bytes),
+            archive_member_count: names.len(),
+            selected_member_count: 0,
+            read_member_count: 0,
+            members: Vec::new(),
+            member_receipts: Vec::new(),
+        };
         for name in names {
-            let lower = name.to_ascii_lowercase();
-            if !(lower.ends_with(".xml") || lower.ends_with(".rels") || lower.ends_with(".vml")) {
+            if !is_xml_member(&name) {
                 continue;
             }
-            let Ok(member) = archive.read(&name) else {
-                continue;
+            package_input.selected_member_count += 1;
+            input.selected_member_count += 1;
+            let declared = match archive.metadata(&name) {
+                Ok(metadata) => Some(json!({
+                    "compressed_bytes": metadata.compressed_size(),
+                    "uncompressed_bytes": metadata.uncompressed_size(),
+                })),
+                Err(error) => {
+                    input.record_failure("member_metadata_read", &path, Some(&name), error);
+                    None
+                },
+            };
+            let member = match archive.read(&name) {
+                Ok(member) => member,
+                Err(error) => {
+                    package_input.member_receipts.push(json!({
+                        "name": name.clone(),
+                        "declared": declared,
+                        "read": false,
+                        "bytes": Value::Null,
+                        "sha256": Value::Null,
+                        "error": error.to_string(),
+                    }));
+                    input.record_failure("member_read", &path, Some(&name), error);
+                    continue;
+                },
             };
             members += 1;
+            package_input.read_member_count += 1;
+            input.read_member_count += 1;
+            package_input.members.push(json!({
+                "name": name.clone(),
+                "bytes": member.len(),
+                "sha256": sha256_hex(&member),
+            }));
+            package_input.member_receipts.push(json!({
+                "name": name.clone(),
+                "declared": declared,
+                "read": true,
+                "bytes": member.len(),
+                "sha256": sha256_hex(&member),
+            }));
             let key = format!("{}::{name}", path.display());
-            let mce = |capabilities: &Capabilities| match process_markup_compatibility(
-                &member,
-                capabilities,
-                &MceLimits::default(),
-            ) {
-                Ok(output) => format!("ok:{}:{:?}", sha256_hex(output.xml.as_ref()), output.report),
-                Err(error) => format!("err:{error}"),
-            };
-            results.insert(format!("{key}::mce_baseline"), mce(&baseline));
-            results.insert(format!("{key}::mce_bare"), mce(&bare));
-            results.insert(
-                format!("{key}::stream_baseline"),
-                stream_digest(&member, &baseline),
-            );
+            let (legacy, oracle) = codec_oracle(&member, &baseline, "ooxml_baseline");
+            results.insert(format!("{key}::mce_baseline"), legacy);
+            oracles.insert(format!("{key}::mce_baseline"), oracle);
+            let (legacy, oracle) = codec_oracle(&member, &bare, "bare");
+            results.insert(format!("{key}::mce_bare"), legacy);
+            oracles.insert(format!("{key}::mce_bare"), oracle);
+            let (legacy, oracle) = stream_oracle(&member, &baseline, "ooxml_baseline");
+            results.insert(format!("{key}::stream_baseline"), legacy);
+            oracles.insert(format!("{key}::stream_baseline"), oracle);
             let [source, authored, compact] = audit_digest(&member);
             results.insert(format!("{key}::audit_source"), source);
             results.insert(format!("{key}::audit_authored"), authored);
             results.insert(format!("{key}::audit_compact"), compact);
-            if lower.ends_with("styles.xml") {
+            if name.to_ascii_lowercase().ends_with("styles.xml") {
                 results.insert(format!("{key}::docx_styles"), styles_digest(&member));
             }
         }
+        package_input.members.sort_by(|left, right| {
+            left.get("name")
+                .and_then(Value::as_str)
+                .cmp(&right.get("name").and_then(Value::as_str))
+        });
+        package_input.member_receipts.sort_by(|left, right| {
+            left.get("name")
+                .and_then(Value::as_str)
+                .cmp(&right.get("name").and_then(Value::as_str))
+        });
+        input.packages.push(package_input);
     }
     for index in 0..generated {
         let document = generated_document(index as u64);
         let key = format!("generated::{index:06}");
-        for (label, capabilities) in [("bare", &bare), ("understood", &understanding_w())] {
-            let codec = match process_markup_compatibility(
-                document.as_bytes(),
-                capabilities,
-                &MceLimits::default(),
-            ) {
-                Ok(output) => format!("ok:{}:{:?}", sha256_hex(output.xml.as_ref()), output.report),
-                Err(error) => format!("err:{error}"),
-            };
-            results.insert(format!("{key}::mce_{label}"), codec);
-            results.insert(
-                format!("{key}::stream_{label}"),
-                stream_digest(document.as_bytes(), capabilities),
-            );
+        let understood = understanding_w();
+        for (label, capability_id, capabilities) in [
+            ("bare", "bare", &bare),
+            ("understood", "understood:urn:w", &understood),
+        ] {
+            let (legacy, oracle) = codec_oracle(document.as_bytes(), capabilities, capability_id);
+            results.insert(format!("{key}::mce_{label}"), legacy);
+            oracles.insert(format!("{key}::mce_{label}"), oracle);
+            let (legacy, oracle) = stream_oracle(document.as_bytes(), capabilities, capability_id);
+            results.insert(format!("{key}::stream_{label}"), legacy);
+            oracles.insert(format!("{key}::stream_{label}"), oracle);
         }
     }
     // Record 0771: documents whose prefixes alias one another and the fixed
@@ -739,34 +1591,50 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
     for index in 0..aliasing {
         let document = aliasing_document(index as u64);
         let key = format!("aliasing::{index:06}");
-        for (label, capabilities) in [
-            ("bare", &bare),
-            ("baseline", &baseline),
-            ("understood", &understood_a),
+        for (label, capability_id, capabilities) in [
+            ("bare", "bare", &bare),
+            ("baseline", "ooxml_baseline", &baseline),
+            ("understood", "understood:urn:a", &understood_a),
         ] {
-            let codec = match process_markup_compatibility(
-                document.as_bytes(),
-                capabilities,
-                &MceLimits::default(),
-            ) {
-                Ok(output) => format!("ok:{}:{:?}", sha256_hex(output.xml.as_ref()), output.report),
-                Err(error) => format!("err:{error}"),
-            };
-            results.insert(format!("{key}::mce_{label}"), codec);
-            results.insert(
-                format!("{key}::stream_{label}"),
-                stream_digest(document.as_bytes(), capabilities),
-            );
+            let (legacy, oracle) = codec_oracle(document.as_bytes(), capabilities, capability_id);
+            results.insert(format!("{key}::mce_{label}"), legacy);
+            oracles.insert(format!("{key}::mce_{label}"), oracle);
+            let (legacy, oracle) = stream_oracle(document.as_bytes(), capabilities, capability_id);
+            results.insert(format!("{key}::stream_{label}"), legacy);
+            oracles.insert(format!("{key}::stream_{label}"), oracle);
         }
     }
+    let (controls, control_failure_count) = qualification_controls();
+    let incomplete_oracle_count = oracles
+        .values()
+        .filter(|oracle| oracle.get("qualification_complete") == Some(&Value::Bool(false)))
+        .count();
     let summary = serde_json::json!({
-        "packages": packages.len(),
+        "schema": "litchi.xml-attribute-bounds.differential.v2",
+        "packages": input.packages.len(),
         "members": members,
         "generated": generated,
         "aliasing": aliasing,
         "results": results,
+        "oracles": oracles,
+        "input_inventory": input.value(&roots),
+        "controls": controls,
+        "qualification_complete": input.failures.is_empty()
+            && incomplete_oracle_count == 0
+            && control_failure_count == 0,
+        "incomplete_oracle_count": incomplete_oracle_count,
+        "control_failure_count": control_failure_count,
     });
     std::fs::write(json, serde_json::to_vec(&summary)?)?;
+    if !input.failures.is_empty() || incomplete_oracle_count != 0 || control_failure_count != 0 {
+        return Err(format!(
+            "differential qualification incomplete: {} input failures, {} incomplete oracles, {} control failures (see JSON report)",
+            input.failures.len(),
+            incomplete_oracle_count,
+            control_failure_count,
+        )
+        .into());
+    }
     Ok(())
 }
 
@@ -780,24 +1648,84 @@ fn understanding(namespace: &str) -> Capabilities {
     capabilities
 }
 
-fn collect_packages(root: &Path, packages: &mut Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
-    let metadata = std::fs::symlink_metadata(root)?;
+fn collect_packages(
+    root: &Path,
+    packages: &mut Vec<PackageCandidate>,
+    input: &mut InputAccounting,
+) -> Result<(), Box<dyn Error>> {
+    let metadata = match std::fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            input.record_failure("root_stat", root, None, error);
+            return Ok(());
+        },
+    };
     if metadata.is_dir() {
-        let mut entries: Vec<_> = std::fs::read_dir(root)?.filter_map(Result::ok).collect();
+        let mut entries = Vec::new();
+        let read_dir = match std::fs::read_dir(root) {
+            Ok(read_dir) => read_dir,
+            Err(error) => {
+                input.record_failure("directory_read", root, None, error);
+                return Ok(());
+            },
+        };
+        for entry in read_dir {
+            match entry {
+                Ok(entry) => entries.push(entry),
+                Err(error) => input.record_failure("directory_entry_read", root, None, error),
+            }
+        }
         entries.sort_by_key(std::fs::DirEntry::path);
         for entry in entries {
-            collect_packages(&entry.path(), packages)?;
+            collect_packages(&entry.path(), packages, input)?;
         }
     } else if metadata.is_file() {
-        let Ok(bytes) = std::fs::read(root) else {
-            return Ok(());
+        input.scanned_file_count += 1;
+        let bytes = match std::fs::read(root) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                input.record_failure("package_scan_read", root, None, error);
+                return Ok(());
+            },
         };
-        if bytes.starts_with(b"PK\x03\x04")
-            && ArchiveReader::new(&bytes)
-                .is_ok_and(|archive| archive.contains("[Content_Types].xml"))
-        {
-            packages.push(root.to_owned());
+        if bytes.starts_with(b"PK\x03\x04") {
+            match ArchiveReader::new(&bytes) {
+                Ok(archive) if archive.contains("[Content_Types].xml") => {
+                    let identity = match std::fs::canonicalize(root) {
+                        Ok(identity) => identity,
+                        Err(error) => {
+                            input.record_failure("package_identity", root, None, error);
+                            root.to_owned()
+                        },
+                    };
+                    if input.seen_packages.insert(identity) {
+                        packages.push(PackageCandidate {
+                            path: root.to_owned(),
+                            first_scan_bytes: bytes.len(),
+                            first_scan_sha256: sha256_hex(&bytes),
+                        });
+                    } else {
+                        input.record_failure(
+                            "duplicate_package",
+                            root,
+                            None,
+                            "package reached through overlapping input roots",
+                        );
+                    }
+                },
+                Ok(_) => input.record_excluded(root, &bytes, "zip_without_content_types"),
+                Err(error) => input.record_failure("package_open", root, None, error),
+            }
+        } else {
+            input.record_excluded(root, &bytes, "not_ooxml_zip");
         }
+    } else {
+        input.record_failure(
+            "unsupported_filesystem_entry",
+            root,
+            None,
+            "input entry is neither a directory nor a regular file",
+        );
     }
     Ok(())
 }
@@ -1176,3 +2104,15 @@ fn aliased_alternate(random: &mut Xorshift, xml: &mut String, depth: usize) {
     }
     let _ = write!(xml, "</{container}:AlternateContent>");
 }
+
+#[cfg(test)]
+#[path = "xml_attribute_bounds/qualification_tests.rs"]
+mod qualification_tests;
+
+#[cfg(test)]
+#[path = "xml_attribute_bounds/boundary_tests.rs"]
+mod boundary_tests;
+
+#[cfg(test)]
+#[path = "xml_attribute_bounds/input_tests.rs"]
+mod input_tests;

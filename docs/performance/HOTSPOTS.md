@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0889 — MCE control qualification
+
+[0889](0889-mce-control-qualification.md) adds explicit input-failure accounting, framed raw/semantic stream oracles, typed refusals, and focused semantic/resource-boundary controls. Repeated name expansion in the legacy MCE codec remains the next bounded hypothesis from 0886. The new qualification evidence supports evaluating that hypothesis; it does not establish a speedup or revive the rejected 0887 storage change.
+
 ## 0888 — executable residency and MCE control audit
 
 [0888](0888-executable-residency-and-mce-controls.md) separates the 0887 process-RSS flags from a claimed library heap regression: identical executable bytes under different file/loading conditions produce materially different peaks, mainly in executable-file mappings. Future RSS reviews need equal-content execution-file controls and separate anonymous/file evidence. A static MCE audit identifies real producer parts, boundary cases, incomplete timing oracles, and differential skip handling to qualify before the next candidate.

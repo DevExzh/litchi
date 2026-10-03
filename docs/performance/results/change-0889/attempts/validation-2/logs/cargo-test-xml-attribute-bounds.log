@@ -1,0 +1,35 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 0.62s
+     Running unittests src/bin/xml_attribute_bounds.rs (target/litchi-0889-validation/debug/deps/xml_attribute_bounds-6cdeabfb287e92fe)
+
+running 24 tests
+test boundary_tests::codec_and_stream_depth_limits_admit_exact_nesting_only ... ok
+test boundary_tests::codec_input_and_output_byte_limits_are_exact ... ok
+test boundary_tests::directive_token_budget_is_cumulative_and_exact ... ok
+test boundary_tests::namespace_budget_counts_new_prefixes_but_not_same_prefix_rebindings ... ok
+test boundary_tests::stream_context_bytes_are_exact_across_namespace_and_frame_state ... ok
+test boundary_tests::stream_event_count_and_raw_attribute_bytes_are_exact ... ok
+test boundary_tests::stream_input_bytes_are_distinct_from_event_bytes ... ok
+test boundary_tests::stream_qualified_and_expanded_name_bytes_share_one_exact_bound ... ok
+test input_tests::differential_rejects_unknown_and_incomplete_options ... ok
+test input_tests::explicit_non_package_root_is_detected_as_incomplete ... ok
+test input_tests::member_read_failures_are_retained_with_member_identity ... ok
+test input_tests::package_discovery_deduplicates_overlapping_input_paths ... ok
+test input_tests::package_identity_rejects_content_drift_without_mutating_a_fixture ... ok
+test input_tests::package_selection_matches_the_differential_extensions ... ok
+test input_tests::stream_oracle_preserves_legacy_digest_for_success_and_refusal ... ok
+test qualification_tests::codec_and_stream_oracles_match_alias_choice_and_namespace_reset_semantics ... ok
+test qualification_tests::codec_and_stream_oracles_match_hand_derived_directive_semantics ... ok
+test qualification_tests::codec_oracle_matches_a_hand_derived_output_and_report ... ok
+test qualification_tests::codec_oracle_retains_typed_must_understand_refusal ... ok
+test qualification_tests::registered_opaque_extension_preserves_lexical_mce_content ... ok
+test qualification_tests::registered_opaque_extension_retains_typed_name_and_duplicate_refusals ... ok
+test qualification_tests::stream_error_record_preserves_typed_primary_and_prior_mce_failures ... ok
+test qualification_tests::stream_oracle_keeps_raw_lexical_values_observable ... ok
+test qualification_tests::stream_oracle_matches_hand_derived_raw_semantic_transcripts ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+cwd=/home/zhuhe/code/litchi
+argv=["cargo","test","--manifest-path","/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml","--locked","--offline","--bin","xml_attribute_bounds","--","--test-threads=1"]
+

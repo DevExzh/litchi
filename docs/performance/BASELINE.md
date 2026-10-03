@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0889 — MCE control qualification
+
+[0889](0889-mce-control-qualification.md) strengthens differential input accounting and codec/stream semantic evidence. The independent real-input census contains three packages and 67 XML, relationship, and VML members. This is correctness qualification for the next MCE experiment, not a new latency baseline; 0885 remains the native reference.
+
 ## 0888 — executable residency and MCE control audit
 
 [0888](0888-executable-residency-and-mce-controls.md) adds 24 monitored diagnostic processes / 4,800 measured iterations and 2,181 raw mapping snapshots. Byte-identical executable copies materially change process RSS; executable-file residency dominates the observed difference. These are separate diagnostics, not replacement latency baselines or proof of a kernel mechanism. The 0887 candidate remains rejected on its failed native latency gate.

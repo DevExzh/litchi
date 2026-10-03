@@ -1,0 +1,399 @@
+{
+  "artifact_hashes": {
+    "documentation": [
+      {
+        "bytes": 8952,
+        "mode": 436,
+        "path": "docs/performance/0889-mce-control-qualification.md",
+        "sha256": "ca5c97eb92e90f659e6e879d63c23d5607312400c60ce224f635ec6683c2d49f"
+      },
+      {
+        "bytes": 464266,
+        "mode": 436,
+        "path": "docs/performance/BASELINE.md",
+        "sha256": "0437d0afd15c16ffa4cffc2fc18f596d50e9336554cbe23456c82cdbd4c42c65"
+      },
+      {
+        "bytes": 766976,
+        "mode": 436,
+        "path": "docs/performance/HOTSPOTS.md",
+        "sha256": "deac8436bbff6a3e7c77313a300ec58b7238f884ee5019f24dbbb85b0375f7c9"
+      },
+      {
+        "bytes": 778822,
+        "mode": 436,
+        "path": "docs/performance/REPORT.md",
+        "sha256": "b034968a6c13770ac1e976946dc60cd973e9f9a469140607f71260ae040f0196"
+      }
+    ],
+    "evidence": [
+      {
+        "bytes": 12802,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/independent-input-census.json",
+        "sha256": "a417211a5cdfb657b622fcd9126543813f7230f2ea53b1eccd76d64c5896ce02"
+      },
+      {
+        "bytes": 1253,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/oracle-verification.json",
+        "sha256": "c17a04661c12d4baab0393243e456f051c15047de98a7232b4023de7d5d70aef"
+      },
+      {
+        "bytes": 1253,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/post-cleanup-oracle-verification.json",
+        "sha256": "c17a04661c12d4baab0393243e456f051c15047de98a7232b4023de7d5d70aef"
+      },
+      {
+        "bytes": 67886,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/qualification-receipt.json",
+        "sha256": "1ed413f1b4cea354601781f8ce981b29efc55e5a4ed5848490b68eeda994d91c"
+      },
+      {
+        "bytes": 2512,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/packet-verification.json",
+        "sha256": "9f24aaebee4b5b09a07661443c8639351dd0b5606332bdcb87a19cbd3b0e5a17"
+      },
+      {
+        "bytes": 2511,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/post-cleanup-packet-verification.json",
+        "sha256": "a8e856e4c8dd92117b013204331cada29172915638ebd38e0148c8d95a04d221"
+      },
+      {
+        "bytes": 639568,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-7/target-cleanup.json",
+        "sha256": "987c49fda48c26e5358d89d3193fb5341b3a253d054179a5fb93dd29df8cb6c6"
+      },
+      {
+        "bytes": 1218,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-5/negative-input-cleanup.json",
+        "sha256": "6fb9b900669c0f8e442d19d2ff3c014f4e7a5a290da15836e00eddefe0c7a8d3"
+      },
+      {
+        "bytes": 881,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/negative-mutation-review.json",
+        "sha256": "5a3f7b5142e3e6e8e6bd80d368f189082d695126f511c853cf3927244633a103"
+      },
+      {
+        "bytes": 499,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/exploratory-cleanup.json",
+        "sha256": "a8d494a05e473b98b09f3b255bf6f557aea9b794b14a0c956dd234482ca7de27"
+      }
+    ],
+    "review_helpers": [
+      {
+        "bytes": 32996,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/validation_runner.py",
+        "sha256": "8ffffb07e478167712619c982dc384159c0a47e92ae79aa6929d819388d31c8b"
+      },
+      {
+        "bytes": 16966,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/verify_oracles.py",
+        "sha256": "fefcf9d88d3f80434961f795c0879048f4a859053b0f87f5af75fa9a35cad670"
+      },
+      {
+        "bytes": 8356,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/verify_packet.py",
+        "sha256": "b75ca197b0bfa07463f2afca6f52b1cb6bb08ded2d1b6673e3693c1157d02f80"
+      },
+      {
+        "bytes": 9700,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/aggregate_validation.py",
+        "sha256": "628f89708cd4b13ba50610689c0c8108dcf0bd9ea90270b96c951a3f3488ce81"
+      },
+      {
+        "bytes": 2422,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/input_census.py",
+        "sha256": "e214c5ef502d161dae9e21ff3f152f924d0b7eae80ce5deb5a8ccc061101ed7a"
+      },
+      {
+        "bytes": 7110,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/cleanup_validation_target.py",
+        "sha256": "f21c3e97a9a4439767c871381a350eab46e5c65c64c22762f7d8373d29a729ed"
+      },
+      {
+        "bytes": 6932,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/cleanup_negative_inputs.py",
+        "sha256": "8a17d82c67adcbeedfccfe0de8630a65ec45c0e361391ce7f0cac7809d27130e"
+      },
+      {
+        "bytes": 76,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/.gitattributes",
+        "sha256": "41be90b3f8cc66cc9913fa2b627f536672fc202848f1d0ac068560e30b807f49"
+      }
+    ],
+    "source": [
+      {
+        "bytes": 79021,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "sha256": "b4e905eed58e7146c298439a9284bbdf9922074a733882ff947febcce4492d04"
+      },
+      {
+        "bytes": 11272,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "sha256": "2dab5d4b9821241a1222fde42ff6b908c0105468f8428b80d268530105c76223"
+      },
+      {
+        "bytes": 4320,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "sha256": "28fada3ae337131f3e0e29879b90536b859a12fa1e370ac38919ab418aa4616c"
+      },
+      {
+        "bytes": 20413,
+        "mode": 436,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+        "sha256": "504f444c3f4805d7d730cc56b2c8b92894f410c0f4b6f8e3439f4406d12a0505"
+      }
+    ]
+  },
+  "attempt_history": {
+    "validation_1": {
+      "identity": {
+        "bytes": 45883,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-1/validation-receipt.json",
+        "sha256": "22ab8d9b995e3d0498406bc4ff366888dd35c7bc08986d092213fe1465db829b"
+      },
+      "receipt": "docs/performance/results/change-0889/attempts/validation-1/validation-receipt.json",
+      "status": "fail"
+    },
+    "validation_2": {
+      "identity": {
+        "bytes": 28233,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-2/validation-receipt.json",
+        "sha256": "9a6fc84b7a06cb342d370bcaa343ba24a94d9bd31109276da6a8ecf7a1cd844d"
+      },
+      "receipt": "docs/performance/results/change-0889/attempts/validation-2/validation-receipt.json",
+      "status": "fail"
+    },
+    "validation_3": {
+      "identity": {
+        "bytes": 37253,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-3/validation-receipt.json",
+        "sha256": "d5249a694f9cb15fcddf58a6b95a043b29e7bfafeb298300a7af90aa5699c477"
+      },
+      "receipt": "docs/performance/results/change-0889/attempts/validation-3/validation-receipt.json",
+      "status": "fail"
+    },
+    "validation_5": {
+      "identity": {
+        "bytes": 33851,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-5/validation-receipt.json",
+        "sha256": "45fc4232bd7570135a1242c2089ec70a119c7079c809ca981df1c47ef816b323"
+      },
+      "receipt": "docs/performance/results/change-0889/attempts/validation-5/validation-receipt.json",
+      "status": "fail"
+    },
+    "validation_6": {
+      "identity": {
+        "bytes": 61894,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-6/validation-receipt.json",
+        "sha256": "3192a83327ab24ff3b4969d9da95f1e34f2c823b0ddee9255a569ee19f508470"
+      },
+      "receipt": "docs/performance/results/change-0889/attempts/validation-6/validation-receipt.json",
+      "status": "pass"
+    },
+    "validation_7": {
+      "identity": {
+        "bytes": 62780,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-7/validation-receipt.json",
+        "sha256": "e81890b316c9aa645a1fca16564666288bd545bedf345a3a698aacc37394818a"
+      },
+      "receipt": "docs/performance/results/change-0889/attempts/validation-7/validation-receipt.json",
+      "status": "pass"
+    }
+  },
+  "cleanup": {
+    "negative_input_cleanup": {
+      "receipt": "docs/performance/results/change-0889/attempts/validation-5/negative-input-cleanup.json",
+      "removed": true,
+      "status": "pass"
+    },
+    "post_cleanup_oracle_verification": {
+      "receipt": "docs/performance/results/change-0889/post-cleanup-oracle-verification.json",
+      "repeat_byte_equal": true,
+      "status": "pass"
+    },
+    "post_cleanup_packet_verification": {
+      "cleanup_checked": true,
+      "current_source_checked": true,
+      "receipt": "docs/performance/results/change-0889/post-cleanup-packet-verification.json",
+      "status": "pass"
+    },
+    "remaining_negative_archives": 0,
+    "target_cleanup": {
+      "pre_cleanup_binary": {
+        "bytes": 7393944,
+        "mode": "0o775",
+        "path": "target/litchi-0889-validation/debug/xml_attribute_bounds",
+        "sha256": "2d8735d6e6b842bc722ce17efe27cf4c6f2a3a0f7952ef5ed81807f5b4b68429"
+      },
+      "pre_cleanup_target": "target/litchi-0889-validation",
+      "receipt": "docs/performance/results/change-0889/attempts/validation-7/target-cleanup.json",
+      "status": "pass",
+      "target_removed": true
+    }
+  },
+  "decision": {
+    "next_step": "matched release measurements are required before any repeated-name-expansion MCE optimization",
+    "optimization_adoption": "none",
+    "performance_claim": false,
+    "qualification": "pass"
+  },
+  "limitations": [
+    "Repeated broad JSON equality establishes determinism and input identity, not agreement with an independently implemented full MCE reference.",
+    "The generated and aliasing populations exercise the diagnostic oracle contracts; they do not prove all MCE semantics.",
+    "This packet contains no latency, allocation, RSS, throughput, or speedup claim.",
+    "The rejected 0887 inline-attribute candidate remains rejected and is not revived by this qualification."
+  ],
+  "negative_controls": {
+    "corrupt_member": {
+      "attempt": "validation-7",
+      "command_passed": true,
+      "failure_stage": "member_read",
+      "member": "[Content_Types].xml",
+      "status": "pass"
+    },
+    "first_corruption_probe": {
+      "attempt": "validation-5",
+      "mutation_review": "docs/performance/results/change-0889/negative-mutation-review.json",
+      "production_defect_claim": false,
+      "refused": false,
+      "retained": true
+    },
+    "missing_root": {
+      "attempt": "validation-3",
+      "retained_failed_attempt": true,
+      "status": "fail",
+      "terminal_runner_failure_after_control": "PermissionError while preparing unreadable copy"
+    },
+    "unreadable_package": {
+      "attempt": "validation-5",
+      "cleanup_status": "pass",
+      "command_passed_in_attempt_6": true,
+      "retained_failed_attempt": true,
+      "status": "fail"
+    }
+  },
+  "oracle_review": {
+    "content_identity_equal": true,
+    "decompressed_json_bytes": 226180145,
+    "decompressed_json_sha256": "53f4e5b747b9c019aae3922e7df1ef7f98bbbb4a047f74b467443e8d49eefe57",
+    "post_cleanup": {
+      "bytes": 1253,
+      "mode": 436,
+      "path": "docs/performance/results/change-0889/post-cleanup-oracle-verification.json",
+      "sha256": "c17a04661c12d4baab0393243e456f051c15047de98a7232b4023de7d5d70aef"
+    },
+    "post_cleanup_missing_controls_refused": true,
+    "post_cleanup_missing_oracle_refused": true,
+    "post_cleanup_repeat_byte_equal": true,
+    "post_cleanup_status": "pass",
+    "pre_cleanup": {
+      "bytes": 1253,
+      "mode": 436,
+      "path": "docs/performance/results/change-0889/oracle-verification.json",
+      "sha256": "c17a04661c12d4baab0393243e456f051c15047de98a7232b4023de7d5d70aef"
+    }
+  },
+  "qualification": {
+    "aliasing_seeds": 20000,
+    "control_failure_count": 0,
+    "controls": 10,
+    "corrupt_member_refused": true,
+    "differential_repeat_byte_equal": true,
+    "distinct_generated_inputs": {
+      "aliasing": 19418,
+      "generated": 13811
+    },
+    "focused_tests_passed": 24,
+    "gates_passed": true,
+    "generated_corpus_is_independent_full_mce_reference": false,
+    "generated_seeds": 20000,
+    "legacy_results_per_run": 200405,
+    "missing_root_refused": true,
+    "oracle_records_per_run": 200201,
+    "outcomes_per_run": {
+      "codec_refusal": 48804,
+      "codec_success": 51330,
+      "stream_refusal": 48133,
+      "stream_success": 51934
+    },
+    "packages": 3,
+    "selected_members": 67,
+    "unreadable_package_refused": true
+  },
+  "reviewer": "/root/mce_qualification_review_0889",
+  "runner_bindings": {
+    "correction": "current runner preserves leading Git porcelain spaces with rstrip(\"\\n\"); executed attempt copies remain immutable",
+    "current_corrected_runner": {
+      "bytes": 32996,
+      "mode": 436,
+      "path": "docs/performance/results/change-0889/validation_runner.py",
+      "sha256": "8ffffb07e478167712619c982dc384159c0a47e92ae79aa6929d819388d31c8b"
+    },
+    "executed_attempt_runners": {
+      "validation_3": {
+        "bytes": 31332,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-3/validation_runner.py",
+        "sha256": "3f21d1bbfb465a461e2eed491e153f85d8a1b12e8f9edb978d891f95ea6802aa"
+      },
+      "validation_5": {
+        "bytes": 31430,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-5/validation_runner.py",
+        "sha256": "e81917306ee9f0a07c3f011ea33bd8d642c70badae7f0af0769cdd45ac150a3f"
+      },
+      "validation_6": {
+        "bytes": 32400,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-6/validation_runner.py",
+        "sha256": "1807f20fbc6bdc00085ed71b30fcc04449c07b9f435b9b96ad040220174a29ad"
+      },
+      "validation_7": {
+        "bytes": 32879,
+        "mode": 436,
+        "path": "docs/performance/results/change-0889/attempts/validation-7/validation_runner.py",
+        "sha256": "1e4d7c4fc6e4e0df7280b2078dbc27f4093220c57f3dbd9a9f888c20fdf661ee"
+      }
+    }
+  },
+  "schema": "litchi.mce-control-qualification-final-review-0889.v1",
+  "scope": {
+    "base_commit": "5c8788cf255b3b4e68bf7d6abd0264a4bbaa0364",
+    "production_code_changed": false,
+    "public_api_changed": false,
+    "reviewer_builds": false,
+    "reviewer_source_edits": false,
+    "shared_build_cache_removed": false,
+    "target_removed": true,
+    "temporary_negative_archives_removed": true,
+    "worktrees_created": 0
+  },
+  "status": "pass"
+}

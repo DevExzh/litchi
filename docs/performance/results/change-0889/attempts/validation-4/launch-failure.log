@@ -1,0 +1,5 @@
+cwd=/home/zhuhe/code/litchi
+argv=["python3","-B","docs/performance/results/change-0889/negative_continuation.py","--attempt","validation-4","--from-attempt","validation-3"]
+exit_code=1
+RuntimeError: owned validation target marker is missing or mismatched: /home/zhuhe/code/litchi/target/litchi-0889-validation/.owner-0889
+No child validation command started; the helper stopped before writing validation-receipt.json.

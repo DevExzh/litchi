@@ -1,0 +1,3 @@
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/code/litchi/target/litchi-0889-validation/debug/xml_attribute_bounds","differential","--json","/home/zhuhe/code/litchi/docs/performance/results/change-0889/attempts/validation-3/runtime/differential-second.json","--generated","20000","--aliasing","20000","/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx","/home/zhuhe/code/litchi/test-data/ooxml/docx/drawing.docx","/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"]
+

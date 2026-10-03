@@ -1,0 +1,76 @@
+{
+  "schema": "litchi.mce-packet-verification-0889.v1",
+  "status": "pass",
+  "source_files_reconstructed": 86,
+  "focused_tests_passed": 24,
+  "broad_runs": 2,
+  "oracle_records_per_run": 200201,
+  "controls_per_run": 10,
+  "required_negative_controls": [
+    {
+      "bytes": 25735,
+      "path": "attempts/validation-3/runtime/missing-root.json",
+      "sha256": "c210fe8880e4f56fc365c1da69844f577670723dc4976f48768dd938d9444c39"
+    },
+    {
+      "bytes": 25777,
+      "path": "attempts/validation-5/runtime/unreadable.json",
+      "sha256": "a864a6e38a385bad7618a24a48cc108287b0b3ec6ffe97ccffdc36c0e8259222"
+    },
+    {
+      "bytes": 210923,
+      "path": "attempts/validation-7/runtime/corrupt.json",
+      "sha256": "c8edbe1b88ec8bc669221788e0982fae4912c49dbe5baa0ffe1db84441c832a9"
+    }
+  ],
+  "attempt_receipts": [
+    {
+      "path": "attempts/validation-1/validation-receipt.json",
+      "bytes": 45883,
+      "sha256": "22ab8d9b995e3d0498406bc4ff366888dd35c7bc08986d092213fe1465db829b"
+    },
+    {
+      "path": "attempts/validation-2/validation-receipt.json",
+      "bytes": 28233,
+      "sha256": "9a6fc84b7a06cb342d370bcaa343ba24a94d9bd31109276da6a8ecf7a1cd844d"
+    },
+    {
+      "path": "attempts/validation-3/validation-receipt.json",
+      "bytes": 37253,
+      "sha256": "d5249a694f9cb15fcddf58a6b95a043b29e7bfafeb298300a7af90aa5699c477"
+    },
+    {
+      "path": "attempts/validation-5/validation-receipt.json",
+      "bytes": 33851,
+      "sha256": "45fc4232bd7570135a1242c2089ec70a119c7079c809ca981df1c47ef816b323"
+    },
+    {
+      "path": "attempts/validation-6/validation-receipt.json",
+      "bytes": 61894,
+      "sha256": "3192a83327ab24ff3b4969d9da95f1e34f2c823b0ddee9255a569ee19f508470"
+    },
+    {
+      "path": "attempts/validation-7/validation-receipt.json",
+      "bytes": 62780,
+      "sha256": "e81890b316c9aa645a1fca16564666288bd545bedf345a3a698aacc37394818a"
+    }
+  ],
+  "oracle_verification": {
+    "path": "oracle-verification.json",
+    "bytes": 1253,
+    "sha256": "c17a04661c12d4baab0393243e456f051c15047de98a7232b4023de7d5d70aef"
+  },
+  "binary": {
+    "bytes": 7393944,
+    "mode": "0o775",
+    "path": "target/litchi-0889-validation/debug/xml_attribute_bounds",
+    "sha256": "2d8735d6e6b842bc722ce17efe27cf4c6f2a3a0f7952ef5ed81807f5b4b68429"
+  },
+  "current_source_checked": true,
+  "cleanup_checked": false,
+  "historical_failures_retained": true,
+  "additional_negative_runs_retained": [
+    "validation-6 unreadable",
+    "validation-6 corrupt"
+  ]
+}

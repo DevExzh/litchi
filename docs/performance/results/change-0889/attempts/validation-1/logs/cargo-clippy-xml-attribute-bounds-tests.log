@@ -1,0 +1,35 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: empty line after doc comment
+   --> src/bin/xml_attribute_bounds.rs:526:1
+    |
+526 | / /// oracle.
+527 | |
+    | |_^
+528 |   fn mce_limits_value(limits: &MceLimits) -> Value {
+    |   ------------------- the comment documents this function
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#empty_line_after_doc_comments
+    = note: `-D clippy::empty-line-after-doc-comments` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::empty_line_after_doc_comments)]`
+    = help: if the empty line is unintentional, remove it
+
+error: field assignment outside of initializer for an instance created with Default::default()
+    --> src/bin/xml_attribute_bounds.rs:1220:9
+     |
+1220 |         processing.max_attributes_per_element = configured_limit;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `litchi_ooxml_common::mce::Limits { max_attributes_per_element: configured_limit, ..Default::default() }` and removing relevant reassignments
+    --> src/bin/xml_attribute_bounds.rs:1219:9
+     |
+1219 |         let mut processing = MceLimits::default();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#field_reassign_with_default
+     = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: could not compile `litchi-perf-baseline` (bin "xml_attribute_bounds" test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+cwd=/home/zhuhe/code/litchi
+argv=["cargo","clippy","--manifest-path","/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml","--locked","--offline","--bin","xml_attribute_bounds","--tests","--no-deps","--","-D","warnings"]
+

@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0889 — MCE control qualification
+
+[0889](0889-mce-control-qualification.md) strengthens the diagnostic harness before another MCE optimization: explicit package/member coverage, complete report fields, framed callback transcripts, typed primary/prior errors, and focused expected-output and resource-limit tests. Production is unchanged. Broad repeat equality is a determinism check, not proof against an independent complete MCE implementation.
+
 ## 0888 — executable residency and MCE control audit
 
 [0888](0888-executable-residency-and-mce-controls.md) completes 24 mapping diagnostics and verifies 4,800 measured iterations / 2,181 snapshots with two readers. Fresh-inode byte-identical copies change RSS substantially while anonymous memory remains much closer; no precise kernel causality or speedup is claimed. The 0887 rejection stands. Temporary executable copies were removed and post-cleanup replay passes; production is unchanged.

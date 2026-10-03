@@ -1,0 +1,26 @@
+{
+  "base_commit": "5c8788cf255b3b4e68bf7d6abd0264a4bbaa0364",
+  "files": [
+    {
+      "bytes": 11272,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+      "sha256": "2dab5d4b9821241a1222fde42ff6b908c0105468f8428b80d268530105c76223"
+    },
+    {
+      "bytes": 3268,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+      "sha256": "92fe004448779f37d53f34f82fe0cc05e37a6abf4f8347f7ea2fbca4f32f4071"
+    },
+    {
+      "bytes": 19093,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+      "sha256": "7951a6f30b5656cde11aa6c4bd5d1689074871a6a8a5f7ae01106bef514996a4"
+    },
+    {
+      "bytes": 77948,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+      "sha256": "02223d74b171ee81bc073b1a2c367ddd7aad78a7a206d5c4d03361f8881e371d"
+    }
+  ],
+  "scope": "Changed diagnostic source overlay captured before corrections; remaining source from base commit"
+}

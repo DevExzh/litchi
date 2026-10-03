@@ -1,0 +1,3 @@
+*.gz -text
+# Preserve byte-exact captured command output.
+*.log -whitespace

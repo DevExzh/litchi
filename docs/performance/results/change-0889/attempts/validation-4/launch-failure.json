@@ -1,0 +1,18 @@
+{
+  "schema": "litchi.mce-0889-attempt-launch-failure.v1",
+  "status": "failed_before_receipt",
+  "attempt": "attempts/validation-4",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0889/negative_continuation.py",
+    "--attempt",
+    "validation-4",
+    "--from-attempt",
+    "validation-3"
+  ],
+  "observed_error": "RuntimeError: owned validation target marker is missing or mismatched: /home/zhuhe/code/litchi/target/litchi-0889-validation/.owner-0889",
+  "commands_started": 0,
+  "validation_receipt_written": false,
+  "diagnostic_log": "attempts/validation-4/launch-failure.log"
+}

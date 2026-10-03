@@ -1,0 +1,26 @@
+{
+  "base_commit": "5c8788cf255b3b4e68bf7d6abd0264a4bbaa0364",
+  "files": [
+    {
+      "bytes": 11272,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+      "sha256": "2dab5d4b9821241a1222fde42ff6b908c0105468f8428b80d268530105c76223"
+    },
+    {
+      "bytes": 4320,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+      "sha256": "28fada3ae337131f3e0e29879b90536b859a12fa1e370ac38919ab418aa4616c"
+    },
+    {
+      "bytes": 20413,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+      "sha256": "504f444c3f4805d7d730cc56b2c8b92894f410c0f4b6f8e3439f4406d12a0505"
+    },
+    {
+      "bytes": 79021,
+      "path": "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+      "sha256": "b4e905eed58e7146c298439a9284bbdf9922074a733882ff947febcce4492d04"
+    }
+  ],
+  "scope": "Diagnostic Rust sources differing from the replay base"
+}

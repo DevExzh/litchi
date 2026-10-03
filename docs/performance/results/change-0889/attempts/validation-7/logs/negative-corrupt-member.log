@@ -1,0 +1,4 @@
+Error: "differential qualification incomplete: 1 input failures, 0 incomplete oracles, 0 control failures (see JSON report)"
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/code/litchi/target/litchi-0889-validation/debug/xml_attribute_bounds","differential","--json","/home/zhuhe/code/litchi/docs/performance/results/change-0889/attempts/validation-7/runtime/corrupt.json","--generated","0","--aliasing","0","/home/zhuhe/code/litchi/docs/performance/results/change-0889/attempts/validation-7/runtime/corrupt-member.xlsx"]
+

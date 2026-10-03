@@ -1,0 +1,20 @@
+{
+  "schema": "litchi.mce-negative-mutation-review-0889.v1",
+  "status": "pass",
+  "member": "[Content_Types].xml",
+  "original_package_sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be",
+  "first_mutation_package_sha256": "0a05b0607bf562ae0048695c460b36e1e4bda5cff78d784467a9fd6bb1fa393a",
+  "first_mutation_preserves_decoded_bytes": true,
+  "decoded_bytes": 3423,
+  "decoded_sha256": "89ad744dca7264143ff96d3b59300fcdfc7d0f924c73af771e2fa4dd05de6d3b",
+  "first_mutation_changed": "BFINAL only; did not force a member read error",
+  "replacement_recipe": {
+    "compression_method": 8,
+    "offset": 569,
+    "original_byte": 204,
+    "mutated_byte": 206,
+    "formula": "(original & ~0x06) | 0x06; reserved BTYPE=3",
+    "independent_raw_deflate_refusal": "Error -3 while decompressing data: invalid block type"
+  },
+  "production_defect_claim": false
+}

@@ -1,0 +1,3 @@
+cwd=/home/zhuhe/code/litchi
+argv=["cargo","fmt","--manifest-path","/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml","--all","--","--check"]
+

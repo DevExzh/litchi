@@ -1,0 +1,1137 @@
+{
+  "after": {
+    "binary": {
+      "bytes": 7386736,
+      "mode": "0o775",
+      "path": "target/litchi-0889-validation/debug/xml_attribute_bounds",
+      "sha256": "bcd1101311436fd83115c283bf4c4a27e572a5a417c80da986aed2683fb6eba8"
+    },
+    "captured_utc": "2026-10-03T17:25:56.251008Z",
+    "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "git_head": "5c8788cf255b3b4e68bf7d6abd0264a4bbaa0364",
+    "git_status": "M docs/performance/BASELINE.md\n M docs/performance/HOTSPOTS.md\n M docs/performance/REPORT.md\n M tools/perf-baseline/src/bin/xml_attribute_bounds.rs\n?? docs/performance/0889-mce-control-qualification.md\n?? docs/performance/results/change-0889/attempts/validation-1/logs/cargo-build-xml-attribute-bounds.log\n?? docs/performance/results/change-0889/attempts/validation-1/logs/cargo-clippy-xml-attribute-bounds-tests.log\n?? docs/performance/results/change-0889/attempts/validation-1/logs/cargo-clippy-xml-attribute-bounds.log\n?? docs/performance/results/change-0889/attempts/validation-1/logs/cargo-rustdoc-xml-attribute-bounds.log\n?? docs/performance/results/change-0889/attempts/validation-1/logs/cargo-test-xml-attribute-bounds.log\n?? docs/performance/results/change-0889/attempts/validation-1/logs/crate-boundaries.log\n?? docs/performance/results/change-0889/attempts/validation-1/logs/fmt-check.log\n?? docs/performance/results/change-0889/attempts/validation-1/source-overlay.json\n?? docs/performance/results/change-0889/attempts/validation-1/source/tools/perf-baseline/src/bin/xml_attribute_bounds.rs\n?? docs/performance/results/change-0889/attempts/validation-1/source/tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs\n?? docs/performance/results/change-0889/attempts/validation-1/source/tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs\n?? docs/performance/results/change-0889/attempts/validation-1/source/tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs\n?? docs/performance/results/change-0889/attempts/validation-1/validation-receipt.json\n?? docs/performance/results/change-0889/independent-input-census.json\n?? docs/performance/results/change-0889/input_census.py\n?? docs/performance/results/change-0889/logs/input-census.log\n?? docs/performance/results/change-0889/logs/preflight-cargo-check-source-5c8788cf25.log\n?? docs/performance/results/change-0889/validation_runner.py\n?? docs/performance/results/change-0889/verify_oracles.py\n?? tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs\n?? tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs\n?? tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "source": [
+      {
+        "bytes": 3173576,
+        "path": "tools/check_crate_boundaries.py",
+        "sha256": "e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9"
+      },
+      {
+        "bytes": 56289,
+        "path": "tools/perf-baseline/Cargo.lock",
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      {
+        "bytes": 3286,
+        "path": "tools/perf-baseline/Cargo.toml",
+        "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+      },
+      {
+        "bytes": 61932,
+        "path": "tools/perf-baseline/src/allocation_metrics.rs",
+        "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5"
+      },
+      {
+        "bytes": 17338,
+        "path": "tools/perf-baseline/src/bin/attribute_checks.rs",
+        "sha256": "81550fd8741212957df412b6072af42a57bfd26520140be3631107887116bc44"
+      },
+      {
+        "bytes": 14297,
+        "path": "tools/perf-baseline/src/bin/attribute_checks_equivalence.rs",
+        "sha256": "84f372cdabf6ef8d971c9ec37031d85455b200542bb3abb3e378d1c9064a18cb"
+      },
+      {
+        "bytes": 380,
+        "path": "tools/perf-baseline/src/bin/docx_bounded_tail_append_compare.rs",
+        "sha256": "68ffc0320d4f993be98a86342b51d321acd329155133be83226032552849c75d"
+      },
+      {
+        "bytes": 441,
+        "path": "tools/perf-baseline/src/bin/docx_plain_paragraph_tail_append.rs",
+        "sha256": "e84214192c3d450730e213fff859d50e5e637aff7cf04a5291e55a78f42a59a6"
+      },
+      {
+        "bytes": 420,
+        "path": "tools/perf-baseline/src/bin/docx_replayable_tail_append.rs",
+        "sha256": "b42f6fc846c93ec2f7f23675ec813250e42a1b396b64bddecc02f2933d9c3a4c"
+      },
+      {
+        "bytes": 86470,
+        "path": "tools/perf-baseline/src/bin/docx_source_selected_paragraph.rs",
+        "sha256": "b08b00f640db33dba4a5fb1715ca1d38984c3fcbb753102c9de0ccc6de6072dd"
+      },
+      {
+        "bytes": 2169,
+        "path": "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+        "sha256": "d895986f85e12bec5a30d728bfda2985efd2b0b897e97970e9fa45b2568ae3db"
+      },
+      {
+        "bytes": 1921,
+        "path": "tools/perf-baseline/src/bin/odp_native_tail_append_probe.rs",
+        "sha256": "6f4dd1f104f31c710c7cda5afaba5c06427ec060ce24aeafc1debcd172e8a786"
+      },
+      {
+        "bytes": 1563,
+        "path": "tools/perf-baseline/src/bin/ordinary_save_artifacts.rs",
+        "sha256": "e532063d5238476b6a4522195cfbc45f74e211b601247bda44afe10e33564794"
+      },
+      {
+        "bytes": 16457,
+        "path": "tools/perf-baseline/src/bin/pptx_external_cross_copy.rs",
+        "sha256": "5b76523caba688bad998b6525eee8afd6fa1612629f18a97db111cba00a51f02"
+      },
+      {
+        "bytes": 406,
+        "path": "tools/perf-baseline/src/bin/pptx_metadata_spool.rs",
+        "sha256": "621ce54557814fd133538e2c91f9c1f7ca4691da75a8237ead8ba0bbb8156744"
+      },
+      {
+        "bytes": 1740,
+        "path": "tools/perf-baseline/src/bin/pptx_native_copy_probe.rs",
+        "sha256": "a8a6e9e6c04c7649342175f609782190d78726cd5037e7ba3d85cf62634b68f5"
+      },
+      {
+        "bytes": 18938,
+        "path": "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs",
+        "sha256": "747ba127d5c500079a9d4a627b5c379677fb39283b1e216912dc6d4efa1e532a"
+      },
+      {
+        "bytes": 77926,
+        "path": "tools/perf-baseline/src/bin/security_corpus.rs",
+        "sha256": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348"
+      },
+      {
+        "bytes": 11537,
+        "path": "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+        "sha256": "80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068"
+      },
+      {
+        "bytes": 65465,
+        "path": "tools/perf-baseline/src/bin/xls_source_attribution.rs",
+        "sha256": "f6785f13e0b17d61151695a93b00e8b6a49ed882731caf048b038dba44e8866a"
+      },
+      {
+        "bytes": 82326,
+        "path": "tools/perf-baseline/src/bin/xlsb_crud.rs",
+        "sha256": "a6408e92b65830a2bfc4f85141aadbb9c9654f573d55f0100fec0b46bd7f8a05"
+      },
+      {
+        "bytes": 4270,
+        "path": "tools/perf-baseline/src/bin/xlsb_synthetic_fixture.rs",
+        "sha256": "549d0c9d637fd6db8c915fe1ff4a9c45ef1f862f92cde7c826c9c0c9e5193f75"
+      },
+      {
+        "bytes": 83667,
+        "path": "tools/perf-baseline/src/bin/xlsx_cell_values_abba.rs",
+        "sha256": "3385a924d9a7c1d40efd7e71dc990c2b536065a569beb69aa8298ade6c5b6228"
+      },
+      {
+        "bytes": 67224,
+        "path": "tools/perf-baseline/src/bin/xlsx_merge_source_abba.rs",
+        "sha256": "96904838c740ea05d3a35f1f3ce7715196c44d64ee929e3dd33b54c067c97d8b"
+      },
+      {
+        "bytes": 404,
+        "path": "tools/perf-baseline/src/bin/xlsx_planning_guard.rs",
+        "sha256": "aea49ce654b7779c68ce685834f3309783d6efc457a6faa8df688913f0634832"
+      },
+      {
+        "bytes": 11272,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "sha256": "2dab5d4b9821241a1222fde42ff6b908c0105468f8428b80d268530105c76223"
+      },
+      {
+        "bytes": 3268,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "sha256": "92fe004448779f37d53f34f82fe0cc05e37a6abf4f8347f7ea2fbca4f32f4071"
+      },
+      {
+        "bytes": 19093,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+        "sha256": "7951a6f30b5656cde11aa6c4bd5d1689074871a6a8a5f7ae01106bef514996a4"
+      },
+      {
+        "bytes": 77948,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "sha256": "02223d74b171ee81bc073b1a2c367ddd7aad78a7a206d5c4d03361f8881e371d"
+      },
+      {
+        "bytes": 393,
+        "path": "tools/perf-baseline/src/bin/xml_stream_audit.rs",
+        "sha256": "9ba25ff294236b1048f8c02f721c0428090edaa657929e13475e6f50057ebe76"
+      },
+      {
+        "bytes": 425,
+        "path": "tools/perf-baseline/src/bin/zip_directory_spool.rs",
+        "sha256": "672c88c3c9cf45c29108e03bb0e99c694389d17d24c514de29ec9b865b1eb615"
+      },
+      {
+        "bytes": 51280,
+        "path": "tools/perf-baseline/src/cold_verified.rs",
+        "sha256": "88ca233eb7245d30f1f0280582fb792ed9b532d1e1aedead9f2d0274d9af7462"
+      },
+      {
+        "bytes": 63720,
+        "path": "tools/perf-baseline/src/corpus_manifest.rs",
+        "sha256": "ae5d7adc623b86bceecd4165bea307fb847f56dd584d463e692acd00e88016ac"
+      },
+      {
+        "bytes": 60110,
+        "path": "tools/perf-baseline/src/docx_bounded_tail_append_compare.rs",
+        "sha256": "9de9e5705ceac8d547830cb0ad19d0037967718ecf223ace345e80ef75ed9bd6"
+      },
+      {
+        "bytes": 40028,
+        "path": "tools/perf-baseline/src/docx_edit_provider/cold.rs",
+        "sha256": "d3fefcdfdad80fe66614ff3da1dc18cf21babf62540c65756828b1e7cc420955"
+      },
+      {
+        "bytes": 64003,
+        "path": "tools/perf-baseline/src/docx_edit_provider.rs",
+        "sha256": "d0d177aaa850b9930320ac1d909cb2a8562f8dc6e5a1cf1adff52535b15dba02"
+      },
+      {
+        "bytes": 85447,
+        "path": "tools/perf-baseline/src/docx_managed_edit.rs",
+        "sha256": "e3732d932356018dff0bd7a17b8eb38e60e177ee7d83992e9a04dbe82fe26c94"
+      },
+      {
+        "bytes": 48780,
+        "path": "tools/perf-baseline/src/docx_managed_read_ahead.rs",
+        "sha256": "e6a18be8bd0e15e8bb449da49a57101c5bdad63c4522332e58dc173cb3ca2fad"
+      },
+      {
+        "bytes": 51027,
+        "path": "tools/perf-baseline/src/docx_plain_paragraph_tail_append.rs",
+        "sha256": "90ccbec47d1866afb67f66300a2ff24af2a5b84a203094985a8a2bbfbd157113"
+      },
+      {
+        "bytes": 55398,
+        "path": "tools/perf-baseline/src/docx_provider_lifecycle.rs",
+        "sha256": "4a9a893838be8a5e2dfd0f8e8ebc3c22c50d02daa3d6eb258d2968d90763714a"
+      },
+      {
+        "bytes": 40088,
+        "path": "tools/perf-baseline/src/docx_read_ahead.rs",
+        "sha256": "3c2ec8fdbb44c182cb1beb5d1eba71ffacedd6cf7fed5fcf22b7ff0dd4176d1d"
+      },
+      {
+        "bytes": 22243,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/compression_profiles.rs",
+        "sha256": "44a7730b513997952e6415a50b2c813020425b7df4feeaccbab98e9dc43aa1bc"
+      },
+      {
+        "bytes": 42097,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/file_store.rs",
+        "sha256": "7f42bf404da7d60fb0d637565f59d5bf26f363342acb9d0b7c619352db351667"
+      },
+      {
+        "bytes": 32005,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/input_profiles.rs",
+        "sha256": "f866d2c2693342c1480be509e62edd6da671adeee16f9701602945310ddd2cb9"
+      },
+      {
+        "bytes": 7156,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/publication_route_tests.rs",
+        "sha256": "3e2e515d1b4f04748e53bfb5e88461a525ed7ddf80abbea541cde21f2ab529d7"
+      },
+      {
+        "bytes": 7971,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/route_failure_tests.rs",
+        "sha256": "d0fb957a8f369f00df7f893dc4b4d9a939ab959c2b3de255d61b45d9957a37ce"
+      },
+      {
+        "bytes": 8210,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/route_smoke_tests.rs",
+        "sha256": "f6a1fb5915c3fdb6cd01acaf4389fe972c926f995a6662e8328cd981665e448a"
+      },
+      {
+        "bytes": 164597,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append.rs",
+        "sha256": "b6303b7b353415a4bad997951f98b2dc1c655f795233e10c908f17c684f9b5be"
+      },
+      {
+        "bytes": 67784,
+        "path": "tools/perf-baseline/src/docx_story_hyperlink_publication.rs",
+        "sha256": "bf17ad82d2a44140897029bbc0cb5da993e4eaa3c08d282844f8fc54bf7d183e"
+      },
+      {
+        "bytes": 24736,
+        "path": "tools/perf-baseline/src/docx_story_hyperlinks.rs",
+        "sha256": "51b42e0038f6d25d911ec02d8beca068469610ad5ac54ee87061f7d2e46e8b03"
+      },
+      {
+        "bytes": 24680,
+        "path": "tools/perf-baseline/src/docx_streaming_create.rs",
+        "sha256": "4c154b42bd80d67cf9e33bbbd16a8e8e4c789604afb39551357e97daccb3a2b1"
+      },
+      {
+        "bytes": 29430,
+        "path": "tools/perf-baseline/src/facade_ole2.rs",
+        "sha256": "070d39478dcca6ee61d534eb277695e72389a09144cf94bab2281827074de885"
+      },
+      {
+        "bytes": 40706,
+        "path": "tools/perf-baseline/src/filesystem/aligned_zip.rs",
+        "sha256": "5536123cc459699d04c40d513e1075d2f67033d13436881d99c2e476e4e61192"
+      },
+      {
+        "bytes": 348839,
+        "path": "tools/perf-baseline/src/filesystem.rs",
+        "sha256": "8f75bd8357b45ade1653a83f793d423beb22471973fc378d4f18be627309aaf4"
+      },
+      {
+        "bytes": 3020616,
+        "path": "tools/perf-baseline/src/lib.rs",
+        "sha256": "04ac6f200c59bc51cb7656c8979bc49031a9bd8f5bbf6c23748bd6e49bf99faf"
+      },
+      {
+        "bytes": 2079,
+        "path": "tools/perf-baseline/src/main.rs",
+        "sha256": "2327bc6430ec6ed125396823a0ce1a9315358cf861ad6458513ac7772ed0f54b"
+      },
+      {
+        "bytes": 52399,
+        "path": "tools/perf-baseline/src/marker_shape.rs",
+        "sha256": "9cfd20fd6d30c27e3c8af797c3a787e3734c12596c0df1b950baae209e640e5e"
+      },
+      {
+        "bytes": 27287,
+        "path": "tools/perf-baseline/src/odp_append_attribution.rs",
+        "sha256": "8846a7fb5ff3d78f4918f1b10b625b3a69d7e7d8f9699381a73a29e4a5d3c76a"
+      },
+      {
+        "bytes": 37562,
+        "path": "tools/perf-baseline/src/odp_buffered_create/content_structure.rs",
+        "sha256": "74fc1ae1879ec98a71e4a26fbeb08f53ba06d956e8c6c4e88bc138b442b9d7c3"
+      },
+      {
+        "bytes": 36155,
+        "path": "tools/perf-baseline/src/odp_buffered_create.rs",
+        "sha256": "1ec90cc2b7acc6ed063b0e887b86ea7791b8aa4e468071d3aeb3690d6badf01d"
+      },
+      {
+        "bytes": 42697,
+        "path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "sha256": "937bc487668d31156dd5e37f86a4f7abca0fc1d2fd5aea17df2287e3a50a3a37"
+      },
+      {
+        "bytes": 46757,
+        "path": "tools/perf-baseline/src/odp_source_tail_append.rs",
+        "sha256": "e8e557db92f060d1506abd4d7ae594a42659c74f246c51205f98d34b6c108cb5"
+      },
+      {
+        "bytes": 19380,
+        "path": "tools/perf-baseline/src/odp_streaming_create.rs",
+        "sha256": "5c2f0fda774cd6a1ba8a22a429b17e6440589fed39aca8518efadc5002bd7b98"
+      },
+      {
+        "bytes": 40253,
+        "path": "tools/perf-baseline/src/odt_streaming_create.rs",
+        "sha256": "c41004f14601c77f308f4d96aaaa21916efbf541f79eab1bf98551c13379afe9"
+      },
+      {
+        "bytes": 44626,
+        "path": "tools/perf-baseline/src/ole2_range_source.rs",
+        "sha256": "bd2ae78bfe52d32b839f3307d496e3c76d593f9264f7ebac430aba29a40f358b"
+      },
+      {
+        "bytes": 26254,
+        "path": "tools/perf-baseline/src/opc_part_add.rs",
+        "sha256": "299c1a2a36407fc9f5b47acf6546e8439a853633a2c117eaf611f47b7f74b6b0"
+      },
+      {
+        "bytes": 96546,
+        "path": "tools/perf-baseline/src/operation_metrics.rs",
+        "sha256": "317bd89aa3b9d6452488ec538c4db158868f2874df9fb2956bdddd677b476ebf"
+      },
+      {
+        "bytes": 100712,
+        "path": "tools/perf-baseline/src/ordinary_save.rs",
+        "sha256": "09d9a2308e2545d038ef785a0770b3e21d26e7379f356bdd6671de65cebddd12"
+      },
+      {
+        "bytes": 32276,
+        "path": "tools/perf-baseline/src/parallel_metrics.rs",
+        "sha256": "fc2125088a4cea7ab1bba97f8059afe020e71e810ca20aedf889eec331f049d0"
+      },
+      {
+        "bytes": 95286,
+        "path": "tools/perf-baseline/src/pptx_cache_retention.rs",
+        "sha256": "1322518d42377d6f1859763ee6b319745afedc303148fd749c3fae2e2cc30872"
+      },
+      {
+        "bytes": 36773,
+        "path": "tools/perf-baseline/src/pptx_metadata_spool.rs",
+        "sha256": "ac36550e4cb40823448a81a622f16f12431b45136050d3545f06d46f33f21e7e"
+      },
+      {
+        "bytes": 43612,
+        "path": "tools/perf-baseline/src/pptx_native_image.rs",
+        "sha256": "66bc6aa527a16a712948b71cf8e557f91b53579f73b1f8750e31dd2e4340203b"
+      },
+      {
+        "bytes": 62105,
+        "path": "tools/perf-baseline/src/pptx_pair_lifecycle.rs",
+        "sha256": "17e96bcd64c7971bf25a0cdc152ce193077eaa95511d7bbb37dccb404855d222"
+      },
+      {
+        "bytes": 54421,
+        "path": "tools/perf-baseline/src/pptx_provider_lifecycle.rs",
+        "sha256": "dbc1f21b873e8a1081e58d53dd0f51db49901145726366967bd9986eeb785153"
+      },
+      {
+        "bytes": 34669,
+        "path": "tools/perf-baseline/src/pptx_range_source.rs",
+        "sha256": "f4b0d6171ef9a318e1d29affa0e593e6c5114f972c76dace13e572611a074921"
+      },
+      {
+        "bytes": 43807,
+        "path": "tools/perf-baseline/src/pptx_retention.rs",
+        "sha256": "9227bd4e73b17a55f64492be8d688f9b885f5ec68564fd001cbd741b56183aba"
+      },
+      {
+        "bytes": 40339,
+        "path": "tools/perf-baseline/src/pptx_slide_boundaries.rs",
+        "sha256": "f903d4a4c672a1c56de0ed3191e65345803f2d6a60fbd14e88ffbc8753693934"
+      },
+      {
+        "bytes": 39935,
+        "path": "tools/perf-baseline/src/pptx_streaming_create.rs",
+        "sha256": "506181e03a6cc832f7a93b651005edb7bb40a4f3085b836c6f6dcaebb67f323e"
+      },
+      {
+        "bytes": 12674,
+        "path": "tools/perf-baseline/src/process_metrics.rs",
+        "sha256": "07ee04303cd16e85e0d4581cd940aa3531b5475f70da01dd73c7f80debec3c51"
+      },
+      {
+        "bytes": 134554,
+        "path": "tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "8dc0a09d046dc44c3e29f820228b87eb4d3a4d2de63b1b67bf2e4d7cff6085de"
+      },
+      {
+        "bytes": 22162,
+        "path": "tools/perf-baseline/src/security_corpus.rs",
+        "sha256": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb"
+      },
+      {
+        "bytes": 93061,
+        "path": "tools/perf-baseline/src/xls_numeric.rs",
+        "sha256": "affe86793afdbfe7861082176b3623916756c6ad7782ec4602ce69513b1bc0a2"
+      },
+      {
+        "bytes": 10118,
+        "path": "tools/perf-baseline/src/xlsx_commit_metrics_tests.rs",
+        "sha256": "6216c258d63a9ef9ccdf8a8ca035522cfce74b79c69476f5baf2ebd3f96c1d88"
+      },
+      {
+        "bytes": 24057,
+        "path": "tools/perf-baseline/src/xlsx_planning_guard.rs",
+        "sha256": "3f7eeede5f66ad9350b81fc012e606c524f244cdeda865a558024608d4182ad5"
+      },
+      {
+        "bytes": 31052,
+        "path": "tools/perf-baseline/src/xml_stream_audit.rs",
+        "sha256": "1c4cccc24c30e2a75414c303d041a12147c464758691d3a7a4ce82ecb6c32ca3"
+      },
+      {
+        "bytes": 37099,
+        "path": "tools/perf-baseline/src/zip_directory_spool.rs",
+        "sha256": "b722f772bf9f17c7b10d70859af31a6087b3a09dcd6ae924e6e7e1819de22636"
+      }
+    ],
+    "source_diff": {
+      "bytes": 46147,
+      "sha256": "dba0ba7c5cd2ce991d621180a8d220bc9b2c8bf333b25302f6616100f86598dc"
+    },
+    "uname": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux"
+  },
+  "all_commands_passed": false,
+  "attempt": "attempts/validation-1",
+  "before": {
+    "binary": null,
+    "captured_utc": "2026-10-03T17:18:51.293818Z",
+    "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "git_head": "5c8788cf255b3b4e68bf7d6abd0264a4bbaa0364",
+    "git_status": "M tools/perf-baseline/src/bin/xml_attribute_bounds.rs\n?? docs/performance/0889-mce-control-qualification.md\n?? docs/performance/results/change-0889/attempts/validation-1/validation-receipt.json\n?? docs/performance/results/change-0889/independent-input-census.json\n?? docs/performance/results/change-0889/input_census.py\n?? docs/performance/results/change-0889/logs/input-census.log\n?? docs/performance/results/change-0889/logs/preflight-cargo-check-source-5c8788cf25.log\n?? docs/performance/results/change-0889/validation_runner.py\n?? docs/performance/results/change-0889/verify_oracles.py\n?? tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs\n?? tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs\n?? tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "source": [
+      {
+        "bytes": 3173576,
+        "path": "tools/check_crate_boundaries.py",
+        "sha256": "e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9"
+      },
+      {
+        "bytes": 56289,
+        "path": "tools/perf-baseline/Cargo.lock",
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      {
+        "bytes": 3286,
+        "path": "tools/perf-baseline/Cargo.toml",
+        "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+      },
+      {
+        "bytes": 61932,
+        "path": "tools/perf-baseline/src/allocation_metrics.rs",
+        "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5"
+      },
+      {
+        "bytes": 17338,
+        "path": "tools/perf-baseline/src/bin/attribute_checks.rs",
+        "sha256": "81550fd8741212957df412b6072af42a57bfd26520140be3631107887116bc44"
+      },
+      {
+        "bytes": 14297,
+        "path": "tools/perf-baseline/src/bin/attribute_checks_equivalence.rs",
+        "sha256": "84f372cdabf6ef8d971c9ec37031d85455b200542bb3abb3e378d1c9064a18cb"
+      },
+      {
+        "bytes": 380,
+        "path": "tools/perf-baseline/src/bin/docx_bounded_tail_append_compare.rs",
+        "sha256": "68ffc0320d4f993be98a86342b51d321acd329155133be83226032552849c75d"
+      },
+      {
+        "bytes": 441,
+        "path": "tools/perf-baseline/src/bin/docx_plain_paragraph_tail_append.rs",
+        "sha256": "e84214192c3d450730e213fff859d50e5e637aff7cf04a5291e55a78f42a59a6"
+      },
+      {
+        "bytes": 420,
+        "path": "tools/perf-baseline/src/bin/docx_replayable_tail_append.rs",
+        "sha256": "b42f6fc846c93ec2f7f23675ec813250e42a1b396b64bddecc02f2933d9c3a4c"
+      },
+      {
+        "bytes": 86470,
+        "path": "tools/perf-baseline/src/bin/docx_source_selected_paragraph.rs",
+        "sha256": "b08b00f640db33dba4a5fb1715ca1d38984c3fcbb753102c9de0ccc6de6072dd"
+      },
+      {
+        "bytes": 2169,
+        "path": "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+        "sha256": "d895986f85e12bec5a30d728bfda2985efd2b0b897e97970e9fa45b2568ae3db"
+      },
+      {
+        "bytes": 1921,
+        "path": "tools/perf-baseline/src/bin/odp_native_tail_append_probe.rs",
+        "sha256": "6f4dd1f104f31c710c7cda5afaba5c06427ec060ce24aeafc1debcd172e8a786"
+      },
+      {
+        "bytes": 1563,
+        "path": "tools/perf-baseline/src/bin/ordinary_save_artifacts.rs",
+        "sha256": "e532063d5238476b6a4522195cfbc45f74e211b601247bda44afe10e33564794"
+      },
+      {
+        "bytes": 16457,
+        "path": "tools/perf-baseline/src/bin/pptx_external_cross_copy.rs",
+        "sha256": "5b76523caba688bad998b6525eee8afd6fa1612629f18a97db111cba00a51f02"
+      },
+      {
+        "bytes": 406,
+        "path": "tools/perf-baseline/src/bin/pptx_metadata_spool.rs",
+        "sha256": "621ce54557814fd133538e2c91f9c1f7ca4691da75a8237ead8ba0bbb8156744"
+      },
+      {
+        "bytes": 1740,
+        "path": "tools/perf-baseline/src/bin/pptx_native_copy_probe.rs",
+        "sha256": "a8a6e9e6c04c7649342175f609782190d78726cd5037e7ba3d85cf62634b68f5"
+      },
+      {
+        "bytes": 18938,
+        "path": "tools/perf-baseline/src/bin/pptx_semantic_inventory.rs",
+        "sha256": "747ba127d5c500079a9d4a627b5c379677fb39283b1e216912dc6d4efa1e532a"
+      },
+      {
+        "bytes": 77926,
+        "path": "tools/perf-baseline/src/bin/security_corpus.rs",
+        "sha256": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348"
+      },
+      {
+        "bytes": 11537,
+        "path": "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+        "sha256": "80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068"
+      },
+      {
+        "bytes": 65465,
+        "path": "tools/perf-baseline/src/bin/xls_source_attribution.rs",
+        "sha256": "f6785f13e0b17d61151695a93b00e8b6a49ed882731caf048b038dba44e8866a"
+      },
+      {
+        "bytes": 82326,
+        "path": "tools/perf-baseline/src/bin/xlsb_crud.rs",
+        "sha256": "a6408e92b65830a2bfc4f85141aadbb9c9654f573d55f0100fec0b46bd7f8a05"
+      },
+      {
+        "bytes": 4270,
+        "path": "tools/perf-baseline/src/bin/xlsb_synthetic_fixture.rs",
+        "sha256": "549d0c9d637fd6db8c915fe1ff4a9c45ef1f862f92cde7c826c9c0c9e5193f75"
+      },
+      {
+        "bytes": 83667,
+        "path": "tools/perf-baseline/src/bin/xlsx_cell_values_abba.rs",
+        "sha256": "3385a924d9a7c1d40efd7e71dc990c2b536065a569beb69aa8298ade6c5b6228"
+      },
+      {
+        "bytes": 67224,
+        "path": "tools/perf-baseline/src/bin/xlsx_merge_source_abba.rs",
+        "sha256": "96904838c740ea05d3a35f1f3ce7715196c44d64ee929e3dd33b54c067c97d8b"
+      },
+      {
+        "bytes": 404,
+        "path": "tools/perf-baseline/src/bin/xlsx_planning_guard.rs",
+        "sha256": "aea49ce654b7779c68ce685834f3309783d6efc457a6faa8df688913f0634832"
+      },
+      {
+        "bytes": 11272,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "sha256": "2dab5d4b9821241a1222fde42ff6b908c0105468f8428b80d268530105c76223"
+      },
+      {
+        "bytes": 3268,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "sha256": "92fe004448779f37d53f34f82fe0cc05e37a6abf4f8347f7ea2fbca4f32f4071"
+      },
+      {
+        "bytes": 19093,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs",
+        "sha256": "7951a6f30b5656cde11aa6c4bd5d1689074871a6a8a5f7ae01106bef514996a4"
+      },
+      {
+        "bytes": 77948,
+        "path": "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "sha256": "02223d74b171ee81bc073b1a2c367ddd7aad78a7a206d5c4d03361f8881e371d"
+      },
+      {
+        "bytes": 393,
+        "path": "tools/perf-baseline/src/bin/xml_stream_audit.rs",
+        "sha256": "9ba25ff294236b1048f8c02f721c0428090edaa657929e13475e6f50057ebe76"
+      },
+      {
+        "bytes": 425,
+        "path": "tools/perf-baseline/src/bin/zip_directory_spool.rs",
+        "sha256": "672c88c3c9cf45c29108e03bb0e99c694389d17d24c514de29ec9b865b1eb615"
+      },
+      {
+        "bytes": 51280,
+        "path": "tools/perf-baseline/src/cold_verified.rs",
+        "sha256": "88ca233eb7245d30f1f0280582fb792ed9b532d1e1aedead9f2d0274d9af7462"
+      },
+      {
+        "bytes": 63720,
+        "path": "tools/perf-baseline/src/corpus_manifest.rs",
+        "sha256": "ae5d7adc623b86bceecd4165bea307fb847f56dd584d463e692acd00e88016ac"
+      },
+      {
+        "bytes": 60110,
+        "path": "tools/perf-baseline/src/docx_bounded_tail_append_compare.rs",
+        "sha256": "9de9e5705ceac8d547830cb0ad19d0037967718ecf223ace345e80ef75ed9bd6"
+      },
+      {
+        "bytes": 40028,
+        "path": "tools/perf-baseline/src/docx_edit_provider/cold.rs",
+        "sha256": "d3fefcdfdad80fe66614ff3da1dc18cf21babf62540c65756828b1e7cc420955"
+      },
+      {
+        "bytes": 64003,
+        "path": "tools/perf-baseline/src/docx_edit_provider.rs",
+        "sha256": "d0d177aaa850b9930320ac1d909cb2a8562f8dc6e5a1cf1adff52535b15dba02"
+      },
+      {
+        "bytes": 85447,
+        "path": "tools/perf-baseline/src/docx_managed_edit.rs",
+        "sha256": "e3732d932356018dff0bd7a17b8eb38e60e177ee7d83992e9a04dbe82fe26c94"
+      },
+      {
+        "bytes": 48780,
+        "path": "tools/perf-baseline/src/docx_managed_read_ahead.rs",
+        "sha256": "e6a18be8bd0e15e8bb449da49a57101c5bdad63c4522332e58dc173cb3ca2fad"
+      },
+      {
+        "bytes": 51027,
+        "path": "tools/perf-baseline/src/docx_plain_paragraph_tail_append.rs",
+        "sha256": "90ccbec47d1866afb67f66300a2ff24af2a5b84a203094985a8a2bbfbd157113"
+      },
+      {
+        "bytes": 55398,
+        "path": "tools/perf-baseline/src/docx_provider_lifecycle.rs",
+        "sha256": "4a9a893838be8a5e2dfd0f8e8ebc3c22c50d02daa3d6eb258d2968d90763714a"
+      },
+      {
+        "bytes": 40088,
+        "path": "tools/perf-baseline/src/docx_read_ahead.rs",
+        "sha256": "3c2ec8fdbb44c182cb1beb5d1eba71ffacedd6cf7fed5fcf22b7ff0dd4176d1d"
+      },
+      {
+        "bytes": 22243,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/compression_profiles.rs",
+        "sha256": "44a7730b513997952e6415a50b2c813020425b7df4feeaccbab98e9dc43aa1bc"
+      },
+      {
+        "bytes": 42097,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/file_store.rs",
+        "sha256": "7f42bf404da7d60fb0d637565f59d5bf26f363342acb9d0b7c619352db351667"
+      },
+      {
+        "bytes": 32005,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/input_profiles.rs",
+        "sha256": "f866d2c2693342c1480be509e62edd6da671adeee16f9701602945310ddd2cb9"
+      },
+      {
+        "bytes": 7156,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/publication_route_tests.rs",
+        "sha256": "3e2e515d1b4f04748e53bfb5e88461a525ed7ddf80abbea541cde21f2ab529d7"
+      },
+      {
+        "bytes": 7971,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/route_failure_tests.rs",
+        "sha256": "d0fb957a8f369f00df7f893dc4b4d9a939ab959c2b3de255d61b45d9957a37ce"
+      },
+      {
+        "bytes": 8210,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append/route_smoke_tests.rs",
+        "sha256": "f6a1fb5915c3fdb6cd01acaf4389fe972c926f995a6662e8328cd981665e448a"
+      },
+      {
+        "bytes": 164597,
+        "path": "tools/perf-baseline/src/docx_replayable_tail_append.rs",
+        "sha256": "b6303b7b353415a4bad997951f98b2dc1c655f795233e10c908f17c684f9b5be"
+      },
+      {
+        "bytes": 67784,
+        "path": "tools/perf-baseline/src/docx_story_hyperlink_publication.rs",
+        "sha256": "bf17ad82d2a44140897029bbc0cb5da993e4eaa3c08d282844f8fc54bf7d183e"
+      },
+      {
+        "bytes": 24736,
+        "path": "tools/perf-baseline/src/docx_story_hyperlinks.rs",
+        "sha256": "51b42e0038f6d25d911ec02d8beca068469610ad5ac54ee87061f7d2e46e8b03"
+      },
+      {
+        "bytes": 24680,
+        "path": "tools/perf-baseline/src/docx_streaming_create.rs",
+        "sha256": "4c154b42bd80d67cf9e33bbbd16a8e8e4c789604afb39551357e97daccb3a2b1"
+      },
+      {
+        "bytes": 29430,
+        "path": "tools/perf-baseline/src/facade_ole2.rs",
+        "sha256": "070d39478dcca6ee61d534eb277695e72389a09144cf94bab2281827074de885"
+      },
+      {
+        "bytes": 40706,
+        "path": "tools/perf-baseline/src/filesystem/aligned_zip.rs",
+        "sha256": "5536123cc459699d04c40d513e1075d2f67033d13436881d99c2e476e4e61192"
+      },
+      {
+        "bytes": 348839,
+        "path": "tools/perf-baseline/src/filesystem.rs",
+        "sha256": "8f75bd8357b45ade1653a83f793d423beb22471973fc378d4f18be627309aaf4"
+      },
+      {
+        "bytes": 3020616,
+        "path": "tools/perf-baseline/src/lib.rs",
+        "sha256": "04ac6f200c59bc51cb7656c8979bc49031a9bd8f5bbf6c23748bd6e49bf99faf"
+      },
+      {
+        "bytes": 2079,
+        "path": "tools/perf-baseline/src/main.rs",
+        "sha256": "2327bc6430ec6ed125396823a0ce1a9315358cf861ad6458513ac7772ed0f54b"
+      },
+      {
+        "bytes": 52399,
+        "path": "tools/perf-baseline/src/marker_shape.rs",
+        "sha256": "9cfd20fd6d30c27e3c8af797c3a787e3734c12596c0df1b950baae209e640e5e"
+      },
+      {
+        "bytes": 27287,
+        "path": "tools/perf-baseline/src/odp_append_attribution.rs",
+        "sha256": "8846a7fb5ff3d78f4918f1b10b625b3a69d7e7d8f9699381a73a29e4a5d3c76a"
+      },
+      {
+        "bytes": 37562,
+        "path": "tools/perf-baseline/src/odp_buffered_create/content_structure.rs",
+        "sha256": "74fc1ae1879ec98a71e4a26fbeb08f53ba06d956e8c6c4e88bc138b442b9d7c3"
+      },
+      {
+        "bytes": 36155,
+        "path": "tools/perf-baseline/src/odp_buffered_create.rs",
+        "sha256": "1ec90cc2b7acc6ed063b0e887b86ea7791b8aa4e468071d3aeb3690d6badf01d"
+      },
+      {
+        "bytes": 42697,
+        "path": "tools/perf-baseline/src/odp_existing_append.rs",
+        "sha256": "937bc487668d31156dd5e37f86a4f7abca0fc1d2fd5aea17df2287e3a50a3a37"
+      },
+      {
+        "bytes": 46757,
+        "path": "tools/perf-baseline/src/odp_source_tail_append.rs",
+        "sha256": "e8e557db92f060d1506abd4d7ae594a42659c74f246c51205f98d34b6c108cb5"
+      },
+      {
+        "bytes": 19380,
+        "path": "tools/perf-baseline/src/odp_streaming_create.rs",
+        "sha256": "5c2f0fda774cd6a1ba8a22a429b17e6440589fed39aca8518efadc5002bd7b98"
+      },
+      {
+        "bytes": 40253,
+        "path": "tools/perf-baseline/src/odt_streaming_create.rs",
+        "sha256": "c41004f14601c77f308f4d96aaaa21916efbf541f79eab1bf98551c13379afe9"
+      },
+      {
+        "bytes": 44626,
+        "path": "tools/perf-baseline/src/ole2_range_source.rs",
+        "sha256": "bd2ae78bfe52d32b839f3307d496e3c76d593f9264f7ebac430aba29a40f358b"
+      },
+      {
+        "bytes": 26254,
+        "path": "tools/perf-baseline/src/opc_part_add.rs",
+        "sha256": "299c1a2a36407fc9f5b47acf6546e8439a853633a2c117eaf611f47b7f74b6b0"
+      },
+      {
+        "bytes": 96546,
+        "path": "tools/perf-baseline/src/operation_metrics.rs",
+        "sha256": "317bd89aa3b9d6452488ec538c4db158868f2874df9fb2956bdddd677b476ebf"
+      },
+      {
+        "bytes": 100712,
+        "path": "tools/perf-baseline/src/ordinary_save.rs",
+        "sha256": "09d9a2308e2545d038ef785a0770b3e21d26e7379f356bdd6671de65cebddd12"
+      },
+      {
+        "bytes": 32276,
+        "path": "tools/perf-baseline/src/parallel_metrics.rs",
+        "sha256": "fc2125088a4cea7ab1bba97f8059afe020e71e810ca20aedf889eec331f049d0"
+      },
+      {
+        "bytes": 95286,
+        "path": "tools/perf-baseline/src/pptx_cache_retention.rs",
+        "sha256": "1322518d42377d6f1859763ee6b319745afedc303148fd749c3fae2e2cc30872"
+      },
+      {
+        "bytes": 36773,
+        "path": "tools/perf-baseline/src/pptx_metadata_spool.rs",
+        "sha256": "ac36550e4cb40823448a81a622f16f12431b45136050d3545f06d46f33f21e7e"
+      },
+      {
+        "bytes": 43612,
+        "path": "tools/perf-baseline/src/pptx_native_image.rs",
+        "sha256": "66bc6aa527a16a712948b71cf8e557f91b53579f73b1f8750e31dd2e4340203b"
+      },
+      {
+        "bytes": 62105,
+        "path": "tools/perf-baseline/src/pptx_pair_lifecycle.rs",
+        "sha256": "17e96bcd64c7971bf25a0cdc152ce193077eaa95511d7bbb37dccb404855d222"
+      },
+      {
+        "bytes": 54421,
+        "path": "tools/perf-baseline/src/pptx_provider_lifecycle.rs",
+        "sha256": "dbc1f21b873e8a1081e58d53dd0f51db49901145726366967bd9986eeb785153"
+      },
+      {
+        "bytes": 34669,
+        "path": "tools/perf-baseline/src/pptx_range_source.rs",
+        "sha256": "f4b0d6171ef9a318e1d29affa0e593e6c5114f972c76dace13e572611a074921"
+      },
+      {
+        "bytes": 43807,
+        "path": "tools/perf-baseline/src/pptx_retention.rs",
+        "sha256": "9227bd4e73b17a55f64492be8d688f9b885f5ec68564fd001cbd741b56183aba"
+      },
+      {
+        "bytes": 40339,
+        "path": "tools/perf-baseline/src/pptx_slide_boundaries.rs",
+        "sha256": "f903d4a4c672a1c56de0ed3191e65345803f2d6a60fbd14e88ffbc8753693934"
+      },
+      {
+        "bytes": 39935,
+        "path": "tools/perf-baseline/src/pptx_streaming_create.rs",
+        "sha256": "506181e03a6cc832f7a93b651005edb7bb40a4f3085b836c6f6dcaebb67f323e"
+      },
+      {
+        "bytes": 12674,
+        "path": "tools/perf-baseline/src/process_metrics.rs",
+        "sha256": "07ee04303cd16e85e0d4581cd940aa3531b5475f70da01dd73c7f80debec3c51"
+      },
+      {
+        "bytes": 134554,
+        "path": "tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "8dc0a09d046dc44c3e29f820228b87eb4d3a4d2de63b1b67bf2e4d7cff6085de"
+      },
+      {
+        "bytes": 22162,
+        "path": "tools/perf-baseline/src/security_corpus.rs",
+        "sha256": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb"
+      },
+      {
+        "bytes": 93061,
+        "path": "tools/perf-baseline/src/xls_numeric.rs",
+        "sha256": "affe86793afdbfe7861082176b3623916756c6ad7782ec4602ce69513b1bc0a2"
+      },
+      {
+        "bytes": 10118,
+        "path": "tools/perf-baseline/src/xlsx_commit_metrics_tests.rs",
+        "sha256": "6216c258d63a9ef9ccdf8a8ca035522cfce74b79c69476f5baf2ebd3f96c1d88"
+      },
+      {
+        "bytes": 24057,
+        "path": "tools/perf-baseline/src/xlsx_planning_guard.rs",
+        "sha256": "3f7eeede5f66ad9350b81fc012e606c524f244cdeda865a558024608d4182ad5"
+      },
+      {
+        "bytes": 31052,
+        "path": "tools/perf-baseline/src/xml_stream_audit.rs",
+        "sha256": "1c4cccc24c30e2a75414c303d041a12147c464758691d3a7a4ce82ecb6c32ca3"
+      },
+      {
+        "bytes": 37099,
+        "path": "tools/perf-baseline/src/zip_directory_spool.rs",
+        "sha256": "b722f772bf9f17c7b10d70859af31a6087b3a09dcd6ae924e6e7e1819de22636"
+      }
+    ],
+    "source_diff": {
+      "bytes": 46147,
+      "sha256": "dba0ba7c5cd2ce991d621180a8d220bc9b2c8bf333b25302f6616100f86598dc"
+    },
+    "uname": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux"
+  },
+  "binary_after_build": {
+    "bytes": 7386736,
+    "mode": "0o775",
+    "path": "target/litchi-0889-validation/debug/xml_attribute_bounds",
+    "sha256": "bcd1101311436fd83115c283bf4c4a27e572a5a417c80da986aed2683fb6eba8"
+  },
+  "command_count": 7,
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 23038462446,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:19:14.852457Z",
+      "log": "attempts/validation-1/logs/fmt-check.log",
+      "log_bytes": 148,
+      "log_sha256": "8f8e4ca230e109699edcef1e932376e47d6b613b8f801294a8d463ceeade7ea2",
+      "name": "fmt_check",
+      "pass": true,
+      "returncode": 0,
+      "started_utc": "2026-10-03T17:18:51.814005Z"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 103397270335,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:20:58.250191Z",
+      "log": "attempts/validation-1/logs/cargo-test-xml-attribute-bounds.log",
+      "log_bytes": 10367,
+      "log_sha256": "5c74e35bb1586a51931acf9243bf768fc002f3db38aebc19aa909194cb1eafbc",
+      "name": "cargo_test_bin",
+      "pass": false,
+      "returncode": 101,
+      "started_utc": "2026-10-03T17:19:14.852945Z"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 12796459429,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:21:11.047121Z",
+      "log": "attempts/validation-1/logs/cargo-clippy-xml-attribute-bounds.log",
+      "log_bytes": 1989,
+      "log_sha256": "cc4832155e2871dd603eff07c73aba4f15ff95b9fc87c69dc7e434cf06d663e2",
+      "name": "clippy_bin_no_deps",
+      "pass": false,
+      "returncode": 101,
+      "started_utc": "2026-10-03T17:20:58.250682Z"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds",
+        "--tests",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 15119479210,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:21:26.167035Z",
+      "log": "attempts/validation-1/logs/cargo-clippy-xml-attribute-bounds-tests.log",
+      "log_bytes": 2063,
+      "log_sha256": "8374062d1b26dc8e3f5ee4953e0f35bc2a5dc08a8d8c10995aded90d1027e91a",
+      "name": "clippy_bin_tests_no_deps",
+      "pass": false,
+      "returncode": 101,
+      "started_utc": "2026-10-03T17:21:11.047580Z"
+    },
+    {
+      "argv": [
+        "cargo",
+        "rustdoc",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 4258999438,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:21:30.426461Z",
+      "log": "attempts/validation-1/logs/cargo-rustdoc-xml-attribute-bounds.log",
+      "log_bytes": 454,
+      "log_sha256": "35e8070453d9f40c1c35a7c190d3988e26a46481df65ca609d10a358d3a8ac0e",
+      "name": "rustdoc_bin",
+      "pass": true,
+      "returncode": 0,
+      "started_utc": "2026-10-03T17:21:26.167484Z"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 265133255133,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:25:55.560136Z",
+      "log": "attempts/validation-1/logs/crate-boundaries.log",
+      "log_bytes": 650,
+      "log_sha256": "3bd9a9c7e409c67a2a067e93ef56743cc17cea53a2d1c5526140b97e709594ba",
+      "name": "crate_boundary_check",
+      "pass": true,
+      "returncode": 0,
+      "started_utc": "2026-10-03T17:21:30.426906Z"
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--bin",
+        "xml_attribute_bounds"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ns": 634071043,
+      "expected": "pass",
+      "finished_utc": "2026-10-03T17:25:56.194675Z",
+      "log": "attempts/validation-1/logs/cargo-build-xml-attribute-bounds.log",
+      "log_bytes": 328,
+      "log_sha256": "6aa378874d66905404647f2b94cabe6aea5609b0ddc3b065a2863c0714f8656f",
+      "name": "cargo_build_bin",
+      "pass": true,
+      "returncode": 0,
+      "started_utc": "2026-10-03T17:25:55.560625Z"
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0889-validation",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-C debuginfo=0",
+    "RUSTFLAGS": "-C debuginfo=0",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "TMPDIR": "/tmp",
+    "TZ": "UTC"
+  },
+  "finished_utc": "2026-10-03T17:25:56.798778Z",
+  "fixtures": [
+    "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+    "test-data/ooxml/docx/drawing.docx",
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "gate_failures": [
+    "cargo_test_bin",
+    "clippy_bin_no_deps",
+    "clippy_bin_tests_no_deps"
+  ],
+  "last_command": {
+    "argv": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+      "--locked",
+      "--offline",
+      "--bin",
+      "xml_attribute_bounds"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "elapsed_ns": 634071043,
+    "expected": "pass",
+    "finished_utc": "2026-10-03T17:25:56.194675Z",
+    "log": "attempts/validation-1/logs/cargo-build-xml-attribute-bounds.log",
+    "log_bytes": 328,
+    "log_sha256": "6aa378874d66905404647f2b94cabe6aea5609b0ddc3b065a2863c0714f8656f",
+    "name": "cargo_build_bin",
+    "pass": true,
+    "returncode": 0,
+    "started_utc": "2026-10-03T17:25:55.560625Z"
+  },
+  "performance_claim": false,
+  "purpose": "correctness_and_bounded_input_qualification",
+  "schema": "litchi.mce-0889-validation.v1",
+  "started_utc": "2026-10-03T17:18:51.242409Z",
+  "status": "fail",
+  "target_dir": "/home/zhuhe/code/litchi/target/litchi-0889-validation",
+  "target_marker": "target/litchi-0889-validation/.owner-0889",
+  "toolchain": "1.95.0"
+}
