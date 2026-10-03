@@ -1,0 +1,230 @@
+{
+  "helper": {
+    "bytes": 2989,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/attribution.py",
+    "sha256": "18c18cd7cfc270f2e05773a85b8802112fc875df2a7073ce1a0085fa631be677"
+  },
+  "performance_claim": null,
+  "profiles": {
+    "00-baseline": {
+      "input": {
+        "bytes": 11960420,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stacks.txt",
+        "sha256": "7b022a98e061da2e5d2a8bbfd3b9f6544d506187c468f91657a311caea8f172f"
+      },
+      "nearest_mce_symbol_by_region": {
+        "process_other": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 4,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 73,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 3,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 55,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 5,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 17,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 4,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 4,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 2
+        },
+        "scan_closure": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 320,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5840,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 240,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 4400,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 400,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 1360,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 320,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 320,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 160
+        }
+      },
+      "regions": {
+        "process_other": 154156,
+        "runner_other": 847,
+        "scan_closure": 518660
+      },
+      "total": 673663,
+      "unresolved_frame_allocation_events": 1
+    },
+    "01-candidate": {
+      "input": {
+        "bytes": 11871109,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/01-candidate/stacks.txt",
+        "sha256": "dabb0e4bb42e2efd06e7280981e9f2345192d2d526d2a11f799d2d446c5e8737"
+      },
+      "nearest_mce_symbol_by_region": {
+        "process_other": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 8,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5791,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 8,
+          "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 99,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 2219,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 9803,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 4429,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 1064,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 7644,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 419,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 3,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 1064,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 1064
+        },
+        "scan_closure": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 360,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 460,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 388660,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 460,
+          "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 7920,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 169800,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 711520,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 338840,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 85080,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 546800,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 86840,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 360,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 60,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 480,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 85080,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 85080
+        }
+      },
+      "regions": {
+        "forced_worksheet_guard": 488980,
+        "process_other": 180878,
+        "runner_other": 847,
+        "scan_closure": 2523420
+      },
+      "total": 3194125,
+      "unresolved_frame_allocation_events": 1
+    },
+    "02-candidate": {
+      "input": {
+        "bytes": 11871109,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/02-candidate/stacks.txt",
+        "sha256": "21480e7daaddef74fd44ad67d031c5e1e3a7341da4721655d2c73dfe92bbe0ca"
+      },
+      "nearest_mce_symbol_by_region": {
+        "process_other": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 8,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5791,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 8,
+          "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 99,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 2219,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 9803,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 4429,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 1064,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 7644,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 419,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 3,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 1064,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 1064
+        },
+        "scan_closure": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 360,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 460,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 388660,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 460,
+          "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 7920,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 169800,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 711520,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 338840,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 85080,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 546800,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 86840,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 360,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 60,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 480,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 85080,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 85080
+        }
+      },
+      "regions": {
+        "forced_worksheet_guard": 488980,
+        "process_other": 180878,
+        "runner_other": 847,
+        "scan_closure": 2523420
+      },
+      "total": 3194125,
+      "unresolved_frame_allocation_events": 1
+    },
+    "03-baseline": {
+      "input": {
+        "bytes": 11960420,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/03-baseline/stacks.txt",
+        "sha256": "b2c415979f972a182ea6afae6207e201985dadde9bbda40e1a5bf1814e81f739"
+      },
+      "nearest_mce_symbol_by_region": {
+        "process_other": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 4,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 73,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 3,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 55,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 5,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 17,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 4,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 4,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 2,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 2
+        },
+        "scan_closure": {
+          "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 320,
+          "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5840,
+          "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+          "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 240,
+          "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 4400,
+          "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 400,
+          "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+          "litchi_ooxml_common::mce::stream::expand (stream.rs)": 1360,
+          "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 320,
+          "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 320,
+          "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 160,
+          "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 160
+        }
+      },
+      "regions": {
+        "process_other": 154156,
+        "runner_other": 847,
+        "scan_closure": 518660
+      },
+      "total": 673663,
+      "unresolved_frame_allocation_events": 1
+    }
+  },
+  "schema": "litchi.heaptrack-site-attribution-0895.v1",
+  "scope": "whole-process disjoint stack-presence regions; MCE symbols inclusive of descendant work; no temporal segmentation"
+}

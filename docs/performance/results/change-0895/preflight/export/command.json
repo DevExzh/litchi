@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/usr/bin/heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/heaptrack.zst",
+    "-t",
+    "0",
+    "-m",
+    "0",
+    "-a",
+    "1",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-n",
+    "30",
+    "-s",
+    "10",
+    "--flamegraph-cost-type",
+    "allocations",
+    "-F",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/export/stacks.txt",
+    "-H",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/export/histogram.txt"
+  ],
+  "started_utc": "2026-10-03T22:58:28.325526+00:00"
+}

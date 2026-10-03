@@ -1,0 +1,63 @@
+{
+  "children": 4,
+  "fail_fast": true,
+  "fresh_child": true,
+  "measured_samples": 80,
+  "performance_claim": null,
+  "plan": {
+    "bytes": 16698,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+    "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+  },
+  "rows": [
+    {
+      "path": "runs/00-baseline/receipt.json",
+      "row": {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 0,
+        "pair": "profile-00",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "path": "runs/01-candidate/receipt.json",
+      "row": {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 1,
+        "pair": "profile-01",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "path": "runs/02-candidate/receipt.json",
+      "row": {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 2,
+        "pair": "profile-02",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "path": "runs/03-baseline/receipt.json",
+      "row": {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 3,
+        "pair": "profile-03",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    }
+  ],
+  "schema": "litchi.xlsx-selected-metadata-heaptrack-capture-0895.v1",
+  "status": "pass",
+  "workload_launched": true
+}

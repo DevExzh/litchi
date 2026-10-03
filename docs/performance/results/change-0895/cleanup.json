@@ -1,0 +1,32 @@
+{
+  "status": "pass",
+  "checked_utc": "2026-10-03T23:13:45.830371+00:00",
+  "production_check": {
+    "argv": [
+      "git",
+      "diff",
+      "--exit-code",
+      "af9f2346a3fd65d762d82ea94dbb49a082c4bc82",
+      "--",
+      "crates",
+      "tools"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "unrelated_untracked_file": {
+    "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+    "bytes": 6390,
+    "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+  },
+  "worktrees_created": [],
+  "worktrees_removed": [],
+  "temporary_build_roots_created": [],
+  "temporary_build_roots_removed": [],
+  "retained_evidence_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0895",
+  "retained_evidence_bytes": 87362958,
+  "cleanup_action": "none needed: no disposable worktrees, builds, executable copies or scratch were created; all packet artifacts are retained evidence",
+  "other_worktrees": "preserved; not owned by this batch",
+  "performance_claim": null
+}

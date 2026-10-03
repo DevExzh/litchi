@@ -1,0 +1,169 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/heaptrack",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/candidate-native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--xlsx-shape",
+    "medium",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/producer.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0895",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/candidate-native",
+    "identity": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/candidate-native",
+      "bytes": 264541160,
+      "sha256": "1907d95f2248c1b548731cede3b0692e6daf357d26a6d305583532d2a33cb548",
+      "mode": 509,
+      "executable": true
+    },
+    "declared": {
+      "build_receipt": {
+        "bytes": 3299,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-native-build.json",
+        "sha256": "44ee75758884f0e60d2115198227f8646c3f6ff85c73e1f51701b600482f0f74"
+      },
+      "bytes": 264541160,
+      "depfile": {
+        "bytes": 403075,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-native.d",
+        "sha256": "d4d96c55a99be13f17df32c4e1bf960ae38660eab54dd0214e7f876dd93fece3"
+      },
+      "elf_build_id": "1a63ace0b03a4f6a033f9a7da024509c9b2c9424",
+      "evidence_bindings": {
+        "build": "candidate_build",
+        "candidate_freeze": "candidate_freeze",
+        "candidate_review": "candidate_review",
+        "depfile": "candidate_native_depfile",
+        "flags": "candidate_flags",
+        "methodology_review": "methodology_review",
+        "quality": "candidate_quality",
+        "source_archive": "source_archive",
+        "source_manifest": "source_manifest",
+        "source_review": "source_review"
+      },
+      "executable": true,
+      "features": [],
+      "mode": 509,
+      "name": "litchi-perf-baseline",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/candidate-native",
+      "profile": "release",
+      "role": "native",
+      "sha256": "1907d95f2248c1b548731cede3b0692e6daf357d26a6d305583532d2a33cb548"
+    },
+    "role": "native",
+    "name": "litchi-perf-baseline",
+    "features": [],
+    "profile": "release",
+    "elf_build_id": "1a63ace0b03a4f6a033f9a7da024509c9b2c9424",
+    "build_receipt": {
+      "bytes": 3299,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-native-build.json",
+      "sha256": "44ee75758884f0e60d2115198227f8646c3f6ff85c73e1f51701b600482f0f74"
+    },
+    "depfile": {
+      "bytes": 403075,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/candidate-native.d",
+      "sha256": "d4d96c55a99be13f17df32c4e1bf960ae38660eab54dd0214e7f876dd93fece3"
+    },
+    "evidence_bindings": {
+      "build": "candidate_build",
+      "candidate_freeze": "candidate_freeze",
+      "candidate_review": "candidate_review",
+      "depfile": "candidate_native_depfile",
+      "flags": "candidate_flags",
+      "methodology_review": "methodology_review",
+      "quality": "candidate_quality",
+      "source_archive": "source_archive",
+      "source_manifest": "source_manifest",
+      "source_review": "source_review"
+    }
+  },
+  "started_utc": "2026-10-03T22:55:23.678873+00:00",
+  "scope": "whole-process one-scan symbol-quality preflight; excluded from formal population",
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight.py",
+    "bytes": 2235,
+    "sha256": "260da9eb6bf041f2a4bac56befa7b79a44fdbbd596e3dc96ad465720779311f9",
+    "mode": 436,
+    "executable": false
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T22:55:24.800331+00:00",
+  "status": "pass",
+  "performance_claim": null,
+  "artifacts": {
+    "producer.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/producer.json",
+      "bytes": 7376,
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5",
+      "mode": 436,
+      "executable": false
+    },
+    "command.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/command.json",
+      "bytes": 4394,
+      "sha256": "4e2890950c7c733e60c9de9ee6d90305e491b1d265ed6983315c4b2a1cd7ebf5",
+      "mode": 436,
+      "executable": false
+    },
+    "heaptrack.zst": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/heaptrack.zst",
+      "bytes": 223296,
+      "sha256": "0bd62ba79f56bb2f4383565984f150b44c33cadc9df15f179d5e171c361fce34",
+      "mode": 436,
+      "executable": false
+    },
+    "report.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/report.json",
+      "bytes": 19846,
+      "sha256": "98999120eb4c3404b2a6bd67c454fb340753319a3687547cf7152ac0d59219d1",
+      "mode": 436,
+      "executable": false
+    },
+    "stderr.txt": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/stderr.txt",
+      "bytes": 104,
+      "sha256": "dc3648788353c966786dea506e6d7c7776cfdd03f88ef4e3e18c4fdaeac31aee",
+      "mode": 436,
+      "executable": false
+    },
+    "stdout.txt": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/stdout.txt",
+      "bytes": 351,
+      "sha256": "92d5d426f8f7c18d9af135ab7177ae988408ab49a2d278c5433b203fa7761bb5",
+      "mode": 436,
+      "executable": false
+    }
+  }
+}

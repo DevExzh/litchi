@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0895 — selected-stream allocation attribution
+
+[0895](0895-selected-stream-allocation-profile.md) profiles the exact retained
+0894 baseline and rejected candidate in four sequential Heaptrack processes /
+80 scans. Whole-process allocation totals repeat exactly: 673,663 baseline,
+3,194,125 candidate. The closest recognized MCE-stream owner accounts for
+76.71% of candidate calls; scan-closure stacks separately reproduce the prior
+25,933 versus 126,171 per-scan allocator counts. Name expansion/copying and
+attribute temporaries lead the candidate allocation groups. All semantic
+guards and offline custody/reduction replay pass. This is allocation
+attribution, with no new latency/RSS/adoption claim. Production is unchanged;
+next is a bounded allocation-free QName expansion hypothesis with existing
+error, resource, and differential gates.
+
 ## 0894 — selected worksheet metadata route rejected
 
 [0894](0894-selected-worksheet-metadata.md) measures the bounded metadata

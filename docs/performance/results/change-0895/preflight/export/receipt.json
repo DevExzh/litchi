@@ -1,0 +1,25 @@
+{
+  "exit_code": 0,
+  "artifacts": {
+    "command.json": {
+      "bytes": 605,
+      "sha256": "540b50897eb7c6186b63bbc72c52dde5dbfbcc54cfc732f68338b64ff4e26158"
+    },
+    "histogram.txt": {
+      "bytes": 2345,
+      "sha256": "b9df1d3f057c0a773031a139fad0c02cd75d9b599fd3adff2b4a8d9cd4d9a820"
+    },
+    "stacks.txt": {
+      "bytes": 11867989,
+      "sha256": "61e98a7c4c9d13a8026a516498cbc33d326b502824587e448c09e3eb66ce34c7"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 210559,
+      "sha256": "3023836c48690805aae7c6aeea98d207be47752193b38505e73252914c3a2b0f"
+    }
+  }
+}

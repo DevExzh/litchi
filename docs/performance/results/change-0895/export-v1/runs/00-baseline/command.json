@@ -1,0 +1,65 @@
+{
+  "argv": [
+    "/usr/bin/heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/heaptrack.zst",
+    "-t",
+    "0",
+    "-m",
+    "0",
+    "-a",
+    "1",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-n",
+    "30",
+    "-s",
+    "10",
+    "--flamegraph-cost-type",
+    "allocations",
+    "-F",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stacks.txt",
+    "-H",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/histogram.txt"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0895",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T23:10:33.274406+00:00",
+  "plan_sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e",
+  "profile": {
+    "bytes": 221981,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/heaptrack.zst",
+    "sha256": "88dd09124668cd36e44a48821d8d70a7e221c1d9178f17a2d0c117d8fad6dbcd"
+  },
+  "row": {
+    "case": "xlsx_producer_medium_source_full_cell_scan",
+    "ordinal": 0,
+    "pair": "profile-00",
+    "role": "baseline",
+    "samples": 20,
+    "warmup": 0
+  },
+  "schema": "litchi.xlsx-selected-metadata-heaptrack-export-0895.v1-command",
+  "started_utc": "2026-10-03T23:10:33.177240+00:00",
+  "tool": {
+    "identity": {
+      "bytes": 346488,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d"
+    },
+    "path": "/usr/bin/heaptrack_print",
+    "version": "heaptrack_print 1.5.0"
+  }
+}

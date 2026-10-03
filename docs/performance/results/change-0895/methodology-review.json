@@ -1,0 +1,169 @@
+{
+  "schema": "litchi.xlsx-selected-metadata-heaptrack-methodology-review-0895.v1",
+  "status": "approved_for_measurement",
+  "reviewer": "/root/allocation_profile_review_0895",
+  "scope": "protocol, custody, stack parsing, allocation-counter reconciliation, and source-attribution review; no formal population capture, latency measurement, build, or production edit by this review",
+  "plan": {
+    "schema": "litchi.xlsx-selected-metadata-heaptrack-0895.v1",
+    "status": "frozen",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+    "bytes": 16698,
+    "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e",
+    "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+    "guard_contract": "post-endpoint-per-worksheet-tolerance-v1"
+  },
+  "protocol": {
+    "case": "xlsx_producer_medium_source_full_cell_scan",
+    "xlsx_shape": "medium",
+    "cpu_affinity": "12",
+    "cache": "warm",
+    "fresh_process_per_row": true,
+    "fail_fast": true,
+    "warmup_per_process": 0,
+    "samples_per_process": 20,
+    "rows": [
+      {"ordinal": 0, "role": "baseline", "samples": 20},
+      {"ordinal": 1, "role": "candidate", "samples": 20},
+      {"ordinal": 2, "role": "candidate", "samples": 20},
+      {"ordinal": 3, "role": "baseline", "samples": 20}
+    ],
+    "total_processes": 4,
+    "total_measured_samples": 80,
+    "formal_capture_order": "baseline,candidate,candidate,baseline",
+    "adoption_gate": null,
+    "latency_measurement": false
+  },
+  "bindings": {
+    "0894_base_guard_reference": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-after-cleanup/report.json",
+      "bytes": 14762,
+      "sha256": "4a07f89b1c2d6a4769eb93cbbcb9da55cea70781894235ff68a2445afa539401"
+    },
+    "tools": {
+      "taskset": {
+        "path": "/usr/bin/taskset",
+        "bytes": 31184,
+        "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+        "mode": 493
+      },
+      "heaptrack": {
+        "path": "/usr/bin/heaptrack",
+        "bytes": 12702,
+        "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+        "mode": 493,
+        "version": "heaptrack 1.5.0"
+      },
+      "heaptrack_print": {
+        "path": "/usr/bin/heaptrack_print",
+        "bytes": 346488,
+        "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d",
+        "mode": 493,
+        "version": "heaptrack_print 1.5.0"
+      }
+    },
+    "packet_helpers": {
+      "common.py": "7f2cd02158ee205e7c82df883a954d1289270b478881a596c04df916460c5ef2",
+      "freeze.py": "ad4b2623bdd56827596d149f25d15ec2c006fc2a60da09c96da67af903d14de0",
+      "capture.py": "55075c3e535f015c6612b31fdaaf39e4b006e5f47824529ce9e756bc6a7a2dac",
+      "export.py": "4c853d9e3c88b205f703472ad89e690e7246601fc0140b80467742abca7df5bf",
+      "reduce.py": "19f09afae83d4eded6d6b3ea31cf0f36cabbe09e34235141039c4b606d6654a0",
+      "verify.py": "f145aa52507942ba0a98f62b469b831b034fc2aa026b269ce18569d9fc99c30c",
+      "attribution.py": "18c18cd7cfc270f2e05773a85b8802112fc875df2a7073ce1a0085fa631be677"
+    },
+    "reused_0894_helper_sha256": {
+      "experiment.py": "e290c4fb1522131382605c91305beb36293069b72653bd4d67193177e20f3f64",
+      "freeze.py": "b2ab5654083e03640428b56be64b0e9da4fca64c612ca73dc2587a911fde97de",
+      "quality.py": "55bf268c9b6270995d36189b391af9bd2244f8cdf7008d527c0ee7f2e502c25f",
+      "quality_source.py": "138dd07b47a209157950c6d1bf0399af202add742ad426855f62da4504727b74",
+      "reduce-0887.py": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad",
+      "reduce.py": "0a27d8bd7a40d03bacf81d79fdb91f72191eb55992ddd0aab1efdedc263b6415",
+      "verify.py": "82ebf22b3ded31a4914fbbba9c351a0aa0498d9462d57483f8a0fc36db15872b"
+    }
+  },
+  "stack_semantics": {
+    "profiler": "heaptrack 1.5.0",
+    "exporter": "heaptrack_print 1.5.0",
+    "record_scope": "whole debuggee process, including corpus/oracle setup, all 20 full-cell iterations, report/producer serialization, process setup, and post-endpoint worksheet tolerance guards",
+    "timed_workload_scope": "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback canonical digest; the heaptrack profile is not a timer and must not be presented as a latency result",
+    "print_options": [
+      "-m 0 (do not merge backtraces)",
+      "-t 0 (retain full symbol/template names)",
+      "--flamegraph-cost-type allocations",
+      "-F full allocation-cost stacks",
+      "-H allocation-size histogram",
+      "-p 0 and -a 1 for bounded ranked text; ranked-text truncation does not truncate -F/-H"
+    ],
+    "profile_suffix": ".zst",
+    "flamegraph_order": "root-to-leaf; nearest owner is the rightmost recognized frame",
+    "disjoint_assignment": "each stack allocation cost belongs to exactly one nearest recognized owner bucket; owner buckets are legacycodec, mce_stream, selected_worksheet, x14ac, and other",
+    "inclusive_assignment": "a separate diagnostic count adds a stack once to each owner category present; inclusive values overlap and are never summed into disjoint totals",
+    "source_attribution": "stack-presence regions only; scan-closure and forced-worksheet-guard frames are disjoint labels, with no temporal segmentation or timer claim"
+  },
+  "reconciliation_contract": {
+    "stack_total": "sum of positive decimal costs in every nonempty flamegraph stack line after removing exactly one terminal separator",
+    "printed_total": "last `calls to allocation functions` total in heaptrack_print ranked text",
+    "histogram_total": "sum of positive allocation counts in every histogram row",
+    "required_equality": "stack_total == printed_total == histogram_total for every profile",
+    "counter_semantics": "heaptrack allocation-hook calls; not a count of all process memory activity, and not a latency metric",
+    "malformed_input": "reject non-decimal, zero, negative, empty, or interior-empty stack/histogram fields",
+    "symbol_quality": "retain unresolved/unclassified frames and review their allocation share; unresolved symbols do not establish causal ownership"
+  },
+  "guard_contract": {
+    "name": "post-endpoint-per-worksheet-tolerance-v1",
+    "required_per_profile": [
+      "all 20 source_version_stable values true",
+      "forced_worksheet_counts exactly [4] repeated 20 times",
+      "forced_worksheet_tolerance_clean exactly true repeated 20 times",
+      "forced_worksheet_guard_iterations exactly 20",
+      "aggregate tolerance report clean after worksheet reports",
+      "final source-version fence after the aggregate report",
+      "producer cell/count/digest/archive oracle equality",
+      "typed errors and callback ordering preserved by the sealed 0894 validator"
+    ],
+    "excluded_claims": ["runtime route observation", "physical cold cache", "native Office behavior", "timer segmentation of heaptrack stacks"]
+  },
+  "preflight": {
+    "formal_population_excluded": true,
+    "scope": "one candidate-native warm-cache scan with zero warmups, retained only for symbol and parser qualification",
+    "receipt": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/receipt.json", "bytes": 6211, "sha256": "9b6a47fe54c76baa101e07207f6be6558c94bbaf8da72b91fae5e23406e1ecad"},
+    "report": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/report.json", "bytes": 19846, "sha256": "98999120eb4c3404b2a6bd67c454fb340753319a3687547cf7152ac0d59219d1"},
+    "trace": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/heaptrack.zst", "bytes": 223296, "sha256": "0bd62ba79f56bb2f4383565984f150b44c33cadc9df15f179d5e171c361fce34"},
+    "export": {
+      "receipt": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/export/receipt.json", "bytes": 704, "sha256": "693bd7e69761a6f10fc3e10721886e66f247d3b6ec95d80becc943cf3be8b62f"},
+      "stacks": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/export/stacks.txt", "bytes": 11867989, "sha256": "61e98a7c4c9d13a8026a516498cbc33d326b502824587e448c09e3eb66ce34c7"},
+      "histogram": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/export/histogram.txt", "bytes": 2345, "sha256": "b9df1d3f057c0a773031a139fad0c02cd75d9b599fd3adff2b4a8d9cd4d9a820"},
+      "ranked_text": {"path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/preflight/export/stdout.txt", "bytes": 210559, "sha256": "3023836c48690805aae7c6aeea98d207be47752193b38505e73252914c3a2b0f"}
+    },
+    "observed_reconciliation": {"stack_lines": 4479, "unique_stacks": 2980, "stack_total": 331658, "histogram_total": 331658, "printed_total": 331658, "unresolved_allocation_events": 1},
+    "semantic_result": "preflight report passed the sealed producer oracle and four-worksheet tolerance guard"
+  },
+  "findings_resolved": [
+    "Heaptrack 1.5.0 emits zstd traces; the frozen profile suffix and capture artifact are `.zst`.",
+    "The 0895 plan seals all packet helpers, including capture, export, reduction, verification, and source attribution, plus the exact heaptrack, heaptrack_print, and taskset identities.",
+    "The flamegraph parser accepts heaptrack_print's one terminal semicolon while rejecting empty interior frames.",
+    "The nearest-owner direction is fixed to the rightmost frame because heaptrack flamegraph stacks are root-to-leaf; inclusive counts are retained separately.",
+    "The exact 0894 guard reference and producer validator are inherited through the frozen base plan and checked before formal capture."
+  ],
+  "negative_controls": [
+    "Changed 0894 binary, base-plan, tool, packet-helper, or reused-helper bytes fail descriptor binding.",
+    "Changed CPU, cache state, role order, sample count, guard contract, profile suffix, owner categories, or print argv fails plan loading.",
+    "A nonzero child, missing profile, missing sidecar, report/oracle mismatch, guard-vector mismatch, or reordered child stops capture without retry or replacement.",
+    "A malformed stack or histogram line, mismatched printed/stack/histogram total, or changed export artifact fails reduction.",
+    "The independent verifier launches no workload or profiler command and replays command, binary, plan, semantic, guard, artifact, and reduction identities."
+  ],
+  "caveats": [
+    "Only two whole-process traces per role are planned; this is descriptive allocation evidence with no uncertainty interval or adoption gate.",
+    "Heaptrack instrumentation and its wrapper can affect process behavior; identical pinned tool versions and role order make the profile a scoped mechanism comparison, not an uninstrumented allocation count.",
+    "Whole-process totals intentionally include setup, oracle construction, output serialization, and post-endpoint guards; stack presence cannot assign allocations to a time interval.",
+    "CPU affinity is recorded without an exclusive-host guarantee and the filesystem cache is warm; no cold-cache, native Office, or universal producer claim follows.",
+    "Nested inclusive owner counts overlap and must not be added; source-audit line attribution is a bounded hypothesis aid, not proof of causality or a production performance claim."
+  ],
+  "review_actions": [
+    "Read-only review of the frozen plan and all sealed packet helper source.",
+    "AST parsing of every 0895 Python helper completed successfully.",
+    "Offline heaptrack_print export inspection confirmed full stack and histogram reconciliation on the retained one-scan preflight.",
+    "Offline reducer replay confirmed 4479 stack lines and exact 331658/331658/331658 totals without launching a workload."
+  ],
+  "formal_capture_started": false,
+  "performance_claim": null
+}

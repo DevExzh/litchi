@@ -1,0 +1,598 @@
+{
+  "caveats": [
+    "Heaptrack covers the whole fresh debuggee process, including setup, oracle work, serialization, destruction, and post-endpoint guards.",
+    "The separate temporary-allocation summaries differ by one in every formal profile and are excluded from the required allocation-call reconciliation.",
+    "Zero baseline forced-guard presence means no baseline stack matched that symbol region; sealed semantic vectors still prove the guard executed.",
+    "Repeated role exports are identical for the reported allocation totals, but this remains descriptive profile evidence with no latency, RSS, or adoption claim."
+  ],
+  "findings": [
+    "All four formal profiles reconcile Heaptrack stderr allocation calls, heaptrack_print calls total, collapsed stack costs, and histogram counts exactly.",
+    "Disjoint owner totals independently reproduce the sealed reduction: baseline mce_stream 14,418 and candidate mce_stream 2,450,201, with complete category sums equal to profile totals.",
+    "Independent closure/guard attribution reproduces baseline 518,660 scan-closure calls and candidate 2,523,420 scan-closure plus 488,980 forced-guard calls.",
+    "Each profile retains one unresolved-frame allocation event with cost 1; no unresolved event is discarded.",
+    "Candidate scan-closure nearest-MCE presence totals 2,508,360 across 20 scans; this is an allocation-site stack diagnostic, not a timing or causal decomposition."
+  ],
+  "formal_capture": {
+    "capture_status": "pass",
+    "children": 4,
+    "export_status": "pass",
+    "fail_fast": true,
+    "fresh_process_per_row": true,
+    "measured_samples": 80,
+    "offline_replay_workload_launched": false,
+    "order": [
+      {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 0,
+        "pair": "profile-00",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      },
+      {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 1,
+        "pair": "profile-01",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      },
+      {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 2,
+        "pair": "profile-02",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      },
+      {
+        "case": "xlsx_producer_medium_source_full_cell_scan",
+        "ordinal": 3,
+        "pair": "profile-03",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    ],
+    "profile_suffix": ".zst",
+    "verification_status": "pass",
+    "workload_launched_during_capture": true
+  },
+  "independent_replay": {
+    "all_profiles_reconciled": true,
+    "inclusive_rule": "presence counts are separate diagnostics and are never added to disjoint totals",
+    "matches_sealed_attribution": true,
+    "matches_sealed_reduction": true,
+    "owner_rule": "rightmost recognized owner frame; categories are disjoint",
+    "parser": "separate read-only parser in this review; no 0895 reducer or attribution module imported",
+    "profiles": [
+      {
+        "exclusive_owner_allocation_cost": {
+          "legacycodec": 535697,
+          "mce_stream": 14418,
+          "other": 112395,
+          "selected_worksheet": 1361,
+          "x14ac": 9792
+        },
+        "exclusive_owner_sum": 673663,
+        "histogram_rows": 332,
+        "inclusive_owner_allocation_cost": {
+          "legacycodec": 545408,
+          "mce_stream": 14904,
+          "selected_worksheet": 511012,
+          "x14ac": 24615
+        },
+        "inclusive_owner_sum_is_not_used": true,
+        "malformed_lines": [],
+        "nearest_mce_symbol_by_region": {
+          "process_other": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 4,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 73,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 3,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 55,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 5,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 17,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 4,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 4,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 2
+          },
+          "scan_closure": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 320,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5840,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 240,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 4400,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 400,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 1360,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 320,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 320,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 160
+          }
+        },
+        "reconciliation": {
+          "histogram_total": 673663,
+          "pass": true,
+          "printed_equals_histogram": true,
+          "printed_total": 673663,
+          "stack_equals_histogram": true,
+          "stack_equals_printed": true,
+          "stack_equals_stderr_allocations": true,
+          "stack_total": 673663,
+          "stderr_allocations": 673663,
+          "stderr_allocations_equals_printed": true
+        },
+        "region_sum": 673663,
+        "regions": {
+          "process_other": 154156,
+          "runner_other": 847,
+          "scan_closure": 518660
+        },
+        "row": {
+          "case": "xlsx_producer_medium_source_full_cell_scan",
+          "ordinal": 0,
+          "pair": "profile-00",
+          "role": "baseline",
+          "samples": 20,
+          "warmup": 0
+        },
+        "stack_lines": 4516,
+        "temporary_allocation_summary": {
+          "printed_minus_stderr": 1,
+          "printed_temporary_memory_allocations": 164351,
+          "stderr_temporary_allocations": 164350,
+          "used_for_required_reconciliation": false
+        },
+        "unclassified_frame_count": 2424,
+        "unique_stacks": 3000,
+        "unresolved_allocation_cost": 1,
+        "unresolved_frame_count": 1,
+        "unresolved_stack_count": 1
+      },
+      {
+        "exclusive_owner_allocation_cost": {
+          "legacycodec": 529082,
+          "mce_stream": 2450201,
+          "other": 112955,
+          "selected_worksheet": 84193,
+          "x14ac": 17694
+        },
+        "exclusive_owner_sum": 3194125,
+        "histogram_rows": 340,
+        "inclusive_owner_allocation_cost": {
+          "legacycodec": 538676,
+          "mce_stream": 2542000,
+          "selected_worksheet": 2542494,
+          "x14ac": 2525012
+        },
+        "inclusive_owner_sum_is_not_used": true,
+        "malformed_lines": [],
+        "nearest_mce_symbol_by_region": {
+          "process_other": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 8,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5791,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 8,
+            "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 99,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 2219,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 9803,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 4429,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 1064,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 7644,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 419,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 3,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 1064,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 1064
+          },
+          "scan_closure": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 360,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 460,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 388660,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 460,
+            "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 7920,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 169800,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 711520,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 338840,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 85080,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 546800,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 86840,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 360,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 60,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 480,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 85080,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 85080
+          }
+        },
+        "reconciliation": {
+          "histogram_total": 3194125,
+          "pass": true,
+          "printed_equals_histogram": true,
+          "printed_total": 3194125,
+          "stack_equals_histogram": true,
+          "stack_equals_printed": true,
+          "stack_equals_stderr_allocations": true,
+          "stack_total": 3194125,
+          "stderr_allocations": 3194125,
+          "stderr_allocations_equals_printed": true
+        },
+        "region_sum": 3194125,
+        "regions": {
+          "forced_worksheet_guard": 488980,
+          "process_other": 180878,
+          "runner_other": 847,
+          "scan_closure": 2523420
+        },
+        "row": {
+          "case": "xlsx_producer_medium_source_full_cell_scan",
+          "ordinal": 1,
+          "pair": "profile-01",
+          "role": "candidate",
+          "samples": 20,
+          "warmup": 0
+        },
+        "stack_lines": 4480,
+        "temporary_allocation_summary": {
+          "printed_minus_stderr": 1,
+          "printed_temporary_memory_allocations": 509170,
+          "stderr_temporary_allocations": 509169,
+          "used_for_required_reconciliation": false
+        },
+        "unclassified_frame_count": 2451,
+        "unique_stacks": 2981,
+        "unresolved_allocation_cost": 1,
+        "unresolved_frame_count": 1,
+        "unresolved_stack_count": 1
+      },
+      {
+        "exclusive_owner_allocation_cost": {
+          "legacycodec": 529082,
+          "mce_stream": 2450201,
+          "other": 112955,
+          "selected_worksheet": 84193,
+          "x14ac": 17694
+        },
+        "exclusive_owner_sum": 3194125,
+        "histogram_rows": 340,
+        "inclusive_owner_allocation_cost": {
+          "legacycodec": 538676,
+          "mce_stream": 2542000,
+          "selected_worksheet": 2542494,
+          "x14ac": 2525012
+        },
+        "inclusive_owner_sum_is_not_used": true,
+        "malformed_lines": [],
+        "nearest_mce_symbol_by_region": {
+          "process_other": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 8,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5791,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 8,
+            "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 99,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 2219,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 9803,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 4429,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 1064,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 7644,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 419,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 3,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 1064,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 1064
+          },
+          "scan_closure": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 360,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 460,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 388660,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 460,
+            "litchi_ooxml_common::mce::stream::Processor::start (stream.rs)": 7920,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 169800,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 711520,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 338840,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 85080,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 546800,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 86840,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 360,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers (stream.rs)": 60,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 480,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 85080,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 85080
+          }
+        },
+        "reconciliation": {
+          "histogram_total": 3194125,
+          "pass": true,
+          "printed_equals_histogram": true,
+          "printed_total": 3194125,
+          "stack_equals_histogram": true,
+          "stack_equals_printed": true,
+          "stack_equals_stderr_allocations": true,
+          "stack_total": 3194125,
+          "stderr_allocations": 3194125,
+          "stderr_allocations_equals_printed": true
+        },
+        "region_sum": 3194125,
+        "regions": {
+          "forced_worksheet_guard": 488980,
+          "process_other": 180878,
+          "runner_other": 847,
+          "scan_closure": 2523420
+        },
+        "row": {
+          "case": "xlsx_producer_medium_source_full_cell_scan",
+          "ordinal": 2,
+          "pair": "profile-02",
+          "role": "candidate",
+          "samples": 20,
+          "warmup": 0
+        },
+        "stack_lines": 4480,
+        "temporary_allocation_summary": {
+          "printed_minus_stderr": 1,
+          "printed_temporary_memory_allocations": 509170,
+          "stderr_temporary_allocations": 509169,
+          "used_for_required_reconciliation": false
+        },
+        "unclassified_frame_count": 2451,
+        "unique_stacks": 2981,
+        "unresolved_allocation_cost": 1,
+        "unresolved_frame_count": 1,
+        "unresolved_stack_count": 1
+      },
+      {
+        "exclusive_owner_allocation_cost": {
+          "legacycodec": 535697,
+          "mce_stream": 14418,
+          "other": 112395,
+          "selected_worksheet": 1361,
+          "x14ac": 9792
+        },
+        "exclusive_owner_sum": 673663,
+        "histogram_rows": 332,
+        "inclusive_owner_allocation_cost": {
+          "legacycodec": 545408,
+          "mce_stream": 14904,
+          "selected_worksheet": 511012,
+          "x14ac": 24615
+        },
+        "inclusive_owner_sum_is_not_used": true,
+        "malformed_lines": [],
+        "nearest_mce_symbol_by_region": {
+          "process_other": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 4,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 73,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 6,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 3,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 55,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 5,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 1,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 17,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 4,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 4,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 2,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 2
+          },
+          "scan_closure": {
+            "litchi_ooxml_common::mce::stream::Namespaces::with_local (stream.rs)": 320,
+            "litchi_ooxml_common::mce::stream::Processor::close_start (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::Processor::parse_element (stream.rs)": 5840,
+            "litchi_ooxml_common::mce::stream::Processor::raw_start_commit (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::apply_directives (stream.rs)": 480,
+            "litchi_ooxml_common::mce::stream::clone_bounded_bytes (stream.rs)": 240,
+            "litchi_ooxml_common::mce::stream::clone_bounded_name_part (stream.rs)": 4400,
+            "litchi_ooxml_common::mce::stream::clone_bounded_string (stream.rs)": 400,
+            "litchi_ooxml_common::mce::stream::clone_raw_attributes (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::collect_directives (stream.rs)": 80,
+            "litchi_ooxml_common::mce::stream::expand (stream.rs)": 1360,
+            "litchi_ooxml_common::mce::stream::invoke_active (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::local_namespaces (stream.rs)": 320,
+            "litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_stoppable_observers (stream.rs)": 320,
+            "litchi_ooxml_common::mce::stream::semantic_attrs (stream.rs)": 160,
+            "litchi_ooxml_common::mce::stream::validate_duplicate_attributes (stream.rs)": 160
+          }
+        },
+        "reconciliation": {
+          "histogram_total": 673663,
+          "pass": true,
+          "printed_equals_histogram": true,
+          "printed_total": 673663,
+          "stack_equals_histogram": true,
+          "stack_equals_printed": true,
+          "stack_equals_stderr_allocations": true,
+          "stack_total": 673663,
+          "stderr_allocations": 673663,
+          "stderr_allocations_equals_printed": true
+        },
+        "region_sum": 673663,
+        "regions": {
+          "process_other": 154156,
+          "runner_other": 847,
+          "scan_closure": 518660
+        },
+        "row": {
+          "case": "xlsx_producer_medium_source_full_cell_scan",
+          "ordinal": 3,
+          "pair": "profile-03",
+          "role": "baseline",
+          "samples": 20,
+          "warmup": 0
+        },
+        "stack_lines": 4516,
+        "temporary_allocation_summary": {
+          "printed_minus_stderr": 1,
+          "printed_temporary_memory_allocations": 164351,
+          "stderr_temporary_allocations": 164350,
+          "used_for_required_reconciliation": false
+        },
+        "unclassified_frame_count": 2424,
+        "unique_stacks": 3000,
+        "unresolved_allocation_cost": 1,
+        "unresolved_frame_count": 1,
+        "unresolved_stack_count": 1
+      }
+    ],
+    "role_repeat_identity": {
+      "baseline_repeats_match": true,
+      "candidate_repeats_match": true
+    },
+    "stack_rule": "positive decimal costs; remove exactly one terminal semicolon; reject empty interior frames"
+  },
+  "inputs": {
+    "attribution": {
+      "bytes": 14787,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/attribution.json",
+      "sha256": "46edd9a68375cce28d3cfb0e11efb7864e3438cca8236912bfe221dc761a6369"
+    },
+    "baseline_index": {
+      "bytes": 468668,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/BASELINE.md",
+      "sha256": "2e8a0ea00416515bf844c27d2521587284edd7f169798c311a9dec33ee8c9d46"
+    },
+    "capture": {
+      "bytes": 1577,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/capture.json",
+      "sha256": "f1e5274e724a65e226462f96e24fd166d25f3b5b893178679cf6e338461e8fc3"
+    },
+    "cleanup": {
+      "bytes": 1046,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/cleanup.json",
+      "sha256": "7efe29e75ff94929260d9037f55d1dc7df2fb6b45f24f69357032495e8adc304"
+    },
+    "decision": {
+      "bytes": 1579,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/decision.json",
+      "sha256": "a40c733cf33ae5d5f178478be9c2b344979d42132468dcf706710da901b40273"
+    },
+    "export": {
+      "bytes": 1769,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/export.json",
+      "sha256": "c68654a8237878513df79fe643c38dd75943b5adc4df8e3ea1477a338b737d73"
+    },
+    "hotspots_index": {
+      "bytes": 770986,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/HOTSPOTS.md",
+      "sha256": "716d96d348c0b7d8900d7efea2285a32b3de7ebf74753b86d5e8d7e10ca48485"
+    },
+    "methodology_review": {
+      "bytes": 11842,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/methodology-review.json",
+      "sha256": "c344a3f04bee3c4a71960b55b0f1027fefd3a8c0a3d478c31a4a0a377a2b1ae8"
+    },
+    "plan": {
+      "bytes": 16698,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+      "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+    },
+    "reduction": {
+      "bytes": 24902579,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/reduction.json",
+      "sha256": "67773fad7f6ca259d4829953c08a08fd1ed0f4d77f6f972dbac8b50c609db79c"
+    },
+    "report": {
+      "bytes": 6660,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0895-selected-stream-allocation-profile.md",
+      "sha256": "d2799a388e54ffbcdc2571905f1cc4041fa1143821c7e5466d3a4497520981bd"
+    },
+    "report_index": {
+      "bytes": 783525,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/REPORT.md",
+      "sha256": "9b0693a048b1af479cf7790dec4737cbaaa2a9b9abc62fce045c77713342e8ca"
+    },
+    "source_audit": {
+      "bytes": 11299,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/source-audit.md",
+      "sha256": "c5293ff28cc3d44e6049a9db586b4f2ac1ec4521189d1024ce15db992aa2b5ab"
+    },
+    "verification": {
+      "bytes": 1459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/verification.json",
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    }
+  },
+  "performance_claim": null,
+  "plan": {
+    "bytes": 16698,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+    "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+  },
+  "reviewer": "/root/allocation_profile_review_0895",
+  "schema": "litchi.xlsx-selected-metadata-heaptrack-capture-review-0895.v1",
+  "scope": "independent offline replay of formal Heaptrack exports and source-order review; no workload, profiler, build, or production edit launched by this review",
+  "source_validity": {
+    "aggregate_tolerance_lines": "producer_shape.rs:2608-2617",
+    "closure_and_guard_presence_disjoint": true,
+    "current_source_head": "af9f2346a3fd65d762d82ea94dbb49a082c4bc82",
+    "endpoint_observation_lines": "producer_shape.rs:2570-2575",
+    "final_source_fence_lines": "producer_shape.rs:2618-2632",
+    "forced_guard_lines": "producer_shape.rs:2585-2607",
+    "formal_binary_note": "formal profiles use retained 0894 native binaries bound by the frozen 0895 plan; current source lines are attribution references, not a claim that the restored HEAD produced those binaries",
+    "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+    "helper_definition_lines": "producer_shape.rs:2449-2475",
+    "source_file": {
+      "bytes": 142118,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape.rs",
+      "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+    },
+    "source_review_conclusion": "stack presence maps to the named regions; it does not segment Heaptrack events by timer or establish causality",
+    "timed_closure_presence_lines": "producer_shape.rs:2520-2568"
+  },
+  "status": "pass"
+}

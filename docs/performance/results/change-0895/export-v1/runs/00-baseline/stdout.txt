@@ -1,0 +1,2408 @@
+reading file "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --case xlsx_producer_medium_source_full_cell_scan --xlsx-shape medium --warmup 0 --samples 20 --filesystem-cache warm --json /home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/report.json --producer-evidence /home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/producer.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+166800 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h5b0a24717f96ef37
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  alloc::raw_vec::RawVecInner$LT$A$GT$::with_capacity_in::h5b48b908e078ad3e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::with_capacity_in::h8385a17165034f4e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  alloc::vec::Vec$LT$T$C$A$GT$::with_capacity_in::h0d6d1b1c026485f8
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h11fe0d156f4d787f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec_in::h89c37e15101da53f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec::h90d457bb995c181f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:376
+  alloc::slice::_$LT$impl$u20$alloc..borrow..ToOwned$u20$for$u20$$u5b$T$u5d$$GT$::to_owned::h487b05a73be4a375
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:842
+  _RNvXs2_NtCslNYArtu3iFV_5alloc3streNtNtB7_6borrow7ToOwned8to_owned
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/str.rs:211
+  litchi_ooxml_common::mce::codec::start::hf25a5fe21e5b8a00
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/mce/codec.rs:0
+  litchi_ooxml_common::mce::codec::process_markup_compatibility::hac578b49dc35b69b
+    at src/mce/codec.rs:771
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::mce::codec::process_ooxml::haf7d4b8dc1ca7d4e
+    at src/mce/codec.rs:1672
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at src/raw/worksheet/mod.rs:479
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+84640 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::mce::codec::start::hf25a5fe21e5b8a00
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/mce/codec.rs:877
+  litchi_ooxml_common::mce::codec::process_markup_compatibility::hac578b49dc35b69b
+    at src/mce/codec.rs:771
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::mce::codec::process_ooxml::haf7d4b8dc1ca7d4e
+    at src/mce/codec.rs:1672
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at src/raw/worksheet/mod.rs:479
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+84640 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h6bf0c9c3cb75834a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h5bae90f74ac2b5a1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_reserve::h977d1176a20856fb
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:691
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::try_reserve::hd8c24526bf572593
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:350
+  alloc::vec::Vec$LT$T$C$A$GT$::try_reserve::ha89d2edf539900d3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1513
+  litchi_ooxml_common::mce::codec::reserve_amortized::he215deb47fbe3eb7
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/mce/codec.rs:202
+  litchi_ooxml_common::mce::codec::start::hf25a5fe21e5b8a00
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/mce/codec.rs:889
+  litchi_ooxml_common::mce::codec::process_markup_compatibility::hac578b49dc35b69b
+    at src/mce/codec.rs:771
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::mce::codec::process_ooxml::haf7d4b8dc1ca7d4e
+    at src/mce/codec.rs:1672
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at src/raw/worksheet/mod.rs:479
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+73720 calls to allocation functions with 16.19K peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::boxed::Box$LT$T$C$A$GT$::try_clone_from_ref_in::hbeaa9a91bc4feb6d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:872
+  alloc::boxed::Box$LT$T$C$A$GT$::clone_from_ref_in::haca90cf37277ab33
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:831
+  alloc::boxed::Box$LT$T$GT$::clone_from_ref::h213cf11a111b413d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:784
+  _RNvXs3_NtNtCslNYArtu3iFV_5alloc5boxed7convertINtB7_3BoxeEINtNtCsgEmfK2I1SDS_4core7convert4FromReE4from
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed/convert.rs:138
+  _$LT$T$u20$as$u20$core..convert..Into$LT$U$GT$$GT$::into::h0d01262c83729981
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/mod.rs:778
+  litchi_xlsx::cell::Number::new::h4a6f686e15a19b7e
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell.rs:395
+  litchi_xlsx::raw::worksheet::semantic::parse_value::hf0e616d48ed26100
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/semantic.rs:178
+  litchi_xlsx::raw::worksheet::semantic::materialize::h6d8bd3860d862175
+    at src/raw/worksheet/semantic.rs:103
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse::hb658127ccffc77b3
+    at src/raw/worksheet/codec.rs:675
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:393
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+20480 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_
+    at library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:666
+  _RNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner7reserveB7_
+    at library/alloc/src/raw_vec/mod.rs:673
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvMs0_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE7reserveB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:340
+  _RNvMs_NtCslNYArtu3iFV_5alloc3vecINtB4_3VechE7reserveB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1446
+  _RNvMs_NtCslNYArtu3iFV_5alloc3vecINtB4_3VechE15append_elementsB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2879
+  _RNvXs2_NtNtCslNYArtu3iFV_5alloc3vec11spec_extendINtB7_3VechEINtB5_10SpecExtendRhINtNtNtCsgEmfK2I1SDS_4core5slice4iter4IterhEE11spec_extendB9_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs:56
+  _RNvMs1_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE17extend_from_sliceB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3500
+  _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String8push_str
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:1102
+  _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:3345
+  _RNvMNtNtCsgEmfK2I1SDS_4core3fmt2rtNtB2_8Argument3fmt
+    at library/core/src/fmt/rt.rs:152
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:0
+  _RNvXs_NvNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_fmtQNtNtCslNYArtu3iFV_5alloc6string6StringNtB4_12SpecWriteFmt14spec_write_fmtBS_
+    at library/core/src/fmt/mod.rs:236
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvYNtNtCslNYArtu3iFV_5alloc6string6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_fmtB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:241
+  _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:654
+  alloc::fmt::format::_$u7b$$u7b$closure$u7d$$u7d$::hd104959e2c6a1230
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::option::Option$LT$T$GT$::map_or_else::hd4c1a338d8ef7677
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1278
+  _RNvNtCslNYArtu3iFV_5alloc3fmt6format
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+  litchi_perf_baseline::producer_shape::cell_address::h2dcd895cc1528842
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:588
+  litchi_perf_baseline::producer_shape::worksheet_part::h83f41d8048eb18e8
+    at src/producer_shape.rs:685
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::xlsx_producer_archive::h8644a06f9dd6a727
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:852
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1261
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+20480 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_
+    at library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner8grow_oneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h7621ab13e20ac16f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h167acd337c5be1e5
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  litchi_perf_baseline::producer_shape::column_label::hf37136775f040e97
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:580
+  litchi_perf_baseline::producer_shape::cell_address::h2dcd895cc1528842
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:588
+  litchi_perf_baseline::producer_shape::worksheet_part::h83f41d8048eb18e8
+    at src/producer_shape.rs:685
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::xlsx_producer_archive::h8644a06f9dd6a727
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:852
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1261
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+18430 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RNvMNtCslNYArtu3iFV_5alloc3vecINtB2_3VechE13with_capacityB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:524
+  _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String13with_capacity
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:485
+  _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:652
+  alloc::fmt::format::_$u7b$$u7b$closure$u7d$$u7d$::hd104959e2c6a1230
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::option::Option$LT$T$GT$::map_or_else::hd4c1a338d8ef7677
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1278
+  _RNvNtCslNYArtu3iFV_5alloc3fmt6format
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+  litchi_perf_baseline::producer_shape::worksheet_part::h83f41d8048eb18e8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:695
+  litchi_perf_baseline::producer_shape::xlsx_producer_archive::h8644a06f9dd6a727
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:852
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1261
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+8340 calls to allocation functions with 0B peak consumption from
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h3d19242af45e5940
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  alloc::raw_vec::RawVecInner$LT$A$GT$::with_capacity_in::ha3c0c7983360de46
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::with_capacity_in::hd595836d4bb59f24
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  alloc::vec::Vec$LT$T$C$A$GT$::with_capacity_in::h11d19671c3dc1b83
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hd9e5fcce1a81059c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec_in::h6c73928f8c0ffbcd
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec::ha53bf2e33dba6abf
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:376
+  litchi_xlsx::cell_values::validation::Validator::observe_inner::h6466e53526486be4
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:133
+  litchi_xlsx::cell_values::validation::Validator::observe::hb02ecd04ff6f3c12
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:108
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::_$u7b$$u7b$closure$u7d$$u7d$::hf5c1104f849b8829
+    at src/cell_values/validation.rs:292
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:1687
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+6480 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h272775c4e7836f94
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  alloc::raw_vec::RawVecInner$LT$A$GT$::with_capacity_in::h620192c9be3c09ac
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::with_capacity_in::h4a863c0bec6c2826
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  alloc::vec::Vec$LT$T$C$A$GT$::with_capacity_in::h24264520f438f36c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hcc26d992f367fab0
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec_in::h01762868070ed128
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hb0ccbeecf912e90f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _$LT$quick_xml..name..NamespaceResolver$u20$as$u20$core..clone..Clone$GT$::clone::h8032465bf9ff21c3
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:509
+  litchi_xlsx::raw::strings::Parser::parse::h57c222d80cd2a474
+    at src/raw/strings.rs:618
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::strings::parse_with::hf070e4088ce6943b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/strings.rs:78
+  litchi_xlsx::raw::strings::parse_repairing::hc7f416fce0f649d3
+    at src/raw/strings.rs:71
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceInner::shared_strings::h84e78c7238f5adf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1488
+  litchi_xlsx::workbook::source::SourceWorksheet::store::_$u7b$$u7b$closure$u7d$$u7d$::h0b41dc4934355bfe
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse::hb658127ccffc77b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:651
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:393
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+6480 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h272775c4e7836f94
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  alloc::raw_vec::RawVecInner$LT$A$GT$::with_capacity_in::h620192c9be3c09ac
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::with_capacity_in::h3065ec2a282034d3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  alloc::vec::Vec$LT$T$C$A$GT$::with_capacity_in::hbacc80aee02502c4
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hf41f3feec380787c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:425
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec_in::h01a20f207edaaf07
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hb83c14ecae9a7eec
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _$LT$quick_xml..name..NamespaceResolver$u20$as$u20$core..clone..Clone$GT$::clone::h8032465bf9ff21c3
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:511
+  litchi_xlsx::raw::strings::Parser::parse::h57c222d80cd2a474
+    at src/raw/strings.rs:618
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::strings::parse_with::hf070e4088ce6943b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/strings.rs:78
+  litchi_xlsx::raw::strings::parse_repairing::hc7f416fce0f649d3
+    at src/raw/strings.rs:71
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceInner::shared_strings::h84e78c7238f5adf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1488
+  litchi_xlsx::workbook::source::SourceWorksheet::store::_$u7b$$u7b$closure$u7d$$u7d$::h0b41dc4934355bfe
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse::hb658127ccffc77b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:651
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:393
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4249 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::MceRewriteEquivalence::observe_start::h5d16c46917137646
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:208
+  litchi_xlsx::raw::worksheet::MceRewriteEquivalence::observe::h7a99b8da9245aaea
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:190
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:1682
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4224 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::validation::scan_attributes::hcd636629e46ef28a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:489
+  litchi_xlsx::cell_values::validation::validate_element::hf9692333f6b7b825
+    at src/cell_values/validation.rs:621
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::validation::Validator::observe_inner::h6466e53526486be4
+    at src/cell_values/validation.rs:135
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::validation::Validator::observe::hb02ecd04ff6f3c12
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:108
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::_$u7b$$u7b$closure$u7d$$u7d$::hf5c1104f849b8829
+    at src/cell_values/validation.rs:292
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:1687
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4096 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::scan_cell_attributes::h8b57f8e2926b3bb9
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:241
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::h48d3478fae5eb109
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:1249
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hdc184b6f23a174bf
+    at src/raw/worksheet/codec.rs:978
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition::hdbbb8ea865f2d076
+    at src/raw/worksheet/codec.rs:753
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at src/raw/worksheet/codec.rs:1699
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4096 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::boxed::Box$LT$T$C$A$GT$::try_clone_from_ref_in::hbeaa9a91bc4feb6d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:872
+  alloc::boxed::Box$LT$T$C$A$GT$::clone_from_ref_in::haca90cf37277ab33
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:831
+  alloc::boxed::Box$LT$T$GT$::clone_from_ref::h213cf11a111b413d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:784
+  _RNvXs3_NtNtCslNYArtu3iFV_5alloc5boxed7convertINtB7_3BoxeEINtNtCsgEmfK2I1SDS_4core7convert4FromReE4from
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed/convert.rs:138
+  _$LT$T$u20$as$u20$core..convert..Into$LT$U$GT$$GT$::into::h0d01262c83729981
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/mod.rs:778
+  litchi_xlsx::cell::Number::new::h4a6f686e15a19b7e
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell.rs:395
+  litchi_xlsx::raw::worksheet::semantic::parse_value::hf0e616d48ed26100
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/semantic.rs:178
+  litchi_xlsx::raw::worksheet::semantic::materialize::h6d8bd3860d862175
+    at src/raw/worksheet/semantic.rs:103
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse::h26584cc1f7bdbd2a
+    at src/raw/worksheet/codec.rs:678
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at src/raw/worksheet/codec.rs:1715
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4096 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11try_reserveB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:691
+  _RNvMs0_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE11try_reserveB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:350
+  _RNvMs_NtCslNYArtu3iFV_5alloc3vecINtB4_3VechE11try_reserveB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1513
+  _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:1305
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text::he69d2ff412dc4df3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:1453
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition::hdbbb8ea865f2d076
+    at src/raw/worksheet/codec.rs:775
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at src/raw/worksheet/codec.rs:1699
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4096 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_
+    at library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner8grow_oneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE8grow_oneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h7621ab13e20ac16f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h167acd337c5be1e5
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  litchi_perf_baseline::producer_shape::column_label::hf37136775f040e97
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:580
+  litchi_perf_baseline::producer_shape::cell_address::h2dcd895cc1528842
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:588
+  litchi_perf_baseline::producer_shape::worksheet_part::h83f41d8048eb18e8
+    at src/producer_shape.rs:685
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::xlsx_producer_archive::h8644a06f9dd6a727
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:852
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:928
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4096 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h3d19242af45e5940
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  alloc::raw_vec::RawVecInner$LT$A$GT$::with_capacity_in::ha3c0c7983360de46
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::with_capacity_in::hd595836d4bb59f24
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  alloc::vec::Vec$LT$T$C$A$GT$::with_capacity_in::h11d19671c3dc1b83
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hd9e5fcce1a81059c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec_in::h6c73928f8c0ffbcd
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec::ha53bf2e33dba6abf
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:376
+  alloc::slice::_$LT$impl$u20$alloc..borrow..ToOwned$u20$for$u20$$u5b$T$u5d$$GT$::to_owned::hccd8d0256649e6ef
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:842
+  _RNvXs2_NtCslNYArtu3iFV_5alloc3streNtNtB7_6borrow7ToOwned8to_owned
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/str.rs:211
+  alloc::borrow::Cow$LT$B$GT$::into_owned::h7dd6eb60bcd7f4d8
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs:333
+  litchi_xlsx::raw::worksheet::codec::decode_cell_attribute::_$u7b$$u7b$closure$u7d$$u7d$::hed2057640908d860
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:267
+  core::result::Result$LT$T$C$E$GT$::map::h503493755b807c55
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:836
+  litchi_xlsx::raw::worksheet::codec::decode_cell_attribute::h787c62cdcd324148
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:267
+  litchi_xlsx::raw::worksheet::codec::scan_cell_attributes::h8b57f8e2926b3bb9
+    at src/raw/worksheet/codec.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_cell::h48d3478fae5eb109
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:1249
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start::hdc184b6f23a174bf
+    at src/raw/worksheet/codec.rs:978
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition::hdbbb8ea865f2d076
+    at src/raw/worksheet/codec.rs:753
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer::ha638a69487a071b3
+    at src/raw/worksheet/codec.rs:1699
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_source_with_observer::h10c65d28e1ca23a8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:408
+  litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::ha0bc4d3eb4c09145
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/validation.rs:283
+  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected::hb5b9a7de1df6e5cd
+    at src/cell_values/snapshot.rs:488
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed::haeb0b1f25e501cf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs:249
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets::h06028f8659e65362
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs:475
+  litchi_perf_baseline::producer_shape::refuse::hd81fa63aba8a9fcd
+    at src/producer_shape.rs:1286
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::prove_value_editor_refusals::h97b948f8e184ed08
+    at src/producer_shape.rs:1262
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::finish_xlsx_producer_corpus::h4f70e9989d5965fe
+    at src/producer_shape.rs:1099
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:929
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+4096 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_
+    at library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:666
+  _RNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner7reserveB7_
+    at library/alloc/src/raw_vec/mod.rs:673
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvMs0_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE7reserveB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:340
+  _RNvMs_NtCslNYArtu3iFV_5alloc3vecINtB4_3VechE7reserveB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1446
+  _RNvMs_NtCslNYArtu3iFV_5alloc3vecINtB4_3VechE15append_elementsB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2879
+  _RNvXs2_NtNtCslNYArtu3iFV_5alloc3vec11spec_extendINtB7_3VechEINtB5_10SpecExtendRhINtNtNtCsgEmfK2I1SDS_4core5slice4iter4IterhEE11spec_extendB9_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs:56
+  _RNvMs1_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE17extend_from_sliceB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3500
+  _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String8push_str
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:1102
+  _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:3345
+  _RNvMNtNtCsgEmfK2I1SDS_4core3fmt2rtNtB2_8Argument3fmt
+    at library/core/src/fmt/rt.rs:152
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:0
+  _RNvXs_NvNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_fmtQNtNtCslNYArtu3iFV_5alloc6string6StringNtB4_12SpecWriteFmt14spec_write_fmtBS_
+    at library/core/src/fmt/mod.rs:236
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvYNtNtCslNYArtu3iFV_5alloc6string6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_fmtB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:241
+  _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:654
+  alloc::fmt::format::_$u7b$$u7b$closure$u7d$$u7d$::hd104959e2c6a1230
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::option::Option$LT$T$GT$::map_or_else::hd4c1a338d8ef7677
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1278
+  _RNvNtCslNYArtu3iFV_5alloc3fmt6format
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+  litchi_perf_baseline::producer_shape::cell_address::h2dcd895cc1528842
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:588
+  litchi_perf_baseline::producer_shape::worksheet_part::h83f41d8048eb18e8
+    at src/producer_shape.rs:685
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::xlsx_producer_archive::h8644a06f9dd6a727
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:852
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:928
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+3860 calls to allocation functions with 0B peak consumption from
+  quick_xml::events::Event::into_owned::h29193e76a83cd368
+    at src/events/mod.rs:0
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::strings::Parser::parse::h57c222d80cd2a474
+    at src/raw/strings.rs:617
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::strings::parse_with::hf070e4088ce6943b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/strings.rs:78
+  litchi_xlsx::raw::strings::parse_repairing::hc7f416fce0f649d3
+    at src/raw/strings.rs:71
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceInner::shared_strings::h84e78c7238f5adf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1488
+  litchi_xlsx::workbook::source::SourceWorksheet::store::_$u7b$$u7b$closure$u7d$$u7d$::h0b41dc4934355bfe
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse::hb658127ccffc77b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:651
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:393
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+3686 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RNvMNtCslNYArtu3iFV_5alloc3vecINtB2_3VechE13with_capacityB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:524
+  _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String13with_capacity
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:485
+  _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:652
+  alloc::fmt::format::_$u7b$$u7b$closure$u7d$$u7d$::hd104959e2c6a1230
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::option::Option$LT$T$GT$::map_or_else::hd4c1a338d8ef7677
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1278
+  _RNvNtCslNYArtu3iFV_5alloc3fmt6format
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs:659
+  litchi_perf_baseline::producer_shape::worksheet_part::h83f41d8048eb18e8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:695
+  litchi_perf_baseline::producer_shape::xlsx_producer_archive::h8644a06f9dd6a727
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:852
+  litchi_perf_baseline::producer_shape::build_xlsx_producer_corpus::h0f3dcf787168bac9
+    at src/producer_shape.rs:928
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12293
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2600 calls to allocation functions with 0B peak consumption from
+  quick_xml::events::Event::into_owned::h29193e76a83cd368
+    at src/events/mod.rs:0
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::strings::Parser::parse::h57c222d80cd2a474
+    at src/raw/strings.rs:617
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::strings::parse_with::hf070e4088ce6943b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/strings.rs:78
+  litchi_xlsx::raw::strings::parse_repairing::hc7f416fce0f649d3
+    at src/raw/strings.rs:71
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceInner::shared_strings::h84e78c7238f5adf6
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1488
+  litchi_xlsx::workbook::source::SourceWorksheet::store::_$u7b$$u7b$closure$u7d$$u7d$::h0b41dc4934355bfe
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse::hb658127ccffc77b3
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:651
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:393
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_bool::h7ea04186e88f131f
+    at src/raw/worksheet/validation.rs:265
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1094
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_bool::h7ea04186e88f131f
+    at src/raw/worksheet/validation.rs:265
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1094
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_bool::h7ea04186e88f131f
+    at src/raw/worksheet/validation.rs:265
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1094
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_bool::h7ea04186e88f131f
+    at src/raw/worksheet/validation.rs:265
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1094
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1012
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h5b0a24717f96ef37
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  alloc::raw_vec::RawVecInner$LT$A$GT$::with_capacity_in::h5b48b908e078ad3e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::with_capacity_in::h8385a17165034f4e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  alloc::vec::Vec$LT$T$C$A$GT$::with_capacity_in::h0d6d1b1c026485f8
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h11fe0d156f4d787f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec_in::h89c37e15101da53f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  alloc::slice::_$LT$impl$u20$$u5b$T$u5d$$GT$::to_vec::h90d457bb995c181f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:376
+  alloc::slice::_$LT$impl$u20$alloc..borrow..ToOwned$u20$for$u20$$u5b$T$u5d$$GT$::to_owned::h487b05a73be4a375
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:842
+  _RNvXs2_NtCslNYArtu3iFV_5alloc3streNtNtB7_6borrow7ToOwned8to_owned
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/str.rs:211
+  alloc::borrow::Cow$LT$B$GT$::into_owned::hc0862af73fcb1644
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs:333
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:139
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1012
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_f64::h9ec747227bbdb37f
+    at src/raw/worksheet/validation.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1046
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_u32::h89cc4e930cc29e04
+    at src/raw/worksheet/validation.rs:225
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1060
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+2560 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h2192e9538cb73f42
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h8358f10299f1184f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4f569f01af9088a9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::he583834752646382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  alloc::vec::Vec$LT$T$C$A$GT$::push::ha5c1c9fbf2a59465
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hf889c004132b9a7f
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hcd091ad4a6cfd55b
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h533aad22d87fd0b0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hc08ee481f1b878ec
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/xml_attributes.rs:231
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_ooxml_common::xml::unqualified_attribute_value::h4aa27e10b5e7742d
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-ooxml-common/src/xml.rs:126
+  litchi_xlsx::raw::worksheet::validation::optional_bool::h7ea04186e88f131f
+    at src/raw/worksheet/validation.rs:265
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_row::ha4a61b2fffb0e926
+    at src/raw/worksheet/codec.rs:1094
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::start_lane_row::h948e0d1c046da849
+    at src/raw/worksheet/codec.rs:625
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_event::h3a38b97dddae868b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:500
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::_$u7b$$u7b$closure$u7d$$u7d$::h855fab1d04dc739c
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:476
+  litchi_xlsx::raw::worksheet::lane::walk::h8b20d66121827b12
+    at src/raw/worksheet/lane.rs:335
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::lane_body::hd088e1abee38747a
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/codec.rs:475
+  litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::parse::h6943ffd172f6ab79
+    at src/raw/worksheet/codec.rs:369
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::raw::worksheet::parse_with_repairs::_$u7b$$u7b$closure$u7d$$u7d$::hd61f7980d29cf023
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:482
+  litchi_xlsx::raw::worksheet::parse_with_repairs::h3c46a7db54cdc881
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:478
+  litchi_xlsx::raw::worksheet::parse::hd1086ea0c99b7370
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/raw/worksheet/mod.rs:456
+  litchi_xlsx::workbook::source::SourceWorksheet::store::h87802edd69c38667
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1206
+  litchi_xlsx::workbook::source::SourceWorksheet::stream_selection::h492c46114cc16c3a
+    at src/workbook/source.rs:1067
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_xlsx::workbook::source::SourceWorksheet::select_cells::hd6b553aa36eca2b8
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:1027
+  litchi_xlsx::workbook::source::SourceWorksheet::visit_cells::h4724a999589fc687
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/workbook/source.rs:941
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::_$u7b$$u7b$closure$u7d$$u7d$::h3254a3433e8e875b
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2543
+  litchi_perf_baseline::producer_shape::run_xlsx_full_cell_scan::h6c162531983d2396
+    at /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/producer_shape.rs:2520
+  litchi_perf_baseline::run::h087cba23d151be5d
+    at src/lib.rs:12304
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  litchi_perf_baseline::main::h96b35aa98c093e7f
+    at src/main.rs:41
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  core::ops::function::FnOnce::call_once::h69e8cb6265db3ace
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+  std::sys::backtrace::__rust_begin_short_backtrace::hf2e836b26fcd9359
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  main
+    in /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+
+
+
+total runtime: 1.32s.
+calls to allocation functions: 673663 (509964/s)
+temporary memory allocations: 164351 (124414/s)
+peak heap memory consumption: 9.33M
+peak RSS (including heaptrack overhead): 33.37M
+total memory leaked: 592B

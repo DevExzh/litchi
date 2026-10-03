@@ -1,0 +1,28 @@
+{
+  "full": {
+    "argv": [
+      "git",
+      "diff",
+      "--cached",
+      "--check"
+    ],
+    "exit_code": 0,
+    "diagnostic_lines": 0
+  },
+  "authored_scope": {
+    "argv": [
+      "git",
+      "diff",
+      "--cached",
+      "--check",
+      "--",
+      "docs/performance",
+      ":(exclude)**/stdout.txt",
+      ":(exclude)**/stderr.txt"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "exclusions": "immutable profiler stdout/stderr only; raw whitespace preserved"
+}

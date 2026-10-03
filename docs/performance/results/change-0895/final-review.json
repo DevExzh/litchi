@@ -1,0 +1,226 @@
+{
+  "adoption": "none; production unchanged",
+  "artifact_descriptors": {
+    "attribution": {
+      "bytes": 14787,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/attribution.json",
+      "sha256": "46edd9a68375cce28d3cfb0e11efb7864e3438cca8236912bfe221dc761a6369"
+    },
+    "baseline_index": {
+      "bytes": 468668,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/BASELINE.md",
+      "sha256": "2e8a0ea00416515bf844c27d2521587284edd7f169798c311a9dec33ee8c9d46"
+    },
+    "capture": {
+      "bytes": 1577,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/capture.json",
+      "sha256": "f1e5274e724a65e226462f96e24fd166d25f3b5b893178679cf6e338461e8fc3"
+    },
+    "capture_review": {
+      "bytes": 29092,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-review.json",
+      "sha256": "e258a54d75f5479bcffcacfa46297c1655cafedce6573bb24474929616f3f177"
+    },
+    "cleanup": {
+      "bytes": 1046,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/cleanup.json",
+      "sha256": "7efe29e75ff94929260d9037f55d1dc7df2fb6b45f24f69357032495e8adc304"
+    },
+    "decision": {
+      "bytes": 1579,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/decision.json",
+      "sha256": "a40c733cf33ae5d5f178478be9c2b344979d42132468dcf706710da901b40273"
+    },
+    "export": {
+      "bytes": 1769,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/export.json",
+      "sha256": "c68654a8237878513df79fe643c38dd75943b5adc4df8e3ea1477a338b737d73"
+    },
+    "hotspots_index": {
+      "bytes": 770986,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/HOTSPOTS.md",
+      "sha256": "716d96d348c0b7d8900d7efea2285a32b3de7ebf74753b86d5e8d7e10ca48485"
+    },
+    "methodology_review": {
+      "bytes": 11842,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/methodology-review.json",
+      "sha256": "c344a3f04bee3c4a71960b55b0f1027fefd3a8c0a3d478c31a4a0a377a2b1ae8"
+    },
+    "plan": {
+      "bytes": 16698,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+      "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+    },
+    "reduction": {
+      "bytes": 24902579,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/reduction.json",
+      "sha256": "67773fad7f6ca259d4829953c08a08fd1ed0f4d77f6f972dbac8b50c609db79c"
+    },
+    "report": {
+      "bytes": 6660,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0895-selected-stream-allocation-profile.md",
+      "sha256": "d2799a388e54ffbcdc2571905f1cc4041fa1143821c7e5466d3a4497520981bd"
+    },
+    "report_index": {
+      "bytes": 783525,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/REPORT.md",
+      "sha256": "9b0693a048b1af479cf7790dec4737cbaaa2a9b9abc62fce045c77713342e8ca"
+    },
+    "source_audit": {
+      "bytes": 11299,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/source-audit.md",
+      "sha256": "c5293ff28cc3d44e6049a9db586b4f2ac1ec4521189d1024ce15db992aa2b5ab"
+    },
+    "staging_whitespace_check": {
+      "bytes": 499,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/staging-whitespace-check.json",
+      "sha256": "c4fbd38dacd03fafc5b878a92dd69eeca2c3fba5ccc8188856b0fa3fe8831a82"
+    },
+    "verification": {
+      "bytes": 1459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/verification.json",
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    }
+  },
+  "base_commit": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "candidate_decision": "no new candidate evaluated",
+  "capture_review": {
+    "independent_replay_pass": true,
+    "matches_attribution": true,
+    "matches_reduction": true,
+    "sha256": "e258a54d75f5479bcffcacfa46297c1655cafedce6573bb24474929616f3f177",
+    "status": "pass"
+  },
+  "caveats": [
+    "Heaptrack is whole-process evidence covering setup, scan, oracle, serialization, destruction, and post-endpoint guards; it is not a latency measurement.",
+    "Temporary-allocation summaries differ by one between capture stderr and ranked text and are excluded from the required allocation-call reconciliation.",
+    "One unresolved-frame event of cost 1 remains in each profile and is retained in totals.",
+    "The diagnostic profiles use retained rejected 0894 binaries; no adoption or causal slowdown claim follows from these counts."
+  ],
+  "cleanup": {
+    "retained_evidence_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0895",
+    "status": "pass",
+    "temporary_build_roots_created": [],
+    "temporary_build_roots_removed": [],
+    "unrelated_untracked_file_preserved": {
+      "bytes": 6390,
+      "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+      "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+    },
+    "worktrees_created": [],
+    "worktrees_removed": []
+  },
+  "count_summary": {
+    "formal_children": 4,
+    "measured_samples": 80,
+    "order": [
+      "baseline",
+      "candidate",
+      "candidate",
+      "baseline"
+    ],
+    "per_role": {
+      "baseline": {
+        "exclusive_owner_allocation_cost": {
+          "legacycodec": 535697,
+          "mce_stream": 14418,
+          "other": 112395,
+          "selected_worksheet": 1361,
+          "x14ac": 9792
+        },
+        "per_process_allocation_calls": 673663,
+        "scan_regions": {
+          "process_other": 154156,
+          "runner_other": 847,
+          "scan_closure": 518660
+        },
+        "stack_lines": 4516,
+        "unique_stacks": 3000,
+        "unresolved_allocation_cost": 1
+      },
+      "candidate": {
+        "exclusive_owner_allocation_cost": {
+          "legacycodec": 529082,
+          "mce_stream": 2450201,
+          "other": 112955,
+          "selected_worksheet": 84193,
+          "x14ac": 17694
+        },
+        "per_process_allocation_calls": 3194125,
+        "scan_regions": {
+          "forced_worksheet_guard": 488980,
+          "process_other": 180878,
+          "runner_other": 847,
+          "scan_closure": 2523420
+        },
+        "stack_lines": 4480,
+        "unique_stacks": 2981,
+        "unresolved_allocation_cost": 1
+      }
+    }
+  },
+  "decision": "retain diagnostic evidence; 0894 rejection remains",
+  "performance_claim": null,
+  "restored_production_commit": "af9f2346a3fd65d762d82ea94dbb49a082c4bc82",
+  "review_findings": [
+    "Every formal profile reconciles stderr allocation calls, printed calls total, collapsed stack costs, and histogram counts exactly.",
+    "The nearest-owner buckets are disjoint and reproduce reduction.json; inclusive frame-presence values remain separate diagnostics.",
+    "Closure and forced-guard labels are stack-presence regions with no overlap; they do not segment profiler events by timer.",
+    "The strict worksheet guard vectors pass for all four fresh children; zero baseline guard allocation presence does not mean guard execution was skipped."
+  ],
+  "reviewed_without_new_build_or_workload": true,
+  "reviewer": "/root/allocation_profile_review_0895",
+  "schema": "litchi.xlsx-selected-metadata-final-review-0895.v1",
+  "scope": {
+    "cleanup_verified": true,
+    "documentation_bound": true,
+    "new_build": false,
+    "new_profiler_capture": false,
+    "new_workload": false,
+    "production_changed": false
+  },
+  "source_state": {
+    "formal_binaries": "retained 0894 native baseline/candidate binaries bound by plan.json",
+    "production_diff_from_restored_commit": "pass; git diff --exit-code af9f2346a3fd65d762d82ea94dbb49a082c4bc82 -- crates tools",
+    "source_attribution": "current producer_shape.rs line ordering was checked for the closure, endpoint snapshots, forced worksheet guard, aggregate tolerance, and final source fence",
+    "source_edits_by_review": false
+  },
+  "staging_review": {
+    "authored_scope_diff_check_exit_code": 0,
+    "full_diff_check_exit_code": 0,
+    "raw_profiler_stdout_stderr_exclusions": "immutable profiler stdout/stderr only; raw whitespace preserved"
+  },
+  "status": "pass"
+}

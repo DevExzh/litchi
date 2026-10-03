@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.allocation-profile-decision-0895.v1",
+  "status": "complete",
+  "decision": "retain diagnostic evidence; 0894 rejection remains",
+  "production_changed": false,
+  "performance_claim": null,
+  "broad_goal_complete": false,
+  "next_hypothesis": "Allocation-free QName validation/prefix-local resolution in MCE stream expand, preserving exact errors, namespaces, resource bounds and callbacks; qualify and measure against restored production before considering rejected metadata admission",
+  "plan": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+    "bytes": 16698,
+    "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+  },
+  "verification": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/verification.json",
+    "bytes": 1459,
+    "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+  },
+  "attribution": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/attribution.json",
+    "bytes": 14787,
+    "sha256": "46edd9a68375cce28d3cfb0e11efb7864e3438cca8236912bfe221dc761a6369"
+  },
+  "source_audit": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/source-audit.md",
+    "bytes": 11299,
+    "sha256": "c5293ff28cc3d44e6049a9db586b4f2ac1ec4521189d1024ce15db992aa2b5ab"
+  },
+  "cleanup": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/cleanup.json",
+    "bytes": 1046,
+    "sha256": "7efe29e75ff94929260d9037f55d1dc7df2fb6b45f24f69357032495e8adc304"
+  }
+}

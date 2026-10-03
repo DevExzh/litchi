@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/freeze.py",
+    "--heaptrack",
+    "/usr/bin/heaptrack",
+    "--heaptrack-version",
+    "heaptrack 1.5.0",
+    "--heaptrack-print",
+    "/usr/bin/heaptrack_print",
+    "--heaptrack-print-version",
+    "heaptrack_print 1.5.0"
+  ],
+  "versions": {
+    "heaptrack": "heaptrack 1.5.0",
+    "heaptrack_print": "heaptrack_print 1.5.0"
+  }
+}

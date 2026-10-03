@@ -1,0 +1,127 @@
+{
+  "allocation_flamegraph_stacks": {
+    "bytes": 11960420,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stacks.txt",
+    "sha256": "7b022a98e061da2e5d2a8bbfd3b9f6544d506187c468f91657a311caea8f172f"
+  },
+  "allocation_histogram": {
+    "bytes": 2396,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/histogram.txt",
+    "sha256": "ea6df42183ee2e24d9026420e5fdd2d08b1474eafd79235a40206a7ac17da46b"
+  },
+  "argv": [
+    "/usr/bin/heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/heaptrack.zst",
+    "-t",
+    "0",
+    "-m",
+    "0",
+    "-a",
+    "1",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-n",
+    "30",
+    "-s",
+    "10",
+    "--flamegraph-cost-type",
+    "allocations",
+    "-F",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stacks.txt",
+    "-H",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/histogram.txt"
+  ],
+  "artifacts": {
+    "histogram.txt": {
+      "bytes": 2396,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/histogram.txt",
+      "sha256": "ea6df42183ee2e24d9026420e5fdd2d08b1474eafd79235a40206a7ac17da46b"
+    },
+    "stacks.txt": {
+      "bytes": 11960420,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stacks.txt",
+      "sha256": "7b022a98e061da2e5d2a8bbfd3b9f6544d506187c468f91657a311caea8f172f"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 193898,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stdout.txt",
+      "sha256": "ea8e769452535c9dddd07eb3a0ad79c34f6894467129167be1513e242a8be5d6"
+    }
+  },
+  "calls_ranked_text": {
+    "bytes": 193898,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stdout.txt",
+    "sha256": "ea8e769452535c9dddd07eb3a0ad79c34f6894467129167be1513e242a8be5d6"
+  },
+  "command": {
+    "bytes": 1829,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/command.json",
+    "sha256": "d46283652eb5e77e07455bd3260c61bfcb08b696ea2caded28d9462272cf9b95"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0895",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T23:10:33.274406+00:00",
+  "plan_sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e",
+  "profile": {
+    "bytes": 221981,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/runs/00-baseline/heaptrack.zst",
+    "sha256": "88dd09124668cd36e44a48821d8d70a7e221c1d9178f17a2d0c117d8fad6dbcd"
+  },
+  "row": {
+    "case": "xlsx_producer_medium_source_full_cell_scan",
+    "ordinal": 0,
+    "pair": "profile-00",
+    "role": "baseline",
+    "samples": 20,
+    "warmup": 0
+  },
+  "schema": "litchi.xlsx-selected-metadata-heaptrack-export-0895.v1",
+  "started_utc": "2026-10-03T23:10:33.177240+00:00",
+  "status": "pass",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "ea8e769452535c9dddd07eb3a0ad79c34f6894467129167be1513e242a8be5d6",
+  "tool": {
+    "identity": {
+      "bytes": 346488,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d"
+    },
+    "path": "/usr/bin/heaptrack_print",
+    "version": "heaptrack_print 1.5.0"
+  },
+  "workload_launched": false
+}
