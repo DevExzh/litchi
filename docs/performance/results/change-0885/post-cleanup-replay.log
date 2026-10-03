@@ -1,0 +1,527 @@
+{
+  "capture": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/capture.json",
+  "capture_sha256": "540be0d5261b18d0164501b89255c30bfd22be39da540c9239c776389f4058d2",
+  "case": "xlsx_producer_medium_source_full_cell_scan",
+  "children": {
+    "allocator": 6,
+    "native": 12
+  },
+  "comparison": null,
+  "cpu_affinity": "12",
+  "performance_claim": null,
+  "plan": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/plan.json",
+  "plan_sha256": "5ab79ab9b5619616f3a78598b855939f40ecaa70e4d77bcc502f8ca6432f3d5b",
+  "producer_evidence_sha256": "f607446bb8b02b9a33b7861c76605e290cbd9c1b253b5b8064a5a937b077a176",
+  "profile": "release",
+  "schema": "litchi.xlsx-producer-full-cell-verification-0885.v1",
+  "status": "pass",
+  "summaries": {
+    "allocator": {
+      "allocation": {
+        "allocated_bytes": {
+          "max": 37618900,
+          "median": 37618900.0,
+          "min": 37618900,
+          "values": [
+            37618900,
+            37618900,
+            37618900,
+            37618900,
+            37618900,
+            37618900
+          ]
+        },
+        "allocation_calls": {
+          "max": 25933,
+          "median": 25933.0,
+          "min": 25933,
+          "values": [
+            25933,
+            25933,
+            25933,
+            25933,
+            25933,
+            25933
+          ]
+        },
+        "deallocated_bytes": {
+          "max": 36679969,
+          "median": 36679969.0,
+          "min": 36679969,
+          "values": [
+            36679969,
+            36679969,
+            36679969,
+            36679969,
+            36679969,
+            36679969
+          ]
+        },
+        "deallocation_calls": {
+          "max": 21616,
+          "median": 21616.0,
+          "min": 21616,
+          "values": [
+            21616,
+            21616,
+            21616,
+            21616,
+            21616,
+            21616
+          ]
+        },
+        "failed_allocation_calls": {
+          "max": 0,
+          "median": 0.0,
+          "min": 0,
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "live_bytes_after": {
+          "max": 1004347,
+          "median": 1004347.0,
+          "min": 1004347,
+          "values": [
+            1004347,
+            1004347,
+            1004347,
+            1004347,
+            1004347,
+            1004347
+          ]
+        },
+        "live_bytes_before": {
+          "max": 65416,
+          "median": 65416.0,
+          "min": 65416,
+          "values": [
+            65416,
+            65416,
+            65416,
+            65416,
+            65416,
+            65416
+          ]
+        },
+        "peak_live_bytes_after": {
+          "max": 9252094,
+          "median": 9252094.0,
+          "min": 9252094,
+          "values": [
+            9252094,
+            9252094,
+            9252094,
+            9252094,
+            9252094,
+            9252094
+          ]
+        },
+        "peak_live_bytes_before": {
+          "max": 9252030,
+          "median": 9252030.0,
+          "min": 9252030,
+          "values": [
+            9252030,
+            9252030,
+            9252030,
+            9252030,
+            9252030,
+            9252030
+          ]
+        },
+        "reallocation_calls": {
+          "max": 366,
+          "median": 366.0,
+          "min": 366,
+          "values": [
+            366,
+            366,
+            366,
+            366,
+            366,
+            366
+          ]
+        },
+        "region_peak_live_bytes": {
+          "max": 9252094,
+          "median": 9252094.0,
+          "min": 9252094,
+          "values": [
+            9252094,
+            9252094,
+            9252094,
+            9252094,
+            9252094,
+            9252094
+          ]
+        }
+      },
+      "children": 6,
+      "p50_ns": {
+        "max": 4016426,
+        "median": 3988001.0,
+        "min": 3976626,
+        "values": [
+          4003006,
+          3981736,
+          3982146,
+          3976626,
+          4016426,
+          3993856
+        ]
+      },
+      "p95_ns": {
+        "max": 4077217,
+        "median": 4022031.5,
+        "min": 4000326,
+        "values": [
+          4041257,
+          4000326,
+          4002806,
+          4002286,
+          4044606,
+          4077217
+        ]
+      },
+      "p99_ns": {
+        "max": 4077217,
+        "median": 4022031.5,
+        "min": 4000326,
+        "values": [
+          4041257,
+          4000326,
+          4002806,
+          4002286,
+          4044606,
+          4077217
+        ]
+      },
+      "rows": [
+        {
+          "child_index": 0,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-00/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-00/report.json",
+          "stats": {
+            "max": 4041257,
+            "min": 3991986,
+            "p50": 4003006,
+            "p95": 4041257,
+            "p99": 4041257
+          }
+        },
+        {
+          "child_index": 1,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/report.json",
+          "stats": {
+            "max": 4000326,
+            "min": 3964996,
+            "p50": 3981736,
+            "p95": 4000326,
+            "p99": 4000326
+          }
+        },
+        {
+          "child_index": 2,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-02/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-02/report.json",
+          "stats": {
+            "max": 4002806,
+            "min": 3956775,
+            "p50": 3982146,
+            "p95": 4002806,
+            "p99": 4002806
+          }
+        },
+        {
+          "child_index": 3,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-03/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-03/report.json",
+          "stats": {
+            "max": 4002286,
+            "min": 3958766,
+            "p50": 3976626,
+            "p95": 4002286,
+            "p99": 4002286
+          }
+        },
+        {
+          "child_index": 4,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-04/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-04/report.json",
+          "stats": {
+            "max": 4044606,
+            "min": 4003916,
+            "p50": 4016426,
+            "p95": 4044606,
+            "p99": 4044606
+          }
+        },
+        {
+          "child_index": 5,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-05/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-05/report.json",
+          "stats": {
+            "max": 4077217,
+            "min": 3975716,
+            "p50": 3993856,
+            "p95": 4077217,
+            "p99": 4077217
+          }
+        }
+      ]
+    },
+    "native": {
+      "cells_per_second_from_p50": {
+        "max": 1155608.1698337742,
+        "median": 1145937.5193060567,
+        "min": 1125748.2199243694,
+        "values": [
+          1143521.1125656387,
+          1151158.7188188033,
+          1155608.1698337742,
+          1152256.5211080117,
+          1140178.8043098536,
+          1125748.2199243694,
+          1150807.7990828939,
+          1146571.342994466,
+          1145303.6956176476,
+          1145095.5746640894,
+          1149132.161139975,
+          1142900.51184978
+        ]
+      },
+      "children": 12,
+      "p50_ns": {
+        "max": 3638469,
+        "median": 3574367.0,
+        "min": 3544454,
+        "values": [
+          3581919,
+          3558154,
+          3544454,
+          3554764,
+          3592419,
+          3638469,
+          3559239,
+          3572390,
+          3576344,
+          3576994,
+          3564429,
+          3583864
+        ]
+      },
+      "p50_spread_flag": false,
+      "p50_spread_ratio": 1.026524536642315,
+      "p95_ns": {
+        "max": 3663595,
+        "median": 3613799.5,
+        "min": 3589814,
+        "values": [
+          3616984,
+          3599924,
+          3597655,
+          3592414,
+          3624804,
+          3663595,
+          3589814,
+          3610615,
+          3620864,
+          3628764,
+          3599505,
+          3621994
+        ]
+      },
+      "p99_ns": {
+        "max": 3675354,
+        "median": 3630854.5,
+        "min": 3596424,
+        "values": [
+          3644164,
+          3666134,
+          3615964,
+          3596424,
+          3635824,
+          3675354,
+          3598375,
+          3622525,
+          3653504,
+          3650644,
+          3617925,
+          3625885
+        ]
+      },
+      "process_peak_rss_bytes": {
+        "max": 21237760,
+        "median": 21106688.0,
+        "min": 19505152,
+        "values": [
+          21237760,
+          21159936,
+          21106688,
+          21155840,
+          19505152,
+          21106688,
+          21016576,
+          21049344,
+          20967424,
+          19513344,
+          21114880,
+          21225472
+        ]
+      },
+      "rows": [
+        {
+          "child_index": 0,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-00/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-00/report.json",
+          "stats": {
+            "max": 3644164,
+            "min": 3554734,
+            "p50": 3581919,
+            "p95": 3616984,
+            "p99": 3644164
+          }
+        },
+        {
+          "child_index": 1,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-01/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-01/report.json",
+          "stats": {
+            "max": 3666134,
+            "min": 3527404,
+            "p50": 3558154,
+            "p95": 3599924,
+            "p99": 3666134
+          }
+        },
+        {
+          "child_index": 2,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-02/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-02/report.json",
+          "stats": {
+            "max": 3615964,
+            "min": 3522484,
+            "p50": 3544454,
+            "p95": 3597655,
+            "p99": 3615964
+          }
+        },
+        {
+          "child_index": 3,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-03/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-03/report.json",
+          "stats": {
+            "max": 3596424,
+            "min": 3535234,
+            "p50": 3554764,
+            "p95": 3592414,
+            "p99": 3596424
+          }
+        },
+        {
+          "child_index": 4,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-04/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-04/report.json",
+          "stats": {
+            "max": 3635824,
+            "min": 3545224,
+            "p50": 3592419,
+            "p95": 3624804,
+            "p99": 3635824
+          }
+        },
+        {
+          "child_index": 5,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-05/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-05/report.json",
+          "stats": {
+            "max": 3675354,
+            "min": 3621814,
+            "p50": 3638469,
+            "p95": 3663595,
+            "p99": 3675354
+          }
+        },
+        {
+          "child_index": 6,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-06/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-06/report.json",
+          "stats": {
+            "max": 3598375,
+            "min": 3523934,
+            "p50": 3559239,
+            "p95": 3589814,
+            "p99": 3598375
+          }
+        },
+        {
+          "child_index": 7,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-07/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-07/report.json",
+          "stats": {
+            "max": 3622525,
+            "min": 3546724,
+            "p50": 3572390,
+            "p95": 3610615,
+            "p99": 3622525
+          }
+        },
+        {
+          "child_index": 8,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-08/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-08/report.json",
+          "stats": {
+            "max": 3653504,
+            "min": 3544374,
+            "p50": 3576344,
+            "p95": 3620864,
+            "p99": 3653504
+          }
+        },
+        {
+          "child_index": 9,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-09/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-09/report.json",
+          "stats": {
+            "max": 3650644,
+            "min": 3518174,
+            "p50": 3576994,
+            "p95": 3628764,
+            "p99": 3650644
+          }
+        },
+        {
+          "child_index": 10,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-10/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-10/report.json",
+          "stats": {
+            "max": 3617925,
+            "min": 3538324,
+            "p50": 3564429,
+            "p95": 3599505,
+            "p99": 3617925
+          }
+        },
+        {
+          "child_index": 11,
+          "evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-11/producer-evidence.json",
+          "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-11/report.json",
+          "stats": {
+            "max": 3625885,
+            "min": 3554795,
+            "p50": 3583864,
+            "p95": 3621994,
+            "p99": 3625885
+          }
+        }
+      ]
+    }
+  }
+}

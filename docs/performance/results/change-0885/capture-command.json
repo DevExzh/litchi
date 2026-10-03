@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture.py",
+    "--plan",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/plan.json",
+    "--output-root",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:49:00.980787+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:49:06.486837+00:00",
+  "log": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture.log",
+  "log_sha256": "540be0d5261b18d0164501b89255c30bfd22be39da540c9239c776389f4058d2"
+}

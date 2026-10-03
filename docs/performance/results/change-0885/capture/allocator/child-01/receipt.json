@@ -1,0 +1,122 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "3",
+    "--samples",
+    "15",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/producer-evidence.json"
+  ],
+  "artifacts": {
+    "producer-evidence.json": {
+      "bytes": 7376,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/producer-evidence.json",
+      "sha256": "4d27e5dffa77be4cc3d4235448fd4189169b49a2bad25f089e129eef796a18a5"
+    },
+    "report.json": {
+      "bytes": 32199,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/report.json",
+      "sha256": "c32c404e840b26bcaffeab901bd55ad967d1431f39c0b3f369d77d916290a69c"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build": {
+      "build_receipt": {
+        "bytes": 2834,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/allocator-build.json",
+        "sha256": "1a4e67d157bbc10e24e7cf2edcebc5bcbdf40a474320a7fbcf169b3b7a13890f"
+      },
+      "bytes": 267473328,
+      "depfile": {
+        "bytes": 276137,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/allocator.d",
+        "sha256": "04b5f388c80d214859f21b8d1bea22ee7ec363444ca494bc04ae1944a994b1cc"
+      },
+      "executable": true,
+      "features": [
+        "allocator-metrics"
+      ],
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+      "sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16"
+    },
+    "build_json": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/build.json",
+    "build_sha256": "4975fd1635267abd98cb0a756a39c948ceb048d31a2bb08972569f786f5e4d8d",
+    "identity": {
+      "bytes": 267473328,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+      "sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16"
+    },
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+    "plan": {
+      "build_receipt": {
+        "bytes": 2834,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/allocator-build.json",
+        "sha256": "1a4e67d157bbc10e24e7cf2edcebc5bcbdf40a474320a7fbcf169b3b7a13890f"
+      },
+      "bytes": 267473328,
+      "depfile": {
+        "bytes": 276137,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/allocator.d",
+        "sha256": "04b5f388c80d214859f21b8d1bea22ee7ec363444ca494bc04ae1944a994b1cc"
+      },
+      "executable": true,
+      "features": [
+        "allocator-metrics"
+      ],
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+      "sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16"
+    }
+  },
+  "child_index": 1,
+  "command": {
+    "bytes": 3222,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/allocator/child-01/command.json",
+    "sha256": "c0253e891268acb67b9a7e7f8abd587c4723c507909b489a273b60f2507650a4"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0885",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:49:05.501850+00:00",
+  "mode": "allocator",
+  "plan_sha256": "5ab79ab9b5619616f3a78598b855939f40ecaa70e4d77bcc502f8ca6432f3d5b",
+  "profile": "release",
+  "schema": "litchi.xlsx-producer-full-cell-receipt-0885.v1",
+  "started_utc": "2026-10-03T15:49:05.255386+00:00"
+}

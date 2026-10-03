@@ -1,0 +1,82 @@
+{
+  "status": "pass",
+  "reviewer": "/root/baseline_review_0885",
+  "scope": "independent retained-capture replay; no timing child or Cargo execution",
+  "replayed": {
+    "plan_sha256": "5ab79ab9b5619616f3a78598b855939f40ecaa70e4d77bcc502f8ca6432f3d5b",
+    "capture_sha256": "540be0d5261b18d0164501b89255c30bfd22be39da540c9239c776389f4058d2",
+    "verification_sha256": "80f36a6db8522a24b5c3d6b8cad39657b3ba962f832af9bebd87869fa5652a9c",
+    "producer_evidence_sha256": "f607446bb8b02b9a33b7861c76605e290cbd9c1b253b5b8064a5a937b077a176",
+    "children": {
+      "native": 12,
+      "allocator": 6
+    },
+    "raw_sample_counts": {
+      "native": 360,
+      "allocator": 90
+    },
+    "native_p50_ns": {
+      "median": 3574367.0,
+      "min": 3544454,
+      "max": 3638469,
+      "values": [
+        3581919,
+        3558154,
+        3544454,
+        3554764,
+        3592419,
+        3638469,
+        3559239,
+        3572390,
+        3576344,
+        3576994,
+        3564429,
+        3583864
+      ]
+    },
+    "allocator_p50_ns": {
+      "median": 3988001.0,
+      "min": 3976626,
+      "max": 4016426,
+      "values": [
+        4003006,
+        3981736,
+        3982146,
+        3976626,
+        4016426,
+        3993856
+      ]
+    },
+    "native_p50_spread_ratio": 1.026524536642315,
+    "native_p50_spread_flag": false,
+    "statistics": "recomputed per child from retained sorted raw elapsed vectors using floored midpoint p50 and nearest-rank p95/p99; retained verification summaries match exactly",
+    "custody": "all 18 child receipts, command receipts, report/evidence/stdout/stderr descriptors, binary identities, plan hashes, and aligned sample-index vectors matched their retained files",
+    "ordering": "all child intervals were sequential and the native lane finished before allocator began",
+    "semantic_replay": "archive, oracle, counts, source-version fences, route flags, producer sidecar census, native RSS scope, allocator zero-failure and positive-primary metrics passed"
+  },
+  "cleanup_review": {
+    "status": "pass",
+    "executed": false,
+    "guards": [
+      "requires build.json, verification.json, capture-review.json, and source-archive-replay.json status pass",
+      "reloads and validates frozen plan before removal",
+      "requires exact /tmp/litchi-0885-source and target/litchi-0885-build paths",
+      "requires non-symlink ownership markers .owner-0885 with exact content",
+      "checks retained source manifest/archive, binaries, depfiles, build receipts/logs, and manifest membership of every dependency",
+      "removes only the two owned source/build directories and records retained archive/binaries"
+    ],
+    "owned_paths": [
+      "/tmp/litchi-0885-source",
+      "/home/zhuhe/code/litchi/target/litchi-0885-build"
+    ],
+    "retained": [
+      "docs/performance/results/change-0885/source.tar.gz",
+      "docs/performance/results/change-0885/binaries/native",
+      "docs/performance/results/change-0885/binaries/allocator"
+    ]
+  },
+  "caveats": [
+    "The capture remains a descriptive warm-cache baseline with CPU affinity and no exclusive-host guarantee; the replay does not create a comparison or speedup claim.",
+    "Cleanup.py was inspected with AST and source checks only; root must execute it after this pass and retain its cleanup.json receipt."
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "finished_utc": "2026-10-03T15:52:30.455501+00:00",
+  "registered_worktrees_created": 0,
+  "removed_owned_scratch": [
+    "/tmp/litchi-0885-source",
+    "/home/zhuhe/code/litchi/target/litchi-0885-build"
+  ],
+  "retained_local_artifacts": [
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.tar.gz",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native"
+  ],
+  "scope": "Only owned0885 source/build directories removed; historical recovery and other teams' worktrees preserved.",
+  "source_dependency_counts_verified": {
+    "allocator": 3847,
+    "native": 3846
+  },
+  "status": "pass"
+}

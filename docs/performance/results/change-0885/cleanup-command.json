@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/cleanup.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:52:29.597124+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:52:30.463844+00:00",
+  "log": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/cleanup.log",
+  "log_sha256": "2c1a5ca43927499c01fad2c3f0400f7316414f2e3f3508987ab9ab373abb096b"
+}

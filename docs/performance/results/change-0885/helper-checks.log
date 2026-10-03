@@ -1,0 +1,11 @@
+test_allocator_rejects_failed_calls_and_requires_positive_primary (__main__.HelpersTest.test_allocator_rejects_failed_calls_and_requires_positive_primary) ... ok
+test_capture_mock_is_single_pass_and_retains_outputs (__main__.HelpersTest.test_capture_mock_is_single_pass_and_retains_outputs) ... ok
+test_report_rejects_debug_profile (__main__.HelpersTest.test_report_rejects_debug_profile) ... ok
+test_report_validates_raw_elapsed_and_aligned_vectors (__main__.HelpersTest.test_report_validates_raw_elapsed_and_aligned_vectors) ... ok
+test_sidecar_checks_full_four_sheet_census (__main__.HelpersTest.test_sidecar_checks_full_four_sheet_census) ... ok
+test_statistics_match_rust_midpoint_and_nearest_rank (__main__.HelpersTest.test_statistics_match_rust_midpoint_and_nearest_rank) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.009s
+
+OK

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0885 — producer XLSX full-cell release baseline
+
+[0885](0885-producer-full-cell-release-baseline.md) establishes a current-source 4,096-cell XLSX full-scan baseline: native p50 median 3.574367 ms; separate allocator medians of 25,933 allocation calls and 37,618,900 allocated bytes. A read-only source audit identifies repeated namespace resolution in x14ac capture as a hypothesis. Current runtime attribution and representative controls are required before implementation; marker-based streaming ineligibility is not a measured hotspot.
+
 ## 0845 — retain indexed entry IDs through OPC publication
 
 [0845](0845-opc-indexed-entry-iteration.md) adopts direct entry iteration in two OPC scans. Across four synthetic 4,096-Part shapes, publication p50 improves 7.24–11.17% and lifecycle 2.31–4.18%, with unchanged owner allocation counts/bytes. All 512 main reports / 211,328 samples validate; no frozen latency, tail, RSS, allocation or spread flag fires. The separate instruction population and additive Callgrind reader repair preserve original captures and failure evidence. Candidate quality gates include 6,935 passing affected-owner tests. Current semantic DOCX/XLSX/PPTX mixed-catalog publication and durability diagnosis is next; the broader goal remains open.

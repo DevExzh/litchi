@@ -1,0 +1,36 @@
+{
+  "revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+  "mode": "read_only",
+  "production_changes": false,
+  "profiling_performed": false,
+  "worktree_created": false,
+  "path": [
+    "SourceWorksheet::visit_cells",
+    "select_cells",
+    "stream_selection",
+    "selected scanner rejects producer shape before dense rows",
+    "store",
+    "raw::worksheet::parse_with_repairs",
+    "x14ac::capture",
+    "process_ooxml",
+    "model parser",
+    "sparse cell callbacks"
+  ],
+  "candidate": {
+    "source": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "hypothesis": "Avoid namespace resolution on events and nested contexts that discard the result. This requires new profile evidence before implementation.",
+    "constraints": [
+      "NsReader scope maintenance",
+      "strict and transitional URIs",
+      "namespace aliases and rebinding",
+      "alternate-content selection",
+      "malformed-input error precedence",
+      "aggregate tolerance report"
+    ],
+    "tests": [
+      "raw/worksheet/tests.rs",
+      "lane_parse_tests.rs"
+    ]
+  },
+  "next_evidence": "Fresh current-source profile separating x14ac capture, MCE processing and model parsing; compare producer-marked and stream-eligible controls; do not reuse deleted0882 timings."
+}

@@ -1,0 +1,4 @@
+# Retain exact built artifacts locally for follow-up measurements. Git records
+# their hashes, build commands, complete source manifest, and source revision.
+/binaries/
+/source.tar.gz

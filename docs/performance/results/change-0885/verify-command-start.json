@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/verify.py",
+    "--plan",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/plan.json",
+    "--capture-root",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/verification.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:49:06.487108+00:00"
+}

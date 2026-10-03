@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "source_archive_sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee",
+  "source_manifest_sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938",
+  "regular_files_verified": 10765,
+  "uncompressed_bytes_verified": 259269148,
+  "method": "Stream every retained tar member and compare full SHA256/size/member set to source manifest; reject duplicates and nonregular entries."
+}

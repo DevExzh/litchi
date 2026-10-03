@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0885 — producer XLSX full-cell release baseline
+
+[0885](0885-producer-full-cell-release-baseline.md) validates eighteen fresh release processes / 450 measured iterations from committed source `335a40350b`. Native p50 median is 3.574367 ms and the native p50 spread ratio is 1.0265, below the frozen 1.20 flag. All scan oracles and allocation checks pass; no production change or speedup is claimed. Retained build identities, raw reports, and replay helpers support the next profiling step. Independent and post-cleanup replay pass; owned source/build scratch was removed.
+
 ## 0884 — qualify producer XLSX full-cell scanning
 
 [0884](0884-producer-full-cell-scan-harness.md) adds an explicit generated-producer scan across 4,096 stored cells with a fixed ordered-value oracle and post-timer source/tolerance checks. Four focused tests and normal/allocator debug report qualification pass. Production, corpus generation, and the default matrix are unchanged. A fresh release baseline is next; no performance improvement is claimed. Seven completed performance worktrees and applied agent patch files were cleaned.

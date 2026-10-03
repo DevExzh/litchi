@@ -1,0 +1,81 @@
+{
+  "schema": "litchi.xlsx-full-cell-baseline-summary-0885.v1",
+  "status": "pass",
+  "source_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+  "case": "xlsx_producer_medium_source_full_cell_scan",
+  "native_children": 12,
+  "native_measured_samples": 360,
+  "allocator_children": 6,
+  "allocator_measured_samples": 90,
+  "warmups_total": 54,
+  "native_p50_ns": {
+    "max": 3638469,
+    "median": 3574367.0,
+    "min": 3544454,
+    "values": [
+      3581919,
+      3558154,
+      3544454,
+      3554764,
+      3592419,
+      3638469,
+      3559239,
+      3572390,
+      3576344,
+      3576994,
+      3564429,
+      3583864
+    ]
+  },
+  "native_p50_spread_flag": false,
+  "native_p50_spread_ratio": 1.026524536642315,
+  "native_process_peak_rss_bytes": {
+    "max": 21237760,
+    "median": 21106688.0,
+    "min": 19505152,
+    "values": [
+      21237760,
+      21159936,
+      21106688,
+      21155840,
+      19505152,
+      21106688,
+      21016576,
+      21049344,
+      20967424,
+      19513344,
+      21114880,
+      21225472
+    ]
+  },
+  "allocator_allocated_bytes": {
+    "max": 37618900,
+    "median": 37618900.0,
+    "min": 37618900,
+    "values": [
+      37618900,
+      37618900,
+      37618900,
+      37618900,
+      37618900,
+      37618900
+    ]
+  },
+  "allocator_allocation_calls": {
+    "max": 25933,
+    "median": 25933.0,
+    "min": 25933,
+    "values": [
+      25933,
+      25933,
+      25933,
+      25933,
+      25933,
+      25933
+    ]
+  },
+  "production_changes": false,
+  "comparison": null,
+  "speedup_claim": null,
+  "next_step": "Current-source profile of full-scan materialization passes with semantically equivalent controls."
+}

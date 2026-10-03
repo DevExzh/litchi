@@ -1,0 +1,20 @@
+{
+  "utc": "2026-10-03T15:41:23.961996+00:00",
+  "status": "pass",
+  "scope": "Offline schema rehearsal only: copies of0884 debug reports with only tool.profile overwritten in memory; no new workload and not release evidence.",
+  "initial_attempt": "FileNotFoundError: used nonexistent native-producer-evidence.json; corrected to native-producer.json before validation. No artifact modified.",
+  "rows": [
+    {
+      "mode": "native",
+      "source_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native.json",
+      "source_evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/native-producer.json",
+      "status": "pass"
+    },
+    {
+      "mode": "allocator",
+      "source_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/allocator.json",
+      "source_evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0884/qualification/allocator-producer.json",
+      "status": "pass"
+    }
+  ]
+}

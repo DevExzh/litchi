@@ -1,0 +1,38 @@
+{
+  "status": "pass",
+  "reviewer": "/root/baseline_review_0885",
+  "protocol": "fixed descriptive XLSX producer full-cell release baseline",
+  "source_review": {
+    "revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+    "producer_path": "tools/perf-baseline/src/producer_shape.rs::run_xlsx_full_cell_scan",
+    "timing_scope": "fresh SourceBackedWorkbook open, worksheet enumeration, Rect::ALL stored-cell visits, and callback digest",
+    "corpus": {
+      "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+      "archive_bytes": 22739,
+      "cells": 4096,
+      "numeric": 3686,
+      "text": 410,
+      "oracle_sha256": "8d29b40718aa9d5b08c746f841195bba17ab8e01608b12e6093daf160c00764b",
+      "marker_refusal_census_sha256": "552c35c8b8f958de28792f00c1e9e831ae884471aa28b5b2a7a1479bd06c5207"
+    },
+    "production_changes": false,
+    "profiling_performed": false
+  },
+  "verified": [
+    "The frozen schedule uses 12 native children with 3 warmups and 30 samples each, followed by 6 allocator children with 3 warmups and 15 samples each; every child is a fresh process pinned with /usr/bin/taskset to CPU 12.",
+    "Native and allocator binaries are release artifacts with explicit feature, size, SHA-256, retained-path, source-revision, and build-descriptor bindings; capture uses a minimal fixed child environment and fails before the next child on exit or semantic evidence failure.",
+    "The verifier recomputes per-child floored-midpoint p50 and nearest-rank p95/p99 from retained raw vectors, requires a sample-index permutation and aligned scan/operation vectors, and retains every row without retries or replacements.",
+    "The semantic fences check the archive, cell counts, canonical digest, worksheet refusal census, source-version stability, route flags, producer sidecar, process-lifetime peak RSS scope, and allocator positivity with zero failed calls.",
+    "The helper checks pass, including non-identity sample-order alignment, raw-statistic recomputation, allocator rejection behavior, full worksheet census, debug-profile rejection, and single-pass capture behavior. Freeze requires these checks and this review before any child launch."
+  ],
+  "caveats": [
+    "This packet is descriptive only: it makes no candidate comparison, speedup, adoption, or performance decision claim.",
+    "CPU affinity is recorded without an exclusive host guarantee; unrelated host load can widen observed variation, and the native p50 spread flag above 1.20 is retained for inspection.",
+    "The workload is a warm in-memory generated producer XLSX using an owned positional ReadAt source. It carries no physical-cold-cache or native Office runtime claim; allocator elapsed values are a separate instrumented observation.",
+    "The source snapshot and source archive are retained for reconstruction. Rebuilding from the exact revision and toolchain does not promise byte-identical binaries, so the packet binds the captured executable hashes as well."
+  ],
+  "required_followups": [
+    "Freeze only after build.json reports pass and helper-checks.json reports exit_code 0; then retain the plan, commands, receipts, stdout/stderr, reports, evidence sidecars, and raw vectors.",
+    "After archive and verification, remove only the owned build/source scratch roots and generated Python cache files; do not reuse old 0882 timings."
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "--case",
+    "xlsx_producer_medium_source_full_cell_scan",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-04/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture/native/child-04/producer-evidence.json"
+  ],
+  "binary": {
+    "build": {
+      "build_receipt": {
+        "bytes": 2783,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native-build.json",
+        "sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+      },
+      "bytes": 264440648,
+      "depfile": {
+        "bytes": 276023,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native.d",
+        "sha256": "53c0719314519d61fa806cab74968fda6520d847d019ffa776e05debdfa0d1de"
+      },
+      "executable": true,
+      "features": [],
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "build_json": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/build.json",
+    "build_sha256": "4975fd1635267abd98cb0a756a39c948ceb048d31a2bb08972569f786f5e4d8d",
+    "identity": {
+      "bytes": 264440648,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    },
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+    "plan": {
+      "build_receipt": {
+        "bytes": 2783,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native-build.json",
+        "sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+      },
+      "bytes": 264440648,
+      "depfile": {
+        "bytes": 276023,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/native.d",
+        "sha256": "53c0719314519d61fa806cab74968fda6520d847d019ffa776e05debdfa0d1de"
+      },
+      "executable": true,
+      "features": [],
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+      "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+    }
+  },
+  "child_index": 4,
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0885",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:49:02.734030+00:00",
+  "mode": "native",
+  "plan_sha256": "5ab79ab9b5619616f3a78598b855939f40ecaa70e4d77bcc502f8ca6432f3d5b",
+  "profile": "release",
+  "schema": "litchi.xlsx-producer-full-cell-child-0885.v1",
+  "started_utc": "2026-10-03T15:49:02.438549+00:00"
+}

@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture.py",
+    "--plan",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/plan.json",
+    "--output-root",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/capture"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:49:00.980787+00:00"
+}

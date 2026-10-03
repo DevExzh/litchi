@@ -1,0 +1,11 @@
+{
+  "tools": {
+    "perf": "/usr/bin/perf",
+    "valgrind": "/usr/bin/valgrind",
+    "strace": "/usr/bin/strace",
+    "taskset": "/usr/bin/taskset"
+  },
+  "note": "Availability only, no profile workload executed.",
+  "perf_event_paranoid": "1",
+  "kptr_restrict": "1"
+}

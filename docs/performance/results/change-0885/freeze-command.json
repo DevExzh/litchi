@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/freeze.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:49:00.591167+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:49:00.980578+00:00",
+  "log": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/freeze.log",
+  "log_sha256": "572067986b93d88522dc9f7c4b96a2e7bdb40729c115709fd2b02accac707b9f"
+}

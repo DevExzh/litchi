@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0885/test_helpers.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-03T15:39:29.362859+00:00",
+  "ast_parsed": [
+    "build.py",
+    "capture.py",
+    "verify.py",
+    "test_helpers.py",
+    "freeze.py"
+  ],
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T15:39:29.420354+00:00",
+  "files": {
+    "build.py": "aec2777ca17bfc7d343cd5f63455965c2d7d716425a48a4dcf5864fdbb8ad4d3",
+    "capture.py": "f751f1d5dd367b856f3e83b03d360dd86c99c33d3d1c0ebd7e8305575a63a27f",
+    "verify.py": "f4de053621d078e249c5d549eeba2ebab1a4b0b7e58edeb5c952c2bbf1980fb9",
+    "test_helpers.py": "57df4f8a6cc7ca2ebe5a1766894b534d6cde0e7f46882a55aadc1a9a3b86e045",
+    "freeze.py": "7e60238b46ea75909b7544c6f07fe6cec13a5fb12059df3ade819b236267e411"
+  },
+  "log_sha256": "c76c9d7f4adcd3f921f39b3127fe46e2435af07655903f814c23e1d57df63763"
+}
