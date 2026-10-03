@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0891 — adopt x14ac namespace lookup elimination
+
+[0891](0891-x14ac-namespace-resolution.md) adopts owner-local removal of
+discarded worksheet namespace lookups after source, correctness, custody, and
+independent raw-data review. On the fixed 4,096-cell producer XLSX full-cell
+scan, primary paired p50 improves **5.49%** (ratio 0.945064; 95% improvement
+interval **4.95–5.95%**). Three control p99 metric flags cover five pair flags;
+the tails are small-population review evidence. Allocation calls and allocated
+bytes remain **25,933** and **37,618,900**; the allocator region peak-live
+difference is five bytes and is not an RSS claim. Scope is warm filesystem,
+CPU 12, Rust 1.95 release, shared host; there is no extrapolation to other
+CRUD, cold cache, concurrency, or general Office performance.
+
 ## 0890 — MCE validated-name reuse rejected
 
 [0890](0890-mce-validated-name-reuse.md) retains 72 matched fresh processes / 3,320 measured iterations for a rejected validated-name reuse candidate. Primary paired p50 ratio is 0.99381 (95% interval 0.98861–1.01112), failing the frozen improvement gate. Allocation calls and allocated bytes are unchanged. Production is restored; 0885 remains the current-source release reference.

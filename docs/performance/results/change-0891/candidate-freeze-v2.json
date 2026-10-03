@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.xlsx-x14ac-candidate-freeze-0891.v1",
+  "status": "frozen",
+  "immutable": true,
+  "create_only": true,
+  "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+  "frozen_utc": "2026-10-03T19:14:47.576954+00:00",
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+  ],
+  "files": [
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "bytes": 28418,
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+      "bytes": 22605,
+      "sha256": "968259a3f95b0619a205b01d231d1de2f7d1197ebef020e6f6658146ac7b1e81"
+    }
+  ],
+  "patch": {
+    "path": "docs/performance/results/change-0891/candidate-v2.patch",
+    "bytes": 27748,
+    "sha256": "f90f6679e673dd523b740aaf69faa95901722510ad1bab2e8a09cdfd12927249"
+  },
+  "performance_claim": false,
+  "supersedes": {
+    "path": "docs/performance/results/change-0891/candidate-freeze.json",
+    "bytes": 993,
+    "sha256": "871e5fb4fdfaa459e9f84c7c37afe772656ee822049773ee258a7eb0aad12039"
+  },
+  "reason": "Test-only strict-lint corrections and fixture slice iteration; production source unchanged. Initial compile failure retained in attempts/quality-v1."
+}

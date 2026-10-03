@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.xlsx-x14ac-candidate-freeze-0891.v1",
+  "status": "frozen",
+  "immutable": true,
+  "create_only": true,
+  "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+  "frozen_utc": "2026-10-03T19:19:04.291196+00:00",
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+  ],
+  "files": [
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "bytes": 28418,
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+      "bytes": 22599,
+      "sha256": "bb2ceef1b0593a9523b528a5ccfdc894d6171e2e59140359e5fb0822c6da7f3a"
+    }
+  ],
+  "patch": {
+    "path": "docs/performance/results/change-0891/candidate-v3.patch",
+    "bytes": 27742,
+    "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+  },
+  "performance_claim": false,
+  "supersedes": {
+    "path": "docs/performance/results/change-0891/candidate-freeze-v2.json",
+    "bytes": 1356,
+    "sha256": "2242e2d8b16af17beb79992801b5ea9432b9613db892b2a74a51f60e90f44a4e"
+  },
+  "reason": "Test-only selected MCE fallback assertion now checks Error::Descent for NaN; production unchanged. Failed focused quality-v2 retained."
+}

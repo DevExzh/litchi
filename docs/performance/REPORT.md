@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## 0891 — x14ac namespace lookup elimination adopted
+
+[0891](0891-x14ac-namespace-resolution.md) adopts removal of discarded
+namespace resolution in the XLSX worksheet owner after the frozen source,
+quality, custody, capture, reduction, and independent raw-data reviews pass.
+The fixed 4,096-cell producer XLSX full-cell scan improves primary paired p50
+**5.49%** (95% improvement interval **4.95–5.95%**). Three control p99 metric
+flags cover five pair flags; their small-population tails remain review
+evidence and cannot rule out tail costs. Allocation calls and allocated bytes
+remain **25,933** and **37,618,900**; the five-byte allocator region peak-live
+change is not an RSS claim. The result is limited to the warm filesystem,
+CPU-12, Rust 1.95 release, shared-host protocol, with no extrapolation to
+other CRUD, cold cache, concurrency, or general Office performance.
+
 ## 0890 — MCE validated-name reuse rejected
 
 [0890](0890-mce-validated-name-reuse.md) completes semantic qualification and a 72-process matched trial, then rejects the candidate on its failed primary latency gate. All four broad diagnostic reports are byte-identical; owner, format, lint, documentation, and boundary gates pass, with an unrelated untracked-file formatting failure retained and scoped formatting verified. Production is restored exactly. The complete candidate patch, binaries, measurements, and failure history remain available for replay. Owned scratch is removed; independent post-cleanup replay passes. A cleanup path-resolution check failure and its corrected read-only custody verification are retained.

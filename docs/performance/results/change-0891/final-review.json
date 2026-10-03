@@ -1,0 +1,401 @@
+{
+  "adoption": "adopted for the bounded fixed producer XLSX full-cell workload",
+  "artifact_hashes": {
+    "allocator_binary": {
+      "bytes": 267476848,
+      "mode": 509,
+      "path": "docs/performance/results/change-0891/binaries/allocator",
+      "sha256": "958fd5e8fe2e8afada36c02a120289ee27cd06e9ca21f55085b43ade8b1a3484"
+    },
+    "allocator_build": {
+      "bytes": 2974,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/allocator-build.json",
+      "sha256": "3c5f65d436fb13f685acbdfdcb19768f723118c230f2f9d8da40664d16fb08d6"
+    },
+    "baseline_index": {
+      "bytes": 465508,
+      "mode": 436,
+      "path": "docs/performance/BASELINE.md",
+      "sha256": "7d4ba6ae4d2f09e97234a17e99cfff41240f55012a0048851f8533a3cb9d750e"
+    },
+    "build": {
+      "bytes": 6113,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/build.json",
+      "sha256": "ccd137fe2b9b6e5fbe338ad3bce0ac79b46d1334d39a022dc6a09dac4756613f"
+    },
+    "candidate_freeze": {
+      "bytes": 1346,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/candidate-freeze-v3.json",
+      "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+    },
+    "candidate_patch": {
+      "bytes": 27742,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/candidate-v3.patch",
+      "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+    },
+    "capture_experiment": {
+      "bytes": 26107,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/capture/experiment.json",
+      "sha256": "8e49eea7a94c5f5996ddc7279c0888d47aea7599a33187e875b855e4bb02a881"
+    },
+    "capture_review": {
+      "bytes": 57161,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/capture-review.json",
+      "sha256": "9f0c627b6131b1111a539bfe8e23e813a5c5b5afbdf3496a9671bf58de7d60c6"
+    },
+    "cleanup": {
+      "bytes": 3951,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/cleanup.json",
+      "sha256": "0b619fa688fe3d807e00624a57782fd34b1f2ac66a2ac2b02c4b55fac66049a1"
+    },
+    "cleanup_pre_removal": {
+      "bytes": 4359655,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/cleanup-pre-removal.json",
+      "sha256": "28191622413bc54c887af13e703d7d03a9b1078b37cc1c44394b466dab047777"
+    },
+    "decision": {
+      "bytes": 6936,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/decision.json",
+      "sha256": "ee931c95454ffb69313b8195f2293bf358750b05342a3b00f0fdde0445bc0722"
+    },
+    "execution_files": {
+      "bytes": 3242,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/execution-files.json",
+      "sha256": "cac6ab6d27cf724cf972aedc58b119ae0469a4f1c06ff751b4223a23bbdc6ae9"
+    },
+    "fixture_census": {
+      "bytes": 4401,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/fixture-census.json",
+      "sha256": "2cc480be8df335983712406e01fc1cf8dd8b8a26175a9849184568dc567a41e3"
+    },
+    "hotspots_index": {
+      "bytes": 768205,
+      "mode": 436,
+      "path": "docs/performance/HOTSPOTS.md",
+      "sha256": "2afe0dddf8df1bd9cddc29236429c5158311d502a7a9561b101fdc33ff882e94"
+    },
+    "independent_review_helper": {
+      "bytes": 24385,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/independent_review.py",
+      "sha256": "36c998b62d7d236396ece9579d48872bbdb26918b811c651200464cdaaf244ac"
+    },
+    "methodology_review": {
+      "bytes": 27607,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/methodology-review-v4.json",
+      "sha256": "ac37c8de7658b0b1a8487627889f499eba6322a7e9d32a43650f9375601f8078"
+    },
+    "native_binary": {
+      "bytes": 264443336,
+      "mode": 509,
+      "path": "docs/performance/results/change-0891/binaries/native",
+      "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+    },
+    "native_build": {
+      "bytes": 2920,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/native-build.json",
+      "sha256": "8f499cc51fcf3a4ef2397833cc739060325def695bfebfaf50d0c23c889b7b5b"
+    },
+    "packet_readme": {
+      "bytes": 4898,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/README.md",
+      "sha256": "7f47ac1cf9fcbab51c23edb50f5a24453a11eb25153e8b287ee3e908983487c3"
+    },
+    "plan": {
+      "bytes": 28857,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/plan.json",
+      "sha256": "2013e65962670e94c91cf52adcca691911110ff03b2682643e8ceed37b5babb3"
+    },
+    "post_cleanup_verification": {
+      "bytes": 15046,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/post-cleanup-verification.json",
+      "sha256": "ace921cd5114ab7a82989f43798991ddaeee50a894516b40bece7a9a77a3bf9f"
+    },
+    "quality": {
+      "bytes": 15079,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/quality.json",
+      "sha256": "9469575384e667dbe8a87a0d7c123dd109cc180d4c39f8278d193b6396cee514"
+    },
+    "reduction": {
+      "bytes": 39572,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/reduction.json",
+      "sha256": "a8f1693b51b90344f738a8518dca0b430b69ef7490ec3e747913c99f2c3e5162"
+    },
+    "report": {
+      "bytes": 12230,
+      "mode": 436,
+      "path": "docs/performance/0891-x14ac-namespace-resolution.md",
+      "sha256": "3afd35a901fe2d827e80666437f4f6cbefcce498bc0df4f4bb5d7cc5b49a7fa1"
+    },
+    "report_index": {
+      "bytes": 780433,
+      "mode": 436,
+      "path": "docs/performance/REPORT.md",
+      "sha256": "df4f1b49ff5797103dc4c33af1e28b6ff9d0e467fb8aca7546c20ae45d9f8a69"
+    },
+    "source_review": {
+      "bytes": 7837,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/source-review-v3.json",
+      "sha256": "eb43725c92b16d7cf6115f399bb19dee7aaae4016e526592e557b55bd5ecd19b"
+    },
+    "verification": {
+      "bytes": 15046,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/verification.json",
+      "sha256": "ace921cd5114ab7a82989f43798991ddaeee50a894516b40bece7a9a77a3bf9f"
+    }
+  },
+  "candidate_decision": "adopt",
+  "cleanup": {
+    "managed_executable_copies_removed": true,
+    "owned_roots_absent": true,
+    "pre_removal": {
+      "bytes": 4359655,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/cleanup-pre-removal.json",
+      "sha256": "28191622413bc54c887af13e703d7d03a9b1078b37cc1c44394b466dab047777"
+    },
+    "receipt": {
+      "bytes": 3951,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/cleanup.json",
+      "sha256": "0b619fa688fe3d807e00624a57782fd34b1f2ac66a2ac2b02c4b55fac66049a1"
+    },
+    "removed_roots": [
+      "/tmp/litchi-0891-source",
+      "/home/zhuhe/code/litchi/target/litchi-0891-build",
+      "/home/zhuhe/code/litchi/target/litchi-0891-quality",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0891/executables"
+    ],
+    "retained_binaries": true,
+    "status": "pass"
+  },
+  "decision": "pass",
+  "decision_receipt": {
+    "adopted_optimization": true,
+    "control_metric_flags": 3,
+    "control_pair_flags": 5,
+    "decision": "adopt",
+    "native_p50_spread_flags": 0,
+    "primary_gate": {
+      "ci95_high": 0.9504901248379113,
+      "ci95_upper_below": 1.0,
+      "median_ratio": 0.9450636749691025,
+      "median_ratio_at_most": 0.98,
+      "pass": true
+    },
+    "primary_metric_flags": 0,
+    "receipt": {
+      "bytes": 6936,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/decision.json",
+      "sha256": "ee931c95454ffb69313b8195f2293bf358750b05342a3b00f0fdde0445bc0722"
+    },
+    "review_judgment": "Five control p99 pairs exceed 1.05, but no control median exceeds 1.05 and all control p99 intervals contain 1. These 50-sample maxima do not establish a systematic regression and cannot rule out tail costs. No no-regression claim is made. Unchanged-owner PPTX p50 also improves, limiting causal attribution within this nonexclusive-host whole-binary comparison.",
+    "status": "complete"
+  },
+  "documentation_review": {
+    "adoption_entry_present": true,
+    "claims_match_reduction_decision": true,
+    "documentation_hash_sealed": true,
+    "indices": {
+      "baseline": {
+        "bytes": 465508,
+        "mode": 436,
+        "path": "docs/performance/BASELINE.md",
+        "sha256": "7d4ba6ae4d2f09e97234a17e99cfff41240f55012a0048851f8533a3cb9d750e"
+      },
+      "hotspots": {
+        "bytes": 768205,
+        "mode": 436,
+        "path": "docs/performance/HOTSPOTS.md",
+        "sha256": "2afe0dddf8df1bd9cddc29236429c5158311d502a7a9561b101fdc33ff882e94"
+      },
+      "report": {
+        "bytes": 780433,
+        "mode": 436,
+        "path": "docs/performance/REPORT.md",
+        "sha256": "df4f1b49ff5797103dc4c33af1e28b6ff9d0e467fb8aca7546c20ae45d9f8a69"
+      }
+    },
+    "packet_readme": {
+      "bytes": 4898,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/README.md",
+      "sha256": "7f47ac1cf9fcbab51c23edb50f5a24453a11eb25153e8b287ee3e908983487c3"
+    },
+    "report": {
+      "bytes": 12230,
+      "mode": 436,
+      "path": "docs/performance/0891-x14ac-namespace-resolution.md",
+      "sha256": "3afd35a901fe2d827e80666437f4f6cbefcce498bc0df4f4bb5d7cc5b49a7fa1"
+    },
+    "status": "pass"
+  },
+  "goal_complete": false,
+  "goal_status": "active; broader performance program is not complete",
+  "limitations": [
+    "The adoption result is limited to the fixed 4,096-cell producer XLSX full-cell scan under the warm-filesystem, CPU-12, Rust 1.95 release, shared-host protocol.",
+    "The run has no exclusive-host or physical-cold-cache guarantee and does not extrapolate to other CRUD operations, cold cache, concurrency, or general Office performance.",
+    "Five control p99 pair flags remain review evidence; the small 50-sample per-child tail population cannot rule out tail costs or establish universal behavior.",
+    "The unchanged-owner PPTX path also improved, so the whole-binary comparison cannot attribute the full measured result solely to the removed x14ac lookups.",
+    "Process RSS and allocator counters are descriptive observations; no causal RSS mechanism or allocator adoption gate is claimed.",
+    "The differential reference and fixed-corpus checks do not establish correctness outside the retained quality and fixture coverage."
+  ],
+  "primary_gate": {
+    "ci95_high": 0.9504901248379113,
+    "ci95_low": 0.940462260937797,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 0.9450636749691025,
+    "median_ratio_at_most": 0.98,
+    "metric": "native primary p50 median ratio",
+    "pass": true
+  },
+  "quality": {
+    "all_features": true,
+    "clippy": true,
+    "crate_boundaries": true,
+    "focused_tests": 9,
+    "format": true,
+    "gate_count": 7,
+    "receipt": {
+      "bytes": 15079,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/quality.json",
+      "sha256": "9469575384e667dbe8a87a0d7c123dd109cc180d4c39f8278d193b6396cee514"
+    },
+    "rustdoc": true,
+    "schema": "litchi.xlsx-x14ac-quality-aggregate-0891.v1",
+    "status": "pass",
+    "xlsx_library_tests": 1390
+  },
+  "replay": {
+    "bindings_checked": 36,
+    "bindings_skipped_for_removed_overlay_or_copies": 2,
+    "commands_checked": 72,
+    "post_cleanup": true,
+    "receipt": {
+      "bytes": 15046,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/post-cleanup-verification.json",
+      "sha256": "ace921cd5114ab7a82989f43798991ddaeee50a894516b40bece7a9a77a3bf9f"
+    },
+    "reduction_recomputed": true,
+    "reduction_sha256": "a8f1693b51b90344f738a8518dca0b430b69ef7490ec3e747913c99f2c3e5162",
+    "retained_only_freeze_verify_exit_code": 0,
+    "semantic_receipts_checked": 72,
+    "source_files_reconstructed": 10766,
+    "status": "pass"
+  },
+  "review": {
+    "capture": {
+      "control_metric_flags": 5,
+      "control_pair_flags": 5,
+      "independent_raw_replay": true,
+      "native_p50_spread_flags": 0,
+      "no_retries_or_replacements": true,
+      "primary_gate": {
+        "ci95_high": 0.9504901248379113,
+        "ci95_upper_below": 1.0,
+        "median_ratio": 0.9450636749691025,
+        "median_ratio_at_most": 0.98,
+        "pass": true
+      },
+      "reduction_exact_match": true,
+      "reviewer": "/root/baseline_review_0885",
+      "schema": "litchi.xlsx-x14ac-capture-review-0891.v1",
+      "status": "pass",
+      "timed_workload_rerun": false
+    },
+    "methodology": {
+      "reviewed_without_build_or_workload": true,
+      "reviewer": "/root/mce_cache_measurement_review_0890",
+      "schema": "litchi.xlsx-x14ac-methodology-review-0891.v4",
+      "status": "pass",
+      "supersedes": "docs/performance/results/change-0891/methodology-review-v3.json"
+    },
+    "source": {
+      "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+      "blockers": [],
+      "candidate_freeze": {
+        "bytes": 1346,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/candidate-freeze-v3.json",
+        "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+      },
+      "candidate_patch": {
+        "bytes": 27742,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/candidate-v3.patch",
+        "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+      },
+      "limitations": [
+        "The differential reference is a test-only copy of the baseline scanner and is not an independent complete XML implementation.",
+        "The MCE public reference follows the existing stream path and does not independently implement the complete XML surface."
+      ],
+      "performance_claim": false,
+      "production_source": {
+        "bytes": 28418,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+        "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+      },
+      "qualification_source": {
+        "bytes": 22599,
+        "mode": 436,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+        "sha256": "bb2ceef1b0593a9523b528a5ccfdc894d6171e2e59140359e5fb0822c6da7f3a"
+      },
+      "schema": "litchi.xlsx-x14ac-source-review-0891.v3",
+      "status": "approved_for_measurement"
+    }
+  },
+  "reviewer": "/root/x14ac_review_0891",
+  "schema": "litchi.xlsx-x14ac-namespace-resolution-final-review-0891.v1",
+  "scope": {
+    "cargo_rerun": false,
+    "cleanup_executed_by_owner": true,
+    "documentation_claims_checked": true,
+    "documentation_hash_sealed": true,
+    "post_cleanup_replay": "pass",
+    "reviewed_without_build_or_workload": true,
+    "source_edits": false,
+    "static_review_only": true,
+    "workload_rerun": false,
+    "worktrees_created_for_0891": 0
+  },
+  "source_files": [
+    {
+      "bytes": 28418,
+      "mode": 436,
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    {
+      "bytes": 22599,
+      "mode": 436,
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+      "sha256": "bb2ceef1b0593a9523b528a5ccfdc894d6171e2e59140359e5fb0822c6da7f3a"
+    }
+  ],
+  "status": "pass"
+}

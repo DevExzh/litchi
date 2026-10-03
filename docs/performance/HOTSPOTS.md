@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0891 — remove discarded x14ac namespace resolution
+
+[0891](0891-x14ac-namespace-resolution.md) adopts the bounded x14ac
+work-elimination candidate. The fixed producer XLSX full-cell scan improves
+primary paired p50 **5.49%** (95% improvement interval **4.95–5.95%**); three
+control p99 metric flags cover five pair flags, with noisy tails retained as
+review evidence. Allocation calls and allocated bytes are unchanged at
+**25,933** and **37,618,900**; a five-byte allocator region peak-live change
+does not establish an RSS result. The claim is limited to the warm CPU-12
+Rust 1.95 shared-host protocol and makes no general Office, cold-cache,
+concurrency, or universal-tail claim.
+
 ## 0890 — MCE validated-name reuse rejected
 
 [0890](0890-mce-validated-name-reuse.md) rejects per-start reuse of validated unprefixed attribute names and recognized MCE directive filtering. Eliminating these repeated validations does not meet the producer XLSX native gate: paired p50 ratio 0.99381, interval 0.98861–1.01112. The 0886 profile still motivates broader work-elimination investigation; it does not establish that this small reuse path is sufficient. Three control metric flags and the DOCX p50 increase remain explicit.

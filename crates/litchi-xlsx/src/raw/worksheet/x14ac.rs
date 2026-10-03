@@ -567,9 +567,6 @@ fn capture_inner(content: &[u8], capture_rows: bool) -> Result<Values> {
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("invalid worksheet extension XML: {error}")))?;
-        let (namespace, event) = reader.resolver().resolve_event(event);
-        let decoder = reader.decoder();
-        let resolver = reader.resolver();
         match event {
             Event::Start(element) => {
                 if stack.len() >= MAX_XML_DEPTH {
@@ -577,29 +574,52 @@ fn capture_inner(content: &[u8], capture_rows: bool) -> Result<Values> {
                         "worksheet extension XML exceeds {MAX_XML_DEPTH} levels"
                     )));
                 }
-                let context = start(
-                    stack.last().copied(),
-                    &namespace,
-                    &element,
-                    decoder,
-                    resolver,
-                    &mut previous_row,
-                    &mut values,
-                    capture_rows,
-                )?;
+                let parent = stack.last().copied();
+                let context = if needs_namespace_resolution(parent) {
+                    let namespace = reader
+                        .resolver()
+                        .resolve_prefix(element.name().prefix(), true);
+                    let decoder = reader.decoder();
+                    let resolver = reader.resolver();
+                    start(
+                        parent,
+                        &namespace,
+                        &element,
+                        decoder,
+                        resolver,
+                        &mut previous_row,
+                        &mut values,
+                        capture_rows,
+                    )?
+                } else {
+                    // A row or an already-unmodeled element cannot contain a
+                    // modeled x14ac target.  NsReader has already installed
+                    // this tag's namespace scope and processed its namespace
+                    // declarations; resolving the discarded element name is
+                    // unnecessary.
+                    Context::Other
+                };
                 stack.push(context);
             },
             Event::Empty(element) => {
-                start(
-                    stack.last().copied(),
-                    &namespace,
-                    &element,
-                    decoder,
-                    resolver,
-                    &mut previous_row,
-                    &mut values,
-                    capture_rows,
-                )?;
+                let parent = stack.last().copied();
+                if needs_namespace_resolution(parent) {
+                    let namespace = reader
+                        .resolver()
+                        .resolve_prefix(element.name().prefix(), true);
+                    let decoder = reader.decoder();
+                    let resolver = reader.resolver();
+                    start(
+                        parent,
+                        &namespace,
+                        &element,
+                        decoder,
+                        resolver,
+                        &mut previous_row,
+                        &mut values,
+                        capture_rows,
+                    )?;
+                }
             },
             Event::End(_) => {
                 stack
@@ -622,6 +642,14 @@ fn capture_inner(content: &[u8], capture_rows: bool) -> Result<Values> {
         }
     }
     Ok(values)
+}
+
+#[inline]
+fn needs_namespace_resolution(parent: Option<Context>) -> bool {
+    matches!(
+        parent,
+        None | Some(Context::Worksheet) | Some(Context::SheetData)
+    )
 }
 
 #[allow(
@@ -757,3 +785,6 @@ pub(crate) fn attribute_name(
     }
     Ok(result)
 }
+
+#[cfg(test)]
+mod reuse_tests;

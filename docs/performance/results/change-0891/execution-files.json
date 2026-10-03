@@ -1,0 +1,92 @@
+{
+  "purpose": "content-identical role/mode copies reused by fresh timed children",
+  "records": {
+    "after": {
+      "allocator": {
+        "copy": {
+          "bytes": 267476848,
+          "device": 66305,
+          "executable": true,
+          "inode": 35440967,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/executables/after-allocator",
+          "sha256": "958fd5e8fe2e8afada36c02a120289ee27cd06e9ca21f55085b43ade8b1a3484"
+        },
+        "source": {
+          "bytes": 267476848,
+          "device": 66305,
+          "executable": true,
+          "inode": 35440960,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/allocator",
+          "sha256": "958fd5e8fe2e8afada36c02a120289ee27cd06e9ca21f55085b43ade8b1a3484"
+        }
+      },
+      "native": {
+        "copy": {
+          "bytes": 264443336,
+          "device": 66305,
+          "executable": true,
+          "inode": 35440966,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/executables/after-native",
+          "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+        },
+        "source": {
+          "bytes": 264443336,
+          "device": 66305,
+          "executable": true,
+          "inode": 35440954,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native",
+          "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+        }
+      }
+    },
+    "before": {
+      "allocator": {
+        "copy": {
+          "bytes": 267473328,
+          "device": 66305,
+          "executable": true,
+          "inode": 35440965,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/executables/before-allocator",
+          "sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16"
+        },
+        "source": {
+          "bytes": 267473328,
+          "device": 66305,
+          "executable": true,
+          "inode": 31864768,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/allocator",
+          "sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16"
+        }
+      },
+      "native": {
+        "copy": {
+          "bytes": 264440648,
+          "device": 66305,
+          "executable": true,
+          "inode": 35440964,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/executables/before-native",
+          "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+        },
+        "source": {
+          "bytes": 264440648,
+          "device": 66305,
+          "executable": true,
+          "inode": 31864761,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/binaries/native",
+          "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+        }
+      }
+    }
+  },
+  "rss_claim": false,
+  "schema": "litchi.xlsx-x14ac-managed-executables-0891.v1",
+  "status": "pass"
+}

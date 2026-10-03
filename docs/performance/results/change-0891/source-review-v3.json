@@ -1,0 +1,146 @@
+{
+  "schema": "litchi.xlsx-x14ac-source-review-0891.v3",
+  "status": "approved_for_measurement",
+  "reviewer": "/root/x14ac_review_0891",
+  "reviewed_without_build_or_timing": true,
+  "base_head": "3348479699f248223184c7bdbc005879b0153307",
+  "supersedes": "docs/performance/results/change-0891/source-review-v2.json",
+  "freeze": {
+    "path": "docs/performance/results/change-0891/candidate-freeze-v3.json",
+    "schema": "litchi.xlsx-x14ac-candidate-freeze-0891.v1",
+    "status": "frozen",
+    "immutable": true,
+    "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+  },
+  "scope": {
+    "production_owner": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "focused_tests": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+    "candidate_paths": [
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+    ],
+    "public_api_changed": false,
+    "dependencies_changed": false,
+    "unsafe_code_added": false,
+    "reviewer_source_edits": false,
+    "reviewer_builds": false,
+    "performance_claim": false
+  },
+  "files": {
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs": {
+      "before": {
+        "bytes": 27139,
+        "sha256": "d226c59e7174c5977ffd2daa889eac89d147a22c404be72f8e9941650a0381fa"
+      },
+      "after": {
+        "bytes": 28418,
+        "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+      }
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs": {
+      "before": {
+        "present": false
+      },
+      "after": {
+        "bytes": 22599,
+        "sha256": "bb2ceef1b0593a9523b528a5ccfdc894d6171e2e59140359e5fb0822c6da7f3a"
+      }
+    }
+  },
+  "patch": {
+    "path": "docs/performance/results/change-0891/candidate-v3.patch",
+    "base": "3348479699f248223184c7bdbc005879b0153307",
+    "bytes": 27742,
+    "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197",
+    "paths": [
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+    ]
+  },
+  "findings": [
+    {
+      "id": "quick-xml-namespace-state",
+      "severity": "pass",
+      "summary": "quick-xml 0.41 NsReader::read_event still performs its pending pop and process_event push/pop bookkeeping, including namespace-declaration validation. NamespaceResolver::resolve_event is a pure lookup: for Start, Empty, and End it calls resolve_prefix(name.prefix(), true), and it returns Unbound for other event kinds. The candidate retains the same lookup for Start and Empty only when the result can affect start(); the discarded End result is not observable."
+    },
+    {
+      "id": "modeled-parent-guard",
+      "severity": "pass",
+      "summary": "needs_namespace_resolution covers exactly the parents for which start() can recognize worksheet, sheetFormatPr, sheetData, or row: None, Worksheet, and SheetData. For Row and Other, start() immediately returns Context::Other without reading attributes or mutating values, so bypassing its discarded namespace lookup preserves behavior."
+    },
+    {
+      "id": "error-and-depth-order",
+      "severity": "pass",
+      "summary": "read_event XML errors, check_end_names, stack pushes and pops, EOF handling, unexpected-end handling, and the depth check remain in the same control path. The direct lookup occurs only after the unchanged depth check and is pure, so the candidate does not reorder typed parser or worksheet errors."
+    },
+    {
+      "id": "structural-attribute-resolution",
+      "severity": "pass",
+      "summary": "Structural descent parsing remains in descent(), including checked_attributes(), resolver.resolve_attribute(), XML value decoding, duplicate detection, lexical parsing, and Descent validation. Default and row inference, duplicate rows, capture_rows modes, and prefix/default-namespace rebinding therefore retain the baseline path."
+    },
+    {
+      "id": "mce-path-preserved",
+      "severity": "pass",
+      "summary": "The markup-compatibility dispatch predicates and stream implementation are outside the production diff. The focused tests exercise fallback selection, supported Choice selection, the selected fallback's typed Descent failure, raw errors, and trailing XML while keeping the raw observer and selected branch controls distinct."
+    },
+    {
+      "id": "v3-test-only-correction",
+      "severity": "pass",
+      "summary": "The v3 overlay changes only the qualification assertion for the selected fallback: NaN is a valid f64 lexical value whose Descent validation returns Error::Descent, so the test now checks that typed result and retains debug context. Production x14ac.rs bytes and SHA-256 are unchanged from v2."
+    },
+    {
+      "id": "source-integrity",
+      "severity": "pass",
+      "summary": "The v3 freeze contains exactly the production file and the nested test module. The v3 freeze, v3 patch, base commit, file sizes, and SHA-256 identities are bound above and match the live files at review time."
+    }
+  ],
+  "blocking_findings": [],
+  "semantic_matrix": {
+    "default_namespace_elements": true,
+    "strict_namespace_elements": true,
+    "prefixed_namespace_elements": true,
+    "namespace_aliases": true,
+    "namespace_rebinding_and_restoration": true,
+    "unknown_prefix_non_structural": true,
+    "malformed_xml_and_attribute_errors": true,
+    "depth_boundary_256_success_257_failure": true,
+    "descent_edge_values_and_limits": true,
+    "duplicate_and_reserved_marker_errors": true,
+    "mce_selected_choice_and_fallback": true,
+    "real_fixture_worksheet_census": "5 packages, 13 worksheet members, 3 members containing a descent marker"
+  },
+  "test_coverage": {
+    "module": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+    "comparison": "baseline and optimized outcomes are compared in both capture_rows modes; successful values and error discriminant/string are checked",
+    "namespace_fixtures": [
+      "default",
+      "strict SpreadsheetML",
+      "prefixed worksheet/default-other",
+      "x14ac prefix aliases",
+      "rebinding and restoration",
+      "unknown prefixes in structural and non-structural contexts"
+    ],
+    "boundary_fixtures": [
+      "malformed end and attribute",
+      "invalid and negative descent",
+      "duplicate defaults and rows",
+      "zero, explicit overflow, and inferred overflow rows",
+      "reserved internal marker",
+      "exact depth limit and one level over limit",
+      "row descent edge values"
+    ],
+    "fixture_census": "docs/performance/results/change-0891/fixture-census.json"
+  },
+  "limitations": [
+    "The differential reference_capture is a test-only copy of the baseline capture_inner/start/descent path from the frozen base commit; it is not an independent full XML implementation and shares quick-xml and selected project helpers.",
+    "The public differential reference intentionally reuses the existing stream implementation for MCE AlternateContent, because the production candidate does not modify that path; MCE coverage therefore validates branch controls and selected/raw cases rather than providing an independent second MCE parser.",
+    "The v1 and v2 focused quality attempts are retained as failed historical attempts; v3 contains the test-only typed-error assertion correction. The final quality receipt remains a separate gate.",
+    "This receipt authorizes measurement only and makes no speed, allocation, RSS, or adoption claim."
+  ],
+  "owner_reported_checks": {
+    "git_diff_check": "pass",
+    "v1_quality_attempt": "failed at focused test compile on eight qualification-test lint diagnostics",
+    "v2_quality_attempt": "failed at one overly specific selected-fallback error-string assertion",
+    "v3_quality": "pending owner quality receipt"
+  }
+}

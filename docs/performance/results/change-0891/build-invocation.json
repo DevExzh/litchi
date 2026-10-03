@@ -1,0 +1,15 @@
+{
+  "schema": "litchi.xlsx-x14ac-build-invocation-0891.v1",
+  "started_utc": "2026-10-03T19:22:57.296277+00:00",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0891/build-executed.py"
+  ],
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/build-executed.py",
+    "bytes": 14241,
+    "sha256": "456ce7f1195e344e7f4b26aad5b662bae6f5c147f630b76c70daa7b2e2480b7e"
+  },
+  "focused_tests_passed": 9
+}

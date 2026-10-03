@@ -1,0 +1,3 @@
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","fmt","--manifest-path","/home/zhuhe/code/litchi/Cargo.toml","-p","litchi-xlsx","--","--check"]
+

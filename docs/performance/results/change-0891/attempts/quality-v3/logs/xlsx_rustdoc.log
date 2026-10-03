@@ -1,0 +1,14 @@
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","rustdoc","--manifest-path","/home/zhuhe/code/litchi/Cargo.toml","--locked","--offline","-j","2","-p","litchi-xlsx","--lib","--","-D","warnings"]
+
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xldm)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized] target(s) in 10.75s
+   Generated /home/zhuhe/code/litchi/target/litchi-0891-quality/doc/litchi_xlsx/index.html

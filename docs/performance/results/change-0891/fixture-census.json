@@ -1,0 +1,124 @@
+{
+  "schema": "litchi.xlsx-x14ac-fixture-census-0891.v1",
+  "status": "pass",
+  "created_utc": "2026-10-03T19:07:01.180967+00:00",
+  "method": "Independent Python standard-library ZIP census; exact fixed package and worksheet-member counts; unreadable/corrupt inputs raise. No parser acceptance assumption.",
+  "packages": [
+    {
+      "path": "test-data/ooxml/xlsx/SimpleMultiCell.xlsx",
+      "bytes": 8123,
+      "sha256": "119b6e70c5bbca6ca3e46f981e0719c154d87203adb4b5b61210d726deab9f7a",
+      "worksheets": [
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 1079,
+          "sha256": "4f422d480807dd190c9292c579e516eb98e264fcdc3b0675348201671a619939",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet2.xml",
+          "bytes": 518,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet3.xml",
+          "bytes": 518,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "contains_descent_marker": false
+        }
+      ]
+    },
+    {
+      "path": "test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx",
+      "bytes": 13378,
+      "sha256": "1e97af3b87636bd0a759c25439a21b928c2ff3b9a3c57ca49ae24cb1ccdb7e2f",
+      "worksheets": [
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 23336,
+          "sha256": "d7d5fc35433f6e7e57c8abd7c3a71e802ad89747b3b2e0117e41e420977cfe48",
+          "contains_descent_marker": true
+        }
+      ]
+    },
+    {
+      "path": "test-data/ooxml/xlsx/StructuredReferences.xlsx",
+      "bytes": 10459,
+      "sha256": "a746e336176f8157c50a0a3b017c4633b7b1d546bd1b8af0f8165a48d1bacc56",
+      "worksheets": [
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 1029,
+          "sha256": "ceef458ca952848377e2ce847a66d640cf30eacfb19122d048cdddd3ec58a492",
+          "contains_descent_marker": true
+        },
+        {
+          "name": "xl/worksheets/sheet2.xml",
+          "bytes": 2191,
+          "sha256": "8ffaaffa927adc8e6da4c9558a4e20ac1bb1c5b9de4256342a52fbe279ce59c6",
+          "contains_descent_marker": true
+        }
+      ]
+    },
+    {
+      "path": "test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx",
+      "bytes": 30333,
+      "sha256": "792b9f21afdb6b8b1f82345864ee15d55c17a1b54d71c250e82c87304385d362",
+      "worksheets": [
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 2805,
+          "sha256": "56390c04364dbc7f113178a80723cf2a2921800d4582c5b6f98c5e51c49f2363",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet2.xml",
+          "bytes": 2387,
+          "sha256": "2cad73f10e656336c697a5c1aaaa33c8a166864a70b6285d181036764186bc0e",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet3.xml",
+          "bytes": 2998,
+          "sha256": "39a3b368295d78ab7d7c62ae7a8bc6a2859f3e0d6f0698f5846af83e4b6f99ef",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet4.xml",
+          "bytes": 3240,
+          "sha256": "ffeb185bf16bebf6108389417252d6808e0835374fd9f91c32b4a51bb8dc8876",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet5.xml",
+          "bytes": 3437,
+          "sha256": "ccf44e3368ab781dd7c82b36a5421a397147637bdb2e2ec1cd1441a70aa0c3a6",
+          "contains_descent_marker": false
+        },
+        {
+          "name": "xl/worksheets/sheet6.xml",
+          "bytes": 1944,
+          "sha256": "108e7b2d694b42c88c9722f8d5a94bdac5b4efb45f2f84d02107404ea4df9dda",
+          "contains_descent_marker": false
+        }
+      ]
+    },
+    {
+      "path": "test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx",
+      "bytes": 7311,
+      "sha256": "ade103f651e3f7cac423cd6b01d4d5a004d03470667723234105ba39672bc74d",
+      "worksheets": [
+        {
+          "name": "xl/worksheets/sheet1.xml",
+          "bytes": 2978,
+          "sha256": "0c2672977f05c90656204a2d7d9d5d47bfca93bc14fa641ecf6ade3e3ae2b38a",
+          "contains_descent_marker": false
+        }
+      ]
+    }
+  ],
+  "package_count": 5,
+  "worksheet_count": 13,
+  "descent_marker_members": 3
+}

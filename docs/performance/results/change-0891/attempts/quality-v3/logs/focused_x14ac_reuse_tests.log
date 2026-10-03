@@ -1,0 +1,20 @@
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","test","--manifest-path","/home/zhuhe/code/litchi/Cargo.toml","--locked","--offline","-j","2","-p","litchi-xlsx","--lib","raw::worksheet::x14ac::reuse_tests","--","--test-threads=1"]
+
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized] target(s) in 23.80s
+     Running unittests src/lib.rs (target/litchi-0891-quality/debug/deps/litchi_xlsx-62aebd858960f98a)
+
+running 9 tests
+test raw::worksheet::x14ac::reuse_tests::actual_xlsx_worksheet_parts_match_the_baseline_reference ... ok
+test raw::worksheet::x14ac::reuse_tests::mce_alternate_has_independent_selected_branch_controls ... ok
+test raw::worksheet::x14ac::reuse_tests::mce_raw_errors_and_trailing_xml_keep_typed_error_controls ... ok
+test raw::worksheet::x14ac::reuse_tests::optimized_capture_keeps_namespace_reader_state_after_rebinding ... ok
+test raw::worksheet::x14ac::reuse_tests::optimized_capture_matches_baseline_across_namespace_spellings ... ok
+test raw::worksheet::x14ac::reuse_tests::optimized_capture_matches_reference_for_errors_and_limits ... ok
+test raw::worksheet::x14ac::reuse_tests::optimized_capture_matches_reference_for_non_structural_unknown_prefixes ... ok
+test raw::worksheet::x14ac::reuse_tests::optimized_capture_matches_reference_for_row_descent_edge_values ... ok
+test raw::worksheet::x14ac::reuse_tests::optimized_capture_matches_the_same_explicit_depth_boundary ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 1381 filtered out; finished in 0.05s
+

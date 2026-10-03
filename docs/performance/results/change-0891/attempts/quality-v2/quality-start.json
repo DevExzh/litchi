@@ -1,0 +1,217 @@
+{
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0891-quality",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-D warnings -C debuginfo=0",
+    "RUSTFLAGS": "-C debuginfo=0",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0-x86_64-unknown-linux-gnu",
+    "TMPDIR": "/tmp",
+    "TZ": "UTC"
+  },
+  "freeze": {
+    "identity": {
+      "bytes": 1356,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-freeze-v2.json",
+      "sha256": "2242e2d8b16af17beb79992801b5ea9432b9613db892b2a74a51f60e90f44a4e"
+    },
+    "path": "candidate-freeze-v2.json",
+    "schema": "litchi.xlsx-x14ac-candidate-freeze-0891.v1"
+  },
+  "frozen_files": [
+    {
+      "actual": {
+        "bytes": 28418,
+        "mode": "0o664",
+        "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+        "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+      },
+      "expected": {
+        "bytes": 28418,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+        "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+      },
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs"
+    },
+    {
+      "actual": {
+        "bytes": 22605,
+        "mode": "0o664",
+        "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+        "sha256": "968259a3f95b0619a205b01d231d1de2f7d1197ebef020e6f6658146ac7b1e81"
+      },
+      "expected": {
+        "bytes": 22605,
+        "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+        "sha256": "968259a3f95b0619a205b01d231d1de2f7d1197ebef020e6f6658146ac7b1e81"
+      },
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+    }
+  ],
+  "manifest": "/home/zhuhe/code/litchi/Cargo.toml",
+  "performance_claim": false,
+  "planned_commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-j",
+        "2",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "raw::worksheet::x14ac::reuse_tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "name": "focused_x14ac_reuse_tests"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-j",
+        "2",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "name": "xlsx_full_lib_tests"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-j",
+        "2",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--all-features"
+      ],
+      "name": "xlsx_all_features_check"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "clippy",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-j",
+        "2",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "name": "xlsx_clippy"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "rustdoc",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-j",
+        "2",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "name": "xlsx_rustdoc"
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "fmt",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/Cargo.toml",
+        "-p",
+        "litchi-xlsx",
+        "--",
+        "--check"
+      ],
+      "name": "xlsx_fmt"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "name": "crate_boundaries"
+    }
+  ],
+  "purpose": "frozen_xlsx_x14ac_quality_gates",
+  "root_lock_before": {
+    "bytes": 138443,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "runner": {
+    "bytes": 14108,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/attempts/quality-v2/quality_runner.py",
+    "sha256": "10ff003a83b8a07732ced8bd087a185af3eec580ae252a4d5a89ae0953dc61a8"
+  },
+  "schema": "litchi.xlsx-x14ac-quality-start-0891.v1",
+  "source_before": [
+    {
+      "bytes": 28418,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    {
+      "bytes": 22605,
+      "mode": "0o664",
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+      "sha256": "968259a3f95b0619a205b01d231d1de2f7d1197ebef020e6f6658146ac7b1e81"
+    }
+  ],
+  "started_utc": "2026-10-03T19:14:47.611676Z",
+  "status": "running",
+  "target_dir": "/home/zhuhe/code/litchi/target/litchi-0891-quality",
+  "target_marker": {
+    "bytes": 32,
+    "mode": "0o664",
+    "path": "/home/zhuhe/code/litchi/target/litchi-0891-quality/.owner-0891-quality",
+    "sha256": "d1e01adf7198f61c0208e0dfe377c1395ee238b462e8e52fb75d9efd45dd1d39"
+  }
+}

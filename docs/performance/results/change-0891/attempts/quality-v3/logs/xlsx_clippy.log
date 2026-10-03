@@ -1,0 +1,34 @@
+cwd=/home/zhuhe/code/litchi
+argv=["/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo","clippy","--manifest-path","/home/zhuhe/code/litchi/Cargo.toml","--locked","--offline","-j","2","-p","litchi-xlsx","--lib","--no-deps","--","-D","warnings"]
+
+    Checking zerofrom v0.1.4
+    Checking hybrid-array v0.4.14
+    Checking yoke v0.7.4
+    Checking zerovec v0.10.4
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking icu_collections v1.5.0
+    Checking digest v0.11.3
+    Checking icu_provider v1.5.0
+    Checking thiserror v2.0.18
+    Checking sha2 v0.11.0
+    Checking icu_locid_transform v1.5.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking icu_properties v1.5.1
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking icu_normalizer v1.5.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking url v2.5.8
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xldm)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized] target(s) in 23.25s

@@ -1,0 +1,167 @@
+{
+  "schema": "litchi.xlsx-x14ac-decision-0891.v1",
+  "status": "complete",
+  "decision": "adopt",
+  "adopted_optimization": true,
+  "decided_utc": "2026-10-03T19:53:05.661755+00:00",
+  "reason": "Frozen primary gate passes; every primary p50/p95/p99 pair improves. Owner-local removal of discarded namespace lookups passes source, correctness, custody, and independent raw-data review. Control tail flags are retained and scoped below.",
+  "primary_gate": {
+    "ci95_high": 0.9504901248379113,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 0.9450636749691025,
+    "median_ratio_at_most": 0.98,
+    "pass": true
+  },
+  "flags": {
+    "primary_metric_flags": 0,
+    "control_metric_flags": 3,
+    "control_pair_flags": 5,
+    "native_p50_spread_flags": 0
+  },
+  "control_review": [
+    {
+      "case": "xlsx_full_cell_scan",
+      "metric": "p99_ns",
+      "median_ratio": 0.9859915665012277,
+      "ci95_low": 0.8707099688663695,
+      "ci95_high": 1.056185491005603,
+      "flagged_pairs": [
+        {
+          "after": 143261,
+          "before": 135640,
+          "pair": "native-b04-c01",
+          "ratio": 1.056185491005603
+        },
+        {
+          "after": 156770,
+          "before": 145130,
+          "pair": "native-b06-c01",
+          "ratio": 1.0802039550747606
+        }
+      ]
+    },
+    {
+      "case": "docx_producer_source_selected_paragraph",
+      "metric": "p99_ns",
+      "median_ratio": 1.0177008317707448,
+      "ci95_low": 0.9627974268220219,
+      "ci95_high": 1.1315278757939309,
+      "flagged_pairs": [
+        {
+          "after": 141001,
+          "before": 115430,
+          "pair": "native-b01-c02",
+          "ratio": 1.2215281989084295
+        },
+        {
+          "after": 128270,
+          "before": 113360,
+          "pair": "native-b07-c02",
+          "ratio": 1.1315278757939309
+        }
+      ]
+    },
+    {
+      "case": "pptx_producer_source_selected_slide",
+      "metric": "p99_ns",
+      "median_ratio": 0.9873623075420417,
+      "ci95_low": 0.9348930865854828,
+      "ci95_high": 1.0045846645367411,
+      "flagged_pairs": [
+        {
+          "after": 207001,
+          "before": 187811,
+          "pair": "native-b01-c03",
+          "ratio": 1.1021771887695608
+        }
+      ]
+    }
+  ],
+  "review_judgment": "Five control p99 pairs exceed 1.05, but no control median exceeds 1.05 and all control p99 intervals contain 1. These 50-sample maxima do not establish a systematic regression and cannot rule out tail costs. No no-regression claim is made. Unchanged-owner PPTX p50 also improves, limiting causal attribution within this nonexclusive-host whole-binary comparison.",
+  "memory": "Allocation calls, reallocations, and total allocated bytes unchanged; region peak live bytes lower by five, not material. Process RSS is descriptive, not a causal claim.",
+  "scope": "Observed 5.4936325% paired-median latency reduction on fixed 4096-cell producer XLSX full-cell scan; 95% paired bootstrap improvement interval 4.9509875% to 5.9537739%; warm filesystem, CPU12, Rust1.95 release, shared host. No extrapolation to other CRUD, cold cache, concurrency, or general Office speed.",
+  "source_retained": [
+    {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "bytes": 28418,
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+      "bytes": 22599,
+      "sha256": "bb2ceef1b0593a9523b528a5ccfdc894d6171e2e59140359e5fb0822c6da7f3a"
+    }
+  ],
+  "evidence": {
+    "plan.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/plan.json",
+      "bytes": 28857,
+      "sha256": "2013e65962670e94c91cf52adcca691911110ff03b2682643e8ceed37b5babb3"
+    },
+    "candidate-freeze-v3.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-freeze-v3.json",
+      "bytes": 1346,
+      "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+    },
+    "candidate-v3.patch": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-v3.patch",
+      "bytes": 27742,
+      "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+    },
+    "quality.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/quality.json",
+      "bytes": 15079,
+      "sha256": "9469575384e667dbe8a87a0d7c123dd109cc180d4c39f8278d193b6396cee514"
+    },
+    "source-review-v3.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/source-review-v3.json",
+      "bytes": 7837,
+      "sha256": "eb43725c92b16d7cf6115f399bb19dee7aaae4016e526592e557b55bd5ecd19b"
+    },
+    "methodology-review-v4.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/methodology-review-v4.json",
+      "bytes": 27607,
+      "sha256": "ac37c8de7658b0b1a8487627889f499eba6322a7e9d32a43650f9375601f8078"
+    },
+    "build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/build.json",
+      "bytes": 6113,
+      "sha256": "ccd137fe2b9b6e5fbe338ad3bce0ac79b46d1334d39a022dc6a09dac4756613f"
+    },
+    "execution-files.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/execution-files.json",
+      "bytes": 3242,
+      "sha256": "cac6ab6d27cf724cf972aedc58b119ae0469a4f1c06ff751b4223a23bbdc6ae9"
+    },
+    "capture/experiment.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/capture/experiment.json",
+      "bytes": 26107,
+      "sha256": "8e49eea7a94c5f5996ddc7279c0888d47aea7599a33187e875b855e4bb02a881"
+    },
+    "reduction.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/reduction.json",
+      "bytes": 39572,
+      "sha256": "a8f1693b51b90344f738a8518dca0b430b69ef7490ec3e747913c99f2c3e5162"
+    },
+    "verification.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/verification.json",
+      "bytes": 15046,
+      "sha256": "ace921cd5114ab7a82989f43798991ddaeee50a894516b40bece7a9a77a3bf9f"
+    },
+    "capture-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/capture-review.json",
+      "bytes": 57161,
+      "sha256": "9f0c627b6131b1111a539bfe8e23e813a5c5b5afbdf3496a9671bf58de7d60c6"
+    },
+    "independent_review.py": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/independent_review.py",
+      "bytes": 24385,
+      "sha256": "36c998b62d7d236396ece9579d48872bbdb26918b811c651200464cdaaf244ac"
+    },
+    "pre-capture-host.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/pre-capture-host.json",
+      "bytes": 18590,
+      "sha256": "d82c6b0c43909dd486c43fe06443b13e5ff83cc8c0e397bb6d28e286ba00eef2"
+    }
+  }
+}

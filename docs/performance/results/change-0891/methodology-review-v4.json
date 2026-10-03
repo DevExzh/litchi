@@ -1,0 +1,676 @@
+{
+  "baseline_reuse": {
+    "build_context_gate": {
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "matching_cargo": true,
+      "matching_compiler": true,
+      "matching_fixed_environment": true,
+      "matching_release_flags": true,
+      "matching_role_argv": true,
+      "target_directory_difference": "expected per-build isolation only"
+    },
+    "candidate_build_runner": {
+      "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+      "build_receipt": {
+        "bytes": 6113,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/build.json",
+        "sha256": "ccd137fe2b9b6e5fbe338ad3bce0ac79b46d1334d39a022dc6a09dac4756613f"
+      },
+      "byte_identical_build_helpers": true,
+      "executed_helper": {
+        "bytes": 14241,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0891/build-executed.py",
+        "sha256": "456ce7f1195e344e7f4b26aad5b662bae6f5c147f630b76c70daa7b2e2480b7e"
+      },
+      "helper": {
+        "bytes": 14241,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0891/build.py",
+        "sha256": "456ce7f1195e344e7f4b26aad5b662bae6f5c147f630b76c70daa7b2e2480b7e"
+      },
+      "invocation": {
+        "bytes": 460,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0891/build-invocation.json",
+        "sha256": "3a7d7d02b3d3439e05d753275bc7eeae48b0bad3e37fa10b93d03913b578ba70"
+      },
+      "invocation_helper_sha256": "456ce7f1195e344e7f4b26aad5b662bae6f5c147f630b76c70daa7b2e2480b7e",
+      "overlay_files": [
+        "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+      ],
+      "source_file_count": 10766,
+      "source_root": "/tmp/litchi-0891-source",
+      "status": "pass",
+      "target_root": "/home/zhuhe/code/litchi/target/litchi-0891-build",
+      "timings_authorized": false
+    },
+    "retained_build": {
+      "allocator_binary": {
+        "bytes": 267473328,
+        "path": "docs/performance/results/change-0885/binaries/allocator",
+        "sha256": "dfaa5423278a9d9b71cd95eb29c16c6cf55ae39c1c6a52aea3367247ee585e16"
+      },
+      "allocator_build": {
+        "bytes": 2834,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0885/allocator-build.json",
+        "sha256": "1a4e67d157bbc10e24e7cf2edcebc5bcbdf40a474320a7fbcf169b3b7a13890f"
+      },
+      "build": {
+        "bytes": 4745,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0885/build.json",
+        "sha256": "4975fd1635267abd98cb0a756a39c948ceb048d31a2bb08972569f786f5e4d8d"
+      },
+      "native_binary": {
+        "bytes": 264440648,
+        "path": "docs/performance/results/change-0885/binaries/native",
+        "sha256": "155db54cee93be9383a9e5d599475c28745248fbea731e7b33b796758069362d"
+      },
+      "native_build": {
+        "bytes": 2783,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0885/native-build.json",
+        "sha256": "308e20f744503b7b39db50fa02622a04ac6cf7c1b0554e548ea1f8fb8b649874"
+      },
+      "source_rechecked_files": 10765,
+      "status": "pass"
+    }
+  },
+  "caveats": [
+    "This receipt authorizes measurement methodology only and makes no latency, allocation, RSS, optimization, or adoption claim.",
+    "The build intentionally reconstructs the retained archive and overlays only the two frozen candidate files, so unrelated workspace files such as an untracked benchmark cannot enter the candidate source root; the source census is checked at 10,766 files.",
+    "Warm-cache CPU-affinity measurements have no exclusive-host or physical-cold-cache guarantee; record host load with the capture packet.",
+    "Managed executable copies narrow pathname/inode history differences but cannot establish a causal RSS result.",
+    "The differential correctness reference shares project helpers and is not an independent parser implementation."
+  ],
+  "correctness_custody": {
+    "fixture_census": {
+      "bytes": 4401,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/fixture-census.json",
+      "sha256": "2cc480be8df335983712406e01fc1cf8dd8b8a26175a9849184568dc567a41e3"
+    },
+    "focused_quality": "9/9 x14ac reuse tests pass",
+    "full_quality": "1390 XLSX library tests pass; zero ignored",
+    "independence_limit": "differential reference is a test-only copy of the retained path and shares project helpers; no independent parser claim",
+    "source_review": {
+      "blocking_findings": [],
+      "receipt": {
+        "bytes": 7837,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0891/source-review-v3.json",
+        "sha256": "eb43725c92b16d7cf6115f399bb19dee7aaae4016e526592e557b55bd5ecd19b"
+      },
+      "status": "approved_for_measurement"
+    }
+  },
+  "helpers": {
+    "build-executed.py": {
+      "bytes": 14241,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/build-executed.py",
+      "sha256": "456ce7f1195e344e7f4b26aad5b662bae6f5c147f630b76c70daa7b2e2480b7e"
+    },
+    "build.py": {
+      "bytes": 14241,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/build.py",
+      "sha256": "456ce7f1195e344e7f4b26aad5b662bae6f5c147f630b76c70daa7b2e2480b7e"
+    },
+    "cleanup.py": {
+      "bytes": 10959,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/cleanup.py",
+      "sha256": "78fea5e9c5dba504fee0e48cf161a7721694c31b4164d4f6932db5b8f8812aba"
+    },
+    "experiment.py": {
+      "bytes": 6131,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/experiment.py",
+      "sha256": "c83f4c156076f9b547858ea81dec0d75184a48b8d1d84c8571f35b8ad4ff0d32"
+    },
+    "freeze.py": {
+      "bytes": 21368,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/freeze.py",
+      "sha256": "cf0ec69f52cf357d5cee66457b15d07053c3ab113ebe79ecf045ec8c8f9a8f20"
+    },
+    "imported/0885/capture.py": {
+      "bytes": 17203,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0885/capture.py",
+      "sha256": "f751f1d5dd367b856f3e83b03d360dd86c99c33d3d1c0ebd7e8305575a63a27f"
+    },
+    "imported/0885/verify.py": {
+      "bytes": 23498,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0885/verify.py",
+      "sha256": "f4de053621d078e249c5d549eeba2ebab1a4b0b7e58edeb5c952c2bbf1980fb9"
+    },
+    "imported/0887/experiment.py": {
+      "bytes": 22587,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0887/experiment.py",
+      "sha256": "0d261b77074ced023c369b6751a5933780f3683cccc7d5eaa84004dd0f08d8c5"
+    },
+    "imported/0887/reduce.py": {
+      "bytes": 13950,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0887/reduce.py",
+      "sha256": "78572861cef679de23ec9729dc07dc1956ab76774b21ed64faa5b91ea8f503ad"
+    },
+    "imported/0887/verify_packet.py": {
+      "bytes": 16934,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0887/verify_packet.py",
+      "sha256": "da804225162f3d106406c8644dce6dbfda2934e1b20e02c0c3d3675298cc98f2"
+    },
+    "prepare_exec.py": {
+      "bytes": 3684,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/prepare_exec.py",
+      "sha256": "56f2c35aee0388f3b55f508c96ba3d4d3139dcd0c9a6e6fe976e19632124dabb"
+    },
+    "quality.py": {
+      "bytes": 7761,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/quality.py",
+      "sha256": "06e010711b1fa0ddf6620b706789285954c854602b989892c7223a57b6e88327"
+    },
+    "quality_runner.py": {
+      "bytes": 14111,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/quality_runner.py",
+      "sha256": "ace5341840d3af6d921858323c1504ded29e9d2149e3cd802cd19e67a221e7d7"
+    },
+    "reduce.py": {
+      "bytes": 861,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/reduce.py",
+      "sha256": "fbb4a9009301d55bcdd2b6aedbfe993acf710e1ee04cf1bbe83e99e420e35d6a"
+    },
+    "tool/taskset": {
+      "bytes": 31184,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "tool/time": {
+      "bytes": 27232,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/time",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"
+    },
+    "verify_packet.py": {
+      "bytes": 12278,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/verify_packet.py",
+      "sha256": "c84e5981eba5cac6f923fd01693542d014dc2087012eac05a98dfec2f3263286"
+    }
+  },
+  "performance_claim": null,
+  "quality_and_cleanup": {
+    "cleanup": "remove only marked 0891 source/build/quality target and managed-copy roots; retain packet binaries, archives, receipts, logs, failed attempts, capture, reduction, and verification",
+    "failed_attempts": "preserve any failed capture/reduction attempt under a new directory; no retry replacement",
+    "plan_gate": "create plan only after both candidate build roles pass, managed copies exist, and experiment.load_plan passes",
+    "quality": "quality-v3 and aggregate quality.json pass before plan freeze",
+    "replay": "run freeze.py --verify --retained-only and verify_packet.py after cleanup; replay must not rebuild or launch a workload"
+  },
+  "quality_custody": {
+    "aggregate": {
+      "bytes": 15079,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/quality.json",
+      "sha256": "9469575384e667dbe8a87a0d7c123dd109cc180d4c39f8278d193b6396cee514"
+    },
+    "all_gates_passed": [
+      "focused_x14ac_reuse_tests",
+      "xlsx_full_lib_tests",
+      "xlsx_all_features_check",
+      "xlsx_clippy",
+      "xlsx_rustdoc",
+      "xlsx_fmt",
+      "crate_boundaries"
+    ],
+    "attempt": {
+      "bytes": 17660,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/attempts/quality-v3/quality-receipt.json",
+      "sha256": "e0c0664f986aa84ab6084caed2fe02cef744d6f8f43617c2eb30ba24aa2087da"
+    },
+    "attempt_status": "pass",
+    "failures": [],
+    "focused_tests_passed": 9,
+    "full_xlsx_tests_ignored": 0,
+    "full_xlsx_tests_passed": 1390,
+    "historical_failed_attempts_retained": [
+      {
+        "attempt": "quality-v1",
+        "reason": "focused test compile failed on eight qualification-test lint diagnostics"
+      },
+      {
+        "attempt": "quality-v2",
+        "reason": "selected fallback assertion expected a string; actual typed Error::Descent"
+      }
+    ],
+    "runner": {
+      "bytes": 14111,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/quality_runner.py",
+      "sha256": "ace5341840d3af6d921858323c1504ded29e9d2149e3cd802cd19e67a221e7d7"
+    },
+    "skipped_after_first_failure": [],
+    "source_and_lock_unchanged": true,
+    "status": "pass"
+  },
+  "release_build": {
+    "allocator": {
+      "binary": {
+        "bytes": 267476848,
+        "executable": true,
+        "mode": 509,
+        "path": "docs/performance/results/change-0891/binaries/allocator",
+        "sha256": "958fd5e8fe2e8afada36c02a120289ee27cd06e9ca21f55085b43ade8b1a3484"
+      },
+      "depfile": {
+        "bytes": 276137,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/allocator.d",
+        "sha256": "4d5afd76bd8fc7eb9d3271efadeefe36c3b06d07e8139252de578deca01ee699"
+      },
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 2974,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/allocator-build.json",
+        "sha256": "3c5f65d436fb13f685acbdfdcb19768f723118c230f2f9d8da40664d16fb08d6"
+      },
+      "start": {
+        "bytes": 2629,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/allocator-build-start.json",
+        "sha256": "63d68d6474ba52f8f283ac49e154f0a3fe62358c1b2b291d89d7f72794b83700"
+      },
+      "status": "pass"
+    },
+    "build": {
+      "bytes": 6113,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/build.json",
+      "sha256": "ccd137fe2b9b6e5fbe338ad3bce0ac79b46d1334d39a022dc6a09dac4756613f"
+    },
+    "build_start": {
+      "bytes": 4313,
+      "executable": false,
+      "mode": 436,
+      "path": "docs/performance/results/change-0891/build-start.json",
+      "sha256": "996281f6fdbf241ea104596e6dae30fc2611f82b196e501011903dbb37c69a65"
+    },
+    "completion": "both native and allocator role receipts pass with exit code 0; source recheck 10766 files",
+    "launch": {
+      "bytes": 460,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/build-invocation.json",
+      "sha256": "3a7d7d02b3d3439e05d753275bc7eeae48b0bad3e37fa10b93d03913b578ba70"
+    },
+    "native": {
+      "binary": {
+        "bytes": 264443336,
+        "executable": true,
+        "mode": 509,
+        "path": "docs/performance/results/change-0891/binaries/native",
+        "sha256": "1cc6b194f4a694eaaddedee95c5dcf4e472e1790306926cf6cb9b1aff378c710"
+      },
+      "depfile": {
+        "bytes": 276023,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/native.d",
+        "sha256": "8caec39bddef41733b399e0728e6db95f6e7818877820023c6f8f0beb83d393b"
+      },
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 2920,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/native-build.json",
+        "sha256": "8f499cc51fcf3a4ef2397833cc739060325def695bfebfaf50d0c23c889b7b5b"
+      },
+      "start": {
+        "bytes": 2577,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/native-build-start.json",
+        "sha256": "2f2da5f6aadf7a1531dd14d343815e4467b0903dc34e907623da962d1d3e6544"
+      },
+      "status": "pass"
+    },
+    "required_final_gate": "freeze.py must bind these passing role receipts, binary hashes, depfiles, source count, argv, compiler, cargo, flags, and environment before capture",
+    "status": "pass",
+    "timings_authorized": false
+  },
+  "required_followups": [
+    "Prepare all four managed executable copies and bind their byte/mode/source identities; run final freeze.py to create the plan and run the actual full load_plan check before any timed child.",
+    "Capture exactly the 72-child packet with no retries or replacements, reduce paired whole-child ratios, and review controls, spread, p95/p99, allocator counters, and RSS before any adoption decision.",
+    "After capture and reduction, remove only marked scratch roots and run retained-only freeze verification plus packet replay; retain all packet artifacts and failed attempts."
+  ],
+  "review_stage": "pre_capture_methodology_review_final_helpers",
+  "reviewed_utc": "2026-10-03T19:43:20.060331+00:00",
+  "reviewed_without_build_or_workload": true,
+  "reviewer": "/root/mce_cache_measurement_review_0890",
+  "rss_and_residency": {
+    "adoption": "RSS is review evidence only and excluded from the primary adoption gate",
+    "interpretation": "copies control pathname and inode history but do not remove executable file-mapping residency confounding",
+    "managed_copies": "one byte/mode/identity-verified fresh copy per role and mode, reused by scheduled children",
+    "measurement": "process-lifetime peak RSS in KiB from /usr/bin/time",
+    "prior_evidence": "retained 0888 evidence shows byte-identical executable copies can have different RSS through executable mappings"
+  },
+  "schedule": {
+    "allocator": {
+      "blocks": 4,
+      "children": 8,
+      "primary_case": "xlsx_producer_medium_source_full_cell_scan",
+      "samples_per_child": 15,
+      "warmup_per_child": 3
+    },
+    "cases": [
+      "xlsx_producer_medium_source_full_cell_scan",
+      "xlsx_full_cell_scan",
+      "docx_producer_source_selected_paragraph",
+      "pptx_producer_source_selected_slide"
+    ],
+    "execution": "sequential fresh child per scheduled row, CPU affinity 12, warm filesystem cache, fail-fast, no retries or replacements",
+    "host_scope": "CPU affinity only; no exclusive-host or physical-cold-cache guarantee",
+    "native": {
+      "blocks": 8,
+      "children": 64,
+      "pairs_per_case": 8,
+      "samples_per_child": 50,
+      "warmup_per_child": 3
+    },
+    "ordering": "native lane then allocator lane; AB/BA alternates by block and case parity"
+  },
+  "schema": "litchi.xlsx-x14ac-methodology-review-0891.v4",
+  "scope": {
+    "base_head": "3348479699f248223184c7bdbc005879b0153307",
+    "candidate": "x14ac structural namespace lookup reuse in worksheet XML parsing",
+    "candidate_paths": [
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+    ],
+    "dependencies_changed": false,
+    "focused_tests": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+    "production_owner": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "public_api_changed": false,
+    "retained_baseline_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+    "source_review": {
+      "bytes": 7837,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/source-review-v3.json",
+      "sha256": "eb43725c92b16d7cf6115f399bb19dee7aaae4016e526592e557b55bd5ecd19b"
+    },
+    "unsafe_code_added": false
+  },
+  "source_custody": {
+    "candidate_files": {
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs": {
+        "bytes": 28418,
+        "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs": {
+        "bytes": 22599,
+        "sha256": "bb2ceef1b0593a9523b528a5ccfdc894d6171e2e59140359e5fb0822c6da7f3a"
+      }
+    },
+    "candidate_freeze": {
+      "bytes": 1346,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/candidate-freeze-v3.json",
+      "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+    },
+    "candidate_freeze_identity": {
+      "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+      "bytes": 1346,
+      "schema": "litchi.xlsx-x14ac-candidate-freeze-0891.v1",
+      "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383",
+      "status": "frozen"
+    },
+    "candidate_patch": {
+      "bytes": 27742,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/candidate-v3.patch",
+      "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+    },
+    "current_tree_equivalence": {
+      "allowed_non_candidate_changes": "exactly the four retained xml_attribute_bounds diagnostic paths",
+      "base_head": "3348479699f248223184c7bdbc005879b0153307",
+      "build_materialization": "archive plus frozen candidate overlays; unrelated workspace files are excluded by construction",
+      "git_diff_base_to_head_paths": [
+        "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs"
+      ],
+      "status": "pass"
+    },
+    "retained_baseline": {
+      "archive": {
+        "bytes": 89024356,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0885/source.tar.gz",
+        "sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+      },
+      "archive_sha256_expected": "bdf6e1c815bbf33796cc779134d27a311cc25ba504bb4f5e5a73fc4d5643bee",
+      "diagnostic_exclusions": [
+        "tools/perf-baseline/src/bin/xml_attribute_bounds.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/boundary_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/input_tests.rs",
+        "tools/perf-baseline/src/bin/xml_attribute_bounds/qualification_tests.rs"
+      ],
+      "manifest": {
+        "bytes": 2083420,
+        "executable": false,
+        "mode": "0o664",
+        "path": "docs/performance/results/change-0885/source.json",
+        "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938"
+      },
+      "manifest_files": 10765,
+      "revision": "335a40350bf06f49691745c14d310fd7a3ca9117"
+    },
+    "root_lock": {
+      "bytes": 138443,
+      "executable": false,
+      "mode": "0o664",
+      "path": "Cargo.lock",
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    },
+    "source_review": {
+      "bytes": 7837,
+      "executable": false,
+      "mode": "0o664",
+      "path": "docs/performance/results/change-0891/source-review-v3.json",
+      "sha256": "eb43725c92b16d7cf6115f399bb19dee7aaae4016e526592e557b55bd5ecd19b"
+    },
+    "source_union": {
+      "added_files": 1,
+      "baseline_files": 10765,
+      "git_apply": "pass",
+      "git_apply_check": "pass",
+      "method": "temporary extraction of retained archive plus git apply of candidate-v3.patch; exact file and hash census",
+      "reconstructed_files": 10766,
+      "replacement_files": 1,
+      "status": "pass",
+      "temporary_directory_cleaned": true
+    }
+  },
+  "static_checks": {
+    "adapter_seed": {
+      "experiment_seed": 891,
+      "reducer_seed": 891,
+      "status": "pass",
+      "workload_launched": false
+    },
+    "final_helper_bindings": {
+      "post_cleanup_wrapper": "managed-copy retained-only marker is propagated into verify_commands; actual replay remains a post-capture gate",
+      "schema_unchanged": true,
+      "status": "pass",
+      "verify_packet_helper": {
+        "bytes": 12278,
+        "executable": false,
+        "mode": 436,
+        "path": "docs/performance/results/change-0891/verify_packet.py",
+        "sha256": "c84e5981eba5cac6f923fd01693542d014dc2087012eac05a98dfec2f3263286"
+      },
+      "workload_launched": false
+    },
+    "freeze_loader": {
+      "check": "build.load_freeze against candidate-freeze-v3.json",
+      "status": "pass",
+      "workload_launched": false
+    },
+    "python_ast": {
+      "current_helpers": 10,
+      "imported_reviewed_helpers": 5,
+      "status": "pass",
+      "workload_launched": false
+    },
+    "safe_cli_help": {
+      "helpers": [
+        "freeze.py",
+        "experiment.py",
+        "reduce.py",
+        "verify_packet.py",
+        "quality.py",
+        "quality_runner.py",
+        "cleanup.py"
+      ],
+      "status": "pass",
+      "workload_launched": false
+    },
+    "schedule": {
+      "allocator_blocks": 4,
+      "allocator_children": 8,
+      "native_blocks": 8,
+      "native_children": 64,
+      "status": "pass",
+      "total_children": 72
+    },
+    "source_replay": {
+      "baseline_files": 10765,
+      "candidate_union_files": 10766,
+      "status": "pass",
+      "temporary_directory_cleaned": true,
+      "workload_launched": false
+    },
+    "synthetic_full_load_plan": {
+      "all_managed_present": "accepted with exact descriptors",
+      "partial_managed_custody": "rejected closed with ValueError",
+      "retained_only": "accepted with declared descriptors when copies absent",
+      "status": "pass",
+      "workload_launched": false,
+      "wrong_seed_and_hash_mutations": "rejected closed"
+    }
+  },
+  "statistics": {
+    "adoption": {
+      "allocator": "counters are a separate observation; no allocator adoption gate",
+      "native_primary_only_after_capture": true,
+      "rss": "review signal only; no automatic adoption"
+    },
+    "allocator_metrics": [
+      "allocated_bytes",
+      "allocation_calls",
+      "peak_live_bytes",
+      "peak_rss_kib"
+    ],
+    "bootstrap": {
+      "confidence": "percentile 95% interval",
+      "draws": 10000,
+      "indices": [
+        249,
+        9749
+      ],
+      "resampling_unit": "paired child ratios",
+      "seed": 891
+    },
+    "native_metrics": [
+      "p50_ns",
+      "p95_ns",
+      "p99_ns",
+      "peak_rss_kib"
+    ],
+    "pairing": "after/before ratios within each scheduled pair; samples are never pooled across children",
+    "primary_gate": {
+      "bootstrap_upper_below": 1.0,
+      "median_ratio_at_most": 0.98,
+      "metric": "native primary p50 median ratio"
+    },
+    "review_flags": {
+      "control_flags_required": true,
+      "native_p50_spread_above": 1.2,
+      "pair_ratio_above": 1.05,
+      "rss_causal_claim": false
+    },
+    "unit": "whole-child aggregate statistics"
+  },
+  "status": "pass",
+  "supersedes": "docs/performance/results/change-0891/methodology-review-v3.json",
+  "verified": [
+    "Current HEAD is bound to 3348479699f248223184c7bdbc005879b0153307 and the baseline revision is 335a40350bf06f49691745c14d310fd7a3ca9117.",
+    "The current-tree baseline comparison contains exactly the four allowed xml_attribute_bounds diagnostic paths.",
+    "The v3 freeze and patch bind exactly the production x14ac file and new reuse-test file; their live bytes and hashes match the freeze.",
+    "Temporary archive-plus-patch replay passes an exact 10,766-file source census and hash check, with no retained temporary directory.",
+    "The immutable executed build helper matches build.py byte-for-byte and is bound by build-invocation.json; no timing or workload was launched by this review.",
+    "Retained 0885 native and allocator binaries are bound to source archive/manifest, role receipts, depfiles, compiler/Cargo, release flags, and fixed environment.",
+    "Quality-v3 and quality.json pass all seven gates, including 9 focused tests and 1,390 full XLSX tests with zero ignored.",
+    "The 0891 experiment adapter preserves the 0887 four-case schedule, fresh-child/fail-fast semantics, managed-copy checks, and seed 891; reducer and verifier imports were checked with unique module loading.",
+    "Synthetic plan tests accept complete and retained-only custody, and reject partial custody, wrong seed, and identity mutations closed.",
+    "The statistics protocol uses paired whole-child ratios, fixed seed 891 bootstrap, primary p50 and CI gates, and separate review-only allocator/RSS evidence.",
+    "Both candidate release roles completed with exit code 0; build.json is pass, source recheck is 10,766 files, and native/allocator binary plus depfile identities are retained.",
+    "Candidate and retained 0885 compiler/Cargo versions, role argv, release flags, and all fixed environment values match; only isolated CARGO_TARGET_DIR differs.",
+    "The post-cleanup verify_commands adapter now propagates retained-only managed custody into the reviewed verifier; actual packet replay remains required after capture cleanup."
+  ]
+}

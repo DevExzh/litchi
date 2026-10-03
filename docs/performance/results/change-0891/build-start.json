@@ -1,0 +1,67 @@
+{
+  "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+  "baseline_revision": "335a40350bf06f49691745c14d310fd7a3ca9117",
+  "binaries": {},
+  "candidate_freeze": {
+    "bytes": 1346,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-freeze-v3.json",
+    "sha256": "08e3b1acbf88aca523c61f5a9992c2ccc5fbc792cf8075e5517815ca15d9d383"
+  },
+  "candidate_patch": {
+    "bytes": 27742,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0891/candidate-v3.patch",
+    "sha256": "6b3c62121225c49a6bd541ac1105a4c906ab1cf48805b13f0a9d1fa91254f197"
+  },
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "compiler": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0891-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.codex/tmp/arg0/codex-arg0BCVfje:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0wWKwSX:/home/zhuhe/.codex/packages/standalone/releases/0.159.3-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0xsnRup:/home/zhuhe/.codex/packages/standalone/releases/0.159.2-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg01o3l0A:/home/zhuhe/.codex/packages/standalone/releases/0.159.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0tsWQwF:/home/zhuhe/.codex/packages/standalone/releases/0.159.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0wnCI9v:/home/zhuhe/.codex/packages/standalone/releases/0.159.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1165373_1789607052703/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1165242_1789607045932/bin:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/254956_1789243784750/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/2181_1789108381859/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+    "TZ": "UTC"
+  },
+  "schema": "litchi.xlsx-x14ac-candidate-build-0891.v1",
+  "source_archive": {
+    "bytes": 89024356,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.tar.gz",
+    "sha256": "bdf6e1c815fbb33796cc779134d27a311cc25ba5043bb4f5e5a73fc4d5643bee"
+  },
+  "source_file_count": 10766,
+  "source_manifest": {
+    "bytes": 2083420,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0885/source.json",
+    "sha256": "121e0791b10883d1f67ce7f4b2439900e62960027f5e607ccdc9431e79e49938"
+  },
+  "source_marker": {
+    "path": "/tmp/litchi-0891-source/.owner-0891",
+    "text": "x14ac candidate 0891\n"
+  },
+  "source_overlay_files": [
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+  ],
+  "source_root": "/tmp/litchi-0891-source",
+  "status": "building",
+  "target_marker": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0891-build/.owner-0891",
+    "text": "x14ac candidate 0891 target\n"
+  },
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0891-build"
+}

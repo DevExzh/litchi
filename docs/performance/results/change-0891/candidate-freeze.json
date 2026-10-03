@@ -1,0 +1,30 @@
+{
+  "schema": "litchi.xlsx-x14ac-candidate-freeze-0891.v1",
+  "status": "frozen",
+  "immutable": true,
+  "create_only": true,
+  "base_commit": "3348479699f248223184c7bdbc005879b0153307",
+  "frozen_utc": "2026-10-03T19:11:33.770800+00:00",
+  "candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs"
+  ],
+  "files": [
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs",
+      "bytes": 28418,
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/x14ac/reuse_tests.rs",
+      "bytes": 22699,
+      "sha256": "366a5e264f2a888359bd842a7637a07798fb94c8e0413f93b3a58bd4cab42daf"
+    }
+  ],
+  "patch": {
+    "path": "docs/performance/results/change-0891/candidate.patch",
+    "bytes": 27846,
+    "sha256": "44220fc1dec8d9d5657ec5026e93d74b4c710791f6e041b09430e6bcca34815e"
+  },
+  "performance_claim": false
+}
