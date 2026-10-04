@@ -38,6 +38,7 @@ mod batch;
 mod capabilities;
 pub mod error;
 mod file;
+pub mod format;
 mod handler;
 mod node;
 mod options;
