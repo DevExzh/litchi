@@ -32,8 +32,15 @@ first", and §16.6 "legacy package retention":
   the leaf owner has no typed model yet; every such gap is listed in
   `capabilities()` and in a delta table, with a follow-up.
 
-  OOXML is still the first write wave (it is the OfficeCLI parity target), but
-  the remaining formats are in scope for v1, not later waves.
+  PRIORITY (owner, 2026-10-04, later the same day): implement in tiers.
+    Tier 1 — OOXML: docx, xlsx, pptx, xlsb (OfficeCLI parity target).
+    Tier 2 — legacy OLE: doc, xls, ppt.
+    Tier 3 — delayed: rtf, ODF (odt/ods/odp/odg/odc/odi/odb/oth/odm/odf), and
+             iWork (pages/keynote/numbers).
+  Tier 3 is still required for done, but it starts only after tiers 1–2 have
+  a working read+write loop. Until then tier-3 formats keep their existing
+  read paths and may appear as read-only `File` variants; the `File` shape
+  must admit their write variants later without reshaping.
 
 The reference implementation is OfficeCLI. It is not tracked in git, so read
 it from the main checkout: /home/zhuhe/code/litchi/3rdparty/OfficeCLI/
@@ -218,9 +225,9 @@ M1  Unified read: node view, `get`/`query`, `view(outline|text|annotated|
 M2  Write kernel for docx/xlsx/pptx, property registry + coercions, typed
     errors with suggestions, atomic and best-effort batch with family
     coalescing, P0 structural surface. Batch scaling benchmark (1 → 10k ops).
-M2b Write handlers for every other claimed format, in parallel streams:
-    legacy binary (doc/xls/ppt) + xlsb; ODF (odt/ods/odp first, then
-    odg/odc/odi/odb/oth/odm/odf); RTF; iWork (pages/keynote/numbers, via their
+M2b Write handlers for xlsb (tier 1) and legacy OLE doc/xls/ppt (tier 2).
+M6  Delayed tier 3, after M2b: RTF; ODF (odt/ods/odp first, then
+    odg/odc/odi/odb/oth/odm/odf); iWork (pages/keynote/numbers, via their
     public edit APIs). Each stream starts from the leaf write-capability
     inventory (record 0002), closes leaf API gaps in the leaf crate where it
     owns them, and reports remaining element-level gaps in `capabilities()`.
@@ -243,9 +250,8 @@ Revisit only if the owner overrides.
 - `OpenOptions` shape: one `OpenOptions` struct with the common knobs (limits,
   security consumption, execution context) plus optional per-format sub-
   options; plain `open()` covers the common case.
-- iWork facade timing: iWork joins the unified `File` enum in v1 (owner
-  override); `litchi::iwork::Document` is replaced once the unified variants
-  cover its read surface.
+- iWork facade timing: iWork joins the unified `File` enum in tier 3 (M6);
+  until then `litchi::iwork::Document` stays put (§16.4).
 - Verb names: `apply` (not `send`); find/replace as OfficeCLI-style `find=`/
   `replace=` props on `set` first, a dedicated verb only if usage demands it;
   `merge` means template merge.
