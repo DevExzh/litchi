@@ -3,5 +3,7 @@ corpus/*
 !corpus/
 !corpus/detect_format/
 !corpus/detect_format/*
+!corpus/selector_grammar/
+!corpus/selector_grammar/*
 artifacts
 coverage

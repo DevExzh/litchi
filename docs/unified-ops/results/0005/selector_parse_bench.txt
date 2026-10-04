@@ -1,0 +1,38 @@
+# selector_parse_bench, 5 consecutive runs, release profile
+# host: AMD EPYC 9R45, 32 logical CPUs, rustc 1.95.0
+# commit base: cc3c793e5d + this change
+## run 1
+corpus paths                     57.0 ns/parse    347.0 MB/s  (950 inputs x 2000)
+corpus selectors                115.9 ns/parse    144.9 MB/s  (132 inputs x 10000)
+/body/p[3]/r[1]                  58.8 ns/parse    255.2 MB/s  (1 inputs x 1000000)
+/slide[1]/shape[@name=Title]     78.6 ns/parse    356.3 MB/s  (1 inputs x 1000000)
+/Sheet1/A1:C5                    41.3 ns/parse    314.6 MB/s  (1 inputs x 1000000)
+row[Salary>5000 and ...]        140.9 ns/parse    227.2 MB/s  (1 inputs x 1000000)
+## run 2
+corpus paths                     56.6 ns/parse    349.6 MB/s  (950 inputs x 2000)
+corpus selectors                114.4 ns/parse    146.8 MB/s  (132 inputs x 10000)
+/body/p[3]/r[1]                  56.1 ns/parse    267.5 MB/s  (1 inputs x 1000000)
+/slide[1]/shape[@name=Title]     78.8 ns/parse    355.4 MB/s  (1 inputs x 1000000)
+/Sheet1/A1:C5                    41.8 ns/parse    311.0 MB/s  (1 inputs x 1000000)
+row[Salary>5000 and ...]        142.5 ns/parse    224.5 MB/s  (1 inputs x 1000000)
+## run 3
+corpus paths                     56.7 ns/parse    348.7 MB/s  (950 inputs x 2000)
+corpus selectors                130.0 ns/parse    129.2 MB/s  (132 inputs x 10000)
+/body/p[3]/r[1]                  57.4 ns/parse    261.3 MB/s  (1 inputs x 1000000)
+/slide[1]/shape[@name=Title]     79.4 ns/parse    352.8 MB/s  (1 inputs x 1000000)
+/Sheet1/A1:C5                    41.8 ns/parse    311.4 MB/s  (1 inputs x 1000000)
+row[Salary>5000 and ...]        157.8 ns/parse    202.8 MB/s  (1 inputs x 1000000)
+## run 4
+corpus paths                     57.2 ns/parse    346.0 MB/s  (950 inputs x 2000)
+corpus selectors                123.6 ns/parse    135.9 MB/s  (132 inputs x 10000)
+/body/p[3]/r[1]                  59.2 ns/parse    253.2 MB/s  (1 inputs x 1000000)
+/slide[1]/shape[@name=Title]     79.4 ns/parse    352.5 MB/s  (1 inputs x 1000000)
+/Sheet1/A1:C5                    41.5 ns/parse    313.2 MB/s  (1 inputs x 1000000)
+row[Salary>5000 and ...]        148.2 ns/parse    215.9 MB/s  (1 inputs x 1000000)
+## run 5
+corpus paths                     57.8 ns/parse    342.0 MB/s  (950 inputs x 2000)
+corpus selectors                118.8 ns/parse    141.3 MB/s  (132 inputs x 10000)
+/body/p[3]/r[1]                  59.2 ns/parse    253.5 MB/s  (1 inputs x 1000000)
+/slide[1]/shape[@name=Title]     85.9 ns/parse    325.8 MB/s  (1 inputs x 1000000)
+/Sheet1/A1:C5                    41.5 ns/parse    313.4 MB/s  (1 inputs x 1000000)
+row[Salary>5000 and ...]        147.1 ns/parse    217.6 MB/s  (1 inputs x 1000000)
