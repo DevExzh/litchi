@@ -1,0 +1,73 @@
+{
+  "helper": {
+    "bytes": 4589,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture.py",
+    "sha256": "7906878cbe6bd24a72c7af05121606e5cdf6a03d85c92ec48a8d81fc2306d029"
+  },
+  "new_workloads": 0,
+  "plan": {
+    "bytes": 56171,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/plan.json",
+    "sha256": "3b4f8a67a248aeb509d34c91a13e94d80d2af911b64a79505526b141ec70d92d"
+  },
+  "rows": [
+    {
+      "index": 0,
+      "report": {
+        "bytes": 21558,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "sha256": "f4a6fae636097e868cd563dcb360bc0f32dce1fba8a22636aff7c75c8413d6d4"
+      },
+      "semantics": {
+        "bytes": 4611,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/semantics.json",
+        "sha256": "160ace2fe9b29f5f6d14d08fc8c3d1f986bbf7f58c80246e048f21a6127f822b"
+      },
+      "shape": "medium"
+    },
+    {
+      "index": 1,
+      "report": {
+        "bytes": 21581,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/01-dense-sparse/report.json",
+        "sha256": "b702365734e26feb3319f492647405868d959a0c72604de309d1949ce6823e0d"
+      },
+      "semantics": {
+        "bytes": 4634,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/01-dense-sparse/semantics.json",
+        "sha256": "d17c198ceb8cad30701e3a1a20dc840e0cf3fb06cc73e8bbd77fb04450e754b4"
+      },
+      "shape": "dense-sparse"
+    },
+    {
+      "index": 2,
+      "report": {
+        "bytes": 21581,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/02-dense-sparse/report.json",
+        "sha256": "4ca9b18cbd05b722cfe25c2a295e13ef42a7fcf93575870d9ee94ef2f2e9293c"
+      },
+      "semantics": {
+        "bytes": 4634,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/02-dense-sparse/semantics.json",
+        "sha256": "d17c198ceb8cad30701e3a1a20dc840e0cf3fb06cc73e8bbd77fb04450e754b4"
+      },
+      "shape": "dense-sparse"
+    },
+    {
+      "index": 3,
+      "report": {
+        "bytes": 21558,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/03-medium/report.json",
+        "sha256": "86322a2662a71778bf019cf8533b5c412c96ac37b595b45fe70da6456f31bb9d"
+      },
+      "semantics": {
+        "bytes": 4611,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/03-medium/semantics.json",
+        "sha256": "160ace2fe9b29f5f6d14d08fc8c3d1f986bbf7f58c80246e048f21a6127f822b"
+      },
+      "shape": "medium"
+    }
+  ],
+  "source_files_verified": 10771,
+  "status": "pass"
+}

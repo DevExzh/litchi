@@ -1,0 +1,53 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/01-dense-sparse/report.json"
+  ],
+  "binary": {
+    "bytes": 264489024,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+    "sha256": "efcf6173bf71b3766aa84cc9a38023bf7b8ca0263f40cd80ec9c23acd4636e62"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 4589,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture.py",
+    "sha256": "7906878cbe6bd24a72c7af05121606e5cdf6a03d85c92ec48a8d81fc2306d029"
+  },
+  "plan": {
+    "bytes": 56171,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/plan.json",
+    "sha256": "3b4f8a67a248aeb509d34c91a13e94d80d2af911b64a79505526b141ec70d92d"
+  },
+  "row": {
+    "index": 1,
+    "repeat": 0,
+    "shape": "dense-sparse"
+  },
+  "started_utc": "2026-10-04T03:06:40.636903+00:00"
+}

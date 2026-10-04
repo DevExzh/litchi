@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0901 — current XLSX publication instruction attribution
+
+[0901](0901-xlsx-publication-instruction-profile.md) profiles four current-source
+one-percent publication calls, retaining twenty separate lifecycle calls and
+four zero-cost terminal dumps. XML auditing accounts for 58.57% / 61.88% of
+publication-owner guest instructions; preservation writing accounts for
+40.88% / 37.69%. Nested rows remain separate from disjoint partitions. Raw
+instruction and semantic replay pass; Valgrind brk warnings and two offline
+helper-invocation failures remain visible. A bounded upfront-stopped audit
+observer hypothesis is identified, with both mandatory XML audits preserved;
+no optimization, native speedup, or memory claim is made. Production is unchanged
+and the broader non-iWork goal remains open.
+
 ## 0900 — current XLSX one-percent edit/save phases
 
 [0900](0900-xlsx-edit-save-phase-refresh.md) refreshes the exact source-backed

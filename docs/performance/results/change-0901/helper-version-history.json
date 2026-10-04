@@ -1,0 +1,53 @@
+{
+  "schema": "litchi.xlsx-publication-profile-helper-version-history-0901.v1",
+  "status": "pass",
+  "versions": [
+    {
+      "name": "v1-raw-adapter",
+      "path": "docs/performance/results/change-0901/analyze.py",
+      "bytes": 30191,
+      "sha256": "8dfd064d925116740fb4dc2257213cf063cf322f7495ed7f3db1a15aa6e90a45",
+      "role": "Initial strict adapter using the retained 0845 Callgrind parser; first-child raw admission passed."
+    },
+    {
+      "name": "v2-initial",
+      "path": null,
+      "bytes": null,
+      "sha256": "aedd039c00252b970960219c9714fc619267b4bd5234d6e968911ed9244c92c9",
+      "retained": false,
+      "role": "Development checkpoint adding raw exclusive self rows, stderr Collected reconciliation, and raw-only default; superseded before canonical replay."
+    },
+    {
+      "name": "v2-annotation-attempt",
+      "path": "docs/performance/results/change-0901/analyze_v2_annotation_attempt.py",
+      "bytes": 34631,
+      "sha256": "2a6911d23a21245f0277b5970e04592543c6554a3df7dcaaef35a9c885a7f2bc",
+      "role": "Exact helper used for the retained optional annotation attempt; it failed closed on a callgrind_annotate source-path display mismatch."
+    },
+    {
+      "name": "v2-final",
+      "path": "docs/performance/results/change-0901/analyze_v2.py",
+      "bytes": 34984,
+      "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04",
+      "role": "Final raw-only helper with exact command/source/semantic bindings; full four-capture canonical replay passed."
+    }
+  ],
+  "final_executed_helper": {
+    "path": "docs/performance/results/change-0901/analyze_v2.py",
+    "bytes": 34984,
+    "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04",
+    "canonical_output": {
+      "path": "docs/performance/results/change-0901/analysis.json",
+      "bytes": 375245,
+      "sha256": "299c218418daa1562e730f63715f78e9262dd918e0e47aa7de0192d87945ea89"
+    }
+  },
+  "annotation_failure": {
+    "path": "docs/performance/results/change-0901/annotation-attempt-failure.json",
+    "bytes": 1635,
+    "sha256": "3e91d3eb6e53dc2a755da0c5b93858b1c8cacd4d9224c23b939e351613717578",
+    "native_workload_rerun": false,
+    "profiler_capture_rerun": false
+  },
+  "note": "v2-final is frozen after canonical replay. Any annotation parser correction must be a new v3 helper; the v2 annotation-attempt source is retained separately for exact provenance."
+}

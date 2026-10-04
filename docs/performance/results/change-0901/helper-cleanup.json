@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.xlsx-publication-profile-helper-cleanup-0901.v1",
+  "status": "pass",
+  "owned_temporary_outputs": [
+    {
+      "path": "/tmp/analysis-0901-first.json",
+      "bytes": 87935,
+      "sha256": "b2131e8e9e8ff9c6e45301d00bed73a65aa6e9495c5fd2bf11194cd7ebf4cc29",
+      "removed": true
+    },
+    {
+      "path": "/tmp/analysis-0901-v2-first.json",
+      "bytes": 94348,
+      "sha256": "39749516ca646efba70a4c7af18285fba55b15c1085307e52db4d77ffb3144f7",
+      "removed": true
+    },
+    {
+      "path": "docs/performance/results/change-0901/__pycache__/analyze_v2.cpython-314.pyc",
+      "bytes": 54759,
+      "sha256": "c30f3eaee0aa7598d4ab172d1e2267e7a5f07252f77a58a70954ab277f62557f",
+      "removed": true
+    }
+  ],
+  "worktrees_created": [],
+  "note": "The temporary raw-only first-child replay output was created by analyze.py and removed after its PASS result was sent to the coordinator. The retained helper source and capture artifacts remain in the packet."
+}

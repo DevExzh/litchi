@@ -1,0 +1,43 @@
+{
+  "schema": "litchi.xlsx-publication-profile-annotation-attempt-0901.v1",
+  "status": "fail",
+  "classification": "offline annotation-helper failure; no native workload or profiler capture was run",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0901/analyze_v2.py",
+    "--annotate",
+    "--output",
+    "docs/performance/results/change-0901/analysis-v2.json"
+  ],
+  "exit_code": 2,
+  "stdout": "",
+  "stderr": "analyze.py: error: capture/00-medium/annotation-inclusive.txt: expected one annotation row for litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream, got []",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "PERL_HASH_SEED": "0",
+    "PERL_PERTURB_KEYS": "0"
+  },
+  "helper": {
+    "path": "docs/performance/results/change-0901/analyze_v2.py",
+    "bytes": 34631,
+    "sha256": "2a6911d23a21245f0277b5970e04592543c6554a3df7dcaaef35a9c885a7f2bc"
+  },
+  "generated_files": [
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/annotation-inclusive.txt",
+      "bytes": 568118,
+      "sha256": "e876c47a5b004a39f8252ad670a444e4d9f549e499c54051fac3c35fc8d7e495",
+      "mode": "0664",
+      "retained": true
+    }
+  ],
+  "analysis_output": {
+    "path": "docs/performance/results/change-0901/analysis-v2.json",
+    "created": false
+  },
+  "note": "The failure occurred while parsing already-retained Callgrind annotation output; raw capture artifacts were not changed. The path-prefix parser mismatch is retained for audit and is not silently reclassified as a passing analysis."
+}

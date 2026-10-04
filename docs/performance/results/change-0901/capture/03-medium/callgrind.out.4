@@ -1,0 +1,1442 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 2099443
+cmd:  /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/03-medium/report.json
+part: 4
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 321093438 - 936208331
+desc: Trigger: --dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+
+positions: line
+events: Ir
+summary: 25999
+
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(166) ./csu/../csu/libc-start.c
+fn=(576) __libc_start_main@@GLIBC_2.34
+cfi=(169) ./csu/../sysdeps/nptl/libc_start_call_main.h
+cfn=(598) (below main)
+calls=0 30 
+360 25999
+
+fl=(155) ./malloc/./malloc/malloc.c
+fn=(646) __libc_malloc2
+3247 6
++4 2
++28 5
+-26 3
+cfn=(648) _int_malloc
+calls=35733 3790 
+* 263
++1 5
+fi=(154) ./malloc/./malloc/arena.c
+151 2
+fe=(155)
+
+fn=(756) free
+3319 178
++3 356
++15 356
+-4 534
++8 534
++6 513
++6 171
+-3 342
++3 171
+-3 171
++1 342
++2 513
+3007 49
++8 49
+-12 49
++4 147
++1 49
++7 49
+3354 49
++10 366
+-34 129
++40 258
+fi=(154)
+151 387
+fe=(155)
+3374 387
+cfn=(724) _int_free_chunk
+calls=37442 4351 
+* 16897
+
+fn=(726) _int_free_merge_chunk
+4407 1032
++7 645
+-6 129
++9 387
++5 387
++4 258
+-1 258
++1 258
+1895 387
+4433 258
++2 53
++2 53
++1 212
++2 53
+-4 53
++4 53
+cfn=(788) unlink_chunk.isra.0
+calls=32316 1592 
+* 1043
++18 258
++6 258
++4 84
++4 258
++9 13
+-1 13
++2 26
++2 39
++7 232
++1 464
++1 116
++2 232
++3 696
++4 116
+-1 116
++2 116
++1 116
++2 348
++1 116
+-61 116
+-1 232
++1 696
+-1 116
+cfn=(728) _int_free_maybe_trim
+calls=10335 +83 
+* 2784
++57 13
+-1 13
++2 13
++1 13
++2 39
++1 13
+-61 13
+-1 26
++1 78
+-1 13
+cfn=(728)
+calls=28595 +83 
+* 322
++20 45
++1 45
+-1 45
+cfn=(788)
+calls=2636 1592 
+* 888
++1 45
+
+fn=(644) malloc
+3283 1
+1269 2
++19 1
+3287 1
+1288 3
+3287 2
++2 3
++2 2
++2 6
++13 1
+cfn=(646)
+calls=35733 -59 
+* 286
+
+fn=(648)
+3790 9
++32 2
+1288 6
+3831 2
++16 2
++72 1
+-1 1
++12 2
+-11 2
+-1 3
++12 2
+-6 1
++5 1
+-7 1
++2 2
++9 2
++3 2
++1 3
+-3 1
++5 1
++1 4
++2 4
+-10 1
++12 2
++1 2
++2 2
++11 4
++29 1
++1 1
++4 2
++31 2
++8 4
++1 1
++1 1
+-1 1
++4 2
++5 4
+-2 1
++3 2
++44 2
++9 1
+-9 4
++1 1
++1 1
++1 1
++1 1
++6 2
+3850 1
++2 1
+-2 1
++2 2
+4340 9
+3901 1
+-52 6
+4105 3
+3930 3
+4111 4
++13 1
+-2 2
+4280 8
++2 3
++1 1
+1888 1
+4286 1
+1888 2
+4031 13
+-72 2
++98 3
++1 2
++6 1
++7 1
+-1 3
++2 2
++2 1
++1 3
++2 1
++1 2
+4195 1
++1 1
++1 1
+-1 1
++1 1
++1 2
++1 3
++5 3
++16 2
++2 4
+-4 6
++8 1
++3 2
++9 2
++3 2
++2 1
++3 2
+-3 4
++3 1
+cfn=(788)
+calls=2961 1592 
+* 19
++3 6
++15 1
++1 2
++3 1
+-9 1
++9 2
++1 1
++1 1
++3 2
++1 1
++1 2
+
+fn=(724)
+4351 516
++8 129
+-3 129
++3 129
+-3 258
++6 258
++6 129
+cfn=(726)
+calls=38909 +39 
+* 14704
++5 258
++27 387
+
+fn=(788)
+1592 99
++2 297
+-2 99
++2 198
++3 99
++3 198
+-2 99
++2 198
++3 99
++1 99
++1 231
++2 8
++1 12
++3 8
++14 4
++1 4
++3 198
+
+fn=(728)
+4528 1419
++3 258
++2 4
++3 6
++14 1419
+
+fl=(169)
+fn=(598)
+cob=(7) /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native
+cfi=(165) ???
+cfn=(606) main
+calls=0 0 
+59 25999
+
+fl=(204) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+fn=(722) __memcpy_avx_unaligned_erms
+255 1
++1 1
++6 1
++1 1
++42 1
++1 1
++36 1
++1 1
++1 1
++1 1
++2 1
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7)
+cfi=(165)
+cfn=(574) (below main)
+calls=0 0 
+0 25999
+
+ob=(7)
+fl=(548) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/snapshot.rs
+fn=(11044) litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed
+381 9
+fi=(275) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs
+745 2
+fi=(323) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/lib.rs
+0 2
+fi=(251) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+444 2
+fi=(338) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs
+2422 6
+fi=(479) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/source_backed.rs
+3856 1
+cfi=(544) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-core/src/source.rs
+cfn=(9316) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version
+calls=1 182 
+* 5
+fi=(238) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs
+2173 2
++1 2
+fi=(544)
+20 8
+fi=(275)
+745 2
+fi=(251)
+444 1
+fi=(235) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/sync/atomic.rs
+3923 1
+fi=(338)
+2405 1
++4 1
+fi=(251)
+1720 1
+fi=(272) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 1
+0 6
+fi=(275)
+745 4
+fe=(548)
+1200 2
+fi=(226) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+2444 1
+fe=(548)
+1205 1
+393 2
++9 7
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fe=(548)
+
+fl=(165)
+fn=(574)
+cob=(2)
+cfi=(166)
+cfn=(576)
+calls=0 242 
+0 25999
+
+fn=(606)
+cfi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+cfn=(852) std::sys::backtrace::__rust_begin_short_backtrace
+calls=0 162 
+0 25999
+
+fl=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs
+fn=(2522) <alloc::string::String as core::fmt::Display>::fmt
+2711 1
+fi=(246) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+612 1
+fi=(247) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs
+1815 1
+fi=(344) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs
+2960 2
+cfn=(1786) <core::fmt::Formatter>::pad
+calls=9521 1909 
+* 459
+fe=(277)
+
+fn=(1788) <alloc::string::String as core::fmt::Write>::write_str
+3344 7
+fi=(246)
+617 1
+fi=(247)
+1446 1
+fi=(268) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2494 1
+fi=(246)
+765 1
+-94 1
+fi=(247)
+0 1
+fi=(232) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs
+961 1
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(247)
+2886 2
+fe=(277)
+3347 7
+fi=(246)
+673 7
+cfn=(1378) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+calls=1 -14 
+* 388
+* 1
+fi=(247)
+2997 1
+2881 1
+fe=(277)
+
+fl=(252) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs
+fn=(9276) litchi_perf_baseline::run_xlsx_cell_values_edit_save
+cfn=(9294) litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates
+calls=0 23990 
+44507 25999
+
+fn=(880) litchi_perf_baseline::run
+cfn=(9276)
+calls=0 44494 
+11446 25999
+
+fn=(9294)
+cfi=(543) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-xlsx/src/cell_values/source.rs
+cfn=(11040) litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+calls=1 600 
+24038 25999
+
+fl=(544)
+fn=(9316)
+182 1
++1 3
++1 1
+
+fl=(251)
+fn=(11144) core::ptr::drop_in_place<litchi_core::source::OwnedSource>
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
++43 2
+cfn=(5585) alloc::sync::Arc<T,A>::drop_slow'2
+calls=1 2109 
+* 214
+fe=(251)
+
+fl=(246)
+fn=(1378)
+659 3
+fi=(268)
+769 1
+fi=(280) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs
+457 1
+0 3
+fe=(246)
+521 2
+fi=(229) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1037 2
+fe=(246)
+159 7
+fi=(229)
+1037 2
+fe=(246)
+527 5
+cfn=(1350) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=9219 +15 
+* 353
+fi=(238)
+2173 2
++1 1
+fe=(246)
+774 1
++1 1
+669 4
+
+fn=(1350)
+542 9
+fi=(268)
+3051 8
+fi=(280)
+457 3
+0 2
+fe=(246)
+632 1
+fi=(274) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs
+186 2
+-91 1
+fi=(237) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+-82 1
+fe=(246)
+563 4
+fi=(237)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=9221 3283 
+* 308
+fe=(246)
+562 2
+0 2
+566 8
+
+fl=(338)
+fn=(5584) alloc::sync::Arc<T,A>::drop_slow
+2109 5
++11 2
+fi=(226)
+805 2
+fe=(338)
+2120 4
+fi=(226)
+805 1
+cfi=(251)
+cfn=(11144)
+calls=1 444 
+* 219
+fe=(338)
+3327 2
+fi=(235)
+3942 1
+fe=(338)
+3479 1
+fi=(256) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/mem/mod.rs
+429 7
+fi=(274)
+200 2
+fi=(237)
+48 5
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(338)
+3327 6
+fi=(235)
+3942 3
+fe=(338)
+3479 3
+fi=(237)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=34 3319 
+* 214
+fe=(338)
+2109 6
+fi=(226)
+805 4
+fi=(246)
+632 2
+fe=(338)
+3327 2
+fi=(235)
+3942 1
+fe=(338)
+3479 1
+fi=(237)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 148
+fe=(338)
+
+fn=(5585)
+2109 2
+fi=(246)
+632 2
+fi=(226)
+805 1
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=54 3319 
+* 168
+fe=(338)
+3327 2
+fi=(235)
+3942 1
+fe=(338)
+3479 1
+fi=(237)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=54 3319 
+* 33
+fe=(338)
+
+fl=(244) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/main.rs
+fn=(854) litchi_perf_baseline::main
+cfi=(252)
+cfn=(880)
+calls=0 10215 
+41 25999
+
+fl=(226)
+fn=(5568) core::ptr::drop_in_place<hashbrown::raw::RawTable<(alloc::string::String,litchi_opc::rel::Relationship)>>
+805 105
+fi=(329) /rust/deps/hashbrown-0.16.1/src/raw/mod.rs
+2697 15
+2312 30
+0 4
+2253 6
+0 2
+2479 2
+fi=(334) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs
+1320 2
+fi=(298) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs
+863 2
+fi=(329)
+3595 6
+0 18
+fe=(226)
+805 18
+cfn=(5560) core::ptr::drop_in_place<litchi_opc::rel::Relationship>
+calls=17 * 
+* 4183
+* 6
+fi=(329)
+3851 12
+fi=(339) /rust/deps/hashbrown-0.16.1/src/control/bitmask.rs
+50 12
+fi=(336) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/nonzero.rs
+641 6
+fi=(232)
+1072 24
+fi=(246)
+632 6
+fe=(226)
+805 6
+fi=(237)
+48 6
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 1060
+* 6
+-48 2
+fi=(268)
+3051 2
+769 2
+fi=(329)
+224 2
++1 2
+fi=(274)
+-25 6
+fi=(329)
+3173 2
+fi=(232)
+1072 2
+fi=(237)
+48 16
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=13 3319 
+* 210
+fe=(226)
+805 104
+
+fn=(11184) core::ptr::drop_in_place<litchi_opc::source_backed::PartCache>
+805 8
+fi=(329)
+2697 1
+2312 2
+fe=(226)
+805 2
+cfn=(11194) core::ptr::drop_in_place<std::collections::hash::map::HashMap<soapberry_zip::office::EntryId,litchi_opc::source_backed::PendingPublication>>
+calls=1 * 
+* 18
+fi=(329)
+2697 1
+2312 2
+fe=(226)
+805 2
+cfn=(11200) core::ptr::drop_in_place<litchi_opc::source_backed::CacheCounters>
+calls=1 * 
+* 34
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
++43 2
+cfn=(5584)
+calls=1 3327 
+* 153
+fe=(226)
+805 6
+cfn=(11208) core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::WritePermits>>
+calls=1 * 
+* 10
+* 14
+
+fn=(11130) core::ptr::drop_in_place<litchi_opc::source_backed::SourceSnapshot>
+805 8
+fi=(251)
+444 2
+fi=(235)
+3942 2
+fi=(338)
+2811 2
++43 3
+cfn=(5584)
+calls=1 2109 
+* 284
+fi=(251)
+444 2
+fi=(235)
+3942 2
+fi=(338)
+2811 2
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fe=(226)
+805 3
+fi=(338)
+2854 2
+cfn=(5584)
+calls=1 3327 
+* 38
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
++43 2
+cfn=(5584)
+calls=1 3327 
+* 38
+fe=(226)
+805 22
+
+fn=(11140) core::ptr::drop_in_place<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>
+805 10
+cfn=(11130)
+calls=1 * 
+* 392
+* 6
+fi=(235)
+3942 1
+fi=(338)
+2811 1
++43 2
+cfn=(5584)
+calls=1 2109 
+* 171
+fe=(226)
+805 92
+fi=(237)
+0 1
+fi=(246)
+632 1
+fi=(237)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 124
+fi=(329)
+2697 1
+2312 2
+0 1
+2253 3
+2479 1
+fi=(334)
+1320 1
+fi=(298)
+863 1
+fi=(329)
+3595 4
+0 68
+3851 17
+fi=(339)
+50 34
+-50 1
+fi=(334)
+1320 1
+fi=(232)
+1072 1
+fi=(298)
+863 1
+fi=(339)
+113 2
+-63 1
+fi=(336)
+641 17
+fi=(232)
+1072 68
+fi=(246)
+632 17
+fi=(232)
+1400 17
+fi=(237)
+48 17
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 561
+* 17
+-48 1
+fi=(268)
+3051 3
+fi=(274)
+200 2
+fi=(329)
+3173 1
+fi=(232)
+1072 2
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 124
+fe=(226)
+805 4
+fi=(246)
+632 3
+fe=(226)
+805 51
+0 17
+fi=(246)
+632 17
+fe=(226)
+805 17
+fi=(237)
+48 17
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 1826
+-48 17
+fi=(246)
+632 17
+fe=(226)
+805 17
+fi=(237)
+48 17
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 2165
+* 17
+-48 1
+fi=(246)
+632 1
+fi=(237)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 155
+fi=(329)
+2697 1
+2312 2
+0 1
+2253 3
+fi=(237)
+0 1
+fi=(268)
+3051 4
+fi=(274)
+200 2
+fi=(329)
+3173 1
+fi=(232)
+1072 2
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 180
+-48 2
+fi=(246)
+632 1
+fe=(226)
+805 1
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+805 5
+fi=(420) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/sync/once/futex.rs
+87 5
+fe=(226)
+805 8
+
+fn=(5560)
+805 18
+fi=(246)
+632 6
+fe=(226)
+805 6
+fi=(237)
+48 6
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 1038
+-48 6
+fi=(246)
+632 6
+fe=(226)
+805 6
+fi=(237)
+48 6
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 198
+-48 6
+fi=(246)
+632 6
+fe=(226)
+805 6
+fi=(237)
+48 6
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 910
+-48 6
+fi=(246)
+632 6
+fe=(226)
+805 6
+fi=(237)
+48 6
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=17 3319 
+* 938
+fe=(226)
+805 17
+fi=(237)
+48 10
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=5 3319 
+* 962
+fe=(226)
+805 2
+
+fn=(11138) core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>
+805 10
+cfn=(11130)
+calls=1 * 
+* 26
+* 2
+cfn=(11140)
+calls=1 * 
+* 6406
+* 3
+fi=(338)
+0 1
+fi=(246)
+632 1
+fe=(226)
+805 1
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 176
+-48 1
+fi=(246)
+632 1
+fe=(226)
+805 1
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 148
+fe=(226)
+805 4
+cfn=(5568)
+calls=1 * 
+* 768
+* 8
+0 1
+805 2
+cfn=(11172) core::ptr::drop_in_place<litchi_opc::source_backed::CatalogPart>
+calls=1 * 
+* 663
+* 26
+cfn=(11172)
+calls=13 * 
+* 13240
+* 42
+0 1
+fi=(246)
+632 1
+fi=(237)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 158
+fi=(329)
+2697 1
+2312 2
+0 1
+2253 3
+2479 1
+fi=(334)
+1320 1
+fi=(298)
+863 1
+fi=(329)
+3595 4
+0 8
+3851 2
+fi=(339)
+50 4
+fi=(336)
+641 2
+fi=(232)
+1072 8
+fi=(246)
+632 2
+fi=(329)
+0 2
+fi=(232)
+1400 2
+fi=(237)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 368
+* 2
+-48 1
+fi=(268)
+3051 4
+fi=(274)
+200 2
+fi=(329)
+3173 1
+fi=(232)
+1072 2
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(329)
+2697 1
+2312 2
+0 1
+2253 3
+2479 1
+fi=(334)
+1320 1
+fi=(298)
+863 1
+fi=(329)
+3595 4
+0 56
+3851 14
+fi=(339)
+50 28
+fi=(336)
+641 14
+fi=(232)
+1072 56
+fi=(246)
+632 14
+fi=(232)
+1400 14
+fi=(237)
+48 14
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=14 3319 
+* 2583
+* 14
+-48 1
+fi=(268)
+3051 3
+fi=(274)
+200 2
+fi=(329)
+3173 1
+fi=(232)
+1072 2
+fi=(237)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+805 6
+fi=(237)
+0 1
+fi=(246)
+632 1
+fi=(237)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+805 4
+fi=(237)
+0 1
+fi=(246)
+632 1
+fe=(226)
+805 2
+cfn=(11184)
+calls=1 * 
+* 258
+* 11
+
+fn=(11172)
+805 42
+fi=(246)
+632 14
+fe=(226)
+805 14
+fi=(237)
+48 14
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=14 3319 
+* 2326
+-48 14
+fi=(246)
+632 14
+fe=(226)
+805 14
+fi=(237)
+48 14
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=14 3319 
+* 1432
+-48 14
+fi=(246)
+632 14
+fe=(226)
+805 14
+fi=(237)
+48 14
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=14 3319 
+* 2366
+fe=(226)
+805 42
+fi=(237)
+48 14
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=14 3319 
+* 2310
+fe=(226)
+805 28
+cfn=(5568)
+calls=14 * 
+* 5119
+* 70
+
+fn=(11200)
+805 2
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fi=(251)
+444 1
+fi=(235)
+3942 1
+fi=(338)
+2811 1
+fe=(226)
+805 2
+
+fn=(11194)
+805 7
+fi=(329)
+2697 1
+2312 2
+fe=(226)
+805 8
+
+fn=(11208)
+805 10
+
+fl=(344)
+fn=(1778) core::fmt::write
+1630 11
+878 2
+fi=(226)
+1717 1
+fe=(344)
+-65 2
+0 5
+fi=(226)
+1717 2
+fe=(344)
+-65 2
+fi=(251)
+659 2
+fe=(344)
+1655 2
++10 4
+0 1
+fi=(251)
+659 2
+fe=(344)
+-82 5
+fi=(562) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/rt.rs
+144 1
++8 2
+cfi=(277)
+cfn=(2522)
+calls=9521 2711 
+* 464
+fi=(238)
+2173 2
+fe=(344)
+0 5
+1739 8
+
+fn=(1786)
+1909 9
++2 3
+0 13
+cfi=(277)
+cfn=(1788)
+calls=1 3344 
+0 434
+
+fl=(243)
+fn=(852)
+fi=(309) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfi=(244)
+cfn=(854)
+calls=0 5 
+250 25999
+fe=(243)
+
+fl=(543)
+fn=(11040)
+600 10
+fi=(275)
+745 2
+fi=(238)
+0 1
+fe=(543)
+607 8
+cfi=(548)
+cfn=(11044)
+calls=1 381 
+* 72
+fi=(238)
+2173 1
+0 1
+2173 2
+0 1
+fe=(543)
+607 4
+fi=(278) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/mod.rs
+156 1
+fi=(275)
+1276 1
+fi=(548)
+-94 1
+fi=(277)
+438 3
+fi=(319) /home/zhuhe/code/litchi/target/litchi-0894-baseline-src/crates/litchi-opc/src/packuri.rs
+-15 3
+fi=(344)
+2125 5
+cfn=(1778)
+calls=1 1630 
+* 523
+fi=(238)
+1183 2
+fi=(277)
+2917 4
+fe=(543)
+610 4
+fi=(252)
+0 1
+fe=(543)
+651 2
+cfi=(226)
+cfn=(11138)
+calls=1 805 
+* 25339
+* 8
+
+totals: 25999

@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0901/analyze_v2.py",
+    "--output",
+    "/tmp/litchi-0901-replay-txx1h3rj/analysis.json"
+  ],
+  "helper_sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04",
+  "byte_identical": true,
+  "analysis_sha256": "299c218418daa1562e730f63715f78e9262dd918e0e47aa7de0192d87945ea89",
+  "removed_directory": "/tmp/litchi-0901-replay-txx1h3rj",
+  "removed_bytes": 375245,
+  "new_workloads": 0,
+  "worktrees_created": 0,
+  "build_roots_created": 0,
+  "temporary_directory_absent": true
+}

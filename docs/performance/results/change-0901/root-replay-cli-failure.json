@@ -1,0 +1,16 @@
+{
+  "status": "failed invocation retained",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0901/analyze_v2.py",
+    "--no-annotate",
+    "--output",
+    "docs/performance/results/change-0901/analysis.json"
+  ],
+  "exit_code": 2,
+  "error": "unrecognized arguments: --no-annotate",
+  "output_created": false,
+  "new_workload": false,
+  "correction": "v2 defaults to raw-only; omit the v1-only --no-annotate flag."
+}

@@ -1,0 +1,1139 @@
+{
+  "basis": "Independent offline raw Callgrind parse, command/artifact custody replay, and canonical-analysis reconciliation. No native workload, build, or profiler capture was run by this review.",
+  "canonical_analysis": {
+    "captures": 4,
+    "file": {
+      "bytes": 375245,
+      "path": "docs/performance/results/change-0901/analysis.json",
+      "sha256": "299c218418daa1562e730f63715f78e9262dd918e0e47aa7de0192d87945ea89"
+    },
+    "mode": "full",
+    "schema": "litchi.xlsx-publication-profile-analysis-0901.v1",
+    "status": "pass"
+  },
+  "captures": [
+    {
+      "artifact_hashes": {
+        "callgrind.out": {
+          "bytes": 573,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out",
+          "sha256": "04aea1fad38965308fab5940e619db494397c175761c69860de7d4571388ca08"
+        },
+        "callgrind.out.1": {
+          "bytes": 38177,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.1",
+          "sha256": "c325ff437cc1551628dd4d02c46467f46ef7fface131af482ed35052666b763b"
+        },
+        "callgrind.out.2": {
+          "bytes": 16688,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.2",
+          "sha256": "276ad3135256d2479655febfbfc77d47b6be30155316bffe8b1ef679aa196cb3"
+        },
+        "callgrind.out.3": {
+          "bytes": 222542,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.3",
+          "sha256": "fa05a3aadbd2376d84365d898df32e45dbc4947220b4a1d84291af5eaac2879c"
+        },
+        "callgrind.out.4": {
+          "bytes": 16710,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.4",
+          "sha256": "2347a056fc579e37d5e089606bdb4366aa3ddee5796b5254411559748309739a"
+        },
+        "callgrind.out.5": {
+          "bytes": 223107,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.5",
+          "sha256": "63db119cb4908e99589e673753bbec7556ee6ccf82b19fcda3a8b0d1f6a4cbc5"
+        },
+        "callgrind.out.6": {
+          "bytes": 226473,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.6",
+          "sha256": "289ddb99a1d05da7dd43f59dc74a31ff9b0a8f81253f3a5d5a53a9a7daf8928f"
+        },
+        "report.json": {
+          "bytes": 21558,
+          "path": "docs/performance/results/change-0901/capture/00-medium/report.json",
+          "sha256": "f4a6fae636097e868cd563dcb360bc0f32dce1fba8a22636aff7c75c8413d6d4"
+        },
+        "start.json": {
+          "bytes": 1855,
+          "path": "docs/performance/results/change-0901/capture/00-medium/start.json",
+          "sha256": "70bf107d65566638bab705b17efe870db51e85496b3117cc3018ab43ce4d1bb9"
+        },
+        "stderr.txt": {
+          "bytes": 1064,
+          "path": "docs/performance/results/change-0901/capture/00-medium/stderr.txt",
+          "sha256": "788b6e0e38092d9e341a9663c59f1f225c5ba38c4c3292002d61b97fe713679a"
+        },
+        "stdout.txt": {
+          "bytes": 0,
+          "path": "docs/performance/results/change-0901/capture/00-medium/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "checks": {
+        "all_exclusive_self_conserves": true,
+        "artifact_hashes": true,
+        "collected_reconciles": true,
+        "command_custody": true,
+        "one_measured_plus_five_lifecycle": true,
+        "owner_conserves": true,
+        "owner_parent_attribution": true,
+        "raw_headers": true,
+        "semantic_gate": true,
+        "terminal_zero_ir": true,
+        "topology_conserves": true
+      },
+      "index": 0,
+      "metrics": {
+        "all_self_ir": 104397410,
+        "collected_values": [
+          169387210,
+          169387210
+        ],
+        "lifecycle_count": 5,
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_calls": 1,
+        "measured_direct_ir": 104397257,
+        "measured_file": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.6",
+        "measured_ir": 104397410,
+        "measured_owner_id": 11038,
+        "measured_parent_id": 9270,
+        "measured_part": 6,
+        "measured_self_ir": 153,
+        "overflow_warning": true,
+        "parts": 6,
+        "summaries": [
+          10398586,
+          25966,
+          27196201,
+          26012,
+          27343035,
+          104397410
+        ],
+        "summary_sum": 169387210,
+        "top_self_rows": [
+          {
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 18584283
+          },
+          {
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 9637971
+          },
+          {
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 9473741
+          },
+          {
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 9402960
+          },
+          {
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 6315810
+          },
+          {
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 5364083
+          },
+          {
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 4901950
+          },
+          {
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 4113321
+          },
+          {
+            "name": "quick_xml::events::attributes::IterState::next",
+            "self_ir": 3459112
+          },
+          {
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 3368490
+          },
+          {
+            "name": "__memset_avx2_unaligned_erms",
+            "self_ir": 3043823
+          },
+          {
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 3018708
+          }
+        ],
+        "topology_children": [
+          {
+            "calls": 1,
+            "inclusive_ir": 61430681,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 42678394,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 2011,
+            "name": "core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::EffectiveTopologyData>>"
+          },
+          {
+            "calls": 6,
+            "inclusive_ir": 943,
+            "name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "calls": 3,
+            "inclusive_ir": 203,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 33,
+            "name": "free"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 26,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyPartAddition>>"
+          }
+        ],
+        "topology_direct_ir": 104112291,
+        "topology_incoming_ir": 104112546,
+        "topology_self_ir": 255
+      },
+      "raw_numbered": [
+        {
+          "bytes": 38177,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.1",
+          "sha256": "c325ff437cc1551628dd4d02c46467f46ef7fface131af482ed35052666b763b"
+        },
+        {
+          "bytes": 16688,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.2",
+          "sha256": "276ad3135256d2479655febfbfc77d47b6be30155316bffe8b1ef679aa196cb3"
+        },
+        {
+          "bytes": 222542,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.3",
+          "sha256": "fa05a3aadbd2376d84365d898df32e45dbc4947220b4a1d84291af5eaac2879c"
+        },
+        {
+          "bytes": 16710,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.4",
+          "sha256": "2347a056fc579e37d5e089606bdb4366aa3ddee5796b5254411559748309739a"
+        },
+        {
+          "bytes": 223107,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.5",
+          "sha256": "63db119cb4908e99589e673753bbec7556ee6ccf82b19fcda3a8b0d1f6a4cbc5"
+        },
+        {
+          "bytes": 226473,
+          "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.6",
+          "sha256": "289ddb99a1d05da7dd43f59dc74a31ff9b0a8f81253f3a5d5a53a9a7daf8928f"
+        }
+      ],
+      "raw_terminal": {
+        "bytes": 573,
+        "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out",
+        "sha256": "04aea1fad38965308fab5940e619db494397c175761c69860de7d4571388ca08"
+      },
+      "repeat": 0,
+      "shape": "medium"
+    },
+    {
+      "artifact_hashes": {
+        "callgrind.out": {
+          "bytes": 585,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out",
+          "sha256": "d96860b79940d07538c5cedce20837f40778bb46a0319420c72c69b658264494"
+        },
+        "callgrind.out.1": {
+          "bytes": 37733,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.1",
+          "sha256": "072eb76d98ada6012cf81ed6460ab6d2deeca899eab2cede4d88cac28f2da759"
+        },
+        "callgrind.out.2": {
+          "bytes": 16733,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.2",
+          "sha256": "d68270fafaf1e62d5fe4d6889c62106d81d2819c32c9a937747b189f8af1ab1c"
+        },
+        "callgrind.out.3": {
+          "bytes": 226412,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.3",
+          "sha256": "4bb6b7c93589a22ecfe78fc075fabe7c21ee0160f7347efce35279187c8eb705"
+        },
+        "callgrind.out.4": {
+          "bytes": 16744,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.4",
+          "sha256": "e82586e25aff442187a22065fd2d9142b3db2b375a879504dc5f59065a52a737"
+        },
+        "callgrind.out.5": {
+          "bytes": 227153,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.5",
+          "sha256": "5743df2f4d19bda57edbc4728b4371d1b59e135855400d45492916bae5285ac5"
+        },
+        "callgrind.out.6": {
+          "bytes": 230878,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.6",
+          "sha256": "9fb5601eddf87886d90f68aac28061b0ffa74dda66c6891f4cdb9eafdb3d2997"
+        },
+        "report.json": {
+          "bytes": 21581,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/report.json",
+          "sha256": "b702365734e26feb3319f492647405868d959a0c72604de309d1949ce6823e0d"
+        },
+        "start.json": {
+          "bytes": 1879,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/start.json",
+          "sha256": "30f1f603f59db0d483e951c64e24b3dadbeccbc24e1a3217b9d205a830cfa6e6"
+        },
+        "stderr.txt": {
+          "bytes": 1076,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/stderr.txt",
+          "sha256": "9a12dd3161fb032b9bd062249d17ca75858b0bf69a47e06f842219c1c7a0eda9"
+        },
+        "stdout.txt": {
+          "bytes": 0,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "checks": {
+        "all_exclusive_self_conserves": true,
+        "artifact_hashes": true,
+        "collected_reconciles": true,
+        "command_custody": true,
+        "one_measured_plus_five_lifecycle": true,
+        "owner_conserves": true,
+        "owner_parent_attribution": true,
+        "raw_headers": true,
+        "semantic_gate": true,
+        "terminal_zero_ir": true,
+        "topology_conserves": true
+      },
+      "index": 1,
+      "metrics": {
+        "all_self_ir": 189501698,
+        "collected_values": [
+          447395173,
+          447395173
+        ],
+        "lifecycle_count": 5,
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_calls": 1,
+        "measured_direct_ir": 189501545,
+        "measured_file": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.6",
+        "measured_ir": 189501698,
+        "measured_owner_id": 11044,
+        "measured_parent_id": 9278,
+        "measured_part": 6,
+        "measured_self_ir": 153,
+        "overflow_warning": true,
+        "parts": 6,
+        "summaries": [
+          10578576,
+          25844,
+          123429438,
+          25937,
+          123833680,
+          189501698
+        ],
+        "summary_sum": 447395173,
+        "top_self_rows": [
+          {
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 35695609
+          },
+          {
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 18146510
+          },
+          {
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 17963652
+          },
+          {
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 12181556
+          },
+          {
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 11105103
+          },
+          {
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 10419019
+          },
+          {
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 9349850
+          },
+          {
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 7871479
+          },
+          {
+            "name": "quick_xml::events::attributes::IterState::next",
+            "self_ir": 6772217
+          },
+          {
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 6444120
+          },
+          {
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 5784291
+          },
+          {
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "self_ir": 5507726
+          }
+        ],
+        "topology_children": [
+          {
+            "calls": 1,
+            "inclusive_ir": 117558775,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 71428233,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 1959,
+            "name": "core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::EffectiveTopologyData>>"
+          },
+          {
+            "calls": 6,
+            "inclusive_ir": 943,
+            "name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "calls": 3,
+            "inclusive_ir": 203,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 33,
+            "name": "free"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 26,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyPartAddition>>"
+          }
+        ],
+        "topology_direct_ir": 188990172,
+        "topology_incoming_ir": 188990427,
+        "topology_self_ir": 255
+      },
+      "raw_numbered": [
+        {
+          "bytes": 37733,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.1",
+          "sha256": "072eb76d98ada6012cf81ed6460ab6d2deeca899eab2cede4d88cac28f2da759"
+        },
+        {
+          "bytes": 16733,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.2",
+          "sha256": "d68270fafaf1e62d5fe4d6889c62106d81d2819c32c9a937747b189f8af1ab1c"
+        },
+        {
+          "bytes": 226412,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.3",
+          "sha256": "4bb6b7c93589a22ecfe78fc075fabe7c21ee0160f7347efce35279187c8eb705"
+        },
+        {
+          "bytes": 16744,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.4",
+          "sha256": "e82586e25aff442187a22065fd2d9142b3db2b375a879504dc5f59065a52a737"
+        },
+        {
+          "bytes": 227153,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.5",
+          "sha256": "5743df2f4d19bda57edbc4728b4371d1b59e135855400d45492916bae5285ac5"
+        },
+        {
+          "bytes": 230878,
+          "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.6",
+          "sha256": "9fb5601eddf87886d90f68aac28061b0ffa74dda66c6891f4cdb9eafdb3d2997"
+        }
+      ],
+      "raw_terminal": {
+        "bytes": 585,
+        "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out",
+        "sha256": "d96860b79940d07538c5cedce20837f40778bb46a0319420c72c69b658264494"
+      },
+      "repeat": 0,
+      "shape": "dense-sparse"
+    },
+    {
+      "artifact_hashes": {
+        "callgrind.out": {
+          "bytes": 585,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out",
+          "sha256": "89f4a1b27d965bc6b90f4fa00dca817e673a29cd4f8af07c2420bc082731f2f0"
+        },
+        "callgrind.out.1": {
+          "bytes": 38127,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.1",
+          "sha256": "7cccd69985ab100b9693ea4414d6bbd7543ae2374daca54694a46e9147d58de3"
+        },
+        "callgrind.out.2": {
+          "bytes": 16795,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.2",
+          "sha256": "f642783f2b8a05b48e1145457bece16c15441cc356599e6a4499e1836dcfdbb1"
+        },
+        "callgrind.out.3": {
+          "bytes": 225939,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.3",
+          "sha256": "fa0c30f0ca45638bfb9f85c1a65c4a2a961dd575900e2c84033fca74580c537b"
+        },
+        "callgrind.out.4": {
+          "bytes": 16779,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.4",
+          "sha256": "d30771ce052174ffc4ec82b263c9b72c5291960e224e3738b9ccf9cb93cb81f3"
+        },
+        "callgrind.out.5": {
+          "bytes": 227585,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.5",
+          "sha256": "b94a2feb41aee427f4522dcb60b7a7a0cb7198a6eb36db96fafa30168463eaf3"
+        },
+        "callgrind.out.6": {
+          "bytes": 231341,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.6",
+          "sha256": "c0513865ee7aa8bde4e2b21a0dd5a3c1f6efba7ac4f338038e4e755912346602"
+        },
+        "report.json": {
+          "bytes": 21581,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/report.json",
+          "sha256": "4ca9b18cbd05b722cfe25c2a295e13ef42a7fcf93575870d9ee94ef2f2e9293c"
+        },
+        "start.json": {
+          "bytes": 1879,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/start.json",
+          "sha256": "248505c000f750974a89f9f08d18ecc522873532f941f852dcce0dbe67dcc9bc"
+        },
+        "stderr.txt": {
+          "bytes": 1076,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/stderr.txt",
+          "sha256": "afe644446e88c169c70cd9959c049c786ee4a19ec4eeea873b1041db595028dd"
+        },
+        "stdout.txt": {
+          "bytes": 0,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "checks": {
+        "all_exclusive_self_conserves": true,
+        "artifact_hashes": true,
+        "collected_reconciles": true,
+        "command_custody": true,
+        "one_measured_plus_five_lifecycle": true,
+        "owner_conserves": true,
+        "owner_parent_attribution": true,
+        "raw_headers": true,
+        "semantic_gate": true,
+        "terminal_zero_ir": true,
+        "topology_conserves": true
+      },
+      "index": 2,
+      "metrics": {
+        "all_self_ir": 189500855,
+        "collected_values": [
+          447400035,
+          447400035
+        ],
+        "lifecycle_count": 5,
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_calls": 1,
+        "measured_direct_ir": 189500702,
+        "measured_file": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.6",
+        "measured_ir": 189500855,
+        "measured_owner_id": 11036,
+        "measured_parent_id": 9268,
+        "measured_part": 6,
+        "measured_self_ir": 153,
+        "overflow_warning": true,
+        "parts": 6,
+        "summaries": [
+          10578837,
+          26017,
+          123429933,
+          26010,
+          123838383,
+          189500855
+        ],
+        "summary_sum": 447400035,
+        "top_self_rows": [
+          {
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 35695609
+          },
+          {
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 18146510
+          },
+          {
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 17963652
+          },
+          {
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 12181556
+          },
+          {
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 11105077
+          },
+          {
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 10419019
+          },
+          {
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 9349850
+          },
+          {
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 7871479
+          },
+          {
+            "name": "quick_xml::events::attributes::IterState::next",
+            "self_ir": 6772217
+          },
+          {
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 6444120
+          },
+          {
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 5784291
+          },
+          {
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "self_ir": 5507726
+          }
+        ],
+        "topology_children": [
+          {
+            "calls": 1,
+            "inclusive_ir": 117557185,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 71428650,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 1925,
+            "name": "core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::EffectiveTopologyData>>"
+          },
+          {
+            "calls": 6,
+            "inclusive_ir": 943,
+            "name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "calls": 3,
+            "inclusive_ir": 203,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 33,
+            "name": "free"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 26,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyPartAddition>>"
+          }
+        ],
+        "topology_direct_ir": 188988965,
+        "topology_incoming_ir": 188989220,
+        "topology_self_ir": 255
+      },
+      "raw_numbered": [
+        {
+          "bytes": 38127,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.1",
+          "sha256": "7cccd69985ab100b9693ea4414d6bbd7543ae2374daca54694a46e9147d58de3"
+        },
+        {
+          "bytes": 16795,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.2",
+          "sha256": "f642783f2b8a05b48e1145457bece16c15441cc356599e6a4499e1836dcfdbb1"
+        },
+        {
+          "bytes": 225939,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.3",
+          "sha256": "fa0c30f0ca45638bfb9f85c1a65c4a2a961dd575900e2c84033fca74580c537b"
+        },
+        {
+          "bytes": 16779,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.4",
+          "sha256": "d30771ce052174ffc4ec82b263c9b72c5291960e224e3738b9ccf9cb93cb81f3"
+        },
+        {
+          "bytes": 227585,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.5",
+          "sha256": "b94a2feb41aee427f4522dcb60b7a7a0cb7198a6eb36db96fafa30168463eaf3"
+        },
+        {
+          "bytes": 231341,
+          "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.6",
+          "sha256": "c0513865ee7aa8bde4e2b21a0dd5a3c1f6efba7ac4f338038e4e755912346602"
+        }
+      ],
+      "raw_terminal": {
+        "bytes": 585,
+        "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out",
+        "sha256": "89f4a1b27d965bc6b90f4fa00dca817e673a29cd4f8af07c2420bc082731f2f0"
+      },
+      "repeat": 1,
+      "shape": "dense-sparse"
+    },
+    {
+      "artifact_hashes": {
+        "callgrind.out": {
+          "bytes": 573,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out",
+          "sha256": "177b4116f3b318403a43907d060696b70af2fb2bb3b558a5e56931a7761d1e58"
+        },
+        "callgrind.out.1": {
+          "bytes": 37956,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.1",
+          "sha256": "e0a5f80d3b0198480813fa4989391d5ec436aad3f00ef0bda2945c55b8904f5a"
+        },
+        "callgrind.out.2": {
+          "bytes": 16775,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.2",
+          "sha256": "5123cfd26e24a80f997f0bbcc91b2fd7aa684f249b61420a3b8f41a213f6973a"
+        },
+        "callgrind.out.3": {
+          "bytes": 222720,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.3",
+          "sha256": "07bec0076755cd54216e6bc090f5e2898577a4243532981b1b1bc1f663d0920f"
+        },
+        "callgrind.out.4": {
+          "bytes": 16753,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.4",
+          "sha256": "8bdc5222696a61d302524c06801bb23528705f47ab4d94a2936e70166cec30d9"
+        },
+        "callgrind.out.5": {
+          "bytes": 223225,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.5",
+          "sha256": "5925b62126d1d7432799a4380cb939b33bd6515164b626d36aa5bcc7e16549f5"
+        },
+        "callgrind.out.6": {
+          "bytes": 226479,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.6",
+          "sha256": "c897954240e9df916f4fec894e19380cec6ca84678afda5d8c4ef0c8cb9252a2"
+        },
+        "report.json": {
+          "bytes": 21558,
+          "path": "docs/performance/results/change-0901/capture/03-medium/report.json",
+          "sha256": "86322a2662a71778bf019cf8533b5c412c96ac37b595b45fe70da6456f31bb9d"
+        },
+        "start.json": {
+          "bytes": 1855,
+          "path": "docs/performance/results/change-0901/capture/03-medium/start.json",
+          "sha256": "40485891d10b690f6243c4890a7513f1d89d80289cdbfed5125fa290226951a0"
+        },
+        "stderr.txt": {
+          "bytes": 1064,
+          "path": "docs/performance/results/change-0901/capture/03-medium/stderr.txt",
+          "sha256": "679b635ce1e0661f83ab6e8f5ed156fadafb93839d535a489f9493ae8aee6d26"
+        },
+        "stdout.txt": {
+          "bytes": 0,
+          "path": "docs/performance/results/change-0901/capture/03-medium/stdout.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "checks": {
+        "all_exclusive_self_conserves": true,
+        "artifact_hashes": true,
+        "collected_reconciles": true,
+        "command_custody": true,
+        "one_measured_plus_five_lifecycle": true,
+        "owner_conserves": true,
+        "owner_parent_attribution": true,
+        "raw_headers": true,
+        "semantic_gate": true,
+        "terminal_zero_ir": true,
+        "topology_conserves": true
+      },
+      "index": 3,
+      "metrics": {
+        "all_self_ir": 104396992,
+        "collected_values": [
+          169383738,
+          169383738
+        ],
+        "lifecycle_count": 5,
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_calls": 1,
+        "measured_direct_ir": 104396839,
+        "measured_file": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.6",
+        "measured_ir": 104396992,
+        "measured_owner_id": 11040,
+        "measured_parent_id": 9276,
+        "measured_part": 6,
+        "measured_self_ir": 153,
+        "overflow_warning": true,
+        "parts": 6,
+        "summaries": [
+          10398879,
+          25964,
+          27195966,
+          25999,
+          27339938,
+          104396992
+        ],
+        "summary_sum": 169383738,
+        "top_self_rows": [
+          {
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 18584283
+          },
+          {
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 9638073
+          },
+          {
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 9473741
+          },
+          {
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 9402960
+          },
+          {
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 6315810
+          },
+          {
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 5364083
+          },
+          {
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 4901950
+          },
+          {
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 4113321
+          },
+          {
+            "name": "quick_xml::events::attributes::IterState::next",
+            "self_ir": 3459112
+          },
+          {
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 3368490
+          },
+          {
+            "name": "__memset_avx2_unaligned_erms",
+            "self_ir": 3043823
+          },
+          {
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 3018708
+          }
+        ],
+        "topology_children": [
+          {
+            "calls": 1,
+            "inclusive_ir": 61430667,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 42678034,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 2020,
+            "name": "core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::EffectiveTopologyData>>"
+          },
+          {
+            "calls": 6,
+            "inclusive_ir": 943,
+            "name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "calls": 3,
+            "inclusive_ir": 203,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 33,
+            "name": "free"
+          },
+          {
+            "calls": 1,
+            "inclusive_ir": 26,
+            "name": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyPartAddition>>"
+          }
+        ],
+        "topology_direct_ir": 104111926,
+        "topology_incoming_ir": 104112181,
+        "topology_self_ir": 255
+      },
+      "raw_numbered": [
+        {
+          "bytes": 37956,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.1",
+          "sha256": "e0a5f80d3b0198480813fa4989391d5ec436aad3f00ef0bda2945c55b8904f5a"
+        },
+        {
+          "bytes": 16775,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.2",
+          "sha256": "5123cfd26e24a80f997f0bbcc91b2fd7aa684f249b61420a3b8f41a213f6973a"
+        },
+        {
+          "bytes": 222720,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.3",
+          "sha256": "07bec0076755cd54216e6bc090f5e2898577a4243532981b1b1bc1f663d0920f"
+        },
+        {
+          "bytes": 16753,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.4",
+          "sha256": "8bdc5222696a61d302524c06801bb23528705f47ab4d94a2936e70166cec30d9"
+        },
+        {
+          "bytes": 223225,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.5",
+          "sha256": "5925b62126d1d7432799a4380cb939b33bd6515164b626d36aa5bcc7e16549f5"
+        },
+        {
+          "bytes": 226479,
+          "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.6",
+          "sha256": "c897954240e9df916f4fec894e19380cec6ca84678afda5d8c4ef0c8cb9252a2"
+        }
+      ],
+      "raw_terminal": {
+        "bytes": 573,
+        "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out",
+        "sha256": "177b4116f3b318403a43907d060696b70af2fb2bb3b558a5e56931a7761d1e58"
+      },
+      "repeat": 1,
+      "shape": "medium"
+    }
+  ],
+  "checks": {
+    "canonical_pass": true,
+    "canonical_reconciliation": true,
+    "cleanup_verified": true,
+    "command_custody": true,
+    "failure_receipts_retained": true,
+    "raw_conservation": true,
+    "raw_parent_attribution": true
+  },
+  "claim_policy": {
+    "allocation_or_rss": false,
+    "guest_ir_only": true,
+    "hardware_cycles": false,
+    "native_latency": false,
+    "performance_claim": null,
+    "raw_only_no_annotation": true,
+    "returned_snapshot_drop_outside_callgrind_scope": true
+  },
+  "cleanup": {
+    "helper_cleanup": {
+      "bytes": 990,
+      "path": "docs/performance/results/change-0901/helper-cleanup.json",
+      "sha256": "f184c9de3e4ff25004303da370b1861516cbd41a7c12cab80faec11127de958d"
+    },
+    "owned_temporary_outputs_absent": true,
+    "replay_cleanup": {
+      "bytes": 594,
+      "path": "docs/performance/results/change-0901/replay-cleanup.json",
+      "sha256": "0a5381d7db9b432c95e84849c6ea843e5916bdbf78da50f7172ba2e5fbcfc50d"
+    },
+    "worktrees_created": 0
+  },
+  "cross_capture_checks": {
+    "all_artifact_hashes": true,
+    "all_collected_counters_reconcile": true,
+    "all_lifecycle_counts": [
+      5,
+      5,
+      5,
+      5
+    ],
+    "all_measured_parts": [
+      6,
+      6,
+      6,
+      6
+    ],
+    "all_overflow_warnings_retained": true,
+    "all_semantic_gates": true,
+    "count": 4,
+    "dense_sparse_indices": [
+      1,
+      2
+    ],
+    "medium_indices": [
+      0,
+      3
+    ],
+    "prediction_matches_observed": true
+  },
+  "limitations": [
+    "Callgrind Ir is guest-instruction attribution, not native wall time, hardware cycles, allocations, RSS, or a latency upper bound.",
+    "The four nm owner addresses are represented by one collapsed demangled Callgrind function ID per raw dump; exact measured/lifecycle parent edges select the recorded owner call, while the symbol list is custody context only.",
+    "The returned publication snapshot drop is inside the 0900 native publication timer but outside this publication-method Callgrind scope.",
+    "Every capture retains Valgrind's brk segment overflow warning; numbered-dump and collected-counter conservation still pass.",
+    "Only immediate children of write_topology_to_stream form a disjoint raw boundary; nested XML, writer, and Deflate rows are diagnostics and no candidate group is summed.",
+    "The optional annotation attempt failed on a path-prefix parser mismatch and is retained as a failure; analysis.json is raw-only."
+  ],
+  "partial_annotation": {
+    "authoritative": false,
+    "bound_by_failure_receipt": true,
+    "file": {
+      "bytes": 568118,
+      "path": "docs/performance/results/change-0901/capture/00-medium/annotation-inclusive.txt",
+      "sha256": "e876c47a5b004a39f8252ad670a444e4d9f549e499c54051fac3c35fc8d7e495"
+    }
+  },
+  "plan": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "cpu": 12,
+    "expected_measured_calls": 1,
+    "file": {
+      "bytes": 56171,
+      "path": "docs/performance/results/change-0901/plan.json",
+      "sha256": "3b4f8a67a248aeb509d34c91a13e94d80d2af911b64a79505526b141ec70d92d"
+    },
+    "head": "7371a3a09489235c9c27ffed5660421275c6ed93",
+    "historical_expected_lifecycle_calls": 5,
+    "lifecycle_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+    "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+    "options": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+      "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+      "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+    ],
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "repeats": 2,
+    "samples": 1,
+    "schedule": [
+      {
+        "index": 0,
+        "repeat": 0,
+        "shape": "medium"
+      },
+      {
+        "index": 1,
+        "repeat": 0,
+        "shape": "dense-sparse"
+      },
+      {
+        "index": 2,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "index": 3,
+        "repeat": 1,
+        "shape": "medium"
+      }
+    ],
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "warmup": 0
+  },
+  "retained_failures": [
+    {
+      "exit_code": 2,
+      "file": {
+        "bytes": 442,
+        "path": "docs/performance/results/change-0901/root-replay-cli-failure.json",
+        "sha256": "c5e8d50c093cd235744a8c1b68a950441aa611fe07ee9f10417e6e6a0b70f540"
+      },
+      "new_workload": false,
+      "output_created": false,
+      "status": "failed invocation retained"
+    },
+    {
+      "exit_code": 2,
+      "file": {
+        "bytes": 1635,
+        "path": "docs/performance/results/change-0901/annotation-attempt-failure.json",
+        "sha256": "3e91d3eb6e53dc2a755da0c5b93858b1c8cacd4d9224c23b939e351613717578"
+      },
+      "new_workload": false,
+      "output_created": false,
+      "status": "fail"
+    }
+  ],
+  "reviewer": "profile_method_review_0901",
+  "schema": "litchi.xlsx-publication-profile-independent-review-0901.v1",
+  "source_identity": {
+    "binary": {
+      "bytes": 264489024,
+      "path": "docs/performance/results/change-0894/binaries/baseline-native",
+      "sha256": "efcf6173bf71b3766aa84cc9a38023bf7b8ca0263f40cd80ec9c23acd4636e62"
+    },
+    "build": {
+      "bytes": 3274,
+      "path": "docs/performance/results/change-0894/native-build.json",
+      "sha256": "85a55352328e47e3ae4366af4d6ac5515bf4b41dba896e167f0685f5340bdae5"
+    },
+    "semantic_source_replay": {
+      "bytes": 2749,
+      "path": "docs/performance/results/change-0901/semantic-source-replay.json",
+      "sha256": "8d473e974484ebefd2e47d240f1d106c38038033d4f036ac07e0cca7dde215cb"
+    },
+    "source_files_verified": 10771,
+    "source_manifest": {
+      "bytes": 3325536,
+      "path": "docs/performance/results/change-0894/source.json",
+      "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+    },
+    "tracked_production_source_diff": false
+  },
+  "status": "pass"
+}

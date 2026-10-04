@@ -1,0 +1,206 @@
+{
+  "command": {
+    "bytes": 4452,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/command.json",
+    "sha256": "6cc8eeffc862ed17c3e4ed4c69b5fe33e2b728a61c1d2ac7b0a7cc1fae5c8e55"
+  },
+  "helper": {
+    "bytes": 2687,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/admit_first.py",
+    "sha256": "cb0dde786dc56a8d10603fe6b4a1f23a20d474f0d22d93abb0c6d652b68a473d"
+  },
+  "lifecycle_calls": 5,
+  "measured_calls": 1,
+  "plan": {
+    "bytes": 56171,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/plan.json",
+    "sha256": "3b4f8a67a248aeb509d34c91a13e94d80d2af911b64a79505526b141ec70d92d"
+  },
+  "reader": {
+    "bytes": 63017,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_v2.py",
+    "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+  },
+  "rows": [
+    {
+      "artifact": {
+        "bytes": 38177,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.1",
+        "sha256": "c325ff437cc1551628dd4d02c46467f46ef7fface131af482ed35052666b763b"
+      },
+      "edge": {
+        "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "callee_id": 11038,
+        "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+        "caller_id": 9288,
+        "calls": 1,
+        "file": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs",
+        "inclusive_ir": 10398586,
+        "line": 1752,
+        "position": "24005"
+      },
+      "header": {
+        "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "events": [
+          "Ir"
+        ],
+        "part": 1,
+        "summary_ir": 10398586,
+        "totals_ir": 10398586,
+        "trigger": "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 16688,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.2",
+        "sha256": "276ad3135256d2479655febfbfc77d47b6be30155316bffe8b1ef679aa196cb3"
+      },
+      "edge": {
+        "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "callee_id": 11038,
+        "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+        "caller_id": 9288,
+        "calls": 1,
+        "file": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs",
+        "inclusive_ir": 25966,
+        "line": 464,
+        "position": "24038"
+      },
+      "header": {
+        "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "events": [
+          "Ir"
+        ],
+        "part": 2,
+        "summary_ir": 25966,
+        "totals_ir": 25966,
+        "trigger": "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 222542,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.3",
+        "sha256": "fa05a3aadbd2376d84365d898df32e45dbc4947220b4a1d84291af5eaac2879c"
+      },
+      "edge": {
+        "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "callee_id": 11038,
+        "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+        "caller_id": 9288,
+        "calls": 1,
+        "file": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs",
+        "inclusive_ir": 27196201,
+        "line": 17640,
+        "position": "24045"
+      },
+      "header": {
+        "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "events": [
+          "Ir"
+        ],
+        "part": 3,
+        "summary_ir": 27196201,
+        "totals_ir": 27196201,
+        "trigger": "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 16710,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.4",
+        "sha256": "2347a056fc579e37d5e089606bdb4366aa3ddee5796b5254411559748309739a"
+      },
+      "edge": {
+        "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "callee_id": 11038,
+        "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+        "caller_id": 9288,
+        "calls": 1,
+        "file": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs",
+        "inclusive_ir": 26012,
+        "line": 466,
+        "position": "24038"
+      },
+      "header": {
+        "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "events": [
+          "Ir"
+        ],
+        "part": 4,
+        "summary_ir": 26012,
+        "totals_ir": 26012,
+        "trigger": "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 223107,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.5",
+        "sha256": "63db119cb4908e99589e673753bbec7556ee6ccf82b19fcda3a8b0d1f6a4cbc5"
+      },
+      "edge": {
+        "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "callee_id": 11038,
+        "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+        "caller_id": 9288,
+        "calls": 1,
+        "file": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs",
+        "inclusive_ir": 27343035,
+        "line": 11229,
+        "position": "24045"
+      },
+      "header": {
+        "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "events": [
+          "Ir"
+        ],
+        "part": 5,
+        "summary_ir": 27343035,
+        "totals_ir": 27343035,
+        "trigger": "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 226473,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.6",
+        "sha256": "289ddb99a1d05da7dd43f59dc74a31ff9b0a8f81253f3a5d5a53a9a7daf8928f"
+      },
+      "edge": {
+        "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "callee_id": 11038,
+        "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+        "caller_id": 9270,
+        "calls": 1,
+        "file": "/home/zhuhe/code/litchi/target/litchi-0894-baseline-src/tools/perf-baseline/src/lib.rs",
+        "inclusive_ir": 104397410,
+        "line": 11184,
+        "position": "44708"
+      },
+      "header": {
+        "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/report.json",
+        "events": [
+          "Ir"
+        ],
+        "part": 6,
+        "summary_ir": 104397410,
+        "totals_ir": 104397410,
+        "trigger": "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+      }
+    }
+  ],
+  "scope": "Guestinstructions inside publication method only. Returned snapshot drop is outside this scope but inside0900 native publication timer. Lifecycle owner calls separate; no native timing, allocation, RSS or speedup claim.",
+  "semantics": {
+    "bytes": 4611,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/semantics.json",
+    "sha256": "160ace2fe9b29f5f6d14d08fc8c3d1f986bbf7f58c80246e048f21a6127f822b"
+  },
+  "status": "pass",
+  "terminal": {
+    "bytes": 573,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out",
+    "sha256": "04aea1fad38965308fab5940e619db494397c175761c69860de7d4571388ca08"
+  }
+}

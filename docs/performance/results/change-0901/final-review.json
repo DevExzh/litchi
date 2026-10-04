@@ -1,0 +1,410 @@
+{
+  "status": "pass",
+  "provenance": "root closure; independent raw/numerical review retained separately",
+  "independent_review_descriptors_verified": 83,
+  "source_diff_empty": true,
+  "capture_children": 4,
+  "measured_publication_calls": 4,
+  "separate_lifecycle_calls": 20,
+  "workload_retries": 0,
+  "new_builds": 0,
+  "worktrees_created": 0,
+  "temporary_outputs_absent": true,
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0901/README.md",
+      "bytes": 2986,
+      "sha256": "76a307e03c761c78f0b4e22bde0775be2b7cadf49e28de7630001e35c1ca5331"
+    },
+    {
+      "path": "docs/performance/results/change-0901/admit_first.py",
+      "bytes": 2687,
+      "sha256": "cb0dde786dc56a8d10603fe6b4a1f23a20d474f0d22d93abb0c6d652b68a473d"
+    },
+    {
+      "path": "docs/performance/results/change-0901/analysis.json",
+      "bytes": 375245,
+      "sha256": "299c218418daa1562e730f63715f78e9262dd918e0e47aa7de0192d87945ea89"
+    },
+    {
+      "path": "docs/performance/results/change-0901/analyze.py",
+      "bytes": 30191,
+      "sha256": "8dfd064d925116740fb4dc2257213cf063cf322f7495ed7f3db1a15aa6e90a45"
+    },
+    {
+      "path": "docs/performance/results/change-0901/analyze_v2.py",
+      "bytes": 34984,
+      "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04"
+    },
+    {
+      "path": "docs/performance/results/change-0901/analyze_v2_annotation_attempt.py",
+      "bytes": 34631,
+      "sha256": "2a6911d23a21245f0277b5970e04592543c6554a3df7dcaaef35a9c885a7f2bc"
+    },
+    {
+      "path": "docs/performance/results/change-0901/annotation-attempt-failure.json",
+      "bytes": 1635,
+      "sha256": "3e91d3eb6e53dc2a755da0c5b93858b1c8cacd4d9224c23b939e351613717578"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/annotation-inclusive.txt",
+      "bytes": 568118,
+      "sha256": "e876c47a5b004a39f8252ad670a444e4d9f549e499c54051fac3c35fc8d7e495"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out",
+      "bytes": 573,
+      "sha256": "04aea1fad38965308fab5940e619db494397c175761c69860de7d4571388ca08"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.1",
+      "bytes": 38177,
+      "sha256": "c325ff437cc1551628dd4d02c46467f46ef7fface131af482ed35052666b763b"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.2",
+      "bytes": 16688,
+      "sha256": "276ad3135256d2479655febfbfc77d47b6be30155316bffe8b1ef679aa196cb3"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.3",
+      "bytes": 222542,
+      "sha256": "fa05a3aadbd2376d84365d898df32e45dbc4947220b4a1d84291af5eaac2879c"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.4",
+      "bytes": 16710,
+      "sha256": "2347a056fc579e37d5e089606bdb4366aa3ddee5796b5254411559748309739a"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.5",
+      "bytes": 223107,
+      "sha256": "63db119cb4908e99589e673753bbec7556ee6ccf82b19fcda3a8b0d1f6a4cbc5"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/callgrind.out.6",
+      "bytes": 226473,
+      "sha256": "289ddb99a1d05da7dd43f59dc74a31ff9b0a8f81253f3a5d5a53a9a7daf8928f"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/command.json",
+      "bytes": 4452,
+      "sha256": "6cc8eeffc862ed17c3e4ed4c69b5fe33e2b728a61c1d2ac7b0a7cc1fae5c8e55"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/report.json",
+      "bytes": 21558,
+      "sha256": "f4a6fae636097e868cd563dcb360bc0f32dce1fba8a22636aff7c75c8413d6d4"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/semantics.json",
+      "bytes": 4611,
+      "sha256": "160ace2fe9b29f5f6d14d08fc8c3d1f986bbf7f58c80246e048f21a6127f822b"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/start.json",
+      "bytes": 1855,
+      "sha256": "70bf107d65566638bab705b17efe870db51e85496b3117cc3018ab43ce4d1bb9"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/stderr.txt",
+      "bytes": 1064,
+      "sha256": "788b6e0e38092d9e341a9663c59f1f225c5ba38c4c3292002d61b97fe713679a"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/00-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out",
+      "bytes": 585,
+      "sha256": "d96860b79940d07538c5cedce20837f40778bb46a0319420c72c69b658264494"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.1",
+      "bytes": 37733,
+      "sha256": "072eb76d98ada6012cf81ed6460ab6d2deeca899eab2cede4d88cac28f2da759"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.2",
+      "bytes": 16733,
+      "sha256": "d68270fafaf1e62d5fe4d6889c62106d81d2819c32c9a937747b189f8af1ab1c"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.3",
+      "bytes": 226412,
+      "sha256": "4bb6b7c93589a22ecfe78fc075fabe7c21ee0160f7347efce35279187c8eb705"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.4",
+      "bytes": 16744,
+      "sha256": "e82586e25aff442187a22065fd2d9142b3db2b375a879504dc5f59065a52a737"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.5",
+      "bytes": 227153,
+      "sha256": "5743df2f4d19bda57edbc4728b4371d1b59e135855400d45492916bae5285ac5"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.6",
+      "bytes": 230878,
+      "sha256": "9fb5601eddf87886d90f68aac28061b0ffa74dda66c6891f4cdb9eafdb3d2997"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/command.json",
+      "bytes": 4542,
+      "sha256": "a72b1ebacd09c106a3974a98d34eecce467e4a448d0cbbb226b0bb5712ae0d84"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/report.json",
+      "bytes": 21581,
+      "sha256": "b702365734e26feb3319f492647405868d959a0c72604de309d1949ce6823e0d"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/semantics.json",
+      "bytes": 4634,
+      "sha256": "d17c198ceb8cad30701e3a1a20dc840e0cf3fb06cc73e8bbd77fb04450e754b4"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/start.json",
+      "bytes": 1879,
+      "sha256": "30f1f603f59db0d483e951c64e24b3dadbeccbc24e1a3217b9d205a830cfa6e6"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/stderr.txt",
+      "bytes": 1076,
+      "sha256": "9a12dd3161fb032b9bd062249d17ca75858b0bf69a47e06f842219c1c7a0eda9"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/01-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out",
+      "bytes": 585,
+      "sha256": "89f4a1b27d965bc6b90f4fa00dca817e673a29cd4f8af07c2420bc082731f2f0"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.1",
+      "bytes": 38127,
+      "sha256": "7cccd69985ab100b9693ea4414d6bbd7543ae2374daca54694a46e9147d58de3"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.2",
+      "bytes": 16795,
+      "sha256": "f642783f2b8a05b48e1145457bece16c15441cc356599e6a4499e1836dcfdbb1"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.3",
+      "bytes": 225939,
+      "sha256": "fa0c30f0ca45638bfb9f85c1a65c4a2a961dd575900e2c84033fca74580c537b"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.4",
+      "bytes": 16779,
+      "sha256": "d30771ce052174ffc4ec82b263c9b72c5291960e224e3738b9ccf9cb93cb81f3"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.5",
+      "bytes": 227585,
+      "sha256": "b94a2feb41aee427f4522dcb60b7a7a0cb7198a6eb36db96fafa30168463eaf3"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.6",
+      "bytes": 231341,
+      "sha256": "c0513865ee7aa8bde4e2b21a0dd5a3c1f6efba7ac4f338038e4e755912346602"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/command.json",
+      "bytes": 4542,
+      "sha256": "90e1c79ff6d4b5ee8d168b9c462056736387b5cb3177e75be4405db26dffc6f8"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/report.json",
+      "bytes": 21581,
+      "sha256": "4ca9b18cbd05b722cfe25c2a295e13ef42a7fcf93575870d9ee94ef2f2e9293c"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/semantics.json",
+      "bytes": 4634,
+      "sha256": "d17c198ceb8cad30701e3a1a20dc840e0cf3fb06cc73e8bbd77fb04450e754b4"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/start.json",
+      "bytes": 1879,
+      "sha256": "248505c000f750974a89f9f08d18ecc522873532f941f852dcce0dbe67dcc9bc"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/stderr.txt",
+      "bytes": 1076,
+      "sha256": "afe644446e88c169c70cd9959c049c786ee4a19ec4eeea873b1041db595028dd"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/02-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out",
+      "bytes": 573,
+      "sha256": "177b4116f3b318403a43907d060696b70af2fb2bb3b558a5e56931a7761d1e58"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.1",
+      "bytes": 37956,
+      "sha256": "e0a5f80d3b0198480813fa4989391d5ec436aad3f00ef0bda2945c55b8904f5a"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.2",
+      "bytes": 16775,
+      "sha256": "5123cfd26e24a80f997f0bbcc91b2fd7aa684f249b61420a3b8f41a213f6973a"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.3",
+      "bytes": 222720,
+      "sha256": "07bec0076755cd54216e6bc090f5e2898577a4243532981b1b1bc1f663d0920f"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.4",
+      "bytes": 16753,
+      "sha256": "8bdc5222696a61d302524c06801bb23528705f47ab4d94a2936e70166cec30d9"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.5",
+      "bytes": 223225,
+      "sha256": "5925b62126d1d7432799a4380cb939b33bd6515164b626d36aa5bcc7e16549f5"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/callgrind.out.6",
+      "bytes": 226479,
+      "sha256": "c897954240e9df916f4fec894e19380cec6ca84678afda5d8c4ef0c8cb9252a2"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/command.json",
+      "bytes": 4452,
+      "sha256": "910b65a03d2b226107fd510c7b8fc10d5a77085c414a50e7740714bd103537f4"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/report.json",
+      "bytes": 21558,
+      "sha256": "86322a2662a71778bf019cf8533b5c412c96ac37b595b45fe70da6456f31bb9d"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/semantics.json",
+      "bytes": 4611,
+      "sha256": "160ace2fe9b29f5f6d14d08fc8c3d1f986bbf7f58c80246e048f21a6127f822b"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/start.json",
+      "bytes": 1855,
+      "sha256": "40485891d10b690f6243c4890a7513f1d89d80289cdbfed5125fa290226951a0"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/stderr.txt",
+      "bytes": 1064,
+      "sha256": "679b635ce1e0661f83ab6e8f5ed156fadafb93839d535a489f9493ae8aee6d26"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture/03-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0901/capture.py",
+      "bytes": 4589,
+      "sha256": "7906878cbe6bd24a72c7af05121606e5cdf6a03d85c92ec48a8d81fc2306d029"
+    },
+    {
+      "path": "docs/performance/results/change-0901/first-child-admission.json",
+      "bytes": 9611,
+      "sha256": "e12b407a864054d05800499cd5dcdcb0230e2cdb9596828ea7b7fac7d6a55139"
+    },
+    {
+      "path": "docs/performance/results/change-0901/helper-cleanup.json",
+      "bytes": 990,
+      "sha256": "f184c9de3e4ff25004303da370b1861516cbd41a7c12cab80faec11127de958d"
+    },
+    {
+      "path": "docs/performance/results/change-0901/helper-version-history.json",
+      "bytes": 2428,
+      "sha256": "8a67a888130de63ef600df2fd08c780e4756c5bdf2966bcc44e42ec50b663f6c"
+    },
+    {
+      "path": "docs/performance/results/change-0901/plan.json",
+      "bytes": 56171,
+      "sha256": "3b4f8a67a248aeb509d34c91a13e94d80d2af911b64a79505526b141ec70d92d"
+    },
+    {
+      "path": "docs/performance/results/change-0901/replay-cleanup.json",
+      "bytes": 594,
+      "sha256": "0a5381d7db9b432c95e84849c6ea843e5916bdbf78da50f7172ba2e5fbcfc50d"
+    },
+    {
+      "path": "docs/performance/results/change-0901/review.json",
+      "bytes": 41166,
+      "sha256": "82e8fcb8cab8d8a790de666f67f344acb416900fc689aca68abf973a13e180ed"
+    },
+    {
+      "path": "docs/performance/results/change-0901/root-replay-cli-failure.json",
+      "bytes": 442,
+      "sha256": "c5e8d50c093cd235744a8c1b68a950441aa611fe07ee9f10417e6e6a0b70f540"
+    },
+    {
+      "path": "docs/performance/results/change-0901/runner-disassembly.txt",
+      "bytes": 300666,
+      "sha256": "ab9f30fd8ac8db5c89038bb38197c0162e90ef514ef4a566415251ec078de58c"
+    },
+    {
+      "path": "docs/performance/results/change-0901/semantic-source-replay.json",
+      "bytes": 2749,
+      "sha256": "8d473e974484ebefd2e47d240f1d106c38038033d4f036ac07e0cca7dde215cb"
+    },
+    {
+      "path": "docs/performance/results/change-0901/source-audit.md",
+      "bytes": 11464,
+      "sha256": "a49ecdcf08e4937e47050b8eeb88d34fa93316bca65c9b82cad2bd7fd46ad76e"
+    },
+    {
+      "path": "docs/performance/results/change-0901/symbols-demangled.txt",
+      "bytes": 1177,
+      "sha256": "a1ca4f8cdd21371e93f4b6188ae86f768a6daaa4fcb8ca47beba56efb7855e91"
+    },
+    {
+      "path": "docs/performance/results/change-0901/symbols-raw.txt",
+      "bytes": 1533,
+      "sha256": "8ece3ed0268fab8b0f526f1746349b224fc5b328d1ef727608a26205e19ca3b2"
+    },
+    {
+      "path": "docs/performance/results/change-0901/whitespace-check.json",
+      "bytes": 3040,
+      "sha256": "b632dfeab7b69668092e6cd64948f5c4a99ee15d9994b9731da663451257dd62"
+    },
+    {
+      "path": "docs/performance/0901-xlsx-publication-instruction-profile.md",
+      "bytes": 8668,
+      "sha256": "67ec32ddf81c05752dd08ac487188c7977901f50b6e73123adf02c859931f563"
+    },
+    {
+      "path": "docs/performance/BASELINE.md",
+      "bytes": 473833,
+      "sha256": "70746d1834b61a159eff7301d632646aca51b64ec38b1f0145056a4e615a5056"
+    },
+    {
+      "path": "docs/performance/HOTSPOTS.md",
+      "bytes": 776100,
+      "sha256": "3d97b1b61e6adf3bcbdd490f30f718fb08398597b34931fa5967329707df4048"
+    },
+    {
+      "path": "docs/performance/REPORT.md",
+      "bytes": 788880,
+      "sha256": "4e09ed8e56035f1c5b580ac7af8ae9e03ed68489c4c4662ef879639ca6534c03"
+    },
+    {
+      "path": "docs/performance/GOAL_AUDIT.md",
+      "bytes": 461848,
+      "sha256": "390f75b0a9db7da32582412d3ef409ed3bdc02b1df8a49576553333c8c744550"
+    }
+  ]
+}
