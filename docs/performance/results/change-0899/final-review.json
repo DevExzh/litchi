@@ -1,0 +1,140 @@
+{
+  "status": "pass",
+  "review_provenance": "root closure audit; independent numerical review retained separately",
+  "independent_descriptors_verified": 33,
+  "production_diff_empty": true,
+  "byte_identical_replay": true,
+  "owned_temporary_removed": true,
+  "worktrees_created": 0,
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0899/README.md",
+      "bytes": 1620,
+      "sha256": "67486a389bd2430329f83aa64fe4ce6d796506eca43752fce858b4ab422127bb"
+    },
+    {
+      "path": "docs/performance/results/change-0899/allocation-custody-replay.json",
+      "bytes": 1459,
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    },
+    {
+      "path": "docs/performance/results/change-0899/allocation-custody-replay.log",
+      "bytes": 1459,
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    },
+    {
+      "path": "docs/performance/results/change-0899/analysis.json",
+      "bytes": 154317,
+      "sha256": "7dc7cca5f7fa426e48f3dc4c9f90e54f67299ab1b47917835127092f93fbfc33"
+    },
+    {
+      "path": "docs/performance/results/change-0899/callgrind-00-self-command.json",
+      "bytes": 1295,
+      "sha256": "68c0a770b398bcee3f81d2c0e72a2f1894fa6f5ff1d366a74b33e94ff3071e86"
+    },
+    {
+      "path": "docs/performance/results/change-0899/callgrind-00-self.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0899/callgrind-00-self.txt",
+      "bytes": 751833,
+      "sha256": "5c00151ad1a256af80a3cea48621e659c4f80cc84febb2a5d8d662d7652cf863"
+    },
+    {
+      "path": "docs/performance/results/change-0899/callgrind-01-self-command.json",
+      "bytes": 1295,
+      "sha256": "f8948796cbdb2bd6d18f40e4477503dc93171b60daa99c5ddf8782232697fde8"
+    },
+    {
+      "path": "docs/performance/results/change-0899/callgrind-01-self.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0899/callgrind-01-self.txt",
+      "bytes": 752444,
+      "sha256": "235099398db83e6c98787979961ac61b88f6bc46cb3698539514c9caebfa7819"
+    },
+    {
+      "path": "docs/performance/results/change-0899/mce-start-audit.md",
+      "bytes": 13630,
+      "sha256": "2b7dc738d53d66855943527e4a822af6c52db61b8d7462f06f51a7a96d718528"
+    },
+    {
+      "path": "docs/performance/results/change-0899/profile-content-replay.json",
+      "bytes": 9889,
+      "sha256": "4b50a86e61c4f9cd9635d76a35ca542f8bfa1d345c2de4068376182404dcc9a4"
+    },
+    {
+      "path": "docs/performance/results/change-0899/profile-custody-replay.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0899/reduce.py",
+      "bytes": 36418,
+      "sha256": "2ce78dcc7a381cecd66bf9f4411cdafc6de4c07828f4e4f8bb1ac50276c3967d"
+    },
+    {
+      "path": "docs/performance/results/change-0899/replay-cleanup.json",
+      "bytes": 493,
+      "sha256": "092d2c137c293bdb8bbce5c36d3690f2dba7aadc841ba6c0d9b66133918d1fa4"
+    },
+    {
+      "path": "docs/performance/results/change-0899/replay-failures.json",
+      "bytes": 554,
+      "sha256": "b8c195b4573a4c2c3847fb32e42a97f527951c7080bcdcbc4efa44a2cc5a0fad"
+    },
+    {
+      "path": "docs/performance/results/change-0899/replay_profile.py",
+      "bytes": 2351,
+      "sha256": "9b8fc6d078a840d9a879798a1be2c9684ff2e5c6e85a98be707a1961e87a91d7"
+    },
+    {
+      "path": "docs/performance/results/change-0899/replay_profile_v2.py",
+      "bytes": 2376,
+      "sha256": "0eb47c04cf65eb09ae64dcd75a15c51568ce9d8ab5c9638ac8d3f2b7eb3b9af9"
+    },
+    {
+      "path": "docs/performance/results/change-0899/review.json",
+      "bytes": 19351,
+      "sha256": "0fecfc6b443a50f98a20946242e934d7796557898efda64397b4f77662988ea7"
+    },
+    {
+      "path": "docs/performance/results/change-0899/source-audit.md",
+      "bytes": 20315,
+      "sha256": "cda3b0ef13706f6995e1c9b7b437d5d1c6b8c6a5d78e710e4d1d8c6df25cf643"
+    },
+    {
+      "path": "docs/performance/results/change-0899/source-identity.json",
+      "bytes": 2975,
+      "sha256": "18f9d2d1fb8cd1b4185844a695603c94d45d4dd148594645b3eb46b715b24c0e"
+    },
+    {
+      "path": "docs/performance/0899-xml-validation-cost-attribution.md",
+      "bytes": 6662,
+      "sha256": "16b9e34d94c0b3ef2fc4a2c4c878fef4d8c06f6861045212cf508dd6c6b1fba1"
+    },
+    {
+      "path": "docs/performance/BASELINE.md",
+      "bytes": 472218,
+      "sha256": "8cbbab293d296516fc297c9a5c5af1adfc4c02c0e234e97389e98d0d845e49ab"
+    },
+    {
+      "path": "docs/performance/HOTSPOTS.md",
+      "bytes": 774485,
+      "sha256": "20d78d8f977ab8cc6e549823c94b5ff2c5f64bcf88ebddaa8cbecc218c9c9439"
+    },
+    {
+      "path": "docs/performance/REPORT.md",
+      "bytes": 787265,
+      "sha256": "84d15537174cc8d3d55f35c1f8525a96767b75b84030e8a41a572812e9c4dadd"
+    }
+  ],
+  "raw_export_whitespace_exception": [
+    "callgrind-00-self.txt",
+    "callgrind-01-self.txt"
+  ]
+}

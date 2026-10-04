@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0899/reduce.py",
+    "--output",
+    "/tmp/litchi-0899-replay-6aq34l7a/analysis.json"
+  ],
+  "byte_identical": true,
+  "analysis_sha256": "7dc7cca5f7fa426e48f3dc4c9f90e54f67299ab1b47917835127092f93fbfc33",
+  "removed_directory": "/tmp/litchi-0899-replay-6aq34l7a",
+  "removed_bytes": 154317,
+  "new_workloads": 0,
+  "new_builds": 0,
+  "new_worktrees": 0,
+  "temporary_directory_absent": true
+}

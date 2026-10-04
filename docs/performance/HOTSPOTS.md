@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0899 — XML validation cost attribution
+
+[0899](0899-xml-validation-cost-attribution.md) reconciles retained allocation,
+native leaf, and exclusive guest profiles without changing production.
+Duplicate-check stacks account for 6,106 allocation calls per scan (23.5453%
+of closure calls), but selected native self periods are only 0.7515–0.8327%
+and exclusive guest instructions about 0.934%. These populations cannot
+predict latency savings or bound callee costs. Historical duplicate iterator
+regressions keep another rewrite low priority. A fused QName validation/split
+is a distinct but deferred hypothesis requiring stronger qualification evidence.
+Independent numerical review and byte-identical replay pass; two documented
+Callgrind data permission changes prevent a strict historical custody pass,
+while the explicitly bounded content/semantic replay passes. No new workload,
+production edit, or worktree was created; the owned replay temporary was removed.
+
 ## 0898 — emitted-name output span candidate rejected
 
 [0898](0898-emitted-name-output-span.md) tests replacing legacy-MCE emitted

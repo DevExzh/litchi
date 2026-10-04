@@ -1,0 +1,64 @@
+{
+  "schema": "litchi.duplicate-attribution-source-0899.v1",
+  "status": "pass",
+  "evaluation_head": "4f8f667983672776be8c747e89795195d15a3357",
+  "baseline_revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "verified_selected_files": 10771,
+  "selected_manifest": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "bytes": 3325536,
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "source_selection_unchanged": true,
+  "accepted_adrs_unchanged": true,
+  "callgrind_0892_production_crates_unchanged": true,
+  "callgrind_harness_differences": [
+    "tools/perf-baseline/src/producer_shape.rs",
+    "tools/perf-baseline/src/producer_shape/full_cell_guard_tests.rs",
+    "tools/perf-baseline/src/producer_shape/selected_route_tests.rs"
+  ],
+  "callgrind_scope_note": "0892 predates forced per-worksheet guards; same production code, different runner diagnostics. Instruction and allocation populations remain separate.",
+  "sources": {
+    "crates/litchi-opc/src/xml_attributes.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs",
+      "bytes": 11642,
+      "sha256": "6c7e5aeb66f1ca420f5e11af0bfa307ae1b5fd6aa29b4d3b5af57d6b9ec6fb56"
+    },
+    "crates/litchi-opc/src/xml_attributes/tests.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes/tests.rs",
+      "bytes": 17857,
+      "sha256": "6c7d024783556aab85af7c142953fe0a09a848e9f6afde814f0f83523b29f098"
+    },
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "bytes": 65338,
+      "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+    },
+    "tools/perf-baseline/src/producer_shape.rs": {
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape.rs",
+      "bytes": 142118,
+      "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+    },
+    "tools/perf-baseline/Cargo.lock": {
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+      "bytes": 56289,
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    }
+  },
+  "quick_xml": {
+    "version": "0.41.0",
+    "cargo_checksum": "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1",
+    "crate": {
+      "path": "/home/zhuhe/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0.crate",
+      "bytes": 231661,
+      "sha256": "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
+    },
+    "attributes_source": {
+      "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs",
+      "bytes": 117680,
+      "sha256": "c46448f11d7dba312e6ad2177dc31deab2ce51282e9f1e4069d3b35175c18518"
+    },
+    "registry_source_matches_checksum_verified_archive": true
+  },
+  "no_workload_or_build": true
+}

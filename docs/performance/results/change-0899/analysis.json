@@ -1,0 +1,2955 @@
+{
+  "callgrind": {
+    "profiles": [
+      {
+        "canonical_inclusive_rows": {
+          "mce_process": {
+            "inclusive_ir": 333250371,
+            "line": 42,
+            "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 46.46259105488303,
+            "raw_line_sha256": "c86f503ad6ed231a0dd45dc1c470b1c7c096ede5f312fa63ab1697aa74fe26d9",
+            "reported_percent": 46.46,
+            "selector": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+          },
+          "mce_start": {
+            "inclusive_ir": 217621270,
+            "line": 43,
+            "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 30.341295772643818,
+            "raw_line_sha256": "8c3d72b762255730ef93ae92e21ddc6884a002b9b4efba61a279430193199faa",
+            "reported_percent": 30.34,
+            "selector": "litchi_ooxml_common::mce::codec::start"
+          },
+          "quick_xml_duplicate_check": {
+            "inclusive_ir": 13030852,
+            "line": 112,
+            "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 1.8167936190315737,
+            "raw_line_sha256": "5309376c7181bf5c8ae04fdba19454e0a2cd3c0e314fee87cecbd5c10919495d",
+            "reported_percent": 1.82,
+            "selector": "quick_xml::events::attributes::IterState::check_for_duplicates"
+          },
+          "quick_xml_iter_state_next": {
+            "inclusive_ir": 38587442,
+            "line": 61,
+            "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 5.379956613761782,
+            "raw_line_sha256": "b160ee57799b2fab63cde514d43d93c0d2885e2ffb6f51673d908ef0c743d48b",
+            "reported_percent": 5.38,
+            "selector": "quick_xml::events::attributes::IterState::next"
+          }
+        },
+        "duplicate_check": {
+          "combined_self_ir": 6700360,
+          "combined_self_percent": 0.9341807652496088,
+          "matching_row_count": 10,
+          "matching_rows": [
+            {
+              "line": 66,
+              "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+              "percent_of_program": 0.5322871197323661,
+              "raw_line_sha256": "a25116e59decdc42afb80c0989758c9bf6bf7cf9fb9137d871516f8d3ba00759",
+              "reported_percent": 0.53,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 3817800
+            },
+            {
+              "line": 194,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.1294189111246186,
+              "raw_line_sha256": "89bf7b95096c763fa0c9b244f02be993a93c841b61297af91b1cb4dfc7bdf6c9",
+              "reported_percent": 0.13,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 928250
+            },
+            {
+              "line": 260,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.07119329769734875,
+              "raw_line_sha256": "c19cf798b9c45c7889870d3a411340f53f4138b855b072934fab393f5c644f12",
+              "reported_percent": 0.07,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 510630
+            },
+            {
+              "line": 311,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.05051555063686701,
+              "raw_line_sha256": "22e9e9d1828900e340948375d96e731ac65d8a9a3082ad40c22a45de0de50634",
+              "reported_percent": 0.05,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 362320
+            },
+            {
+              "line": 314,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.04995228384349943,
+              "raw_line_sha256": "61b84c5b847d86b07eb2586ddab79e9108e304d0fac906196b478ca321119a7a",
+              "reported_percent": 0.05,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 358280
+            },
+            {
+              "line": 350,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.03746421288262457,
+              "raw_line_sha256": "945c06e2521ac08b1b55c2db4dd398607aa037b45d701dd9269e9feca0e46dc0",
+              "reported_percent": 0.04,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 268710
+            },
+            {
+              "line": 389,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.02631599189310181,
+              "raw_line_sha256": "e0849b8853f40630fd358006a6c1bdad7d3d1118dba237db75883e3efa4fdb4d",
+              "reported_percent": 0.03,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 188750
+            },
+            {
+              "line": 430,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.02301446771811558,
+              "raw_line_sha256": "02a67530f35a79673cca723c3f3e7c62ce24f29530dfff746517873c47dea909",
+              "reported_percent": 0.02,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 165070
+            },
+            {
+              "line": 493,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.012621916535536461,
+              "raw_line_sha256": "47b3e414a4d3bdcc5ee14cc53d02bab7640e9e5d5dbd4606355d29eaabbbc993",
+              "reported_percent": 0.01,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 90530
+            },
+            {
+              "line": 826,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.0013970131855304908,
+              "raw_line_sha256": "2ab97550994597301814fcfead9091a137ca17fdbcdce2cf1c866de7f7bd7c77",
+              "reported_percent": 0.0,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 10020
+            }
+          ],
+          "percent_definition": "sum of exclusive matching self Ir divided by PROGRAM TOTALS Ir; printed row percentages are not summed",
+          "selector": "quick_xml::events::attributes::IterState::check_for_duplicates"
+        },
+        "exclusive_annotation": {
+          "annotation": {
+            "bytes": 751833,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self.txt",
+            "sha256": "5c00151ad1a256af80a3cea48621e659c4f80cc84febb2a5d8d662d7652cf863"
+          },
+          "raw": {
+            "bytes": 602399,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/callgrind.out",
+            "sha256": "029f332d8a2f036f744d6fddd69348ce7c73a1b9fde483fc75ff90ba71783381"
+          },
+          "receipt": {
+            "bytes": 1295,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self-command.json",
+            "sha256": "68c0a770b398bcee3f81d2c0e72a2f1894fa6f5ff1d366a74b33e94ff3071e86"
+          },
+          "stderr": {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exclusive_function_groups": {
+          "bounded_output_reserve": {
+            "combined_self_ir": 18127870,
+            "combined_self_percent": 2.527432476605052,
+            "matching_row_count": 7,
+            "matching_rows": [
+              {
+                "line": 33,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 1.8751653472111824,
+                "raw_line_sha256": "9045498b7ea5c0a5cf378515d738c8a5bc7bf9ccd31843672f8aace59ee6430f",
+                "reported_percent": 1.88,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 13449520
+              },
+              {
+                "line": 101,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 0.32612031956194215,
+                "raw_line_sha256": "da27e328cbe1754f26de9653666c101ef9660ec0af8ec1ea05ebf0a71bbd43e6",
+                "reported_percent": 0.33,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 2339080
+              },
+              {
+                "line": 129,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 0.24460278769408114,
+                "raw_line_sha256": "7ee1068657621c1a7d7f781e819c7dbbcb8497b8bb56211fb25f188174a94889",
+                "reported_percent": 0.24,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 1754400
+              },
+              {
+                "line": 245,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 0.08152868566574949,
+                "raw_line_sha256": "0ae87ca30b8f27925742e22d5e8f9a0bd0689a6a491d112985ee212ac29740bc",
+                "reported_percent": 0.08,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 584760
+              },
+              {
+                "line": 3873,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 8.365348416350245e-06,
+                "raw_line_sha256": "2a13221c80a810a9604380ea7107e9a8b7b1879ae31ff14d027eae2c393aa9e0",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 60
+              },
+              {
+                "line": 4082,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 5.576898944233497e-06,
+                "raw_line_sha256": "8348b449b4ae1a161c92ca6a6e7ea36affa5531ad51b92d12080ce4004cd2242",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 40
+              },
+              {
+                "line": 4379,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 1.3942247360583742e-06,
+                "raw_line_sha256": "c30c63cb13d0f96bf91edb57d0748cc1b2ff90439f42ec1243b071c55a1fcd95",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 10
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve"
+          },
+          "duplicate_check": {
+            "combined_self_ir": 6700360,
+            "combined_self_percent": 0.9341807652496088,
+            "matching_row_count": 10,
+            "matching_rows": [
+              {
+                "line": 66,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.5322871197323661,
+                "raw_line_sha256": "a25116e59decdc42afb80c0989758c9bf6bf7cf9fb9137d871516f8d3ba00759",
+                "reported_percent": 0.53,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 3817800
+              },
+              {
+                "line": 194,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.1294189111246186,
+                "raw_line_sha256": "89bf7b95096c763fa0c9b244f02be993a93c841b61297af91b1cb4dfc7bdf6c9",
+                "reported_percent": 0.13,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 928250
+              },
+              {
+                "line": 260,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.07119329769734875,
+                "raw_line_sha256": "c19cf798b9c45c7889870d3a411340f53f4138b855b072934fab393f5c644f12",
+                "reported_percent": 0.07,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 510630
+              },
+              {
+                "line": 311,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.05051555063686701,
+                "raw_line_sha256": "22e9e9d1828900e340948375d96e731ac65d8a9a3082ad40c22a45de0de50634",
+                "reported_percent": 0.05,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 362320
+              },
+              {
+                "line": 314,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.04995228384349943,
+                "raw_line_sha256": "61b84c5b847d86b07eb2586ddab79e9108e304d0fac906196b478ca321119a7a",
+                "reported_percent": 0.05,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 358280
+              },
+              {
+                "line": 350,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.03746421288262457,
+                "raw_line_sha256": "945c06e2521ac08b1b55c2db4dd398607aa037b45d701dd9269e9feca0e46dc0",
+                "reported_percent": 0.04,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 268710
+              },
+              {
+                "line": 389,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.02631599189310181,
+                "raw_line_sha256": "e0849b8853f40630fd358006a6c1bdad7d3d1118dba237db75883e3efa4fdb4d",
+                "reported_percent": 0.03,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 188750
+              },
+              {
+                "line": 430,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.02301446771811558,
+                "raw_line_sha256": "02a67530f35a79673cca723c3f3e7c62ce24f29530dfff746517873c47dea909",
+                "reported_percent": 0.02,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 165070
+              },
+              {
+                "line": 493,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.012621916535536461,
+                "raw_line_sha256": "47b3e414a4d3bdcc5ee14cc53d02bab7640e9e5d5dbd4606355d29eaabbbc993",
+                "reported_percent": 0.01,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 90530
+              },
+              {
+                "line": 826,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.0013970131855304908,
+                "raw_line_sha256": "2ab97550994597301814fcfead9091a137ca17fdbcdce2cf1c866de7f7bd7c77",
+                "reported_percent": 0.0,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 10020
+              }
+            ],
+            "selector": "quick_xml::events::attributes::IterState::check_for_duplicates"
+          },
+          "is_ncname": {
+            "combined_self_ir": 10172600,
+            "combined_self_percent": 1.4182890550027416,
+            "matching_row_count": 5,
+            "matching_rows": [
+              {
+                "line": 45,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 1.0323564942638952,
+                "raw_line_sha256": "2f5735f024e05eb7ed5b0d12180398848330c7abb0384dc2d296ae5f1180bdfa",
+                "reported_percent": 1.03,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 7404520
+              },
+              {
+                "line": 168,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 0.16628081892126592,
+                "raw_line_sha256": "879e3071a273e1b8a836a53d7f4aa852a3a20bc92181b1b7651dc901199ccba9",
+                "reported_percent": 0.17,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 1192640
+              },
+              {
+                "line": 186,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 0.14050439200101872,
+                "raw_line_sha256": "65c6f2e3227078aa04c8693559f79ef7dfc15fc27debf1b58f0d11346ae0f34b",
+                "reported_percent": 0.14,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 1007760
+              },
+              {
+                "line": 284,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:litchi_ooxml_common::xml_name::validation::is_ncname [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.06135704218445693,
+                "raw_line_sha256": "a81a79c7514f643cf7727a0f797cac6222368e11443f18282fa90d8a130e94b2",
+                "reported_percent": 0.06,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 440080
+              },
+              {
+                "line": 449,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 0.017790307632104853,
+                "raw_line_sha256": "e1f22ff78b7d4080a7a9d1e18dcf3dae54a76213604656dcfd333c7c5ba767f0",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 127600
+              }
+            ],
+            "selector": "litchi_ooxml_common::xml_name::validation::is_ncname"
+          },
+          "is_qualified_name": {
+            "combined_self_ir": 8686020,
+            "combined_self_percent": 1.2110263941897759,
+            "matching_row_count": 7,
+            "matching_rows": [
+              {
+                "line": 86,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.4109561063016221,
+                "raw_line_sha256": "55845ccba220f79a24f9077d0e10ee278ba02862301d68ea2ed5f1a24c99a522",
+                "reported_percent": 0.41,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 2947560
+              },
+              {
+                "line": 99,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/iter.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.3379015185816354,
+                "raw_line_sha256": "e7b99e06c21217eaf259add6851adc6bf9480389b877ea672e2fb81359c19b9d",
+                "reported_percent": 0.34,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 2423580
+              },
+              {
+                "line": 106,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.3072759780293772,
+                "raw_line_sha256": "30a4250cb4b4d72aabc49e6a7ebc4167e5adc785924c0253330b99eb2c2ab4ea",
+                "reported_percent": 0.31,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 2203920
+              },
+              {
+                "line": 213,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.10158879116815737,
+                "raw_line_sha256": "bc15508d33e02e0718744f823dd3338330aa007454c227e2e4d0065206d7f547",
+                "reported_percent": 0.1,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 728640
+              },
+              {
+                "line": 307,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.05163093042571371,
+                "raw_line_sha256": "c009e6e56d3c753851cf233a765c5cb7a071de28a8f8afa11f7ce72699a10253",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 370320
+              },
+              {
+                "line": 848,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.0012548022624525367,
+                "raw_line_sha256": "4bbe65072e00ad7125601f722dbf4fcbfc783bce69546d99be0b7ddbee698023",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 9000
+              },
+              {
+                "line": 1255,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.00041826742081751224,
+                "raw_line_sha256": "65e889b09c4dfc59b10422a1ecee8d6b4718f4bfc6f8dac685e99f155bb518ab",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 3000
+              }
+            ],
+            "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name"
+          },
+          "mce_esc": {
+            "combined_self_ir": 1335010,
+            "combined_self_percent": 0.186130396488529,
+            "matching_row_count": 12,
+            "matching_rows": [
+              {
+                "line": 317,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.04853714573640018,
+                "raw_line_sha256": "631b70d3c8664b567498925166164c69def6cd977d421e8e4fdf2a2e8ca4b273",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 348130
+              },
+              {
+                "line": 380,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.029427901503984104,
+                "raw_line_sha256": "e0db0bc1949f39090f6d8dea1efb971699270a120dd400f684e864895d95d3c3",
+                "reported_percent": 0.03,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 211070
+              },
+              {
+                "line": 440,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.02072515070150773,
+                "raw_line_sha256": "bf8a78b94adf7b1ebe83ffe3d14eb3b9ff86c1ecdfc1f7c00f0c7090ba9070f3",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 148650
+              },
+              {
+                "line": 470,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.016580120561206186,
+                "raw_line_sha256": "7a0f703db61f43ae86d8e19accb16b9e1cc7fcaff0f962aec90d33cd4501b511",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 118920
+              },
+              {
+                "line": 471,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.016580120561206186,
+                "raw_line_sha256": "1dacdedd9b999c2b53a646632eba92ad8ca41886d9f1e78a9a7e80732f145d8d",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 118920
+              },
+              {
+                "line": 472,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.016580120561206186,
+                "raw_line_sha256": "ed0f3e9d20639b2a55dd6e6a09fb0914b9e11205922e88ce1efe3925e64a1060",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 118920
+              },
+              {
+                "line": 497,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.012435090420904639,
+                "raw_line_sha256": "cd5af892e82324cdbadd6aaeb7eeaa540d3a90d17d3a83060d8464529377c9b9",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 89190
+              },
+              {
+                "line": 555,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.008271935359034333,
+                "raw_line_sha256": "ac37b7795c7b5ab37cf0c1ad14f0dd533f327ab47ee47da6cabf1870a2595424",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 59330
+              },
+              {
+                "line": 624,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.004557720662174825,
+                "raw_line_sha256": "b350d3f64cead76be89c51c1e452fbef958ec01db43a212d862f43c1f6461003",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 32690
+              },
+              {
+                "line": 635,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.0041450301403015465,
+                "raw_line_sha256": "f4d9d853a7eaedc1645fb3db5426c22dcd5fb23d783b1b48a05b822ea7887d2c",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 29730
+              },
+              {
+                "line": 636,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.0041450301403015465,
+                "raw_line_sha256": "e1f7ba0e1e57e7042ac86b18015bfbaf462e6f160c17d874e7b1c62b82ba4367",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 29730
+              },
+              {
+                "line": 637,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/lib.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.0041450301403015465,
+                "raw_line_sha256": "9bc60c47993cf4e8e1043e8b6b4fc320962d6f9b7a12bcb269195384a26160d5",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 29730
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::esc"
+          },
+          "mce_expand_parts": {
+            "combined_self_ir": 10415520,
+            "combined_self_percent": 1.4521575622910716,
+            "matching_row_count": 6,
+            "matching_rows": [
+              {
+                "line": 46,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::expand_parts [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 1.0227112475398434,
+                "raw_line_sha256": "5f87e9deb55056e92d86f5aec5e909f64fc8e7a0f09260bf96cc98c36fcbd1b3",
+                "reported_percent": 1.02,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 7335340
+              },
+              {
+                "line": 137,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/pattern.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.2301558309790443,
+                "raw_line_sha256": "0c89c8eb58060e596eaf8722ed5c5b280087a00ab77ceebf529fedc8092fdc89",
+                "reported_percent": 0.23,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 1650780
+              },
+              {
+                "line": 178,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.1473305163087605,
+                "raw_line_sha256": "235c3684b02adaa31e417b3265324b023b363ac5834d40f1bdd13523f47383ef",
+                "reported_percent": 0.15,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 1056720
+              },
+              {
+                "line": 310,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.0511457402175654,
+                "raw_line_sha256": "6538f0e166c3d68a148cb58ccc17e177be77b937db875b1d316600b2450be61a",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 366840
+              },
+              {
+                "line": 1266,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.0004071136229290452,
+                "raw_line_sha256": "7b5c92c2cd5250b006d04847880474a5e866c5fddf05c7c895d101b1bc591357",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 2920
+              },
+              {
+                "line": 1267,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.0004071136229290452,
+                "raw_line_sha256": "3eae045a97078116a5008ae0e1b3fc72ea130b018656bacb982985bfee35db1f",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 2920
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::expand_parts"
+          },
+          "mce_start": {
+            "combined_self_ir": 39019560,
+            "combined_self_percent": 5.440203574211389,
+            "matching_row_count": 33,
+            "matching_rows": [
+              {
+                "line": 29,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 2.370762048789436,
+                "raw_line_sha256": "709d638b80b4fca011d29682156ee45f8887335195b9bf5d743609538d9ae547",
+                "reported_percent": 2.37,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 17004160
+              },
+              {
+                "line": 60,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.6257991670045373,
+                "raw_line_sha256": "39b55df2e4105de92a1b8143d8eec47ac61a30eacfad2cbba73f2bd2762c9fef",
+                "reported_percent": 0.63,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 4488510
+              },
+              {
+                "line": 90,
+                "location": "/tmp/litchi-0891-source/crates/litchi-opc/src/xml_attributes.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.378064950553269,
+                "raw_line_sha256": "5cb248583f0b6912be766fbfab57806e41aa1d5b8e3bc2d08a860187aa5e982f",
+                "reported_percent": 0.38,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2711650
+              },
+              {
+                "line": 102,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.3255737834654073,
+                "raw_line_sha256": "10270b4721481f48861adadbcdbcbe0092a88d008c6e9dcbc065c4a9397cf1d3",
+                "reported_percent": 0.33,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2335160
+              },
+              {
+                "line": 109,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.30325503389058484,
+                "raw_line_sha256": "f19085abfbd07393bb8ebdc5e5c60cbd03fe8ff8354719a151fccbdadd1bdbfd",
+                "reported_percent": 0.3,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2175080
+              },
+              {
+                "line": 136,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.23314783726262556,
+                "raw_line_sha256": "8b0ed234b19abf5f1419e0495d00e073710352fca2691d967a5759c46119932f",
+                "reported_percent": 0.23,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1672240
+              },
+              {
+                "line": 139,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.22366292638322044,
+                "raw_line_sha256": "354bd2657c76ee46ae060ee61b7d43d5fab3f2e2897c3640f94a762602c4594c",
+                "reported_percent": 0.22,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1604210
+              },
+              {
+                "line": 149,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.19938947372844415,
+                "raw_line_sha256": "defe57ec5cc178d23eff1a1ff04739523eda771383858bd2926c53a5529dfebb",
+                "reported_percent": 0.2,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1430110
+              },
+              {
+                "line": 154,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.18916283528945596,
+                "raw_line_sha256": "94d7240d1a8daa8e13badab3b680769c7c307e99b8fb79893b725671a0577976",
+                "reported_percent": 0.19,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1356760
+              },
+              {
+                "line": 228,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.09394565116508537,
+                "raw_line_sha256": "3ee80e5fdbeadb92133898597e3ca0c0d6f7848c9a7fc94b206d9beff83061e3",
+                "reported_percent": 0.09,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 673820
+              },
+              {
+                "line": 230,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.09261556076688568,
+                "raw_line_sha256": "0e5335fc57649d5f27b1e4689d71040bb9786497814e1e11dfe68444d84d92af",
+                "reported_percent": 0.09,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 664280
+              },
+              {
+                "line": 278,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/scope.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0633912160743661,
+                "raw_line_sha256": "d7954d8d0cae5a8a072f61019b6f9491c7fcc4651c2184c0ab5154e1e9f03037",
+                "reported_percent": 0.06,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 454670
+              },
+              {
+                "line": 295,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/lib.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.05833436295668237,
+                "raw_line_sha256": "16916c817eac3dbccaaf810cceb6ee5c6b101ef75beb2adc9987db2f6e1fd49b",
+                "reported_percent": 0.06,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 418400
+              },
+              {
+                "line": 309,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.05146222923265065,
+                "raw_line_sha256": "3c67c5043defd80c979e1dd39266e54c0a8d8ff3ebef6032285c12ea741622c6",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 369110
+              },
+              {
+                "line": 320,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.047140132550869684,
+                "raw_line_sha256": "feb104270ce4abb0cd0e9623e03376c6a72dd60051e94ccb8e102676e7addab7",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 338110
+              },
+              {
+                "line": 322,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.047028594571985015,
+                "raw_line_sha256": "c92ce98dfa3fa94e470dcc32d9db20fe11d2e7179e4ee295170040230bb942b0",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 337310
+              },
+              {
+                "line": 340,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.04111289901688934,
+                "raw_line_sha256": "1f22ce5e2c43e1b1d66ea886214a6ad8e1fc82de36482cf0504e08ae040eff8f",
+                "reported_percent": 0.04,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 294880
+              },
+              {
+                "line": 408,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.023576340286747106,
+                "raw_line_sha256": "0bb4c6fa7a1458ea9dee32a33998397e5bfb5b7c16c12d086bf2f4cbf10a2a10",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 169100
+              },
+              {
+                "line": 414,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.023434129363669152,
+                "raw_line_sha256": "7df40b21100271c3b1a671909eb4780d7a37018f971e8cf6e4fb1e2efaae0a19",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 168080
+              },
+              {
+                "line": 426,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/sync/atomic.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.023319802935312366,
+                "raw_line_sha256": "a0e8d94b69afd65c7232b02f66a4798ef6a48b0ceaf5fc957fdb9aac824cabdc",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 167260
+              },
+              {
+                "line": 510,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.011708699333418227,
+                "raw_line_sha256": "acc6b02c5b67140ccf06bc9b3aa19d986a6e961ca34fc1c9fc142bcebc970fb6",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 83980
+              },
+              {
+                "line": 512,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.011666872591336475,
+                "raw_line_sha256": "9695517ed90f1de44b4854a83548838ec4c5c3e65d3a275504bf2839ee4731be",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 83680
+              },
+              {
+                "line": 1091,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0005786032654642253,
+                "raw_line_sha256": "925aa81479f73ca9752fa1116f35ae1b5706bf330f405f74897dce64dbc2b2f6",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 4150
+              },
+              {
+                "line": 1161,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0005074978039252482,
+                "raw_line_sha256": "505b198f72461c62bf5b9f8ba16d2f15678b175f7e8454bbb8e8ba8d2ddfd8df",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 3640
+              },
+              {
+                "line": 1213,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/iter.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0004489403650107965,
+                "raw_line_sha256": "7f76c24b9c592662afb8cf4f98d94375a9843487d7331e6041a2fcbf861ba8bb",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 3220
+              },
+              {
+                "line": 1314,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/pattern.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0003708637797915275,
+                "raw_line_sha256": "6dff1b0861e84776e46ebb639ae598503e3374be0b30eaf000e7fad36232ffae",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2660
+              },
+              {
+                "line": 1464,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0002802391719477332,
+                "raw_line_sha256": "707e4c0b352f73dc1001f86206638bde1306fcc1c090c8dcbe51476b5ec491bd",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2010
+              },
+              {
+                "line": 1825,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.00015754739517459627,
+                "raw_line_sha256": "382f6cf1f9b204a93af37f2bd42ef15eac05c8a183b421677b2718388a35376c",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1130
+              },
+              {
+                "line": 1850,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.00015336472096642116,
+                "raw_line_sha256": "c4ea0f54320f3b499b819812f656a5daba0f3bc137c05bd71d10cb15c23cea2a",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1100
+              },
+              {
+                "line": 2535,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 5.8557438914451715e-05,
+                "raw_line_sha256": "446f5c86e6b0c80105b2a99bd8bf69635394c17f6e6a7c158599dc9875e16259",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 420
+              },
+              {
+                "line": 2779,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 4.32209668178096e-05,
+                "raw_line_sha256": "6ffd20d80345fd5242b8d581372b27b82c25a3c21e92a8990b83fc2a95824056",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 310
+              },
+              {
+                "line": 2782,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 4.32209668178096e-05,
+                "raw_line_sha256": "0f2a19183089b9521392b343154723f6bbac289224e9451e77435c9209d6495a",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 310
+              },
+              {
+                "line": 3957,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 6.97112368029187e-06,
+                "raw_line_sha256": "b1f5e6d1a640da60350c24ea6b0581857801767e5cac2b7621538846138d2117",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 50
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::start"
+          },
+          "quick_xml_iter_state_next": {
+            "combined_self_ir": 25556590,
+            "combined_self_percent": 3.563162994730208,
+            "matching_row_count": 7,
+            "matching_rows": [
+              {
+                "line": 31,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 2.1288905473532935,
+                "raw_line_sha256": "c5f565ccc505fae27123a8b596a3f405e633004952731e4d8c6d8982be70509c",
+                "reported_percent": 2.13,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 15269350
+              },
+              {
+                "line": 67,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.5300716966267693,
+                "raw_line_sha256": "5e8e32edb0f609f904b53532500d608e4f66767ac1398e1b22150ab90fdb8334",
+                "reported_percent": 0.53,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 3801910
+              },
+              {
+                "line": 88,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.38484645966945696,
+                "raw_line_sha256": "1a44acb4ac583e8cafc67ade6995b7b90b44c4cb5128d6d6d796710dea4c8e8c",
+                "reported_percent": 0.38,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 2760290
+              },
+              {
+                "line": 153,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.18921581582942618,
+                "raw_line_sha256": "b50a6faaa95f0c43ad88ed26652214a8f25a256b47bd29f1ab144b19536e4935",
+                "reported_percent": 0.19,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 1357140
+              },
+              {
+                "line": 160,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/utils.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.17859600601486955,
+                "raw_line_sha256": "bfe632e2950246cffe52fa12be56552cf0263990748e697f00fb8878ac9a51df",
+                "reported_percent": 0.18,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 1280970
+              },
+              {
+                "line": 231,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.09201046723143634,
+                "raw_line_sha256": "bc3044a6a5598c723af291c20bfdd55152e61f50f73f8bb563b2433053031096",
+                "reported_percent": 0.09,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 659940
+              },
+              {
+                "line": 288,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/lib.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.059532002004956515,
+                "raw_line_sha256": "62cb3dcded2eda05026e04303b189bb6927116be7b4fa125f7c253f1afab022e",
+                "reported_percent": 0.06,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 426990
+              }
+            ],
+            "selector": "quick_xml::events::attributes::IterState::next"
+          }
+        },
+        "exclusive_reconciliation": {
+          "numeric_row_count": 4506,
+          "pass": true,
+          "summed_numeric_rows_ir": 717244483,
+          "total_ir": 717244483
+        },
+        "inclusive_context": {
+          "annotation": {
+            "bytes": 756350,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/inclusive-canonical.txt",
+            "sha256": "e6d8693722aaff6c276c043e1291446b69a447c47dcfb685b95685cc9041c6bb"
+          },
+          "interpretation": "Selected inclusive guest-instruction rows are overlapping context and are never summed or treated as native latency.",
+          "native_time": null,
+          "overlap": true,
+          "total_ir": 717244483
+        },
+        "profile": "callgrind-00"
+      },
+      {
+        "canonical_inclusive_rows": {
+          "mce_process": {
+            "inclusive_ir": 333315243,
+            "line": 42,
+            "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 46.46490107373761,
+            "raw_line_sha256": "c31e746d5d99a9e3a1d3049ff2d42c346583da32b1e53b72886d01735e42b4a2",
+            "reported_percent": 46.46,
+            "selector": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+          },
+          "mce_start": {
+            "inclusive_ir": 217686503,
+            "line": 43,
+            "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 30.345992388301564,
+            "raw_line_sha256": "a2fc4013442808f76a0c7a39a2dddf4e7c864eb619951aade14595c7ab83235c",
+            "reported_percent": 30.35,
+            "selector": "litchi_ooxml_common::mce::codec::start"
+          },
+          "quick_xml_duplicate_check": {
+            "inclusive_ir": 13029937,
+            "line": 112,
+            "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 1.8164027791013249,
+            "raw_line_sha256": "e6e33d75dd3b7c75e7de362c25bdd47a940211bd428b3f553237a42f305fc682",
+            "reported_percent": 1.82,
+            "selector": "quick_xml::events::attributes::IterState::check_for_duplicates"
+          },
+          "quick_xml_iter_state_next": {
+            "inclusive_ir": 38586527,
+            "line": 61,
+            "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+            "percent_of_program": 5.379049405892623,
+            "raw_line_sha256": "53c695641217e7c98c0c4f3bf3b866fa836ee58b3175627c72b76a17ab9da410",
+            "reported_percent": 5.38,
+            "selector": "quick_xml::events::attributes::IterState::next"
+          }
+        },
+        "duplicate_check": {
+          "combined_self_ir": 6700360,
+          "combined_self_percent": 0.9340453852523887,
+          "matching_row_count": 10,
+          "matching_rows": [
+            {
+              "line": 66,
+              "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+              "percent_of_program": 0.5322099815258537,
+              "raw_line_sha256": "a25116e59decdc42afb80c0989758c9bf6bf7cf9fb9137d871516f8d3ba00759",
+              "reported_percent": 0.53,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 3817800
+            },
+            {
+              "line": 194,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.1294001559409539,
+              "raw_line_sha256": "89bf7b95096c763fa0c9b244f02be993a93c841b61297af91b1cb4dfc7bdf6c9",
+              "reported_percent": 0.13,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 928250
+            },
+            {
+              "line": 260,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.07118298047738139,
+              "raw_line_sha256": "c19cf798b9c45c7889870d3a411340f53f4138b855b072934fab393f5c644f12",
+              "reported_percent": 0.07,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 510630
+            },
+            {
+              "line": 311,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.05050823000326034,
+              "raw_line_sha256": "22e9e9d1828900e340948375d96e731ac65d8a9a3082ad40c22a45de0de50634",
+              "reported_percent": 0.05,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 362320
+            },
+            {
+              "line": 314,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.04994504483762452,
+              "raw_line_sha256": "61b84c5b847d86b07eb2586ddab79e9108e304d0fac906196b478ca321119a7a",
+              "reported_percent": 0.05,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 358280
+            },
+            {
+              "line": 350,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.03745878362821839,
+              "raw_line_sha256": "945c06e2521ac08b1b55c2db4dd398607aa037b45d701dd9269e9feca0e46dc0",
+              "reported_percent": 0.04,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 268710
+            },
+            {
+              "line": 389,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.026312178221228166,
+              "raw_line_sha256": "e0849b8853f40630fd358006a6c1bdad7d3d1118dba237db75883e3efa4fdb4d",
+              "reported_percent": 0.03,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 188750
+            },
+            {
+              "line": 430,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.023011132497897397,
+              "raw_line_sha256": "02a67530f35a79673cca723c3f3e7c62ce24f29530dfff746517873c47dea909",
+              "reported_percent": 0.02,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 165070
+            },
+            {
+              "line": 493,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.012620087387378999,
+              "raw_line_sha256": "47b3e414a4d3bdcc5ee14cc53d02bab7640e9e5d5dbd4606355d29eaabbbc993",
+              "reported_percent": 0.01,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 90530
+            },
+            {
+              "line": 826,
+              "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+              "percent_of_program": 0.001396810732591821,
+              "raw_line_sha256": "2ab97550994597301814fcfead9091a137ca17fdbcdce2cf1c866de7f7bd7c77",
+              "reported_percent": 0.0,
+              "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+              "self_ir": 10020
+            }
+          ],
+          "percent_definition": "sum of exclusive matching self Ir divided by PROGRAM TOTALS Ir; printed row percentages are not summed",
+          "selector": "quick_xml::events::attributes::IterState::check_for_duplicates"
+        },
+        "exclusive_annotation": {
+          "annotation": {
+            "bytes": 752444,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-01-self.txt",
+            "sha256": "235099398db83e6c98787979961ac61b88f6bc46cb3698539514c9caebfa7819"
+          },
+          "raw": {
+            "bytes": 602634,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/callgrind.out",
+            "sha256": "9535567fb567534534714c9121d3dada776979332437fe872d10d5559cd792ed"
+          },
+          "receipt": {
+            "bytes": 1295,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-01-self-command.json",
+            "sha256": "f8948796cbdb2bd6d18f40e4477503dc93171b60daa99c5ddf8782232697fde8"
+          },
+          "stderr": {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-01-self.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exclusive_function_groups": {
+          "bounded_output_reserve": {
+            "combined_self_ir": 18127870,
+            "combined_self_percent": 2.527066205092744,
+            "matching_row_count": 7,
+            "matching_rows": [
+              {
+                "line": 33,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 1.874893601218398,
+                "raw_line_sha256": "9d9fbb44bff58d1409f594b8d2afd8973adcdb0af38a8af1e3d8622eb28afd62",
+                "reported_percent": 1.87,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 13449520
+              },
+              {
+                "line": 101,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 0.3260730587216444,
+                "raw_line_sha256": "da27e328cbe1754f26de9653666c101ef9660ec0af8ec1ea05ebf0a71bbd43e6",
+                "reported_percent": 0.33,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 2339080
+              },
+              {
+                "line": 129,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 0.24456734024541826,
+                "raw_line_sha256": "7ee1068657621c1a7d7f781e819c7dbbcb8497b8bb56211fb25f188174a94889",
+                "reported_percent": 0.24,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 1754400
+              },
+              {
+                "line": 245,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 0.08151687065772388,
+                "raw_line_sha256": "0ae87ca30b8f27925742e22d5e8f9a0bd0689a6a491d112985ee212ac29740bc",
+                "reported_percent": 0.08,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 584760
+              },
+              {
+                "line": 3879,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 8.364136123304318e-06,
+                "raw_line_sha256": "2a13221c80a810a9604380ea7107e9a8b7b1879ae31ff14d027eae2c393aa9e0",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 60
+              },
+              {
+                "line": 4085,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 5.576090748869545e-06,
+                "raw_line_sha256": "8348b449b4ae1a161c92ca6a6e7ea36affa5531ad51b92d12080ce4004cd2242",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 40
+              },
+              {
+                "line": 4381,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs:litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "percent_of_program": 1.3940226872173863e-06,
+                "raw_line_sha256": "c30c63cb13d0f96bf91edb57d0748cc1b2ff90439f42ec1243b071c55a1fcd95",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve",
+                "self_ir": 10
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve"
+          },
+          "duplicate_check": {
+            "combined_self_ir": 6700360,
+            "combined_self_percent": 0.9340453852523887,
+            "matching_row_count": 10,
+            "matching_rows": [
+              {
+                "line": 66,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.5322099815258537,
+                "raw_line_sha256": "a25116e59decdc42afb80c0989758c9bf6bf7cf9fb9137d871516f8d3ba00759",
+                "reported_percent": 0.53,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 3817800
+              },
+              {
+                "line": 194,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.1294001559409539,
+                "raw_line_sha256": "89bf7b95096c763fa0c9b244f02be993a93c841b61297af91b1cb4dfc7bdf6c9",
+                "reported_percent": 0.13,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 928250
+              },
+              {
+                "line": 260,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.07118298047738139,
+                "raw_line_sha256": "c19cf798b9c45c7889870d3a411340f53f4138b855b072934fab393f5c644f12",
+                "reported_percent": 0.07,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 510630
+              },
+              {
+                "line": 311,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.05050823000326034,
+                "raw_line_sha256": "22e9e9d1828900e340948375d96e731ac65d8a9a3082ad40c22a45de0de50634",
+                "reported_percent": 0.05,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 362320
+              },
+              {
+                "line": 314,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.04994504483762452,
+                "raw_line_sha256": "61b84c5b847d86b07eb2586ddab79e9108e304d0fac906196b478ca321119a7a",
+                "reported_percent": 0.05,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 358280
+              },
+              {
+                "line": 350,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.03745878362821839,
+                "raw_line_sha256": "945c06e2521ac08b1b55c2db4dd398607aa037b45d701dd9269e9feca0e46dc0",
+                "reported_percent": 0.04,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 268710
+              },
+              {
+                "line": 389,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.026312178221228166,
+                "raw_line_sha256": "e0849b8853f40630fd358006a6c1bdad7d3d1118dba237db75883e3efa4fdb4d",
+                "reported_percent": 0.03,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 188750
+              },
+              {
+                "line": 430,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.023011132497897397,
+                "raw_line_sha256": "02a67530f35a79673cca723c3f3e7c62ce24f29530dfff746517873c47dea909",
+                "reported_percent": 0.02,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 165070
+              },
+              {
+                "line": 493,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.012620087387378999,
+                "raw_line_sha256": "47b3e414a4d3bdcc5ee14cc53d02bab7640e9e5d5dbd4606355d29eaabbbc993",
+                "reported_percent": 0.01,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 90530
+              },
+              {
+                "line": 826,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:quick_xml::events::attributes::IterState::check_for_duplicates",
+                "percent_of_program": 0.001396810732591821,
+                "raw_line_sha256": "2ab97550994597301814fcfead9091a137ca17fdbcdce2cf1c866de7f7bd7c77",
+                "reported_percent": 0.0,
+                "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+                "self_ir": 10020
+              }
+            ],
+            "selector": "quick_xml::events::attributes::IterState::check_for_duplicates"
+          },
+          "is_ncname": {
+            "combined_self_ir": 10172600,
+            "combined_self_percent": 1.4180835187987584,
+            "matching_row_count": 5,
+            "matching_rows": [
+              {
+                "line": 45,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 1.032206886795488,
+                "raw_line_sha256": "2f5735f024e05eb7ed5b0d12180398848330c7abb0384dc2d296ae5f1180bdfa",
+                "reported_percent": 1.03,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 7404520
+              },
+              {
+                "line": 168,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 0.16625672176829437,
+                "raw_line_sha256": "879e3071a273e1b8a836a53d7f4aa852a3a20bc92181b1b7651dc901199ccba9",
+                "reported_percent": 0.17,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 1192640
+              },
+              {
+                "line": 186,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 0.1404840303270193,
+                "raw_line_sha256": "65c6f2e3227078aa04c8693559f79ef7dfc15fc27debf1b58f0d11346ae0f34b",
+                "reported_percent": 0.14,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 1007760
+              },
+              {
+                "line": 284,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:litchi_ooxml_common::xml_name::validation::is_ncname [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.06134815041906273,
+                "raw_line_sha256": "a81a79c7514f643cf7727a0f797cac6222368e11443f18282fa90d8a130e94b2",
+                "reported_percent": 0.06,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 440080
+              },
+              {
+                "line": 449,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:litchi_ooxml_common::xml_name::validation::is_ncname",
+                "percent_of_program": 0.017787729488893848,
+                "raw_line_sha256": "e1f22ff78b7d4080a7a9d1e18dcf3dae54a76213604656dcfd333c7c5ba767f0",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_ncname",
+                "self_ir": 127600
+              }
+            ],
+            "selector": "litchi_ooxml_common::xml_name::validation::is_ncname"
+          },
+          "is_qualified_name": {
+            "combined_self_ir": 8686020,
+            "combined_self_percent": 1.210850894162396,
+            "matching_row_count": 7,
+            "matching_rows": [
+              {
+                "line": 86,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.4108965511934479,
+                "raw_line_sha256": "55845ccba220f79a24f9077d0e10ee278ba02862301d68ea2ed5f1a24c99a522",
+                "reported_percent": 0.41,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 2947560
+              },
+              {
+                "line": 99,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/iter.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.3378525504286313,
+                "raw_line_sha256": "e7b99e06c21217eaf259add6851adc6bf9480389b877ea672e2fb81359c19b9d",
+                "reported_percent": 0.34,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 2423580
+              },
+              {
+                "line": 106,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.3072314480812142,
+                "raw_line_sha256": "30a4250cb4b4d72aabc49e6a7ebc4167e5adc785924c0253330b99eb2c2ab4ea",
+                "reported_percent": 0.31,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 2203920
+              },
+              {
+                "line": 213,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.10157406908140763,
+                "raw_line_sha256": "bc15508d33e02e0718744f823dd3338330aa007454c227e2e4d0065206d7f547",
+                "reported_percent": 0.1,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 728640
+              },
+              {
+                "line": 307,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.05162344815303425,
+                "raw_line_sha256": "c009e6e56d3c753851cf233a765c5cb7a071de28a8f8afa11f7ce72699a10253",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 370320
+              },
+              {
+                "line": 849,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.0012546204184956478,
+                "raw_line_sha256": "4bbe65072e00ad7125601f722dbf4fcbfc783bce69546d99be0b7ddbee698023",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 9000
+              },
+              {
+                "line": 1258,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "percent_of_program": 0.00041820680616521587,
+                "raw_line_sha256": "65e889b09c4dfc59b10422a1ecee8d6b4718f4bfc6f8dac685e99f155bb518ab",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name",
+                "self_ir": 3000
+              }
+            ],
+            "selector": "litchi_ooxml_common::xml_name::validation::is_qualified_name"
+          },
+          "mce_esc": {
+            "combined_self_ir": 1335010,
+            "combined_self_percent": 0.18610342276620828,
+            "matching_row_count": 12,
+            "matching_rows": [
+              {
+                "line": 317,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 0.04853011181009887,
+                "raw_line_sha256": "631b70d3c8664b567498925166164c69def6cd977d421e8e4fdf2a2e8ca4b273",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 348130
+              },
+              {
+                "line": 380,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.029423636859097373,
+                "raw_line_sha256": "e0db0bc1949f39090f6d8dea1efb971699270a120dd400f684e864895d95d3c3",
+                "reported_percent": 0.03,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 211070
+              },
+              {
+                "line": 440,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.020722147245486447,
+                "raw_line_sha256": "bf8a78b94adf7b1ebe83ffe3d14eb3b9ff86c1ecdfc1f7c00f0c7090ba9070f3",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 148650
+              },
+              {
+                "line": 470,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.016577717796389158,
+                "raw_line_sha256": "7a0f703db61f43ae86d8e19accb16b9e1cc7fcaff0f962aec90d33cd4501b511",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 118920
+              },
+              {
+                "line": 471,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.016577717796389158,
+                "raw_line_sha256": "1dacdedd9b999c2b53a646632eba92ad8ca41886d9f1e78a9a7e80732f145d8d",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 118920
+              },
+              {
+                "line": 472,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.016577717796389158,
+                "raw_line_sha256": "ed0f3e9d20639b2a55dd6e6a09fb0914b9e11205922e88ce1efe3925e64a1060",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 118920
+              },
+              {
+                "line": 497,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.012433288347291868,
+                "raw_line_sha256": "cd5af892e82324cdbadd6aaeb7eeaa540d3a90d17d3a83060d8464529377c9b9",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 89190
+              },
+              {
+                "line": 555,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.008270736603260753,
+                "raw_line_sha256": "ac37b7795c7b5ab37cf0c1ad14f0dd533f327ab47ee47da6cabf1870a2595424",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 59330
+              },
+              {
+                "line": 624,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.004557060164513636,
+                "raw_line_sha256": "b350d3f64cead76be89c51c1e452fbef958ec01db43a212d862f43c1f6461003",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 32690
+              },
+              {
+                "line": 635,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.0041444294490972896,
+                "raw_line_sha256": "f4d9d853a7eaedc1645fb3db5426c22dcd5fb23d783b1b48a05b822ea7887d2c",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 29730
+              },
+              {
+                "line": 636,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.0041444294490972896,
+                "raw_line_sha256": "e1f7ba0e1e57e7042ac86b18015bfbaf462e6f160c17d874e7b1c62b82ba4367",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 29730
+              },
+              {
+                "line": 637,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/lib.rs:litchi_ooxml_common::mce::codec::esc",
+                "percent_of_program": 0.0041444294490972896,
+                "raw_line_sha256": "9bc60c47993cf4e8e1043e8b6b4fc320962d6f9b7a12bcb269195384a26160d5",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::esc",
+                "self_ir": 29730
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::esc"
+          },
+          "mce_expand_parts": {
+            "combined_self_ir": 10415520,
+            "combined_self_percent": 1.4519471179166432,
+            "matching_row_count": 6,
+            "matching_rows": [
+              {
+                "line": 46,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::expand_parts [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 1.0225630378453183,
+                "raw_line_sha256": "5f87e9deb55056e92d86f5aec5e909f64fc8e7a0f09260bf96cc98c36fcbd1b3",
+                "reported_percent": 1.02,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 7335340
+              },
+              {
+                "line": 137,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/pattern.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.23012247716047168,
+                "raw_line_sha256": "0c89c8eb58060e596eaf8722ed5c5b280087a00ab77ceebf529fedc8092fdc89",
+                "reported_percent": 0.23,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 1650780
+              },
+              {
+                "line": 178,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.14730916540363564,
+                "raw_line_sha256": "235c3684b02adaa31e417b3265324b023b363ac5834d40f1bdd13523f47383ef",
+                "reported_percent": 0.15,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 1056720
+              },
+              {
+                "line": 310,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.0511383282578826,
+                "raw_line_sha256": "6538f0e166c3d68a148cb58ccc17e177be77b937db875b1d316600b2450be61a",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 366840
+              },
+              {
+                "line": 1269,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.00040705462466747677,
+                "raw_line_sha256": "7b5c92c2cd5250b006d04847880474a5e866c5fddf05c7c895d101b1bc591357",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 2920
+              },
+              {
+                "line": 1270,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs:litchi_ooxml_common::mce::codec::expand_parts",
+                "percent_of_program": 0.00040705462466747677,
+                "raw_line_sha256": "3eae045a97078116a5008ae0e1b3fc72ea130b018656bacb982985bfee35db1f",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::expand_parts",
+                "self_ir": 2920
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::expand_parts"
+          },
+          "mce_start": {
+            "combined_self_ir": 39019560,
+            "combined_self_percent": 5.439415188524004,
+            "matching_row_count": 33,
+            "matching_rows": [
+              {
+                "line": 29,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 2.370418481707439,
+                "raw_line_sha256": "709d638b80b4fca011d29682156ee45f8887335195b9bf5d743609538d9ae547",
+                "reported_percent": 2.37,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 17004160
+              },
+              {
+                "line": 60,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.625708477180211,
+                "raw_line_sha256": "39b55df2e4105de92a1b8143d8eec47ac61a30eacfad2cbba73f2bd2762c9fef",
+                "reported_percent": 0.63,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 4488510
+              },
+              {
+                "line": 90,
+                "location": "/tmp/litchi-0891-source/crates/litchi-opc/src/xml_attributes.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.37801016197930254,
+                "raw_line_sha256": "5cb248583f0b6912be766fbfab57806e41aa1d5b8e3bc2d08a860187aa5e982f",
+                "reported_percent": 0.38,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2711650
+              },
+              {
+                "line": 102,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.32552660182825516,
+                "raw_line_sha256": "10270b4721481f48861adadbcdbcbe0092a88d008c6e9dcbc065c4a9397cf1d3",
+                "reported_percent": 0.33,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2335160
+              },
+              {
+                "line": 109,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.30321108665127927,
+                "raw_line_sha256": "f19085abfbd07393bb8ebdc5e5c60cbd03fe8ff8354719a151fccbdadd1bdbfd",
+                "reported_percent": 0.3,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2175080
+              },
+              {
+                "line": 136,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.2331140498472402,
+                "raw_line_sha256": "8b0ed234b19abf5f1419e0495d00e073710352fca2691d967a5759c46119932f",
+                "reported_percent": 0.23,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1672240
+              },
+              {
+                "line": 139,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.22363051350610033,
+                "raw_line_sha256": "354bd2657c76ee46ae060ee61b7d43d5fab3f2e2897c3640f94a762602c4594c",
+                "reported_percent": 0.22,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1604210
+              },
+              {
+                "line": 149,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.19936057852164563,
+                "raw_line_sha256": "defe57ec5cc178d23eff1a1ff04739523eda771383858bd2926c53a5529dfebb",
+                "reported_percent": 0.2,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1430110
+              },
+              {
+                "line": 154,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.18913542211090612,
+                "raw_line_sha256": "94d7240d1a8daa8e13badab3b680769c7c307e99b8fb79893b725671a0577976",
+                "reported_percent": 0.19,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1356760
+              },
+              {
+                "line": 228,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.09393203671008192,
+                "raw_line_sha256": "3ee80e5fdbeadb92133898597e3ca0c0d6f7848c9a7fc94b206d9beff83061e3",
+                "reported_percent": 0.09,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 673820
+              },
+              {
+                "line": 230,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.09260213906647653,
+                "raw_line_sha256": "0e5335fc57649d5f27b1e4689d71040bb9786497814e1e11dfe68444d84d92af",
+                "reported_percent": 0.09,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 664280
+              },
+              {
+                "line": 278,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/mce/scope.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0633820295197129,
+                "raw_line_sha256": "d7954d8d0cae5a8a072f61019b6f9491c7fcc4651c2184c0ab5154e1e9f03037",
+                "reported_percent": 0.06,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 454670
+              },
+              {
+                "line": 295,
+                "location": "/tmp/litchi-0891-source/crates/litchi-ooxml-common/src/lib.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.05832590923317544,
+                "raw_line_sha256": "16916c817eac3dbccaaf810cceb6ee5c6b101ef75beb2adc9987db2f6e1fd49b",
+                "reported_percent": 0.06,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 418400
+              },
+              {
+                "line": 309,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.05145477140788095,
+                "raw_line_sha256": "3c67c5043defd80c979e1dd39266e54c0a8d8ff3ebef6032285c12ea741622c6",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 369110
+              },
+              {
+                "line": 320,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.047133301077507045,
+                "raw_line_sha256": "feb104270ce4abb0cd0e9623e03376c6a72dd60051e94ccb8e102676e7addab7",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 338110
+              },
+              {
+                "line": 322,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.04702177926252966,
+                "raw_line_sha256": "c92ce98dfa3fa94e470dcc32d9db20fe11d2e7179e4ee295170040230bb942b0",
+                "reported_percent": 0.05,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 337310
+              },
+              {
+                "line": 340,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.04110694100066629,
+                "raw_line_sha256": "1f22ce5e2c43e1b1d66ea886214a6ad8e1fc82de36482cf0504e08ae040eff8f",
+                "reported_percent": 0.04,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 294880
+              },
+              {
+                "line": 410,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.023572923640846004,
+                "raw_line_sha256": "0bb4c6fa7a1458ea9dee32a33998397e5bfb5b7c16c12d086bf2f4cbf10a2a10",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 169100
+              },
+              {
+                "line": 416,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.023430733326749827,
+                "raw_line_sha256": "7df40b21100271c3b1a671909eb4780d7a37018f971e8cf6e4fb1e2efaae0a19",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 168080
+              },
+              {
+                "line": 426,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/sync/atomic.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.023316423466398003,
+                "raw_line_sha256": "a0e8d94b69afd65c7232b02f66a4798ef6a48b0ceaf5fc957fdb9aac824cabdc",
+                "reported_percent": 0.02,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 167260
+              },
+              {
+                "line": 510,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.01170700252725161,
+                "raw_line_sha256": "acc6b02c5b67140ccf06bc9b3aa19d986a6e961ca34fc1c9fc142bcebc970fb6",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 83980
+              },
+              {
+                "line": 512,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.011665181846635089,
+                "raw_line_sha256": "9695517ed90f1de44b4854a83548838ec4c5c3e65d3a275504bf2839ee4731be",
+                "reported_percent": 0.01,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 83680
+              },
+              {
+                "line": 1094,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0005785194151952153,
+                "raw_line_sha256": "925aa81479f73ca9752fa1116f35ae1b5706bf330f405f74897dce64dbc2b2f6",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 4150
+              },
+              {
+                "line": 1164,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0005074242581471286,
+                "raw_line_sha256": "505b198f72461c62bf5b9f8ba16d2f15678b175f7e8454bbb8e8ba8d2ddfd8df",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 3640
+              },
+              {
+                "line": 1216,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/iter.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0004488753052839984,
+                "raw_line_sha256": "7f76c24b9c592662afb8cf4f98d94375a9843487d7331e6041a2fcbf861ba8bb",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 3220
+              },
+              {
+                "line": 1317,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/pattern.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.00037081003479982476,
+                "raw_line_sha256": "6dff1b0861e84776e46ebb639ae598503e3374be0b30eaf000e7fad36232ffae",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2660
+              },
+              {
+                "line": 1467,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.00028019856013069465,
+                "raw_line_sha256": "707e4c0b352f73dc1001f86206638bde1306fcc1c090c8dcbe51476b5ec491bd",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 2010
+              },
+              {
+                "line": 1827,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.00015752456365556466,
+                "raw_line_sha256": "382f6cf1f9b204a93af37f2bd42ef15eac05c8a183b421677b2718388a35376c",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1130
+              },
+              {
+                "line": 1853,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 0.0001533424955939125,
+                "raw_line_sha256": "c4ea0f54320f3b499b819812f656a5daba0f3bc137c05bd71d10cb15c23cea2a",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 1100
+              },
+              {
+                "line": 2539,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 5.8548952863130226e-05,
+                "raw_line_sha256": "446f5c86e6b0c80105b2a99bd8bf69635394c17f6e6a7c158599dc9875e16259",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 420
+              },
+              {
+                "line": 2783,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 4.3214703303738974e-05,
+                "raw_line_sha256": "6ffd20d80345fd5242b8d581372b27b82c25a3c21e92a8990b83fc2a95824056",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 310
+              },
+              {
+                "line": 2786,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 4.3214703303738974e-05,
+                "raw_line_sha256": "0f2a19183089b9521392b343154723f6bbac289224e9451e77435c9209d6495a",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 310
+              },
+              {
+                "line": 3961,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:litchi_ooxml_common::mce::codec::start",
+                "percent_of_program": 6.9701134360869314e-06,
+                "raw_line_sha256": "b1f5e6d1a640da60350c24ea6b0581857801767e5cac2b7621538846138d2117",
+                "reported_percent": 0.0,
+                "selector": "litchi_ooxml_common::mce::codec::start",
+                "self_ir": 50
+              }
+            ],
+            "selector": "litchi_ooxml_common::mce::codec::start"
+          },
+          "quick_xml_iter_state_next": {
+            "combined_self_ir": 25556590,
+            "combined_self_percent": 3.5626466267912984,
+            "matching_row_count": 7,
+            "matching_rows": [
+              {
+                "line": 31,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi/docs/performance/results/change-0891/binaries/native]",
+                "percent_of_program": 2.1285820319062796,
+                "raw_line_sha256": "c5f565ccc505fae27123a8b596a3f405e633004952731e4d8c6d8982be70509c",
+                "reported_percent": 2.13,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 15269350
+              },
+              {
+                "line": 67,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.5299948794758653,
+                "raw_line_sha256": "5e8e32edb0f609f904b53532500d608e4f66767ac1398e1b22150ab90fdb8334",
+                "reported_percent": 0.53,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 3801910
+              },
+              {
+                "line": 88,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.3847906883299279,
+                "raw_line_sha256": "1a44acb4ac583e8cafc67ade6995b7b90b44c4cb5128d6d6d796710dea4c8e8c",
+                "reported_percent": 0.38,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 2760290
+              },
+              {
+                "line": 153,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.18918839497302037,
+                "raw_line_sha256": "b50a6faaa95f0c43ad88ed26652214a8f25a256b47bd29f1ab144b19536e4935",
+                "reported_percent": 0.19,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 1357140
+              },
+              {
+                "line": 160,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/utils.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.17857012416448553,
+                "raw_line_sha256": "bfe632e2950246cffe52fa12be56552cf0263990748e697f00fb8878ac9a51df",
+                "reported_percent": 0.18,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 1280970
+              },
+              {
+                "line": 231,
+                "location": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.0919971332202242,
+                "raw_line_sha256": "bc3044a6a5598c723af291c20bfdd55152e61f50f73f8bb563b2433053031096",
+                "reported_percent": 0.09,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 659940
+              },
+              {
+                "line": 288,
+                "location": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/lib.rs:quick_xml::events::attributes::IterState::next",
+                "percent_of_program": 0.05952337472149518,
+                "raw_line_sha256": "62cb3dcded2eda05026e04303b189bb6927116be7b4fa125f7c253f1afab022e",
+                "reported_percent": 0.06,
+                "selector": "quick_xml::events::attributes::IterState::next",
+                "self_ir": 426990
+              }
+            ],
+            "selector": "quick_xml::events::attributes::IterState::next"
+          }
+        },
+        "exclusive_reconciliation": {
+          "numeric_row_count": 4510,
+          "pass": true,
+          "summed_numeric_rows_ir": 717348440,
+          "total_ir": 717348440
+        },
+        "inclusive_context": {
+          "annotation": {
+            "bytes": 756965,
+            "executable": false,
+            "mode": 436,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/inclusive-canonical.txt",
+            "sha256": "4ca8721c227dd46a8cb3d65a2c50228f63ede9ff50d275882b9380499dd29f4f"
+          },
+          "interpretation": "Selected inclusive guest-instruction rows are overlapping context and are never summed or treated as native latency.",
+          "native_time": null,
+          "overlap": true,
+          "total_ir": 717348440
+        },
+        "profile": "callgrind-01"
+      }
+    ],
+    "self_rows": {
+      "combined_percent_definition": "combined exclusive duplicate-checker self Ir / PROGRAM TOTALS Ir",
+      "disjoint": true,
+      "duplicate_selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+      "unit": "Ir"
+    }
+  },
+  "heaptrack_stacks": {
+    "integer_reconciliation": {
+      "expected_scan_closure_total": 518660,
+      "expected_whole_process_total": 673663,
+      "repeated_baseline_region_counts_identical": true
+    },
+    "nearest_owner_semantics": "rightmost litchi_ooxml_common::mce::codec frame; mce_start is the exact start owner, other_codec_owner covers other codec frames, and no_codec_owner is retained separately",
+    "profiles": [
+      {
+        "duplicate_check": {
+          "scan_closure": {
+            "allocation_cost": 122120,
+            "percent_of_closure": 23.545289785215747,
+            "stack_line_count": 63,
+            "unique_stack_count": 31
+          },
+          "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+          "whole_process": {
+            "allocation_cost": 144432,
+            "percent_of_process": 21.439800018703714,
+            "stack_line_count": 482,
+            "unique_stack_count": 227
+          }
+        },
+        "input": {
+          "bytes": 11960420,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/00-baseline/stacks.txt",
+          "sha256": "7b022a98e061da2e5d2a8bbfd3b9f6544d506187c468f91657a311caea8f172f"
+        },
+        "integer_reconciliation": {
+          "expected_scan_closure_total": 518660,
+          "expected_whole_process_total": 673663,
+          "pass": true,
+          "scan_closure_total": 518660,
+          "sum_of_regions": 673663,
+          "whole_process_total": 673663
+        },
+        "nearest_closure_owners": [
+          {
+            "allocation_cost": 343320,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::start::hf25a5fe21e5b8a00 (codec.rs)",
+            "percent_of_closure": 66.19365287471561,
+            "stack_line_count": 48,
+            "unique_stack_count": 34
+          },
+          {
+            "allocation_cost": 173280,
+            "nearest_codec_owner": "<no codec frame>",
+            "percent_of_closure": 33.40916978367331,
+            "stack_line_count": 432,
+            "unique_stack_count": 337
+          },
+          {
+            "allocation_cost": 860,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::process_markup_compatibility::hac578b49dc35b69b (codec.rs)",
+            "percent_of_closure": 0.16581189989588555,
+            "stack_line_count": 15,
+            "unique_stack_count": 15
+          },
+          {
+            "allocation_cost": 700,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::apply_directives::hf2c387326f946b2a (codec.rs)",
+            "percent_of_closure": 0.13496317433386032,
+            "stack_line_count": 8,
+            "unique_stack_count": 6
+          },
+          {
+            "allocation_cost": 200,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::Namespaces::with_local::ha45308a20dd50ed2 (codec.rs)",
+            "percent_of_closure": 0.038560906952531525,
+            "stack_line_count": 4,
+            "unique_stack_count": 4
+          },
+          {
+            "allocation_cost": 180,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::close::hd28df9a83f3968b6 (codec.rs)",
+            "percent_of_closure": 0.03470481625727837,
+            "stack_line_count": 3,
+            "unique_stack_count": 3
+          },
+          {
+            "allocation_cost": 100,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::reserve_amortized::h4a8441b10a1bd69f (codec.rs)",
+            "percent_of_closure": 0.019280453476265762,
+            "stack_line_count": 2,
+            "unique_stack_count": 2
+          },
+          {
+            "allocation_cost": 20,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve::h92cb3441f902a8e3 (codec.rs)",
+            "percent_of_closure": 0.0038560906952531523,
+            "stack_line_count": 1,
+            "unique_stack_count": 1
+          }
+        ],
+        "nearest_mce_start_vs_other_closure_owners": {
+          "mce_start": {
+            "allocation_cost": 343320,
+            "percent_of_closure": 66.19365287471561,
+            "stack_line_count": 48
+          },
+          "no_codec_owner": {
+            "allocation_cost": 173280,
+            "percent_of_closure": 33.40916978367331,
+            "stack_line_count": 432
+          },
+          "other_codec_owner": {
+            "allocation_cost": 2060,
+            "percent_of_closure": 0.3971773416110747,
+            "stack_line_count": 33
+          }
+        },
+        "profile": "00-baseline",
+        "regions": {
+          "forced_worksheet_guard": {
+            "allocation_cost": 0,
+            "percent_of_process": 0.0,
+            "stack_line_count": 0,
+            "unique_stack_count": 0
+          },
+          "process_other": {
+            "allocation_cost": 154156,
+            "percent_of_process": 22.88325171487821,
+            "stack_line_count": 3869,
+            "unique_stack_count": 2531
+          },
+          "runner_other": {
+            "allocation_cost": 847,
+            "percent_of_process": 0.12573052104687357,
+            "stack_line_count": 134,
+            "unique_stack_count": 67
+          },
+          "scan_closure": {
+            "allocation_cost": 518660,
+            "percent_of_process": 76.99101776407491,
+            "stack_line_count": 513,
+            "unique_stack_count": 402
+          }
+        },
+        "stack_line_count": 4516,
+        "whole_process_allocation_cost": 673663
+      },
+      {
+        "duplicate_check": {
+          "scan_closure": {
+            "allocation_cost": 122120,
+            "percent_of_closure": 23.545289785215747,
+            "stack_line_count": 63,
+            "unique_stack_count": 31
+          },
+          "selector": "quick_xml::events::attributes::IterState::check_for_duplicates",
+          "whole_process": {
+            "allocation_cost": 144432,
+            "percent_of_process": 21.439800018703714,
+            "stack_line_count": 482,
+            "unique_stack_count": 227
+          }
+        },
+        "input": {
+          "bytes": 11960420,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/runs/03-baseline/stacks.txt",
+          "sha256": "b2c415979f972a182ea6afae6207e201985dadde9bbda40e1a5bf1814e81f739"
+        },
+        "integer_reconciliation": {
+          "expected_scan_closure_total": 518660,
+          "expected_whole_process_total": 673663,
+          "pass": true,
+          "scan_closure_total": 518660,
+          "sum_of_regions": 673663,
+          "whole_process_total": 673663
+        },
+        "nearest_closure_owners": [
+          {
+            "allocation_cost": 343320,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::start::hf25a5fe21e5b8a00 (codec.rs)",
+            "percent_of_closure": 66.19365287471561,
+            "stack_line_count": 48,
+            "unique_stack_count": 34
+          },
+          {
+            "allocation_cost": 173280,
+            "nearest_codec_owner": "<no codec frame>",
+            "percent_of_closure": 33.40916978367331,
+            "stack_line_count": 432,
+            "unique_stack_count": 337
+          },
+          {
+            "allocation_cost": 860,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::process_markup_compatibility::hac578b49dc35b69b (codec.rs)",
+            "percent_of_closure": 0.16581189989588555,
+            "stack_line_count": 15,
+            "unique_stack_count": 15
+          },
+          {
+            "allocation_cost": 700,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::apply_directives::hf2c387326f946b2a (codec.rs)",
+            "percent_of_closure": 0.13496317433386032,
+            "stack_line_count": 8,
+            "unique_stack_count": 6
+          },
+          {
+            "allocation_cost": 200,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::Namespaces::with_local::ha45308a20dd50ed2 (codec.rs)",
+            "percent_of_closure": 0.038560906952531525,
+            "stack_line_count": 4,
+            "unique_stack_count": 4
+          },
+          {
+            "allocation_cost": 180,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::close::hd28df9a83f3968b6 (codec.rs)",
+            "percent_of_closure": 0.03470481625727837,
+            "stack_line_count": 3,
+            "unique_stack_count": 3
+          },
+          {
+            "allocation_cost": 100,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::reserve_amortized::h4a8441b10a1bd69f (codec.rs)",
+            "percent_of_closure": 0.019280453476265762,
+            "stack_line_count": 2,
+            "unique_stack_count": 2
+          },
+          {
+            "allocation_cost": 20,
+            "nearest_codec_owner": "litchi_ooxml_common::mce::codec::BoundedOutput::reserve::h92cb3441f902a8e3 (codec.rs)",
+            "percent_of_closure": 0.0038560906952531523,
+            "stack_line_count": 1,
+            "unique_stack_count": 1
+          }
+        ],
+        "nearest_mce_start_vs_other_closure_owners": {
+          "mce_start": {
+            "allocation_cost": 343320,
+            "percent_of_closure": 66.19365287471561,
+            "stack_line_count": 48
+          },
+          "no_codec_owner": {
+            "allocation_cost": 173280,
+            "percent_of_closure": 33.40916978367331,
+            "stack_line_count": 432
+          },
+          "other_codec_owner": {
+            "allocation_cost": 2060,
+            "percent_of_closure": 0.3971773416110747,
+            "stack_line_count": 33
+          }
+        },
+        "profile": "03-baseline",
+        "regions": {
+          "forced_worksheet_guard": {
+            "allocation_cost": 0,
+            "percent_of_process": 0.0,
+            "stack_line_count": 0,
+            "unique_stack_count": 0
+          },
+          "process_other": {
+            "allocation_cost": 154156,
+            "percent_of_process": 22.88325171487821,
+            "stack_line_count": 3869,
+            "unique_stack_count": 2531
+          },
+          "runner_other": {
+            "allocation_cost": 847,
+            "percent_of_process": 0.12573052104687357,
+            "stack_line_count": 134,
+            "unique_stack_count": 67
+          },
+          "scan_closure": {
+            "allocation_cost": 518660,
+            "percent_of_process": 76.99101776407491,
+            "stack_line_count": 513,
+            "unique_stack_count": 402
+          }
+        },
+        "stack_line_count": 4516,
+        "whole_process_allocation_cost": 673663
+      }
+    ],
+    "region_semantics": "0897 region_for: scan_closure, forced_worksheet_guard, runner_other, process_other"
+  },
+  "helpers": {
+    "prior_helpers": {
+      "0892_callgrind_helper": {
+        "bytes": 7859,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/analyze_callgrind.py",
+        "sha256": "af811918f40bb1efe68a7514884f9fd09dfb2ddb956ee80a7656748ab3d072bd"
+      },
+      "0892_leaf_helper": {
+        "bytes": 8833,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/reduce.py",
+        "sha256": "8067d6f763c9c3bdc6bbac797b2c541fe97a5e5648383ed5c0bf6e3f8c5d2696"
+      },
+      "0895_attribution_helper": {
+        "bytes": 2989,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/attribution.py",
+        "sha256": "18c18cd7cfc270f2e05773a85b8802112fc875df2a7073ce1a0085fa631be677"
+      },
+      "0895_reduction_helper": {
+        "bytes": 11949,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/reduce.py",
+        "sha256": "19f09afae83d4eded6d6b3ea31cf0f36cabbe09e34235141039c4b606d6654a0"
+      },
+      "0897_reduction_helper": {
+        "bytes": 36575,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/reduce.py",
+        "sha256": "2358d29863ff23501dd1c0c92cebceb37bb8b41a2956382fc0b63ac4e5671516"
+      }
+    },
+    "reducer": {
+      "bytes": 36418,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/reduce.py",
+      "sha256": "2ce78dcc7a381cecd66bf9f4411cdafc6de4c07828f4e4f8bb1ac50276c3967d"
+    }
+  },
+  "inputs": {
+    "0892_callgrind_analysis": {
+      "bytes": 8883,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind-analysis.json",
+      "sha256": "4fe23865dee127a3b73e4fa3ff731b8a345d9b521447f46546bfd9b94824f522"
+    },
+    "0892_callgrind_helper": {
+      "bytes": 7859,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/analyze_callgrind.py",
+      "sha256": "af811918f40bb1efe68a7514884f9fd09dfb2ddb956ee80a7656748ab3d072bd"
+    },
+    "0892_leaf_analysis": {
+      "bytes": 25951,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/self-analysis.json",
+      "sha256": "ec68184b494a4e60bdafd2f7d2beddf1853b97968770cfe88dc9b401eda1509c"
+    },
+    "0892_leaf_helper": {
+      "bytes": 8833,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/reduce.py",
+      "sha256": "8067d6f763c9c3bdc6bbac797b2c541fe97a5e5648383ed5c0bf6e3f8c5d2696"
+    },
+    "0895_attribution_helper": {
+      "bytes": 2989,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/attribution.py",
+      "sha256": "18c18cd7cfc270f2e05773a85b8802112fc875df2a7073ce1a0085fa631be677"
+    },
+    "0895_reduction_helper": {
+      "bytes": 11949,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/reduce.py",
+      "sha256": "19f09afae83d4eded6d6b3ea31cf0f36cabbe09e34235141039c4b606d6654a0"
+    },
+    "0895_verification": {
+      "bytes": 1459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/verification.json",
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    },
+    "0897_analysis": {
+      "bytes": 468414,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/analysis.json",
+      "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+    },
+    "0897_reduction_helper": {
+      "bytes": 36575,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/reduce.py",
+      "sha256": "2358d29863ff23501dd1c0c92cebceb37bb8b41a2956382fc0b63ac4e5671516"
+    },
+    "0899_allocation_custody_replay": {
+      "bytes": 1459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/allocation-custody-replay.json",
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    },
+    "0899_profile_content_replay": {
+      "bytes": 9889,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/profile-content-replay.json",
+      "sha256": "4b50a86e61c4f9cd9635d76a35ca542f8bfa1d345c2de4068376182404dcc9a4"
+    },
+    "callgrind_00_inclusive": {
+      "bytes": 756350,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/inclusive-canonical.txt",
+      "sha256": "e6d8693722aaff6c276c043e1291446b69a447c47dcfb685b95685cc9041c6bb"
+    },
+    "callgrind_00_raw": {
+      "bytes": 602399,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/callgrind.out",
+      "sha256": "029f332d8a2f036f744d6fddd69348ce7c73a1b9fde483fc75ff90ba71783381"
+    },
+    "callgrind_00_self": {
+      "bytes": 751833,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self.txt",
+      "sha256": "5c00151ad1a256af80a3cea48621e659c4f80cc84febb2a5d8d662d7652cf863"
+    },
+    "callgrind_00_self_command": {
+      "bytes": 1295,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self-command.json",
+      "sha256": "68c0a770b398bcee3f81d2c0e72a2f1894fa6f5ff1d366a74b33e94ff3071e86"
+    },
+    "callgrind_00_self_stderr": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "callgrind_01_inclusive": {
+      "bytes": 756965,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/inclusive-canonical.txt",
+      "sha256": "4ca8721c227dd46a8cb3d65a2c50228f63ede9ff50d275882b9380499dd29f4f"
+    },
+    "callgrind_01_raw": {
+      "bytes": 602634,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-01/callgrind.out",
+      "sha256": "9535567fb567534534714c9121d3dada776979332437fe872d10d5559cd792ed"
+    },
+    "callgrind_01_self": {
+      "bytes": 752444,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-01-self.txt",
+      "sha256": "235099398db83e6c98787979961ac61b88f6bc46cb3698539514c9caebfa7819"
+    },
+    "callgrind_01_self_command": {
+      "bytes": 1295,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-01-self-command.json",
+      "sha256": "f8948796cbdb2bd6d18f40e4477503dc93171b60daa99c5ddf8782232697fde8"
+    },
+    "callgrind_01_self_stderr": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-01-self.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "leaf_child_00": {
+      "bytes": 727369,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/leaf-samples.txt",
+      "sha256": "f7561aa9ae92be3026887dd9b980afaa632e1652782bc573e645484718fd10dc"
+    },
+    "leaf_child_00_self_symbols": {
+      "bytes": 54146,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/self-symbols.txt",
+      "sha256": "53dcdcbddc8c3b68ecfaf3c2cec761318c46e14d0fbb97c9978c3516e091e91f"
+    },
+    "leaf_child_01": {
+      "bytes": 730127,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-01/leaf-samples.txt",
+      "sha256": "0078a0d18690611ae8613c0ea64309c66a6026fa10d83c80a65c07e5158627bc"
+    },
+    "leaf_child_01_self_symbols": {
+      "bytes": 95189,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-01/self-symbols.txt",
+      "sha256": "f563c58864b7242012c7bd644db70fe7dd6dc61e98821e1e53267759cba11664"
+    },
+    "leaf_child_02": {
+      "bytes": 725556,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-02/leaf-samples.txt",
+      "sha256": "013334bd52729ed6d19dbcf6f011adde13713ba5827bb8251dc94bff1601392e"
+    },
+    "leaf_child_02_self_symbols": {
+      "bytes": 95189,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-02/self-symbols.txt",
+      "sha256": "c84c388198c00019d06b778cffe99a5d85393a1c48d12bfd1e4f488cde73d3b4"
+    },
+    "source_identity": {
+      "bytes": 2975,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/source-identity.json",
+      "sha256": "18f9d2d1fb8cd1b4185844a695603c94d45d4dd148594645b3eb46b715b24c0e"
+    }
+  },
+  "leaf_periods": {
+    "disjoint": true,
+    "event": "cycles:u",
+    "groups": [
+      "duplicate_check",
+      "bounded_output_reserve",
+      "mce_esc",
+      "mce_start",
+      "quick_xml_iter_state_next",
+      "mce_expand_parts",
+      "is_qualified_name",
+      "is_ncname",
+      "other"
+    ],
+    "profiles": [
+      {
+        "child": "child-00",
+        "groups": {
+          "bounded_output_reserve": {
+            "percent_of_total": 1.0827051405601085,
+            "period": 341263578,
+            "sample_count": 39
+          },
+          "duplicate_check": {
+            "percent_of_total": 0.8327414433850081,
+            "period": 262476194,
+            "sample_count": 30
+          },
+          "is_ncname": {
+            "percent_of_total": 1.8319790528433768,
+            "period": 577431198,
+            "sample_count": 66
+          },
+          "is_qualified_name": {
+            "percent_of_total": 0.5274373916031446,
+            "period": 166245790,
+            "sample_count": 19
+          },
+          "mce_esc": {
+            "percent_of_total": 0.13888613243215903,
+            "period": 43776257,
+            "sample_count": 5
+          },
+          "mce_expand_parts": {
+            "percent_of_total": 3.3308759086230495,
+            "period": 1049876451,
+            "sample_count": 120
+          },
+          "mce_start": {
+            "percent_of_total": 12.993706407034807,
+            "period": 4095555266,
+            "sample_count": 468
+          },
+          "other": {
+            "percent_of_total": 77.81802693224576,
+            "period": 24527876805,
+            "sample_count": 3018
+          },
+          "quick_xml_iter_state_next": {
+            "percent_of_total": 1.4436415912725913,
+            "period": 455029053,
+            "sample_count": 52
+          }
+        },
+        "input": {
+          "bytes": 727369,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-00/leaf-samples.txt",
+          "sha256": "f7561aa9ae92be3026887dd9b980afaa632e1652782bc573e645484718fd10dc"
+        },
+        "reconciliation": {
+          "expected_sample_count": 3817,
+          "expected_total_period": 31519530592,
+          "pass": true,
+          "sum_group_period": 31519530592,
+          "sum_group_sample_count": 3817
+        },
+        "sample_count": 3817,
+        "scope": "Disjoint sampled-IP leaf symbols from retained cycles:u profiles; native sample evidence only, no latency estimate.",
+        "total_period": 31519530592
+      },
+      {
+        "child": "child-01",
+        "groups": {
+          "bounded_output_reserve": {
+            "percent_of_total": 0.968465199263523,
+            "period": 306673764,
+            "sample_count": 35
+          },
+          "duplicate_check": {
+            "percent_of_total": 0.8022987649439706,
+            "period": 254055574,
+            "sample_count": 29
+          },
+          "is_ncname": {
+            "percent_of_total": 1.051456601731243,
+            "period": 332953785,
+            "sample_count": 38
+          },
+          "is_qualified_name": {
+            "percent_of_total": 0.44269451376250796,
+            "period": 140183450,
+            "sample_count": 16
+          },
+          "mce_esc": {
+            "percent_of_total": 0.027637873924940326,
+            "period": 8751797,
+            "sample_count": 1
+          },
+          "mce_expand_parts": {
+            "percent_of_total": 2.9315613197305557,
+            "period": 928306918,
+            "sample_count": 106
+          },
+          "mce_start": {
+            "percent_of_total": 13.136588171512155,
+            "period": 4159826232,
+            "sample_count": 475
+          },
+          "other": {
+            "percent_of_total": 79.36633393503855,
+            "period": 25132108393,
+            "sample_count": 3068
+          },
+          "quick_xml_iter_state_next": {
+            "percent_of_total": 1.2729636200925523,
+            "period": 403096100,
+            "sample_count": 46
+          }
+        },
+        "input": {
+          "bytes": 730127,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-01/leaf-samples.txt",
+          "sha256": "0078a0d18690611ae8613c0ea64309c66a6026fa10d83c80a65c07e5158627bc"
+        },
+        "reconciliation": {
+          "expected_sample_count": 3814,
+          "expected_total_period": 31665956013,
+          "pass": true,
+          "sum_group_period": 31665956013,
+          "sum_group_sample_count": 3814
+        },
+        "sample_count": 3814,
+        "scope": "Disjoint sampled-IP leaf symbols from retained cycles:u profiles; native sample evidence only, no latency estimate.",
+        "total_period": 31665956013
+      },
+      {
+        "child": "child-02",
+        "groups": {
+          "bounded_output_reserve": {
+            "percent_of_total": 1.0014821103102922,
+            "period": 314996475,
+            "sample_count": 36
+          },
+          "duplicate_check": {
+            "percent_of_total": 0.7515367396962399,
+            "period": 236381081,
+            "sample_count": 27
+          },
+          "is_ncname": {
+            "percent_of_total": 0.9186277637797331,
+            "period": 288936272,
+            "sample_count": 33
+          },
+          "is_qualified_name": {
+            "percent_of_total": 0.33372781848832767,
+            "period": 104967513,
+            "sample_count": 12
+          },
+          "mce_esc": {
+            "percent_of_total": 0.1668681679752711,
+            "period": 52485096,
+            "sample_count": 6
+          },
+          "mce_expand_parts": {
+            "percent_of_total": 3.6181679185754345,
+            "period": 1138023464,
+            "sample_count": 130
+          },
+          "mce_start": {
+            "percent_of_total": 13.497031461687376,
+            "period": 4245225441,
+            "sample_count": 485
+          },
+          "other": {
+            "percent_of_total": 78.2371781671414,
+            "period": 24607963620,
+            "sample_count": 3018
+          },
+          "quick_xml_iter_state_next": {
+            "percent_of_total": 1.4753798523459354,
+            "period": 464051677,
+            "sample_count": 53
+          }
+        },
+        "input": {
+          "bytes": 725556,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/capture/child-02/leaf-samples.txt",
+          "sha256": "013334bd52729ed6d19dbcf6f011adde13713ba5827bb8251dc94bff1601392e"
+        },
+        "reconciliation": {
+          "expected_sample_count": 3800,
+          "expected_total_period": 31453030639,
+          "pass": true,
+          "sum_group_period": 31453030639,
+          "sum_group_sample_count": 3800
+        },
+        "sample_count": 3800,
+        "scope": "Disjoint sampled-IP leaf symbols from retained cycles:u profiles; native sample evidence only, no latency estimate.",
+        "total_period": 31453030639
+      }
+    ]
+  },
+  "prior_evidence": {
+    "0892_callgrind_analysis": {
+      "bytes": 8883,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind-analysis.json",
+      "sha256": "4fe23865dee127a3b73e4fa3ff731b8a345d9b521447f46546bfd9b94824f522"
+    },
+    "0892_leaf_analysis": {
+      "bytes": 25951,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/self-analysis.json",
+      "sha256": "ec68184b494a4e60bdafd2f7d2beddf1853b97968770cfe88dc9b401eda1509c"
+    },
+    "0895_verification": {
+      "bytes": 1459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/verification.json",
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    },
+    "0897_analysis": {
+      "bytes": 468414,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/analysis.json",
+      "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+    },
+    "0899_allocation_custody_replay": {
+      "bytes": 1459,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/allocation-custody-replay.json",
+      "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+    },
+    "0899_profile_content_replay": {
+      "bytes": 9889,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/profile-content-replay.json",
+      "sha256": "4b50a86e61c4f9cd9635d76a35ca542f8bfa1d345c2de4068376182404dcc9a4"
+    }
+  },
+  "schema": "litchi.duplicate-attribution-analysis-0899.v1",
+  "scope": {
+    "adoption_decision": null,
+    "guest_instruction_callgrind": true,
+    "heaptrack_whole_process_stacks": true,
+    "interpretation": "Disjoint self/leaf rows are reconciled within their own profiler populations. Inclusive guest rows overlap and are context only; none is native time or end-to-end latency.",
+    "mode": "offline-only retained-artifact analysis",
+    "native_latency_claim": null,
+    "native_leaf_periods": true,
+    "performance_claim": null,
+    "source_baseline_revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+    "source_evaluation_head": "4f8f667983672776be8c747e89795195d15a3357"
+  },
+  "source_identity": {
+    "baseline_revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+    "evaluation_head": "4f8f667983672776be8c747e89795195d15a3357",
+    "quick_xml": {
+      "attributes_source": {
+        "bytes": 117680,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs",
+        "sha256": "c46448f11d7dba312e6ad2177dc31deab2ce51282e9f1e4069d3b35175c18518"
+      },
+      "cargo_checksum": "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1",
+      "crate": {
+        "bytes": 231661,
+        "path": "/home/zhuhe/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0.crate",
+        "sha256": "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
+      },
+      "registry_source_matches_checksum_verified_archive": true,
+      "version": "0.41.0"
+    },
+    "receipt": {
+      "bytes": 2975,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/source-identity.json",
+      "sha256": "18f9d2d1fb8cd1b4185844a695603c94d45d4dd148594645b3eb46b715b24c0e"
+    },
+    "sources": {
+      "crates/litchi-ooxml-common/src/mce/codec.rs": {
+        "bytes": 65338,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs",
+        "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+      },
+      "crates/litchi-opc/src/xml_attributes.rs": {
+        "bytes": 11642,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs",
+        "sha256": "6c7e5aeb66f1ca420f5e11af0bfa307ae1b5fd6aa29b4d3b5af57d6b9ec6fb56"
+      },
+      "crates/litchi-opc/src/xml_attributes/tests.rs": {
+        "bytes": 17857,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes/tests.rs",
+        "sha256": "6c7d024783556aab85af7c142953fe0a09a848e9f6afde814f0f83523b29f098"
+      },
+      "tools/perf-baseline/Cargo.lock": {
+        "bytes": 56289,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      "tools/perf-baseline/src/producer_shape.rs": {
+        "bytes": 142118,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape.rs",
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      }
+    },
+    "verified_selected_files": 10771
+  },
+  "status": "pass"
+}

@@ -1,0 +1,45 @@
+{
+  "capture": {
+    "children": 4,
+    "guard_children": 4,
+    "receipt": {
+      "bytes": 1577,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/capture-v1/capture.json",
+      "sha256": "f1e5274e724a65e226462f96e24fd166d25f3b5b893178679cf6e338461e8fc3"
+    }
+  },
+  "children": 4,
+  "export": {
+    "profiles": 4,
+    "receipt": {
+      "bytes": 1769,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/export-v1/export.json",
+      "sha256": "c68654a8237878513df79fe643c38dd75943b5adc4df8e3ea1477a338b737d73"
+    }
+  },
+  "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+  "measured_samples": 80,
+  "performance_claim": null,
+  "plan": {
+    "bytes": 16698,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/plan.json",
+    "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+  },
+  "profiler_workload_launched": false,
+  "reduction": {
+    "bytes": 24902579,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0895/reduction.json",
+    "sha256": "67773fad7f6ca259d4829953c08a08fd1ed0f4d77f6f972dbac8b50c609db79c"
+  },
+  "schema": "litchi.xlsx-selected-metadata-heaptrack-verification-0895.v1",
+  "status": "pass",
+  "workload_launched": false
+}

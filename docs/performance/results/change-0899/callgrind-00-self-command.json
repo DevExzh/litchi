@@ -1,0 +1,34 @@
+{
+  "status": "pass",
+  "argv": [
+    "/usr/bin/callgrind_annotate",
+    "--inclusive=no",
+    "--threshold=100",
+    "--auto=no",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/callgrind.out"
+  ],
+  "exit_code": 0,
+  "started_utc": "2026-10-04T02:24:59.340955+00:00",
+  "finished_utc": "2026-10-04T02:24:59.539788+00:00",
+  "input": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0892/callgrind/callgrind-00/callgrind.out",
+    "bytes": 602399,
+    "sha256": "029f332d8a2f036f744d6fddd69348ce7c73a1b9fde483fc75ff90ba71783381"
+  },
+  "output": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self.txt",
+    "bytes": 751833,
+    "sha256": "5c00151ad1a256af80a3cea48621e659c4f80cc84febb2a5d8d662d7652cf863"
+  },
+  "stderr": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0899/callgrind-00-self.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "tool": {
+    "path": "/usr/bin/callgrind_annotate",
+    "bytes": 44669,
+    "sha256": "7f6c574f2df13fc35bbf238c6a69444e2ba88cf30a795c493c6d304ebf4ffc6a"
+  },
+  "scope": "Offline annotation of existing raw profile; no workload or profiler capture launched"
+}

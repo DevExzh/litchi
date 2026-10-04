@@ -1,0 +1,19 @@
+{
+  "status": "retained_failures",
+  "workload_launched": false,
+  "attempts": [
+    {
+      "kind": "original0892strictverifier",
+      "exit_code": 1,
+      "exception": "ValueError: callgrind-00/callgrind.out mode mismatch",
+      "output_created": false
+    },
+    {
+      "kind": "0899explicit-content-adapter-v1",
+      "exit_code": 1,
+      "exception": "KeyError: profile0892 during dynamic import registration",
+      "output_created": false,
+      "helper_sha256": "9b8fc6d078a840d9a879798a1be2c9684ff2e5c6e85a98be707a1961e87a91d7"
+    }
+  ]
+}
