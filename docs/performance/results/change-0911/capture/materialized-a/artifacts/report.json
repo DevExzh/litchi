@@ -1,0 +1,77 @@
+{
+  "schema": "pptx-owned-input-benchmark-v1",
+  "status": "completed",
+  "route": "materialized",
+  "implementation": "OwnedSource(Vec) -> SourceBackedPackage::from_read_at -> into_opc_package -> Package::from_opc_package",
+  "warmup_iterations": 0,
+  "measured_samples": 1,
+  "corpus": {
+    "name": "pptx-source-backed-media",
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "package_format": "PPTX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 229,
+    "archive_member_count": 445,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 17568429,
+    "archive_bytes": 17017139,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "target_entry": "slide:100/shape:0",
+    "target_payload_bytes": 52,
+    "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+    "xlsx": null
+  },
+  "source": {
+    "file": "source.pptx",
+    "bytes": 17017139,
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "output": {
+    "file": "output.pptx",
+    "bytes": 17017145,
+    "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+  },
+  "sink_capacity_bytes": 34099814,
+  "sink_max_write_bytes": 65536,
+  "selected_slide_positions": [
+    0,
+    28,
+    57,
+    85,
+    114,
+    142,
+    171,
+    199
+  ],
+  "replacement_count": 64,
+  "timing_scope": "one fresh Vec clone plus route ingress, opened transaction snapshot, 64 text replacements and commit, commit publication, Package::to_bytes, and the identical bounded sink writes; one route per process",
+  "phase_scope": "clone_ns is source.to_vec; ingress_ns begins after the clone and ends after route package construction; snapshot_ns is opened_presentation_transaction; edit_commit_ns is all selected shape replacements plus commit; publish_ns is apply_opened_presentation_commit, to_bytes, and identical 64 KiB sequential sink writes",
+  "teardown_scope": "total_ns stops after the timed body drops the package, transaction, source owner, output Vec, and route-local state; the preallocated sink is retained after the boundary",
+  "verification_scope": "semantic output, digest stability, source identity, sink counters, and artifact writes occur outside measured timers",
+  "performance_claim": "none; descriptive paired phase evidence only, with no inferred speedup, allocation result, or production recommendation",
+  "samples": [
+    {
+      "index": 0,
+      "clone_ns": 5499059,
+      "ingress_ns": 912367396,
+      "snapshot_ns": 652999239,
+      "edit_commit_ns": 158298351,
+      "publish_ns": 9084142974,
+      "total_ns": 10819034909,
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "output_bytes": 17017145,
+      "sink_write_calls": 260,
+      "sink_largest_write": 65536
+    }
+  ],
+  "gates": {
+    "source_identity_verified": true,
+    "source_shape_verified": true,
+    "semantic_output_verified": true,
+    "stable_output_verified": true,
+    "sink_verified": true,
+    "source_immutability_verified": true
+  }
+}

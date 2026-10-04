@@ -1,0 +1,14 @@
+==389483== Callgrind, a call-graph generating cache profiler
+==389483== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==389483== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==389483== Command: /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native owned 0 1 /home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/artifacts
+==389483== 
+==389483== For interactive control, run 'callgrind_control -h'.
+==389483== brk segment overflow in thread #1: can't grow to 0x4fdb000
+==389483== (see section Limitations in user manual)
+==389483== NOTE: further instances of this message will not be shown
+==389483== 
+==389483== Events    : Ir
+==389483== Collected : 1226489836
+==389483== 
+==389483== I   refs:      1,226,489,836

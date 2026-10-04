@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0911 — bounded snapshot attribution, no production adoption
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) separates fixture setup
+from the measured cold opened transaction in four same-binary profiles. Both
+initial scope failures are retained, and all final semantic and raw-counter
+gates pass. Software SHA dispatch limits interpretation of guest costs; native
+attribution remains the next gate. No latency, allocation or new speedup claim.
+
 ## 0910 — comparable owning-input PPTX measurement
 
 [0910](0910-pptx-owning-input-native-control.md) retains 12 alternating process

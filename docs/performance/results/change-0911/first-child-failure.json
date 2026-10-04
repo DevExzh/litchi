@@ -1,0 +1,199 @@
+{
+  "schema": "litchi.pptx-snapshot-instruction-profile-0911-first-child-admission-failure.v1",
+  "status": "rejected",
+  "attempt": "v1",
+  "label": "materialized-a",
+  "route": "materialized",
+  "reason_code": "extra_positive_owner_interval_from_corpus_builder",
+  "reason": "The first child executed the selected owner once while build_pptx_source_edit_corpus was constructing the benchmark corpus and once from timed_iteration. The v1 owner-scoped collection therefore emitted two positive dumps with different callers. The protocol requires exactly one positive owner edge from timed_iteration, so this child is not admitted.",
+  "protocol": {
+    "schema": "litchi.pptx-snapshot-instruction-profile-0911.v1",
+    "owner": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "required_parent": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+    "options": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_pptx::package::model::Package::opened_presentation_transaction",
+      "--zero-before=litchi_pptx::package::model::Package::opened_presentation_transaction",
+      "--dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction"
+    ],
+    "warmup": 0,
+    "samples": 1,
+    "cpu": 12
+  },
+  "bindings": {
+    "evidence_parent": "52a27130589915884be5fd10bb1ade2f835ed32e",
+    "compiled_source_parent": "468fe2931d6532c32f4c6608590816b8eaa88e31",
+    "binary": {
+      "path": "docs/performance/results/change-0910/binaries/native",
+      "bytes": 9301456,
+      "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+    },
+    "plan": {
+      "path": "docs/performance/results/change-0911/plan.json",
+      "bytes": 6031,
+      "sha256": "f7f56da7606833fae93dc862a64d2910ed7b1c358bde3d63843891a05376a2d2"
+    },
+    "capture_helper": {
+      "path": "docs/performance/results/change-0911/capture.py",
+      "bytes": 8178,
+      "sha256": "d2fae5909e587d5a76627522011f7b498bb42de85695ad3b6fcb7679922c8099"
+    },
+    "protocol_review": {
+      "path": "docs/performance/results/change-0911/protocol-review.md",
+      "bytes": 10019,
+      "sha256": "184de944ccf0043954ea405f0d4f98db70acb212a24bca73498973dc777d26f5"
+    },
+    "protocol_clarification": {
+      "path": "docs/performance/results/change-0911/protocol-clarification.md",
+      "bytes": 3554,
+      "sha256": "aecacb5035499c38cc3fbb5c015ce8618f9cb5b19a9b0d9d83766d9d183d30c9"
+    },
+    "owner_symbols": {
+      "path": "docs/performance/results/change-0911/owner-symbols.txt",
+      "bytes": 168,
+      "sha256": "0120d0338b9fde3ed088683dbdbc7457a4230b20d6a9da09e5e3ad3593d776bd"
+    },
+    "reader": {
+      "path": "docs/performance/results/change-0845/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    }
+  },
+  "command": {
+    "path": "docs/performance/results/change-0911/capture/materialized-a/command.json",
+    "bytes": 4033,
+    "sha256": "dbdbd172d3836daca24cb2934d6c85c525f54048edb8d943b856b34bea53ac77",
+    "exit_code": 0,
+    "start": {
+      "path": "docs/performance/results/change-0911/capture/materialized-a/start.json",
+      "bytes": 1747,
+      "sha256": "60867fce0df04e553c39696f0dd2322feb630ba77a3bee58f9f8050a42fef66b"
+    },
+    "argv_matches_plan": true,
+    "binary_matches_plan": true,
+    "environment_matches_plan": true,
+    "cpu_affinity_matches_plan": true
+  },
+  "raw_dumps": [
+    {
+      "part": 1,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/callgrind.out.1",
+      "bytes": 74795,
+      "sha256": "319a21fa8295973e269efc2b16276cf247c4b6727d08aef14d5fdce1aa350be8",
+      "header": {
+        "events": ["Ir"],
+        "summary_ir": 126617815,
+        "totals_ir": 126617815,
+        "part": 1,
+        "trigger": "--dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction"
+      },
+      "owner": {
+        "id": 1920,
+        "calls": 1,
+        "inclusive_ir": 126617815,
+        "caller": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+        "caller_id": 862,
+        "line": 3639,
+        "position": "0",
+        "file": "???",
+        "callee": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+        "callee_id": 1920,
+        "self_ir": 53,
+        "direct_children_ir": 126617762,
+        "all_function_self_ir": 126617815,
+        "direct_child_count": 5
+      },
+      "classification": "rejected_setup_corpus_owner_call"
+    },
+    {
+      "part": 2,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/callgrind.out.2",
+      "bytes": 75172,
+      "sha256": "24e185756962834f47d083af89746c485ab80d13cbdb2c2f7d6b8f1a979d16d7",
+      "header": {
+        "events": ["Ir"],
+        "summary_ir": 1000613578,
+        "totals_ir": 1000613578,
+        "part": 2,
+        "trigger": "--dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction"
+      },
+      "owner": {
+        "id": 1920,
+        "calls": 1,
+        "inclusive_ir": 1000613578,
+        "caller": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+        "caller_id": 2380,
+        "line": 5685,
+        "position": "0",
+        "file": "???",
+        "callee": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+        "callee_id": 1920,
+        "self_ir": 53,
+        "direct_children_ir": 1000613525,
+        "all_function_self_ir": 1000613578,
+        "direct_child_count": 5
+      },
+      "classification": "measured_parent_edge_present_but_not_admissible_alone"
+    }
+  ],
+  "terminal": {
+    "path": "docs/performance/results/change-0911/capture/materialized-a/callgrind.out",
+    "bytes": 463,
+    "sha256": "2fd0f6bb44f4dab8c6290cefebe21c8a5af5907bd26e7992a85a56ec86c321e7",
+    "header": {
+      "events": ["Ir"],
+      "summary_ir": 0,
+      "totals_ir": 0,
+      "part": 3,
+      "trigger": "Program termination"
+    }
+  },
+  "workload": {
+    "semantics": {
+      "path": "docs/performance/results/change-0911/capture/materialized-a/semantics.json",
+      "bytes": 1751,
+      "sha256": "f9d386ad47f9400a74749e9c6ecbb09a2265bb55dfeb9ea3c34a973e8d4514ba",
+      "status": "pass"
+    },
+    "report": {
+      "path": "docs/performance/results/change-0911/capture/materialized-a/artifacts/report.json",
+      "bytes": 3179,
+      "sha256": "9af5a21535a8c6d3e996c9277c80470d49a61ab0b4a738dcc15be6ea9c1acc65"
+    },
+    "source": {
+      "path": "docs/performance/results/change-0911/capture/materialized-a/artifacts/source.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    "output": {
+      "path": "docs/performance/results/change-0911/capture/materialized-a/artifacts/output.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    "semantic_and_corpus_gates_pass": true
+  },
+  "checks": {
+    "binary_hash_bound": true,
+    "owner_symbol_unique_in_nm": true,
+    "command_options_exact_v1": true,
+    "callgrind_event_is_exactly_ir": true,
+    "positive_dump_summary_equals_totals": true,
+    "owner_partition_conserved_in_each_dump": true,
+    "all_function_self_cost_conserved_in_each_dump": true,
+    "terminal_dump_is_zero": true,
+    "first_positive_owner_edge_from_required_parent": false,
+    "timed_iteration_owner_edge_present": true,
+    "positive_owner_dump_count_is_one": false,
+    "extra_positive_owner_edge_explained": false,
+    "admission": false
+  },
+  "cause": {
+    "raw_observation": "callgrind.out.1 records build_pptx_source_edit_corpus -> opened_presentation_transaction; callgrind.out.2 records timed_iteration -> opened_presentation_transaction",
+    "source_path": "tools/perf-baseline/src/lib.rs",
+    "source_calls": [16937, 16978],
+    "source_function": "build_pptx_source_edit_corpus",
+    "mechanism": "The benchmark process constructs the generated corpus before entering timed_iteration, and that corpus construction itself uses the same transaction owner. With zero-before and dump-after bound to the owner, Callgrind creates one positive scoped part for each dynamic owner call.",
+    "policy": "The part-1 setup interval is retained as evidence. It is not subtracted, relabeled, or discarded; the part-2 timed interval is not admitted independently from the failed first-child packet."
+  }
+}

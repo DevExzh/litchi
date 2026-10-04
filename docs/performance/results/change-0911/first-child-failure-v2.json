@@ -1,0 +1,176 @@
+{
+  "schema": "litchi.pptx-snapshot-instruction-profile-0911-first-child-admission-failure.v2",
+  "status": "rejected",
+  "attempt": "v2",
+  "label": "materialized-a",
+  "route": "materialized",
+  "reason_code": "reset_scoped_dump_contains_two_positive_owner_edges",
+  "reason": "The v2 dump is triggered after timed_iteration and has conserved Ir, but its raw owner graph retains two positive incoming owner edges: the reachable setup corpus call and the measured timed_iteration call. The v2 protocol requires exactly one positive owner edge in the accepted dump, so this child is not admitted.",
+  "protocol": {
+    "schema": "litchi.pptx-snapshot-instruction-profile-0911.v2",
+    "owner": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "required_parent": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+    "options": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_pptx::package::model::Package::opened_presentation_transaction",
+      "--zero-before=litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+      "--dump-after=litchi_perf_baseline::pptx_owned_benchmark::timed_iteration"
+    ],
+    "warmup": 0,
+    "samples": 1,
+    "cpu": 12
+  },
+  "bindings": {
+    "evidence_parent": "52a27130589915884be5fd10bb1ade2f835ed32e",
+    "compiled_source_parent": "468fe2931d6532c32f4c6608590816b8eaa88e31",
+    "binary": {
+      "path": "docs/performance/results/change-0910/binaries/native",
+      "bytes": 9301456,
+      "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+    },
+    "plan": {
+      "path": "docs/performance/results/change-0911/plan-v2.json",
+      "bytes": 7187,
+      "sha256": "796615b6d15bd3c8c40961100f65ddd628d6f8435d8642004ea0381a1c1a32f1"
+    },
+    "capture_helper": {
+      "path": "docs/performance/results/change-0911/capture_v2.py",
+      "bytes": 8468,
+      "sha256": "af6be91d565d481607b76b95cb9ecaa778c25378f93d16c951a0e36b1cbbd501"
+    },
+    "protocol_review": {
+      "path": "docs/performance/results/change-0911/protocol-review-v2.md",
+      "bytes": 8033,
+      "sha256": "6ea5925abef18e3a863025ec17534396f8c2334975d17b5eac08c2272f1c148c"
+    },
+    "v1_failure": {
+      "path": "docs/performance/results/change-0911/first-child-failure.json",
+      "bytes": 8443,
+      "sha256": "9b95c86e2575fc7aa7f6aee47b6a57492d9a1e843855f538bb5d987e0e7992e0"
+    },
+    "owner_symbols": {
+      "path": "docs/performance/results/change-0911/owner-symbols-v2.txt",
+      "bytes": 168,
+      "sha256": "0120d0338b9fde3ed088683dbdbc7457a4230b20d6a9da09e5e3ad3593d776bd"
+    },
+    "reader": {
+      "path": "docs/performance/results/change-0845/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    }
+  },
+  "command": {
+    "path": "docs/performance/results/change-0911/capture-v2/materialized-a/command.json",
+    "bytes": 3812,
+    "sha256": "db0611e0fab4dea345768ab6e4247f5f261feaef78a55749d0fbe310eeb9b5a3",
+    "exit_code": 0,
+    "start": {
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/start.json",
+      "bytes": 1739,
+      "sha256": "24f451bdebab2bdefe9b2ee76f59b7aa96dbf3b64695e40d7fc6ea7ea31086c4"
+    },
+    "argv_matches_plan": true,
+    "binary_matches_plan": true,
+    "environment_matches_plan": true,
+    "cpu_affinity_matches_plan": true
+  },
+  "raw_dump": {
+    "path": "docs/performance/results/change-0911/capture-v2/materialized-a/callgrind.out.1",
+    "bytes": 77841,
+    "sha256": "d0b1b89cb86106a717ef905f8ae975436599c77ca7e3024911a181a6ecc041cc",
+    "header": {
+      "events": ["Ir"],
+      "summary_ir": 1127351444,
+      "totals_ir": 1127351444,
+      "part": 1,
+      "trigger": "--dump-after=litchi_perf_baseline::pptx_owned_benchmark::timed_iteration"
+    },
+    "owner": {
+      "id": 1920,
+      "self_ir": 106,
+      "direct_children_ir": 1127351338,
+      "all_function_self_ir": 1127351444,
+      "direct_child_count": 5,
+      "incoming": [
+        {
+          "caller": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+          "caller_id": 2380,
+          "callee": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+          "callee_id": 1920,
+          "calls": 1,
+          "inclusive_ir": 1000676539,
+          "line": 2832,
+          "position": "0",
+          "file": "???"
+        },
+        {
+          "caller": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+          "caller_id": 862,
+          "callee": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+          "callee_id": 1920,
+          "calls": 1,
+          "inclusive_ir": 126674905,
+          "line": 4548,
+          "position": "0",
+          "file": "???"
+        }
+      ]
+    }
+  },
+  "terminal": {
+    "path": "docs/performance/results/change-0911/capture-v2/materialized-a/callgrind.out",
+    "bytes": 466,
+    "sha256": "4d7802d56d7b9b19f1c51026e9aac29f4de083b37ec659ba003f9bdf4b39294a",
+    "header": {
+      "events": ["Ir"],
+      "summary_ir": 0,
+      "totals_ir": 0,
+      "part": 2,
+      "trigger": "Program termination"
+    }
+  },
+  "workload": {
+    "semantics": {
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/semantics.json",
+      "bytes": 1754,
+      "sha256": "5b4a82108521865e9b7719795b0b4929c648210b9b3dcecba54e5cf777be61dc",
+      "status": "pass"
+    },
+    "report": {
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/artifacts/report.json",
+      "bytes": 3179,
+      "sha256": "c324d6d5eccdfabadffc10768d4bcef3e972658d6aeebef598af3424a890b300"
+    },
+    "source": {
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/artifacts/source.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    "output": {
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/artifacts/output.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    "semantic_and_corpus_gates_pass": true
+  },
+  "checks": {
+    "binary_hash_bound": true,
+    "owner_symbol_unique_in_nm": true,
+    "command_options_exact_v2": true,
+    "callgrind_event_is_exactly_ir": true,
+    "positive_dump_summary_equals_totals": true,
+    "owner_partition_conserved": true,
+    "all_function_self_cost_conserved": true,
+    "terminal_dump_is_zero": true,
+    "timed_iteration_owner_edge_present": true,
+    "setup_owner_edge_present": true,
+    "positive_owner_edge_count_is_one": false,
+    "admission": false
+  },
+  "cause": {
+    "raw_observation": "The timed_iteration-triggered dump contains both timed_iteration -> owner (1,000,676,539 Ir) and build_pptx_source_edit_corpus -> owner (126,674,905 Ir).",
+    "interpretation": "The raw graph retains a positive setup owner edge in the reset-scoped dump. This receipt records the observation without asserting a Valgrind reset implementation detail or subtracting the setup interval.",
+    "policy": "The v2 child is rejected under its exact-one-owner-edge protocol. Neither edge is discarded or combined into a qualified snapshot result."
+  }
+}

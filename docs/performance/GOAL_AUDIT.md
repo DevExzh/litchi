@@ -1,5 +1,13 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0911 — cold snapshot scope qualified; native attribution remains open
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) closes the profiling
+scope gap identified after 0910, with independently conserved setup and measured
+owner contexts. It adds bounded generated-fixture instruction evidence, not an
+adopted optimization or a native hotspot proof. Broader CRUD/input coverage,
+allocation and scaling remain open; ODF is deferred and iWork excluded.
+
 ## 0910 — owning-route baseline closes a PPTX interpretation gap
 
 [0910](0910-pptx-owning-input-native-control.md) provides a comparable native

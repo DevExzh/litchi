@@ -1,0 +1,183 @@
+{
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "compiled_source_parent": "468fe2931d6532c32f4c6608590816b8eaa88e31",
+  "cpu": 12,
+  "created_utc": "2026-10-04T09:24:55.068259+00:00",
+  "cwd": "/tmp/litchi-0911-run-v2",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "evidence_parent": "52a27130589915884be5fd10bb1ade2f835ed32e",
+  "helper": {
+    "bytes": 8468,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture_v2.py",
+    "sha256": "af6be91d565d481607b76b95cb9ecaa778c25378f93d16c951a0e36b1cbbd501"
+  },
+  "inputs": [
+    {
+      "bytes": 1756112,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/source-v1.json",
+      "sha256": "7a6d1310fb97dde1f275ec8702efabbef2cfb643c9ee4c1178169fed53aa4586"
+    },
+    {
+      "bytes": 1029,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/source-base.json",
+      "sha256": "d8395085b8d5ca08c20bcea6ebbe77de9c306a7165e8d5e90cf170f9655caf7d"
+    },
+    {
+      "bytes": 21717,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/source-overlay-v1.patch",
+      "sha256": "da5abaaf2635263ece50784529aa85537ca04442cf707dd7fbfcb9c6a3dc7fbd"
+    },
+    {
+      "bytes": 397,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binary.json",
+      "sha256": "b551a9bdc5b3ca1d4f2f27efdc91252edab8c280f0705cf6a14bec45f6561748"
+    },
+    {
+      "bytes": 2065,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/build-v1/command.json",
+      "sha256": "092a714b08043212bd001f7861e51e8a9d43989077855ee1a1953d0e1b951a05"
+    },
+    {
+      "bytes": 2031,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/quality-v1/fmt/command.json",
+      "sha256": "1a165923b75a839589b74d074c531b63a88b674f3715806476462d16b04c9e8a"
+    },
+    {
+      "bytes": 1920,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/quality-v1/clippy/command.json",
+      "sha256": "0da01e867f0959e4cedd8e2a2b3fed4faea9e2ab844553f18997feb4fb75ba86"
+    },
+    {
+      "bytes": 340498,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/analysis.json",
+      "sha256": "62f8dcd7ad6f226d1e5d3527bd6afdcce5ca12775d1a826bb5b6fda105f7acf2"
+    },
+    {
+      "bytes": 281,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/replay-after-cleanup.json",
+      "sha256": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257"
+    },
+    {
+      "bytes": 41191,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/closure.json",
+      "sha256": "bc23cf57306d3539d00843d9491fc76d30b15ca250c0a6d737a63772757cf36e"
+    },
+    {
+      "bytes": 10764,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-materialized/artifacts/report.json",
+      "sha256": "167b382cd000f55483cf635ffb3861cc34a552b128cdf1f4c64e04de506fd6bc"
+    },
+    {
+      "bytes": 10617,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-owned/artifacts/report.json",
+      "sha256": "cb6102c26074ff55d7635148790f43f52c103cfafee81b543d50219e98db5047"
+    },
+    {
+      "bytes": 168,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/owner-symbols-v2.txt",
+      "sha256": "0120d0338b9fde3ed088683dbdbc7457a4230b20d6a9da09e5e3ad3593d776bd"
+    },
+    {
+      "bytes": 63017,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_v2.py",
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "bytes": 8033,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/protocol-review-v2.md",
+      "sha256": "6ea5925abef18e3a863025ec17534396f8c2334975d17b5eac08c2272f1c148c"
+    },
+    {
+      "bytes": 3554,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/protocol-clarification.md",
+      "sha256": "aecacb5035499c38cc3fbb5c015ce8618f9cb5b19a9b0d9d83766d9d183d30c9"
+    },
+    {
+      "bytes": 8443,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/first-child-failure.json",
+      "sha256": "9b95c86e2575fc7aa7f6aee47b6a57492d9a1e843855f538bb5d987e0e7992e0"
+    },
+    {
+      "bytes": 2344,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/first-child-failure.md",
+      "sha256": "d0214064a3616cd74258208e8884018a5d4ce8abdac86d6a1d0b74089a47ee18"
+    },
+    {
+      "bytes": 6031,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/plan.json",
+      "sha256": "f7f56da7606833fae93dc862a64d2910ed7b1c358bde3d63843891a05376a2d2"
+    },
+    {
+      "bytes": 8178,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture.py",
+      "sha256": "d2fae5909e587d5a76627522011f7b498bb42de85695ad3b6fcb7679922c8099"
+    }
+  ],
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--zero-before=litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+    "--dump-after=litchi_perf_baseline::pptx_owned_benchmark::timed_iteration"
+  ],
+  "owner": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+  "parent": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+  "samples": 1,
+  "schedule": [
+    {
+      "index": 0,
+      "kind": "materialized",
+      "label": "materialized-a"
+    },
+    {
+      "index": 1,
+      "kind": "owned",
+      "label": "owned-a"
+    },
+    {
+      "index": 2,
+      "kind": "owned",
+      "label": "owned-b"
+    },
+    {
+      "index": 3,
+      "kind": "materialized",
+      "label": "materialized-b"
+    }
+  ],
+  "schema": "litchi.pptx-snapshot-instruction-profile-0911.v2",
+  "scope": "Ir collected inside opened_presentation_transaction, reset before and dumped after timed_iteration. Pre-reset setup is excluded; process-level Collected may differ. First child requires one owner entry from timed_iteration, a nonzero snapshot dump and a zero terminal dump. Instrumented elapsed durations are not native timing. No allocation, CPU-cycle or codec-byte inference.",
+  "tools": [
+    {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    {
+      "bytes": 528,
+      "path": "/usr/bin/valgrind",
+      "sha256": "4652774bd116cb49951ef74115ad4237cad5021b2bd4d80002f09d986ec438b9"
+    },
+    {
+      "bytes": 2700304,
+      "path": "/usr/libexec/valgrind/callgrind-amd64-linux",
+      "sha256": "0b411771104cca10984c00a6c6c76bc54ebc989ae7e7a8c2f5e1ba4fec0e427d"
+    },
+    {
+      "bytes": 48712,
+      "path": "/usr/bin/x86_64-linux-gnu-nm",
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009"
+    }
+  ],
+  "valgrind_version": "valgrind-3.26.0",
+  "warmup": 0
+}

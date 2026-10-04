@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0911 — PPTX cold snapshot instruction control
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) retains four admitted
+same-binary captures, with setup and measured transaction contexts separated by
+exact callers. Materialized snapshot counts are 1.000594–1.000667 billion Ir;
+owning counts are 1.099869–1.099913 billion Ir. These guest instruction counts
+are separate from the 0910 native timing result. No production change.
+
 ## 0910 — native PPTX owning-input control
 
 [0910](0910-pptx-owning-input-native-control.md) compares existing routes in

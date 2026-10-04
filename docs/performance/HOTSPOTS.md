@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0911 — qualify native dispatch before optimizing the snapshot
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) attributes cold snapshot
+work with exact caller gates. Software SHA-256 dominates the guest instruction
+profile; this cannot establish its native time share on a SHA-capable host.
+Owning input also exposes deferred payload access under complete-package
+fingerprinting. Confirm native dispatch and phase costs before choosing a
+production change; preserve source/revision binding and deferred-error behavior.
+
 ## 0910 — owning input changes the PPTX priority
 
 [0910](0910-pptx-owning-input-native-control.md) measures publication p50 at

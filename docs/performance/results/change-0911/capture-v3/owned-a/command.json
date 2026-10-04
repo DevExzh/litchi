@@ -1,0 +1,106 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--zero-before=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "owned",
+    "0",
+    "1",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/artifacts"
+  ],
+  "artifacts": [
+    {
+      "bytes": 17017145,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 3091,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/artifacts/report.json",
+      "sha256": "eada7b87f357e8abee4c94182f26e4799290d520c5ffff932bd85dbd2d9cd47f"
+    },
+    {
+      "bytes": 17017139,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 452,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out",
+      "sha256": "56ab642407f10022d7937b09d3ee17a85937ccd8fdc9da867264f99914da1938"
+    },
+    {
+      "bytes": 74647,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out.1",
+      "sha256": "166bd77e4969337b24264c6b2d05901f47e7daa813db3938d255773b71aa00c4"
+    },
+    {
+      "bytes": 84889,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out.2",
+      "sha256": "71a7b94b0869a13ae7c8d0ed48172bb4540cb51adb1edaad7dfafe898ad08a4d"
+    },
+    {
+      "bytes": 1727,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/start.json",
+      "sha256": "28386338112f046846386142725577cb86b714de5f34dc3baf2bcf85ba15dae0"
+    },
+    {
+      "bytes": 807,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/stderr.txt",
+      "sha256": "e58553249352366f75aa607d1e6ea7ad972315714c56c76c42a8e863be4b6494"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-a/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cwd": "/tmp/litchi-0911-run-v3",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T09:32:24.334079+00:00",
+  "helper": {
+    "bytes": 8724,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture_v3.py",
+    "sha256": "fd861ce82b9eb44ea6e41cfa19e00ef7a65ab70f47785cd127cd758325a78523"
+  },
+  "load_after": [
+    18.685546875,
+    21.400390625,
+    22.5419921875
+  ],
+  "load_before": [
+    18.16455078125,
+    21.54296875,
+    22.6181640625
+  ],
+  "plan": {
+    "bytes": 8262,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/plan-v3.json",
+    "sha256": "28366047e447183badd9d7a91f10e82bc6e17a5de82529a4ef8da859b4034089"
+  },
+  "row": {
+    "index": 1,
+    "kind": "owned",
+    "label": "owned-a"
+  },
+  "started_utc": "2026-10-04T09:31:58.669022+00:00"
+}
