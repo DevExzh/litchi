@@ -45,6 +45,7 @@ Office round trips.
 | [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
 | [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
 | [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) |
+| [0033](0033-unified-operations-api.md) | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains
@@ -63,10 +64,11 @@ the table.
 
 | ADR | Proposed | Decision |
 |---|---|---|
-| [0033](0033-unified-operations-api.md) | 2026-10-04 | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
+| _none_ | | |
 
-ADR 0033 was proposed by unified-ops change record 0004, which also registers
-the inert `litchi-ops` scaffold in the topology gates.
+ADR 0033, proposed on 2026-10-04 by unified-ops change record 0004, was
+accepted the same day by the owner's decision recorded in
+[unified-ops record 0006](../unified-ops/0006-owner-accepts-adr-0033.md).
 
 Earlier proposals have all been accepted. ADR 0030 and ADR 0031, proposed on
 2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in

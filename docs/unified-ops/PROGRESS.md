@@ -11,6 +11,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | 0003 | M0a facade migration plan (flat `File`, `litchi::open`) | in progress |
 | 0004 | ADR 0033 draft + `litchi-ops` scaffold + gate registration | merged (`af70966a6d`) |
 | 0005 | M0b path/selector grammar in `litchi-core::selector` | in progress |
+| 0006 | Owner accepts ADR 0033 | done |
 
 ## Awaiting owner confirmation
 
@@ -26,4 +27,4 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 ## Awaiting owner decision
 
-- **ADR 0033 acceptance.** The ADR index forbids code resting on a proposed record. M0a/M2 code needs 0033 accepted.
+- ~~ADR 0033 acceptance~~ — accepted 2026-10-04 (record 0006).
