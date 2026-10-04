@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0907 — current PPTX evidence, broad goal still open
+
+[0907](0907-pptx-multi-slide-current-baseline.md) replaces stale timing as the
+basis for the next PPTX profile: 800 fresh guarded-workflow samples with exact
+source/binary/report bindings. It does not establish raw ZIP header fidelity,
+producer representativeness, cold/range behavior, allocation/RSS improvement,
+or comprehensive CRUD coverage. Route-specific phase attribution remains
+necessary before a production candidate. ODF is deferred, iWork excluded,
+and integration is pending the unrelated target cherry-pick.
+
 ## 0906 — remaining coverage is explicit
 
 [0906](0906-office-coverage-qualification.md) verifies the 534-selector registry

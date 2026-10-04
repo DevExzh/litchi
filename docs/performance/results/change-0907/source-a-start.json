@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/target/litchi-0907-build/release/litchi-perf-baseline",
+    "--case",
+    "pptx_source_backed_multi_slide_batch_edit_save",
+    "--workers",
+    "1",
+    "--warmup",
+    "30",
+    "--samples",
+    "200",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source-a.json"
+  ],
+  "binary": {
+    "bytes": 264596744,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0907-build/release/litchi-perf-baseline",
+    "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84"
+  },
+  "cwd": "/tmp/litchi-0907-src",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "load_before": [
+    20.48779296875,
+    19.818359375,
+    19.34716796875
+  ],
+  "started_utc": "2026-10-04T07:01:10.955845+00:00"
+}

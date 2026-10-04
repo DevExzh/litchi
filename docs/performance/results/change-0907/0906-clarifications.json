@@ -1,0 +1,17 @@
+{
+  "scope": "Corrections to the immutable 0906 audit; original retained unchanged.",
+  "corrections": [
+    {
+      "topic": "CLI output option",
+      "old": "--output PATH",
+      "correct": "--json PATH",
+      "source": "tools/perf-baseline/src/lib.rs:13011"
+    },
+    {
+      "topic": "source-backed post-publication checks",
+      "old": "inverse/forward checks",
+      "correct": "Inverse apply must succeed; original forward apply must refuse the already-published snapshot as stale. Eager path instead requires successful inverse then forward replay.",
+      "source": "tools/perf-baseline/src/lib.rs:51074"
+    }
+  ]
+}

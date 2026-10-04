@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0907 — current PPTX multi-slide baseline
+
+[0907](0907-pptx-multi-slide-current-baseline.md) retains 800 samples from four
+fresh CPU-12 ABBA legs on frozen `3d3650ac03`. Existing eager/source-backed
+workflows have pooled p50 263.429593/7.841286 ms with equal output hashes.
+This guarded-workflow comparison is descriptive, with shared-host and timer
+limits; it is not a new optimization or historical before/after result.
+
 ## 0906 — selector and workload scope qualification
 
 [0906](0906-office-coverage-qualification.md) verifies 534 enum/name/CLI

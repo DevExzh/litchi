@@ -1,0 +1,5 @@
+{
+  "initial_analyzer_check_attempt": "The reducer correctly rejected zero ordinary payload read calls. The mutation harness expected the word positive instead of the actual no source read diagnostic and failed its own reason assertion. Corrected only that expected substring; no analyzer or workload data changed.",
+  "temporary_failed_attempt_removed": true,
+  "second_analyzer_check_attempt": "The reducer correctly rejected a sink write over 64 KiB. Corrected the mutation harness expected diagnostic substring from largest_write to largest write; analyzer and raw reports unchanged."
+}

@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0907 — fresh PPTX guarded workflow comparison
+
+[0907](0907-pptx-multi-slide-current-baseline.md) measures four same-binary
+ABBA legs, 30 warmups and 200 samples each. Pooled eager/source-backed p50 is
+263.429593/7.841286 ms, an observed 33.5952 ratio between existing paths.
+Both produce the same output identity and pass their semantic/OPC guards.
+Source-backed mode reports 9 versus 229 materializations but more total logical
+reads and sink writes. No new optimization, physical-I/O, or memory claim.
+
 ## 0906 — Office measurement coverage qualified
 
 [0906](0906-office-coverage-qualification.md) adds a reproducible source-bound

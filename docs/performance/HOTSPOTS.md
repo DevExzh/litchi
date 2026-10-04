@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0907 — attribute current PPTX costs before optimizing
+
+[0907](0907-pptx-multi-slide-current-baseline.md) confirms the current eager
+multi-slide workflow remains expensive beside the source-backed path. The
+clock includes differing patch guards; current phase observers do not split
+this route. Profile eager materialization/serialization and source-backed
+editing/publication next, with replay separately measured. Static repeated
+comparison and planning candidates are hypotheses, not measured hotspots.
+
 ## 0906 — distinguish edit timing from patch replay
 
 [0906](0906-office-coverage-qualification.md) identifies a scope boundary before

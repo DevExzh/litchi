@@ -1,0 +1,49 @@
+{
+  "binary": {
+    "bytes": 264596744,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0907-build/release/litchi-perf-baseline",
+    "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84"
+  },
+  "cpu": 12,
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 3692,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/capture.py",
+    "sha256": "25a410179fea60620edc4850b66d30c6683ffa99045020f6af93c96c089eafca"
+  },
+  "legs": [
+    [
+      "eager-a",
+      "eager"
+    ],
+    [
+      "source-a",
+      "source_backed"
+    ],
+    [
+      "source-b",
+      "source_backed"
+    ],
+    [
+      "eager-b",
+      "eager"
+    ]
+  ],
+  "samples_per_leg": 200,
+  "scope": "Descriptive same-binary guarded workflow comparison; no candidate optimization or historical timing comparison.",
+  "source_before": {
+    "checked_utc": "2026-10-04T06:59:52.706393+00:00",
+    "file_count": 9350,
+    "manifest": {
+      "bytes": 1755018,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source.json",
+      "sha256": "a987e841e27283d54d977f1c0b85609f248872eede70a6271d13bee568ebd812"
+    }
+  },
+  "warmup": 30
+}

@@ -1,0 +1,16 @@
+{
+  "binary_unchanged": true,
+  "completed_utc": "2026-10-04T07:03:07.842516+00:00",
+  "retained_samples": 800,
+  "source_after": {
+    "checked_utc": "2026-10-04T07:03:08.206780+00:00",
+    "file_count": 9350,
+    "manifest": {
+      "bytes": 1755018,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source.json",
+      "sha256": "a987e841e27283d54d977f1c0b85609f248872eede70a6271d13bee568ebd812"
+    }
+  },
+  "status": "pass",
+  "workload_children": 4
+}
