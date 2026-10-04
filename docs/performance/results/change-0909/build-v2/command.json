@@ -1,0 +1,72 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--manifest-path",
+    "/tmp/litchi-0909-src/tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--release",
+    "--example",
+    "pptx_owned_control",
+    "-j",
+    "2"
+  ],
+  "cwd": "/tmp/litchi-0909-src",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0909-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "start_utc": "2026-10-04T08:12:41.929886+00:00",
+  "source": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/source-v2.json",
+    "bytes": 1755712,
+    "sha256": "721c94f6a21fcad311fd48a811f7af05c83122fea74b2a72696521ded5cf9521"
+  },
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/run.py",
+    "bytes": 5333,
+    "sha256": "1827f27e23c0f2d1610b2bfb6820135723ac9f1efc213a7a9f0da54eaec2f8bf"
+  },
+  "scope": "Untimed correctness qualification; this build is not the 0907 timing binary.",
+  "toolchain": {
+    "cargo": {
+      "launcher": "/home/zhuhe/.cargo/bin/cargo",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    "rustc": {
+      "launcher": "/home/zhuhe/.cargo/bin/rustc",
+      "version": "rustc 1.95.0 (59807616e 2026-04-14)"
+    }
+  },
+  "end_utc": "2026-10-04T08:14:24.989843+00:00",
+  "exit_code": 0,
+  "logs": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/build-v2/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/build-v2/stderr.txt",
+      "bytes": 147,
+      "sha256": "3f4db4ea55a6ff148eff77ca1de7fc06f5654f2c3a9ba569d489bfd9f99ffe4c"
+    }
+  ],
+  "binary": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0909-build/release/examples/pptx_owned_control",
+    "bytes": 9627816,
+    "sha256": "1656a25df4663c298e41624b7c96b225247c934038eaf8bc1bc85c508551b04f"
+  }
+}

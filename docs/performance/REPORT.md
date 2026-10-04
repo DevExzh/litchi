@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0909 — executable owning-input preservation qualification
+
+[0909](0909-pptx-owning-input-preservation-control.md) adds a standalone
+harness exporter and independent ZIP census. The generated 200-slide fixture passes
+64 edits, 437 untouched-member comparisons, exact no-op and durable inverse,
+stale/foreign refusal, input limit and sink failure gates. Formatting and Clippy
+pass; source/census replay survives cleanup. No production optimization adopted.
+
 ## 0908 — PPTX profile identifies an ingress comparison gap
 
 [0908](0908-pptx-multi-slide-instruction-profile.md) validates four serial

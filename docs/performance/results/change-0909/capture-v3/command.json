@@ -1,0 +1,105 @@
+{
+  "argv": [
+    "/home/zhuhe/code/litchi/target/litchi-0909-build/release/examples/pptx_owned_control",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts"
+  ],
+  "cwd": "/tmp/litchi-0909-src",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0909-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "start_utc": "2026-10-04T08:17:59.096303+00:00",
+  "source": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/source-v3.json",
+    "bytes": 1755712,
+    "sha256": "4361f1201859660de809f93be728715d7a09fd9c7f7833d5901be1baaf2cf0a2"
+  },
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/run.py",
+    "bytes": 5333,
+    "sha256": "1827f27e23c0f2d1610b2bfb6820135723ac9f1efc213a7a9f0da54eaec2f8bf"
+  },
+  "scope": "Untimed correctness qualification; this build is not the 0907 timing binary.",
+  "toolchain": {
+    "cargo": {
+      "launcher": "/home/zhuhe/.cargo/bin/cargo",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    "rustc": {
+      "launcher": "/home/zhuhe/.cargo/bin/rustc",
+      "version": "rustc 1.95.0 (59807616e 2026-04-14)"
+    }
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0909-build/release/examples/pptx_owned_control",
+    "bytes": 9583784,
+    "sha256": "ee74476a9ce337e943e08b3194f9696378f5caa15c7aa30adbbf1bc3429abc16"
+  },
+  "end_utc": "2026-10-04T08:18:00.322629+00:00",
+  "exit_code": 0,
+  "logs": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/gates.json",
+      "bytes": 1954,
+      "sha256": "a8b13072dd131afecd016a30e69adde48ba477c993d736dbc6e659db6bdb7837"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-forward-replay.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-inverse.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-noop.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-output.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/raw-zip-census.json",
+      "bytes": 736758,
+      "sha256": "b6a9b5b2ac71d45a51eb757481c123fc129d61db5cf196bb395358f71abae819"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/report.json",
+      "bytes": 5318,
+      "sha256": "3b00b3de0a992daf88ac94742f66c3a1cfc1959eab92a3681b34adf714123308"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/source.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    }
+  ]
+}

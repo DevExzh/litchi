@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0909 — owning-input PPTX control qualified without timing
+
+[0909](0909-pptx-owning-input-preservation-control.md) qualifies existing
+`from_vec` ingress on the exact 0907 fixture. The same 64 edits change 8 of 445 ZIP
+members;437 untouched members preserve raw components. No-op and live/durable
+inverse restore full source bytes for this fixture. No timing or speedup claim.
+
 ## 0908 — same-binary PPTX instruction attribution
 
 [0908](0908-pptx-multi-slide-instruction-profile.md) retains four exact-owner

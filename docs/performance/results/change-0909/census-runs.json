@@ -1,0 +1,100 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T08:18:42.086526+00:00",
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+    "bytes": 29840,
+    "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+  },
+  "runs": [
+    {
+      "label": "output",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-output.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-output.json\n",
+      "stderr": "",
+      "report": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-output.json",
+        "bytes": 3682247,
+        "sha256": "222e59dd0bff60912e4098045b65854a6ba3c3ac895b3736803a8acfd95675da"
+      }
+    },
+    {
+      "label": "noop",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-noop.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-noop.json"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-noop.json\n",
+      "stderr": "",
+      "report": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-noop.json",
+        "bytes": 3679751,
+        "sha256": "66de5f8fabc9f4b5a35afcfe0313638b73440a820c528b93087a12ad3a557bb0"
+      }
+    },
+    {
+      "label": "inverse",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-inverse.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-inverse.json"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-inverse.json\n",
+      "stderr": "",
+      "report": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-inverse.json",
+        "bytes": 3679754,
+        "sha256": "b5bed4c59b10fd4e26c6d8919c0b803a550d5f90e2ad1437c4e89cdc08b8a396"
+      }
+    },
+    {
+      "label": "forward-replay",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-output.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/artifacts/owned-control-forward-replay.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-forward-replay.json"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-forward-replay.json\n",
+      "stderr": "",
+      "report": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-forward-replay.json",
+        "bytes": 3679775,
+        "sha256": "d356658983a40cc7772dc422aadd4f159dc3cf16cad059c497af6e5174f7ec46"
+      }
+    }
+  ]
+}

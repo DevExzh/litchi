@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0909 — one owning-input control admitted, broader scope remains open
+
+[0909](0909-pptx-owning-input-preservation-control.md) addresses the missing
+owning-input qualification from 0908. It establishes bounded generated-fixture
+preservation and reversible-edit evidence, not producer-wide support or cost
+elimination. Owning-route timing, actual compression/copy attribution, unknown
+and adversarial variants, and broad CRUD coverage remain open. ODF is deferred,
+iWork excluded, and target integration pending the unrelated cherry-pick.
+
 ## 0908 — measured instruction owners, preservation control still missing
 
 [0908](0908-pptx-multi-slide-instruction-profile.md) adds scoped guest

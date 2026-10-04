@@ -1,0 +1,38 @@
+{
+  "status": "planned_before_execution",
+  "scope": "Existing owning from_vec route on the exact generated0907media-rich multi-slide fixture; no production bridge or performance claim",
+  "parent": "57de5495f899a43574110f8c572823a7d9907e5f",
+  "source_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+  "selected_slide_positions": [
+    0,
+    28,
+    57,
+    85,
+    114,
+    142,
+    171,
+    199
+  ],
+  "input_ownership": "Fresh cloned Vec moved into from_vec; all allocation, cloning, validation and I/O untimed",
+  "required_gates": [
+    "exact source identity and229OPC/445ZIP shape",
+    "owned ingress exact-source capability and no-op transaction/save identity",
+    "64requested replacements and semantic/logical OPC untouched-part oracle",
+    "serialized forward/inverse patch roundtrip, fresh forward application, live inverse and reopened inverse full archive identity for this fixture",
+    "affected-resource stale and foreign source refusal without mutation",
+    "exact input-byte bound accepted; one-byte-below bound rejected with exact typed ReadLimit",
+    "partial output typed IncompleteOutput count and exact accepted prefix; zero-output typed I/O refusal; publication retry unchanged",
+    "independent raw census: only8selectedslide names may change;437untouchedmembers identical in raw local/compressed/descriptor/central metadata except relocation offsets; order and archivecomment unchanged",
+    "independent raw no-op/inverse/replay census and source/build/capture custody replay"
+  ],
+  "not_certified": [
+    "general producer-specific physical inverse",
+    "unknown-member, signed, encrypted, malformed, physical-only or unrelated-resource mutation variants",
+    "allocation failure/cancellation/adversarial ZIP64 and descriptor matrix",
+    "borrowed or range ingress equivalence",
+    "actual copy/regenerate decisions or avoided decompression/compression",
+    "latency, instructions, allocation/RSS or speedup"
+  ],
+  "program_goal": "All broader GOAL requirements remain active; these exclusions describe this evidence packet only",
+  "census_helper_sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+}

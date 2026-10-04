@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0909/check-zip-census.py"
+  ],
+  "exit_code": 0,
+  "stdout": "{\n  \"cases\": [\n    {\n      \"compression\": 0,\n      \"kind\": \"positive_identical\",\n      \"label\": \"stored-identical\",\n      \"returncode\": 0\n    },\n    {\n      \"compression\": 8,\n      \"kind\": \"positive_identical\",\n      \"label\": \"deflated-identical\",\n      \"returncode\": 0\n    },\n    {\n      \"compression\": 0,\n      \"kind\": \"positive_allowed_selected_edit\",\n      \"label\": \"stored-selected-edit\",\n      \"returncode\": 0\n    },\n    {\n      \"compression\": 8,\n      \"kind\": \"positive_allowed_selected_edit\",\n      \"label\": \"deflated-selected-edit\",\n      \"returncode\": 0\n    },\n    {\n      \"kind\": \"negative_rejection\",\n      \"label\": \"untouched-payload\",\n      \"reason\": \"changed_untouched_member\",\n      \"returncode\": 1\n    },\n    {\n      \"kind\": \"negative_rejection\",\n      \"label\": \"untouched-metadata\",\n      \"reason\": \"changed_untouched_member\",\n      \"returncode\": 1\n    },\n    {\n      \"kind\": \"negative_rejection\",\n      \"label\": \"untouched-order\",\n      \"reason\": \"ordered_filenames_changed\",\n      \"returncode\": 1\n    },\n    {\n      \"kind\": \"negative_rejection\",\n      \"label\": \"archive-comment\",\n      \"reason\": \"archive_comment_changed\",\n      \"returncode\": 1\n    }\n  ],\n  \"coverage\": {\n    \"claim\": \"This checker does not claim ZIP64 or data-descriptor coverage.\",\n    \"data_descriptors\": false,\n    \"deflated\": true,\n    \"stored\": true,\n    \"zip64\": false\n  },\n  \"schema\": \"litchi.performance.zip-census-check.v1\",\n  \"status\": \"pass\"\n}\n",
+  "stderr": "",
+  "utc": "2026-10-04T08:00:31.700380+00:00",
+  "files": {
+    "zip-census.py": "ec3dc13267e55e137094daea6e4ba789501e746d5ae68fece4cca7bd81ba1772",
+    "check-zip-census.py": "951de3da1fca52cb07ae6c237f5edaf315130a0eacee6c9592519dc9edf958b7",
+    "method.md": "15f809ec53fa1ce96980418a314d6cb855221449b430d4a99f7ee5fc71189443"
+  }
+}

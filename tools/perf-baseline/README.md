@@ -1,5 +1,23 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+## Untimed PPTX owning-input control
+
+Export the fixed 200-slide media-rich multi-slide edit through the owning
+`Package::from_vec` route:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml \
+  --release --example pptx_owned_control -- /path/to/new-pptx-control
+```
+
+The output directory must be new. The probe records qualification gates and
+archive hashes for independent physical ZIP comparison. Input clones and all
+checks are untimed; this example makes no latency, allocation, or avoided
+compression claim. It is separate from the existing materialized ReadAt
+benchmark selector and does not change its workload or timer.
+See [0909](../../docs/performance/0909-pptx-owning-input-preservation-control.md)
+for the retained fixture qualification and its coverage limits.
+
 ## Untimed XLSX attribute fixtures
 
 Export the deterministic medium and dense-sparse one-percent cell-edit inputs

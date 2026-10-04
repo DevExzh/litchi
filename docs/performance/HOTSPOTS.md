@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0909 — measure the qualified owning route before a bridge
+
+[0909](0909-pptx-owning-input-preservation-control.md) proves the existing
+owning route retains source admission through the multi-slide edit and passes
+raw preservation, inverse, limit and sink gates on the generated fixture.
+Its output matches 0907, but byte equality cannot prove avoided Deflate work.
+Next measure this control with explicit copy/replay boundaries before production
+changes; do not generalize the materialized ReadAt hotspot to all owned input.
+
 ## 0908 — qualify the owning eager control next
 
 [0908](0908-pptx-multi-slide-instruction-profile.md) attributes about 69.67%

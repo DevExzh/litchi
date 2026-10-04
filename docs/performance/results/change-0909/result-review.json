@@ -1,0 +1,258 @@
+{
+  "schema": "litchi.performance.0909.pptx-owned-control-result-review.v1",
+  "status": "qualified_generated_fixture",
+  "verdict": "pass_for_bounded_same_corpus_control",
+  "final_report": {
+    "path": "docs/performance/0909-pptx-owning-input-preservation-control.md",
+    "sha256": "5a18f154e9ff8f789f1e4d04a8ccdf3fd2e96a433e0dfca616ccb2438d20b4ab"
+  },
+  "review": {
+    "mode": "offline_source_and_artifact_review",
+    "reviewer_ran_builds": false,
+    "reviewer_ran_workloads": false,
+    "reviewer_ran_profilers": false,
+    "reviewer_ran_tests": false,
+    "reviewer_reran_replay": false,
+    "source_manifest_checked_before_cleanup": true,
+    "physical_zip_offsets_checked_independently": true,
+    "partial_prefix_hash_checked_independently": true,
+    "scope": "Correctness and preservation qualification only; no timing, allocation, copy-instruction, compression-instruction, or production-bridge claim."
+  },
+  "source_custody": {
+    "parent_commit": "57de5495f899a43574110f8c572823a7d9907e5f",
+    "manifest": {
+      "path": "docs/performance/results/change-0909/source-v3.json",
+      "bytes": 1755712,
+      "sha256": "4361f1201859660de809f93be728715d7a09fd9c7f7833d5901be1baaf2cf0a2",
+      "file_count": 9352,
+      "matched_build_checkout_before_cleanup": true,
+      "missing_files": 0,
+      "mismatched_files": 0
+    },
+    "overlay_patch": {
+      "path": "docs/performance/results/change-0909/source-overlay-v3.patch",
+      "bytes": 29255,
+      "sha256": "e7b6ea69348e14febdf7ca507eccf9eb997a832c6f1c552f0d87effe596ee840",
+      "paths": [
+        "tools/perf-baseline/src/lib.rs",
+        "tools/perf-baseline/src/pptx_owned_control.rs",
+        "tools/perf-baseline/examples/pptx_owned_control.rs"
+      ],
+      "production_paths_present": false
+    },
+    "build_v3": {
+      "path": "docs/performance/results/change-0909/build-v3/command.json",
+      "exit_code": 0,
+      "sha256": "ba6ee21b5aae56fb69edfeef77861a1655afe55d9ab9c639b7c9246baa28178e"
+    },
+    "capture_v3": {
+      "path": "docs/performance/results/change-0909/capture-v3/command.json",
+      "exit_code": 0,
+      "sha256": "b935fd1d52e0c36387cab1d8badbb04a57bcdbeb1958642623c1c50335b4fc85"
+    },
+    "analysis": {
+      "path": "docs/performance/results/change-0909/analysis.json",
+      "status": "qualified_generated_fixture",
+      "sha256": "1099d6c2fe9f6a2fe4dda3b7fb8ab8014be8b14b4aaf6667ac2574bb45634f20"
+    }
+  },
+  "corpus": {
+    "name": "pptx-source-backed-media",
+    "slides": 200,
+    "text_boxes_per_slide": 8,
+    "media_entries": 8,
+    "opc_entries": 229,
+    "zip_members": 445,
+    "entry_bytes": 2097152,
+    "archive_bytes": 17017139,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "selected_slide_positions": [0, 28, 57, 85, 114, 142, 171, 199],
+    "replacement_count": 64
+  },
+  "artifacts": {
+    "source": {
+      "path": "docs/performance/results/change-0909/capture-v3/artifacts/source.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    "noop": {
+      "path": "docs/performance/results/change-0909/capture-v3/artifacts/owned-control-noop.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    "output": {
+      "path": "docs/performance/results/change-0909/capture-v3/artifacts/owned-control-output.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    "inverse": {
+      "path": "docs/performance/results/change-0909/capture-v3/artifacts/owned-control-inverse.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    "forward_replay": {
+      "path": "docs/performance/results/change-0909/capture-v3/artifacts/owned-control-forward-replay.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    }
+  },
+  "ownership": {
+    "ingress_unmodified_owned_source": true,
+    "ingress_exact_source_len": 17017139,
+    "ingress_exact_source_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "after_edit_unmodified_owned_source": false,
+    "after_edit_retained_source_limits": true,
+    "after_edit_exact_source_len": null,
+    "after_edit_exact_source_sha256": null,
+    "after_noop_commit_unmodified_owned_source": true,
+    "interpretation": "Observed package ownership state, with report fields emitted after guard checks; input ownership does not measure copy avoidance."
+  },
+  "runtime_gates": {
+    "source_identity_verified": true,
+    "source_shape_verified": true,
+    "owning_ingress_verified": true,
+    "exact_noop_verified": true,
+    "semantic_output_verified": true,
+    "untouched_logical_parts_verified": true,
+    "forward_output_verified": true,
+    "inverse_exact_source_verified": true,
+    "forward_replay_exact_output_verified": true,
+    "durable_forward_roundtrip_verified": true,
+    "durable_inverse_reopen_verified": true,
+    "source_immutability_verified": true,
+    "finite_input_limit_verified": true,
+    "input_limit_actual": 17017139,
+    "input_limit_maximum": 17017138,
+    "stale_source_refusal": {
+      "refused": true,
+      "output_unchanged": true,
+      "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }"
+    },
+    "foreign_source_refusal": {
+      "refused": true,
+      "output_unchanged": true,
+      "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }"
+    },
+    "partial_sink": {
+      "accepted_prefix_bytes": 8508572,
+      "error_kind": "OpcError::IncompleteOutput",
+      "prefix_sha256": "6286ed5e43e5a7d443392494736fc7b08887923cf0156392dfc3dddf21c26909"
+    },
+    "zero_sink": {
+      "accepted_prefix_bytes": 0,
+      "error_kind": "OpcError::ZipError (preservation writer mapping)",
+      "prefix_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "inverse_scope": {
+    "full_archive_byte_identity": true,
+    "known_source_logical_identity": true,
+    "known_source_semantic_identity": true,
+    "general_arbitrary_producer_identity": false,
+    "explanation": "The inverse and durable reopened inverse equal this admitted source byte-for-byte; logical and semantic equality follow for this known source only."
+  },
+  "raw_zip_census": {
+    "helper": {
+      "path": "docs/performance/results/change-0909/zip-census.py",
+      "bytes": 29840,
+      "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+    },
+    "runs_status": "pass",
+    "runs_record": {
+      "path": "docs/performance/results/change-0909/census-runs.json",
+      "bytes": 4262,
+      "sha256": "d9226c05b2c52892aec060dfc43a12d99c283175abbdf62ef1f7178a74d5f309"
+    },
+    "run_count": 4,
+    "violations": 0,
+    "member_count": 445,
+    "output_changed_members": [
+      "ppt/slides/slide1.xml",
+      "ppt/slides/slide29.xml",
+      "ppt/slides/slide58.xml",
+      "ppt/slides/slide86.xml",
+      "ppt/slides/slide115.xml",
+      "ppt/slides/slide143.xml",
+      "ppt/slides/slide172.xml",
+      "ppt/slides/slide200.xml"
+    ],
+    "output_unchanged_members": 437,
+    "noop_unchanged_members": 445,
+    "inverse_unchanged_members": 445,
+    "forward_replay_unchanged_members": 445,
+    "noop_changed_members": 0,
+    "inverse_changed_members": 0,
+    "forward_replay_changed_members": 0,
+    "ordered_filenames_equal": true,
+    "central_order_equal": true,
+    "physical_order_offsets_sorted": true,
+    "archive_comments_equal": true,
+    "data_descriptors_observed": true,
+    "zip64_observed": false,
+    "raw_components_changed_only_for_selected_slides": [
+      "central_metadata",
+      "decoded_payload",
+      "local_data_descriptor",
+      "raw_compressed_payload"
+    ],
+    "implementation_path_inferred": false,
+    "rust_inventory_omits_replay": true,
+    "external_replay_census_closes_rust_inventory_gap": true
+  },
+  "quality_and_replay": {
+    "quality_final": {
+      "path": "docs/performance/results/change-0909/quality-v3-v2/receipt.json",
+      "sha256": "bef68db9cd500096363d29e56bc196d0cbb6403080289786bbc3dfed5486f499",
+      "status": "pass",
+      "rustfmt_exit_code": 0,
+      "clippy_exit_code": 0,
+      "scope": "Changed harness lib/example; no production implementation changed; no full workspace test claim."
+    },
+    "quality_initial": {
+      "path": "docs/performance/results/change-0909/quality-v3/receipt.json",
+      "status": "fail",
+      "reason": "Default formatting policy was used without the retained rustfmt configuration."
+    },
+    "replay_before_cleanup": {
+      "path": "docs/performance/results/change-0909/replay-before-cleanup.json",
+      "sha256": "81d71adbc909969c8b3b4ebf428ebdbdff1c43810db415076bd1ee30d9eeb799",
+      "status": "pass",
+      "source_file_count": 9352,
+      "capture_artifacts_checked": 8,
+      "byte_exact_replays": ["output", "noop", "inverse", "forward-replay"],
+      "build_or_workload_run": false,
+      "deleted_source_root_used": false
+    }
+  },
+  "history": {
+    "v1_build": "Failed E0282 collection inference and E0026/E0027 ReadLimit field spelling.",
+    "v2_capture": "Stopped at an overly specific zero-sink IoError expectation; existing preservation writer maps the injected cause to ZipError.",
+    "v3_resolution": "Corrected the gate to the actual ZipError mapping and retained the zero-byte and unchanged-package witnesses."
+  },
+  "limitations": [
+    "No production source or public Copy/Regenerate observer was changed or measured.",
+    "No performance, allocation, input-copy, or compression-instruction claim is supported.",
+    "Unknown-member, signed, encrypted, and malformed inputs are not covered.",
+    "Source mutation during publication is not covered; the fixture uses an immutable Vec owner.",
+    "Generated data descriptors and ZIP64=false are fixture observations, not adversarial archive coverage.",
+    "Stale refusal is exercised for the affected selected resource and does not generalize to every mutation scope.",
+    "The result qualifies the known generated corpus and does not certify arbitrary producer archives."
+  ],
+  "claims": {
+    "bounded_same_generated_fixture_qualification": true,
+    "raw_untouched_member_preservation": true,
+    "full_inverse_bytes_for_known_source": true,
+    "semantic_inverse_for_known_source": true,
+    "all_producers_inverse": false,
+    "copy_avoidance": false,
+    "compression_instruction_avoidance": false,
+    "production_bridge": false,
+    "performance_result": false
+  },
+  "evidence_files": [
+    {"path": "docs/performance/results/change-0909/capture-v3/artifacts/report.json", "sha256": "3b00b3de0a992daf88ac94742f66c3a1cfc1959eab92a3681b34adf714123308"},
+    {"path": "docs/performance/results/change-0909/capture-v3/artifacts/gates.json", "sha256": "a8b13072dd131afecd016a30e69adde48ba477c993d736dbc6e659db6bdb7837"},
+    {"path": "docs/performance/results/change-0909/qualification-amendment.json", "sha256": "5678d59a27a70518fe55169b31f31fd6ec83b8570a54df5f11ccdb79027a4cb4"},
+    {"path": "docs/performance/results/change-0909/analysis.json", "sha256": "1099d6c2fe9f6a2fe4dda3b7fb8ab8014be8b14b4aaf6667ac2574bb45634f20"}
+  ]
+}

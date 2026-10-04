@@ -1,0 +1,678 @@
+diff --git a/tools/perf-baseline/examples/pptx_owned_control.rs b/tools/perf-baseline/examples/pptx_owned_control.rs
+new file mode 100644
+index 0000000000..fa41817b6b
+--- /dev/null
++++ b/tools/perf-baseline/examples/pptx_owned_control.rs
+@@ -0,0 +1,10 @@
++//! Export the untimed owning-input PPTX preservation qualification fixtures.
++
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let mut args = std::env::args_os().skip(1);
++    let path = args.next().ok_or("expected a new output directory")?;
++    if args.next().is_some() {
++        return Err("expected exactly one output directory".into());
++    }
++    litchi_perf_baseline::write_pptx_owned_control_fixtures(std::path::Path::new(&path))
++}
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 135dd375f7..b7bf0aaff5 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -37,6 +37,7 @@ mod parallel_metrics;
+ pub mod pptx_cache_retention;
+ pub mod pptx_metadata_spool;
+ pub mod pptx_native_image;
++mod pptx_owned_control;
+ pub mod pptx_pair_lifecycle;
+ pub mod pptx_provider_lifecycle;
+ pub mod pptx_range_source;
+@@ -10222,6 +10223,17 @@ pub fn write_xlsx_attribute_fixtures(
+     xlsx_attribute_fixtures::export(directory, include_one_edit)
+ }
+ 
++/// Export the untimed owning-input PPTX preservation qualification fixtures.
++///
++/// This is a standalone harness helper. It uses the fixed media-rich
++/// multi-slide corpus and refuses an existing output directory so the source,
++/// candidate, and gate receipts remain immutable custody artifacts.
++pub fn write_pptx_owned_control_fixtures(
++    directory: &std::path::Path,
++) -> Result<(), Box<dyn Error>> {
++    pptx_owned_control::export(directory)
++}
++
+ pub fn run() -> Result<(), Box<dyn Error>> {
+     if filesystem::run_child_if_requested()? {
+         return Ok(());
+diff --git a/tools/perf-baseline/src/pptx_owned_control.rs b/tools/perf-baseline/src/pptx_owned_control.rs
+new file mode 100644
+index 0000000000..928a14987e
+--- /dev/null
++++ b/tools/perf-baseline/src/pptx_owned_control.rs
+@@ -0,0 +1,626 @@
++//! Untimed qualification of the owning-input PPTX preservation route.
++//!
++//! This module deliberately lives beside the performance harness. It does not
++//! change the production facade or claim that an owning ingress is a faster
++//! replacement for the materialized ReadAt route. The source and candidate ZIP
++//! files are retained so an independent physical census can inspect every raw
++//! member, local record, central record, order, and archive comment.
++
++use super::{
++    Corpus, PPTX_SOURCE_MEDIA_ENTRY_COUNT, PPTX_SOURCE_SLIDE_COUNT,
++    PPTX_SOURCE_TEXT_BOXES_PER_SLIDE, PackageWriter, build_pptx_source_edit_corpus,
++    pptx_multi_slide_positions, raw_zip_layout, raw_zip_members, sha256_hex,
++    verify_pptx_multi_slide_edit_output, verify_pptx_source_edit_semantics,
++};
++use serde::Serialize;
++use std::{
++    collections::BTreeMap,
++    error::Error,
++    fs::{self, OpenOptions},
++    io::{self, Write},
++    path::Path,
++};
++
++const SCHEMA: &str = "pptx-owned-control-qualification-v1";
++const SOURCE_FILE: &str = "source.pptx";
++const OUTPUT_FILE: &str = "owned-control-output.pptx";
++const NOOP_FILE: &str = "owned-control-noop.pptx";
++const INVERSE_FILE: &str = "owned-control-inverse.pptx";
++const FORWARD_REPLAY_FILE: &str = "owned-control-forward-replay.pptx";
++const RAW_CENSUS_FILE: &str = "raw-zip-census.json";
++const GATES_FILE: &str = "gates.json";
++const REPORT_FILE: &str = "report.json";
++
++// These are the frozen 0907 primary-corpus identities. The owning control is
++// allowed to produce a different physical candidate; only its source is bound
++// to the prior baseline so this probe cannot silently change corpus.
++const EXPECTED_SOURCE_BYTES: usize = 17_017_139;
++const EXPECTED_SOURCE_SHA256: &str =
++    "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757";
++const EXPECTED_ENTRY_COUNT: usize = 229;
++const EXPECTED_MEMBER_COUNT: usize = 445;
++const EXPECTED_UNCOMPRESSED_BYTES: usize = 17_568_429;
++
++#[derive(Debug, Serialize)]
++struct Artifact {
++    file: &'static str,
++    bytes: usize,
++    sha256: String,
++}
++
++#[derive(Debug, Serialize)]
++#[serde(tag = "status", rename_all = "snake_case")]
++enum PartialSinkGate {
++    Verified {
++        accepted_prefix_bytes: usize,
++        error: String,
++    },
++}
++
++#[derive(Debug, Serialize)]
++struct RefusalGate {
++    refused: bool,
++    output_unchanged: bool,
++    error: String,
++}
++
++#[derive(Debug, Serialize)]
++struct Gates {
++    source_identity_verified: bool,
++    source_shape_verified: bool,
++    owning_ingress_verified: bool,
++    exact_noop_verified: bool,
++    semantic_output_verified: bool,
++    untouched_logical_parts_verified: bool,
++    forward_output_verified: bool,
++    inverse_exact_source_verified: bool,
++    forward_replay_exact_output_verified: bool,
++    durable_forward_roundtrip_verified: bool,
++    durable_inverse_reopen_verified: bool,
++    finite_input_limit_verified: bool,
++    stale_source_refusal: RefusalGate,
++    foreign_source_refusal: RefusalGate,
++    partial_sink: PartialSinkGate,
++    source_immutability_verified: bool,
++    raw_census_artifacts_exported: bool,
++}
++
++#[derive(Debug, Serialize)]
++struct OwnershipCapability {
++    ingress_unmodified_owned_source: bool,
++    ingress_exact_source_len: Option<usize>,
++    ingress_exact_source_sha256: Option<String>,
++    after_edit_unmodified_owned_source: bool,
++    after_edit_exact_source_len: Option<usize>,
++    after_edit_exact_source_sha256: Option<String>,
++    after_noop_commit_unmodified_owned_source: bool,
++}
++
++#[derive(Debug, Serialize)]
++struct Coverage {
++    unknown_member_variant: &'static str,
++    signed_input: &'static str,
++    encrypted_input: &'static str,
++    malformed_input: &'static str,
++    source_mutation_during_publication: &'static str,
++}
++
++#[derive(Debug, Serialize)]
++struct ControlReport {
++    schema: &'static str,
++    status: &'static str,
++    implementation: &'static str,
++    timing_scope: &'static str,
++    performance_claim: &'static str,
++    corpus: super::CorpusManifest,
++    slides: usize,
++    text_boxes_per_slide: usize,
++    media_entries: usize,
++    selected_slide_positions: Vec<usize>,
++    replacement_count: usize,
++    ownership: OwnershipCapability,
++    coverage: Coverage,
++    source: Artifact,
++    no_op: Artifact,
++    output: Artifact,
++    inverse: Artifact,
++    forward_replay: Artifact,
++    durable_forward_patch_bytes: usize,
++    durable_forward_patch_sha256: String,
++    durable_inverse_patch_bytes: usize,
++    durable_inverse_patch_sha256: String,
++    raw_census_file: &'static str,
++    gates: Gates,
++}
++
++#[derive(Debug, Serialize)]
++struct FailureReport {
++    schema: &'static str,
++    status: &'static str,
++    implementation: &'static str,
++    error: String,
++    corpus: Option<super::CorpusManifest>,
++}
++
++#[derive(Debug, Serialize)]
++struct RawZipMemberRecord {
++    local_record_bytes: usize,
++    central_record_bytes_without_offset: usize,
++    local_sha256: String,
++    central_sha256_without_offset: String,
++}
++
++#[derive(Debug, Serialize)]
++struct RawZipInventory {
++    file: &'static str,
++    archive_bytes: usize,
++    archive_sha256: String,
++    member_count: usize,
++    physical_order: Vec<String>,
++    central_order: Vec<String>,
++    archive_comment_bytes: usize,
++    archive_comment_sha256: String,
++    members: BTreeMap<String, RawZipMemberRecord>,
++}
++
++#[derive(Debug, Serialize)]
++struct RawZipCensus {
++    schema: &'static str,
++    purpose: &'static str,
++    source: RawZipInventory,
++    output: RawZipInventory,
++    no_op: RawZipInventory,
++    inverse: RawZipInventory,
++}
++
++struct RunOutput {
++    report: ControlReport,
++    raw_census: RawZipCensus,
++}
++
++#[derive(Debug)]
++struct PrefixFailSink {
++    bytes: Vec<u8>,
++    fail_after: usize,
++}
++
++impl Write for PrefixFailSink {
++    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
++        if self.bytes.len() >= self.fail_after {
++            return Err(io::Error::other("intentional PPTX partial sink failure"));
++        }
++        let remaining = self.fail_after - self.bytes.len();
++        let accepted = remaining.min(input.len());
++        self.bytes.extend_from_slice(&input[..accepted]);
++        if accepted < input.len() {
++            Ok(accepted)
++        } else {
++            Ok(input.len())
++        }
++    }
++
++    fn flush(&mut self) -> io::Result<()> {
++        Ok(())
++    }
++}
++
++fn artifact(file: &'static str, bytes: &[u8]) -> Artifact {
++    Artifact {
++        file,
++        bytes: bytes.len(),
++        sha256: sha256_hex(bytes),
++    }
++}
++
++fn digest_hex(digest: [u8; 32]) -> String {
++    let mut output = String::with_capacity(64);
++    for byte in digest {
++        use std::fmt::Write as _;
++        let _ = write!(&mut output, "{byte:02x}");
++    }
++    output
++}
++
++fn ownership_capability(opc: &litchi_opc::OpcPackage) -> OwnershipCapability {
++    OwnershipCapability {
++        ingress_unmodified_owned_source: opc.is_unmodified_owned_source(),
++        ingress_exact_source_len: opc.exact_source_len(),
++        ingress_exact_source_sha256: opc.exact_source_sha256().map(digest_hex),
++        after_edit_unmodified_owned_source: false,
++        after_edit_exact_source_len: None,
++        after_edit_exact_source_sha256: None,
++        after_noop_commit_unmodified_owned_source: false,
++    }
++}
++
++fn raw_inventory(file: &'static str, bytes: &[u8]) -> Result<RawZipInventory, Box<dyn Error>> {
++    let members = raw_zip_members(bytes)?;
++    let (physical_order, central_order, comment) = raw_zip_layout(bytes)?;
++    let members = members
++        .into_iter()
++        .map(|(name, member)| {
++            (
++                name,
++                RawZipMemberRecord {
++                    local_record_bytes: member.local.len(),
++                    central_record_bytes_without_offset: member.central_without_offset.len(),
++                    local_sha256: sha256_hex(&member.local),
++                    central_sha256_without_offset: sha256_hex(&member.central_without_offset),
++                },
++            )
++        })
++        .collect();
++    Ok(RawZipInventory {
++        file,
++        archive_bytes: bytes.len(),
++        archive_sha256: sha256_hex(bytes),
++        member_count: members.len(),
++        physical_order,
++        central_order,
++        archive_comment_bytes: comment.len(),
++        archive_comment_sha256: sha256_hex(&comment),
++        members,
++    })
++}
++
++fn write_new_bytes(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
++    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
++    file.write_all(bytes)?;
++    file.flush()?;
++    file.sync_all()?;
++    Ok(())
++}
++
++fn write_new_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Box<dyn Error>> {
++    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
++    serde_json::to_writer_pretty(&mut file, value)?;
++    file.write_all(b"\n")?;
++    file.flush()?;
++    file.sync_all()?;
++    Ok(())
++}
++
++fn check_primary_corpus(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
++    if corpus.manifest.generator != super::PPTX_SOURCE_EDIT_CORPUS_GENERATOR
++        || corpus.archive.len() != EXPECTED_SOURCE_BYTES
++        || sha256_hex(&corpus.archive) != EXPECTED_SOURCE_SHA256
++        || corpus.manifest.entry_count != EXPECTED_ENTRY_COUNT
++        || corpus.manifest.archive_member_count != EXPECTED_MEMBER_COUNT
++        || corpus.manifest.uncompressed_payload_bytes != EXPECTED_UNCOMPRESSED_BYTES
++        || corpus.manifest.shape != "media-rich"
++        || corpus.manifest.entry_bytes != super::PPTX_SOURCE_MEDIA_ENTRY_BYTES
++    {
++        return Err(
++            "PPTX owning-control source differs from the frozen 0907 primary corpus".into(),
++        );
++    }
++    Ok(())
++}
++
++fn replacement_texts(slide_position: usize) -> Vec<String> {
++    (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
++        .map(|shape| super::semantic_pptx_text(slide_position, shape, true))
++        .collect()
++}
++
++fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Error>> {
++    check_primary_corpus(&corpus)?;
++    let source = corpus.archive.clone();
++    let selected_positions = pptx_multi_slide_positions().to_vec();
++    let replacement_count = selected_positions
++        .len()
++        .checked_mul(PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
++        .ok_or("PPTX owning-control replacement count overflows usize")?;
++
++    let source_package = litchi_pptx::Package::from_vec(source.clone())?;
++    verify_pptx_source_edit_semantics(&source_package, 0)?;
++    let ingress_ownership = ownership_capability(source_package.opc()?);
++    if !ingress_ownership.ingress_unmodified_owned_source
++        || ingress_ownership.ingress_exact_source_len != Some(source.len())
++        || ingress_ownership.ingress_exact_source_sha256.as_deref() != Some(EXPECTED_SOURCE_SHA256)
++    {
++        return Err("owning PPTX ingress did not retain exact source authorization".into());
++    }
++    let mut no_op_package = litchi_pptx::Package::from_vec(source.clone())?;
++    let no_op_edit = no_op_package.opened_presentation_transaction()?;
++    let no_op_commit = no_op_edit.commit()?;
++    if no_op_commit.is_changed() {
++        return Err("owning PPTX empty transaction unexpectedly changed the package".into());
++    }
++    no_op_package.apply_opened_presentation_commit(no_op_commit)?;
++    let no_op_ownership = ownership_capability(no_op_package.opc()?);
++    let no_op = no_op_package.to_bytes()?;
++    write_new_bytes(&directory.join(NOOP_FILE), &no_op)?;
++    if no_op != source {
++        return Err(
++            "owning PPTX no-op transaction/save did not preserve exact source bytes".into(),
++        );
++    }
++    if !no_op_ownership.ingress_unmodified_owned_source {
++        return Err("owning PPTX no-op transaction revoked exact source authorization".into());
++    }
++
++    let mut package = litchi_pptx::Package::from_vec(source.clone())?;
++    let mut edit = package.opened_presentation_transaction()?;
++    for slide_position in selected_positions.iter().copied() {
++        let texts = replacement_texts(slide_position);
++        let replacements = super::pptx_batch_replacements(&texts);
++        if edit.set_shape_texts(slide_position, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE
++        {
++            return Err("owning PPTX control changed an unexpected shape count".into());
++        }
++    }
++    let commit = edit.commit()?;
++    if !commit.is_changed() {
++        return Err("owning PPTX control produced an unchanged commit".into());
++    }
++    if commit.patch().resource_count() == 0 {
++        return Err("owning PPTX control produced an empty write set".into());
++    }
++    let forward = commit.patch().clone();
++    let inverse = forward.inverse();
++    package.apply_opened_presentation_commit(commit)?;
++    let mut ownership = ingress_ownership;
++    let after_edit = ownership_capability(package.opc()?);
++    ownership.after_edit_unmodified_owned_source = after_edit.ingress_unmodified_owned_source;
++    ownership.after_edit_exact_source_len = after_edit.ingress_exact_source_len;
++    ownership.after_edit_exact_source_sha256 = after_edit.ingress_exact_source_sha256;
++    ownership.after_noop_commit_unmodified_owned_source =
++        no_op_ownership.ingress_unmodified_owned_source;
++    let output = package.to_bytes()?;
++    write_new_bytes(&directory.join(OUTPUT_FILE), &output)?;
++    verify_pptx_multi_slide_edit_output(&corpus, &output)?;
++
++    let mut streamed = Vec::new();
++    PackageWriter::write_to_stream(&mut streamed, package.opc()?)?;
++    if streamed != output {
++        return Err("owning PPTX OPC stream differs from Package::to_bytes output".into());
++    }
++
++    let fail_after = output
++        .len()
++        .checked_div(2)
++        .unwrap_or(0)
++        .clamp(1, output.len().saturating_sub(1));
++    let mut partial = PrefixFailSink {
++        bytes: Vec::new(),
++        fail_after,
++    };
++    let partial_result = PackageWriter::write_to_stream(&mut partial, package.opc()?);
++    if partial_result.is_ok()
++        || partial.bytes.is_empty()
++        || partial.bytes.len() >= output.len()
++        || partial.bytes != output[..partial.bytes.len()]
++    {
++        return Err(
++            "owning PPTX control did not preserve the partial-sink failure contract".into(),
++        );
++    }
++    let partial_sink = PartialSinkGate::Verified {
++        accepted_prefix_bytes: partial.bytes.len(),
++        error: partial_result
++            .err()
++            .map(|error| error.to_string())
++            .unwrap_or_else(|| "partial sink unexpectedly completed".to_owned()),
++    };
++    if package.to_bytes()? != output {
++        return Err("owning PPTX partial sink failure changed the package".into());
++    }
++    let mut zero = PrefixFailSink {
++        bytes: Vec::new(),
++        fail_after: 0,
++    };
++    let zero_result = PackageWriter::write_to_stream(&mut zero, package.opc()?);
++    if zero_result.is_ok() || !zero.bytes.is_empty() || package.to_bytes()? != output {
++        return Err("owning PPTX zero sink failure changed output or package state".into());
++    }
++
++    let mut inverse_package = package;
++    inverse_package.apply_opened_presentation_patch(&inverse)?;
++    let inverse_output = inverse_package.to_bytes()?;
++    write_new_bytes(&directory.join(INVERSE_FILE), &inverse_output)?;
++    if inverse_output != source {
++        return Err("owning PPTX inverse did not restore exact source bytes".into());
++    }
++    inverse_package.apply_opened_presentation_patch(&forward)?;
++    let forward_replay = inverse_package.to_bytes()?;
++    write_new_bytes(&directory.join(FORWARD_REPLAY_FILE), &forward_replay)?;
++    if forward_replay != output {
++        return Err("owning PPTX forward replay did not restore exact candidate bytes".into());
++    }
++
++    let durable_forward_bytes = forward.to_bytes()?;
++    let decoded_forward = litchi_pptx::opened::Patch::from_bytes(&durable_forward_bytes)?;
++    if decoded_forward != forward {
++        return Err("owning PPTX durable forward patch changed during round-trip".into());
++    }
++    let durable_inverse_bytes = inverse.to_bytes()?;
++    let decoded_inverse = litchi_pptx::opened::Patch::from_bytes(&durable_inverse_bytes)?;
++    if decoded_inverse != inverse {
++        return Err("owning PPTX durable inverse patch changed during round-trip".into());
++    }
++    let mut durable_forward_package = litchi_pptx::Package::from_vec(source.clone())?;
++    durable_forward_package.apply_opened_presentation_patch(&decoded_forward)?;
++    let durable_forward_output = durable_forward_package.to_bytes()?;
++    if durable_forward_output != output {
++        return Err("owning PPTX durable forward patch failed on a reopened source".into());
++    }
++    let mut durable_inverse_package = litchi_pptx::Package::from_vec(output.clone())?;
++    durable_inverse_package.apply_opened_presentation_patch(&decoded_inverse)?;
++    let durable_inverse_output = durable_inverse_package.to_bytes()?;
++    if durable_inverse_output != source {
++        return Err("owning PPTX durable inverse patch failed on a reopened candidate".into());
++    }
++
++    let exact_limit = litchi_opc::ReadLimits::builder()
++        .max_input_bytes(u64::try_from(source.len())?)?
++        .build()?;
++    let exact_limited = litchi_pptx::Package::from_vec_with_limits(source.clone(), exact_limit)?;
++    if exact_limited.opc()?.exact_source_len() != Some(source.len()) {
++        return Err("owning PPTX exact input-byte limit did not admit the source".into());
++    }
++    let under_limit = litchi_opc::ReadLimits::builder()
++        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
++        .build()?;
++    match litchi_pptx::Package::from_vec_with_limits(source.clone(), under_limit) {
++        Err(litchi_pptx::Error::Opc(litchi_opc::OpcError::ReadLimit {
++            resource: litchi_opc::ReadResource::InputBytes,
++            actual,
++            limit,
++        })) if actual == source.len() as u64 && limit == source.len() as u64 - 1 => {},
++        _ => {
++            return Err(
++                "owning PPTX input-byte limit did not return the exact typed boundary error".into(),
++            );
++        },
++    }
++
++    let mut stale = litchi_pptx::Package::from_vec(source.clone())?;
++    let mut stale_edit = stale.opened_presentation_transaction()?;
++    let stale_texts = replacement_texts(0);
++    let stale_replacements = super::pptx_batch_replacements(&stale_texts);
++    if stale_edit.set_shape_texts(0, &stale_replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
++        return Err("owning PPTX stale fixture changed an unexpected shape count".into());
++    }
++    stale.apply_opened_presentation_commit(stale_edit.commit()?)?;
++    let stale_before = stale.to_bytes()?;
++    let stale_error = stale
++        .apply_opened_presentation_patch(&forward)
++        .err()
++        .ok_or("owning PPTX control accepted a stale source patch")?;
++    let stale_after = stale.to_bytes()?;
++    let stale_refusal = RefusalGate {
++        refused: true,
++        output_unchanged: stale_before == stale_after,
++        error: stale_error.to_string(),
++    };
++    if !stale_refusal.output_unchanged {
++        return Err("owning PPTX stale-source refusal mutated its package".into());
++    }
++
++    let mut foreign_seed = litchi_pptx::Package::new()?;
++    let foreign_bytes = foreign_seed.to_bytes()?;
++    let mut foreign = litchi_pptx::Package::from_vec(foreign_bytes)?;
++    let foreign_before = foreign.to_bytes()?;
++    let foreign_error = foreign
++        .apply_opened_presentation_patch(&forward)
++        .err()
++        .ok_or("owning PPTX control accepted a foreign source patch")?;
++    let foreign_after = foreign.to_bytes()?;
++    let foreign_refusal = RefusalGate {
++        refused: true,
++        output_unchanged: foreign_before == foreign_after,
++        error: foreign_error.to_string(),
++    };
++    if !foreign_refusal.output_unchanged {
++        return Err("owning PPTX foreign-source refusal mutated its package".into());
++    }
++
++    let source_immutability_verified = source == corpus.archive;
++    if !source_immutability_verified {
++        return Err("owning PPTX control mutated its source byte owner".into());
++    }
++    let source_artifact = artifact(SOURCE_FILE, &source);
++    let no_op_artifact = artifact(NOOP_FILE, &no_op);
++    let output_artifact = artifact(OUTPUT_FILE, &output);
++    let inverse_artifact = artifact(INVERSE_FILE, &inverse_output);
++    let replay_artifact = artifact(FORWARD_REPLAY_FILE, &forward_replay);
++    let raw_census = RawZipCensus {
++        schema: "pptx-owned-control-raw-zip-census-v1",
++        purpose: "inventory only; independent review must classify changed dependency closure and untouched raw records",
++        source: raw_inventory(SOURCE_FILE, &source)?,
++        output: raw_inventory(OUTPUT_FILE, &output)?,
++        no_op: raw_inventory(NOOP_FILE, &no_op)?,
++        inverse: raw_inventory(INVERSE_FILE, &inverse_output)?,
++    };
++    let gates = Gates {
++        source_identity_verified: true,
++        source_shape_verified: true,
++        owning_ingress_verified: true,
++        exact_noop_verified: no_op == source,
++        semantic_output_verified: true,
++        untouched_logical_parts_verified: true,
++        forward_output_verified: output != source,
++        inverse_exact_source_verified: inverse_output == source,
++        forward_replay_exact_output_verified: forward_replay == output,
++        durable_forward_roundtrip_verified: decoded_forward == forward
++            && durable_forward_output == output,
++        durable_inverse_reopen_verified: decoded_inverse == inverse
++            && durable_inverse_output == source,
++        finite_input_limit_verified: true,
++        stale_source_refusal: stale_refusal,
++        foreign_source_refusal: foreign_refusal,
++        partial_sink: partial_sink,
++        source_immutability_verified,
++        raw_census_artifacts_exported: true,
++    };
++    let report = ControlReport {
++        schema: SCHEMA,
++        status: "qualified",
++        implementation: "litchi_pptx::Package::from_vec -> opened_presentation_transaction -> PackageWriter::write_to_stream",
++        timing_scope: "untimed qualification; no elapsed-time, allocation, instruction, compression, or speedup measurement",
++        performance_claim: "none; this owning control only establishes preservation and refusal gates",
++        corpus: corpus.manifest,
++        slides: PPTX_SOURCE_SLIDE_COUNT,
++        text_boxes_per_slide: PPTX_SOURCE_TEXT_BOXES_PER_SLIDE,
++        media_entries: PPTX_SOURCE_MEDIA_ENTRY_COUNT,
++        selected_slide_positions: selected_positions,
++        replacement_count,
++        ownership,
++        coverage: Coverage {
++            unknown_member_variant: "not_covered; independent raw census receives primary corpus only",
++            signed_input: "not_covered",
++            encrypted_input: "not_covered",
++            malformed_input: "not_covered",
++            source_mutation_during_publication: "not_covered; immutable Vec owner used",
++        },
++        source: source_artifact,
++        no_op: no_op_artifact,
++        output: output_artifact,
++        inverse: inverse_artifact,
++        forward_replay: replay_artifact,
++        durable_forward_patch_bytes: durable_forward_bytes.len(),
++        durable_forward_patch_sha256: sha256_hex(&durable_forward_bytes),
++        durable_inverse_patch_bytes: durable_inverse_bytes.len(),
++        durable_inverse_patch_sha256: sha256_hex(&durable_inverse_bytes),
++        raw_census_file: RAW_CENSUS_FILE,
++        gates,
++    };
++    Ok(RunOutput { report, raw_census })
++}
++
++fn write_failure(directory: &Path, corpus: Option<super::CorpusManifest>, error: &dyn Error) {
++    let failure = FailureReport {
++        schema: SCHEMA,
++        status: "failed",
++        implementation: "litchi_pptx::Package::from_vec owning-input control",
++        error: error.to_string(),
++        corpus,
++    };
++    let _ = write_new_json(&directory.join(GATES_FILE), &failure);
++    let _ = write_new_json(&directory.join(REPORT_FILE), &failure);
++}
++
++pub(crate) fn export(directory: &Path) -> Result<(), Box<dyn Error>> {
++    if directory.exists() {
++        return Err("PPTX owning-control output directory already exists".into());
++    }
++    fs::create_dir(directory)?;
++    let mut corpus_manifest = None;
++    let result = (|| -> Result<(), Box<dyn Error>> {
++        let corpus = build_pptx_source_edit_corpus()?;
++        check_primary_corpus(&corpus)?;
++        corpus_manifest = Some(corpus.manifest.clone());
++        write_new_bytes(&directory.join(SOURCE_FILE), &corpus.archive)?;
++        let run = run_control(corpus, directory)?;
++        write_new_json(&directory.join(RAW_CENSUS_FILE), &run.raw_census)?;
++        write_new_json(&directory.join(GATES_FILE), &run.report.gates)?;
++        write_new_json(&directory.join(REPORT_FILE), &run.report)?;
++        Ok(())
++    })();
++    if let Err(error) = result {
++        write_failure(directory, corpus_manifest, error.as_ref());
++        return Err(error);
++    }
++    Ok(())
++}

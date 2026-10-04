@@ -37,6 +37,7 @@ mod parallel_metrics;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
+mod pptx_owned_control;
 pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
 pub mod pptx_range_source;
@@ -10220,6 +10221,17 @@ pub fn write_xlsx_attribute_fixtures(
     include_one_edit: bool,
 ) -> Result<(), Box<dyn Error>> {
     xlsx_attribute_fixtures::export(directory, include_one_edit)
+}
+
+/// Export the untimed owning-input PPTX preservation qualification fixtures.
+///
+/// This is a standalone harness helper. It uses the fixed media-rich
+/// multi-slide corpus and refuses an existing output directory so the source,
+/// candidate, and gate receipts remain immutable custody artifacts.
+pub fn write_pptx_owned_control_fixtures(
+    directory: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
+    pptx_owned_control::export(directory)
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {

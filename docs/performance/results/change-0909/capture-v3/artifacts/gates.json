@@ -1,0 +1,44 @@
+{
+  "source_identity_verified": true,
+  "source_shape_verified": true,
+  "owning_ingress_verified": true,
+  "exact_noop_verified": true,
+  "semantic_output_verified": true,
+  "untouched_logical_parts_verified": true,
+  "forward_output_verified": true,
+  "inverse_exact_source_verified": true,
+  "forward_replay_exact_output_verified": true,
+  "durable_forward_roundtrip_verified": true,
+  "durable_inverse_reopen_verified": true,
+  "finite_input_limit_verified": true,
+  "stale_source_refusal": {
+    "refused": true,
+    "output_unchanged": true,
+    "error": "unsafe PPTX edit during apply_opened_presentation_patch: an opened-presentation patch resource is stale",
+    "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }"
+  },
+  "foreign_source_refusal": {
+    "refused": true,
+    "output_unchanged": true,
+    "error": "unsafe PPTX edit during apply_opened_presentation_patch: an opened-presentation patch resource is stale",
+    "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }"
+  },
+  "partial_sink": {
+    "status": "verified",
+    "accepted_prefix_bytes": 8508572,
+    "error_kind": "OpcError::IncompleteOutput",
+    "prefix_sha256": "6286ed5e43e5a7d443392494736fc7b08887923cf0156392dfc3dddf21c26909",
+    "error": "incomplete OPC output after 8508572 byte(s): ZIP error: intentional PPTX partial sink failure"
+  },
+  "zero_sink": {
+    "status": "verified",
+    "accepted_prefix_bytes": 0,
+    "error_kind": "OpcError::ZipError (preservation writer mapping)",
+    "prefix_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "error": "ZIP error: intentional PPTX partial sink failure"
+  },
+  "input_limit_actual": 17017139,
+  "input_limit_maximum": 17017138,
+  "source_immutability_verified": true,
+  "raw_census_artifacts_exported": true
+}
