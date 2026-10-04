@@ -4763,8 +4763,34 @@ first three already exist from the S2 amendment above; only
 features now carry that one edge. None of the four reaches an iWork package, so the non-iWork release gate keeps
 `litchi-ops` among its bulk packages, and the package stays runtime-neutral.
 
-Together with the S2 amendment above, the current inventory is 66 workspace
-packages, 256 internal dependency declarations, 245 canonical edges, 12
-development-only edges, 11 ordered
+Together with the S2 amendment above, the inventory at this point was 66
+workspace packages, 256 internal dependency declarations and 245 canonical
+edges.
+
+## 2026-10-04 amendment: `litchi-ops` detection edges (M0a step S4)
+
+Unified-ops M0a step S4 moves the facade's smart detection
+(`crates/litchi/src/detection_smart/`) into `litchi_ops::detect` as a move,
+not a rewrite. Detection needs the OLE, OPC, ODF and RTF probes and the
+source-backed owners that the per-family path detectors hand back, so
+`litchi-ops` gains 14 optional normal edges, each owned by the matching format
+feature: `litchi-cfb`, `litchi-docx`, `litchi-odf-common`, `litchi-odp`,
+`litchi-ods`, `litchi-odt`, `litchi-ooxml-common`, `litchi-opc`,
+`litchi-ppt`, `litchi-pptx`, `litchi-rtf`, `litchi-xls`, `litchi-xlsb` and
+`litchi-xlsx`. Detection does not need `litchi-doc`. Eleven of the fourteen already exist from
+the S2 and S3 amendments above; `litchi-odp`, `litchi-ods`, `litchi-odt` and
+`litchi-ooxml-common` are new, which brings `litchi-ops` to fifteen leaf edges. The facade gains `litchi
+-> litchi-ops`: an optional normal edge enabled by every format feature, plus
+a development edge that turns on `litchi-ops/test-support` for the facade's
+unit tests.
+
+`litchi-ops` takes no iWork edge. The iWork arms stay in the facade and run as
+a lowest-precedence ZIP tail that the ops detectors call where the arms used
+to run, so the non-iWork release gate still counts `litchi-ops` among its 47
+bulk packages.
+
+Together with the S2 and S3 amendments above, the current inventory is 66
+workspace packages, 262 internal dependency declarations, 250 canonical edges,
+12 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.

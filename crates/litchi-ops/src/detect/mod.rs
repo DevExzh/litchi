@@ -1,20 +1,31 @@
 //! Smart format detection — opens files via the per-format crates to disambiguate.
 //!
-//! Lives in the umbrella because it coordinates the CFB substrate with
-//! `litchi_doc`, `crate::ppt`, `crate::xls`, the standalone OOXML modules, the concrete iWork owners, and
-//! `crate::odf`. Format-specific detectors stay in their owning leaf crates.
+//! The root coordinator composes the leaf probes (ADR 0010): the CFB
+//! substrate with OLE stream-name classification, OPC content types for the
+//! standalone OOXML owners, `litchi_odf_common::detect` for OpenDocument
+//! (ADR 0009), and the RTF transport probe. Format-specific detectors stay in
+//! their owning leaf crates.
+//!
+//! The iWork arms are not here. iWork is the last ZIP candidate, and
+//! `litchi-ops` must not depend on an iWork crate, so the `litchi` facade
+//! supplies them as a lowest-precedence tail. The detectors exported here
+//! classify every other format with unchanged precedence and report an iWork
+//! package as unrecognized.
 
-pub mod detected;
-pub mod functions;
+pub(crate) mod detected;
+pub(crate) mod functions;
 
 // Format-family probes used by `functions`.
 pub(crate) mod ole2;
 pub mod ooxml;
+pub(crate) mod tail;
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+pub(crate) mod workbook_metadata;
 
 /// Detect the fixed transport header used by compressed RTF.
 ///
 /// The shared core detector intentionally has no dependency on the RTF leaf
-/// crate. Keep this probe in the facade, where the optional RTF transport
+/// crate. Keep this probe in the coordinator, where the optional RTF transport
 /// implementation is available, so smart detection can hand compressed bytes
 /// to the native parser without weakening non-RTF builds.
 #[cfg(feature = "rtf")]
@@ -23,15 +34,15 @@ pub(crate) fn is_compressed_rtf(bytes: &[u8]) -> bool {
     litchi_rtf::transport::is_compressed_rtf(bytes)
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::cell::Cell;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 thread_local! {
     static OPC_PROBE_COUNT: Cell<usize> = const { Cell::new(0) };
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 #[allow(
     dead_code,
     reason = "the probe counter is used only by feature-gated detection tests"
@@ -40,21 +51,23 @@ pub(crate) fn record_opc_probe() {
     OPC_PROBE_COUNT.with(|count| count.set(count.get().saturating_add(1)));
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 #[allow(
     dead_code,
     reason = "the probe counter is used only by feature-gated detection tests"
 )]
-pub(crate) fn reset_opc_probe_count() {
+#[doc(hidden)]
+pub fn reset_opc_probe_count() {
     OPC_PROBE_COUNT.with(|count| count.set(0));
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 #[allow(
     dead_code,
     reason = "the probe counter is used only by feature-gated detection tests"
 )]
-pub(crate) fn opc_probe_count() -> usize {
+#[doc(hidden)]
+pub fn opc_probe_count() -> usize {
     OPC_PROBE_COUNT.with(Cell::get)
 }
 

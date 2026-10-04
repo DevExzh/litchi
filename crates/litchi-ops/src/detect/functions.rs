@@ -15,6 +15,7 @@ use super::detected::PreparedDetection;
 use super::ole2;
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 use super::ooxml;
+use super::tail::{NoZipTail, ZipTail};
 use litchi_core::detection::FileFormat;
 use litchi_core::detection::simd_utils::{check_office_signatures, signature_matches};
 use litchi_core::detection::{rtf, utils};
@@ -39,7 +40,7 @@ use litchi_odf_common::detect as odf;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::common::detection::detect_file_format;
+/// use litchi_ops::detect::detect_file_format;
 ///
 /// let format = detect_file_format("document.docx");
 /// if let Some(format) = format {
@@ -48,8 +49,16 @@ use litchi_odf_common::detect as odf;
 /// # Ok::<(), std::io::Error>(())
 /// ```
 pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
+    detect_file_format_with_tail(path, &NoZipTail)
+}
+
+/// [`detect_file_format`] with a lowest-precedence ZIP candidate.
+pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
+    path: P,
+    tail: &T,
+) -> Option<FileFormat> {
     let mut file = File::open(path).ok()?;
-    detect_format_from_reader(&mut file)
+    detect_format_from_reader_with_tail(&mut file, tail)
 }
 
 /// Detect a file format and retain the OOXML package the detection built.
@@ -78,18 +87,15 @@ pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::common::detection::{FileFormat, detect_and_prepare};
-/// use litchi::Document;
+/// use litchi_core::detection::FileFormat;
+/// use litchi_ops::detect::detect_and_prepare;
 ///
 /// if let Some(detected) = detect_and_prepare("document.docx") {
-///     if detected.format() == FileFormat::Docx
-///         && let Some(prepared) = detected.into_prepared()
-///     {
-///         let document = Document::from_prepared(prepared)?;
-///         println!("{}", document.text()?);
+///     let (format, prepared) = detected.into_parts();
+///     if format == FileFormat::Docx && prepared.is_some() {
+///         println!("the DOCX index can be adopted without a second scan");
 ///     }
 /// }
-/// # Ok::<(), litchi::common::Error>(())
 /// ```
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
@@ -113,7 +119,20 @@ pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
     path: P,
     limits: crate::opc::ReadLimits,
 ) -> Option<PreparedDetection> {
-    super::detected::detect_and_prepare_path_with_limits(path.as_ref(), limits)
+    detect_and_prepare_with_limits_and_tail(path, limits, &NoZipTail)
+}
+
+/// [`detect_and_prepare_with_limits`] with a lowest-precedence ZIP candidate.
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub fn detect_and_prepare_with_limits_and_tail<P: AsRef<Path>, T: ZipTail>(
+    path: P,
+    limits: crate::opc::ReadLimits,
+    tail: &T,
+) -> Option<PreparedDetection> {
+    super::detected::detect_and_prepare_path_with_limits(path.as_ref(), limits, tail)
 }
 
 /// Detect file format from a byte slice.
@@ -134,7 +153,7 @@ pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi::common::detection::detect_file_format_from_bytes;
+/// use litchi_ops::detect::detect_file_format_from_bytes;
 /// use std::fs;
 ///
 /// let data = fs::read("document.docx")?;
@@ -145,6 +164,14 @@ pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
 /// # Ok::<(), std::io::Error>(())
 /// ```
 pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
+    detect_file_format_from_bytes_with_tail(bytes, &NoZipTail)
+}
+
+/// [`detect_file_format_from_bytes`] with a lowest-precedence ZIP candidate.
+pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
+    bytes: &[u8],
+    tail: &T,
+) -> Option<FileFormat> {
     if bytes.len() < 4 {
         return None;
     }
@@ -180,7 +207,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
             // First try OOXML detection (most common), except for a
             // validated ordinary ODF package with no OPC catalog marker.
             if !normal_odf {
-                #[cfg(test)]
+                #[cfg(any(test, feature = "test-support"))]
                 super::record_opc_probe();
                 if let Some(result) = ooxml::detect_zip_format(bytes) {
                     return Some(result);
@@ -196,11 +223,11 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 
         // Finally try iWork detection
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
-        if let Ok(Some(format)) = litchi_iwa_detect::bytes(bytes)
-            && let Some(result) = iwork_format(format)
-        {
+        if let Some(result) = tail.classify_bytes(bytes) {
             return Some(result);
         }
+        #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
+        let _ = tail;
 
         return None;
     }
@@ -251,6 +278,16 @@ fn is_normal_odf_package(bytes: &[u8]) -> bool {
 /// * `None` if the format is not recognized
 ///
 pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
+    detect_format_from_reader_with_tail(reader, &NoZipTail)
+}
+
+/// [`detect_format_from_reader`] with a lowest-precedence ZIP candidate.
+pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
+    reader: &mut R,
+    tail: &T,
+) -> Option<FileFormat> {
+    #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
+    let _ = tail;
     let original = reader.stream_position().ok()?;
     let detected = (|| {
         reader.seek(SeekFrom::Start(0)).ok()?;
@@ -311,7 +348,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                             if matches!(catalog, odf::CatalogDecision::Ordinary) {
                                 return Some(package.format());
                             }
-                            #[cfg(test)]
+                            #[cfg(any(test, feature = "test-support"))]
                             super::record_opc_probe();
                             if let Some(format) = ooxml::detect_zip_format(snapshot.as_slice()) {
                                 return Some(format);
@@ -322,7 +359,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                             let catalog =
                                 odf::packaged_has_ooxml_catalog_with_limits(&bytes, catalog_limits);
                             if catalog != Some(false) {
-                                #[cfg(test)]
+                                #[cfg(any(test, feature = "test-support"))]
                                 super::record_opc_probe();
                                 if let Some(format) = ooxml::detect_zip_format(&bytes) {
                                     return Some(format);
@@ -338,9 +375,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                             ))]
                             {
                                 reader.seek(SeekFrom::Start(0)).ok()?;
-                                if let Ok(Some(format)) = litchi_iwa_detect::reader(reader)
-                                    && let Some(format) = iwork_format(format)
-                                {
+                                if let Some(format) = tail.classify_reader(reader) {
                                     return Some(format);
                                 }
                             }
@@ -372,7 +407,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             if !normal_odf {
                 reader.seek(SeekFrom::Start(0)).ok()?;
-                #[cfg(test)]
+                #[cfg(any(test, feature = "test-support"))]
                 super::record_opc_probe();
                 if let Some(format) = ooxml::detect_zip_format_from_reader(reader) {
                     return Some(format);
@@ -390,9 +425,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
-                if let Ok(Some(format)) = litchi_iwa_detect::reader(reader)
-                    && let Some(format) = iwork_format(format)
-                {
+                if let Some(format) = tail.classify_reader(reader) {
                     return Some(format);
                 }
             }
@@ -427,23 +460,6 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
     })();
     reader.seek(SeekFrom::Start(original)).ok()?;
     detected
-}
-
-#[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
-#[allow(
-    unreachable_patterns,
-    reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
-)]
-fn iwork_format(format: litchi_iwa_detect::Format) -> Option<FileFormat> {
-    match format {
-        #[cfg(feature = "pages")]
-        litchi_iwa_detect::Format::Pages => Some(FileFormat::Pages),
-        #[cfg(feature = "keynote")]
-        litchi_iwa_detect::Format::Keynote => Some(FileFormat::Keynote),
-        #[cfg(feature = "numbers")]
-        litchi_iwa_detect::Format::Numbers => Some(FileFormat::Numbers),
-        _ => None,
-    }
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ use std::io::{Read, Seek};
 /// # Note
 /// This function requires `doc`, `ppt`, or `xls` to be enabled.
 #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
-pub fn detect_ole2_format(bytes: &[u8]) -> Option<FileFormat> {
+pub(crate) fn detect_ole2_format(bytes: &[u8]) -> Option<FileFormat> {
     // First check if it's a valid OLE file using the standard function
     if !litchi_cfb::is_ole_file(bytes) {
         return None;
@@ -25,7 +25,7 @@ pub fn detect_ole2_format(bytes: &[u8]) -> Option<FileFormat> {
 /// Stub implementation when all CFB-backed format features are disabled.
 /// Always returns None since OLE2 parsing is not available.
 #[cfg(not(any(feature = "doc", feature = "ppt", feature = "xls")))]
-pub fn detect_ole2_format(_bytes: &[u8]) -> Option<FileFormat> {
+pub(crate) fn detect_ole2_format(_bytes: &[u8]) -> Option<FileFormat> {
     None
 }
 
@@ -35,7 +35,7 @@ pub fn detect_ole2_format(_bytes: &[u8]) -> Option<FileFormat> {
 /// # Note
 /// This function requires `doc`, `ppt`, or `xls` to be enabled.
 #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
-pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
+pub(crate) fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
     // Try to open as OLE file - this will validate the format and parse structure
     let ole_file = match litchi_cfb::OleFile::open(reader) {
         Ok(ole) => ole,
@@ -71,6 +71,8 @@ pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<
 /// Stub implementation when all CFB-backed format features are disabled.
 /// Always returns None since OLE2 parsing is not available.
 #[cfg(not(any(feature = "doc", feature = "ppt", feature = "xls")))]
-pub fn detect_ole2_format_from_reader<R: Read + Seek>(_reader: &mut R) -> Option<FileFormat> {
+pub(crate) fn detect_ole2_format_from_reader<R: Read + Seek>(
+    _reader: &mut R,
+) -> Option<FileFormat> {
     None
 }

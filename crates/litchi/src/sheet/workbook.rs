@@ -201,28 +201,16 @@ fn xls_metadata_error_is_soft(error: &litchi_cfb::OleError) -> bool {
 }
 
 /// Core-properties repairs of an OOXML workbook's metadata read, folded into
-/// the format report by [`Workbook::tolerance_report`].
+/// the format report by [`Workbook::tolerance_report`], and the read itself.
+/// Both live beside the workbook source-path detector in `litchi_ops`.
 #[cfg(any(feature = "xlsx", feature = "xlsb"))]
-pub(crate) type MetadataRepairs = crate::ooxml_common::leniency::ToleranceReport;
+pub(crate) use litchi_ops::__migration::detect::{MetadataRepairs, read_source_backed_metadata};
 
 /// Without an OOXML workbook format no metadata read records repairs.
 #[cfg(not(any(feature = "xlsx", feature = "xlsb")))]
 #[derive(Debug, Default)]
 pub(crate) struct MetadataRepairs {
     _none: (),
-}
-
-/// Read an OOXML workbook's core properties with their repairs.
-#[cfg(any(feature = "xlsx", feature = "xlsb"))]
-pub(crate) fn read_source_backed_metadata(
-    package: &crate::opc::SourceBackedPackage,
-) -> crate::ooxml_common::Result<(Metadata, MetadataRepairs)> {
-    let mut repairs = MetadataRepairs::default();
-    let metadata =
-        crate::ooxml_common::properties::read_source_backed_with_report(package, &mut repairs)?
-            .map(Metadata::from)
-            .unwrap_or_default();
-    Ok((metadata, repairs))
 }
 
 /// A unified workbook interface for supported spreadsheet formats.

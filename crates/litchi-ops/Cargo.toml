@@ -14,38 +14,57 @@ default = []
 # Format features mirror the `litchi` facade's per-format features. Each one
 # gains its `dep:` leaf edge, and the matching `tools/crate_boundaries.json`
 # entry, in the change that first uses it (ADR 0033, record 0004). The error
-# module (record 0003, step S2) wires the leaf errors of the tier 1-2 formats
-# and RTF; the `OpenOptions` sub-options (step S3, §2.5) name OOXML limits from
-# `litchi-opc`, DOC leniency from `litchi-doc`, PPT record limits from
-# `litchi-ppt`, and ODF package limits from `litchi-odf-common`.
-doc     = ["dep:litchi-doc", "dep:litchi-cfb"]
-docx    = ["dep:litchi-docx", "dep:litchi-opc"]
-ppt     = ["dep:litchi-ppt", "dep:litchi-cfb"]
-pptx    = ["dep:litchi-pptx", "dep:litchi-opc"]
-xls     = ["dep:litchi-xls", "dep:litchi-cfb"]
-xlsx    = ["dep:litchi-xlsx", "dep:litchi-opc"]
-xlsb    = ["dep:litchi-xlsb", "dep:litchi-opc"]
+# module (M0a step S2) wires the leaf errors of the tier 1-2 formats and RTF;
+# the `OpenOptions` sub-options (step S3) name OOXML, DOC, PPT and ODF limit
+# types; detection (step S4) needs the OLE, OPC, ODF and RTF probes and owners.
+# The iWork features carry no dependency: `litchi-ops` must stay iWork-free
+# (`tools/non_iwork_gate.py`), so they only shape `detect::DetectedFormat` and
+# the facade-supplied lowest-precedence ZIP tail.
+doc     = ["dep:litchi-cfb", "dep:litchi-doc"]
+docx    = ["dep:litchi-docx", "opc"]
+ppt     = ["dep:litchi-cfb", "dep:litchi-ppt"]
+pptx    = ["dep:litchi-pptx", "opc"]
+xls     = ["dep:litchi-cfb", "dep:litchi-xls"]
+xlsx    = ["dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
+xlsb    = ["dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
 rtf     = ["dep:litchi-rtf"]
-odt     = ["dep:litchi-odf-common"]
-ods     = ["dep:litchi-odf-common"]
-odp     = ["dep:litchi-odf-common"]
+odt     = ["dep:litchi-odf-common", "dep:litchi-odt"]
+ods     = ["dep:litchi-odf-common", "dep:litchi-ods"]
+odp     = ["dep:litchi-odf-common", "dep:litchi-odp"]
 pages   = []
 keynote = []
 numbers = []
 
+# Mirrors the facade's `opc` capability, which detection consults on its own
+# (an XLS-only build with OPC enabled bounds its workbook path probe).
+opc = ["dep:litchi-opc"]
+
+# Compiles the detection probe counter and the test-only source detectors the
+# `litchi` facade's unit tests exercise. Enabled only by `litchi`'s
+# dev-dependency; never part of a release build.
+test-support = []
+
 [dependencies]
-litchi-cfb        = { workspace = true, optional = true }
-litchi-core       = { workspace = true }
-litchi-doc        = { workspace = true, optional = true }
-litchi-docx       = { workspace = true, optional = true }
-litchi-odf-common = { workspace = true, optional = true }
-litchi-opc        = { workspace = true, optional = true }
-litchi-ppt        = { workspace = true, optional = true }
-litchi-pptx       = { workspace = true, optional = true }
-litchi-rtf        = { workspace = true, optional = true }
-litchi-xls        = { workspace = true, optional = true }
-litchi-xlsb       = { workspace = true, optional = true }
-litchi-xlsx       = { workspace = true, optional = true }
+litchi-cfb          = { workspace = true, optional = true }
+litchi-core         = { workspace = true }
+litchi-doc          = { workspace = true, optional = true }
+litchi-docx         = { workspace = true, optional = true }
+litchi-odf-common   = { workspace = true, optional = true }
+litchi-odp          = { workspace = true, optional = true }
+litchi-ods          = { workspace = true, optional = true }
+litchi-odt          = { workspace = true, optional = true }
+litchi-ooxml-common = { workspace = true, optional = true }
+litchi-opc          = { workspace = true, optional = true }
+litchi-ppt          = { workspace = true, optional = true }
+litchi-pptx         = { workspace = true, optional = true }
+litchi-rtf          = { workspace = true, optional = true }
+litchi-xls          = { workspace = true, optional = true }
+litchi-xlsb         = { workspace = true, optional = true }
+litchi-xlsx         = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+zip      = { version = "8", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true
