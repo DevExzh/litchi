@@ -1,0 +1,2311 @@
+{
+  "bootstrap": {
+    "confidence": 0.95,
+    "draws": 10000,
+    "seed": 913
+  },
+  "checks": {
+    "bootstrap_recomputed_independently": true,
+    "phase_totals_recomputed": true,
+    "raw_receipts_read": true,
+    "route_specific_pairing": true,
+    "source_output_sink_guards": true
+  },
+  "child_processes": 48,
+  "paired_by_route": {
+    "materialized": {
+      "median_ratio_bootstrap": {
+        "clone_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.6034072231535835,
+          "seed": 913,
+          "statistic": 0.9912316436092107,
+          "upper": 1.0222502372539048
+        },
+        "edit_commit_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9860772482519098,
+          "seed": 913,
+          "statistic": 0.9971536968722232,
+          "upper": 1.0033739470429126
+        },
+        "ingress_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9832284846761733,
+          "seed": 913,
+          "statistic": 1.0027888629863482,
+          "upper": 1.0245763070051899
+        },
+        "publish_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9768864401798799,
+          "seed": 913,
+          "statistic": 0.9833659018136096,
+          "upper": 0.9883832356415287
+        },
+        "snapshot_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9931675031178542,
+          "seed": 913,
+          "statistic": 0.9977720142222919,
+          "upper": 1.0019415627883168
+        },
+        "total_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9730520628620976,
+          "seed": 913,
+          "statistic": 0.984089747530512,
+          "upper": 0.9901747761629278
+        }
+      },
+      "pairs": [
+        {
+          "clone_ns": {
+            "baseline_median": 2919625.0,
+            "baseline_over_candidate": 3.74979611075649,
+            "candidate_median": 778609.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2870540.5,
+            "baseline_over_candidate": 1.0134577380316672,
+            "candidate_median": 2832422.5
+          },
+          "ingress_ns": {
+            "baseline_median": 6362788.5,
+            "baseline_over_candidate": 1.0525622877704672,
+            "candidate_median": 6045047.0
+          },
+          "pair": 0,
+          "publish_ns": {
+            "baseline_median": 238571382.0,
+            "baseline_over_candidate": 1.0032155569913903,
+            "candidate_median": 237806701.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 12325985.5,
+            "baseline_over_candidate": 1.005469971909048,
+            "candidate_median": 12258929.5
+          },
+          "total_ns": {
+            "baseline_median": 265058688.0,
+            "baseline_over_candidate": 1.0189412215699538,
+            "candidate_median": 260131480.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2779527.0,
+            "baseline_over_candidate": 0.9139111911851089,
+            "candidate_median": 3041353.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2858887.0,
+            "baseline_over_candidate": 1.0025687675737016,
+            "candidate_median": 2851562.0
+          },
+          "ingress_ns": {
+            "baseline_median": 6189552.0,
+            "baseline_over_candidate": 1.0057464942160517,
+            "candidate_median": 6154187.0
+          },
+          "pair": 1,
+          "publish_ns": {
+            "baseline_median": 237961655.5,
+            "baseline_over_candidate": 0.986684884606262,
+            "candidate_median": 241172900.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 12289818.0,
+            "baseline_over_candidate": 0.996112267810816,
+            "candidate_median": 12337784.0
+          },
+          "total_ns": {
+            "baseline_median": 264126124.0,
+            "baseline_over_candidate": 0.9860823519760327,
+            "candidate_median": 267854022.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 786418.0,
+            "baseline_over_candidate": 0.2929032551220582,
+            "candidate_median": 2684907.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2849397.5,
+            "baseline_over_candidate": 0.988378032208859,
+            "candidate_median": 2882902.5
+          },
+          "ingress_ns": {
+            "baseline_median": 6100362.0,
+            "baseline_over_candidate": 0.865924083830388,
+            "candidate_median": 7044915.5
+          },
+          "pair": 2,
+          "publish_ns": {
+            "baseline_median": 233939560.5,
+            "baseline_over_candidate": 0.9691848919965301,
+            "candidate_median": 241377638.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 12316888.0,
+            "baseline_over_candidate": 0.9976241313030116,
+            "candidate_median": 12346221.0
+          },
+          "total_ns": {
+            "baseline_median": 256492053.0,
+            "baseline_over_candidate": 0.9546253090667282,
+            "candidate_median": 268683483.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 765863.0,
+            "baseline_over_candidate": 0.9872059201702525,
+            "candidate_median": 775788.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2796542.0,
+            "baseline_over_candidate": 0.9795286319116984,
+            "candidate_median": 2854987.5
+          },
+          "ingress_ns": {
+            "baseline_median": 5958695.5,
+            "baseline_over_candidate": 0.9815908943773004,
+            "candidate_median": 6070447.0
+          },
+          "pair": 3,
+          "publish_ns": {
+            "baseline_median": 233958624.0,
+            "baseline_over_candidate": 0.9825703093069185,
+            "candidate_median": 238108786.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 12185302.5,
+            "baseline_over_candidate": 0.9896726547076407,
+            "candidate_median": 12312457.5
+          },
+          "total_ns": {
+            "baseline_median": 255962913.5,
+            "baseline_over_candidate": 0.9826524071026379,
+            "candidate_median": 260481643.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 772283.0,
+            "baseline_over_candidate": 0.9813460099140621,
+            "candidate_median": 786963.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2792461.5,
+            "baseline_over_candidate": 0.9847147593762976,
+            "candidate_median": 2835807.5
+          },
+          "ingress_ns": {
+            "baseline_median": 6027571.0,
+            "baseline_over_candidate": 0.9935230150130232,
+            "candidate_median": 6066866.0
+          },
+          "pair": 4,
+          "publish_ns": {
+            "baseline_median": 233753692.0,
+            "baseline_over_candidate": 0.9810999381110949,
+            "candidate_median": 238256759.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 12199182.0,
+            "baseline_over_candidate": 0.9916745775630126,
+            "candidate_median": 12301598.0
+          },
+          "total_ns": {
+            "baseline_median": 255804655.0,
+            "baseline_over_candidate": 0.981834337999363,
+            "candidate_median": 260537491.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 791679.0,
+            "baseline_over_candidate": 1.0064588223852449,
+            "candidate_median": 786598.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2825072.0,
+            "baseline_over_candidate": 0.9874397371275219,
+            "candidate_median": 2861007.0
+          },
+          "ingress_ns": {
+            "baseline_median": 6114391.0,
+            "baseline_over_candidate": 1.004588873567086,
+            "candidate_median": 6086461.0
+          },
+          "pair": 5,
+          "publish_ns": {
+            "baseline_median": 234456842.0,
+            "baseline_over_candidate": 0.9841614943203009,
+            "candidate_median": 238230050.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 12236982.0,
+            "baseline_over_candidate": 0.9946604286726958,
+            "candidate_median": 12302673.0
+          },
+          "total_ns": {
+            "baseline_median": 256749956.5,
+            "baseline_over_candidate": 0.9855270879583862,
+            "candidate_median": 260520446.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 784233.0,
+            "baseline_over_candidate": 0.26601591279441317,
+            "candidate_median": 2948068.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2831522.0,
+            "baseline_over_candidate": 0.9493411492856276,
+            "candidate_median": 2982618.0
+          },
+          "ingress_ns": {
+            "baseline_median": 6017276.0,
+            "baseline_over_candidate": 0.9157053305012751,
+            "candidate_median": 6571192.5
+          },
+          "pair": 6,
+          "publish_ns": {
+            "baseline_median": 234119477.5,
+            "baseline_over_candidate": 0.9676513277979382,
+            "candidate_median": 241946113.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 12209207.0,
+            "baseline_over_candidate": 0.9753458728406689,
+            "candidate_median": 12517823.0
+          },
+          "total_ns": {
+            "baseline_median": 256195412.5,
+            "baseline_over_candidate": 0.9517948495556352,
+            "candidate_median": 269170833.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 796288.5,
+            "baseline_over_candidate": 0.9952573670481688,
+            "candidate_median": 800083.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2964507.5,
+            "baseline_over_candidate": 1.0196957809226392,
+            "candidate_median": 2907247.0
+          },
+          "ingress_ns": {
+            "baseline_median": 6315426.5,
+            "baseline_over_candidate": 1.027175871861348,
+            "candidate_median": 6148340.0
+          },
+          "pair": 7,
+          "publish_ns": {
+            "baseline_median": 234872131.0,
+            "baseline_over_candidate": 0.9789203336898953,
+            "candidate_median": 239929770.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 12415178.0,
+            "baseline_over_candidate": 1.0030063097604243,
+            "candidate_median": 12377966.0
+          },
+          "total_ns": {
+            "baseline_median": 257748282.0,
+            "baseline_over_candidate": 0.9823231420677402,
+            "candidate_median": 262386450.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 810748.5,
+            "baseline_over_candidate": 1.009531891367568,
+            "candidate_median": 803093.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2955077.5,
+            "baseline_over_candidate": 0.9922983882206021,
+            "candidate_median": 2978013.0
+          },
+          "ingress_ns": {
+            "baseline_median": 6341892.0,
+            "baseline_over_candidate": 1.0009888524056103,
+            "candidate_median": 6335627.0
+          },
+          "pair": 8,
+          "publish_ns": {
+            "baseline_median": 237287082.5,
+            "baseline_over_candidate": 0.9865301145689065,
+            "candidate_median": 240526953.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 12461868.0,
+            "baseline_over_candidate": 0.9979198971415723,
+            "candidate_median": 12487844.0
+          },
+          "total_ns": {
+            "baseline_median": 260326907.0,
+            "baseline_over_candidate": 0.9884133366863774,
+            "candidate_median": 263378586.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 802658.5,
+            "baseline_over_candidate": 1.0349685831402418,
+            "candidate_median": 775539.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2924998.0,
+            "baseline_over_candidate": 1.0030315577948037,
+            "candidate_median": 2916157.5
+          },
+          "ingress_ns": {
+            "baseline_median": 6296507.5,
+            "baseline_over_candidate": 1.0276311095138633,
+            "candidate_median": 6127206.0
+          },
+          "pair": 9,
+          "publish_ns": {
+            "baseline_median": 235264447.0,
+            "baseline_over_candidate": 0.9900815866767956,
+            "candidate_median": 237621273.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 12390104.5,
+            "baseline_over_candidate": 1.0038525656845414,
+            "candidate_median": 12342554.0
+          },
+          "total_ns": {
+            "baseline_median": 257873717.0,
+            "baseline_over_candidate": 0.9919362156394783,
+            "candidate_median": 259970059.5
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2748707.0,
+            "baseline_over_candidate": 3.483238375717885,
+            "candidate_median": 789124.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2855643.0,
+            "baseline_over_candidate": 1.0020090055238442,
+            "candidate_median": 2849917.5
+          },
+          "ingress_ns": {
+            "baseline_median": 6300458.0,
+            "baseline_over_candidate": 1.0219767421490316,
+            "candidate_median": 6164972.0
+          },
+          "pair": 10,
+          "publish_ns": {
+            "baseline_median": 237366713.0,
+            "baseline_over_candidate": 0.9995498994414537,
+            "candidate_median": 237473600.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 12292409.5,
+            "baseline_over_candidate": 0.9988365307171817,
+            "candidate_median": 12306728.0
+          },
+          "total_ns": {
+            "baseline_median": 263703139.5,
+            "baseline_over_candidate": 1.0151210215221764,
+            "candidate_median": 259775075.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 774988.5,
+            "baseline_over_candidate": 0.2838809111064102,
+            "candidate_median": 2729977.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2816957.5,
+            "baseline_over_candidate": 1.0037163362910215,
+            "candidate_median": 2806527.5
+          },
+          "ingress_ns": {
+            "baseline_median": 6037557.0,
+            "baseline_over_candidate": 0.9848660749750462,
+            "candidate_median": 6130333.0
+          },
+          "pair": 11,
+          "publish_ns": {
+            "baseline_median": 234136757.0,
+            "baseline_over_candidate": 0.9748525466698645,
+            "candidate_median": 240176586.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 12246479.5,
+            "baseline_over_candidate": 1.0008768158162094,
+            "candidate_median": 12235751.0
+          },
+          "total_ns": {
+            "baseline_median": 256250286.0,
+            "baseline_over_candidate": 0.9642697877248322,
+            "candidate_median": 265745426.5
+          }
+        }
+      ]
+    },
+    "owned": {
+      "median_ratio_bootstrap": {
+        "clone_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9620077878056983,
+          "seed": 913,
+          "statistic": 1.0229592834973036,
+          "upper": 1.056858851947824
+        },
+        "edit_commit_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9810393352415244,
+          "seed": 913,
+          "statistic": 0.9893373369195035,
+          "upper": 1.0087674379424991
+        },
+        "ingress_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9727101403175964,
+          "seed": 913,
+          "statistic": 0.9958011528996236,
+          "upper": 1.0167662445769745
+        },
+        "publish_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9691815268890416,
+          "seed": 913,
+          "statistic": 1.0121356882437746,
+          "upper": 1.0391860214988835
+        },
+        "snapshot_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9815774072442325,
+          "seed": 913,
+          "statistic": 1.000426946166365,
+          "upper": 1.0129565759104961
+        },
+        "total_ns": {
+          "confidence": 0.95,
+          "draws": 10000,
+          "lower": 0.9733079247831775,
+          "seed": 913,
+          "statistic": 1.005714080656532,
+          "upper": 1.0174857562044162
+        }
+      },
+      "pairs": [
+        {
+          "clone_ns": {
+            "baseline_median": 3080179.0,
+            "baseline_over_candidate": 1.096821450159395,
+            "candidate_median": 2808277.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2997938.0,
+            "baseline_over_candidate": 1.0344039589714749,
+            "candidate_median": 2898227.5
+          },
+          "ingress_ns": {
+            "baseline_median": 3127024.0,
+            "baseline_over_candidate": 1.0800856463003983,
+            "candidate_median": 2895163.0
+          },
+          "pair": 0,
+          "publish_ns": {
+            "baseline_median": 5902961.5,
+            "baseline_over_candidate": 1.0961669467763187,
+            "candidate_median": 5385093.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 15972395.5,
+            "baseline_over_candidate": 1.0285299890494406,
+            "candidate_median": 15529343.5
+          },
+          "total_ns": {
+            "baseline_median": 33375298.0,
+            "baseline_over_candidate": 1.0621746114814783,
+            "candidate_median": 31421668.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2808227.5,
+            "baseline_over_candidate": 1.0154769950535667,
+            "candidate_median": 2765427.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2959448.0,
+            "baseline_over_candidate": 0.9810824617695996,
+            "candidate_median": 3016513.0
+          },
+          "ingress_ns": {
+            "baseline_median": 2990358.0,
+            "baseline_over_candidate": 0.9693441891207221,
+            "candidate_median": 3084929.0
+          },
+          "pair": 1,
+          "publish_ns": {
+            "baseline_median": 5415363.5,
+            "baseline_over_candidate": 0.9508077372821541,
+            "candidate_median": 5695540.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15742798.0,
+            "baseline_over_candidate": 0.9759963987546044,
+            "candidate_median": 16129975.5
+          },
+          "total_ns": {
+            "baseline_median": 31563261.5,
+            "baseline_over_candidate": 0.9641307419855177,
+            "candidate_median": 32737532.5
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 3153663.0,
+            "baseline_over_candidate": 1.0494603553438515,
+            "candidate_median": 3005033.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2986768.0,
+            "baseline_over_candidate": 1.0168750707518464,
+            "candidate_median": 2937202.5
+          },
+          "ingress_ns": {
+            "baseline_median": 3050918.0,
+            "baseline_over_candidate": 1.022887513714722,
+            "candidate_median": 2982652.5
+          },
+          "pair": 2,
+          "publish_ns": {
+            "baseline_median": 5821579.0,
+            "baseline_over_candidate": 1.0486839253878222,
+            "candidate_median": 5551319.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15898186.5,
+            "baseline_over_candidate": 1.0120434494986186,
+            "candidate_median": 15708996.0
+          },
+          "total_ns": {
+            "baseline_median": 33087159.0,
+            "baseline_over_candidate": 1.023903911750905,
+            "candidate_median": 32314711.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2723136.5,
+            "baseline_over_candidate": 0.974716798650713,
+            "candidate_median": 2793772.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2859407.0,
+            "baseline_over_candidate": 0.9928937813902841,
+            "candidate_median": 2879872.0
+          },
+          "ingress_ns": {
+            "baseline_median": 2851418.0,
+            "baseline_over_candidate": 0.9972705861944263,
+            "candidate_median": 2859222.0
+          },
+          "pair": 3,
+          "publish_ns": {
+            "baseline_median": 5458008.5,
+            "baseline_over_candidate": 0.9981356763821679,
+            "candidate_median": 5468203.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15792892.5,
+            "baseline_over_candidate": 1.0183669694522972,
+            "candidate_median": 15508056.5
+          },
+          "total_ns": {
+            "baseline_median": 31811786.0,
+            "baseline_over_candidate": 1.0084693034074743,
+            "candidate_median": 31544625.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2952307.5,
+            "baseline_over_candidate": 1.082870385992814,
+            "candidate_median": 2726372.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2847337.5,
+            "baseline_over_candidate": 0.9789770094886251,
+            "candidate_median": 2908482.5
+          },
+          "ingress_ns": {
+            "baseline_median": 2843492.0,
+            "baseline_over_candidate": 0.9712680112911292,
+            "candidate_median": 2927608.0
+          },
+          "pair": 4,
+          "publish_ns": {
+            "baseline_median": 5412528.0,
+            "baseline_over_candidate": 0.9875553164959292,
+            "candidate_median": 5480734.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15530127.0,
+            "baseline_over_candidate": 0.9741084346312098,
+            "candidate_median": 15942914.0
+          },
+          "total_ns": {
+            "baseline_median": 31565536.0,
+            "baseline_over_candidate": 0.9824851075808372,
+            "candidate_median": 32128259.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 3010582.5,
+            "baseline_over_candidate": 1.039046436561836,
+            "candidate_median": 2897447.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2979817.5,
+            "baseline_over_candidate": 0.9907796982791297,
+            "candidate_median": 3007548.0
+          },
+          "ingress_ns": {
+            "baseline_median": 3042963.5,
+            "baseline_over_candidate": 0.9939198031342329,
+            "candidate_median": 3061578.5
+          },
+          "pair": 5,
+          "publish_ns": {
+            "baseline_median": 5780544.5,
+            "baseline_over_candidate": 1.0296881176099448,
+            "candidate_median": 5613879.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15874668.0,
+            "baseline_over_candidate": 0.99993924651506,
+            "candidate_median": 15875632.5
+          },
+          "total_ns": {
+            "baseline_median": 32638664.5,
+            "baseline_over_candidate": 1.0110676006579271,
+            "candidate_median": 32281387.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2934342.5,
+            "baseline_over_candidate": 1.0133001706766027,
+            "candidate_median": 2895827.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 3014308.0,
+            "baseline_over_candidate": 0.986600267245125,
+            "candidate_median": 3055247.5
+          },
+          "ingress_ns": {
+            "baseline_median": 3125113.5,
+            "baseline_over_candidate": 0.9943317196048208,
+            "candidate_median": 3142928.5
+          },
+          "pair": 6,
+          "publish_ns": {
+            "baseline_median": 5930275.0,
+            "baseline_over_candidate": 1.0201649562923454,
+            "candidate_median": 5813055.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 16253694.0,
+            "baseline_over_candidate": 1.000383721528895,
+            "candidate_median": 16247459.5
+          },
+          "total_ns": {
+            "baseline_median": 33567633.0,
+            "baseline_over_candidate": 1.0107544844703575,
+            "candidate_median": 33210471.5
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2877787.0,
+            "baseline_over_candidate": 0.9202328060736024,
+            "candidate_median": 3127238.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 3013922.5,
+            "baseline_over_candidate": 0.9809962087134493,
+            "candidate_median": 3072308.0
+          },
+          "ingress_ns": {
+            "baseline_median": 3101543.5,
+            "baseline_over_candidate": 0.9741522693440637,
+            "candidate_median": 3183838.5
+          },
+          "pair": 7,
+          "publish_ns": {
+            "baseline_median": 5448043.0,
+            "baseline_over_candidate": 0.9050700634657098,
+            "candidate_median": 6019471.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15923268.5,
+            "baseline_over_candidate": 0.9871584157338607,
+            "candidate_median": 16130408.5
+          },
+          "total_ns": {
+            "baseline_median": 31646260.0,
+            "baseline_over_candidate": 0.938654733674702,
+            "candidate_median": 33714484.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 3061208.0,
+            "baseline_over_candidate": 1.0304415719410402,
+            "candidate_median": 2970773.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 3033198.0,
+            "baseline_over_candidate": 1.000659805133152,
+            "candidate_median": 3031198.0
+          },
+          "ingress_ns": {
+            "baseline_median": 3131783.0,
+            "baseline_over_candidate": 1.0042178790744267,
+            "candidate_median": 3118629.0
+          },
+          "pair": 8,
+          "publish_ns": {
+            "baseline_median": 5820825.0,
+            "baseline_over_candidate": 1.0041064201952037,
+            "candidate_median": 5797020.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15958584.0,
+            "baseline_over_candidate": 1.0034142059904805,
+            "candidate_median": 15904283.5
+          },
+          "total_ns": {
+            "baseline_median": 32958051.5,
+            "baseline_over_candidate": 1.0029588579055893,
+            "candidate_median": 32860821.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 3087823.5,
+            "baseline_over_candidate": 1.0642573485517965,
+            "candidate_median": 2901388.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2944588.0,
+            "baseline_over_candidate": 1.0312971558308401,
+            "candidate_median": 2855227.5
+          },
+          "ingress_ns": {
+            "baseline_median": 3039983.0,
+            "baseline_over_candidate": 1.0475520656102069,
+            "candidate_median": 2901987.5
+          },
+          "pair": 9,
+          "publish_ns": {
+            "baseline_median": 5729159.5,
+            "baseline_over_candidate": 1.065758679441029,
+            "candidate_median": 5375663.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15755193.5,
+            "baseline_over_candidate": 1.0138697023223735,
+            "candidate_median": 15539663.0
+          },
+          "total_ns": {
+            "baseline_median": 32665441.0,
+            "baseline_over_candidate": 1.0347788056719875,
+            "candidate_median": 31567559.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 772404.0,
+            "baseline_over_candidate": 0.269390458416551,
+            "candidate_median": 2867228.5
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2829407.0,
+            "baseline_over_candidate": 0.9273858723957693,
+            "candidate_median": 3050949.0
+          },
+          "ingress_ns": {
+            "baseline_median": 2907092.5,
+            "baseline_over_candidate": 0.9249818119743947,
+            "candidate_median": 3142864.5
+          },
+          "pair": 10,
+          "publish_ns": {
+            "baseline_median": 3289634.0,
+            "baseline_over_candidate": 0.5409063161949172,
+            "candidate_median": 6081707.5
+          },
+          "snapshot_ns": {
+            "baseline_median": 15574267.0,
+            "baseline_over_candidate": 0.950202877099582,
+            "candidate_median": 16390465.0
+          },
+          "total_ns": {
+            "baseline_median": 25879572.0,
+            "baseline_over_candidate": 0.7619016047862108,
+            "candidate_median": 33967079.0
+          }
+        },
+        {
+          "clone_ns": {
+            "baseline_median": 2699632.0,
+            "baseline_over_candidate": 0.9492987769606834,
+            "candidate_median": 2843817.0
+          },
+          "edit_commit_ns": {
+            "baseline_median": 2851097.5,
+            "baseline_over_candidate": 0.9878949755598775,
+            "candidate_median": 2886033.0
+          },
+          "ingress_ns": {
+            "baseline_median": 2901398.0,
+            "baseline_over_candidate": 1.010644975439227,
+            "candidate_median": 2870838.0
+          },
+          "pair": 11,
+          "publish_ns": {
+            "baseline_median": 5453125.0,
+            "baseline_over_candidate": 1.0202608724611466,
+            "candidate_median": 5344834.0
+          },
+          "snapshot_ns": {
+            "baseline_median": 15542084.0,
+            "baseline_over_candidate": 1.000470170803835,
+            "candidate_median": 15534780.0
+          },
+          "total_ns": {
+            "baseline_median": 31399615.5,
+            "baseline_over_candidate": 0.9999848726550645,
+            "candidate_median": 31400090.5
+          }
+        }
+      ]
+    }
+  },
+  "pairs_per_route": 12,
+  "plan": {
+    "bytes": 10141,
+    "path": "docs/performance/results/change-0913/capture-plan.json",
+    "sha256": "56ab8a214388fdc8686e7ad3fbc0077a36e23a1213a29ba99dc6df8c003c054f"
+  },
+  "raw": {
+    "max_rss_kib_by_child": {
+      "block-00-pair-00-materialized-baseline": 97188,
+      "block-00-pair-00-materialized-candidate": 96168,
+      "block-01-pair-00-owned-baseline": 95716,
+      "block-01-pair-00-owned-candidate": 95780,
+      "block-02-pair-01-materialized-baseline": 97328,
+      "block-02-pair-01-materialized-candidate": 97104,
+      "block-03-pair-01-owned-baseline": 95596,
+      "block-03-pair-01-owned-candidate": 97244,
+      "block-04-pair-02-materialized-baseline": 95328,
+      "block-04-pair-02-materialized-candidate": 97256,
+      "block-05-pair-02-owned-baseline": 95492,
+      "block-05-pair-02-owned-candidate": 95504,
+      "block-06-pair-03-materialized-baseline": 95356,
+      "block-06-pair-03-materialized-candidate": 95320,
+      "block-07-pair-03-owned-baseline": 97144,
+      "block-07-pair-03-owned-candidate": 95524,
+      "block-08-pair-04-materialized-baseline": 95748,
+      "block-08-pair-04-materialized-candidate": 95336,
+      "block-09-pair-04-owned-baseline": 95632,
+      "block-09-pair-04-owned-candidate": 97236,
+      "block-10-pair-05-materialized-baseline": 95416,
+      "block-10-pair-05-materialized-candidate": 95388,
+      "block-11-pair-05-owned-baseline": 95552,
+      "block-11-pair-05-owned-candidate": 95944,
+      "block-12-pair-06-materialized-baseline": 95232,
+      "block-12-pair-06-materialized-candidate": 97176,
+      "block-13-pair-06-owned-baseline": 97400,
+      "block-13-pair-06-owned-candidate": 97432,
+      "block-14-pair-07-materialized-baseline": 95616,
+      "block-14-pair-07-materialized-candidate": 95376,
+      "block-15-pair-07-owned-baseline": 95456,
+      "block-15-pair-07-owned-candidate": 95308,
+      "block-16-pair-08-materialized-baseline": 95712,
+      "block-16-pair-08-materialized-candidate": 95344,
+      "block-17-pair-08-owned-baseline": 95448,
+      "block-17-pair-08-owned-candidate": 110256,
+      "block-18-pair-09-materialized-baseline": 95312,
+      "block-18-pair-09-materialized-candidate": 95236,
+      "block-19-pair-09-owned-baseline": 95452,
+      "block-19-pair-09-owned-candidate": 95500,
+      "block-20-pair-10-materialized-baseline": 97260,
+      "block-20-pair-10-materialized-candidate": 95384,
+      "block-21-pair-10-owned-baseline": 109856,
+      "block-21-pair-10-owned-candidate": 97316,
+      "block-22-pair-11-materialized-baseline": 95440,
+      "block-22-pair-11-materialized-candidate": 97196,
+      "block-23-pair-11-owned-baseline": 95632,
+      "block-23-pair-11-owned-candidate": 97264
+    },
+    "total_ns_by_child": {
+      "block-00-pair-00-materialized-baseline": [
+        264331134,
+        265148228,
+        263144877,
+        264221774,
+        264359774,
+        265054118,
+        265063258,
+        264076473,
+        266326935,
+        264366075,
+        265401790,
+        264533505,
+        265304979,
+        265259899,
+        265901192,
+        265310630,
+        265928913,
+        264851217,
+        264009763,
+        265896792
+      ],
+      "block-00-pair-00-materialized-candidate": [
+        259810109,
+        260413111,
+        264166908,
+        260203491,
+        259860659,
+        260394171,
+        260998584,
+        259834479,
+        282692420,
+        261524116,
+        259487287,
+        262522791,
+        259080315,
+        259507318,
+        260059469,
+        259773778,
+        260266161,
+        259203706,
+        260693152,
+        260008080
+      ],
+      "block-01-pair-00-owned-baseline": [
+        32549674,
+        32830385,
+        32441894,
+        33142777,
+        33401088,
+        33386038,
+        33981661,
+        34093731,
+        34467653,
+        33265848,
+        32637964,
+        32588744,
+        32807105,
+        33364558,
+        33422718,
+        33206156,
+        33915470,
+        33823959,
+        34028601,
+        33749260
+      ],
+      "block-01-pair-00-owned-candidate": [
+        31252838,
+        31849061,
+        31689910,
+        31266797,
+        31418259,
+        31335058,
+        31435598,
+        31419988,
+        31859930,
+        31532299,
+        31274038,
+        31387968,
+        31338739,
+        31457488,
+        31554169,
+        31390619,
+        31542239,
+        31423348,
+        31566609,
+        31228427
+      ],
+      "block-02-pair-01-materialized-baseline": [
+        264343761,
+        265285606,
+        265035315,
+        263938549,
+        263011014,
+        263378596,
+        264155109,
+        264199070,
+        264859012,
+        264994743,
+        262322862,
+        263898828,
+        263430016,
+        264097139,
+        264396090,
+        262161021,
+        264091979,
+        263084725,
+        265696416,
+        265203894
+      ],
+      "block-02-pair-01-materialized-candidate": [
+        267256028,
+        268144252,
+        266876636,
+        267077358,
+        267002257,
+        267010447,
+        268390761,
+        266835823,
+        268047858,
+        267900677,
+        268287008,
+        266762122,
+        265873318,
+        267897268,
+        270087576,
+        268698160,
+        269092222,
+        268856401,
+        267810776,
+        267674337
+      ],
+      "block-03-pair-01-owned-baseline": [
+        31592047,
+        31282176,
+        31226856,
+        31633368,
+        32411331,
+        31802678,
+        31827479,
+        31623188,
+        31896529,
+        31771318,
+        31333606,
+        31378236,
+        31097215,
+        31015945,
+        31014824,
+        30979724,
+        31617787,
+        31380246,
+        31914228,
+        31534476
+      ],
+      "block-03-pair-01-owned-candidate": [
+        33425646,
+        32932463,
+        32958653,
+        33325745,
+        32922033,
+        32598342,
+        32169170,
+        32291151,
+        32697183,
+        32678723,
+        32373261,
+        32423431,
+        32305861,
+        32909644,
+        33483076,
+        32888263,
+        32432521,
+        33311375,
+        32777882,
+        32349131
+      ],
+      "block-04-pair-02-materialized-baseline": [
+        255439244,
+        255918265,
+        256317157,
+        256330387,
+        255764455,
+        255016341,
+        255389983,
+        256653719,
+        255236602,
+        255810445,
+        257062680,
+        257191641,
+        258392126,
+        258986339,
+        259965812,
+        300143136,
+        257778828,
+        256943867,
+        256738936,
+        255115149
+      ],
+      "block-04-pair-02-materialized-candidate": [
+        265613714,
+        270012544,
+        269612182,
+        268136106,
+        268834599,
+        267331063,
+        266507928,
+        268321036,
+        269945764,
+        270339915,
+        270210355,
+        268978709,
+        270347400,
+        269109890,
+        267962965,
+        268416857,
+        268620007,
+        268720128,
+        266886310,
+        268646838
+      ],
+      "block-05-pair-02-owned-baseline": [
+        32315676,
+        32973569,
+        32763708,
+        32769767,
+        33376951,
+        33136379,
+        33362500,
+        34128373,
+        33943202,
+        34535375,
+        33350120,
+        33639491,
+        33908562,
+        33116009,
+        33023948,
+        32916188,
+        33058309,
+        32806648,
+        32383936,
+        32441376
+      ],
+      "block-05-pair-02-owned-candidate": [
+        31985854,
+        32262716,
+        32908678,
+        32861528,
+        32923178,
+        33337530,
+        32493107,
+        32259945,
+        32366706,
+        32471557,
+        32141235,
+        32009604,
+        31798953,
+        32086375,
+        32500227,
+        32679997,
+        32125174,
+        32006204,
+        32518517,
+        32170205
+      ],
+      "block-06-pair-03-materialized-baseline": [
+        258101908,
+        265780421,
+        259600235,
+        257195804,
+        265281659,
+        255897378,
+        258098788,
+        254942905,
+        254816204,
+        255157185,
+        255531997,
+        255633547,
+        255883829,
+        255043795,
+        255614997,
+        265534590,
+        258720200,
+        256882053,
+        256028449,
+        255445617
+      ],
+      "block-06-pair-03-materialized-candidate": [
+        261386161,
+        261613483,
+        262176235,
+        261464503,
+        260480668,
+        260305367,
+        260272417,
+        260502178,
+        260621709,
+        260092746,
+        260917370,
+        259716705,
+        260226067,
+        259733595,
+        260482618,
+        260735979,
+        260667189,
+        259902355,
+        259303553,
+        259283003
+      ],
+      "block-07-pair-03-owned-baseline": [
+        31383925,
+        31759286,
+        31734956,
+        31715576,
+        31640575,
+        31663155,
+        31820947,
+        31994617,
+        31891627,
+        31974817,
+        31809766,
+        31916867,
+        31700256,
+        31816486,
+        32238698,
+        31679595,
+        31924647,
+        31850256,
+        31453364,
+        31813806
+      ],
+      "block-07-pair-03-owned-candidate": [
+        31417564,
+        31341574,
+        31753646,
+        31467094,
+        31670606,
+        31557835,
+        31411814,
+        31390375,
+        31497345,
+        31462855,
+        31632576,
+        31568085,
+        31619475,
+        31531415,
+        31714956,
+        31530095,
+        31564585,
+        31688026,
+        31576826,
+        31348424
+      ],
+      "block-08-pair-04-materialized-baseline": [
+        255762215,
+        257388252,
+        255190783,
+        255857555,
+        255847095,
+        255720725,
+        256418498,
+        256466938,
+        255475864,
+        255925555,
+        256220277,
+        255365513,
+        255745575,
+        255352693,
+        255074172,
+        256013066,
+        255964496,
+        256364508,
+        255485244,
+        255301863
+      ],
+      "block-08-pair-04-materialized-candidate": [
+        261711851,
+        260511746,
+        259873963,
+        261041028,
+        261026488,
+        260494696,
+        261255259,
+        260965608,
+        259705743,
+        260563236,
+        259991113,
+        260284696,
+        260844438,
+        260780157,
+        260355005,
+        261900852,
+        260480136,
+        260160165,
+        260642157,
+        259987804
+      ],
+      "block-09-pair-04-owned-baseline": [
+        31490416,
+        31480696,
+        31451686,
+        31529116,
+        31484377,
+        31733637,
+        31579566,
+        31346435,
+        31836618,
+        32104409,
+        32482480,
+        31550576,
+        32337889,
+        31551506,
+        31408275,
+        31780957,
+        32343450,
+        31678047,
+        31640297,
+        31434586
+      ],
+      "block-09-pair-04-owned-candidate": [
+        32099029,
+        31951868,
+        32000218,
+        32129039,
+        31689937,
+        32215799,
+        32193299,
+        32422860,
+        32788212,
+        32605211,
+        32203339,
+        31583417,
+        32127479,
+        33418814,
+        32099428,
+        31636947,
+        32350719,
+        31588056,
+        31870047,
+        32522241
+      ],
+      "block-10-pair-05-materialized-baseline": [
+        256766902,
+        257251494,
+        257249503,
+        256681881,
+        256431750,
+        256341950,
+        256872182,
+        256137518,
+        256130149,
+        256139129,
+        257004623,
+        256377160,
+        257079303,
+        256733011,
+        257166183,
+        256624821,
+        257980327,
+        256914882,
+        256210350,
+        258254807
+      ],
+      "block-10-pair-05-materialized-candidate": [
+        259626792,
+        259609452,
+        260882147,
+        259006430,
+        260806767,
+        261346869,
+        260517916,
+        260351925,
+        260445295,
+        261091878,
+        261599401,
+        260506936,
+        260328525,
+        259889264,
+        261280909,
+        260677186,
+        260522976,
+        260688627,
+        260729556,
+        259818453
+      ],
+      "block-11-pair-05-owned-baseline": [
+        31974907,
+        32151538,
+        32386679,
+        32775440,
+        32710070,
+        32957911,
+        32343999,
+        33068032,
+        32663890,
+        31945707,
+        33234203,
+        33947725,
+        32381868,
+        31957676,
+        32613439,
+        33061071,
+        32800960,
+        33465223,
+        31803586,
+        31973537
+      ],
+      "block-11-pair-05-owned-candidate": [
+        32093576,
+        33002050,
+        32259187,
+        32462458,
+        32243457,
+        32086147,
+        32303587,
+        32189007,
+        32530539,
+        33199921,
+        32717339,
+        32519728,
+        32652458,
+        32219737,
+        32864410,
+        32235227,
+        32850420,
+        31737425,
+        31570244,
+        31839796
+      ],
+      "block-12-pair-06-materialized-baseline": [
+        255137283,
+        255218814,
+        256219628,
+        254794862,
+        256811500,
+        256978741,
+        255970197,
+        257095752,
+        257448774,
+        257467253,
+        258194687,
+        255819186,
+        259325551,
+        261660682,
+        256325658,
+        256011237,
+        255659216,
+        256171197,
+        256109217,
+        255956957
+      ],
+      "block-12-pair-06-materialized-candidate": [
+        268584991,
+        269453995,
+        269173063,
+        269168603,
+        268425970,
+        269289754,
+        269675985,
+        269202820,
+        268498902,
+        269942558,
+        268965944,
+        268457342,
+        269820488,
+        268859824,
+        268521472,
+        268600213,
+        268686663,
+        269519677,
+        270241800,
+        271973107
+      ],
+      "block-13-pair-06-owned-baseline": [
+        33885484,
+        33572113,
+        33547163,
+        34226736,
+        34501077,
+        34017274,
+        33671113,
+        33487453,
+        33226961,
+        33253001,
+        33582662,
+        34023825,
+        33563153,
+        33590913,
+        33722173,
+        33080891,
+        33078701,
+        33461482,
+        33270492,
+        33545352
+      ],
+      "block-13-pair-06-owned-candidate": [
+        33521423,
+        33232082,
+        33188861,
+        33015581,
+        33370892,
+        33384752,
+        34248816,
+        32897630,
+        32820540,
+        32699999,
+        32841699,
+        32640659,
+        33915015,
+        33925925,
+        34457267,
+        33575093,
+        33085171,
+        32720280,
+        32342397,
+        33420703
+      ],
+      "block-14-pair-07-materialized-baseline": [
+        257667167,
+        256935734,
+        257635187,
+        257227365,
+        256896673,
+        257056914,
+        257349695,
+        257126045,
+        258080229,
+        258110169,
+        257829397,
+        258108079,
+        258131800,
+        258524470,
+        258454350,
+        258170590,
+        257988790,
+        257866100,
+        257581489,
+        256700295
+      ],
+      "block-14-pair-07-materialized-candidate": [
+        262452653,
+        263191395,
+        263819028,
+        263106285,
+        510560635,
+        296382752,
+        286545322,
+        263736878,
+        262572102,
+        261617869,
+        261919590,
+        262804643,
+        262278201,
+        261638459,
+        262020250,
+        261654809,
+        261685549,
+        261596743,
+        262168906,
+        262320247
+      ],
+      "block-15-pair-07-owned-baseline": [
+        31119972,
+        31124003,
+        31401024,
+        31496385,
+        31582084,
+        31590974,
+        31744385,
+        31593085,
+        31900856,
+        31992327,
+        31578255,
+        31570904,
+        31614235,
+        31678285,
+        31951257,
+        31957246,
+        32007457,
+        32066417,
+        32059497,
+        31938116
+      ],
+      "block-15-pair-07-owned-candidate": [
+        33936005,
+        34023485,
+        33950665,
+        34172296,
+        34194186,
+        34144916,
+        34159906,
+        34042476,
+        33910185,
+        33700264,
+        33728704,
+        33660103,
+        33670703,
+        33350732,
+        32944230,
+        32984901,
+        32511958,
+        33063661,
+        32402699,
+        32723269
+      ],
+      "block-16-pair-08-materialized-baseline": [
+        259758534,
+        259362763,
+        261373061,
+        396549501,
+        319528990,
+        290138865,
+        260910690,
+        259363323,
+        260882780,
+        260151746,
+        260400497,
+        260278467,
+        259511964,
+        260375347,
+        260619008,
+        259964755,
+        260582578,
+        259035711,
+        259524113,
+        259722024
+      ],
+      "block-16-pair-08-materialized-candidate": [
+        263528222,
+        262859049,
+        263006770,
+        263101620,
+        261920165,
+        262643218,
+        263522671,
+        263027779,
+        262923959,
+        263511892,
+        263036210,
+        263862543,
+        263881573,
+        263682872,
+        264197925,
+        263536622,
+        263426161,
+        263286930,
+        263331011,
+        263876413
+      ],
+      "block-17-pair-08-owned-baseline": [
+        32905681,
+        32969701,
+        33021892,
+        32946402,
+        32867591,
+        33133362,
+        33280103,
+        32678550,
+        33810165,
+        33166583,
+        32939702,
+        32803371,
+        33002812,
+        32896292,
+        33365393,
+        32696611,
+        32710951,
+        32983582,
+        33239063,
+        32557580
+      ],
+      "block-17-pair-08-owned-candidate": [
+        33493674,
+        33417524,
+        33610204,
+        33350523,
+        33151733,
+        33409083,
+        33826245,
+        33042662,
+        32771621,
+        32935502,
+        32908021,
+        32813621,
+        32393669,
+        32623561,
+        32707640,
+        32244319,
+        32612390,
+        32219308,
+        32382549,
+        32013527
+      ],
+      "block-18-pair-09-materialized-baseline": [
+        268748424,
+        268191262,
+        259700894,
+        261527872,
+        259512314,
+        258093587,
+        257431884,
+        257863507,
+        258233078,
+        258501119,
+        257241754,
+        257218933,
+        257608955,
+        258475938,
+        256597961,
+        257883927,
+        257009112,
+        256379780,
+        256691311,
+        257430824
+      ],
+      "block-18-pair-09-materialized-candidate": [
+        261525242,
+        261499941,
+        262262785,
+        261310631,
+        260992010,
+        262912608,
+        262022854,
+        261800843,
+        260928999,
+        259477323,
+        259624293,
+        259442133,
+        259294142,
+        259386573,
+        258436379,
+        259135022,
+        258920071,
+        259945914,
+        259072141,
+        259994205
+      ],
+      "block-19-pair-09-owned-baseline": [
+        32337710,
+        32647281,
+        33174954,
+        32705671,
+        33293504,
+        33026733,
+        33058223,
+        32233069,
+        32444880,
+        31982199,
+        32274960,
+        32204380,
+        32182410,
+        32053629,
+        32765732,
+        33553235,
+        33896466,
+        33420964,
+        32461620,
+        32683601
+      ],
+      "block-19-pair-09-owned-candidate": [
+        31573889,
+        31791620,
+        32968365,
+        33393657,
+        31845461,
+        31317218,
+        31678870,
+        31550489,
+        31453278,
+        31448209,
+        31353849,
+        31766600,
+        31458638,
+        31561229,
+        31257388,
+        32073172,
+        31733520,
+        31394988,
+        31363528,
+        31737597
+      ],
+      "block-20-pair-10-materialized-baseline": [
+        264543453,
+        265277396,
+        264211122,
+        264023950,
+        263762619,
+        263742600,
+        263013936,
+        262572724,
+        263223807,
+        263377308,
+        263480978,
+        264276172,
+        263584699,
+        262996836,
+        263585528,
+        263585359,
+        263934380,
+        263663679,
+        264253742,
+        264958095
+      ],
+      "block-20-pair-10-materialized-candidate": [
+        259637951,
+        259899035,
+        259408529,
+        259111025,
+        260367131,
+        259217222,
+        259288223,
+        259628144,
+        259622055,
+        259407513,
+        258917632,
+        259651115,
+        260376898,
+        260305467,
+        260926640,
+        260735899,
+        260280557,
+        260903820,
+        262960709,
+        260266587
+      ],
+      "block-21-pair-10-owned-baseline": [
+        25932102,
+        25857982,
+        25949873,
+        26045312,
+        26162724,
+        26008202,
+        25771831,
+        25704681,
+        25725891,
+        25901162,
+        26764696,
+        25848212,
+        25672891,
+        25840412,
+        25992432,
+        25686381,
+        25741201,
+        25721592,
+        25929672,
+        26008692
+      ],
+      "block-21-pair-10-owned-candidate": [
+        31764838,
+        32158359,
+        32192990,
+        32433391,
+        31892038,
+        31977965,
+        33159680,
+        33075090,
+        32200006,
+        32396027,
+        35474152,
+        38005372,
+        38520705,
+        34774478,
+        35790872,
+        54379607,
+        36591837,
+        52014856,
+        50413489,
+        39102918
+      ],
+      "block-22-pair-11-materialized-baseline": [
+        255396138,
+        255613180,
+        255973661,
+        255069097,
+        256409057,
+        257830983,
+        255558163,
+        256620247,
+        256968659,
+        259538381,
+        257992214,
+        257390181,
+        255979245,
+        256967869,
+        255997645,
+        256187336,
+        255653173,
+        256604298,
+        256313236,
+        255680604
+      ],
+      "block-22-pair-11-materialized-candidate": [
+        266228450,
+        266152290,
+        265741479,
+        267436936,
+        267188615,
+        267411015,
+        266151080,
+        265001525,
+        265624668,
+        265119048,
+        265436763,
+        265096261,
+        264609819,
+        265512614,
+        265749374,
+        266272027,
+        265414263,
+        267073990,
+        266385127,
+        265606664
+      ],
+      "block-23-pair-11-owned-baseline": [
+        31709141,
+        33381509,
+        32567676,
+        32177514,
+        32420645,
+        32138424,
+        31878622,
+        31573801,
+        31120839,
+        31039338,
+        31350840,
+        31127079,
+        31550091,
+        31360540,
+        31351580,
+        31012459,
+        31438691,
+        31087869,
+        31036209,
+        30947388
+      ],
+      "block-23-pair-11-owned-candidate": [
+        31415170,
+        31417600,
+        31076129,
+        31121329,
+        31009979,
+        31107669,
+        31187059,
+        31259050,
+        31318290,
+        31347300,
+        31592681,
+        31624941,
+        31559431,
+        31426750,
+        31666222,
+        31623981,
+        31390991,
+        31409190,
+        31418810,
+        31298930
+      ]
+    }
+  },
+  "routes": {
+    "materialized": {
+      "baseline": {
+        "clone_ns": {
+          "max": 3381578,
+          "mean": 1304958.8833333333,
+          "min": 737903,
+          "p50": 797623,
+          "p95": 2915965,
+          "p99": 3149513,
+          "samples": 240
+        },
+        "edit_commit_ns": {
+          "max": 9491961,
+          "mean": 2914412.8583333334,
+          "min": 2744122,
+          "p50": 2852707,
+          "p95": 3058903,
+          "p99": 3205204,
+          "samples": 240
+        },
+        "ingress_ns": {
+          "max": 11801051,
+          "mean": 6220708.416666667,
+          "min": 5841985,
+          "p50": 6200227,
+          "p95": 6542008,
+          "p99": 6844636,
+          "samples": 240
+        },
+        "max_rss_kib": {
+          "max": 97328,
+          "mean": 95911.33333333333,
+          "min": 95232,
+          "p50": 95528,
+          "p95": 97328,
+          "p99": 97328,
+          "samples": 12
+        },
+        "processes": 12,
+        "publish_ns": {
+          "max": 352232191,
+          "mean": 236733622.55416667,
+          "min": 232965618,
+          "p50": 235127068,
+          "p95": 239019000,
+          "p99": 276758805,
+          "samples": 240
+        },
+        "samples": 240,
+        "snapshot_ns": {
+          "max": 25403509,
+          "mean": 12422362.133333333,
+          "min": 12093131,
+          "p50": 12299914,
+          "p95": 12634394,
+          "p99": 15031437,
+          "samples": 240
+        },
+        "total_ns": {
+          "max": 396549501,
+          "mean": 260278151.62083334,
+          "min": 254794862,
+          "p50": 257804112,
+          "p95": 265534590,
+          "p99": 300143136,
+          "samples": 240
+        }
+      },
+      "candidate": {
+        "clone_ns": {
+          "max": 5693244,
+          "mean": 1514742.5,
+          "min": 738163,
+          "p50": 805303,
+          "p95": 3076703,
+          "p99": 3477415,
+          "samples": 240
+        },
+        "edit_commit_ns": {
+          "max": 6408037,
+          "mean": 2907948.1333333333,
+          "min": 2750502,
+          "p50": 2867327,
+          "p95": 3034753,
+          "p99": 3239124,
+          "samples": 240
+        },
+        "ingress_ns": {
+          "max": 13711316,
+          "mean": 6329629.158333333,
+          "min": 5893566,
+          "p50": 6166932,
+          "p95": 7043511,
+          "p99": 7630813,
+          "samples": 240
+        },
+        "max_rss_kib": {
+          "max": 97256,
+          "mean": 96023.66666666667,
+          "min": 95236,
+          "p50": 95386,
+          "p95": 97256,
+          "p99": 97256,
+          "samples": 12
+        },
+        "processes": 12,
+        "publish_ns": {
+          "max": 461761984,
+          "mean": 240606919.23333332,
+          "min": 236574224,
+          "p50": 239362901,
+          "p95": 242218247,
+          "p99": 260819593,
+          "samples": 240
+        },
+        "samples": 240,
+        "snapshot_ns": {
+          "max": 28280366,
+          "mean": 12470993.083333334,
+          "min": 12141153,
+          "p50": 12335764,
+          "p95": 12573054,
+          "p99": 16477028,
+          "samples": 240
+        },
+        "total_ns": {
+          "max": 510560635,
+          "mean": 264684293.3625,
+          "min": 258436379,
+          "p50": 262021552,
+          "p95": 269942558,
+          "p99": 286545322,
+          "samples": 240
+        }
+      }
+    },
+    "owned": {
+      "baseline": {
+        "clone_ns": {
+          "max": 3508715,
+          "mean": 2766907.0,
+          "min": 755823,
+          "p50": 2918177,
+          "p95": 3261834,
+          "p99": 3413364,
+          "samples": 240
+        },
+        "edit_commit_ns": {
+          "max": 3181774,
+          "mean": 2950735.066666667,
+          "min": 2781212,
+          "p50": 2961973,
+          "p95": 3085183,
+          "p99": 3142863,
+          "samples": 240
+        },
+        "ingress_ns": {
+          "max": 3232844,
+          "mean": 3012502.2875,
+          "min": 2775361,
+          "p50": 3029638,
+          "p95": 3180253,
+          "p99": 3226834,
+          "samples": 240
+        },
+        "max_rss_kib": {
+          "max": 109856,
+          "mean": 97031.33333333333,
+          "min": 95448,
+          "p50": 95614,
+          "p95": 109856,
+          "p99": 109856,
+          "samples": 12
+        },
+        "processes": 12,
+        "publish_ns": {
+          "max": 6340718,
+          "mean": 5469392.220833333,
+          "min": 3221174,
+          "p50": 5622224,
+          "p95": 6075257,
+          "p99": 6195867,
+          "samples": 240
+        },
+        "samples": 240,
+        "snapshot_ns": {
+          "max": 16500070,
+          "mean": 15833636.191666666,
+          "min": 15397239,
+          "p50": 15838492,
+          "p95": 16246042,
+          "p99": 16408240,
+          "samples": 240
+        },
+        "total_ns": {
+          "max": 34535375,
+          "mean": 31895091.320833333,
+          "min": 25672891,
+          "p50": 32179962,
+          "p95": 33915470,
+          "p99": 34467653,
+          "samples": 240
+        }
+      },
+      "candidate": {
+        "clone_ns": {
+          "max": 4678651,
+          "mean": 2891749.2083333335,
+          "min": 2391350,
+          "p50": 2875937,
+          "p95": 3151663,
+          "p99": 3380675,
+          "samples": 240
+        },
+        "edit_commit_ns": {
+          "max": 7278793,
+          "mean": 2990082.9166666665,
+          "min": 2810443,
+          "p50": 2947448,
+          "p95": 3150354,
+          "p99": 3239264,
+          "samples": 240
+        },
+        "ingress_ns": {
+          "max": 5448135,
+          "mean": 3037824.7708333335,
+          "min": 2783643,
+          "p50": 3004148,
+          "p95": 3223604,
+          "p99": 4225040,
+          "samples": 240
+        },
+        "max_rss_kib": {
+          "max": 110256,
+          "mean": 97525.66666666667,
+          "min": 95308,
+          "p50": 96590,
+          "p95": 110256,
+          "p99": 110256,
+          "samples": 12
+        },
+        "processes": 12,
+        "publish_ns": {
+          "max": 14363436,
+          "mean": 5722126.404166667,
+          "min": 5248744,
+          "p50": 5573934,
+          "p95": 6217296,
+          "p99": 9511953,
+          "samples": 240
+        },
+        "samples": 240,
+        "snapshot_ns": {
+          "max": 32315406,
+          "mean": 15986949.658333333,
+          "min": 15422749,
+          "p50": 15836998,
+          "p95": 16396800,
+          "p99": 19169137,
+          "samples": 240
+        },
+        "total_ns": {
+          "max": 54379607,
+          "mean": 32704255.4625,
+          "min": 31009979,
+          "p50": 32259566,
+          "p95": 34194186,
+          "p99": 50413489,
+          "samples": 240
+        }
+      }
+    }
+  },
+  "samples": 20,
+  "schema": "litchi.performance.0913.independent-stats.v1",
+  "status": "pass",
+  "warmup": 30
+}

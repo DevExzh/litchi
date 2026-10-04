@@ -1,0 +1,3591 @@
+{
+  "status": "pass",
+  "scope": "Static per-physical-member admission bound; not measured calls, allocation counts, or dynamic copied bytes.",
+  "source": {
+    "path": "docs/performance/results/change-0913/capture/block-01-pair-00-owned-baseline/artifacts/source.pptx",
+    "bytes": 17017139,
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "code_commit": "66b944b07fcf4c6fa37f10e7ed83a02417455f57",
+  "code": [
+    {
+      "path": "crates/soapberry-zip/src/office.rs",
+      "bytes": 699729,
+      "sha256": "f72bfef6e6a072b3e88c465afb1358e4f77046e37c606ed3902fe3a1621ceac3"
+    },
+    {
+      "path": "crates/soapberry-zip/src/archive.rs",
+      "bytes": 222715,
+      "sha256": "f3496a11c6e7ed798f11396fce9a4a336f0a9d9ff167fc94b9bded14cb547fa5"
+    }
+  ],
+  "members": 445,
+  "file_members": 445,
+  "eligible_file_members": 437,
+  "one_read_per_eligible_file_span_bytes": 211315,
+  "media_compressed_bytes": 16782376,
+  "media_decoded_bytes": 16777216,
+  "media_all_already_passthrough": true,
+  "rows": [
+    {
+      "name": "[Content_Types].xml",
+      "directory": false,
+      "compressed_bytes": 1025,
+      "decoded_bytes": 29562,
+      "proposed_span_bytes": 1114,
+      "eligible": true
+    },
+    {
+      "name": "_rels/.rels",
+      "directory": false,
+      "compressed_bytes": 234,
+      "decoded_bytes": 591,
+      "proposed_span_bytes": 315,
+      "eligible": true
+    },
+    {
+      "name": "docProps/app.xml",
+      "directory": false,
+      "compressed_bytes": 492,
+      "decoded_bytes": 1091,
+      "proposed_span_bytes": 578,
+      "eligible": true
+    },
+    {
+      "name": "docProps/core.xml",
+      "directory": false,
+      "compressed_bytes": 212,
+      "decoded_bytes": 344,
+      "proposed_span_bytes": 299,
+      "eligible": true
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-00.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-01.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-02.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-03.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-04.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-05.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-06.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/media/litchi-perf-source-media-07.png",
+      "directory": false,
+      "compressed_bytes": 2097797,
+      "decoded_bytes": 2097152,
+      "proposed_span_bytes": 2097908,
+      "eligible": false
+    },
+    {
+      "name": "ppt/notesMasters/notesMaster1.xml",
+      "directory": false,
+      "compressed_bytes": 1435,
+      "decoded_bytes": 7626,
+      "proposed_span_bytes": 1538,
+      "eligible": true
+    },
+    {
+      "name": "ppt/notesMasters/_rels/notesMaster1.xml.rels",
+      "directory": false,
+      "compressed_bytes": 182,
+      "decoded_bytes": 290,
+      "proposed_span_bytes": 296,
+      "eligible": true
+    },
+    {
+      "name": "ppt/presProps.xml",
+      "directory": false,
+      "compressed_bytes": 326,
+      "decoded_bytes": 647,
+      "proposed_span_bytes": 413,
+      "eligible": true
+    },
+    {
+      "name": "ppt/presentation.xml",
+      "directory": false,
+      "compressed_bytes": 1288,
+      "decoded_bytes": 7096,
+      "proposed_span_bytes": 1378,
+      "eligible": true
+    },
+    {
+      "name": "ppt/_rels/presentation.xml.rels",
+      "directory": false,
+      "compressed_bytes": 1316,
+      "decoded_bytes": 28070,
+      "proposed_span_bytes": 1417,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout1.xml",
+      "directory": false,
+      "compressed_bytes": 1061,
+      "decoded_bytes": 4356,
+      "proposed_span_bytes": 1164,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout10.xml",
+      "directory": false,
+      "compressed_bytes": 906,
+      "decoded_bytes": 3020,
+      "proposed_span_bytes": 1010,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 302,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout11.xml",
+      "directory": false,
+      "compressed_bytes": 957,
+      "decoded_bytes": 3244,
+      "proposed_span_bytes": 1061,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 302,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout2.xml",
+      "directory": false,
+      "compressed_bytes": 878,
+      "decoded_bytes": 2965,
+      "proposed_span_bytes": 981,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout3.xml",
+      "directory": false,
+      "compressed_bytes": 1118,
+      "decoded_bytes": 4439,
+      "proposed_span_bytes": 1221,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout4.xml",
+      "directory": false,
+      "compressed_bytes": 1040,
+      "decoded_bytes": 4711,
+      "proposed_span_bytes": 1143,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout5.xml",
+      "directory": false,
+      "compressed_bytes": 1247,
+      "decoded_bytes": 7221,
+      "proposed_span_bytes": 1350,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout6.xml",
+      "directory": false,
+      "compressed_bytes": 790,
+      "decoded_bytes": 2231,
+      "proposed_span_bytes": 893,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout7.xml",
+      "directory": false,
+      "compressed_bytes": 747,
+      "decoded_bytes": 1894,
+      "proposed_span_bytes": 850,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout8.xml",
+      "directory": false,
+      "compressed_bytes": 1205,
+      "decoded_bytes": 4801,
+      "proposed_span_bytes": 1308,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/slideLayout9.xml",
+      "directory": false,
+      "compressed_bytes": 1139,
+      "decoded_bytes": 4656,
+      "proposed_span_bytes": 1242,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+      "directory": false,
+      "compressed_bytes": 187,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 301,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideMasters/slideMaster1.xml",
+      "directory": false,
+      "compressed_bytes": 1768,
+      "decoded_bytes": 11985,
+      "proposed_span_bytes": 1871,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+      "directory": false,
+      "compressed_bytes": 269,
+      "decoded_bytes": 1989,
+      "proposed_span_bytes": 383,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide1.xml",
+      "directory": false,
+      "compressed_bytes": 621,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 712,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide1.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide10.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide10.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide100.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide100.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide101.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide101.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide102.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide102.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide103.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide103.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide104.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide104.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide105.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide105.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide106.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide106.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide107.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide107.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide108.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide108.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide109.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide109.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide11.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide11.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide110.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide110.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide111.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide111.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide112.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide112.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide113.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide113.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide114.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide114.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide115.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide115.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide116.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide116.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide117.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide117.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide118.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide118.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide119.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide119.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide12.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide12.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide120.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide120.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide121.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide121.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide122.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide122.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide123.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide123.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide124.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide124.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide125.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide125.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide126.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide126.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide127.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide127.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide128.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide128.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide129.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide129.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide13.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide13.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide130.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide130.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide131.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide131.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide132.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide132.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide133.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide133.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide134.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide134.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide135.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide135.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide136.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide136.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide137.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide137.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide138.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide138.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide139.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide139.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide14.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide14.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide140.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide140.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide141.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide141.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide142.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide142.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide143.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide143.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide144.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide144.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide145.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide145.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide146.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide146.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide147.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide147.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide148.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide148.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide149.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide149.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide15.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide15.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide150.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide150.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide151.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide151.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide152.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide152.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide153.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide153.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide154.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide154.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide155.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide155.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide156.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide156.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide157.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide157.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide158.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide158.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide159.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide159.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide16.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide16.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide160.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide160.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide161.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide161.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide162.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide162.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide163.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide163.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide164.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide164.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide165.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide165.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide166.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide166.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide167.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide167.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide168.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide168.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide169.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide169.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide17.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide17.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide170.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide170.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide171.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide171.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide172.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide172.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide173.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide173.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide174.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide174.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide175.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide175.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide176.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide176.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide177.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide177.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide178.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide178.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide179.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide179.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide18.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide18.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide180.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide180.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide181.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide181.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide182.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide182.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide183.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide183.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide184.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide184.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide185.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide185.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide186.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide186.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide187.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide187.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide188.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide188.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide189.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide189.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide19.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide19.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide190.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide190.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide191.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide191.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide192.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide192.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide193.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide193.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide194.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide194.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide195.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide195.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide196.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide196.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide197.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide197.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide198.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 615,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide198.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide199.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide199.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide2.xml",
+      "directory": false,
+      "compressed_bytes": 622,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 713,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide2.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide20.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide20.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide200.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide200.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 292,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide21.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide21.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide22.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide22.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide23.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide23.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide24.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide24.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide25.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide25.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide26.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide26.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide27.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide27.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide28.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide28.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide29.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide29.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide3.xml",
+      "directory": false,
+      "compressed_bytes": 622,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 713,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide3.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide30.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide30.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide31.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide31.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide32.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide32.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide33.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide33.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide34.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide34.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide35.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide35.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide36.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide36.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide37.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide37.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide38.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide38.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide39.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide39.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide4.xml",
+      "directory": false,
+      "compressed_bytes": 622,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 713,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide4.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide40.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide40.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide41.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide41.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide42.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide42.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide43.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide43.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide44.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide44.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide45.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide45.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide46.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide46.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide47.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide47.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide48.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide48.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide49.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide49.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide5.xml",
+      "directory": false,
+      "compressed_bytes": 622,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 713,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide5.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide50.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide50.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide51.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide51.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide52.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide52.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide53.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide53.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide54.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide54.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide55.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide55.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide56.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide56.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide57.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide57.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide58.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide58.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide59.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide59.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide6.xml",
+      "directory": false,
+      "compressed_bytes": 621,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 712,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide6.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide60.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide60.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide61.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide61.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide62.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide62.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide63.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide63.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide64.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide64.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide65.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide65.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide66.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide66.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide67.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide67.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide68.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide68.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide69.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide69.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide7.xml",
+      "directory": false,
+      "compressed_bytes": 622,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 713,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide7.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide70.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide70.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide71.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide71.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide72.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide72.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide73.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide73.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide74.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide74.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide75.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide75.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide76.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide76.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide77.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide77.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide78.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide78.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide79.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide79.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide8.xml",
+      "directory": false,
+      "compressed_bytes": 622,
+      "decoded_bytes": 4029,
+      "proposed_span_bytes": 713,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide8.xml.rels",
+      "directory": false,
+      "compressed_bytes": 225,
+      "decoded_bytes": 465,
+      "proposed_span_bytes": 327,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide80.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide80.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide81.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide81.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide82.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide82.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide83.xml",
+      "directory": false,
+      "compressed_bytes": 520,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide83.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide84.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide84.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide85.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide85.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide86.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide86.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide87.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide87.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide88.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide88.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide89.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide89.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide9.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 612,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide9.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 290,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide90.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide90.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide91.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide91.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide92.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide92.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide93.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide93.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide94.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide94.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide95.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide95.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide96.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide96.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide97.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide97.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide98.xml",
+      "directory": false,
+      "compressed_bytes": 522,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 614,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide98.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/slide99.xml",
+      "directory": false,
+      "compressed_bytes": 521,
+      "decoded_bytes": 3491,
+      "proposed_span_bytes": 613,
+      "eligible": true
+    },
+    {
+      "name": "ppt/slides/_rels/slide99.xml.rels",
+      "directory": false,
+      "compressed_bytes": 188,
+      "decoded_bytes": 309,
+      "proposed_span_bytes": 291,
+      "eligible": true
+    },
+    {
+      "name": "ppt/tableStyles.xml",
+      "directory": false,
+      "compressed_bytes": 166,
+      "decoded_bytes": 180,
+      "proposed_span_bytes": 255,
+      "eligible": true
+    },
+    {
+      "name": "ppt/theme/theme1.xml",
+      "directory": false,
+      "compressed_bytes": 1569,
+      "decoded_bytes": 7653,
+      "proposed_span_bytes": 1659,
+      "eligible": true
+    },
+    {
+      "name": "ppt/theme/theme2.xml",
+      "directory": false,
+      "compressed_bytes": 1569,
+      "decoded_bytes": 7653,
+      "proposed_span_bytes": 1659,
+      "eligible": true
+    },
+    {
+      "name": "ppt/viewProps.xml",
+      "directory": false,
+      "compressed_bytes": 419,
+      "decoded_bytes": 896,
+      "proposed_span_bytes": 482,
+      "eligible": true
+    }
+  ]
+}

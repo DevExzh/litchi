@@ -1,0 +1,367 @@
+
+running 185 tests
+test catalog::shared::tests::shared_component_consumption_unwraps_the_retained_archive ... ok
+test catalog::shared::tests::shared_ingress_accepts_exact_aggregate_iwa_budget_and_rejects_one_below ... ok
+test catalog::shared::tests::shared_ingress_accepts_exact_archive_profile_and_rejects_one_below ... ok
+test catalog::shared::tests::shared_ingress_retains_archive_allocation_and_owns_component_name ... ok
+test catalog::shared::tests::shared_ingress_accepts_exact_entry_budget_and_rejects_one_below ... ok
+test catalog::shared::tests::shared_ingress_rejects_duplicate_and_noncanonical_names ... ok
+test catalog::tests::rejects_input_above_profile ... ok
+test catalog::tests::rejects_mixed_direct_and_legacy_representations ... ok
+test catalog::tests::semantic_component_parser_passes_the_remaining_object_cap_to_core_before_retaining ... ok
+test catalog::tests::consumes_component_name_and_archive ... ok
+test catalog::tests::parses_direct_iwa_and_skips_operation_storage ... ok
+test catalog::tests::gets_in_range_component_by_index ... ok
+test catalog::tests::gets_first_component_by_index ... ok
+test catalog::tests::parses_nested_index_and_rejects_encryption ... ok
+test catalog::tests::returns_none_for_out_of_range_component_index ... ok
+test catalog::tests::semantic_directory_index_reads_only_canonical_iwa_entries ... ok
+test catalog::tests::semantic_directory_iwa_total_budget_is_exact_and_refuses_a_zero_remainder_before_read ... ok
+test catalog::tests::source_catalog_retains_the_validated_ingress_profile ... ok
+test catalog::tests::source_catalog_component_handoff_releases_physical_source ... ok
+test catalog::tests::aggregate_decompressed_iwa_budget_is_exact_for_direct_and_source_catalogs ... ok
+test catalog::tests::source_catalog_normalizes_legacy_index_during_two_required_traversals ... ok
+test catalog::tests::semantic_object_budget_reports_checked_add_overflow_as_a_typed_limit ... ok
+test catalog::tests::semantic_object_budget_accepts_the_exact_cap_and_rejects_one_more ... ok
+test catalog::tests::source_catalog_reuses_owned_vector_payload_without_copy ... ok
+test catalog::tests::source_catalog_reuses_shared_source_and_traverses_direct_zip_once ... ok
+test directory::tests::detects_replaced_file_against_captured_version ... ok
+test catalog::tests::source_catalog_component_projection_matches_component_only_ingress ... ok
+test catalog::tests::semantic_source_catalog_materializes_only_components_and_fixed_sidecars ... ok
+test directory::tests::exact_index_revalidation_runs_after_component_parsing ... ok
+test directory::tests::conditional_semantic_index_zip_classifies_root_before_hostile_foreign_members ... ok
+test directory::tests::freezes_direct_index_zip_without_claiming_whole_package_provenance ... ok
+test directory::tests::conditional_semantic_loose_index_classifies_root_before_hostile_foreign_members ... ok
+test directory::tests::loose_index_charges_entry_and_aggregate_limits_before_decode ... ok
+test directory::tests::freezes_legacy_marker_evidence_without_classifying_it ... ok
+test directory::tests::freezes_loose_index_in_deterministic_name_order ... ok
+test directory::tests::index_only_profile_ignores_all_pages_sidecar_authorities ... ok
+test directory::tests::opened_root_is_pinned_when_its_path_is_replaced ... ok
+test directory::tests::pages_metadata_profile_charges_all_three_sidecars_before_index_capture ... ok
+test directory::tests::rejects_special_nodes_in_loose_index ... ok
+test directory::tests::freezes_only_the_canonical_properties_diagnostic_under_aggregate_limits ... ok
+test directory::tests::pages_metadata_profile_rejects_selected_symlink_and_directory ... ok
+test directory::tests::rejects_symbolic_properties_diagnostic ... ok
+test directory::tests::replaced_index_path_cannot_redirect_or_publish_pinned_capture ... ok
+test directory::tests::pages_metadata_profile_freezes_only_all_three_canonical_sidecars ... ok
+test directory::tests::rejects_root_and_member_symbolic_links ... ok
+test error::tests::backend_limit_errors_remain_typed ... ok
+test directory::tests::pages_metadata_profile_charges_exact_entry_and_expanded_totals ... ok
+test directory::tests::pages_metadata_profile_reserves_exact_name_metadata_before_index_parse ... ok
+test directory::tests::rejects_nonportable_loose_member_basenames ... ok
+test logical::tests::rejects_unsafe_ambiguous_and_encrypted_entries ... ok
+test logical::tests::frozen_snapshot_is_cow_isolated_without_payload_copy ... ok
+test logical::tests::logical_components_match_direct_zip_and_skip_operation_storage ... ok
+test package::tests::borrowed_source_respects_input_limits_before_copying ... ok
+test limits::tests::zip_policy_maps_every_backend_resource_ceiling ... ok
+test ingress::tests::candidate_plan_reports_targets_without_allocating_a_reader_index ... ok
+test package::tests::catalog_storage_requirements_include_nested_physical_census ... ok
+test logical::tests::validates_exact_and_one_over_entry_payload_and_metadata_limits ... ok
+test directory::tests::sidecar_incremental_reads_enforce_the_hard_cap_before_growth_allocation ... ok
+test package::tests::accepts_owned_source_without_copying_payload_buffer ... ok
+test ingress::tests::reassembly_preparation_rejection_happens_before_prepare ... ok
+test package::tests::deletion_can_remove_an_opaque_member_without_decoding_it ... ok
+test package::tests::exact_artifacts_authorize_pointer_or_exact_bytes_but_not_fingerprints ... ok
+test package::tests::accepts_shared_source_without_copying_input ... ok
+test package::tests::exact_artifacts_byte_noop_requires_exact_equality ... ok
+test directory::tests::pinned_pages_sidecars_refuse_replacement_deletion_and_type_changes ... ok
+test ingress::tests::reassembly_preparation_is_admitted_before_reader_and_indexes ... ok
+test package::tests::empty_reassembly_uses_the_exact_noop_source_path ... ok
+test package::tests::deletion_selection_is_exact_unique_and_disjoint_from_edits ... ok
+test package::tests::deletes_a_member_and_preserves_the_remaining_physical_record ... ok
+test ingress::tests::candidate_phases_charge_before_decode ... ok
+test package::tests::deletion_reassembly_enforces_shape_and_output_limits ... ok
+test directory::tests::preexisting_ancestor_symlink_is_resolved_before_root_is_pinned ... ok
+test directory::tests::rejects_directory_encryption_markers_in_every_supported_location ... ok
+test directory::tests::rejects_ambiguous_and_nested_index_representations ... ok
+test package::tests::checks_positional_source_limits_before_reading ... ok
+test ingress::tests::candidate_plan_rejects_tight_entry_budget_before_target_read ... ok
+test ingress::tests::reassembly_preparation_covers_insertions_and_deletions ... ok
+test package::tests::insertion_failures_leave_sink_and_source_untouched_and_empty_is_exact_noop ... ok
+test package::tests::insertion_preflights_entry_name_data_total_and_output_limits ... ok
+test package::tests::combines_an_edit_and_deletion_in_one_reassembly ... ok
+test package::tests::insertion_combines_with_edit_and_delete_in_one_transaction ... ok
+test package::tests::deflate_patch_preserves_untouched_count_and_central_record ... ok
+test package::tests::insertion_preserves_untouched_raw_records_and_metadata ... ok
+test package::tests::identical_nonempty_edits_use_the_exact_source_for_store_and_deflate ... ok
+test directory::tests::pages_metadata_profile_enforces_each_hard_and_caller_entry_ceiling ... ok
+test package::tests::insertion_rejects_collisions_unsafe_names_and_invalid_positions ... ok
+test package::tests::exact_artifacts_clone_inverse_and_handoffs_share_allocations ... ok
+test package::tests::exact_artifacts_retain_owned_vector_buffers_through_inverse ... ok
+test package::tests::insertion_supports_a_deflated_source_and_keeps_existing_compression ... ok
+test logical::tests::does_not_reinterpret_input_limit_as_logical_payload_limit ... ok
+test package::tests::pages_metadata_profile_refuses_selected_header_mismatches_before_read ... ok
+test package::tests::prepared_noop_reassembly_retains_exact_source_and_needs_no_offsets ... ok
+test package::tests::keynote_properties_profile_reads_only_iwa_and_properties ... ok
+test package::tests::pages_metadata_profile_does_not_promote_raw_normalization_near_names ... ok
+test package::tests::flattens_legacy_index_before_outer_entries ... ok
+test package::tests::identical_nonempty_edits_preserve_legacy_source ... ok
+test package::tests::exact_noop_reassembly_enforces_the_total_uncompressed_limit ... ok
+test package::tests::prepared_insertions_report_and_enforce_allocation_requirements ... ok
+test package::tests::preserves_flat_entry_order_and_payloads ... ok
+test package::tests::preserves_physical_metadata_and_exact_noop_bytes ... ok
+test package::tests::preserves_nested_index_limit_error_type ... ok
+test package::tests::prepared_reassembly_rejects_allocation_ceiling_before_execution ... ok
+test package::tests::rejects_a_positional_source_that_changes_during_snapshot ... ok
+test package::tests::nested_deflate_storage_keeps_the_reader_sentinel_and_arc_owner ... ok
+test package::tests::prepared_reassembly_reports_exact_final_workspace_and_executes ... ok
+test package::tests::reassembles_stored_edit_while_preserving_physical_provenance ... ok
+test package::tests::reassembly_patch_applies_inverts_and_rejects_foreign_sources ... ok
+test package::tests::rejected_edits_leave_the_sink_untouched ... ok
+test package::tests::reassembly_patch_preserves_typed_refusals ... ok
+test package::tests::rejects_legacy_non_iwa_members ... ok
+test package::tests::rejects_output_limits_before_writing_any_bytes ... ok
+test package::tests::rejects_mixed_direct_and_legacy_representations ... ok
+test package::tests::rejects_truncated_local_metadata_before_materializing_payload ... ok
+test package::tests::retains_unsupported_compression_as_opaque_raw_record ... ok
+test limits::tests::decompression_errors_identify_the_binding_component_or_aggregate_budget ... ok
+test package::tests::inserts_at_append_front_middle_and_equal_positions_deterministically ... ok
+test package::tests::semantic_components_profile_reads_no_sidecars ... ok
+test package::tests::semantic_profile_skips_irrelevant_opaque_and_refuses_selected_opaque_before_read ... ok
+test package::tests::semantic_profile_batch_preflights_late_iwa_before_any_component_read ... ok
+test package::tests::semantic_detection_reads_only_the_exact_modern_root ... ok
+test package::tests::reassembles_deflate_edit_and_round_trips_metadata ... ok
+test package::tests::semantic_detection_reads_only_the_legacy_container_and_root ... ok
+test package::tests::semantic_detection_refuses_root_and_nested_index_raw_aliases ... ok
+test package::tests::semantic_profile_reads_only_exact_iwa_and_three_sidecars_in_modern_zip ... ok
+test package::tests::semantic_profile_reads_only_nested_iwa_and_prefixed_sidecars_in_legacy_zip ... ok
+test package::tests::shared_source_preserves_opaque_zip_bytes_exactly ... ok
+test publication::tests::missing_filename_is_rejected_without_running_callback ... ok
+test package::tests::shared_source_respects_input_limits ... ok
+test publication::tests::preserved_permissions_clear_privileged_execution_bits ... ok
+test publication::tests::nonregular_destination_is_rejected ... ok
+test publication::tests::new_destination_is_forced_to_private_permissions ... ok
+test package::tests::snapshots_a_positional_source_in_bounded_reads ... ok
+test publication::tests::relative_destination_is_fixed_to_an_absolute_parent ... ok
+test package::tests::logical_entry_profile_checks_declared_sizes_before_entry_read ... ok
+test publication::tests::parent_sync_failure_reports_committed_after_replacement ... ok
+test package_state::tests::excludes_legacy_operation_logs_from_iwa_scans ... ok
+test package::tests::writes_flat_entry_order_and_payloads_without_exposing_zip_types ... ok
+test package_state::tests::exposes_ordered_entry_views_without_leaking_the_store ... ok
+test package_state::tests::mutating_a_component_reparses_its_replacement ... ok
+test publication::tests::staging_permissions_do_not_inherit_a_shared_destination_mode ... ok
+test package_state::tests::forks_share_completed_archives_and_detach_entry_storage ... ok
+test package_state::tests::moved_and_replaced_entry_invalidates_only_its_name_cache ... ok
+test package_state::tests::patch_publication_is_exact_source_checked_and_starts_a_fresh_cache ... ok
+test package_state::tests::patch_publication_restarts_the_component_cache ... ok
+test publication::tests::callback_failure_does_not_delete_a_replaced_temporary_path ... ok
+test package::tests::rejects_declared_nested_index_size_before_decompression ... ok
+test publication::tests::successful_publication_replaces_destination ... ok
+test publication::tests::callback_failure_preserves_destination_and_removes_tempfile ... ok
+test package_state::tests::failed_flight_wakes_waiters_and_allows_a_retry ... ok
+test package_state::tests::forks_do_not_inherit_active_parser_flights ... ok
+test publication::tests::existing_permissions_are_preserved ... ok
+test publication::tests::unreadable_existing_mode_is_preserved_without_blocking_publication ... ok
+test publication::tests::typed_publication_values_are_send_sync_and_redacted ... ok
+test semantic::tests::exhausted_global_object_budget_refuses_a_component_parser ... ok
+test publication::tests::symbolic_link_destination_is_rejected_without_touching_target ... ok
+test publication::tests::replaced_temporary_path_is_not_published_or_deleted ... ok
+test publication::tests::unsupported_parent_sync_is_accepted ... ok
+test semantic::tests::components_only_does_not_read_metadata ... ok
+test semantic::tests::exact_portable_component_subpaths_are_admitted ... ok
+test semantic::tests::remaining_object_budget_tightens_the_core_parser_limit ... ok
+test semantic::tests::aggregate_iwa_budget_reaches_snappy_and_refuses_zero_remaining_before_read ... ok
+test publication::tests::missing_destination_is_created ... ok
+test semantic::tests::legacy_projection_normalizes_exact_root_components ... ok
+test semantic::tests::raw_metadata_normalization_alias_is_refused_before_reads ... ok
+test semantic::tests::legacy_projection_rejects_nested_and_hostile_iwa_authorities ... ok
+test semantic::tests::selected_opaque_metadata_is_refused_before_component_read ... ok
+test zip::tests::constrained_index_precedes_physical_layout_materialization ... ok
+test zip::tests::physical_member_limit_counts_directory_records ... ok
+test semantic::tests::metadata_cap_is_checked_before_any_selected_payload_read ... ok
+test semantic::tests::legacy_projection_reads_index_components_and_prefixed_sidecars_only ... ok
+test zip::tests::raw_layout_aggregates_physical_metadata_across_entries ... ok
+test zip::tests::nested_index_applies_raw_local_member_name_limit ... ok
+test semantic::tests::flat_metadata_name_collisions_in_either_zip_header_are_refused_before_reads ... ok
+test zip::tests::directory_index_report_covers_local_and_central_metadata_limits ... ok
+test zip::tests::nested_index_applies_raw_central_member_name_limit ... ok
+test zip::tests::raw_layout_rejects_central_member_name_before_materialization ... ok
+test publication::tests::destination_changed_to_a_symbolic_link_is_rejected_before_persist ... ok
+test package_state::tests::single_flight_shares_one_parsed_archive_across_threads ... ok
+test semantic::tests::legacy_metadata_name_collisions_in_either_zip_header_are_refused_before_reads ... ok
+test zip::tests::raw_layout_rejects_compressed_size_before_materialization ... ok
+test zip::tests::raw_layout_rejects_local_member_name_before_materialization ... ok
+test zip::tests::raw_layout_charges_local_and_central_metadata_before_materialization ... ok
+test semantic::tests::modern_projection_reads_only_components_and_exact_sidecars ... ok
+test package::tests::semantic_detection_does_not_gather_high_count_non_root_names ... ok
+test semantic::tests::native_numbers_fixture_projects_all_exact_components ... ok
+
+test result: ok. 185 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 1 test
+test declared_nested_index_size_wins_over_corrupt_deflate_for_every_ingress_api ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test archive_owned_routes_preserve_core_type_identity ... ok
+test routed_archive_and_snappy_values_round_trip_with_references ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test native_reassembly_patch_round_trips_all_iwork_families ... ok
+test native_iwa_headers_and_payloads_are_exactly_preserved ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 1 test
+test archive_aliases_reach_neutral_package_primitives_directly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+test exact_noop_reuses_completed_cache_and_inverse_restores_ordered_bytes ... ok
+test mixed_reorder_patch_retains_only_unchanged_name_caches ... ok
+test inverse_mixed_patch_retains_reordered_cache_and_reparses_replacement ... ok
+test speculative_and_oversized_archives_are_rejected_with_typed_limits ... ok
+test structural_ingress_is_atomic_and_keeps_unaffected_cache_entries ... ok
+test successful_publication_and_failed_publication_preserve_the_source ... ok
+test patch_publication_forks_cache_and_invalidates_only_changed_names ... ok
+test reordered_patch_retains_name_keyed_archive_cache ... ok
+test patch_publication_does_not_import_unaffected_source_flights ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 65 tests
+test archive::ingress::tests::preflight_rejects_missing_required_nested_header_fields ... ok
+test archive::ingress::tests::preflight_applies_message_budget_before_payload_work ... ok
+test archive::inventory::tests::archive_and_object_reports_have_expected_root_collection_difference ... ok
+test archive::inventory::tests::admission_rejects_before_nested_metadata_is_inspected ... ok
+test archive::inventory::tests::inventory_counts_all_nested_clone_storage_and_references ... ok
+test archive::ingress::tests::preflight_rejects_truncated_payload_before_parse_allocation ... ok
+test archive::inventory::tests::max_minus_one_rejects_before_the_next_nested_collection ... ok
+test archive::ingress::tests::preflight_matches_the_physical_archive_shape ... ok
+test archive::ingress::tests::requirements_are_copyable_for_a_caller_ledger ... ok
+test archive::tests::append_objects_rejects_zero_and_duplicate_identifiers_atomically ... ok
+test archive::tests::ambiguous_or_malformed_data_reference_fields_are_rejected_atomically ... ok
+test archive::tests::canonical_headers_use_compact_retention_path ... ok
+test archive::tests::append_objects_is_atomic_ordered_and_bounded ... ok
+test archive::tests::canonical_field_transition_rejects_stale_and_existing_paths_atomically ... ok
+test archive::tests::canonical_data_pruning_can_restore_exact_bytes_after_metadata_restore ... ok
+test archive::tests::canonical_field_transition_inserts_and_removes_exactly_with_unknown_header ... ok
+test archive::tests::canonical_field_transition_rejects_noncanonical_remove_and_limits_atomically ... ok
+test archive::tests::canonical_last_reference_pruning_and_inverse_restore_exact_bytes ... ok
+test archive::tests::all_data_pruning_clears_aggregate_and_nested_references_only ... ok
+test archive::tests::canonical_message_length_width_change_and_inverse_restore_exact_bytes ... ok
+test archive::tests::canonical_object_framing_rejects_inexact_offsets_and_extents ... ok
+test archive::tests::canonical_object_framing_rejects_overlong_prefix_on_any_object ... ok
+test archive::tests::canonical_object_field_removal_refuses_noncanonical_wire ... ok
+test archive::tests::canonical_object_fields_reject_ambiguous_authorization_atomically ... ok
+test archive::tests::canonical_object_framing_rejects_truncated_source_regions ... ok
+test archive::tests::canonical_object_fields_bound_output_header_atomically ... ok
+test archive::tests::canonical_object_framing_accepts_unknown_raw_archive_info_bytes ... ok
+test archive::tests::canonical_object_fields_compose_with_selected_reference_transition ... ok
+test archive::tests::canonical_object_fields_admit_exact_metadata_and_reject_one_under ... ok
+test archive::tests::changed_cardinality_data_transition_inverse_restores_exact_source ... ok
+test archive::tests::checked_object_removal_is_exact_and_atomic ... ok
+test archive::tests::changed_cardinality_data_transition_rejects_stale_or_limited_requests_atomically ... ok
+test archive::tests::canonical_object_fields_preserve_unknown_header_and_remove_exact_suffix ... ok
+test archive::tests::combined_reference_pruning_budgets_selectors_and_wire_work_atomically ... ok
+test archive::tests::data_reference_reorder_rejects_ambiguous_matching_field_infos_atomically ... ok
+test archive::tests::deletion_grade_reference_inspection_rejects_unknown_header_metadata ... ok
+test archive::tests::data_reference_reorder_accepts_arbitrary_nonzero_ids_and_rejects_new_or_zero_ids ... ok
+test archive::tests::data_reference_reorder_preserves_unknown_header_bytes ... ok
+test archive::tests::data_reference_reorder_noop_preserves_source_with_ambiguous_field_infos ... ok
+test archive::tests::changed_cardinality_data_transition_supports_insert_remove_and_replace ... ok
+test archive::tests::encoded_len_matches_retained_unknown_header_and_exact_limits ... ok
+test archive::tests::exact_reference_transition_hostile_authorization_is_atomic ... ok
+test archive::tests::encoded_len_matches_serialization_for_full_metadata ... ok
+test archive::tests::empty_reference_removal_delegates_to_preserving_replacement ... ok
+test archive::tests::exact_reference_transition_rejects_ambiguous_raw_reference_atomically ... ok
+test archive::tests::object_reference_reorder_authorization_failures_are_atomic ... ok
+test archive::tests::reference_inspection_enforces_metadata_limit_before_late_callbacks ... ok
+test archive::tests::data_pruning_zero_and_noop_policies_preserve_existing_behavior ... ok
+test archive::tests::exact_reference_transition_preserves_raw_spans_and_changes_all_selected_lists ... ok
+test archive::tests::object_reference_reorder_limits_and_malformed_fields_are_atomic ... ok
+test archive::tests::exact_reference_transition_retains_duplicate_unselected_field_members ... ok
+test archive::tests::reference_inspection_streams_aggregate_and_field_occurrences ... ok
+test archive::tests::same_content_ignoring_offsets_distinguishes_new_and_canonical_provenance ... ok
+test snappy::tests::maximum_compressed_len_matches_checked_chunk_boundaries ... ok
+test archive::tests::exact_reference_transition_limits_are_inclusive_and_atomic ... ok
+test archive::tests::same_content_ignoring_offsets_accepts_identical_objects_at_different_offsets ... ok
+test archive::tests::object_reference_reorder_preserves_raw_header_and_nested_metadata ... ok
+test archive::tests::same_content_ignoring_offsets_rejects_divergent_published_content ... ok
+test archive::tests::reference_pruning_failures_are_atomic ... ok
+test archive::tests::object_reference_reorder_noop_matches_preserving_replacement ... ok
+test archive::tests::reference_pruning_preserves_all_untouched_header_encodings ... ok
+test snappy::tests::maximum_compressed_len_enforces_hard_input_and_output_ceilings ... ok
+test archive::tests::selected_object_and_data_pruning_preserves_raw_occurrences ... ok
+test snappy::tests::decompressed_length_preflight_matches_decoded_stream ... ok
+test snappy::tests::maximum_compressed_len_bounds_every_emitted_stream ... ok
+
+test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 6 tests
+test clone_refuses_merge_and_diff_metadata_without_mutating_source ... ok
+test clone_remap_scratch_obeys_header_memory_limit_for_a_small_source ... ok
+test clone_identity_self_map_is_byte_consistent_and_does_not_mutate_source ... ok
+test clone_with_finite_limits_fails_before_mutating_the_source ... ok
+test clone_remaps_aggregate_and_field_objects_preserves_data_and_raw_header_spans ... ok
+test clone_rejects_invalid_remaps_and_replacement_arity_atomically ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 31 tests
+test archive_limits_are_copyable_and_checked ... ok
+test archive_crud_rejects_duplicates_and_preserves_order ... ok
+test archive_limits_bound_objects_messages_payloads_and_metadata ... ok
+test archive_rejects_malformed_lengths_and_truncated_payloads ... ok
+test archive_validation_rejects_duplicate_structural_ids ... ok
+test buffa_preflight_byte_and_field_limits_are_inclusive ... ok
+test archive_round_trip_preserves_order_and_payloads ... ok
+test buffa_preflight_counts_packed_metadata_before_decode ... ok
+test buffa_preflight_charges_unrecognized_closed_enum_records ... ok
+test buffa_preflight_metadata_and_message_count_limits_are_inclusive ... ok
+test buffa_preflight_enforces_field_nesting_and_memory_budgets ... ok
+test configured_limits_are_enforced ... ok
+test buffa_preflight_nesting_and_memory_limits_are_inclusive ... ok
+test buffa_preflight_rejects_malformed_deferred_children ... ok
+test empty_stream_round_trips ... ok
+test malformed_large_length_is_rejected_without_arithmetic_overflow ... ok
+test hostile_native_header_bytes_remain_the_no_op_authority ... ok
+test message_info_reader_and_io_errors_are_reported ... ok
+test missing_required_field_info_path_is_rejected_before_publication ... ok
+test message_mutations_are_atomic_and_update_metadata ... ok
+test nested_duplicates_and_unknown_wire_payloads_preserve_the_raw_header ... ok
+test preserving_replacement_grows_scalar_and_enclosing_length_widths ... ok
+test reader_headers_are_bounded_and_truncation_is_structured ... ok
+test parse_does_not_reserve_object_slots_from_payload_size ... ok
+test neutral_field_metadata_preserves_presence_and_unknown_enum_values ... ok
+test truncated_header_and_payload_are_rejected ... ok
+test upsert_failure_rolls_back_without_replacing_existing_object ... ok
+test preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly ... ok
+test unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte ... ok
+test selected_archive_parse_retains_only_requested_objects_but_validates_all_frames ... ok
+test round_trip_spans_multiple_frames ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

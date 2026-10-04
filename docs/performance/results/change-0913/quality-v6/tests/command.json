@@ -1,0 +1,86 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-xlsb",
+    "--locked",
+    "--release",
+    "-j",
+    "2",
+    "--features",
+    "litchi-opc/sign,litchi-opc/performance-diagnostics"
+  ],
+  "cwd": "/tmp/litchi-0913-src",
+  "started_utc": "2026-10-04T10:53:17.227375+00:00",
+  "ended_utc": "2026-10-04T11:02:59.941412+00:00",
+  "exit_code": 101,
+  "helper": {
+    "path": "docs/performance/results/change-0913/quality-v6.py",
+    "bytes": 3242,
+    "sha256": "a0f72001a87884a6dd7fa04470f68411533c5d0be7ad5f797b2591cbff933a8a"
+  },
+  "source": {
+    "path": "docs/performance/results/change-0913/source-v1.json",
+    "bytes": 1758278,
+    "sha256": "68de7c9416ba7763606a64780bde4e3de8476b02a809234b4a36975b9612af82"
+  },
+  "fixtures": {
+    "path": "docs/performance/results/change-0913/fixtures.json",
+    "bytes": 277180,
+    "sha256": "29bbcb5ef9af8033e1141cdcff819f3ac9bcbaefc5a261ec0581df714da9756b"
+  },
+  "extra_fixtures": {
+    "path": "docs/performance/results/change-0913/extra-fixtures.json",
+    "bytes": 3027,
+    "sha256": "11c5933c32a017375982d7e8ba25fe9652e5fe4caed2f436417729e33eb7d5fc"
+  },
+  "more_fixtures": {
+    "path": "docs/performance/results/change-0913/more-fixtures.json",
+    "bytes": 717,
+    "sha256": "abacf5bc6b4e6c3a3ac31e9111e7281d47707741b62ce4acebe83829f8eba631"
+  },
+  "quality_root_lock": {
+    "path": "docs/performance/results/change-0913/quality-lock-v3/Cargo.lock",
+    "bytes": 137417,
+    "sha256": "32e1995cfc75a490432eae1d8160376105691ad4152e6ca99a0f08e1413abe9c"
+  },
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0913-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0913/quality-v6/tests/stdout.txt",
+      "bytes": 117258,
+      "sha256": "58aee348d946e4b10a6a5561e628dc2c0b170a6fc3030d66c74bc292afa0d87c"
+    },
+    {
+      "path": "docs/performance/results/change-0913/quality-v6/tests/stderr.txt",
+      "bytes": 1893,
+      "sha256": "d60a811d031dd6f3637236e2cd9d863332822370c230100ec599aa5b5e44e773"
+    }
+  ]
+}

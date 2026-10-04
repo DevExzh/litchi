@@ -1,0 +1,47 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "litchi-iwa-core",
+    "-p",
+    "litchi-iwa-archive",
+    "--locked",
+    "--offline",
+    "--all-features",
+    "-j",
+    "2",
+    "--all-targets"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution",
+  "start_utc": "2026-10-04T17:42:32.465005+00:00",
+  "end_utc": "2026-10-04T17:42:32.541766+00:00",
+  "exit_code": 101,
+  "helper": {
+    "path": "docs/performance/results/change-0913/iwa-quality-v2.py",
+    "bytes": 2903,
+    "sha256": "cb5ef4081178120db862a50d86e6ac1b12916ec7a1d1d5e60903e8ddfd9f00e2"
+  },
+  "source": {
+    "path": "docs/performance/results/change-0913/iwa-quality-source.json",
+    "bytes": 1837,
+    "sha256": "153f20cdd7e4ee308ee7aaa8372ac743c139499ffb9dc8e5544fff0c4d4f855f"
+  },
+  "quality_lock": {
+    "path": "docs/performance/results/change-0913/iwa-quality-lock.json",
+    "bytes": 386,
+    "sha256": "aa65b5ed5d1cc16127138b854738ca61093dbad4d67faddcb584911c51ca0a55"
+  },
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0913/iwa-quality-v2/tests/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0913/iwa-quality-v2/tests/stderr.txt",
+      "bytes": 266,
+      "sha256": "d50760d6ba0e19b670942c9c52182daa9f02bca9cc9d46d0190c3e1c654f9a34"
+    }
+  ]
+}

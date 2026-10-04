@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0913 — direct owned-source read candidate rejected
+
+The fresh matched comparison in [0913](0913-pptx-owned-direct-read.md) fails
+the frozen gate: owned paired total ratio 1.005714×, 95% interval
+0.973308–1.017486. All 48 children and preservation checks passed; candidate
+production changes were restored. These are fresh before/after measurements
+on the updated kernel, not a comparison against historical 0910 timing.
+
 ## 0912 — native PPTX SHA dispatch witness
 
 [0912](0912-pptx-native-sha-dispatch.md) observes the x86 SHA backend inside

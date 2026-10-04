@@ -1,0 +1,47 @@
+    Checking der v0.7.10
+    Checking zerofrom v0.1.8
+    Checking yoke v0.8.3
+    Checking zerovec v0.11.6
+    Checking tinystr v0.8.3
+    Checking icu_locale_core v2.2.0
+    Checking spki v0.7.3
+    Checking pkcs8 v0.10.2
+    Checking sec1 v0.7.3
+    Checking elliptic-curve v0.13.8
+    Checking zerotrie v0.2.4
+    Checking potential_utf v0.1.5
+    Checking litchi-core v0.0.1 (/tmp/litchi-0913-src/crates/litchi-core)
+    Checking icu_provider v2.2.0
+    Checking icu_collections v2.2.0
+    Checking rand v0.8.7
+    Checking num-bigint-dig v0.8.6
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking pkcs1 v0.7.5
+    Checking litchi-cfb v0.0.1 (/tmp/litchi-0913-src/crates/litchi-cfb)
+    Checking rsa v0.9.10
+    Checking p256 v0.13.2
+    Checking icu_normalizer v2.2.0
+    Checking icu_properties v2.2.0
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-0913-src/crates/xml-minifier-macros)
+    Checking x509-cert v0.2.5
+    Checking xml-minifier v0.1.0 (/tmp/litchi-0913-src/crates/xml-minifier)
+    Checking idna_adapter v1.2.2
+    Checking soapberry-zip v0.0.1 (/tmp/litchi-0913-src/crates/soapberry-zip)
+    Checking litchi-sign v0.0.1 (/tmp/litchi-0913-src/crates/litchi-sign)
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-sheet v0.0.1 (/tmp/litchi-0913-src/crates/litchi-sheet)
+    Checking litchi-xldm v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xldm)
+    Checking litchi-opc v0.0.1 (/tmp/litchi-0913-src/crates/litchi-opc)
+ Documenting litchi-opc v0.0.1 (/tmp/litchi-0913-src/crates/litchi-opc)
+ Documenting soapberry-zip v0.0.1 (/tmp/litchi-0913-src/crates/soapberry-zip)
+    Checking litchi-ooxml-common v0.0.1 (/tmp/litchi-0913-src/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/tmp/litchi-0913-src/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/tmp/litchi-0913-src/crates/litchi-spreadsheet-drawing)
+ Documenting litchi-pptx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-pptx)
+ Documenting litchi-xlsx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xlsx)
+ Documenting litchi-xlsb v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xlsb)
+ Documenting litchi-docx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-docx)
+    Finished `release` profile [optimized] target(s) in 20.64s
+   Generated /home/zhuhe/code/litchi/target/litchi-0913-build/doc/litchi_docx/index.html and 5 other files

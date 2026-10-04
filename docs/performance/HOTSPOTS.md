@@ -1,5 +1,13 @@
 # Performance hotspot inventory
 
+## 0913 — large media already bypass the member-span buffer
+
+[0913](0913-pptx-owned-direct-read.md) rejects the direct-owned-read candidate.
+The 64 KiB span cap already excludes all eight 2 MiB media members. A static
+one-read-per-member bound admits only 211,315 span bytes across 437 eligible
+members; it is not a dynamic copy or allocation measurement. Qualify actual
+payload-size and force-path exposure before another copy-elimination candidate.
+
 ## 0912 — native SHA confirmed; owned-source copy candidate identified
 
 [0912](0912-pptx-native-sha-dispatch.md) confirms native x86 SHA reachability,

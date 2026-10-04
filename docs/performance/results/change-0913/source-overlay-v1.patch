@@ -1,0 +1,638 @@
+diff --git a/crates/litchi-opc/src/payload.rs b/crates/litchi-opc/src/payload.rs
+index 21687d44ab..23792470bb 100644
+--- a/crates/litchi-opc/src/payload.rs
++++ b/crates/litchi-opc/src/payload.rs
+@@ -177,7 +177,7 @@ impl DeferredPayload {
+ 
+     fn decode(&self) -> std::result::Result<Arc<Vec<u8>>, OpcError> {
+         let archive = self.source.index()?;
+-        let blob = archive.read(&self.member).map_err(OpcError::from)?;
++        let blob = archive.read_owned(&self.member).map_err(OpcError::from)?;
+         let limits = self.source.limits;
+         let inflated = blob.len() as u64;
+         limits.check(ReadResource::PartBytes, inflated, limits.max_part_bytes())?;
+diff --git a/crates/litchi-opc/tests/owned_direct_concurrency.rs b/crates/litchi-opc/tests/owned_direct_concurrency.rs
+new file mode 100644
+index 0000000000..39490fbd21
+--- /dev/null
++++ b/crates/litchi-opc/tests/owned_direct_concurrency.rs
+@@ -0,0 +1,240 @@
++#![allow(
++    clippy::expect_used,
++    clippy::unwrap_used,
++    reason = "focused concurrency assertions intentionally panic on fixture errors"
++)]
++
++//! Concurrency contracts for the owned-source deferred OPC payload path.
++//!
++//! The package and its cloned parts are `Send + Sync`; the first force must
++//! therefore have one shared `OnceLock` outcome.  These tests exercise that
++//! boundary through the public package API while the ZIP reader uses its
++//! specialized owned-source path internally.
++
++use std::sync::{Arc, Barrier};
++use std::thread;
++
++use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, ReadResource};
++use soapberry_zip::office::StreamingArchiveWriter;
++
++const MANIFEST: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#;
++const ROOT_RELATIONSHIPS: &[u8] =
++    br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#;
++const GOOD_MEMBER: &str = "custom/good.xml";
++const BAD_MEMBER: &str = "custom/bad.bin";
++const GOOD_URI: &str = "/custom/good.xml";
++const BAD_URI: &str = "/custom/bad.bin";
++const GOOD_PAYLOAD: &[u8] = b"<good/>";
++const BAD_PAYLOAD: &[u8] = b"lazy-corrupt-payload";
++const WORKERS: usize = 12;
++
++fn uri(value: &str) -> PackURI {
++    PackURI::new(value).expect("valid test part URI")
++}
++
++fn archive() -> Vec<u8> {
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_stored("[Content_Types].xml", MANIFEST)
++        .expect("write manifest");
++    writer
++        .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
++        .expect("write root relationships");
++    writer
++        .write_deflated_sized(GOOD_MEMBER, GOOD_PAYLOAD)
++        .expect("write good member");
++    writer
++        .write_stored(BAD_MEMBER, BAD_PAYLOAD)
++        .expect("write bad member");
++    writer.finish_to_bytes().expect("finish test archive")
++}
++
++fn corrupt_bad_member(mut bytes: Vec<u8>) -> Vec<u8> {
++    let offset = bytes
++        .windows(BAD_PAYLOAD.len())
++        .position(|window| window == BAD_PAYLOAD)
++        .expect("stored test payload must be present in the archive");
++    bytes[offset] ^= 1;
++    bytes
++}
++
++fn owned_package(source: Arc<Vec<u8>>) -> OpcPackage {
++    OpcPackage::from_shared_vec_with_limits(source, ReadLimits::default())
++        .expect("open shared owned package")
++}
++
++#[test]
++fn concurrent_first_force_shares_decoded_allocation_across_clones_and_keeps_source_exact() {
++    let source = Arc::new(archive());
++    let package = owned_package(Arc::clone(&source));
++    let cloned = package.clone();
++    let part_name = uri(GOOD_URI);
++    let barrier = Arc::new(Barrier::new(WORKERS + 1));
++
++    let decoded: Vec<Arc<Vec<u8>>> = thread::scope(|scope| {
++        let mut handles = Vec::with_capacity(WORKERS);
++        for worker in 0..WORKERS {
++            let barrier = Arc::clone(&barrier);
++            let target = if worker % 2 == 0 { &package } else { &cloned };
++            let part_name = part_name.clone();
++            handles.push(scope.spawn(move || {
++                barrier.wait();
++                let part = target
++                    .get_part(&part_name)
++                    .expect("good part must decode concurrently");
++                let blob = part.blob_arc();
++                assert_eq!(blob.as_slice(), GOOD_PAYLOAD);
++                blob
++            }));
++        }
++        barrier.wait();
++        handles
++            .into_iter()
++            .map(|handle| handle.join().expect("worker must not panic"))
++            .collect()
++    });
++
++    assert_eq!(decoded.len(), WORKERS);
++    for blob in &decoded {
++        assert_eq!(blob.as_slice(), GOOD_PAYLOAD);
++        assert!(Arc::ptr_eq(blob, &decoded[0]));
++    }
++    assert_eq!(
++        package.deferred_decode_counters(),
++        Some((1, GOOD_PAYLOAD.len() as u64))
++    );
++    assert_eq!(
++        cloned.deferred_decode_counters(),
++        Some((1, GOOD_PAYLOAD.len() as u64))
++    );
++
++    let package_source = package
++        .exact_source_shared()
++        .expect("owned package must retain exact source");
++    let clone_source = cloned
++        .exact_source_shared()
++        .expect("cloned package must retain exact source");
++    assert!(Arc::ptr_eq(&package_source, &source));
++    assert!(Arc::ptr_eq(&clone_source, &source));
++    assert_eq!(
++        PackageWriter::to_bytes(&package).unwrap(),
++        source.as_slice()
++    );
++    assert_eq!(PackageWriter::to_bytes(&cloned).unwrap(), source.as_slice());
++}
++
++#[test]
++fn concurrent_corrupt_first_force_records_one_stable_refusal_across_clones() {
++    let source = Arc::new(corrupt_bad_member(archive()));
++    let package = owned_package(Arc::clone(&source));
++    let cloned = package.clone();
++    let part_name = uri(BAD_URI);
++    let barrier = Arc::new(Barrier::new(WORKERS + 1));
++
++    let refusals: Vec<String> = thread::scope(|scope| {
++        let mut handles = Vec::with_capacity(WORKERS);
++        for worker in 0..WORKERS {
++            let barrier = Arc::clone(&barrier);
++            let target = if worker % 2 == 0 { &package } else { &cloned };
++            let part_name = part_name.clone();
++            handles.push(scope.spawn(move || {
++                barrier.wait();
++                match target.get_part(&part_name) {
++                    Ok(_) => panic!("corrupt part must refuse on first access"),
++                    Err(error) => {
++                        assert!(matches!(error, OpcError::ZipError(_)));
++                        error.to_string()
++                    },
++                }
++            }));
++        }
++        barrier.wait();
++        handles
++            .into_iter()
++            .map(|handle| handle.join().expect("worker must not panic"))
++            .collect()
++    });
++
++    assert_eq!(refusals.len(), WORKERS);
++    for refusal in &refusals {
++        assert_eq!(refusal, &refusals[0]);
++    }
++    for target in [&package, &cloned] {
++        for _ in 0..4 {
++            let refusal = match target.get_part(&part_name) {
++                Ok(_) => panic!("recorded corrupt refusal must remain stable"),
++                Err(error) => {
++                    assert!(matches!(error, OpcError::ZipError(_)));
++                    error.to_string()
++                },
++            };
++            assert_eq!(refusal, refusals[0]);
++        }
++    }
++    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
++    assert_eq!(cloned.deferred_decode_counters(), Some((0, 0)));
++    assert_eq!(
++        PackageWriter::to_bytes(&package).unwrap(),
++        source.as_slice()
++    );
++    assert_eq!(PackageWriter::to_bytes(&cloned).unwrap(), source.as_slice());
++}
++
++#[test]
++fn owned_direct_decode_respects_exact_declared_part_and_total_boundaries() {
++    let source = Arc::new(archive());
++    let exact_limits = ReadLimits::builder()
++        .max_part_bytes(BAD_PAYLOAD.len() as u64)
++        .expect("positive part limit")
++        .max_total_part_bytes((GOOD_PAYLOAD.len() + BAD_PAYLOAD.len()) as u64)
++        .expect("positive total limit")
++        .build()
++        .expect("consistent exact limits");
++    let package = OpcPackage::from_shared_vec_with_limits(Arc::clone(&source), exact_limits)
++        .expect("declared exact boundaries admit the archive");
++    assert_eq!(
++        package.get_part(&uri(GOOD_URI)).unwrap().blob(),
++        GOOD_PAYLOAD
++    );
++    assert_eq!(
++        package.deferred_decode_counters(),
++        Some((1, GOOD_PAYLOAD.len() as u64))
++    );
++    assert_eq!(
++        PackageWriter::to_bytes(&package).unwrap(),
++        source.as_slice()
++    );
++
++    let part_under = ReadLimits::builder()
++        .max_part_bytes((BAD_PAYLOAD.len() - 1) as u64)
++        .expect("positive part limit")
++        .max_total_part_bytes((GOOD_PAYLOAD.len() + BAD_PAYLOAD.len()) as u64)
++        .expect("positive total limit")
++        .build()
++        .expect("consistent part-under limit");
++    assert!(matches!(
++        OpcPackage::from_shared_vec_with_limits(Arc::clone(&source), part_under),
++        Err(OpcError::ReadLimit {
++            resource: ReadResource::PartBytes,
++            actual,
++            maximum,
++        }) if actual == BAD_PAYLOAD.len() as u64 && maximum == (BAD_PAYLOAD.len() - 1) as u64
++    ));
++
++    let total_under = ReadLimits::builder()
++        .max_part_bytes(BAD_PAYLOAD.len() as u64)
++        .expect("positive part limit")
++        .max_total_part_bytes((GOOD_PAYLOAD.len() + BAD_PAYLOAD.len() - 1) as u64)
++        .expect("positive total limit")
++        .build()
++        .expect("consistent total-under limit");
++    assert!(matches!(
++        OpcPackage::from_shared_vec_with_limits(source, total_under),
++        Err(OpcError::ReadLimit {
++            resource: ReadResource::TotalPartBytes,
++            actual,
++            maximum,
++        }) if actual == (GOOD_PAYLOAD.len() + BAD_PAYLOAD.len()) as u64
++            && maximum == (GOOD_PAYLOAD.len() + BAD_PAYLOAD.len() - 1) as u64
++    ));
++}
+diff --git a/crates/soapberry-zip/src/office.rs b/crates/soapberry-zip/src/office.rs
+index 1bf700238f..db6b8c8dae 100644
+--- a/crates/soapberry-zip/src/office.rs
++++ b/crates/soapberry-zip/src/office.rs
+@@ -1755,6 +1755,14 @@ impl<'a, R> Iterator for IndexedArchiveNames<'a, R> {
+ 
+ impl<R> ExactSizeIterator for IndexedArchiveNames<'_, R> {}
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++enum IndexedReadSourcePolicy {
++    /// Use the bounded local-record span optimization for ordinary sources.
++    MemberSpan,
++    /// Read directly from an immutable retained in-memory source.
++    DirectOwned,
++}
++
+ /// Reusable decoder state for one sequential operation over an indexed ZIP
+ /// archive.
+ ///
+@@ -1768,6 +1776,7 @@ where
+ {
+     archive: &'a IndexedArchive<R>,
+     decoder: Option<DeflateDecoder<CountingReader<ZipReader<SpannedSource<'a, R>>>>>,
++    source_policy: IndexedReadSourcePolicy,
+ }
+ 
+ impl<'a, R> IndexedReadSession<'a, R>
+@@ -1780,6 +1789,7 @@ where
+         Self {
+             archive,
+             decoder: None,
++            source_policy: IndexedReadSourcePolicy::MemberSpan,
+         }
+     }
+ 
+@@ -1821,11 +1831,18 @@ where
+         accounting: &mut ZipOperationAccounting,
+     ) -> Result<Vec<u8>, Error> {
+         let indexed = self.archive.indexed_entry(entry_id)?;
+-        // One positional read covers this member's whole local record — fixed
+-        // header, variable region, payload and data descriptor — and every
+-        // read below is answered from it. A member the window does not admit
+-        // yields the passthrough reader and the historical grammar.
+-        let spanned = self.archive.member_source(&indexed.info.wayfinder)?;
++        // The ordinary policy may cover this member's whole local record —
++        // fixed header, variable region, payload and data descriptor — with
++        // one positional read. The owned policy skips that speculative copy;
++        // both policies use the passthrough reader for all validation below.
++        let spanned = match self.source_policy {
++            IndexedReadSourcePolicy::MemberSpan => {
++                self.archive.member_source(&indexed.info.wayfinder)?
++            },
++            IndexedReadSourcePolicy::DirectOwned => {
++                SpannedSource::passthrough(self.archive.archive.get_ref())
++            },
++        };
+         let entry = self
+             .archive
+             .archive
+@@ -1960,6 +1977,50 @@ where
+     }
+ }
+ 
++impl<'a> IndexedReadSession<'a, Arc<Vec<u8>>> {
++    /// Create a session that reads directly from an immutable retained source.
++    ///
++    /// This is deliberately private plumbing for the specialized owned-source
++    /// archive method below. The generic session keeps its bounded
++    /// `MemberSpan` optimization and its source-read grammar unchanged.
++    fn new_direct_owned(archive: &'a IndexedArchive<Arc<Vec<u8>>>) -> Self {
++        Self {
++            archive,
++            decoder: None,
++            source_policy: IndexedReadSourcePolicy::DirectOwned,
++        }
++    }
++}
++
++impl IndexedArchive<Arc<Vec<u8>>> {
++    /// Read and verify one member directly from an immutable retained source.
++    ///
++    /// This is the owned-source path used by deferred OPC payloads. It keeps
++    /// the indexed reader's framing, output reservation, decoder, verifier,
++    /// and accounting grammar, while bypassing the generic source's bounded
++    /// speculative `MemberSpan` copy. The method is hidden implementation
++    /// plumbing because callers should use their format owner's API. Each
++    /// call creates a fresh read session; it does not cache decoded members or
++    /// promise decoder reuse across calls.
++    #[doc(hidden)]
++    pub fn read_owned(&self, name: &str) -> Result<Vec<u8>, Error> {
++        let mut accounting = ZipOperationAccounting::default();
++        self.read_owned_with_accounting(name, &mut accounting)
++    }
++
++    /// Read and verify one owned-source member while recording payload work.
++    #[doc(hidden)]
++    pub fn read_owned_with_accounting(
++        &self,
++        name: &str,
++        accounting: &mut ZipOperationAccounting,
++    ) -> Result<Vec<u8>, Error> {
++        let entry_id = self.entry_id_for_name(name)?;
++        let mut session = IndexedReadSession::new_direct_owned(self);
++        session.read_entry_with_accounting(entry_id, accounting)
++    }
++}
++
+ #[derive(Debug, Clone)]
+ struct IndexedEntry {
+     name: String,
+diff --git a/crates/soapberry-zip/tests/owned_direct_read.rs b/crates/soapberry-zip/tests/owned_direct_read.rs
+new file mode 100644
+index 0000000000..221d7e0964
+--- /dev/null
++++ b/crates/soapberry-zip/tests/owned_direct_read.rs
+@@ -0,0 +1,263 @@
++#![allow(
++    clippy::expect_used,
++    clippy::indexing_slicing,
++    clippy::unwrap_used,
++    reason = "The fixtures below are small, deterministic, and bounded."
++)]
++
++//! Differential coverage for the owned-source direct-read path.
++//!
++//! `IndexedArchive<Arc<Vec<u8>>>::read_owned` has the same framing, decoder,
++//! verifier, output reservation, and error contract as `read`, but deliberately
++//! bypasses the generic `MemberSpan` copy. These tests compare the two routes
++//! over stored and Deflate members, a descriptor, ZIP64 metadata, payload
++//! corruption, a truncated compressed stream, and index-time resource limits.
++
++use soapberry_zip::office::{ArchiveLimits, IndexedArchive, StreamingArchiveWriter};
++use soapberry_zip::{Error, ErrorKind, LimitResource, ZipArchive, ZipOperationAccounting};
++use std::sync::Arc;
++
++const ZIP64_BYTES: &[u8] = include_bytes!("../assets/zip64.zip");
++
++fn open(bytes: Vec<u8>) -> IndexedArchive<Arc<Vec<u8>>> {
++    let source = Arc::new(bytes);
++    let length = source.len() as u64;
++    IndexedArchive::from_reader(source, length).expect("fixture archive opens")
++}
++
++fn open_with_limits(
++    bytes: Vec<u8>,
++    limits: ArchiveLimits,
++) -> Result<IndexedArchive<Arc<Vec<u8>>>, Error> {
++    let source = Arc::new(bytes);
++    let length = source.len() as u64;
++    IndexedArchive::from_reader_with_limits(source, length, limits)
++}
++
++fn descriptor_archive() -> Vec<u8> {
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_stored("stored.bin", b"stored payload")
++        .expect("stored fixture");
++    writer
++        .write_deflated("deflated.bin", b"deflated payload with a data descriptor")
++        .expect("deflated fixture");
++    writer.finish_to_bytes().expect("fixture archive finishes")
++}
++
++fn canonical_deflate_archive() -> Vec<u8> {
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_deflated_sized(
++            "truncated.bin",
++            b"a Deflate payload whose compressed stream can be shortened",
++        )
++        .expect("canonical Deflate fixture");
++    writer.finish_to_bytes().expect("fixture archive finishes")
++}
++
++fn entry_offsets(bytes: &[u8], name: &str) -> (usize, usize, usize, usize) {
++    let archive = ZipArchive::from_slice(bytes).expect("fixture archive parses");
++    let mut entries = archive.entries();
++    while let Some(record) = entries.next_entry().expect("fixture entry parses") {
++        if record.file_path().as_ref() == name.as_bytes() {
++            let wayfinder = record.wayfinder();
++            let entry = archive
++                .get_entry(wayfinder)
++                .expect("fixture local record parses");
++            let (payload_start, payload_end) = entry.compressed_data_range();
++            let local = record.local_header_offset() as usize;
++            let central = find_central_header(bytes, name);
++            return (local, central, payload_start as usize, payload_end as usize);
++        }
++    }
++    panic!("fixture member {name:?} is absent")
++}
++
++fn find_central_header(bytes: &[u8], name: &str) -> usize {
++    let name = name.as_bytes();
++    bytes
++        .windows(4)
++        .enumerate()
++        .filter(|(_, signature)| *signature == [0x50, 0x4b, 0x01, 0x02])
++        .find_map(|(offset, _)| {
++            let name_len =
++                u16::from_le_bytes(bytes[offset + 28..offset + 30].try_into().ok()?) as usize;
++            let name_end = offset.checked_add(46)?.checked_add(name_len)?;
++            (bytes.get(offset + 46..name_end)? == name).then_some(offset)
++        })
++        .unwrap_or_else(|| panic!("fixture central member {name:?} is absent"))
++}
++
++fn family(error: &Error) -> &'static str {
++    match error.kind() {
++        ErrorKind::InvalidChecksum { .. } => "checksum",
++        ErrorKind::InvalidSize { .. } => "size",
++        ErrorKind::LimitExceeded { .. } => "limit",
++        ErrorKind::Eof => "eof",
++        ErrorKind::IO(source) | ErrorKind::Io(source) => source
++            .get_ref()
++            .and_then(|nested| nested.downcast_ref::<Error>())
++            .map_or("io", family),
++        ErrorKind::InvalidInput { .. } => "invalid-input",
++        ErrorKind::InvalidSignature { .. } => "signature",
++        ErrorKind::FileNotFound(_) => "not-found",
++        _ => "other",
++    }
++}
++
++fn assert_same_failure(materialized: &Error, owned: &Error) {
++    assert_eq!(
++        family(materialized),
++        family(owned),
++        "materialized={materialized:?}; owned={owned:?}"
++    );
++    assert_eq!(
++        format!("{materialized:?}"),
++        format!("{owned:?}"),
++        "Debug diagnostics differ"
++    );
++    assert_eq!(
++        materialized.to_string(),
++        owned.to_string(),
++        "Display diagnostics differ"
++    );
++}
++
++fn assert_limit(error: &Error, actual: u64, maximum: u64) {
++    match error.kind() {
++        ErrorKind::LimitExceeded {
++            resource,
++            actual: found_actual,
++            maximum: found_maximum,
++        } => {
++            assert_eq!(*resource, LimitResource::EntrySize);
++            assert_eq!((*found_actual, *found_maximum), (actual, maximum));
++        },
++        other => panic!("expected an entry-size limit refusal, got {other:?}"),
++    }
++}
++
++#[test]
++fn owned_direct_reads_match_member_span_for_store_deflate_and_descriptor() {
++    let bytes = descriptor_archive();
++    let materialized = open(bytes.clone());
++    let owned = open(bytes);
++
++    for name in ["stored.bin", "deflated.bin"] {
++        let mut materialized_accounting = ZipOperationAccounting::default();
++        let mut owned_accounting = ZipOperationAccounting::default();
++        let expected = materialized
++            .read_with_accounting(name, &mut materialized_accounting)
++            .expect("member-span read succeeds");
++        let actual = owned
++            .read_owned_with_accounting(name, &mut owned_accounting)
++            .expect("direct owned read succeeds");
++        assert_eq!(actual, expected, "payload mismatch for {name}");
++        assert_eq!(
++            owned_accounting, materialized_accounting,
++            "accounting drift for {name}"
++        );
++    }
++
++    let descriptor_bytes = descriptor_archive();
++    let archive = ZipArchive::from_slice(&descriptor_bytes).expect("fixture parses");
++    let mut entries = archive.entries();
++    let descriptor = entries
++        .next_entry()
++        .expect("first entry parses")
++        .expect("first entry exists");
++    let deflated = entries
++        .next_entry()
++        .expect("second entry parses")
++        .expect("second entry exists");
++    assert!(!descriptor.has_data_descriptor());
++    assert!(deflated.has_data_descriptor());
++}
++
++#[test]
++fn owned_direct_reads_match_zip64_member_metadata() {
++    let materialized = open(ZIP64_BYTES.to_vec());
++    let owned = open(ZIP64_BYTES.to_vec());
++    assert!(materialized.archive_is_zip64());
++    assert!(materialized.has_zip64_metadata());
++    assert_eq!(
++        owned.read_owned("README").expect("direct ZIP64 read"),
++        materialized.read("README").expect("member-span ZIP64 read")
++    );
++}
++
++#[test]
++fn owned_direct_preserves_crc_failure_and_missing_member_identity() {
++    let mut bytes = descriptor_archive();
++    let (_, _, payload_start, _) = entry_offsets(&bytes, "stored.bin");
++    bytes[payload_start] ^= 0x80;
++
++    let materialized = open(bytes.clone());
++    let owned = open(bytes);
++    let materialized_error = materialized
++        .read("stored.bin")
++        .expect_err("corrupt Store payload must fail");
++    let owned_error = owned
++        .read_owned("stored.bin")
++        .expect_err("corrupt Store payload must fail");
++    assert_eq!(family(&materialized_error), "checksum");
++    assert_same_failure(&materialized_error, &owned_error);
++
++    let materialized = open(descriptor_archive());
++    let owned = open(descriptor_archive());
++    let materialized_error = materialized
++        .read("missing.bin")
++        .expect_err("missing member must fail");
++    let owned_error = owned
++        .read_owned("missing.bin")
++        .expect_err("missing member must fail");
++    assert_same_failure(&materialized_error, &owned_error);
++    assert_eq!(family(&owned_error), "not-found");
++}
++
++#[test]
++fn owned_direct_preserves_truncated_deflate_failure() {
++    let mut bytes = canonical_deflate_archive();
++    let (local, central, _, payload_end) = entry_offsets(&bytes, "truncated.bin");
++    let compressed_size = u32::from_le_bytes(bytes[local + 18..local + 22].try_into().unwrap());
++    assert!(
++        compressed_size > 1,
++        "fixture must have a truncatable stream"
++    );
++    let shortened = compressed_size - 1;
++    bytes[local + 18..local + 22].copy_from_slice(&shortened.to_le_bytes());
++    bytes[central + 20..central + 24].copy_from_slice(&shortened.to_le_bytes());
++    assert!(payload_end > 0);
++
++    let materialized = open(bytes.clone());
++    let owned = open(bytes);
++    let materialized_error = materialized
++        .read("truncated.bin")
++        .expect_err("shortened Deflate stream must fail");
++    let owned_error = owned
++        .read_owned("truncated.bin")
++        .expect_err("shortened Deflate stream must fail");
++    assert_same_failure(&materialized_error, &owned_error);
++}
++
++#[test]
++fn owned_direct_keeps_index_resource_limit_refusal_typed() {
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_stored("limited.bin", b"1234")
++        .expect("limit fixture");
++    let bytes = writer.finish_to_bytes().expect("fixture archive finishes");
++    let limits = ArchiveLimits {
++        max_entry_size: 3,
++        ..ArchiveLimits::UNBOUNDED
++    };
++
++    let materialized_error = open_with_limits(bytes.clone(), limits)
++        .expect_err("member-span index must enforce entry limit");
++    let owned_error =
++        open_with_limits(bytes, limits).expect_err("owned index must enforce entry limit");
++    assert_limit(&materialized_error, 4, 3);
++    assert_limit(&owned_error, 4, 3);
++    assert_same_failure(&materialized_error, &owned_error);
++}

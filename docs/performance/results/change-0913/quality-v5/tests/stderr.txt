@@ -1,0 +1,16 @@
+   Compiling litchi-xlsb v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xlsb)
+   Compiling soapberry-zip v0.0.1 (/tmp/litchi-0913-src/crates/soapberry-zip)
+   Compiling litchi-xlsx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xlsx)
+   Compiling litchi-docx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-docx)
+error: couldn't read `/tmp/litchi-0913-src/crates/litchi-xlsx/../../docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json`: No such file or directory (os error 2)
+  --> crates/litchi-xlsx/tests/form_control_scalar_lifecycle.rs:43:22
+   |
+43 |   const CORPUS: &str = include_str!(concat!(
+   |  ______________________^
+44 | |     env!("CARGO_MANIFEST_DIR"),
+45 | |     "/../../docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json"
+46 | | ));
+   | |__^
+
+error: could not compile `litchi-xlsx` (test "form_control_scalar_lifecycle") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

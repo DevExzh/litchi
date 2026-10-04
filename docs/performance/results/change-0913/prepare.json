@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "reconstructed_files": 9355,
+  "baseline_manifest_sha256": "7a6d1310fb97dde1f275ec8702efabbef2cfb643c9ee4c1178169fed53aa4586",
+  "source_root": "/tmp/litchi-0913-src",
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0913-build",
+  "worktrees_created": 0
+}

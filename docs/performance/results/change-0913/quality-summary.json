@@ -1,0 +1,198 @@
+{
+  "status": "pass",
+  "final_attempt": "quality-v8",
+  "commands": {
+    "fmt": {
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/fmt.py"
+      ],
+      "exit_code": 0
+    },
+    "tests": {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "--locked",
+        "--offline",
+        "--release",
+        "-j",
+        "2",
+        "--features",
+        "litchi-opc/sign,litchi-opc/performance-diagnostics"
+      ],
+      "exit_code": 0
+    },
+    "clippy": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--release",
+        "-j",
+        "2",
+        "--features",
+        "litchi-opc/sign,litchi-opc/performance-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    "docs": {
+      "argv": [
+        "cargo",
+        "doc",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "--release",
+        "-j",
+        "2",
+        "--features",
+        "litchi-opc/sign,litchi-opc/performance-diagnostics"
+      ],
+      "exit_code": 0
+    }
+  },
+  "earlier_attempts": [
+    {
+      "path": "quality",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": 101
+        }
+      ]
+    },
+    {
+      "path": "quality-v2",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": -2
+        }
+      ]
+    },
+    {
+      "path": "quality-v3",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": 101
+        }
+      ]
+    },
+    {
+      "path": "quality-v4",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": 101
+        }
+      ]
+    },
+    {
+      "path": "quality-v5",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": 101
+        }
+      ]
+    },
+    {
+      "path": "quality-v6",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": 101
+        }
+      ]
+    },
+    {
+      "path": "quality-v7",
+      "commands": [
+        {
+          "kind": "fmt",
+          "exit_code": 0
+        },
+        {
+          "kind": "tests",
+          "exit_code": 101
+        }
+      ]
+    }
+  ],
+  "test_suites": 330,
+  "tests": {
+    "passed": 8096,
+    "failed": 0,
+    "ignored": 50,
+    "measured": 0,
+    "filtered_out": 0
+  }
+}

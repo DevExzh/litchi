@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "parent": "66b944b07fcf4c6fa37f10e7ed83a02417455f57",
+  "added": [
+    {
+      "path": "docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json",
+      "bytes": 11467,
+      "sha256": "a0e5055863909579a8b325468e9729900b16c652d61743b6a050bd4d19777077",
+      "origin": "git"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+      "bytes": 12470,
+      "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+      "origin": "existing local LibreOffice test fixture",
+      "retained": "docs/performance/results/change-0913/quality-inputs/tdf169496_hidden_graphic.xlsx"
+    }
+  ]
+}

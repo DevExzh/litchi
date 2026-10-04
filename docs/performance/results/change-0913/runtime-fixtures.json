@@ -1,0 +1,40 @@
+{
+  "status": "pass",
+  "added": [
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx",
+      "bytes": 74104,
+      "sha256": "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d",
+      "retained": "docs/performance/results/change-0913/quality-inputs/svg.docx",
+      "origin": "existing local native test fixture"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx",
+      "bytes": 302210,
+      "sha256": "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283",
+      "retained": "docs/performance/results/change-0913/quality-inputs/tdf164835_nonDummyLineHeight.docx",
+      "origin": "existing local native test fixture"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
+      "bytes": 35202,
+      "sha256": "f717ca4657257b538466c772eca2a4d4886cb5b919c2ad5f044377fcee124fc8",
+      "retained": "docs/performance/results/change-0913/quality-inputs/tdf169496_hidden_graphic.pptx",
+      "origin": "existing local native test fixture"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx",
+      "bytes": 9579,
+      "sha256": "2525665a1e430a9ee543faf456424bd7b994cce0a2d76470a5a07453e3e2ab39",
+      "retained": "docs/performance/results/change-0913/quality-inputs/tdf163852.pptx",
+      "origin": "existing local native test fixture"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sd/qa/unit/data/pptx/tdf164622.pptx",
+      "bytes": 18696,
+      "sha256": "33b86388804554e35cb3b07e81cf5db5cb6bb02e76716c71f233b57325c2d199",
+      "retained": "docs/performance/results/change-0913/quality-inputs/tdf164622.pptx",
+      "origin": "existing local native test fixture"
+    }
+  ]
+}

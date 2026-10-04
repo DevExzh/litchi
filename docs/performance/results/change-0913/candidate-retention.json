@@ -1,0 +1,71 @@
+{
+  "status": "pass",
+  "purpose": "Historical candidate bytes; no dependency on later mutable root sources.",
+  "files": [
+    {
+      "logical_path": "crates/soapberry-zip/src/office.rs",
+      "original": {
+        "path": "crates/soapberry-zip/src/office.rs",
+        "bytes": 702248,
+        "sha256": "4fb6da379044e89f9606e362032ac1d0744c829289dc08c742e38b8e4c22b209"
+      },
+      "retained": {
+        "path": "docs/performance/results/change-0913/candidate-source/crates/soapberry-zip/src/office.rs",
+        "bytes": 702248,
+        "sha256": "4fb6da379044e89f9606e362032ac1d0744c829289dc08c742e38b8e4c22b209"
+      }
+    },
+    {
+      "logical_path": "crates/litchi-opc/src/payload.rs",
+      "original": {
+        "path": "crates/litchi-opc/src/payload.rs",
+        "bytes": 17074,
+        "sha256": "e055789a770a657c258afb45a5ba5b7502d3268a350bb221fb8cefd7a564902e"
+      },
+      "retained": {
+        "path": "docs/performance/results/change-0913/candidate-source/crates/litchi-opc/src/payload.rs",
+        "bytes": 17074,
+        "sha256": "e055789a770a657c258afb45a5ba5b7502d3268a350bb221fb8cefd7a564902e"
+      }
+    },
+    {
+      "logical_path": "crates/soapberry-zip/tests/owned_direct_read.rs",
+      "original": {
+        "path": "crates/soapberry-zip/tests/owned_direct_read.rs",
+        "bytes": 9896,
+        "sha256": "d025b4a885a027e2734ffd460d88a071295f8548a29cb690717deb74e28252b0"
+      },
+      "retained": {
+        "path": "docs/performance/results/change-0913/candidate-source/crates/soapberry-zip/tests/owned_direct_read.rs",
+        "bytes": 9896,
+        "sha256": "d025b4a885a027e2734ffd460d88a071295f8548a29cb690717deb74e28252b0"
+      }
+    },
+    {
+      "logical_path": "crates/litchi-opc/tests/owned_direct_concurrency.rs",
+      "original": {
+        "path": "crates/litchi-opc/tests/owned_direct_concurrency.rs",
+        "bytes": 9029,
+        "sha256": "240c258b2c37a949ffeed05f95dec04bc931a6f260c309b1bdd52c94d1fcc637"
+      },
+      "retained": {
+        "path": "docs/performance/results/change-0913/candidate-source/crates/litchi-opc/tests/owned_direct_concurrency.rs",
+        "bytes": 9029,
+        "sha256": "240c258b2c37a949ffeed05f95dec04bc931a6f260c309b1bdd52c94d1fcc637"
+      }
+    },
+    {
+      "logical_path": "crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+      "original": {
+        "path": "crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+        "bytes": 9756,
+        "sha256": "313b30201cfa71da020a24caf1ae635acf67d9d4fb7ac24d83a498930f1b970f"
+      },
+      "retained": {
+        "path": "docs/performance/results/change-0913/candidate-source/crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+        "bytes": 9756,
+        "sha256": "313b30201cfa71da020a24caf1ae635acf67d9d4fb7ac24d83a498930f1b970f"
+      }
+    }
+  ]
+}

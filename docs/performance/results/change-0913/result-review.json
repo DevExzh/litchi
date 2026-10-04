@@ -1,0 +1,334 @@
+{
+  "capture": {
+    "all_children_passed": true,
+    "census_expected_changed_members": 8,
+    "census_members": 445,
+    "census_unchanged_members": 437,
+    "censuses": 4,
+    "children": 48,
+    "guarded_operations": 2400,
+    "independent_metric_groups": 40,
+    "measured_samples": 960
+  },
+  "evidence": {
+    "analysis": {
+      "bytes": 614975,
+      "path": "docs/performance/results/change-0913/analysis.json",
+      "sha256": "21ce18d6536d392a018f583f66ff975dc978760a0473d8b65bae42c32d955123"
+    },
+    "candidate_retention": {
+      "bytes": 2819,
+      "path": "docs/performance/results/change-0913/candidate-retention.json",
+      "sha256": "842147a6d8f97f3894b015700d30c078e811f8634d066d356a802d10ec5cc99d"
+    },
+    "cleanup": {
+      "bytes": 418,
+      "path": "docs/performance/results/change-0913/cleanup.json",
+      "sha256": "8b96fdcb596e79a952211534e4d98f9111b52f9c33f6c1e9eb2e36ffbd1dad36"
+    },
+    "decision": {
+      "bytes": 4301,
+      "path": "docs/performance/results/change-0913/decision.json",
+      "sha256": "623900749448cc7109789ab5887dcf483522c0490bd99569cead32ca12bcd1d2"
+    },
+    "independent_comparison": {
+      "bytes": 572,
+      "path": "docs/performance/results/change-0913/independent-comparison.json",
+      "sha256": "3fa5e283d1bcb8775277669e39a01ef349a809758ce8edd09473d58ef8aa6d2a"
+    },
+    "independent_statistics": {
+      "bytes": 60742,
+      "path": "docs/performance/results/change-0913/independent-stats.json",
+      "sha256": "6bb6ff31031929f27c1a0489e9b64861b7fbabaa53fc97f77b596b53fb61c151"
+    },
+    "iwa_cleanup": {
+      "bytes": 377,
+      "path": "docs/performance/results/change-0913/iwa-cleanup.json",
+      "sha256": "e42d178a950c9e0fa9c1c59794ffaaf8057110795a7790ee09f6840e9d6592f8"
+    },
+    "iwa_replay": {
+      "bytes": 2401,
+      "path": "docs/performance/results/change-0913/iwa-replay.json",
+      "sha256": "27e823a2e1fda3229f3985d12750d11793688182d7f634b3986453e0541f590e"
+    },
+    "iwa_resolution": {
+      "bytes": 1952,
+      "path": "docs/performance/results/change-0913/iwa-resolution-after.json",
+      "sha256": "9e454e092ab4f304f23de4afbc506d66d135db191e2d14d7b9bfc92e7b667126"
+    },
+    "quality_summary": {
+      "bytes": 3495,
+      "path": "docs/performance/results/change-0913/quality-summary.json",
+      "sha256": "463585daec4b54fb8e9e0df382d2ad8109349580d6e725c20682f2ae16c05731"
+    },
+    "replay_after_cleanup": {
+      "bytes": 1882,
+      "path": "docs/performance/results/change-0913/replay-after-cleanup.json",
+      "sha256": "1f6c44b4f2141769abb37789616597a23121d7d81f4d7f1e05a3d439acde66ad"
+    },
+    "replay_before_cleanup": {
+      "bytes": 1882,
+      "path": "docs/performance/results/change-0913/replay-before-cleanup.json",
+      "sha256": "1f6c44b4f2141769abb37789616597a23121d7d81f4d7f1e05a3d439acde66ad"
+    },
+    "source_recovery": {
+      "bytes": 1120,
+      "path": "docs/performance/results/change-0913/source-recovery.json",
+      "sha256": "c234eb5ec8abb9eb4f36b622fbbe6ce1be9437eac84584ee3e4ca2fbd1834c63"
+    },
+    "span_eligibility": {
+      "bytes": 91120,
+      "path": "docs/performance/results/change-0913/span-eligibility.json",
+      "sha256": "167a7c3d5ad390e3fac699b94d574fc548c5cd5b53dd9056c0fc3c1ca194e818"
+    }
+  },
+  "final_report": {
+    "bytes": 11248,
+    "path": "docs/performance/0913-pptx-owned-direct-read.md",
+    "sha256": "f188885085ce663cbced23da2d5a38428a05c5d1c7d5523ac647e6d1e6d9c3cd"
+  },
+  "gate_review": {
+    "allocation_or_peak_live_measurement": false,
+    "flags": [
+      {
+        "baseline_p95": 2915965,
+        "candidate_over_baseline": 1.055123432551488,
+        "candidate_p95": 3076703,
+        "kind": "candidate_p95_regression_over_5_percent",
+        "metric": "clone_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 3149513,
+        "candidate_over_baseline": 1.1041119690568033,
+        "candidate_p99": 3477415,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "clone_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p95": 6542008,
+        "candidate_over_baseline": 1.076658879047534,
+        "candidate_p95": 7043511,
+        "kind": "candidate_p95_regression_over_5_percent",
+        "metric": "ingress_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 6844636,
+        "candidate_over_baseline": 1.1148603081303374,
+        "candidate_p99": 7630813,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "ingress_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 15031437,
+        "candidate_over_baseline": 1.0961711777789442,
+        "candidate_p99": 16477028,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "snapshot_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 3226834,
+        "candidate_over_baseline": 1.3093453211414037,
+        "candidate_p99": 4225040,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "ingress_ns",
+        "route": "owned"
+      },
+      {
+        "baseline_p99": 16408240,
+        "candidate_over_baseline": 1.1682628362335021,
+        "candidate_p99": 19169137,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "snapshot_ns",
+        "route": "owned"
+      },
+      {
+        "baseline_p99": 6195867,
+        "candidate_over_baseline": 1.5352093581092041,
+        "candidate_p99": 9511953,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "publish_ns",
+        "route": "owned"
+      },
+      {
+        "baseline_p99": 34467653,
+        "candidate_over_baseline": 1.4626319059206032,
+        "candidate_p99": 50413489,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "total_ns",
+        "route": "owned"
+      }
+    ],
+    "flags_over_five_percent": 9,
+    "materialized_total_bootstrap_lower_bound": 0.9730520628620976,
+    "materialized_total_bootstrap_upper_bound": 0.9901747761629278,
+    "materialized_total_ratio": 0.984089747530512,
+    "owned_total_bootstrap_lower_bound": 0.9733079247831775,
+    "owned_total_bootstrap_upper_bound": 1.0174857562044162,
+    "owned_total_ci_lower_above_one": false,
+    "owned_total_gate_pass": false,
+    "owned_total_median": 1.005714080656532,
+    "owned_total_median_practical_target_met": false,
+    "ratio_direction": "baseline over candidate, within each route",
+    "required_lower_bound_above_one": true,
+    "required_owned_total_median": 1.05,
+    "rss_over_five_percent_regression": false
+  },
+  "helper_review": {
+    "existing_worktree_file_bytes_checked": true,
+    "foreign_untracked_files_preserved": true,
+    "integrate_static_review_pass": true,
+    "private_index_and_normal_index_lock_reviewed": true,
+    "review_workload_or_build_run": false,
+    "seal_static_review_pass": true
+  },
+  "helpers": {
+    "integrate": {
+      "bytes": 3753,
+      "path": "docs/performance/results/change-0913/integrate.py",
+      "sha256": "5ecb385a4a6422f6e2688167a8aee3c2d3b2a4a5ff95256b675ec5e925d2b3e4"
+    },
+    "iwa_replay": {
+      "bytes": 18500,
+      "path": "docs/performance/results/change-0913/iwa-replay.py",
+      "sha256": "a34e03cef10e939995b9f1ca66b720380b458783b5cffacc60902fc539e670bf"
+    },
+    "replay": {
+      "bytes": 49221,
+      "path": "docs/performance/results/change-0913/replay.py",
+      "sha256": "cbbf4e2a5a4fc821288e64e28e9ce32aefe47f6c3fc2ccf4a5e2d786a4f26d88"
+    },
+    "seal": {
+      "bytes": 6139,
+      "path": "docs/performance/results/change-0913/seal.py",
+      "sha256": "508960978ee5e3f9e4c7ac3ae84a9aef6e603f70997f75c3d48fb3795e2507b6"
+    },
+    "span_eligibility": {
+      "bytes": 3052,
+      "path": "docs/performance/results/change-0913/span-eligibility.py",
+      "sha256": "a551a47899a9f55e4a937eb06bde2f8d4c0c1ea445feaeaa8652be2344c5f71b"
+    }
+  },
+  "iwa": {
+    "cleanup_evidence": {
+      "bytes": 377,
+      "path": "docs/performance/results/change-0913/iwa-cleanup.json",
+      "sha256": "e42d178a950c9e0fa9c1c59794ffaaf8057110795a7790ee09f6840e9d6592f8"
+    },
+    "commit": "1b12cef9a97bbe3597039f7e3caadc2c45c905ce",
+    "parent": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+    "replay_evidence": {
+      "bytes": 2401,
+      "path": "docs/performance/results/change-0913/iwa-replay.json",
+      "sha256": "27e823a2e1fda3229f3985d12750d11793688182d7f634b3986453e0541f590e"
+    },
+    "resolution_evidence": {
+      "bytes": 1952,
+      "path": "docs/performance/results/change-0913/iwa-resolution-after.json",
+      "sha256": "9e454e092ab4f304f23de4afbc506d66d135db191e2d14d7b9bfc92e7b667126"
+    },
+    "separate_from_performance_result": true,
+    "tests_passed": 302
+  },
+  "outcome": {
+    "actual_no_adoption": true,
+    "candidate_adopted": false,
+    "decision": "rejected",
+    "new_speedup_claim": false,
+    "reason": "Frozen owned-route practical and confidence gates both failed; candidate-specific production and test files restored to parent."
+  },
+  "quality": {
+    "failed": 0,
+    "final_attempt": "quality-v8",
+    "ignored": 50,
+    "test_suites": 330,
+    "tests_passed": 8096
+  },
+  "restoration_and_custody": {
+    "candidate_production_paths_bound": [],
+    "candidate_retained_files_are_the_only_candidate_source_binding": true,
+    "production_candidate_adopted": false,
+    "restored_parent_records": [
+      {
+        "action": "restored parent",
+        "bytes": 699729,
+        "path": "crates/soapberry-zip/src/office.rs",
+        "sha256": "f72bfef6e6a072b3e88c465afb1358e4f77046e37c606ed3902fe3a1621ceac3"
+      },
+      {
+        "action": "restored parent",
+        "bytes": 17068,
+        "path": "crates/litchi-opc/src/payload.rs",
+        "sha256": "fc6e468322dcc2939b5eeb2d88ca1401fdb5c93849a131947e3e36de85779998"
+      },
+      {
+        "action": "removed candidate-only test",
+        "path": "crates/soapberry-zip/tests/owned_direct_read.rs"
+      },
+      {
+        "action": "removed candidate-only test",
+        "path": "crates/litchi-opc/tests/owned_direct_concurrency.rs"
+      },
+      {
+        "action": "removed candidate-only test",
+        "path": "crates/soapberry-zip/tests/owned_direct_adversarial.rs"
+      }
+    ],
+    "retained_candidate_files": [
+      {
+        "bytes": 702248,
+        "path": "docs/performance/results/change-0913/candidate-source/crates/soapberry-zip/src/office.rs",
+        "sha256": "4fb6da379044e89f9606e362032ac1d0744c829289dc08c742e38b8e4c22b209"
+      },
+      {
+        "bytes": 17074,
+        "path": "docs/performance/results/change-0913/candidate-source/crates/litchi-opc/src/payload.rs",
+        "sha256": "e055789a770a657c258afb45a5ba5b7502d3268a350bb221fb8cefd7a564902e"
+      },
+      {
+        "bytes": 9896,
+        "path": "docs/performance/results/change-0913/candidate-source/crates/soapberry-zip/tests/owned_direct_read.rs",
+        "sha256": "d025b4a885a027e2734ffd460d88a071295f8548a29cb690717deb74e28252b0"
+      },
+      {
+        "bytes": 9029,
+        "path": "docs/performance/results/change-0913/candidate-source/crates/litchi-opc/tests/owned_direct_concurrency.rs",
+        "sha256": "240c258b2c37a949ffeed05f95dec04bc931a6f260c309b1bdd52c94d1fcc637"
+      },
+      {
+        "bytes": 9756,
+        "path": "docs/performance/results/change-0913/candidate-source/crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+        "sha256": "313b30201cfa71da020a24caf1ae635acf67d9d4fb7ac24d83a498930f1b970f"
+      }
+    ]
+  },
+  "review_markdown": {
+    "bytes": 2845,
+    "path": "docs/performance/results/change-0913/result-review.md",
+    "sha256": "9d501a85ab5c142bd18a457e74ce6c81313614b70590b2d1c28f138474df42fe"
+  },
+  "review_status": "pass",
+  "schema": "litchi.performance.0913.result-review.v1",
+  "source_eligibility_review": {
+    "eligible_file_members": 437,
+    "evidence": {
+      "bytes": 91120,
+      "path": "docs/performance/results/change-0913/span-eligibility.json",
+      "sha256": "167a7c3d5ad390e3fac699b94d574fc548c5cd5b53dd9056c0fc3c1ca194e818"
+    },
+    "media_all_already_passthrough": true,
+    "media_compressed_bytes_each": 2097797,
+    "media_compressed_bytes_total": 16782376,
+    "media_decoded_bytes_total": 16777216,
+    "media_members": 8,
+    "member_count": 445,
+    "not_dynamic_call_or_copy_count": true,
+    "one_read_per_eligible_file_span_bytes": 211315,
+    "scope": "Static per-physical-member admission bound; not measured calls, allocation counts, or dynamic copied bytes."
+  },
+  "status": "pass"
+}

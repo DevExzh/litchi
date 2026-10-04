@@ -1,0 +1,21 @@
+{
+  "status": "authorized",
+  "request": "Resolve the iWork cherry-pick as well.",
+  "recorded_utc": "2026-10-04T17:34:15.379846+00:00",
+  "head_before": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "cherry_pick": "f2869418f0038098f4e4934b406c892ca0fe78fd",
+  "index_before_sha256": "1fa921e90b0e01ef746c28a1ec694cc00b2b8785edce496ce2d7f03a60881f39",
+  "staged_paths": [
+    "crates/litchi-iwa-archive/src/ingress.rs",
+    "crates/litchi-iwa-archive/src/lib.rs",
+    "crates/litchi-iwa-archive/src/package.rs",
+    "crates/litchi-iwa-core/src/archive.rs",
+    "crates/litchi-iwa-core/src/archive/ingress.rs",
+    "crates/litchi-iwa-core/src/lib.rs",
+    "crates/litchi-iwa-core/src/snappy.rs"
+  ],
+  "unmerged_paths": [
+    "crates/litchi-iwa-core/src/archive.rs",
+    "crates/litchi-iwa-core/src/lib.rs"
+  ]
+}

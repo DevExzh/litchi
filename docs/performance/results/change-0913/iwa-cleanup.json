@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "worktrees_created": 1,
+  "worktrees_removed": 1,
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution",
+      "files": 10893,
+      "logical_bytes": 271943971
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0913-iwa-build",
+      "files": 2682,
+      "logical_bytes": 877242207
+    }
+  ]
+}

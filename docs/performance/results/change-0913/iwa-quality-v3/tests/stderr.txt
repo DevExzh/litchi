@@ -1,0 +1,111 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling cfg-if v1.0.4
+   Compiling typenum v1.20.1
+   Compiling syn v2.0.114
+   Compiling libc v0.2.189
+   Compiling foldhash v0.1.5
+   Compiling bytes v1.12.1
+   Compiling rustversion v1.0.23
+   Compiling anyhow v1.0.104
+   Compiling hashbrown v0.15.5
+   Compiling getrandom v0.3.4
+   Compiling thiserror v2.0.18
+   Compiling rustix v1.1.4
+   Compiling either v1.18.0
+   Compiling once_cell v1.21.4
+   Compiling simdutf8 v0.1.5
+   Compiling smoothutf8 v0.2.3
+   Compiling itertools v0.14.0
+   Compiling thiserror-impl v2.0.18
+   Compiling hybrid-array v0.4.14
+   Compiling prettyplease v0.2.37
+   Compiling linux-raw-sys v0.12.1
+   Compiling bitflags v2.13.1
+   Compiling prost-derive v0.14.4
+   Compiling fastrand v2.5.0
+   Compiling serde_core v1.0.229
+   Compiling cpufeatures v0.3.1
+   Compiling buffa v0.9.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.16.1
+   Compiling const-oid v0.10.2
+   Compiling regex-syntax v0.8.11
+   Compiling autocfg v1.5.1
+   Compiling num-traits v0.2.19
+   Compiling digest v0.11.3
+   Compiling indexmap v2.11.4
+   Compiling buffa-descriptor v0.9.1
+   Compiling regex-automata v0.4.18
+   Compiling tempfile v3.27.0
+   Compiling prost v0.14.4
+   Compiling syn v3.0.4
+   Compiling serde v1.0.229
+   Compiling fixedbitset v0.5.7
+   Compiling petgraph v0.8.3
+   Compiling prost-types v0.14.4
+   Compiling serde_derive v1.0.229
+   Compiling regex v1.13.1
+   Compiling buffa-codegen v0.9.1
+   Compiling sha2 v0.11.0
+   Compiling multimap v0.10.1
+   Compiling heck v0.5.0
+   Compiling version_check v0.9.5
+   Compiling log v0.4.29
+   Compiling prost-build v0.14.4
+   Compiling generic-array v0.14.9
+   Compiling buffa-build v0.9.1
+   Compiling crossbeam-utils v0.8.22
+   Compiling iana-time-zone v0.1.65
+   Compiling chrono v0.4.45
+   Compiling litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-protos)
+   Compiling crossbeam-epoch v0.9.20
+   Compiling snap v1.1.2
+   Compiling crossbeam-deque v0.8.7
+   Compiling ryu v1.0.22
+   Compiling litchi-iwa-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-common)
+   Compiling rand_core v0.10.1
+   Compiling zmij v1.0.19
+   Compiling rayon-core v1.13.0
+   Compiling getrandom v0.4.3
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling serde_json v1.0.149
+   Compiling zerocopy v0.8.56
+   Compiling crc32fast v1.5.1
+   Compiling digest v0.10.7
+   Compiling chacha20 v0.10.2
+   Compiling cpufeatures v0.2.17
+   Compiling zlib-rs v0.6.7
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling rayon v1.12.0
+   Compiling flate2 v1.1.10
+   Compiling sha2 v0.10.9
+   Compiling rand v0.10.2
+   Compiling smallvec v1.16.0
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-core)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/soapberry-zip)
+   Compiling litchi-iwa-package v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-package)
+   Compiling litchi-iwa-cache v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-cache)
+   Compiling litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-core)
+   Compiling litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-archive)
+    Finished `test` profile [unoptimized] target(s) in 51.28s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/litchi_iwa_archive-beda9e85c8a53410)
+     Running tests/adversarial_limits.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/adversarial_limits-48698b9b7f96373e)
+     Running tests/core_type_routes.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/core_type_routes-83e10268d53c187a)
+     Running tests/native_iwa_preservation.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/native_iwa_preservation-202677c4a7f75b5c)
+     Running tests/package_aliases.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/package_aliases-3b5bf5a228b684ff)
+     Running tests/package_state_atomicity.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/package_state_atomicity-f99d1f3498a59ef5)
+     Running unittests examples/compare_iwa_packages.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/examples/compare_iwa_packages-4b5625352a34121c)
+     Running unittests examples/native_noop.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/examples/native_noop-8856cc5761ab8b85)
+     Running unittests examples/preserve_iwork.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/examples/preserve_iwork-a471e688c35676a4)
+     Running unittests examples/roundtrip_iwork.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/examples/roundtrip_iwork-10718966b533df7f)
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/litchi_iwa_core-924b52c27f7c38b7)
+     Running tests/archive_object_clone.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/archive_object_clone-7dd97f8c553afffe)
+     Running tests/framing.rs (/home/zhuhe/code/litchi/target/litchi-0913-iwa-build/debug/deps/framing-7ead20c5cc72b627)

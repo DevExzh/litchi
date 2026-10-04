@@ -1,0 +1,51 @@
+{
+  "status": "pass",
+  "source_file_count": 9358,
+  "baseline_source_file_count": 9355,
+  "source_manifest": "source-v1.json",
+  "baseline_source_manifest": "docs/performance/results/change-0910/source-v1.json",
+  "candidate_overlay_count": 4,
+  "candidate_overlay_paths": [
+    "crates/soapberry-zip/src/office.rs",
+    "crates/litchi-opc/src/payload.rs",
+    "crates/soapberry-zip/tests/owned_direct_read.rs",
+    "crates/litchi-opc/tests/owned_direct_concurrency.rs"
+  ],
+  "old_build_receipts_checked": 1,
+  "candidate_build_receipts_checked": 1,
+  "baseline_binary": {
+    "path": "docs/performance/results/change-0910/binaries/native",
+    "bytes": 9301456,
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "candidate_binary": {
+    "path": "docs/performance/results/change-0913/binaries/candidate",
+    "bytes": 9314448,
+    "sha256": "1d6c3cc5630d4d16a2b6088b4d44bd9b19d728bda975608cd859407f02cd8336"
+  },
+  "capture_command_receipts_checked": 48,
+  "capture_stdout_stderr_receipts_checked": 96,
+  "capture_artifacts_checked": 144,
+  "capture_process_metrics_checked": 48,
+  "quality_attempts_checked": 8,
+  "quality_command_receipts_checked": 18,
+  "quality_failed_attempts_retained": 7,
+  "quality_final_attempt": "quality-v8",
+  "census_runs_checked": 4,
+  "census_reports_byte_exact": true,
+  "temporary_fixture_files_checked": 1445,
+  "runtime_fixture_files_checked": 5,
+  "source_recovery_checked": true,
+  "independent_statistics_byte_exact": true,
+  "iwa_commit_replay_byte_exact": true,
+  "span_eligibility_replay_byte_exact": true,
+  "analysis_byte_exact": true,
+  "analysis": {
+    "bytes": 614975,
+    "sha256": "21ce18d6536d392a018f583f66ff975dc978760a0473d8b65bae42c32d955123",
+    "checks": 15
+  },
+  "deleted_source_root_used": false,
+  "deleted_build_root_used": false,
+  "build_or_workload_or_profiler_run": false
+}

@@ -1,0 +1,50 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "-p",
+    "litchi-iwa-core",
+    "-p",
+    "litchi-iwa-archive",
+    "--locked",
+    "--offline",
+    "--all-features",
+    "-j",
+    "2",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution",
+  "start_utc": "2026-10-04T17:46:13.078241+00:00",
+  "end_utc": "2026-10-04T17:46:15.648120+00:00",
+  "exit_code": 0,
+  "helper": {
+    "path": "docs/performance/results/change-0913/iwa-quality-v4.py",
+    "bytes": 2916,
+    "sha256": "1d53163a06bedf89a21a3a62ef7e3b1ad18ba288978afdab77f88c7d98c2f247"
+  },
+  "source": {
+    "path": "docs/performance/results/change-0913/iwa-quality-source-v4.json",
+    "bytes": 2001,
+    "sha256": "7c3a0b394822c380a4a7045cc0d2ea608a90351aa181bf24aa09916df7b22bee"
+  },
+  "quality_lock": {
+    "path": "docs/performance/results/change-0913/iwa-lock-update/command.json",
+    "bytes": 1028,
+    "sha256": "0326b4996a7285c528465f80a934013f8da193b426f2b9c64ea7dda1d70abaf8"
+  },
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0913/iwa-quality-v4/clippy/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0913/iwa-quality-v4/clippy/stderr.txt",
+      "bytes": 310,
+      "sha256": "eacc889ffcceba59e75e0d14a6673af96a0843fc107dd45727e9d669eca81560"
+    }
+  ]
+}

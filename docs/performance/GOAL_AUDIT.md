@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0913 — rejected input-span hypothesis and completed requested integration
+
+[0913](0913-pptx-owned-direct-read.md) closes the proposed copy-bypass experiment
+without adopting unproved complexity. The candidate passed correctness but
+failed both native admission conditions. Static eligibility limits the
+mechanism to small members. Broader CRUD, producer, cold/range, allocation and
+scaling coverage remains open; ODF is deferred. The separately requested iWork
+cherry-pick passed 302 tests and quality gates; it adds no performance claim.
+
 ## 0912 — native backend witness and implementable payload candidate
 
 [0912](0912-pptx-native-sha-dispatch.md) resolves backend reachability for two

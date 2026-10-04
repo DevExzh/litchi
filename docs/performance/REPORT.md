@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0913 — failed native gate, production restored
+
+[0913](0913-pptx-owned-direct-read.md) retains 48 matched processes, independent
+statistics, four raw preservation censuses and 8,096 passing Office tests.
+The owned ratio 1.005714× (95% interval 0.973308–1.017486) fails adoption; all
+nine tail flags remain disclosed. Production code is restored. Separately, the
+user-requested iWork cherry-pick is resolved and its temporary worktree removed.
+
 ## 0912 — dispatch uncertainty resolved, native attribution still open
 
 [0912](0912-pptx-native-sha-dispatch.md) retains a rejected perf attempt and two

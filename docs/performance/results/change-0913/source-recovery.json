@@ -1,0 +1,29 @@
+{
+  "status": "pass",
+  "reason": "Temporary source observed absent after environment continuation; cause unknown. No deliberate cleanup receipt existed.",
+  "source_root": "/tmp/litchi-0913-src",
+  "baseline_files": 9355,
+  "candidate_files": 9358,
+  "quality_files": 10803,
+  "helper": {
+    "path": "docs/performance/results/change-0913/recover-source.py",
+    "bytes": 3770,
+    "sha256": "1618b01aeef21f61fb471aacb940e40e57ad02dd05d99f198008283e1afc2dc1"
+  },
+  "source": {
+    "path": "docs/performance/results/change-0913/source-v1.json",
+    "bytes": 1758278,
+    "sha256": "68de7c9416ba7763606a64780bde4e3de8476b02a809234b4a36975b9612af82"
+  },
+  "supplemental_revision": {
+    "path": "docs/performance/results/change-0913/supplemental-owned-direct-adversarial-v2.json",
+    "bytes": 760,
+    "sha256": "888acfae55cc22c151cf654aa0a0636fe02a07033c5514e3780a79bcd53a811d"
+  },
+  "production_changes": false,
+  "candidate_binary": {
+    "path": "docs/performance/results/change-0913/binaries/candidate",
+    "bytes": 9314448,
+    "sha256": "1d6c3cc5630d4d16a2b6088b4d44bd9b19d728bda975608cd859407f02cd8336"
+  }
+}

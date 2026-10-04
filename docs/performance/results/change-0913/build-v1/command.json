@@ -1,0 +1,86 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--manifest-path",
+    "/tmp/litchi-0913-src/tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--release",
+    "--example",
+    "pptx_owned_benchmark",
+    "-j",
+    "2"
+  ],
+  "baseline_binary": {
+    "bytes": 9301456,
+    "path": "docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "binary": {
+    "bytes": 9314448,
+    "path": "target/litchi-0913-build/release/examples/pptx_owned_benchmark",
+    "sha256": "1d6c3cc5630d4d16a2b6088b4d44bd9b19d728bda975608cd859407f02cd8336"
+  },
+  "cwd": "/tmp/litchi-0913-src",
+  "end_utc": "2026-10-04T10:39:01.427578+00:00",
+  "environment_overrides": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0913-build",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "helper": {
+    "bytes": 18777,
+    "path": "docs/performance/results/change-0913/run.py",
+    "sha256": "aba6069edf063377c1d0fec408779a28fa85acd1d2118ce37b7da9b0c411d9c1"
+  },
+  "logs": [
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0913/build-v1/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 7834,
+      "path": "docs/performance/results/change-0913/build-v1/stderr.txt",
+      "sha256": "158cb05d441d870d299a044936746c9254c3acd7ae9d80b81ead6a4c1e75f69a"
+    }
+  ],
+  "plan": {
+    "bytes": 10141,
+    "path": "docs/performance/results/change-0913/capture-plan.json",
+    "sha256": "56ab8a214388fdc8686e7ad3fbc0077a36e23a1213a29ba99dc6df8c003c054f"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "retained_binary": {
+    "bytes": 9314448,
+    "path": "docs/performance/results/change-0913/binaries/candidate",
+    "sha256": "1d6c3cc5630d4d16a2b6088b4d44bd9b19d728bda975608cd859407f02cd8336"
+  },
+  "source": {
+    "bytes": 1758278,
+    "path": "docs/performance/results/change-0913/source-v1.json",
+    "sha256": "68de7c9416ba7763606a64780bde4e3de8476b02a809234b4a36975b9612af82"
+  },
+  "start_utc": "2026-10-04T10:29:13.561951+00:00",
+  "toolchain": {
+    "cargo": {
+      "launcher": "/home/zhuhe/.cargo/bin/cargo",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    "rustc": {
+      "launcher": "/home/zhuhe/.cargo/bin/rustc",
+      "version": "rustc 1.95.0 (59807616e 2026-04-14)"
+    }
+  }
+}

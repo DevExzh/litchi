@@ -1,0 +1,170 @@
+{
+  "status": "pass",
+  "helper": {
+    "path": "docs/performance/results/change-0913/census.py",
+    "bytes": 2467,
+    "sha256": "1847e379a48f47841cb9fe0466960c6731efbf084b16e09de3fdf6e030f5e15c"
+  },
+  "runs": [
+    {
+      "label": "materialized-baseline",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-00-pair-00-materialized-baseline/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-00-pair-00-materialized-baseline/artifacts/output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-materialized-baseline.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-materialized-baseline.json\n",
+      "stderr": "",
+      "helper": {
+        "path": "docs/performance/results/change-0909/zip-census.py",
+        "bytes": 29840,
+        "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+      },
+      "report": {
+        "path": "docs/performance/results/change-0913/census-materialized-baseline.json",
+        "bytes": 3682305,
+        "sha256": "fd90d6655060f1f23ad2a842ff22fb561a59a1f82bc0668ced04424c6bc0fe5f"
+      },
+      "physical_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "unchanged_members": 437
+    },
+    {
+      "label": "materialized-candidate",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-00-pair-00-materialized-candidate/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-00-pair-00-materialized-candidate/artifacts/output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-materialized-candidate.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-materialized-candidate.json\n",
+      "stderr": "",
+      "helper": {
+        "path": "docs/performance/results/change-0909/zip-census.py",
+        "bytes": 29840,
+        "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+      },
+      "report": {
+        "path": "docs/performance/results/change-0913/census-materialized-candidate.json",
+        "bytes": 3682307,
+        "sha256": "6f7a2de680b7ab3fe7c76af4546b2574ca3c21c7a72a563508eaec647bd6e8cb"
+      },
+      "physical_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "unchanged_members": 437
+    },
+    {
+      "label": "owned-baseline",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-01-pair-00-owned-baseline/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-01-pair-00-owned-baseline/artifacts/output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-owned-baseline.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-owned-baseline.json\n",
+      "stderr": "",
+      "helper": {
+        "path": "docs/performance/results/change-0909/zip-census.py",
+        "bytes": 29840,
+        "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+      },
+      "report": {
+        "path": "docs/performance/results/change-0913/census-owned-baseline.json",
+        "bytes": 3682291,
+        "sha256": "a57719939dfc71c6e99165dd8a2e8002f564c7f33678cc840c7146d0e65bd999"
+      },
+      "physical_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "unchanged_members": 437
+    },
+    {
+      "label": "owned-candidate",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-01-pair-00-owned-candidate/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-01-pair-00-owned-candidate/artifacts/output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-owned-candidate.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0913/census-owned-candidate.json\n",
+      "stderr": "",
+      "helper": {
+        "path": "docs/performance/results/change-0909/zip-census.py",
+        "bytes": 29840,
+        "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+      },
+      "report": {
+        "path": "docs/performance/results/change-0913/census-owned-candidate.json",
+        "bytes": 3682293,
+        "sha256": "ad5e3766d94957eaf159abb4dc942bea8e90dd0030565c41b5208f9ac1f37839"
+      },
+      "physical_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "unchanged_members": 437
+    }
+  ]
+}

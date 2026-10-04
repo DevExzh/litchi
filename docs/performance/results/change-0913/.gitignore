@@ -1,0 +1,3 @@
+binaries/
+**/*.pptx
+!quality-inputs/*.pptx

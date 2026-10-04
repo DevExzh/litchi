@@ -1,0 +1,117 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "max_rss_kib=%M\nuser_seconds=%U\nsystem_seconds=%S\nelapsed_seconds=%e\nmajor_faults=%F\nminor_faults=%R\nvoluntary_context_switches=%w\ninvoluntary_context_switches=%c",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/process.txt",
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0913/binaries/candidate",
+    "materialized",
+    "30",
+    "20",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/artifacts"
+  ],
+  "artifacts": [
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 10744,
+      "path": "docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/artifacts/report.json",
+      "sha256": "7cecee76938c5687830a86e6565dfa3f0e557e8911b36a206af957d914baa74d"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    }
+  ],
+  "baseline_binary": {
+    "bytes": 9301456,
+    "path": "docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "binary": {
+    "bytes": 9314448,
+    "path": "docs/performance/results/change-0913/binaries/candidate",
+    "sha256": "1d6c3cc5630d4d16a2b6088b4d44bd9b19d728bda975608cd859407f02cd8336"
+  },
+  "build_helper": {
+    "bytes": 18777,
+    "path": "docs/performance/results/change-0913/run.py",
+    "sha256": "aba6069edf063377c1d0fec408779a28fa85acd1d2118ce37b7da9b0c411d9c1"
+  },
+  "candidate_binary": {
+    "bytes": 9314448,
+    "path": "docs/performance/results/change-0913/binaries/candidate",
+    "sha256": "1d6c3cc5630d4d16a2b6088b4d44bd9b19d728bda975608cd859407f02cd8336"
+  },
+  "cwd": "/tmp/litchi-0913-src",
+  "end_utc": "2026-10-04T17:56:30.588523+00:00",
+  "environment_is_complete": true,
+  "environment_overrides": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "helper": {
+    "bytes": 2368,
+    "path": "docs/performance/results/change-0913/capture.py",
+    "sha256": "b5b86e74c58b75cda0cf6e41862bb9771ebe6fd04967471a7216995b429889f1"
+  },
+  "host_environment": {
+    "bytes": 4824,
+    "path": "docs/performance/results/change-0913/environment-after-recovery.json",
+    "sha256": "7951bd49e85ef1d0e61a3daace59522e6467658c5d194eb7be5efc81d6f368e5"
+  },
+  "leg": {
+    "block": 10,
+    "label": "block-10-pair-05-materialized-candidate",
+    "pair": 5,
+    "position": 0,
+    "route": "materialized",
+    "variant": "candidate"
+  },
+  "logs": [
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "plan": {
+    "bytes": 10141,
+    "path": "docs/performance/results/change-0913/capture-plan.json",
+    "sha256": "56ab8a214388fdc8686e7ad3fbc0077a36e23a1213a29ba99dc6df8c003c054f"
+  },
+  "process_metrics": {
+    "bytes": 176,
+    "path": "docs/performance/results/change-0913/capture/block-10-pair-05-materialized-candidate/process.txt",
+    "sha256": "77f2f63da3bbef81ead412345ae43c0d48f11400f8c4c9b13f69024653abe71a"
+  },
+  "process_tools": {
+    "bytes": 1731,
+    "path": "docs/performance/results/change-0913/process-tools.json",
+    "sha256": "0386df29b0475202ae724360505ae2103224e66c0bf225eb75a7a38eaf2f9cd1"
+  },
+  "removed_environment_keys": [],
+  "source": {
+    "bytes": 1758278,
+    "path": "docs/performance/results/change-0913/source-v1.json",
+    "sha256": "68de7c9416ba7763606a64780bde4e3de8476b02a809234b4a36975b9612af82"
+  },
+  "start_utc": "2026-10-04T17:56:13.464048+00:00",
+  "variant": "candidate"
+}
