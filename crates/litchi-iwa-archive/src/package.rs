@@ -1472,7 +1472,73 @@ impl LogicalEntryLimits {
     }
 }
 
-/// Ordered raw entries extracted from one physical iWork ZIP input.
+/// The report is deliberately small and allocation-free. It describes the
+/// temporary physical ZIP census performed while a catalog is built; the
+/// logical [`Entry`] table is charged separately by callers that retain it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CatalogStorageRequirements {
+    retained_bytes: usize,
+    traversal_bytes: usize,
+    allocations: usize,
+}
+
+impl CatalogStorageRequirements {
+    /// Heap bytes retained or staged by the physical catalog census.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Bytes inspected while building the physical catalog census.
+    #[must_use]
+    pub const fn traversal_bytes(self) -> usize {
+        self.traversal_bytes
+    }
+
+    /// Logical allocation events represented by the census.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    pub(crate) const fn from_parts(
+        retained_bytes: usize,
+        traversal_bytes: usize,
+        allocations: usize,
+    ) -> Self {
+        Self {
+            retained_bytes,
+            traversal_bytes,
+            allocations,
+        }
+    }
+
+    pub(crate) fn add(self, other: Self) -> Result<Self> {
+        Ok(Self {
+            retained_bytes: self
+                .retained_bytes
+                .checked_add(other.retained_bytes)
+                .ok_or_else(|| Error::InvalidBundle("catalog retained bytes overflow".to_owned()))?,
+            traversal_bytes: self
+                .traversal_bytes
+                .checked_add(other.traversal_bytes)
+                .ok_or_else(|| Error::InvalidBundle("catalog traversal bytes overflow".to_owned()))?,
+            allocations: self
+                .allocations
+                .checked_add(other.allocations)
+                .ok_or_else(|| Error::InvalidBundle("catalog allocation count overflow".to_owned()))?,
+        })
+    }
+
+    pub(crate) fn add_owned(self, bytes: usize, allocations: usize) -> Result<Self> {
+        self.add(Self {
+            retained_bytes: bytes,
+            traversal_bytes: bytes,
+            allocations,
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Catalog {
     entries: Vec<Entry>,
@@ -1481,6 +1547,7 @@ pub struct Catalog {
     source_is_exact: bool,
     semantic_profile: Option<LogicalEntryLimitProfile>,
     legacy_outer_prefix: Option<Box<[u8]>>,
+    physical_storage: CatalogStorageRequirements,
 }
 
 /// One exact canonical iWork metadata member selected from raw ZIP
@@ -1814,6 +1881,7 @@ impl Catalog {
         logical_entry_limits: Option<LogicalEntryLimits>,
     ) -> Result<Self> {
         let archive = ZipArchive::new_with_limits(source.as_ref(), checked_limits)?;
+        let mut physical_storage = archive.storage_requirements()?;
         if crate::zip::is_encrypted(&archive) {
             return Err(Error::Encrypted);
         }
@@ -1855,7 +1923,9 @@ impl Catalog {
             (entries, semantic_profile.is_none(), None)
         } else if let Some(index_name) = nested_name {
             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
-            let entries = if semantic_profile.is_some() {
+            physical_storage = physical_storage
+                .add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
+            let (entries, nested_storage) = if semantic_profile.is_some() {
                 collect_semantic_legacy(
                     &archive,
                     &index_name,
@@ -1867,6 +1937,7 @@ impl Catalog {
             } else {
                 collect_legacy(&archive, &index_name, checked_limits, &source)?
             };
+            physical_storage = physical_storage.add(nested_storage)?;
             (entries, false, Some(prefix))
         } else {
             let entries = if semantic_profile.is_some() {
@@ -1883,6 +1954,7 @@ impl Catalog {
             source_is_exact,
             semantic_profile,
             legacy_outer_prefix,
+            physical_storage,
         })
     }
 
@@ -1925,6 +1997,17 @@ impl Catalog {
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
         self.source.as_slice()
+    }
+
+    /// Return the physical ZIP census admitted while this catalog was built.
+    ///
+    /// The report includes owned physical-entry names, local and central
+    /// header-box payloads, central-order storage, and temporary nested
+    /// `Index.zip` catalog state. Logical entry payloads are exposed through
+    /// [`Entry`] and remain the responsibility of the retaining format owner.
+    #[must_use]
+    pub const fn storage_requirements(&self) -> CatalogStorageRequirements {
+        self.physical_storage
     }
 
     /// Return whether the catalog's logical entries still describe the
@@ -4484,7 +4567,7 @@ fn collect_legacy(
     index_name: &str,
     limits: Limits,
     source: &SharedBytes,
-) -> Result<Vec<Entry>> {
+) -> Result<(Vec<Entry>, CatalogStorageRequirements)> {
     let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
         Error::InvalidBundle(format!("invalid legacy package index name: {index_name}"))
     })?;
@@ -4513,6 +4596,9 @@ fn collect_legacy(
             Error::InvalidBundle(format!("legacy package index: {error}"))
         }
     })?;
+    let storage = index
+        .storage_requirements()?
+        .add_owned(index_source.as_ref().len(), 1)?;
 
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -4558,7 +4644,7 @@ fn collect_legacy(
             &mut seen,
         )?;
     }
-    Ok(entries)
+    Ok((entries, storage))
 }
 
 fn collect_semantic_legacy(
@@ -4568,7 +4654,7 @@ fn collect_semantic_legacy(
     source: &SharedBytes,
     raw_prefix: &[u8],
     logical_entry_limits: Option<LogicalEntryLimits>,
-) -> Result<Vec<Entry>> {
+) -> Result<(Vec<Entry>, CatalogStorageRequirements)> {
     let index_entry = archive
         .physical_entries()
         .find(|entry| entry.name() == index_name)
@@ -4595,6 +4681,9 @@ fn collect_semantic_legacy(
             Error::InvalidBundle(format!("legacy package index: {error}"))
         }
     })?;
+    let storage = index
+        .storage_requirements()?
+        .add_owned(index_source.as_ref().len(), 1)?;
 
     preflight_semantic_iwa_entries(&index, true)?;
 
@@ -4647,7 +4736,7 @@ fn collect_semantic_legacy(
             &mut seen,
         )?;
     }
-    Ok(entries)
+    Ok((entries, storage))
 }
 
 const fn is_semantic_metadata_authority(raw_name: &[u8]) -> bool {
@@ -5087,6 +5176,24 @@ mod tests {
         push_u16(&mut bytes, checked_u16(archive_comment.len()));
         bytes.extend_from_slice(archive_comment);
         bytes
+    }
+
+    #[test]
+    fn catalog_storage_requirements_include_nested_physical_census() -> Result<()> {
+        let flat = Catalog::from_bytes(&physical_two_entry_zip())?;
+        let flat_requirements = flat.storage_requirements();
+        assert!(flat_requirements.retained_bytes() > 0);
+        assert!(flat_requirements.traversal_bytes() > 0);
+        assert!(flat_requirements.allocations() >= 2);
+
+        let nested_index = zip(&[("Index/Document.iwa", b"nested component")])?;
+        let nested_source = zip(&[("legacy.pages/Index.zip", nested_index.as_slice())])?;
+        let nested = Catalog::from_bytes(&nested_source)?;
+        let nested_requirements = nested.storage_requirements();
+        assert!(nested_requirements.retained_bytes() > flat_requirements.retained_bytes());
+        assert!(nested_requirements.allocations() > flat_requirements.allocations());
+        assert!(nested_requirements.traversal_bytes() > flat_requirements.traversal_bytes());
+        Ok(())
     }
 
     #[test]

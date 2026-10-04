@@ -53,6 +53,7 @@ pub use directory::{
 pub use error::{Error, LimitKind, Result};
 pub use limits::Limits;
 pub use logical::LogicalSourceCatalog;
+pub use package::CatalogStorageRequirements;
 #[doc(hidden)]
 pub use package::LogicalEntryLimits;
 pub use package::SourceProvenance;

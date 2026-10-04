@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{mem::size_of, ops::Range};
 
 use soapberry_zip::office::{ArchiveLimits as ZipLimits, ArchiveReader};
 use soapberry_zip::{ZipArchive as RawZipArchive, ZipFileHeaderRecord};
@@ -6,6 +6,7 @@ use soapberry_zip::{ZipArchive as RawZipArchive, ZipFileHeaderRecord};
 use crate::catalog::DirectoryIndexReport;
 use crate::catalog::{Component, parse_component};
 use crate::{Error, Limits, Result};
+use crate::package::CatalogStorageRequirements;
 
 pub(crate) const ZIP_CENTRAL_FIXED_METADATA_BYTES: u64 = 46;
 
@@ -193,6 +194,81 @@ impl<'data> ZipArchive<'data> {
         #[cfg(test)]
         TEST_ENTRY_READ_COUNT.with(|count| count.set(count.get().saturating_add(1)));
         self.read(entry.name())
+    }
+
+    /// Census the owned physical ZIP structures retained while this archive
+    /// is parsed. The source bytes themselves are borrowed and therefore are
+    /// intentionally excluded; names, six header-box payloads per member,
+    /// physical-entry structs, and central-order storage are included.
+    pub(crate) fn storage_requirements(&self) -> Result<CatalogStorageRequirements> {
+        let physical_count = self.physical_entries.len();
+        let mut retained = physical_count
+            .checked_mul(size_of::<PhysicalEntry>())
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    self.central_order
+                        .len()
+                        .checked_mul(size_of::<usize>())?,
+                )
+            })
+            .ok_or_else(|| Error::InvalidBundle("physical ZIP storage overflow".to_owned()))?;
+        let mut traversal = physical_count
+            .checked_add(self.central_order.len())
+            .ok_or_else(|| Error::InvalidBundle("physical ZIP work overflow".to_owned()))?;
+        let mut allocations = usize::from(physical_count != 0)
+            .checked_add(usize::from(!self.central_order.is_empty()))
+            .ok_or_else(|| Error::InvalidBundle("physical ZIP allocation overflow".to_owned()))?;
+
+        for entry in &self.physical_entries {
+            let header_bytes = [
+                &entry.local_header.name,
+                &entry.local_header.extra,
+                &entry.local_header.comment,
+                &entry.central_header.name,
+                &entry.central_header.extra,
+                &entry.central_header.comment,
+            ]
+            .into_iter()
+            .try_fold(0usize, |total, value| {
+                total.checked_add(value.len()).ok_or_else(|| {
+                    Error::InvalidBundle("physical ZIP header bytes overflow".to_owned())
+                })
+            })?;
+            retained = retained
+                .checked_add(entry.name.len())
+                .and_then(|value| value.checked_add(header_bytes))
+                .ok_or_else(|| Error::InvalidBundle("physical ZIP storage overflow".to_owned()))?;
+            traversal = traversal
+                .checked_add(entry.name.len())
+                .and_then(|value| value.checked_add(header_bytes))
+                .and_then(|value| value.checked_add(entry.local_record.len()))
+                .and_then(|value| value.checked_add(entry.central_record.len()))
+                .ok_or_else(|| Error::InvalidBundle("physical ZIP work overflow".to_owned()))?;
+            allocations = allocations
+                .checked_add(usize::from(!entry.name.is_empty()))
+                .and_then(|value| {
+                    value.checked_add(
+                        [
+                            &entry.local_header.name,
+                            &entry.local_header.extra,
+                            &entry.local_header.comment,
+                            &entry.central_header.name,
+                            &entry.central_header.extra,
+                            &entry.central_header.comment,
+                        ]
+                        .into_iter()
+                        .filter(|value| !value.is_empty())
+                        .count(),
+                    )
+                })
+                .ok_or_else(|| Error::InvalidBundle("physical ZIP allocation overflow".to_owned()))?;
+        }
+
+        Ok(CatalogStorageRequirements::from_parts(
+            retained,
+            traversal,
+            allocations,
+        ))
     }
 
     pub(crate) fn source(&self) -> &[u8] {
