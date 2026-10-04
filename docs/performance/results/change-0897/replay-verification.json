@@ -1,0 +1,28 @@
+{
+  "canonical": {
+    "bytes": 468414,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/analysis.json",
+    "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+  },
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0897/reduce.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0897/replay.json"
+  ],
+  "comparison": "byte-identical",
+  "exit_code": 0,
+  "log": {
+    "bytes": 244,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/replay.log",
+    "sha256": "6de9505cd4ed2b3c2feec6f4cfef70a81f3981771c017cae355b53e6f8d9a5a1"
+  },
+  "replay": {
+    "bytes": 468414,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/replay.json",
+    "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+  },
+  "status": "pass",
+  "workload_launched": false
+}

@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0897 — restored fallback allocation attribution
+
+[0897](0897-fallback-allocation-attribution.md) reattributes both retained
+0895 baseline profiles after confirming current-source identity and capture
+custody. Each process has 518,660 scan-closure allocation calls over 20 scans;
+343,320 have legacy MCE `start` as their nearest codec owner. Two duplicate
+export rows combine to a 167,220-call string-copy signature (32.24% of closure
+calls). The next bounded hypothesis is to retain emitted-name output offsets
+for closing tags instead of an additional owned name. This is a prioritization
+result, not proof of removable calls or latency savings. Production is
+unchanged; correctness qualification and a matched native trial remain required.
+
 ## 0896 — borrowed QName candidate rejected
 
 [0896](0896-borrowed-qname-expansion.md) rejects the bounded QName candidate

@@ -1,0 +1,51 @@
+{
+  "baseline_source": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "evaluation_head": "c6d7ba22f525fbf82bbe7a7bcc1beb495169763b",
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 65338,
+      "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 129836,
+      "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs": {
+      "bytes": 28418,
+      "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    "tools/perf-baseline/src/producer_shape.rs": {
+      "bytes": 142118,
+      "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+    }
+  },
+  "performance_claim": null,
+  "schema": "litchi.fallback-source-0897.v1",
+  "scope": "Read-only offline reattribution of retained0895 baseline profiles. No source or workload modification.",
+  "source_comparison": {
+    "argv": [
+      "git",
+      "diff",
+      "--exit-code",
+      "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+      "c6d7ba22f5",
+      "--",
+      ".cargo",
+      "Cargo.toml",
+      "README.md",
+      "clippy.toml",
+      "deny.toml",
+      "rust-toolchain.toml",
+      "rustfmt.toml",
+      "crates",
+      "test-data",
+      "tools/perf-baseline",
+      "docs/adr"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": ""
+  },
+  "status": "pass",
+  "utc": "2026-10-04T00:36:31.564477+00:00"
+}

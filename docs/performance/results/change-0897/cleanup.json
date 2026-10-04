@@ -1,0 +1,45 @@
+{
+  "build_roots_created": [],
+  "canonical": {
+    "bytes": 468414,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/analysis.json",
+    "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+  },
+  "other_worktrees": "preserved; not owned by batch",
+  "production_check": {
+    "argv": [
+      "git",
+      "diff",
+      "--exit-code",
+      "HEAD",
+      "--",
+      "crates",
+      "tools"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": ""
+  },
+  "python_cache_absent": true,
+  "removed_duplicate": {
+    "absent": true,
+    "bytes": 468414,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/replay.json",
+    "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+  },
+  "replay_verification": {
+    "bytes": 948,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/replay-verification.json",
+    "sha256": "2b02c3afdaf632bad3f7eda421856821251381ff46f186b09bd2f2342c3e9cb7"
+  },
+  "retained_profile_artifacts": "all original0895 evidence preserved",
+  "schema": "litchi.fallback-cleanup-0897.v1",
+  "status": "pass",
+  "unrelated_untracked_file": {
+    "bytes": 6390,
+    "path": "/home/zhuhe/code/litchi/crates/litchi/examples/bench_word_parse.rs",
+    "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+  },
+  "utc": "2026-10-04T00:55:57.787599+00:00",
+  "worktrees_created": []
+}

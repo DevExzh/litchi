@@ -1,0 +1,251 @@
+{
+  "schema": "litchi.xlsx-fallback-independent-review-0897.v1",
+  "status": "pass",
+  "reviewer": "fallback_review_0897",
+  "scope": {
+    "mode": "offline-only retained-artifact review",
+    "profiles_reviewed": [
+      "00-baseline",
+      "03-baseline"
+    ],
+    "samples_reviewed": 40,
+    "iwork_excluded": true,
+    "new_workload_build_or_profiler": false,
+    "allocation_semantics": "whole-process heaptrack allocation-hook call cost",
+    "candidate_rows_analyzed": 0,
+    "latency_or_native_timing_claim": null,
+    "rss_or_production_adoption_claim": null
+  },
+  "inputs": {
+    "packet": {
+      "source-identity.json": {
+        "bytes": 1532,
+        "sha256": "ea0006f70cd7e97c8b61b1916d9b217c85dccaf5f00a45efee141c7f67976b19"
+      },
+      "prior-capture-verification.json": {
+        "bytes": 1459,
+        "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+      },
+      "prior-capture-verification.log": {
+        "bytes": 1459,
+        "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+      },
+      "reduce.py": {
+        "bytes": 36575,
+        "sha256": "2358d29863ff23501dd1c0c92cebceb37bb8b41a2956382fc0b63ac4e5671516"
+      },
+      "analysis.json": {
+        "bytes": 468414,
+        "sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+      },
+      "source-audit.md": {
+        "bytes": 9969,
+        "sha256": "d8d4f397cef1fe65fa8af6416f1c3828f88ad9472f8279bd216655c443d8cf75"
+      }
+    },
+    "retained_0895_receipts": {
+      "plan.json": {
+        "bytes": 16698,
+        "sha256": "b9fbf3ddb8319742dab56a54150c9fd16519a4e7cf850458c48385cedb45332e"
+      },
+      "capture-v1/capture.json": {
+        "bytes": 1577,
+        "sha256": "f1e5274e724a65e226462f96e24fd166d25f3b5b893178679cf6e338461e8fc3"
+      },
+      "export-v1/export.json": {
+        "bytes": 1769,
+        "sha256": "c68654a8237878513df79fe643c38dd75943b5adc4df8e3ea1477a338b737d73"
+      },
+      "verification.json": {
+        "bytes": 1459,
+        "sha256": "d759e88e8fa4e2591b70f74802889df7ca4d908ec1d71424fd9fd04608d10fd6"
+      },
+      "attribution.json": {
+        "bytes": 14787,
+        "sha256": "46edd9a68375cce28d3cfb0e11efb7864e3438cca8236912bfe221dc761a6369"
+      },
+      "reduction.json": {
+        "bytes": 24902579,
+        "sha256": "67773fad7f6ca259d4829953c08a08fd1ed0f4d77f6f972dbac8b50c609db79c"
+      }
+    },
+    "selected_profile_exports": {
+      "00-baseline/stacks.txt": {
+        "bytes": 11960420,
+        "sha256": "7b022a98e061da2e5d2a8bbfd3b9f6544d506187c468f91657a311caea8f172f"
+      },
+      "00-baseline/histogram.txt": {
+        "bytes": 2396,
+        "sha256": "ea6df42183ee2e24d9026420e5fdd2d08b1474eafd79235a40206a7ac17da46b"
+      },
+      "00-baseline/stdout.txt": {
+        "bytes": 193898,
+        "sha256": "ea8e769452535c9dddd07eb3a0ad79c34f6894467129167be1513e242a8be5d6"
+      },
+      "03-baseline/stacks.txt": {
+        "bytes": 11960420,
+        "sha256": "b2c415979f972a182ea6afae6207e201985dadde9bbda40e1a5bf1814e81f739"
+      },
+      "03-baseline/histogram.txt": {
+        "bytes": 2396,
+        "sha256": "ea6df42183ee2e24d9026420e5fdd2d08b1474eafd79235a40206a7ac17da46b"
+      },
+      "03-baseline/stdout.txt": {
+        "bytes": 193898,
+        "sha256": "2b2dc730e749702f72bf3c1f53a7234401ba67b8a9670611bc7a620a5330fd0b"
+      }
+    },
+    "source_files_bound_by_analysis": {
+      "mce/codec.rs": {
+        "bytes": 65338,
+        "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996"
+      },
+      "mce/stream.rs": {
+        "bytes": 125424,
+        "sha256": "1e194cae9ec2f2b559543656011c198fb67c84f52dc47894dba44f18e4f9710f"
+      },
+      "x14ac.rs": {
+        "bytes": 28418,
+        "sha256": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+      },
+      "producer_shape.rs": {
+        "bytes": 142118,
+        "sha256": "0a81997839bfe6f23edc09707bd6b695a8d11aecbd330b1d9191ffff4c8cfa77"
+      },
+      "perf_runner.rs": {
+        "bytes": 3020616,
+        "sha256": "04ac6f200c59bc51cb7656c8979bc49031a9bd8f5bbf6c23748bd6e49bf99faf"
+      },
+      "full_cell_guard_tests.rs": {
+        "bytes": 4882,
+        "sha256": "645d9aeafc54d6a9febdc0cf86cfa8d43a66c378b1d3e466a47abc0d68accccd"
+      }
+    }
+  },
+  "checks": {
+    "source_binding": {
+      "status": "pass",
+      "baseline_source": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+      "evaluation_head": "c6d7ba22f525fbf82bbe7a7bcc1beb495169763b",
+      "relevant_current_sources_match_base_and_evaluation_blobs": true,
+      "performance_claim": null
+    },
+    "prior_verification": {
+      "status": "pass",
+      "children": 4,
+      "measured_samples": 80,
+      "offline_verifier_launched_profiler": false,
+      "json_and_log_are_byte_identical": true
+    },
+    "helper_replay": {
+      "status": "pass",
+      "current_reduce_py_replayed_offline": true,
+      "analysis_json_byte_identical_to_replay": true,
+      "replay_sha256": "8b704e99a0414372ec77e2aabf6e7c733c2ae7f4816ed35f20ee304a63afddce"
+    },
+    "reconciliation": {
+      "profiles": {
+        "00-baseline": {
+          "ordinal": 0,
+          "stack_lines": 4516,
+          "unique_stacks": 3000,
+          "stack_total": 673663,
+          "histogram_rows": 332,
+          "histogram_count_sum": 673663,
+          "printed_allocation_total": 673663,
+          "unresolved_cost": 1,
+          "regions": {
+            "scan_closure": 518660,
+            "forced_worksheet_guard": 0,
+            "runner_other": 847,
+            "process_other": 154156
+          }
+        },
+        "03-baseline": {
+          "ordinal": 3,
+          "stack_lines": 4516,
+          "unique_stacks": 3000,
+          "stack_total": 673663,
+          "histogram_rows": 332,
+          "histogram_count_sum": 673663,
+          "printed_allocation_total": 673663,
+          "unresolved_cost": 1,
+          "regions": {
+            "scan_closure": 518660,
+            "forced_worksheet_guard": 0,
+            "runner_other": 847,
+            "process_other": 154156
+          }
+        }
+      },
+      "0895_owner_exclusive_totals": {
+        "legacycodec": 535697,
+        "mce_stream": 14418,
+        "selected_worksheet": 1361,
+        "x14ac": 9792,
+        "other": 112395
+      },
+      "closure_codec": 345380,
+      "start_subgroups": {
+        "owned_to_owned_name_hypothesis": 168700,
+        "quickxml_duplicate": 85560,
+        "rawreserve": 86060,
+        "other": 3000
+      },
+      "start_subgroup_sum": 343320,
+      "repeated_baseline_counts_and_signatures_identical": true,
+      "candidates_excluded": true
+    },
+    "attribution_boundary": {
+      "dominant_exact_stack_aggregate": 167220,
+      "aggregate_rows": [
+        {
+          "line": 1,
+          "allocation_cost": 166800
+        },
+        {
+          "line": 80,
+          "allocation_cost": 420
+        }
+      ],
+      "stack_sha256": "8ed8a306d9a0d04e30703b1b247698b2fa3803bc96f58dfa47d73847825e32cc",
+      "candidate_raw_line_cost": 166800,
+      "possible_name_retention_source_lines": [
+        950,
+        1116,
+        1132
+      ],
+      "other_owned_expressions_remain_possible": [
+        903,
+        909,
+        996,
+        997
+      ],
+      "conclusion": "Measured stack text supports an owned-name mechanism hypothesis only; it does not identify an exact source line or a removable allocation count."
+    },
+    "x14ac_scope_boundary": {
+      "whole_process_inclusive": 24615,
+      "nearest_owner_exclusive": 9792,
+      "scopes_are_not_additive": true,
+      "conclusion": "The inclusive x14ac value is a route signal and does not isolate copy_bytes, copy_name, or copy_str."
+    },
+    "claim_boundary": {
+      "not_a_latency_metric": true,
+      "native_timing_claim": null,
+      "rss_causal_claim": null,
+      "production_adoption_decision": null
+    }
+  },
+  "issues": [],
+  "coordinator_metadata_corrections": {
+    "scope": "Correct two transcribed hashes and rebind source-audit; independent review conclusions/counts unchanged. All other review input descriptors checked against current bytes.",
+    "source_audit_x14ac_sha256": {
+      "before": "9f766274df5cc0a6a80291644ecbc4f9d8afc6dac556af86bd21fbde66d148",
+      "after": "9f766274df5cc0a6a80291644ceecbc4f9d8afc6dac556af86bd21fbde66d148"
+    },
+    "attribution_stack_sha256": {
+      "before": "8ed8a3069a0d04e30703b1b247698b2fa3803bc96f58dfa47d73847825e32cc",
+      "after": "8ed8a306d9a0d04e30703b1b247698b2fa3803bc96f58dfa47d73847825e32cc"
+    }
+  }
+}
