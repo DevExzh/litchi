@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-diagnostic",
+    "differential",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json",
+    "--generated",
+    "20000",
+    "--aliasing",
+    "20000",
+    "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+    "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/ooxml/docx/drawing.docx",
+    "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/target/litchi-0898-source",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0898-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0898-build/tmp",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 10136,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/qualify.py",
+    "sha256": "b96f95ead295c1f5c6d32ba9dd0c4e8be7dd6854622e1987b06f18ab3b538f08"
+  },
+  "started_utc": "2026-10-04T01:03:11.166649+00:00"
+}

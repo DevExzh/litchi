@@ -1,0 +1,52 @@
+{
+  "schema": "litchi.emitted-name-decision-0898.v1",
+  "status": "rejected",
+  "production_adopted": false,
+  "native_speedup_claim": null,
+  "primary_gate": {
+    "ci95_high": 0.9877410001268981,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 0.9850658963459487,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "reason": "Measured primary p50 benefit is1.4934%, below frozen2% criterion. Bootstrap upper below1 and32.27% fewer allocation calls do not override failed primary gate. Independent raw replay passes; source restored.",
+  "next_step": "Profile remaining work in the restored fallback before selecting a stronger bounded end-to-end hypothesis.",
+  "evidence": {
+    "plan.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/plan.json",
+      "bytes": 41575,
+      "sha256": "e2582ea93191498fcb6a9687dbd958f76008439dda81c24494e525f1bf256d6a"
+    },
+    "reduction.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/reduction.json",
+      "bytes": 45773,
+      "sha256": "8b5a4481e6cec9c1d095cc2a2ad7a1b286cc4250812305ad90d8fa897f6926c8"
+    },
+    "verification.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/verification.json",
+      "bytes": 846,
+      "sha256": "227df4e8d136ddbd64bb0c383251411c3b597dbaaffed273fe77f6b178426a48"
+    },
+    "native-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/native-review.json",
+      "bytes": 307788,
+      "sha256": "af003c9482d7dd126ac746e6518f250b2f2d4c0c3e12926f31e8344648c2b49d"
+    },
+    "methodology-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/methodology-review.json",
+      "bytes": 28029,
+      "sha256": "464e3a8fe8775f90ec7daad375d8635e39f9e5d0d09fc11d89b3e1fd4f99aa7b"
+    },
+    "corpus-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus-review.json",
+      "bytes": 18882,
+      "sha256": "7edddcdee528e7b8d38351165f849fe9d70f58c0d64f0c6f83d77f41fb165350"
+    },
+    "restoration.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/restoration.json",
+      "bytes": 730,
+      "sha256": "9efcb9a740571b6817ba048c07f7406306c6bc954faa64d623290a9388fbbc21"
+    }
+  }
+}

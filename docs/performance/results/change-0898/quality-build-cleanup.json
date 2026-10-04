@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T01:33:04.697432+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0898-build/debug",
+      "bytes": 2553043174,
+      "absent": true
+    }
+  ],
+  "retained_diagnostic_binaries": true,
+  "quality_corpus": "all pass",
+  "prior_doc_cleanup": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/disk-recovery-doc-cleanup.json",
+    "bytes": 403,
+    "sha256": "f7f94d517cac0b35a90f25a00f159049ff5aa60b3c429c887134418be63a8ac9"
+  },
+  "scope": "owned debug target outputs only; source preserved"
+}

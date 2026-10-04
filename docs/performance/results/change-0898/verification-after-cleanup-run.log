@@ -1,0 +1,25 @@
+{
+  "allocator_children": 8,
+  "children": 72,
+  "experiment": {
+    "bytes": 26148,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/experiment.json",
+    "sha256": "a1a746c983b81527d0afbf87e9b701fa3f10beb93a737374a43f4f2df34e8bce"
+  },
+  "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+  "native_children": 64,
+  "performance_claim": null,
+  "plan": {
+    "bytes": 41575,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/plan.json",
+    "sha256": "e2582ea93191498fcb6a9687dbd958f76008439dda81c24494e525f1bf256d6a"
+  },
+  "primary_guard_children": 24,
+  "schema": "litchi.xlsx-mce-codec-emitted-name-output-span-verification-0898.v1",
+  "status": "pass",
+  "workload_launched": false
+}

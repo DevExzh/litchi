@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0898 — emitted-name output span candidate rejected
+
+[0898](0898-emitted-name-output-span.md) completes the 72-child / 3,320-sample
+trial for bounded legacy-MCE output-name spans. The producer XLSX primary p50
+ratio is **0.9850658963** with bootstrap interval **0.9772547023–0.9877410001**:
+the **1.4934%** improvement misses the required ≤0.98 median even though the
+upper endpoint is below 1.0. The allocator lane falls **25,933→17,565** calls
+(32.2678%), while allocated bytes fall only **37,618,900→37,609,931** and
+region peak-live bytes **9,252,430→9,252,427**; these diagnostics cannot
+override the native gate. No native p50-spread flags fire. XLSX and DOCX
+control p99 pairs flag at **1.189261/1.052093**; all RSS flags are descriptive
+under the known fork/exec executable-residency bias. The candidate is rejected
+for adoption, production is restored, and independent replay/custody review is
+retained as final evidence. Future work should profile the remaining fallback
+allocations before proposing a stronger hypothesis.
+
 ## 0897 — restored fallback allocation attribution
 
 [0897](0897-fallback-allocation-attribution.md) reattributes both retained

@@ -1,0 +1,49 @@
+{
+  "schema": "litchi.emitted-name-candidate-review-0898.v1",
+  "status": "approved_for_measurement",
+  "production_adoption": false,
+  "performance_claim": null,
+  "scope": "All10 quality gates, semantic differential, independent source/corpus reviews and before/after source census pass. Matching release binaries permit frozen paired trial; adoption remains dependent on native gate and final review.",
+  "evidence": {
+    "candidate-build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-build.json",
+      "bytes": 3792,
+      "sha256": "e3dbbe2f14ad56c76cfe3ba3ad7c233ebfb9e8e79203b57a5c2bc2e997e14aac"
+    },
+    "quality.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/quality.json",
+      "bytes": 3111,
+      "sha256": "f52c28784da2be17509c0d4b1f225582b8172fe50bb4cb393187a82b852338fb"
+    },
+    "source-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-review.json",
+      "bytes": 782,
+      "sha256": "43e841e5e1991f80e6429d4b09c1e096de376dc0d14208915a71da0553311fea"
+    },
+    "corpus-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus-review.json",
+      "bytes": 18882,
+      "sha256": "7edddcdee528e7b8d38351165f849fe9d70f58c0d64f0c6f83d77f41fb165350"
+    },
+    "corpus-comparison.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus-comparison.json",
+      "bytes": 8190,
+      "sha256": "74a52e511a17eebfa084eb70734dc31395b1ef54b10324ac9665e4fe1ff7d012"
+    },
+    "source-before-build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-before-build.json",
+      "bytes": 1881318,
+      "sha256": "b60430df7c9fdb44756f94dae20c8987b91d8bb15d45c3277b61fcad981d443f"
+    },
+    "source-after-build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-after-build.json",
+      "bytes": 1881541,
+      "sha256": "07c6e9083f7e04dd7291237cd8f8c40810f0c44c62eac05a9b6b040fc8179150"
+    },
+    "candidate-source.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source.json",
+      "bytes": 1342,
+      "sha256": "1143bec60aa44f98c35693444fce7abf53726da687e4bfe717425438e8ab4c00"
+    }
+  }
+}

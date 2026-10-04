@@ -1,0 +1,48 @@
+{
+  "argv": [
+    "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "/home/zhuhe/code/litchi/target/litchi-0898-source/crates/litchi-ooxml-common/src/mce/codec.rs",
+    "/home/zhuhe/code/litchi/target/litchi-0898-source/crates/litchi-ooxml-common/src/mce/tests.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi/target/litchi-0898-source",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0898-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TMPDIR": "/home/zhuhe/code/litchi/target/litchi-0898-build/tmp",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T01:26:26.180941+00:00",
+  "helper": {
+    "bytes": 10769,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/qualify-v4.py",
+    "sha256": "69d5a98477a914038a96d77bda790ed93da430033acbcb8a6880f1674e34e468"
+  },
+  "log": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/fmt-v2.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_utc": "2026-10-04T01:26:26.140800+00:00",
+  "status": "pass"
+}

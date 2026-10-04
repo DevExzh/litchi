@@ -1,0 +1,229 @@
+{
+  "command_receipts": {
+    "baseline": {
+      "argv": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-diagnostic",
+        "differential",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json",
+        "--generated",
+        "20000",
+        "--aliasing",
+        "20000",
+        "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+        "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/ooxml/docx/drawing.docx",
+        "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+      ],
+      "descriptor": {
+        "bytes": 2033,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential-run.json",
+        "sha256": "fc1a643a9d85f3dd15bf142894c52c2f68e5f42e0e0a86e4ac6f96bbcc65f7fb"
+      },
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "status": "pass"
+    },
+    "candidate": {
+      "argv": [
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-diagnostic",
+        "differential",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.json",
+        "--generated",
+        "20000",
+        "--aliasing",
+        "20000",
+        "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+        "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/ooxml/docx/drawing.docx",
+        "/home/zhuhe/code/litchi/target/litchi-0898-source/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx"
+      ],
+      "descriptor": {
+        "bytes": 2039,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential-run.json",
+        "sha256": "4b5c2af3653c41f1ba3f87dd326c22f3f347cdb033200b1c8d830ccb52250622"
+      },
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "status": "pass"
+    }
+  },
+  "compressed_reports": {
+    "baseline": {
+      "codec": "gzip",
+      "compressed": {
+        "bytes": 12319926,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json.gz",
+        "sha256": "06ccf6d61a9b0ac3dc6a42f7c26d45d5dda5dc23efc521eb3892962d746165e3"
+      },
+      "filename": "",
+      "mtime": 0,
+      "roundtrip": true,
+      "source": {
+        "bytes": 226196057,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json",
+        "sha256": "2607c491787238ec5960100d73376adcec9ff4ddf60849f35f11f5a053f897fe"
+      }
+    },
+    "candidate": {
+      "codec": "gzip",
+      "compressed": {
+        "bytes": 12319926,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.json.gz",
+        "sha256": "06ccf6d61a9b0ac3dc6a42f7c26d45d5dda5dc23efc521eb3892962d746165e3"
+      },
+      "filename": "",
+      "mtime": 0,
+      "roundtrip": true,
+      "source": {
+        "bytes": 226196057,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.json",
+        "sha256": "2607c491787238ec5960100d73376adcec9ff4ddf60849f35f11f5a053f897fe"
+      }
+    }
+  },
+  "formal_reports": {
+    "baseline": {
+      "bytes": 226196057,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json",
+      "sha256": "2607c491787238ec5960100d73376adcec9ff4ddf60849f35f11f5a053f897fe"
+    },
+    "byte_equal": true,
+    "candidate": {
+      "bytes": 226196057,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.json",
+      "sha256": "2607c491787238ec5960100d73376adcec9ff4ddf60849f35f11f5a053f897fe"
+    },
+    "records_equal": true,
+    "semantic_equal": true,
+    "sha256_equal": true,
+    "summary": {
+      "aliasing": 20000,
+      "controls": 10,
+      "distinct_generated_inputs": {
+        "aliasing": 19418,
+        "generated": 13811
+      },
+      "generated": 20000,
+      "legacy_results": 200405,
+      "members": 67,
+      "oracle_records": 200201,
+      "outcomes": {
+        "codec_refusal": 48804,
+        "codec_success": 51330,
+        "stream_refusal": 48133,
+        "stream_success": 51934
+      },
+      "packages": 3
+    }
+  },
+  "performance_claim": false,
+  "production_adoption": false,
+  "schema": "litchi.mce-corpus-comparison-0898.v1",
+  "source_build_receipts": {
+    "baseline_build": {
+      "baseline_revision": null,
+      "current_revision": null,
+      "descriptor": {
+        "bytes": 1317,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-diagnostic-build-run.json",
+        "sha256": "1a14893b353aa00818468a38053900598f1c6f0713bcffdb6fa2b392facdda45"
+      },
+      "guard_contract": null,
+      "production_adopted": null,
+      "quality": null,
+      "source": {
+        "bytes": 2606,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source.json",
+        "sha256": "7834075609d240c1f97ebbc9579a269c68a9da2ca5055733ab2db7a56119c99c"
+      },
+      "status": "pass"
+    },
+    "candidate_build": {
+      "baseline_revision": null,
+      "current_revision": null,
+      "descriptor": {
+        "bytes": 1702,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-diagnostic-build-run.json",
+        "sha256": "9e27ecea23fd20081e2708537045f92a48b67b4b11b3b17d5d299e48d9e59564"
+      },
+      "guard_contract": null,
+      "production_adopted": null,
+      "quality": null,
+      "source": null,
+      "status": "pass"
+    },
+    "candidate_source": {
+      "baseline_revision": null,
+      "current_revision": null,
+      "descriptor": {
+        "bytes": 1342,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source.json",
+        "sha256": "1143bec60aa44f98c35693444fce7abf53726da687e4bfe717425438e8ab4c00"
+      },
+      "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+      "production_adopted": false,
+      "quality": null,
+      "source": {
+        "bytes": 2606,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source.json",
+        "sha256": "7834075609d240c1f97ebbc9579a269c68a9da2ca5055733ab2db7a56119c99c"
+      },
+      "status": "pass"
+    },
+    "source": {
+      "baseline_revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+      "current_revision": "8d517a7861",
+      "descriptor": {
+        "bytes": 2606,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source.json",
+        "sha256": "7834075609d240c1f97ebbc9579a269c68a9da2ca5055733ab2db7a56119c99c"
+      },
+      "guard_contract": null,
+      "production_adopted": null,
+      "quality": null,
+      "source": null,
+      "status": "pass"
+    }
+  },
+  "status": "pass"
+}

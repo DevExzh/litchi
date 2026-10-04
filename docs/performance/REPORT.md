@@ -1,5 +1,24 @@
 # Performance program phase report
 
+## 0898 — emitted-name output span candidate rejected
+
+[0898](0898-emitted-name-output-span.md) completes the bounded legacy-MCE
+output-span qualification with 72 children / 3,320 measured samples and
+passing capture, reduction, verification, quality, and differential evidence.
+The producer XLSX primary p50 ratio is **0.9850658963**
+(**0.9772547023–0.9877410001** bootstrap interval), a **1.4934%** gain that
+misses the required ≤0.98 median. The upper endpoint is below 1.0, but the
+primary gate is false and the candidate is rejected for adoption. Allocator
+calls fall **25,933→17,565** while allocated bytes move
+**37,618,900→37,609,931** and region peak-live bytes
+**9,252,430→9,252,427**; those separate diagnostics do not override the
+native gate. No native p50-spread flags fire; XLSX/DOCX control p99 flags are
+**1.189261/1.052093**, and RSS flags remain descriptive under known fork/exec
+executable-residency bias. Production is restored. Independent raw replay and post-cleanup verification
+pass; the marked source/build roots are removed, with all failed replay-helper
+versions and candidate evidence retained. The next step is to profile remaining fallback work and revisit
+only a stronger measured hypothesis.
+
 ## 0897 — restored fallback allocation attribution
 
 [0897](0897-fallback-allocation-attribution.md) reattributes both retained

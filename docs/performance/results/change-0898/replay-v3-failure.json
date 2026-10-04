@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.mce-codec-emitted-name-output-span-native-replay-failure-0898.v3",
+  "status": "fail",
+  "phase": "child binary custody replay",
+  "command": {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0898/independent_review_v3.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 1
+  },
+  "exception": {
+    "type": "ReviewError",
+    "message": "child 0: binary binding",
+    "file": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v3.py",
+    "line": 707,
+    "function": "replay",
+    "expression": "receipt.get(\"binary\") == binary"
+  },
+  "observed_shape": {
+    "plan_binary": "flat descriptor with bytes/sha256/mode/executable",
+    "child_receipt_binary": "wrapper with declared flat descriptor and identity descriptor"
+  },
+  "result_created": false,
+  "native_review": null,
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v3.py",
+    "bytes": 52182,
+    "sha256": "dcb7ba256314afbfd1d0f224b01b4f46eaaf05e8a813e31df6b47bfbe7fc3312"
+  },
+  "correction_scope": "The versioned v4 helper checks child binary.declared against the plan and child binary.identity against the same descriptor; v3 is unchanged."
+}

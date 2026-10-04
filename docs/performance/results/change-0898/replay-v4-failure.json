@@ -1,0 +1,36 @@
+{
+  "command": {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0898/independent_review_v4.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 1
+  },
+  "correction_scope": "The versioned v5 helper checks command binary.declared and binary.identity against the plan; v4 is unchanged.",
+  "exception": {
+    "expression": "command.get(\"binary\") == binary and command.get(\"environment\") == CHILD_ENV and command.get(\"cwd\") == str(PACKET)",
+    "file": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v4.py",
+    "function": "replay",
+    "line": 719,
+    "message": "child 0: command custody",
+    "type": "ReviewError"
+  },
+  "helper": {
+    "bytes": 52549,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v4.py",
+    "sha256": "411450bd0f2c7b6830435a86da6aa909dea9843c1e35c0ef1266b42f42dc3ae2"
+  },
+  "native_review": null,
+  "observed_shape": {
+    "command_binary": "wrapper with declared flat descriptor and identity descriptor",
+    "cwd": "matches PACKET",
+    "environment": "matches CHILD_ENV",
+    "plan_binary": "flat descriptor with bytes/sha256/mode/executable"
+  },
+  "phase": "child command custody replay",
+  "result_created": false,
+  "schema": "litchi.mce-codec-emitted-name-output-span-native-replay-failure-0898.v4",
+  "status": "fail"
+}

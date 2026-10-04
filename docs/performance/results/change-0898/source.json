@@ -1,0 +1,67 @@
+{
+  "archive": {
+    "bytes": 89047170,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.tar.gz",
+    "sha256": "f6f9d13813866ea24fd9cc108fc949aa42cdd042bacd3ca960897e8c88c63ce9"
+  },
+  "baseline_revision": "506aa2edae6666d9c76ae6827c2f5941a8e47896",
+  "current_revision": "8d517a7861",
+  "manifest": {
+    "bytes": 3325536,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "root_lock": {
+    "bytes": 138457,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/quality-Cargo.lock",
+    "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+  },
+  "source_root": "/home/zhuhe/code/litchi/target/litchi-0898-source",
+  "source_selection_unchanged": true,
+  "standalone_lock": {
+    "bytes": 56289,
+    "executable": false,
+    "mode": 420,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0898-source/tools/perf-baseline/Cargo.lock",
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "status": "pass",
+  "support": {
+    "docs/adr/0008-migration-and-verification.md": {
+      "bytes": 1145334,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0898-source/docs/adr/0008-migration-and-verification.md",
+      "sha256": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2"
+    },
+    "docs/adr/0028-iwa-monolith-exit.md": {
+      "bytes": 771812,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0898-source/docs/adr/0028-iwa-monolith-exit.md",
+      "sha256": "d746f84441a6623c8a6e3731701e614c39544467433615ad83af001da4e52023"
+    },
+    "tools/check_crate_boundaries.py": {
+      "bytes": 3173576,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0898-source/tools/check_crate_boundaries.py",
+      "sha256": "e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9"
+    },
+    "tools/crate_boundaries.json": {
+      "bytes": 13436,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/target/litchi-0898-source/tools/crate_boundaries.json",
+      "sha256": "715e27ba51b9d60163bf2f51f0d21893ad223df3e61f8ebc768a46c4f7deea36"
+    }
+  },
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0898-build",
+  "verified_files": 10771
+}

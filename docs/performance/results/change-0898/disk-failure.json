@@ -1,0 +1,21 @@
+{
+  "status": "incomplete",
+  "runner_exit_code": 1,
+  "child_exit_code": null,
+  "formal_pass": false,
+  "reason": "Shared filesystem ENOSPC truncated log and prevented receipt write; child exit unavailable. Resume under fresh label.",
+  "files": {
+    "pptx-tests-v2-start.json": {
+      "bytes": 1316,
+      "sha256": "751f0ade2ad7660ecaa2e366ae4f6eb903f1e74f62d5ab386a26fa3393bf3bee"
+    },
+    "pptx-tests-v2.log": {
+      "bytes": 28672,
+      "sha256": "c96e16c71cda5968ae1e63986f497e50af22aefec31ee699ae912ffc8cc88a8d"
+    },
+    "pptx-tests-v2-run.json": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

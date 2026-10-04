@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0898 — emitted-name output span candidate rejected
+
+[0898](0898-emitted-name-output-span.md) tests replacing legacy-MCE emitted
+QName ownership with checked append-only output offsets. The primary producer
+XLSX p50 ratio is **0.9850658963** with bootstrap interval
+**0.9772547023–0.9877410001**, a **1.4934%** improvement that misses the fixed
+2% benefit gate. The separate allocator lane removes **8,368 calls**
+(**32.2678%**) but only **8,969 allocated bytes**; the 3-byte region peak-live
+change is negligible and no allocator/RSS metric authorizes adoption. Native
+p50-spread flags are zero. XLSX control pair `b01` and DOCX control pair `b02`
+retain p99 flags **1.189261/1.052093**. RSS flags are descriptive and carry the
+known fork/exec executable-residency bias, with no heap claim. Production is
+restored and the candidate is rejected; the next investigation is remaining
+fallback allocation attribution, with this mechanism revisited only under a
+stronger end-to-end hypothesis.
+
 ## 0897 — restored fallback allocation attribution
 
 [0897](0897-fallback-allocation-attribution.md) reattributes both retained

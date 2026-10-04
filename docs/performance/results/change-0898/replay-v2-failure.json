@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.mce-codec-emitted-name-output-span-native-replay-failure-0898.v2",
+  "status": "fail",
+  "phase": "independent plan/source binding replay",
+  "command": {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0898/independent_review_v2.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 1
+  },
+  "exception": {
+    "type": "ReviewError",
+    "message": "candidate_review receipt status",
+    "file": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v2.py",
+    "line": 381,
+    "function": "validate_bindings",
+    "expression": "review.get(\"status\") in {\"pass\", \"approved\", \"frozen\"}"
+  },
+  "observed_receipt": {
+    "binding": "candidate_review",
+    "status": "approved_for_measurement"
+  },
+  "result_created": false,
+  "native_review": null,
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v2.py",
+    "bytes": 52154,
+    "sha256": "64c56b2f86dddd91b3e178a9f6e5635379609f9139bfa218f0eebe966d82135a"
+  },
+  "correction_scope": "The versioned v3 helper accepts the explicitly approved_for_measurement candidate review status; v2 is unchanged."
+}

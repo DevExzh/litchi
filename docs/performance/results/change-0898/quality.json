@@ -1,0 +1,83 @@
+{
+  "gate_count": 10,
+  "gates": {
+    "boundary": {
+      "bytes": 1523,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/boundary-v2-run.json",
+      "sha256": "a792395914b4321cf0b645128ffe146c6a05dcbfaa4033a7c6b11271be132b9c"
+    },
+    "common-clippy": {
+      "bytes": 1739,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/common-clippy-v2-run.json",
+      "sha256": "60335f06572cd519b9dd4e66687f17a524c5fe34b5fad0356d7bac354bd26ddd"
+    },
+    "common-doc": {
+      "bytes": 1693,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/common-doc-v2-run.json",
+      "sha256": "585d9a055c2eedea75779bbb40afa4fde98d886600683015d718711456770e9d"
+    },
+    "common-tests": {
+      "bytes": 1680,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/common-tests-v2-run.json",
+      "sha256": "c93f25c133cea307c1a9b54c3f69861f624f414f1ef5062eec27bac26eaf78ef"
+    },
+    "diagnostic-tests": {
+      "bytes": 1696,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/diagnostic-tests-v2-run.json",
+      "sha256": "d6d314091917aa21ce451af0ed059ed804e101ac16173255fb800479f755b79c"
+    },
+    "docx-tests": {
+      "bytes": 1662,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/docx-tests-v2-run.json",
+      "sha256": "227c2aba9655ec008c208038be4c0d54925a8b48e4da8aa5f2afadcf08429f5b"
+    },
+    "fmt": {
+      "bytes": 1730,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/fmt-v2-run.json",
+      "sha256": "a9ab205951655ab7df7f0ef49909f60d16f3731ad8d7eae9c1980edce8977160"
+    },
+    "pptx-tests": {
+      "bytes": 1661,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/pptx-tests-v3-run.json",
+      "sha256": "df14d8ef28617942d5ff1bf3a3f533661c4f5f19525599058d24325a58dc9b05"
+    },
+    "producer-tests": {
+      "bytes": 1689,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/producer-tests-v2-run.json",
+      "sha256": "eeae58c0a24fa19d164cde33a918d5abc4901d940a05969a453828ccbae53103"
+    },
+    "xlsx-tests": {
+      "bytes": 1662,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/xlsx-tests-v2-run.json",
+      "sha256": "d797c5ce0ef50f11dcc604004c7c0f370e5a3fd91304a64ca44185728ef9c56c"
+    }
+  },
+  "source": {
+    "bytes": 1342,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source.json",
+    "sha256": "1143bec60aa44f98c35693444fce7abf53726da687e4bfe717425438e8ab4c00"
+  },
+  "status": "pass"
+}

@@ -1,0 +1,1914 @@
+//! Bounded ISO/IEC 29500-3 MCE preprocessing and active-offset selection.
+
+use quick_xml::{
+    Reader, XmlVersion,
+    encoding::Decoder,
+    events::{BytesStart, Event},
+};
+use std::{borrow::Cow, collections::HashSet, ops::Range, rc::Rc, str, sync::Arc};
+
+use super::model::{
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits,
+    Output, Report, XML_NS,
+};
+use super::patterns::{NamePattern, Patterns};
+use super::scope::{Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
+use crate::xml::attributes::BytesStartExt as _;
+use crate::xml_name;
+
+type R<T> = Result<T, Error>;
+
+const ACTIVE_MARKER_TEMPLATE: &[u8; 38] = b"litchi-mce-active-0000000000000000-00:";
+const ACTIVE_MARKER_HASH_START: usize = 18;
+const ACTIVE_MARKER_HASH_END: usize = 34;
+const ACTIVE_MARKER_SALT_START: usize = 35;
+const ACTIVE_MARKER_SALT_END: usize = 37;
+const ACTIVE_MARKER_WRAPPER_BYTES: usize = 7;
+const DECIMAL_BUFFER_BYTES: usize = usize::BITS as usize;
+
+/// Retain source byte offsets that survive semantic MCE branch selection.
+///
+/// Returned offsets always refer to `xml`; the marked preprocessing buffer is
+/// an implementation detail. Input order and duplicate offsets are preserved.
+/// Every offset must be less than `xml.len()` and identify a position where an
+/// XML comment can be inserted (normally an element-start offset).
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
+pub fn active_offsets(
+    xml: &[u8],
+    offsets: &[u32],
+    capabilities: &Capabilities,
+    limits: &OffsetLimits,
+) -> R<Vec<u32>> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit("active-offset source bytes"));
+    }
+    if offsets.len() > limits.max_offsets {
+        return Err(limit("active-offset count"));
+    }
+    for &offset in offsets {
+        if usize::try_from(offset).map_or(true, |offset| offset >= xml.len()) {
+            return Err(bad("active offset is outside the source XML"));
+        }
+    }
+
+    if offsets.is_empty() {
+        return Ok(Vec::new());
+    }
+    if find_bytes(xml, NAMESPACE.as_bytes()).is_none() {
+        return copy_offsets(offsets);
+    }
+
+    let marker = active_marker(xml)?;
+    let max_index = offsets
+        .len()
+        .checked_sub(1)
+        .ok_or_else(|| bad("active-offset count is invalid"))?;
+    let decimal_digits = decimal_len(max_index)?;
+    let marker_bytes = marker
+        .len()
+        .checked_add(ACTIVE_MARKER_WRAPPER_BYTES)
+        .and_then(|bytes| bytes.checked_add(decimal_digits))
+        .ok_or_else(|| limit("active-offset marker bytes"))?;
+    let marked_len = offsets
+        .len()
+        .checked_mul(marker_bytes)
+        .and_then(|extra| xml.len().checked_add(extra))
+        .ok_or_else(|| limit("active-offset marked XML bytes"))?;
+    if marked_len > limits.max_marked_bytes {
+        return Err(limit("active-offset marked XML bytes"));
+    }
+
+    let mut positions = Vec::new();
+    reserve_exact(&mut positions, offsets.len(), "active-offset positions")?;
+    positions.extend(
+        offsets
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, offset)| (offset, index)),
+    );
+    positions.sort_unstable_by_key(|&(offset, index)| (offset, index));
+
+    let mut marked = Vec::new();
+    reserve_exact(&mut marked, marked_len, "active-offset marked XML")?;
+    let mut cursor = 0usize;
+    let mut decimal = [0u8; DECIMAL_BUFFER_BYTES];
+    for (offset, index) in positions {
+        let offset = usize::try_from(offset).map_err(|error| {
+            bad(format!(
+                "active offset does not fit the platform address space: {error}"
+            ))
+        })?;
+        marked.extend_from_slice(
+            xml.get(cursor..offset)
+                .ok_or_else(|| bad("active offsets are not valid source positions"))?,
+        );
+        marked.extend_from_slice(b"<!--");
+        marked.extend_from_slice(&marker);
+        marked.extend_from_slice(decimal_bytes(index, &mut decimal)?);
+        marked.extend_from_slice(b"-->");
+        cursor = offset;
+    }
+    marked.extend_from_slice(
+        xml.get(cursor..)
+            .ok_or_else(|| bad("active-offset source cursor is invalid"))?,
+    );
+
+    let processed = process_markup_compatibility(&marked, capabilities, &limits.processing)?;
+    let processed = processed.xml.as_ref();
+    let mut selected = Vec::new();
+    reserve_exact(&mut selected, offsets.len(), "active-offset selection map")?;
+    selected.resize(offsets.len(), false);
+
+    let mut cursor = 0usize;
+    while let Some(relative) = find_bytes(
+        processed
+            .get(cursor..)
+            .ok_or_else(|| bad("active-offset output cursor is invalid"))?,
+        &marker,
+    ) {
+        let marker_start = cursor
+            .checked_add(relative)
+            .ok_or_else(|| bad("active-offset marker position overflowed"))?;
+        let opening_start = marker_start
+            .checked_sub(4)
+            .ok_or_else(|| bad("active-offset marker lacks a comment opening"))?;
+        if processed.get(opening_start..marker_start) != Some(b"<!--".as_slice()) {
+            return Err(bad("active-offset marker lacks a comment opening"));
+        }
+        let digits_start = marker_start
+            .checked_add(marker.len())
+            .ok_or_else(|| bad("active-offset marker position overflowed"))?;
+        let tail = processed
+            .get(digits_start..)
+            .ok_or_else(|| bad("active-offset marker is truncated"))?;
+        let digits_end =
+            find_bytes(tail, b"-->").ok_or_else(|| bad("active-offset marker is unterminated"))?;
+        let digits = tail
+            .get(..digits_end)
+            .ok_or_else(|| bad("active-offset marker range is invalid"))?;
+        let index = parse_decimal(digits)?;
+        let slot = selected
+            .get_mut(index)
+            .ok_or_else(|| bad("active-offset marker index is out of range"))?;
+        if *slot {
+            return Err(bad("active-offset marker is duplicated"));
+        }
+        *slot = true;
+        cursor = digits_start
+            .checked_add(digits_end)
+            .and_then(|end| end.checked_add(3))
+            .ok_or_else(|| bad("active-offset marker end overflowed"))?;
+    }
+
+    let retained = selected.iter().filter(|&&selected| selected).count();
+    let mut active = Vec::new();
+    reserve_exact(&mut active, retained, "active offsets")?;
+    for (&offset, selected) in offsets.iter().zip(selected) {
+        if selected {
+            active.push(offset);
+        }
+    }
+    Ok(active)
+}
+
+fn copy_offsets(offsets: &[u32]) -> R<Vec<u32>> {
+    let mut copied = Vec::new();
+    reserve_exact(&mut copied, offsets.len(), "active offsets")?;
+    copied.extend_from_slice(offsets);
+    Ok(copied)
+}
+
+pub(crate) fn reserve_exact<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    resource: &'static str,
+) -> R<()> {
+    values
+        .try_reserve_exact(additional)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
+/// Reserve with the standard amortized growth policy.
+///
+/// The per-element buffers below grow one entry at a time, so an exact
+/// reservation reallocates on every push; they take the geometric policy while
+/// the fixed-size reservations above keep their exact one.
+fn reserve_amortized<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> R<()> {
+    values
+        .try_reserve(additional)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
+fn active_marker(xml: &[u8]) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
+    let hash = xml.iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    active_marker_with_hash(xml, hash)
+}
+
+pub(crate) fn active_marker_with_hash(
+    xml: &[u8],
+    hash: u64,
+) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
+    let mut base = *ACTIVE_MARKER_TEMPLATE;
+    write_hex(
+        hash,
+        base.get_mut(ACTIVE_MARKER_HASH_START..ACTIVE_MARKER_HASH_END)
+            .ok_or_else(|| bad("active-offset marker hash range is invalid"))?,
+    )?;
+    for salt in u8::MIN..=u8::MAX {
+        let mut candidate = base;
+        write_hex(
+            u64::from(salt),
+            candidate
+                .get_mut(ACTIVE_MARKER_SALT_START..ACTIVE_MARKER_SALT_END)
+                .ok_or_else(|| bad("active-offset marker salt range is invalid"))?,
+        )?;
+        if find_bytes(xml, &candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(bad("source XML collides with active-offset markers"))
+}
+
+fn write_hex(mut value: u64, output: &mut [u8]) -> R<()> {
+    for byte in output.iter_mut().rev() {
+        let nibble = u8::try_from(value & 0x0f)
+            .map_err(|error| bad(format!("active-offset marker nibble is invalid: {error}")))?;
+        *byte = if nibble < 10 {
+            b'0' + nibble
+        } else {
+            b'a' + (nibble - 10)
+        };
+        value >>= 4;
+    }
+    if value == 0 {
+        Ok(())
+    } else {
+        Err(bad("active-offset marker value is too large"))
+    }
+}
+
+fn decimal_len(mut value: usize) -> R<usize> {
+    let mut len = 1usize;
+    while value >= 10 {
+        value /= 10;
+        len = len
+            .checked_add(1)
+            .ok_or_else(|| bad("active-offset decimal length overflowed"))?;
+    }
+    Ok(len)
+}
+
+fn decimal_bytes(mut value: usize, buffer: &mut [u8]) -> R<&[u8]> {
+    let mut cursor = buffer.len();
+    loop {
+        cursor = cursor
+            .checked_sub(1)
+            .ok_or_else(|| bad("active-offset decimal buffer is too small"))?;
+        let digit = u8::try_from(value % 10)
+            .map_err(|error| bad(format!("active-offset decimal digit is invalid: {error}")))?;
+        let slot = buffer
+            .get_mut(cursor)
+            .ok_or_else(|| bad("active-offset decimal cursor is invalid"))?;
+        *slot = b'0' + digit;
+        value /= 10;
+        if value == 0 {
+            break;
+        }
+    }
+    buffer
+        .get(cursor..)
+        .ok_or_else(|| bad("active-offset decimal range is invalid"))
+}
+
+fn parse_decimal(digits: &[u8]) -> R<usize> {
+    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
+        return Err(bad("active-offset marker index is invalid"));
+    }
+    digits.iter().try_fold(0usize, |value, digit| {
+        value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(usize::from(*digit - b'0')))
+            .ok_or_else(|| bad("active-offset marker index overflowed"))
+    })
+}
+
+pub(crate) fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    memchr::memmem::find(haystack, needle)
+}
+
+#[derive(Clone, Default)]
+struct Namespaces {
+    head: Option<Arc<NamespaceLayer>>,
+    bindings: usize,
+}
+
+struct NamespaceLayer {
+    parent: Option<Arc<NamespaceLayer>>,
+    local: Vec<(String, String)>,
+}
+
+/// Namespace declarations one element's lookup may walk before the debug
+/// cross-check of [`Scope`] against the declaration chain gives up.
+const CROSS_CHECKED_DECLARATIONS: usize = 256;
+
+impl Namespaces {
+    /// Resolve `prefix` by walking the declaration chain, or `None` when
+    /// `budget` declarations were visited first.
+    ///
+    /// The walk costs one comparison per declaration in scope, which an input
+    /// controls; production lookups use [`Scope`], and this walk only checks
+    /// it in debug builds.
+    fn walk(&self, prefix: &str, budget: usize) -> Option<Option<&str>> {
+        if prefix == "xml" {
+            return Some(Some(XML_NS));
+        }
+        let mut steps = 0usize;
+        let mut layer = self.head.as_deref();
+        while let Some(current) = layer {
+            for (candidate, namespace) in current.local.iter().rev() {
+                if steps == budget {
+                    return None;
+                }
+                steps += 1;
+                if candidate == prefix {
+                    return Some(Some(namespace));
+                }
+            }
+            layer = current.parent.as_deref();
+        }
+        Some(None)
+    }
+
+    /// Add the declarations `local` of the element at `depth` to this chain,
+    /// the chain of its parent.
+    ///
+    /// `scope` must hold the bindings of this chain; whether it already holds
+    /// the element's own does not matter. Each prefix is compared with the
+    /// others once through a sort and resolved once through `scope`, so an
+    /// element's declarations cost `O(n log n)` whatever their number.
+    fn with_local(
+        &self,
+        local: Vec<(String, String)>,
+        lim: &Limits,
+        scope: &Scope,
+        depth: usize,
+    ) -> R<Self> {
+        if local.is_empty() {
+            return Ok(self.clone());
+        }
+        if has_duplicate_prefix(&local)? {
+            return Err(bad("duplicate namespace declaration"));
+        }
+        let mut bindings = self.bindings;
+        for (prefix, _) in &local {
+            let bound = scope.get_outside(prefix, depth);
+            debug_assert!(
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                    .is_none_or(|walked| walked == bound),
+                "the prefix index disagrees with the declaration chain for {prefix:?}"
+            );
+            if bound.is_none() {
+                bindings = bindings
+                    .checked_add(1)
+                    .ok_or_else(|| limit("namespace bindings"))?;
+            }
+        }
+        if bindings > lim.max_namespace_bindings {
+            return Err(limit("namespace bindings"));
+        }
+        Ok(Self {
+            head: Some(Arc::new(NamespaceLayer {
+                parent: self.head.clone(),
+                local,
+            })),
+            bindings,
+        })
+    }
+}
+
+/// Prefix resolution at the element being processed: [`Scope`] answers, with
+/// the namespace's identity, and debug builds cross-check the URI against the
+/// element's declaration chain while that walk stays short.
+#[derive(Clone, Copy)]
+struct Resolver<'a> {
+    scope: &'a Scope,
+    chain: &'a Namespaces,
+}
+
+impl<'a> Resolver<'a> {
+    /// The namespace `prefix` is bound to, with its identity.
+    fn resolve(self, prefix: &str) -> Option<Uri<'a>> {
+        let bound = self.scope.resolve(prefix);
+        debug_assert!(
+            self.chain
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                .is_none_or(|walked| walked == bound.map(|uri| uri.text)),
+            "the prefix index disagrees with the declaration chain for {prefix:?}"
+        );
+        bound
+    }
+}
+
+/// Whether any declaration sits between an inherited chain and the chain in
+/// effect at the nearest emitted ancestor.
+///
+/// `with_local` shares the parent layer verbatim when an element declares
+/// nothing, so distinct pointers imply at least one intervening declaration.
+#[inline]
+fn hoists(head: Option<&Arc<NamespaceLayer>>, stop: Option<&Arc<NamespaceLayer>>) -> bool {
+    match (head, stop) {
+        (None, _) => false,
+        (Some(_), None) => true,
+        (Some(head), Some(stop)) => !Arc::ptr_eq(head, stop),
+    }
+}
+
+/// Declarations to re-declare on an emitted element, innermost first.
+type Hoisted = Rc<[(String, String)]>;
+
+/// The declarations a child of the top frame of `st` must re-declare when it
+/// is the first element emitted below the top frame's nearest emitted
+/// ancestor: the effective bindings declared between that ancestor and the
+/// top frame, innermost first and each prefix once, in the order the source
+/// declared them within one element.
+///
+/// Everything between them was declared on an `AlternateContent` wrapper, a
+/// `Choice`/`Fallback` branch or a `ProcessContent` element that the output
+/// drops, so it has to be re-declared on the first emitted descendant for
+/// every qualified name in the output to resolve to the namespace it resolved
+/// to in the source.
+///
+/// A frame's list extends its parent's: its own declarations first, then the
+/// parent's entries its declarations do not shadow. Each list is built at most
+/// once, the first time a child needs it, and a frame that declares nothing
+/// shares its parent's, so emitting a child costs work proportional to the
+/// declarations it re-declares rather than to every declaration in the
+/// dropped scopes.
+#[cold]
+#[inline(never)]
+fn hoisted_for_children(st: &mut [Frame]) -> R<Hoisted> {
+    let Some(top) = st.len().checked_sub(1) else {
+        return Ok(Rc::from(Vec::new()));
+    };
+    // The lowest frame whose list has to be built: the ones below it are
+    // cached or contribute nothing.
+    let mut first = top;
+    while first > 0 && st[first].hoisted.is_none() && frame_hoists(&st[first - 1]) {
+        first -= 1;
+    }
+    for index in first..=top {
+        if st[index].hoisted.is_some() {
+            continue;
+        }
+        let inherited = if index > 0 && frame_hoists(&st[index - 1]) {
+            st[index - 1]
+                .hoisted
+                .clone()
+                .ok_or_else(|| bad("MCE hoisting state is incomplete"))?
+        } else {
+            Rc::from(Vec::new())
+        };
+        let list = if !frame_hoists(&st[index]) {
+            Rc::from(Vec::new())
+        } else if st[index].declares {
+            let own = st[index]
+                .ctx
+                .ns
+                .head
+                .as_ref()
+                .map_or(&[][..], |layer| layer.local.as_slice());
+            let mut list = Vec::new();
+            reserve_exact(
+                &mut list,
+                own.len().saturating_add(inherited.len()),
+                "MCE hoisted namespace declarations",
+            )?;
+            list.extend(own.iter().filter(|(prefix, _)| prefix != "xml").cloned());
+            let own_prefixes = sorted_prefixes(own)?;
+            list.extend(
+                inherited
+                    .iter()
+                    .filter(|(prefix, _)| own_prefixes.binary_search(&prefix.as_str()).is_err())
+                    .cloned(),
+            );
+            Rc::from(list)
+        } else {
+            inherited
+        };
+        st[index].hoisted = Some(list);
+    }
+    st[top]
+        .hoisted
+        .clone()
+        .ok_or_else(|| bad("MCE hoisting state is incomplete"))
+}
+
+/// Whether a child of `frame` inherits declarations its output lacks.
+#[inline]
+fn frame_hoists(frame: &Frame) -> bool {
+    hoists(frame.ctx.ns.head.as_ref(), frame.emitted_ns.as_ref())
+}
+
+/// The namespace scope an element's output already carries at its nearest
+/// emitted ancestor; [`hoisted_for_children`] re-declares the difference.
+struct Inherited<'a> {
+    emitted: Option<&'a Arc<NamespaceLayer>>,
+}
+
+impl Inherited<'_> {
+    /// The scope children inherit as already emitted: this element's own scope
+    /// when it reached the output, otherwise the scope it inherited.
+    fn after(&self, ctx: &Ctx, emitted: bool) -> Option<Arc<NamespaceLayer>> {
+        if emitted {
+            ctx.ns.head.clone()
+        } else {
+            self.emitted.cloned()
+        }
+    }
+}
+
+struct DirectiveLayer {
+    parent: Option<Arc<DirectiveLayer>>,
+    ignorable: HashSet<UriId>,
+    process: Patterns<UriId>,
+    preserve_elements: Patterns<UriId>,
+    preserve_attributes: Patterns<UriId>,
+}
+
+#[derive(Clone)]
+struct Ctx {
+    ns: Namespaces,
+    directives: Option<Arc<DirectiveLayer>>,
+    opaque: bool,
+}
+
+impl Ctx {
+    fn root() -> Self {
+        Self {
+            ns: Namespaces {
+                head: None,
+                bindings: 1,
+            },
+            directives: None,
+            opaque: false,
+        }
+    }
+
+    fn is_ignorable(&self, namespace: UriId) -> bool {
+        ignorable_in(&self.directives, namespace)
+    }
+
+    fn processes(&self, namespace: UriId, local: &str) -> bool {
+        pattern_directive_matches(&self.directives, namespace, local, |layer| &layer.process)
+    }
+
+    fn preserves_element(&self, namespace: UriId, local: &str) -> bool {
+        pattern_directive_matches(&self.directives, namespace, local, |layer| {
+            &layer.preserve_elements
+        })
+    }
+
+    fn preserves_attribute(&self, namespace: UriId, local: &str) -> bool {
+        pattern_directive_matches(&self.directives, namespace, local, |layer| {
+            &layer.preserve_attributes
+        })
+    }
+}
+
+/// Whether a directive layer from `head` outward makes `namespace` ignorable.
+fn ignorable_in(head: &Option<Arc<DirectiveLayer>>, namespace: UriId) -> bool {
+    let mut layer = head.as_deref();
+    while let Some(current) = layer {
+        if current.ignorable.contains(&namespace) {
+            return true;
+        }
+        layer = current.parent.as_deref();
+    }
+    false
+}
+
+fn pattern_directive_matches(
+    head: &Option<Arc<DirectiveLayer>>,
+    namespace: UriId,
+    local: &str,
+    select: impl Fn(&DirectiveLayer) -> &Patterns<UriId>,
+) -> bool {
+    let mut layer = head.as_deref();
+    while let Some(current) = layer {
+        if select(current).matches(&namespace, local) {
+            return true;
+        }
+        if current.ignorable.contains(&namespace) {
+            return false;
+        }
+        layer = current.parent.as_deref();
+    }
+    false
+}
+
+struct BoundedOutput {
+    bytes: Vec<u8>,
+    max: usize,
+}
+
+impl BoundedOutput {
+    fn new(hint: usize, max: usize) -> R<Self> {
+        let mut bytes = Vec::new();
+        reserve_exact(&mut bytes, hint.min(max), "MCE output")?;
+        Ok(Self { bytes, max })
+    }
+
+    #[inline]
+    fn extend_from_slice(&mut self, value: &[u8]) -> R<()> {
+        self.reserve(value.len())?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    #[inline]
+    fn push(&mut self, value: u8) -> R<()> {
+        self.reserve(1)?;
+        self.bytes.push(value);
+        Ok(())
+    }
+
+    /// Copy a name that is already in the append-only output buffer.
+    ///
+    /// The range is an index pair rather than a borrowed slice because output
+    /// growth may move the allocation. Validate it before reserving: the
+    /// standard `Vec` helper assumes a valid range and would panic otherwise.
+    #[inline]
+    fn extend_from_within(&mut self, range: Range<usize>) -> R<()> {
+        let additional = range
+            .end
+            .checked_sub(range.start)
+            .ok_or_else(|| bad("MCE output name span is reversed"))?;
+        if range.end > self.bytes.len() {
+            return Err(bad("MCE output name span is outside the output"));
+        }
+        self.reserve(additional)?;
+        self.bytes.extend_from_within(range);
+        Ok(())
+    }
+
+    #[inline]
+    fn checked_range(&self, start: usize, length: usize) -> R<Range<usize>> {
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| limit("output bytes"))?;
+        if end > self.bytes.len() {
+            return Err(bad("MCE output name span is outside the output"));
+        }
+        Ok(start..end)
+    }
+
+    fn reserve(&mut self, additional: usize) -> R<()> {
+        let len = self
+            .bytes
+            .len()
+            .checked_add(additional)
+            .ok_or_else(|| limit("output bytes"))?;
+        if len > self.max {
+            return Err(limit("output bytes"));
+        }
+        if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
+            // Grow geometrically so a document that outgrows the input-sized
+            // hint costs a logarithmic number of reallocations instead of one
+            // per written run, and clamp the request to the configured output
+            // bound so the reservation never asks for more than the limit
+            // already admits.
+            let target = self
+                .bytes
+                .capacity()
+                .saturating_mul(2)
+                .min(self.max)
+                .max(len);
+            let grow = target.saturating_sub(self.bytes.len());
+            self.bytes
+                .try_reserve_exact(grow)
+                // Spare capacity is optional: under allocator pressure, retry
+                // the minimum allocation needed for this admitted write.
+                .or_else(|source| {
+                    if target > len {
+                        self.bytes.try_reserve_exact(additional)
+                    } else {
+                        Err(source)
+                    }
+                })
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE output",
+                    source,
+                })?;
+        }
+        Ok(())
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+enum Mode {
+    Emit(Range<usize>),
+    Inactive,
+    Unwrap,
+    Skip,
+    Alt {
+        choices: usize,
+        selected: bool,
+        fallback: bool,
+    },
+    Branch,
+}
+struct Frame {
+    ctx: Ctx,
+    mode: Mode,
+    active: bool,
+    /// Namespace scope already present in the output at this frame's nearest
+    /// emitted ancestor; declarations between it and `ctx.ns` are hoisted onto
+    /// the first emitted descendant.
+    emitted_ns: Option<Arc<NamespaceLayer>>,
+    /// Whether the element declared namespaces: its declarations are then the
+    /// layer at `ctx.ns.head`, and [`Scope`] holds them until it closes.
+    declares: bool,
+    /// The declarations its children re-declare when emitted, built by
+    /// [`hoisted_for_children`] the first time a child needs them.
+    hoisted: Option<Hoisted>,
+}
+
+/// One source attribute: its qualified name borrowed from the event, its
+/// normalized value borrowed unless quick-xml had to unescape or normalize it,
+/// and whether the compatibility filter keeps it in the output.
+struct Attr<'a> {
+    key: &'a str,
+    value: Cow<'a, str>,
+    keep: bool,
+}
+
+#[inline(never)]
+fn contains_mce_namespace(mut remaining: &[u8]) -> bool {
+    let needle = NAMESPACE.as_bytes();
+    let first = needle[0];
+    while remaining.len() >= needle.len() {
+        let valid_starts = remaining.len() - needle.len() + 1;
+        let Some(offset) = memchr::memchr(first, &remaining[..valid_starts]) else {
+            return false;
+        };
+        if remaining[offset..].starts_with(needle) {
+            return true;
+        }
+        remaining = &remaining[offset + 1..];
+    }
+    false
+}
+
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
+pub fn process_markup_compatibility<'a>(
+    xml: &'a [u8],
+    caps: &Capabilities,
+    lim: &Limits,
+) -> R<Output<'a>> {
+    if xml.len() > lim.max_input_bytes {
+        return Err(limit("input bytes"));
+    }
+    if !contains_mce_namespace(xml) {
+        if xml.len() > lim.max_output_bytes {
+            return Err(limit("output bytes"));
+        }
+        return Ok(Output {
+            xml: Cow::Borrowed(xml),
+            report: Report::default(),
+        });
+    }
+    let mut r = Reader::from_reader(xml);
+    r.config_mut().trim_text(false);
+    let mut stack = Vec::new();
+    let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+    let mut rep = Report::default();
+    let mut root = false;
+    let mut scope = Scope::new(caps);
+    let mut buf = Vec::new();
+    loop {
+        let d = r.decoder();
+        match r.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => start(
+                &e, d, false, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
+            )?,
+            Ok(Event::Empty(e)) => start(
+                &e, d, true, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
+            )?,
+            Ok(Event::End(_)) => {
+                let f: Frame = stack.pop().ok_or_else(|| bad("unexpected end"))?;
+                // The frame was at depth `stack.len() + 1`.
+                scope.truncate(stack.len() + 1);
+                match f.mode {
+                    Mode::Alt { choices: 0, .. } => {
+                        return Err(bad("AlternateContent requires Choice"));
+                    },
+                    Mode::Emit(name) if f.active => {
+                        out.extend_from_slice(b"</")?;
+                        out.extend_from_within(name)?;
+                        out.push(b'>')?;
+                    },
+                    Mode::Emit(_)
+                    | Mode::Inactive
+                    | Mode::Unwrap
+                    | Mode::Skip
+                    | Mode::Alt { .. }
+                    | Mode::Branch => {},
+                }
+            },
+            Ok(Event::Text(e)) => {
+                if visible(&stack) {
+                    out.extend_from_slice(e.as_ref())?;
+                }
+            },
+            Ok(Event::CData(e)) => {
+                if visible(&stack) {
+                    out.extend_from_slice(b"<![CDATA[")?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.extend_from_slice(b"]]>")?;
+                }
+            },
+            Ok(Event::Comment(e)) => {
+                if visible(&stack) {
+                    out.extend_from_slice(b"<!--")?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.extend_from_slice(b"-->")?;
+                }
+            },
+            Ok(Event::Decl(e)) => {
+                if stack.is_empty() && !root {
+                    out.extend_from_slice(b"<?")?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.extend_from_slice(b"?>")?;
+                } else {
+                    return Err(bad("late XML declaration"));
+                }
+            },
+            Ok(Event::GeneralRef(e)) => {
+                if visible(&stack) {
+                    let n = e.decode().map_err(xerr)?;
+                    if e.resolve_char_ref().map_err(xerr)?.is_none()
+                        && !matches!(n.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot")
+                    {
+                        return Err(bad("custom entity"));
+                    }
+                    out.push(b'&')?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.push(b';')?;
+                }
+            },
+            Ok(Event::DocType(_) | Event::PI(_)) => {
+                return Err(bad("DTD and processing instructions are rejected"));
+            },
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(Error::Xml(e.to_string())),
+        }
+        buf.clear();
+    }
+    if !stack.is_empty() {
+        return Err(bad("unterminated XML"));
+    }
+    Ok(Output {
+        xml: Cow::Owned(out.into_inner()),
+        report: rep,
+    })
+}
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the MCE start event advances one bounded parser state tuple"
+)]
+fn start(
+    e: &BytesStart<'_>,
+    d: Decoder,
+    empty: bool,
+    caps: &Capabilities,
+    lim: &Limits,
+    st: &mut Vec<Frame>,
+    out: &mut BoundedOutput,
+    rep: &mut Report,
+    root: &mut bool,
+    scope: &mut Scope,
+) -> R<()> {
+    if st.len() >= lim.max_depth {
+        return Err(limit("depth"));
+    }
+    let depth = st.len() + 1;
+    let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
+    let mut raw = Vec::new();
+    let max_attributes = lim
+        .max_attributes_per_element
+        .min(ATTRIBUTES_PER_ELEMENT_CEILING);
+    let mut attributes = 0usize;
+    for a in e.checked_attributes() {
+        // Counted before the item is inspected: the first 32 names use
+        // quick-xml's bounded linear check and later names use the ordered
+        // map check, so the limit bounds all duplicate-check work for the
+        // tag.
+        attributes = attributes
+            .checked_add(1)
+            .ok_or_else(|| limit("attributes per element"))?;
+        if attributes > max_attributes {
+            return Err(limit("attributes per element"));
+        }
+        let a = a.map_err(xerr)?;
+        reserve_amortized(&mut raw, 1, "MCE attributes")?;
+        raw.push(Attr {
+            key: str::from_utf8(a.key.into_inner()).map_err(xerr)?,
+            value: a
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
+                .map_err(xerr)?,
+            keep: true,
+        });
+    }
+    let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
+    let mut local_namespaces = Vec::new();
+    for a in &raw {
+        if a.key == "xmlns" {
+            reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
+            local_namespaces.push((String::new(), a.value.as_ref().to_owned()));
+        } else if let Some(p) = a.key.strip_prefix("xmlns:") {
+            if !xml_name::is_ncname(p) || a.value.is_empty() {
+                return Err(bad("invalid namespace"));
+            }
+            reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
+            local_namespaces.push((p.into(), a.value.as_ref().to_owned()));
+        }
+    }
+    let declares = !local_namespaces.is_empty();
+    if declares {
+        c.ns = c.ns.with_local(local_namespaces, lim, scope, depth)?;
+        if let Some(layer) = c.ns.head.as_ref() {
+            scope.push(depth, &layer.local, caps)?;
+        }
+    }
+    let (namespace, local) = expand_parts(q, resolver(scope, &c.ns), true)?;
+    validate_expanded_attribute_duplicates(&raw, resolver(scope, &c.ns))?;
+    let parent_active = st.last().is_none_or(|f| f.active);
+    if c.opaque {
+        let hoisted = if parent_active {
+            hoisted_if_any(st)?
+        } else {
+            None
+        };
+        let mode = if parent_active {
+            Mode::Emit(write_start(
+                out,
+                q,
+                &c,
+                &mut raw,
+                false,
+                rep,
+                e.as_ref(),
+                hoisted.as_deref(),
+                scope,
+                depth,
+            )?)
+        } else {
+            Mode::Inactive
+        };
+        let frame = {
+            let parent = st.last();
+            let inherited = Inherited {
+                emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
+            };
+            Frame {
+                emitted_ns: inherited.after(&c, parent_active),
+                ctx: c,
+                mode,
+                active: parent_active,
+                declares,
+                hoisted: None,
+            }
+        };
+        return close(st, frame, empty, out, scope);
+    }
+
+    let mut directives = Vec::new();
+    let mut tokens = 0usize;
+    for a in &raw {
+        if a.key == "xmlns" || a.key.starts_with("xmlns:") {
+            continue;
+        }
+        let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
+        if !scope.is_mce(namespace.id) {
+            continue;
+        }
+        if !matches!(
+            local,
+            "Ignorable"
+                | "ProcessContent"
+                | "PreserveElements"
+                | "PreserveAttributes"
+                | "MustUnderstand"
+        ) {
+            return Err(bad("unknown MCE attribute"));
+        }
+        tokens = tokens
+            .checked_add(a.value.split_whitespace().count())
+            .ok_or_else(|| limit("directive tokens"))?;
+        if tokens > lim.max_directive_tokens {
+            return Err(limit("directive tokens"));
+        }
+        reserve_amortized(&mut directives, 1, "MCE directives")?;
+        directives.push((local, a.value.as_ref()));
+    }
+
+    if !directives.is_empty() {
+        apply_directives(&c.ns, &mut c.directives, &directives, scope)?;
+    }
+    // Only a namespace an extension element lives in, a URI the caller chose,
+    // is compared with the extension names.
+    c.opaque = scope.has_extensions(namespace.id)
+        && caps.extensions.contains(&Name {
+            namespace: namespace.text.to_owned(),
+            local_name: local.to_owned(),
+        });
+
+    if scope.is_mce(namespace.id) {
+        match local {
+            "AlternateContent" => {
+                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Container)?;
+            },
+            "Choice" => {
+                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Choice)?;
+            },
+            "Fallback" => {
+                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Fallback)?;
+            },
+            _ => {},
+        }
+    }
+
+    let alt = if let Some(parent) = st.last_mut()
+        && let Mode::Alt {
+            choices,
+            selected,
+            fallback,
+        } = &mut parent.mode
+    {
+        if !scope.is_mce(namespace.id) {
+            if c.is_ignorable(namespace.id) && !scope.understood(namespace.id) {
+                rep.ignored_elements += 1;
+                Some((false, Mode::Skip))
+            } else {
+                return Err(bad("non-ignorable AlternateContent child"));
+            }
+        } else {
+            Some(match local {
+                "Choice" => {
+                    if *fallback {
+                        return Err(bad("Choice after Fallback"));
+                    }
+                    *choices += 1;
+                    if *choices > lim.max_choices_per_alternate {
+                        return Err(limit("choices"));
+                    }
+                    let req =
+                        attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
+                    let mut ok = true;
+                    let mut count = 0;
+                    for p in req.split_whitespace() {
+                        if !xml_name::is_ncname(p) {
+                            return Err(bad("invalid Requires prefix"));
+                        }
+                        count += 1;
+                        ok &= scope.understood(
+                            resolver(scope, &c.ns)
+                                .resolve(p)
+                                .ok_or_else(|| bad(format!("unbound Requires {p}")))?
+                                .id,
+                        );
+                    }
+                    if count == 0 {
+                        return Err(bad("empty Requires"));
+                    }
+                    let a = parent.active && !*selected && ok;
+                    if a {
+                        *selected = true;
+                        rep.selected_choices += 1;
+                    }
+                    (a, Mode::Branch)
+                },
+                "Fallback" => {
+                    if *fallback {
+                        return Err(bad("duplicate Fallback"));
+                    }
+                    *fallback = true;
+                    let a = parent.active && !*selected;
+                    if a {
+                        *selected = true;
+                        rep.selected_fallbacks += 1;
+                    }
+                    (a, Mode::Branch)
+                },
+                _ => return Err(bad("invalid AlternateContent child")),
+            })
+        }
+    } else {
+        None
+    };
+    if let Some((active, mode)) = alt {
+        let frame = {
+            let parent = st.last();
+            let inherited = Inherited {
+                emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
+            };
+            Frame {
+                emitted_ns: inherited.after(&c, false),
+                ctx: c,
+                mode,
+                active,
+                declares,
+                hoisted: None,
+            }
+        };
+        return close(st, frame, empty, out, scope);
+    }
+    let mut active = parent_active;
+    let mut emit = false;
+    let mode = if scope.is_mce(namespace.id) {
+        match local {
+            "AlternateContent" => {
+                rep.alternate_content_count += 1;
+                Mode::Alt {
+                    choices: 0,
+                    selected: false,
+                    fallback: false,
+                }
+            },
+            _ => return Err(bad("Choice/Fallback outside AlternateContent")),
+        }
+    } else if c.is_ignorable(namespace.id) && !scope.understood(namespace.id) {
+        if c.preserves_element(namespace.id, local) {
+            rep.preserved_elements += 1;
+            emit = true;
+            Mode::Inactive
+        } else if c.processes(namespace.id, local) {
+            for a in &raw {
+                let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
+                if scope.is_xml(namespace.id) && matches!(local, "base" | "lang" | "space") {
+                    return Err(bad("xml context attribute on unwrapped element"));
+                }
+            }
+            rep.unwrapped_elements += 1;
+            Mode::Unwrap
+        } else {
+            rep.ignored_elements += 1;
+            active = false;
+            Mode::Skip
+        }
+    } else {
+        emit = true;
+        Mode::Inactive
+    };
+    let emitted = emit && active;
+    let hoisted = if emitted { hoisted_if_any(st)? } else { None };
+    let mode = if emitted {
+        Mode::Emit(write_start(
+            out,
+            q,
+            &c,
+            &mut raw,
+            true,
+            rep,
+            e.as_ref(),
+            hoisted.as_deref(),
+            scope,
+            depth,
+        )?)
+    } else if emit {
+        Mode::Inactive
+    } else {
+        mode
+    };
+    let frame = {
+        let parent = st.last();
+        let inherited = Inherited {
+            emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
+        };
+        if st.is_empty() {
+            if *root {
+                return Err(bad("multiple roots"));
+            }
+            *root = true;
+        }
+        Frame {
+            emitted_ns: inherited.after(&c, emitted),
+            ctx: c,
+            mode,
+            active,
+            declares,
+            hoisted: None,
+        }
+    };
+    close(st, frame, empty, out, scope)
+}
+
+/// Apply one element's compatibility directives to its context: the
+/// `Ignorable` namespaces it adds, the `ProcessContent`, `PreserveElements`
+/// and `PreserveAttributes` targets, and the `MustUnderstand` check.
+///
+/// Only an element that carries a directive calls this, so an ordinary
+/// element builds none of these sets.
+fn apply_directives(
+    ns: &Namespaces,
+    head: &mut Option<Arc<DirectiveLayer>>,
+    directives: &[(&str, &str)],
+    scope: &Scope,
+) -> R<()> {
+    let mut local_ign: HashSet<UriId> = HashSet::new();
+    if let Some((_, value)) = directives.iter().find(|(name, _)| *name == "Ignorable") {
+        let mut seen = HashSet::new();
+        for prefix in value.split_whitespace() {
+            if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
+                return Err(bad("invalid or duplicate Ignorable prefix"));
+            }
+            let uri = resolver(scope, ns)
+                .resolve(prefix)
+                .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
+            if scope.is_mce(uri.id) {
+                return Err(bad("MCE cannot be ignorable"));
+            }
+            local_ign
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE Ignorable directives",
+                    source,
+                })?;
+            local_ign.insert(uri.id);
+        }
+    }
+    let mut new_ignorable: HashSet<UriId> = HashSet::new();
+    for namespace in &local_ign {
+        if !ignorable_in(head, *namespace) {
+            new_ignorable
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE effective Ignorable directives",
+                    source,
+                })?;
+            new_ignorable.insert(*namespace);
+        }
+    }
+
+    let mut local_process = Patterns::default();
+    let mut local_preserve_elements = Patterns::default();
+    let mut local_preserve_attributes = Patterns::default();
+    for (name, value) in directives {
+        match *name {
+            "Ignorable" => {},
+            "ProcessContent" => {
+                for token in value.split_whitespace() {
+                    let target = parse_qname_target(token, resolver(scope, ns), true)?;
+                    let namespace = *target.namespace();
+                    if !local_ign.contains(&namespace) && !ignorable_in(head, namespace) {
+                        return Err(bad("ProcessContent target is not effectively ignorable"));
+                    }
+                    if !local_process.insert(target, "MCE ProcessContent directives")? {
+                        return Err(bad("duplicate ProcessContent target"));
+                    }
+                }
+            },
+            "PreserveElements" => {
+                for token in value.split_whitespace() {
+                    let target = parse_qname_target(token, resolver(scope, ns), true)?;
+                    if !local_ign.contains(target.namespace()) {
+                        return Err(bad("PreserveElements target is not locally ignorable"));
+                    }
+                    if !local_preserve_elements.insert(target, "MCE PreserveElements directives")? {
+                        return Err(bad("duplicate PreserveElements target"));
+                    }
+                }
+            },
+            "PreserveAttributes" => {
+                for token in value.split_whitespace() {
+                    let target = parse_qname_target(token, resolver(scope, ns), true)?;
+                    if !local_ign.contains(target.namespace()) {
+                        return Err(bad("PreserveAttributes target is not locally ignorable"));
+                    }
+                    if !local_preserve_attributes
+                        .insert(target, "MCE PreserveAttributes directives")?
+                    {
+                        return Err(bad("duplicate PreserveAttributes target"));
+                    }
+                }
+            },
+            "MustUnderstand" => {
+                let mut seen = HashSet::new();
+                for prefix in value.split_whitespace() {
+                    if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
+                        return Err(bad("invalid or duplicate MustUnderstand prefix"));
+                    }
+                    let uri = resolver(scope, ns)
+                        .resolve(prefix)
+                        .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
+                    if !scope.understood(uri.id) {
+                        return Err(Error::MustUnderstand(uri.text.to_owned()));
+                    }
+                }
+            },
+            _ => unreachable!(),
+        }
+    }
+    if !new_ignorable.is_empty()
+        || !local_process.is_empty()
+        || !local_preserve_elements.is_empty()
+        || !local_preserve_attributes.is_empty()
+    {
+        *head = Some(Arc::new(DirectiveLayer {
+            parent: head.take(),
+            ignorable: new_ignorable,
+            process: local_process,
+            preserve_elements: local_preserve_elements,
+            preserve_attributes: local_preserve_attributes,
+        }));
+    }
+    Ok(())
+}
+
+/// The declarations the element being started re-declares, when its parent
+/// frame has dropped declarations to hoist.
+#[inline]
+fn hoisted_if_any(st: &mut [Frame]) -> R<Option<Hoisted>> {
+    if st.last().is_some_and(frame_hoists) {
+        hoisted_for_children(st).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+/// Resolve prefixes against `scope`, cross-checked against the element's
+/// declaration chain `chain` in debug builds.
+const fn resolver<'a>(scope: &'a Scope, chain: &'a Namespaces) -> Resolver<'a> {
+    Resolver { scope, chain }
+}
+
+/// Finish an element's start: an empty element closes at once, and its
+/// declarations leave `scope`; any other element's frame is pushed and keeps
+/// them until its end tag.
+fn close(
+    st: &mut Vec<Frame>,
+    f: Frame,
+    empty: bool,
+    out: &mut BoundedOutput,
+    scope: &mut Scope,
+) -> R<()> {
+    if empty {
+        // The element would have been at depth `st.len() + 1`.
+        scope.truncate(st.len() + 1);
+        match f.mode {
+            Mode::Emit(name) if f.active => {
+                out.extend_from_slice(b"</")?;
+                out.extend_from_within(name)?;
+                out.push(b'>')?;
+            },
+            Mode::Alt { .. } => return Err(bad("empty AlternateContent")),
+            Mode::Emit(_) | Mode::Inactive | Mode::Unwrap | Mode::Skip | Mode::Branch => {},
+        }
+    } else {
+        reserve_amortized(st, 1, "MCE element stack")?;
+        st.push(f);
+    }
+    Ok(())
+}
+fn visible(s: &[Frame]) -> bool {
+    s.last().is_some_and(|f| f.active)
+}
+fn bad(s: impl Into<String>) -> Error {
+    Error::NonConformant(s.into())
+}
+fn limit(s: &str) -> Error {
+    Error::LimitExceeded(s.into())
+}
+fn xerr(e: impl std::fmt::Display) -> Error {
+    Error::Xml(e.to_string())
+}
+fn attr<'a>(r: &'a [Attr<'_>], n: &str) -> R<Option<&'a str>> {
+    let mut v = None;
+    for a in r {
+        if a.key == n {
+            if v.is_some() {
+                return Err(bad("duplicate attribute"));
+            }
+            v = Some(a.value.as_ref());
+        }
+    }
+    Ok(v)
+}
+
+#[derive(Clone, Copy)]
+enum AlternateKind {
+    Container,
+    Choice,
+    Fallback,
+}
+
+fn validate_alternate_attributes(
+    raw: &[Attr<'_>],
+    ctx: &Ctx,
+    scope: &Scope,
+    kind: AlternateKind,
+) -> R<()> {
+    for attribute in raw {
+        if attribute.key == "xmlns" || attribute.key.starts_with("xmlns:") {
+            continue;
+        }
+        let (namespace, local) = expand_parts(attribute.key, resolver(scope, &ctx.ns), false)?;
+        if namespace.text.is_empty() {
+            if matches!(kind, AlternateKind::Choice) && local == "Requires" {
+                continue;
+            }
+            return Err(bad("unexpected unprefixed AlternateContent attribute"));
+        }
+        if scope.is_xml(namespace.id) && matches!(local, "lang" | "space") {
+            return Err(bad(
+                "xml:lang and xml:space are forbidden on AlternateContent markup",
+            ));
+        }
+        if scope.is_mce(namespace.id) || scope.is_xml(namespace.id) {
+            continue;
+        }
+        if !scope.understood(namespace.id) && !ctx.is_ignorable(namespace.id) {
+            return Err(bad(
+                "AlternateContent attribute namespace is neither understood nor ignorable",
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Lexically different prefixes can still name the same attribute. Check
+/// before opaque/skipped branches return or directives discard attributes.
+/// Unprefixed attributes have no namespace and their lexical uniqueness was
+/// already checked; declarations cannot bind a prefix to the empty URI.
+///
+/// Up to eight prefixed names use bounded stack comparisons. Larger lists
+/// use a fallibly reserved vector and in-place sorting, never URI copies or
+/// URI-length-dependent hashing. Scratch is dropped before processing children.
+fn validate_expanded_attribute_duplicates(raw: &[Attr<'_>], ns: Resolver<'_>) -> R<()> {
+    let mut prefixed = raw.iter().filter_map(|attribute| {
+        let (prefix, local) = attribute.key.split_once(':')?;
+        (prefix != "xmlns").then_some((local, attribute.key, 0usize))
+    });
+    let Some(first) = prefixed.next() else {
+        return Ok(());
+    };
+    let Some(second) = prefixed.next() else {
+        return Ok(());
+    };
+    let mut inline = [("", "", 0usize); 8];
+    let mut used = 0;
+    let mut overflow = Vec::new();
+    for name in std::iter::once(first)
+        .chain(std::iter::once(second))
+        .chain(prefixed)
+    {
+        if used < inline.len() {
+            // Different local parts cannot collide, regardless of prefix.
+            // Resolve only possible collisions, avoiding a repeated QName
+            // validation and scope lookup for every ordinary attribute.
+            for previous in inline[..used]
+                .iter()
+                .filter(|previous| previous.0 == name.0)
+            {
+                let (left, _) = expand_parts(previous.1, ns, false)?;
+                let (right, _) = expand_parts(name.1, ns, false)?;
+                if left.id == right.id {
+                    return Err(bad("duplicate attribute"));
+                }
+            }
+            inline[used] = name;
+            used += 1;
+        } else {
+            if overflow.is_empty() {
+                reserve_exact(&mut overflow, raw.len(), "MCE expanded attribute names")?;
+                overflow.extend_from_slice(&inline);
+            }
+            overflow.push(name);
+        }
+    }
+    overflow.sort_unstable_by(|left, right| left.0.cmp(right.0));
+    let mut start = 0;
+    while start < overflow.len() {
+        let mut end = start + 1;
+        while end < overflow.len() && overflow[end].0 == overflow[start].0 {
+            end += 1;
+        }
+        if end - start > 1 {
+            let group = &mut overflow[start..end];
+            for name in &mut *group {
+                name.2 = expand_parts(name.1, ns, false)?.0.id;
+            }
+            group.sort_unstable_by_key(|name| name.2);
+            if group.windows(2).any(|pair| pair[0].2 == pair[1].2) {
+                return Err(bad("duplicate attribute"));
+            }
+        }
+        start = end;
+    }
+    Ok(())
+}
+
+/// Resolve one qualified name against the in-scope declarations without
+/// materializing an owned [`Name`].
+///
+/// The lexical rule and the error identity are those of
+/// `xml_name::QualifiedName`, whose `parse` reports `InvalidQualifiedName` for
+/// every lexical failure and reconstructs the same `prefix:local` split; this
+/// borrows that split from the caller's bytes instead of allocating it.
+fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n>, element: bool) -> R<(Uri<'n>, &'q str)> {
+    if !xml_name::is_qualified_name(q) {
+        let error = xml_name::NameError::InvalidQualifiedName(q.to_owned());
+        return Err(bad(format!("invalid QName: {error}")));
+    }
+    let (p, l) = q.split_once(':').unwrap_or(("", q));
+    let n = if p.is_empty() {
+        if element {
+            ns.resolve("").unwrap_or(Uri::NONE)
+        } else {
+            Uri::NONE
+        }
+    } else {
+        ns.resolve(p)
+            .ok_or_else(|| bad(format!("unbound prefix {p}")))?
+    };
+    Ok((n, l))
+}
+fn parse_qname_target(token: &str, ns: Resolver<'_>, wildcard: bool) -> R<NamePattern<UriId>> {
+    let (prefix, local) = token
+        .split_once(':')
+        .ok_or_else(|| bad("preservation and processing targets must be prefixed QNames"))?;
+    if token.matches(':').count() != 1 || !xml_name::is_ncname(prefix) || local.is_empty() {
+        return Err(bad("invalid compatibility target QName"));
+    }
+    let namespace = ns
+        .resolve(prefix)
+        .ok_or_else(|| bad(format!("unbound compatibility target prefix {prefix}")))?
+        .id;
+    if ns.scope.is_mce(namespace) {
+        return Err(bad("compatibility target cannot use the MCE namespace"));
+    }
+    if local == "*" {
+        return wildcard
+            .then_some(NamePattern::Namespace(namespace))
+            .ok_or_else(|| bad("wildcard is not allowed in this compatibility directive"));
+    }
+    if !xml_name::is_ncname(local) {
+        return Err(bad("invalid compatibility target QName"));
+    }
+    Ok(NamePattern::Exact(namespace, local.into()))
+}
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the MCE writer emits one event against the complete bounded context"
+)]
+fn write_start(
+    o: &mut BoundedOutput,
+    q: &str,
+    ctx: &Ctx,
+    raw: &mut [Attr<'_>],
+    filter: bool,
+    rep: &mut Report,
+    tag: &[u8],
+    hoisted: Option<&[(String, String)]>,
+    scope: &Scope,
+    depth: usize,
+) -> R<Range<usize>> {
+    // Decide the compatibility filter first, so the counters are identical
+    // whether the tag is copied or rebuilt, and so the copy is taken only when
+    // every source attribute survives unchanged.
+    let mut rewrite = false;
+    for a in raw.iter_mut() {
+        a.keep = true;
+        if a.key == "xmlns" {
+            continue;
+        }
+        if let Some(p) = a.key.strip_prefix("xmlns:") {
+            // The `xml` prefix is bound by the XML specification; a source
+            // re-declaration was never carried into the output and must not
+            // start being carried now.
+            if p == "xml" {
+                a.keep = false;
+                rewrite = true;
+            }
+            continue;
+        }
+        let (namespace, local) = expand_parts(a.key, resolver(scope, &ctx.ns), false)?;
+        if filter && scope.is_mce(namespace.id) {
+            rep.ignored_attributes += 1;
+            a.keep = false;
+            rewrite = true;
+            continue;
+        }
+        if filter
+            && !namespace.text.is_empty()
+            && ctx.is_ignorable(namespace.id)
+            && !scope.understood(namespace.id)
+        {
+            if ctx.preserves_attribute(namespace.id, local) {
+                rep.preserved_attributes += 1;
+            } else {
+                rep.ignored_attributes += 1;
+                a.keep = false;
+                rewrite = true;
+            }
+        }
+    }
+
+    if !rewrite
+        && hoisted.is_none()
+        && raw.iter().all(|a| matches!(a.value, Cow::Borrowed(_)))
+        && !tag.iter().any(|byte| matches!(*byte, b'&' | b'<'))
+    {
+        // Nothing is dropped, nothing has to be re-declared, no value was
+        // unescaped or normalized and no value holds markup: the source start
+        // tag already is the output start tag, so copy its bytes.
+        o.push(b'<')?;
+        let name_start = o.bytes.len();
+        o.extend_from_slice(tag)?;
+        o.push(b'>')?;
+        return o.checked_range(name_start, q.len());
+    }
+
+    o.push(b'<')?;
+    let name_start = o.bytes.len();
+    o.extend_from_slice(q.as_bytes())?;
+    if let Some(hoisted) = hoisted {
+        // Only the declarations of dropped ancestors are re-emitted here; an
+        // element's own declarations are written by the attribute loop below,
+        // in source order, exactly once.
+        for (p, u) in hoisted {
+            let own = scope.declared_at(p, depth);
+            debug_assert!(
+                raw.len() > CROSS_CHECKED_DECLARATIONS || own == declares(raw, p),
+                "the prefix index disagrees with the element's own declarations for {p:?}"
+            );
+            if own {
+                continue;
+            }
+            o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
+            if !p.is_empty() {
+                o.extend_from_slice(p.as_bytes())?;
+            }
+            o.extend_from_slice(b"=\"")?;
+            esc(o, u)?;
+            o.push(b'\"')?;
+        }
+    }
+    for a in raw.iter() {
+        if !a.keep {
+            continue;
+        }
+        o.push(b' ')?;
+        o.extend_from_slice(a.key.as_bytes())?;
+        o.extend_from_slice(b"=\"")?;
+        esc(o, &a.value)?;
+        o.push(b'\"')?;
+    }
+    o.push(b'>')?;
+    o.checked_range(name_start, q.len())
+}
+
+/// Whether the element already declares `prefix` itself, in which case the
+/// hoisted binding it shadows must not be emitted a second time.
+///
+/// Linear in the element's attributes: production code asks [`Scope`], and
+/// debug builds cross-check it with this.
+fn declares(raw: &[Attr<'_>], prefix: &str) -> bool {
+    raw.iter().any(|a| {
+        if prefix.is_empty() {
+            a.key == "xmlns"
+        } else {
+            a.key.strip_prefix("xmlns:") == Some(prefix)
+        }
+    })
+}
+fn esc(o: &mut BoundedOutput, s: &str) -> R<()> {
+    for c in s.chars() {
+        match c {
+            '&' => o.extend_from_slice(b"&amp;")?,
+            '<' => o.extend_from_slice(b"&lt;")?,
+            '"' => o.extend_from_slice(b"&quot;")?,
+            '\t' => o.extend_from_slice(b"&#x9;")?,
+            '\n' => o.extend_from_slice(b"&#xA;")?,
+            '\r' => o.extend_from_slice(b"&#xD;")?,
+            _ => {
+                let mut b = [0; 4];
+                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes())?;
+            },
+        }
+    }
+    Ok(())
+}
+/// Applies the baseline OOXML markup-compatibility profile.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
+pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
+    process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
+}
+
+/// Applies baseline preprocessing to one OPC part.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
+pub fn process_part(part: &dyn litchi_opc::Part) -> R<Cow<'_, [u8]>> {
+    process_ooxml(part.blob())
+}
+
+/// Applies baseline preprocessing while retaining the part's shared blob on the fast path.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
+pub fn process_part_arc(part: &dyn litchi_opc::Part) -> R<Arc<Vec<u8>>> {
+    Ok(match process_part(part)? {
+        Cow::Borrowed(_) => part.blob_arc(),
+        Cow::Owned(v) => Arc::new(v),
+    })
+}
+/// Applies baseline preprocessing to UTF-8 OOXML.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
+pub fn process_str(x: &str) -> R<Cow<'_, str>> {
+    match process_ooxml(x.as_bytes())? {
+        Cow::Borrowed(_) => Ok(Cow::Borrowed(x)),
+        Cow::Owned(v) => String::from_utf8(v)
+            .map(Cow::Owned)
+            .map_err(|error| Error::Xml(format!("MCE output is not UTF-8: {error}"))),
+    }
+}
+
+#[cfg(test)]
+mod search_equivalence_tests {
+    fn scalar_windows_find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+        if needle.is_empty() {
+            return Some(0);
+        }
+        haystack
+            .windows(needle.len())
+            .position(|window| window == needle)
+    }
+
+    fn assert_same(haystack: &[u8], needle: &[u8]) {
+        let expected = scalar_windows_find(haystack, needle);
+        assert_eq!(
+            super::find_bytes(haystack, needle),
+            expected,
+            "search mismatch for haystack {haystack:?} and needle {needle:?}"
+        );
+    }
+
+    fn binary_words(max_len: usize) -> Vec<Vec<u8>> {
+        let mut words = Vec::new();
+        for length in 0..=max_len {
+            let count = 1usize << length;
+            for bits in 0..count {
+                let mut word = Vec::with_capacity(length);
+                for bit in 0..length {
+                    word.push(if bits & (1usize << bit) == 0 {
+                        0
+                    } else {
+                        u8::MAX
+                    });
+                }
+                words.push(word);
+            }
+        }
+        words
+    }
+
+    #[test]
+    fn small_binary_words_match_scalar_windows_exhaustively() {
+        let haystacks = binary_words(7);
+        let needles = binary_words(8);
+        for haystack in &haystacks {
+            for needle in &needles {
+                assert_same(haystack, needle);
+            }
+        }
+
+        for (haystack, needle) in [
+            (b"\0\0\0\0".as_slice(), b"\0\0\0".as_slice()),
+            (b"\xff\0\xff\0\xff".as_slice(), b"\xff\0\xff".as_slice()),
+            (b"\0\xff\0\xff".as_slice(), b"\xff\0\xff".as_slice()),
+        ] {
+            assert_same(haystack, needle);
+        }
+    }
+
+    fn adversarial_haystacks() -> Vec<Vec<u8>> {
+        let namespace = super::NAMESPACE.as_bytes();
+        let marker = &super::ACTIVE_MARKER_TEMPLATE[..];
+        let mut corpus = vec![Vec::new(), vec![0u8; 513], vec![u8::MAX; 1025]];
+
+        let mut alternating = Vec::with_capacity(2049);
+        for index in 0..2049 {
+            alternating.push(if index & 1 == 0 { 0 } else { u8::MAX });
+        }
+        corpus.push(alternating);
+
+        let mut repeated = vec![b'a'; 2048];
+        repeated.extend_from_slice(b"aaabaa");
+        corpus.push(repeated);
+
+        let mut namespace_case = vec![0xa5; 1024];
+        namespace_case.extend_from_slice(namespace);
+        namespace_case.extend_from_slice(&[0, u8::MAX, b'<', b'>']);
+        namespace_case.extend_from_slice(namespace);
+        corpus.push(namespace_case);
+
+        let mut marker_case = vec![u8::MAX; 777];
+        marker_case.extend_from_slice(marker);
+        marker_case.extend_from_slice(&[0, u8::MAX, 0, u8::MAX]);
+        marker_case.extend_from_slice(marker);
+        corpus.push(marker_case);
+
+        let mut generated = Vec::with_capacity(4096);
+        let mut state = 0x0123_4567_89ab_cdefu64;
+        for _ in 0..4096 {
+            state = state
+                .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                .wrapping_add(0xd1b5_4a32_d192_ed03);
+            generated.push(state.to_le_bytes()[3]);
+        }
+        generated.extend_from_slice(namespace);
+        generated.extend_from_slice(marker);
+        corpus.push(generated);
+        corpus
+    }
+
+    fn adversarial_needles() -> Vec<Vec<u8>> {
+        let namespace = super::NAMESPACE.as_bytes();
+        let marker = &super::ACTIVE_MARKER_TEMPLATE[..];
+        let mut namespace_prefix = namespace.to_vec();
+        namespace_prefix.truncate(namespace_prefix.len().saturating_sub(1));
+        let mut marker_prefix = marker.to_vec();
+        marker_prefix.truncate(marker_prefix.len().saturating_sub(1));
+        let mut near_namespace = namespace.to_vec();
+        if let Some(last) = near_namespace.last_mut() {
+            *last ^= 1;
+        }
+        let mut near_marker = marker.to_vec();
+        if let Some(last) = near_marker.last_mut() {
+            *last ^= 1;
+        }
+
+        vec![
+            Vec::new(),
+            vec![0],
+            vec![u8::MAX],
+            vec![0, u8::MAX, 0, u8::MAX],
+            vec![u8::MAX; 256],
+            vec![b'a'; 256],
+            vec![0xa5; 5000],
+            namespace.to_vec(),
+            namespace_prefix,
+            near_namespace,
+            marker.to_vec(),
+            marker_prefix,
+            near_marker,
+        ]
+    }
+
+    #[test]
+    fn larger_binary_and_mce_patterns_match_scalar_windows() {
+        for haystack in adversarial_haystacks() {
+            for needle in adversarial_needles() {
+                assert_same(&haystack, &needle);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod marker_exhaustion_test {
+    #[test]
+    fn all_marker_salts_preserve_the_exact_refusal() {
+        let hash = 0x0123_4567_89ab_cdef_u64;
+        let mut source = Vec::new();
+        for salt in u8::MIN..=u8::MAX {
+            let marker = format!("litchi-mce-active-{hash:016x}-{salt:02x}:");
+            source.extend_from_slice(marker.as_bytes());
+        }
+        assert!(matches!(
+            super::active_marker_with_hash(&source, hash),
+            Err(super::Error::NonConformant(message))
+                if message == "source XML collides with active-offset markers"
+        ));
+    }
+}

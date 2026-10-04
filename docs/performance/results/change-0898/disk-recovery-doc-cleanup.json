@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T01:19:18.684351+00:00",
+  "reason": "Host filesystem ENOSPC during PPTX attempt; remove only already-qualified owned rustdoc output.",
+  "removed": "/home/zhuhe/code/litchi/target/litchi-0898-build/doc",
+  "bytes": 15694823,
+  "absent": true,
+  "pptx_attempt": "unqualified; log truncated, command exit not recoverable, runner exited1 while writing receipt"
+}

@@ -1,0 +1,34 @@
+{
+  "binary": {
+    "bytes": 7392488,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-diagnostic",
+    "sha256": "86531c51011808a12d6583a89e836ec4a42d5a7f4cacd6f22048ee576c99108c"
+  },
+  "exit_code": 0,
+  "kind": "reuse_exact_qualified_baseline_binary",
+  "original_binary": {
+    "bytes": 7392488,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/baseline-diagnostic",
+    "sha256": "86531c51011808a12d6583a89e836ec4a42d5a7f4cacd6f22048ee576c99108c"
+  },
+  "original_build": {
+    "bytes": 1698,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/baseline-diagnostic-build.json",
+    "sha256": "8204f60e195450f267f44bb05e59ec2457b1008a52a1e3275b33758b80dd9444"
+  },
+  "reason": "Baseline selected source unchanged from506aa2; reuse avoids an identical rebuild. Fresh differential executes both roles against the same0898source fixtures.",
+  "source": {
+    "bytes": 2606,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source.json",
+    "sha256": "7834075609d240c1f97ebbc9579a269c68a9da2ca5055733ab2db7a56119c99c"
+  },
+  "status": "pass"
+}

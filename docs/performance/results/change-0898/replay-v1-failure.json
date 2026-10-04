@@ -1,0 +1,30 @@
+{
+  "schema": "litchi.mce-codec-emitted-name-output-span-native-replay-failure-0898.v1",
+  "status": "fail",
+  "phase": "independent plan/source binding replay",
+  "command": {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0898/independent_review.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 1
+  },
+  "exception": {
+    "type": "NameError",
+    "message": "name 'source_after_path' is not defined. Did you mean: 'source_after'?",
+    "file": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review.py",
+    "line": 322,
+    "function": "validate_source_census",
+    "expression": "descriptor(source_after_path) if \"source_after_build\" in bindings else None"
+  },
+  "result_created": false,
+  "native_review": null,
+  "helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review.py",
+    "bytes": 52089,
+    "sha256": "df8b8caae743eadbbf81266eba4b6419830fb47a5de5c2b5cb32840a5b4defc7"
+  },
+  "correction_scope": "The versioned v2 helper initializes source_after_path before using it; the preserved v1 helper is unchanged."
+}

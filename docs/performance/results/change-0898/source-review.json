@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "scope": "Independent source review approves qualification only; no production adoption or performance claim.",
+  "review": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source_review.md",
+    "bytes": 4505,
+    "sha256": "17a3ae53b3df87ce2b2dcb2f8c4946f494de3d01014ae010029f40a05fbca80a"
+  },
+  "candidate_source": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source.json",
+    "bytes": 1342,
+    "sha256": "1143bec60aa44f98c35693444fce7abf53726da687e4bfe717425438e8ab4c00"
+  },
+  "coordinator_note": "Rebound the Name-import-only test correction confirmed by reviewer to the final frozen hash; corrected free-function naming and capacity-growth wording. Production codec unchanged."
+}

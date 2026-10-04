@@ -1,0 +1,34 @@
+{
+  "status": "pass",
+  "rows": [
+    {
+      "raw": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json",
+        "bytes": 226196057,
+        "sha256": "2607c491787238ec5960100d73376adcec9ff4ddf60849f35f11f5a053f897fe"
+      },
+      "compressed": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/baseline-differential.json.gz",
+        "bytes": 12319926,
+        "sha256": "06ccf6d61a9b0ac3dc6a42f7c26d45d5dda5dc23efc521eb3892962d746165e3"
+      },
+      "roundtrip": true,
+      "raw_absent": true
+    },
+    {
+      "raw": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.json",
+        "bytes": 226196057,
+        "sha256": "2607c491787238ec5960100d73376adcec9ff4ddf60849f35f11f5a053f897fe"
+      },
+      "compressed": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-differential.json.gz",
+        "bytes": 12319926,
+        "sha256": "06ccf6d61a9b0ac3dc6a42f7c26d45d5dda5dc23efc521eb3892962d746165e3"
+      },
+      "roundtrip": true,
+      "raw_absent": true
+    }
+  ],
+  "removed_bytes": 452392114
+}

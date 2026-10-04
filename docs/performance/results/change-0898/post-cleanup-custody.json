@@ -1,0 +1,48 @@
+{
+  "status": "pass",
+  "scope": "Coordinator post-cleanup retained binary, fixture relocation, compressed report roundtrip, restored production and absence checks",
+  "removed_bytes": 3302605032,
+  "worktrees_created": [],
+  "evidence": {
+    "owned-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/owned-cleanup.json",
+      "bytes": 5950,
+      "sha256": "d341b6eb9f541f68e23c3f57a33e9305661385252dcb16a61b4a87d0c88ae00f"
+    },
+    "reports-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/reports-cleanup.json",
+      "bytes": 1191,
+      "sha256": "00a6baab13cce2bd537a83537ce8d1adeca605ee178a3af3b750e920875c3e06"
+    },
+    "quality-build-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/quality-build-cleanup.json",
+      "bytes": 592,
+      "sha256": "fcb4638cc9f6a76f97cb7a0888e23114da166494c3c6af42a6441267b5d96fd1"
+    },
+    "disk-recovery-doc-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/disk-recovery-doc-cleanup.json",
+      "bytes": 403,
+      "sha256": "f7f94d517cac0b35a90f25a00f159049ff5aa60b3c429c887134418be63a8ac9"
+    },
+    "restoration.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/restoration.json",
+      "bytes": 730,
+      "sha256": "9efcb9a740571b6817ba048c07f7406306c6bc954faa64d623290a9388fbbc21"
+    },
+    "verification-after-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/verification-after-cleanup.json",
+      "bytes": 846,
+      "sha256": "227df4e8d136ddbd64bb0c383251411c3b597dbaaffed273fe77f6b178426a48"
+    },
+    "native-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/native-review.json",
+      "bytes": 307788,
+      "sha256": "af003c9482d7dd126ac746e6518f250b2f2d4c0c3e12926f31e8344648c2b49d"
+    },
+    "decision.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/decision.json",
+      "bytes": 2326,
+      "sha256": "3064a2c4bb1ef53b318e7612245a45642f772324ab0255e6d429ba2aad08258e"
+    }
+  }
+}

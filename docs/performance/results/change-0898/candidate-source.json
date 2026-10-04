@@ -1,0 +1,35 @@
+{
+  "guard_contract": "post-endpoint-per-worksheet-tolerance-v1",
+  "overlay": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 66818,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-overlay/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "89579ff2a159282a64b395c0c5e5131044e3aed718075c43fe3d1992aec4c003"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 132321,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-overlay/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "ea9bc287274bcfba6eee8dbb6728e87fb20d57b526d78441d7126938d0aab166"
+    }
+  },
+  "patch": {
+    "bytes": 11851,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate.patch",
+    "sha256": "c222fa7dcf8ded6b7d4b0a0a2d8c9dae63a15ebbdecc50f957b8bd08e3d08e67"
+  },
+  "production_adopted": false,
+  "source": {
+    "bytes": 2606,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source.json",
+    "sha256": "7834075609d240c1f97ebbc9579a269c68a9da2ca5055733ab2db7a56119c99c"
+  },
+  "status": "pass"
+}

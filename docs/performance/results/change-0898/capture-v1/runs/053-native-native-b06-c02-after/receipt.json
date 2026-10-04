@@ -1,0 +1,157 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/peak-rss-kib.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0898/binaries/candidate-native",
+    "--case",
+    "docx_producer_source_selected_paragraph",
+    "--xlsx-shape",
+    "medium",
+    "--warmup",
+    "3",
+    "--samples",
+    "50",
+    "--filesystem-cache",
+    "warm",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/report.json",
+    "--producer-evidence",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/producer.json"
+  ],
+  "artifacts": {
+    "peak-rss-kib.txt": {
+      "bytes": 7,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/peak-rss-kib.txt",
+      "sha256": "eaf2cb9bccf28aef023b0b337bdb014a1b6cbd1809b520b7912a595bbe6cf59a"
+    },
+    "producer.json": {
+      "bytes": 1473,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/producer.json",
+      "sha256": "f7209f277ce7654138b66d6bde615d4b4a87293d5507eb096f91d1b0f3144e80"
+    },
+    "report.json": {
+      "bytes": 7198,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/report.json",
+      "sha256": "09e39b58164fd3a7d26db447ee731318b269bea44740ff24fa1912a0aade1225"
+    },
+    "stderr.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout.txt": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "binary": {
+    "build_receipt": {
+      "bytes": 1907,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-native-build-run.json",
+      "sha256": "7302358f421e79a380230d1749f91bbaa95732a77a67e834581d796d98b25e12"
+    },
+    "declared": {
+      "build_receipt": {
+        "bytes": 1907,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-native-build-run.json",
+        "sha256": "7302358f421e79a380230d1749f91bbaa95732a77a67e834581d796d98b25e12"
+      },
+      "bytes": 264524200,
+      "depfile": {
+        "bytes": 376019,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-native.d",
+        "sha256": "4ba8f9ed9cae00f5e2fddd6b8a1f2c70788f0dc4890b70de50a22e77e35caf37"
+      },
+      "elf_build_id": "7b3df7a6506822f631edb9f6bba6ddd94a78761c",
+      "evidence_bindings": {
+        "build": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-build.json",
+        "quality": "candidate_quality",
+        "source": "source_manifest"
+      },
+      "executable": true,
+      "features": [],
+      "mode": 509,
+      "name": "litchi-perf-baseline",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/binaries/candidate-native",
+      "role": "native",
+      "sha256": "3f1581fa8671292a9cad0093c7d06846a1eec31e384480fae70482ca61dc7ed2"
+    },
+    "depfile": {
+      "bytes": 376019,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-native.d",
+      "sha256": "4ba8f9ed9cae00f5e2fddd6b8a1f2c70788f0dc4890b70de50a22e77e35caf37"
+    },
+    "elf_build_id": "7b3df7a6506822f631edb9f6bba6ddd94a78761c",
+    "evidence_bindings": {
+      "build": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-build.json",
+      "quality": "candidate_quality",
+      "source": "source_manifest"
+    },
+    "features": [],
+    "identity": {
+      "bytes": 264524200,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/binaries/candidate-native",
+      "sha256": "3f1581fa8671292a9cad0093c7d06846a1eec31e384480fae70482ca61dc7ed2"
+    },
+    "name": "litchi-perf-baseline",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/binaries/candidate-native",
+    "role": "native"
+  },
+  "command": {
+    "bytes": 4086,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/capture-v1/runs/053-native-native-b06-c02-after/command.json",
+    "sha256": "95c42337a7b67239147502936e2db54833426c4c1e7f98b3ebc02d3d78bf39eb"
+  },
+  "cwd": "/home/zhuhe/code/litchi/docs/performance/results/change-0898",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T02:03:28.820198+00:00",
+  "plan_sha256": "e2582ea93191498fcb6a9687dbd958f76008439dda81c24494e525f1bf256d6a",
+  "row": {
+    "block": 6,
+    "case": "docx_producer_source_selected_paragraph",
+    "case_index": 2,
+    "lane": "native",
+    "ordinal": 53,
+    "pair": "native-b06-c02",
+    "role": "after",
+    "samples": 50,
+    "warmup": 3
+  },
+  "schema": "litchi.xlsx-mce-codec-emitted-name-output-span-child-receipt-0898.v1",
+  "started_utc": "2026-10-04T02:03:27.580166+00:00"
+}

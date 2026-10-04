@@ -1,0 +1,30 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0898-source/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 30.10s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/litchi-0898-build/debug/deps/litchi_perf_baseline-b8237ea32ee46032)
+
+running 22 tests
+test producer_shape::tests::real_file_corpus_refuses_a_missing_path ... ok
+test producer_shape::tests::producer_full_cell_scan_rejects_incomplete_duplicate_and_out_of_order_callbacks ... ok
+test producer_shape::tests::docx_producer_document_carries_the_word_2013_namespace_set ... ok
+test producer_shape::tests::pptx_producer_slides_carry_alternate_content ... ok
+test producer_shape::tests::xlsx_producer_edit_variant_is_admitted_and_proves_nothing_else ... ok
+test producer_shape::tests::producer_edit_oracle_rejects_an_untouched_member_change ... ok
+test producer_shape::tests::producer_edit_oracle_accepts_the_expected_semantic_and_package_change ... ok
+test producer_shape::tests::producer_edit_oracle_rejects_lexical_damage_outside_the_target ... ok
+test producer_shape::tests::xlsx_producer_shared_string_share_is_forty_percent ... ok
+test producer_shape::selected_route_tests::producer_malformed_prefix_remains_a_typed_scan_error ... ok
+test producer_shape::tests::xlsx_producer_read_variant_records_the_value_editor_verdict_on_every_fact ... ok
+test producer_shape::tests::producer_edit_oracle_rejects_a_wrong_target_value ... ok
+test producer_shape::selected_route_tests::producer_medium_read_reports_the_first_selected_scanner_refusal_per_sheet ... ok
+test producer_shape::full_cell_guard_tests::forced_guard_propagates_malformed_worksheet_store_error ... ok
+test producer_shape::tests::producer_full_cell_oracle_binds_the_reviewed_medium_read_contract ... ok
+test producer_shape::tests::xlsx_producer_read_variant_carries_shared_strings_and_relationships ... ok
+test producer_shape::tests::producer_read_and_edit_variants_are_distinct_corpora ... ok
+test producer_shape::tests::xlsx_producer_worksheets_carry_the_real_producer_signature ... ok
+test producer_shape::full_cell_guard_tests::forced_guard_rejects_unpublished_dirty_worksheet_after_clean_aggregate ... ok
+test producer_shape::selected_route_tests::producer_medium_read_marker_removal_controls_reveal_downstream_refusals ... ok
+test producer_shape::tests::producer_full_cell_scan_runner_visits_every_stored_cell ... ok
+test producer_shape::tests::producer_generation_is_byte_identical_across_runs ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 562 filtered out; finished in 0.83s
+

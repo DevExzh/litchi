@@ -1,0 +1,31 @@
+{
+  "status": "pass",
+  "reason": "First common test compilation failed on missing Name import in new test. Preserve first freeze by path+hash; subsequent freeze corrects only test import.",
+  "relocations": [
+    {
+      "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source.json",
+      "sha256": "a99d88b93599a959cd68aa74df9585bd6985fdf2c45ffefdabe46b1378a02b3e",
+      "retained": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source-v1.json"
+    },
+    {
+      "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate.patch",
+      "sha256": "7414c652c839dc19d584b400b8140de066d47f95eb42beb58b2f8e3979ad81c5",
+      "retained": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-v1.patch"
+    },
+    {
+      "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-before-build.json",
+      "sha256": "7b9fabc7331d1031b92cc0a0222d5f329fddfb32fe7b36e81e9570458ca35151",
+      "retained": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-before-build-v1.json"
+    },
+    {
+      "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-overlay/crates/litchi-ooxml-common/src/mce/codec.rs",
+      "sha256": "89579ff2a159282a64b395c0c5e5131044e3aed718075c43fe3d1992aec4c003",
+      "retained": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-overlay-v1/crates/litchi-ooxml-common/src/mce/codec.rs"
+    },
+    {
+      "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-overlay/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "cd9e76061b893a866a1a181bc2bb4a726944a3d54cc9929f808154594eb2b7e8",
+      "retained": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-overlay-v1/crates/litchi-ooxml-common/src/mce/tests.rs"
+    }
+  ]
+}

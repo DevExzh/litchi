@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T02:07:17.678986+00:00",
+  "reason": "Frozen native primary gate misses required2% improvement; restore only2ownedlivefiles; retain candidate overlays and isolated source for independent replay.",
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/codec.rs": {
+      "bytes": 65338,
+      "sha256": "9bc4e4a6476318dce1dae6ea198847490112d1d5119fb773e388ab5d0b65a996",
+      "baseline_revision": "8d517a7861163f04663dae6481e6123b6a314b3c"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 129836,
+      "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76",
+      "baseline_revision": "8d517a7861163f04663dae6481e6123b6a314b3c"
+    }
+  }
+}

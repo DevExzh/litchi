@@ -1,0 +1,131 @@
+{
+  "schema": "litchi.emitted-name-freeze-bindings-0898.v1",
+  "evaluation_head": "8d517a7861163f04663dae6481e6123b6a314b3c",
+  "bindings": {
+    "source_manifest": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_identity": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-before-build.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "candidate_freeze": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-source.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "candidate_build": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-build.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "candidate_quality": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/quality.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "guard_reference": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-after-cleanup/report.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-review.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "candidate_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/candidate-review.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "corpus_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus-review.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "corpus_comparison": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus-comparison.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_after_build": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-after-build.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_census_helper": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source_audit.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "corpus_compare_helper": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus_compare.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_v1": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/qualify.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_v2": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/qualify-v2.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_final": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/qualify-v4.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "reports_cleanup": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/reports-cleanup.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "quality_build_cleanup": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/quality-build-cleanup.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "prior_profile_attribution": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/analysis.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "prior_profile_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0897/review.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_v3": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/qualify-v3.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "disk_failure": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/disk-failure.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "disk_recovery": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/disk-recovery-doc-cleanup.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "methodology_preflight": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/methodology-preflight.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "cleanup_helper": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/cleanup_owned.py",
+      "kind": "evidence",
+      "role": "review"
+    }
+  }
+}

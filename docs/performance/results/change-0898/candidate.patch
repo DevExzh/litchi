@@ -1,0 +1,325 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 2346289019..a823d96ea2 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -5,7 +5,7 @@ use quick_xml::{
+     encoding::Decoder,
+     events::{BytesStart, Event},
+ };
+-use std::{borrow::Cow, collections::HashSet, rc::Rc, str, sync::Arc};
++use std::{borrow::Cow, collections::HashSet, ops::Range, rc::Rc, str, sync::Arc};
+ 
+ use super::model::{
+     ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits,
+@@ -638,6 +638,36 @@ impl BoundedOutput {
+         Ok(())
+     }
+ 
++    /// Copy a name that is already in the append-only output buffer.
++    ///
++    /// The range is an index pair rather than a borrowed slice because output
++    /// growth may move the allocation. Validate it before reserving: the
++    /// standard `Vec` helper assumes a valid range and would panic otherwise.
++    #[inline]
++    fn extend_from_within(&mut self, range: Range<usize>) -> R<()> {
++        let additional = range
++            .end
++            .checked_sub(range.start)
++            .ok_or_else(|| bad("MCE output name span is reversed"))?;
++        if range.end > self.bytes.len() {
++            return Err(bad("MCE output name span is outside the output"));
++        }
++        self.reserve(additional)?;
++        self.bytes.extend_from_within(range);
++        Ok(())
++    }
++
++    #[inline]
++    fn checked_range(&self, start: usize, length: usize) -> R<Range<usize>> {
++        let end = start
++            .checked_add(length)
++            .ok_or_else(|| limit("output bytes"))?;
++        if end > self.bytes.len() {
++            return Err(bad("MCE output name span is outside the output"));
++        }
++        Ok(start..end)
++    }
++
+     fn reserve(&mut self, additional: usize) -> R<()> {
+         let len = self
+             .bytes
+@@ -684,7 +714,8 @@ impl BoundedOutput {
+     }
+ }
+ enum Mode {
+-    Emit(String),
++    Emit(Range<usize>),
++    Inactive,
+     Unwrap,
+     Skip,
+     Alt {
+@@ -782,13 +813,17 @@ pub fn process_markup_compatibility<'a>(
+                     Mode::Alt { choices: 0, .. } => {
+                         return Err(bad("AlternateContent requires Choice"));
+                     },
+-                    Mode::Emit(q) if f.active => {
++                    Mode::Emit(name) if f.active => {
+                         out.extend_from_slice(b"</")?;
+-                        out.extend_from_slice(q.as_bytes())?;
++                        out.extend_from_within(name)?;
+                         out.push(b'>')?;
+                     },
+-                    Mode::Emit(_) | Mode::Unwrap | Mode::Skip | Mode::Alt { .. } | Mode::Branch => {
+-                    },
++                    Mode::Emit(_)
++                    | Mode::Inactive
++                    | Mode::Unwrap
++                    | Mode::Skip
++                    | Mode::Alt { .. }
++                    | Mode::Branch => {},
+                 }
+             },
+             Ok(Event::Text(e)) => {
+@@ -925,29 +960,31 @@ fn start(
+         } else {
+             None
+         };
++        let mode = if parent_active {
++            Mode::Emit(write_start(
++                out,
++                q,
++                &c,
++                &mut raw,
++                false,
++                rep,
++                e.as_ref(),
++                hoisted.as_deref(),
++                scope,
++                depth,
++            )?)
++        } else {
++            Mode::Inactive
++        };
+         let frame = {
+             let parent = st.last();
+             let inherited = Inherited {
+                 emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
+             };
+-            if parent_active {
+-                write_start(
+-                    out,
+-                    q,
+-                    &c,
+-                    &mut raw,
+-                    false,
+-                    rep,
+-                    e.as_ref(),
+-                    hoisted.as_deref(),
+-                    scope,
+-                    depth,
+-                )?;
+-            }
+             Frame {
+                 emitted_ns: inherited.after(&c, parent_active),
+                 ctx: c,
+-                mode: Mode::Emit(q.to_owned()),
++                mode,
+                 active: parent_active,
+                 declares,
+                 hoisted: None,
+@@ -1098,6 +1135,7 @@ fn start(
+         return close(st, frame, empty, out, scope);
+     }
+     let mut active = parent_active;
++    let mut emit = false;
+     let mode = if scope.is_mce(namespace.id) {
+         match local {
+             "AlternateContent" => {
+@@ -1113,7 +1151,8 @@ fn start(
+     } else if c.is_ignorable(namespace.id) && !scope.understood(namespace.id) {
+         if c.preserves_element(namespace.id, local) {
+             rep.preserved_elements += 1;
+-            Mode::Emit(q.to_owned())
++            emit = true;
++            Mode::Inactive
+         } else if c.processes(namespace.id, local) {
+             for a in &raw {
+                 let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
+@@ -1129,29 +1168,34 @@ fn start(
+             Mode::Skip
+         }
+     } else {
+-        Mode::Emit(q.to_owned())
++        emit = true;
++        Mode::Inactive
+     };
+-    let emitted = matches!(mode, Mode::Emit(_)) && active;
++    let emitted = emit && active;
+     let hoisted = if emitted { hoisted_if_any(st)? } else { None };
++    let mode = if emitted {
++        Mode::Emit(write_start(
++            out,
++            q,
++            &c,
++            &mut raw,
++            true,
++            rep,
++            e.as_ref(),
++            hoisted.as_deref(),
++            scope,
++            depth,
++        )?)
++    } else if emit {
++        Mode::Inactive
++    } else {
++        mode
++    };
+     let frame = {
+         let parent = st.last();
+         let inherited = Inherited {
+             emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
+         };
+-        if emitted {
+-            write_start(
+-                out,
+-                q,
+-                &c,
+-                &mut raw,
+-                true,
+-                rep,
+-                e.as_ref(),
+-                hoisted.as_deref(),
+-                scope,
+-                depth,
+-            )?;
+-        }
+         if st.is_empty() {
+             if *root {
+                 return Err(bad("multiple roots"));
+@@ -1323,13 +1367,13 @@ fn close(
+         // The element would have been at depth `st.len() + 1`.
+         scope.truncate(st.len() + 1);
+         match f.mode {
+-            Mode::Emit(q) if f.active => {
++            Mode::Emit(name) if f.active => {
+                 out.extend_from_slice(b"</")?;
+-                out.extend_from_slice(q.as_bytes())?;
++                out.extend_from_within(name)?;
+                 out.push(b'>')?;
+             },
+             Mode::Alt { .. } => return Err(bad("empty AlternateContent")),
+-            Mode::Emit(_) | Mode::Unwrap | Mode::Skip | Mode::Branch => {},
++            Mode::Emit(_) | Mode::Inactive | Mode::Unwrap | Mode::Skip | Mode::Branch => {},
+         }
+     } else {
+         reserve_amortized(st, 1, "MCE element stack")?;
+@@ -1539,7 +1583,7 @@ fn write_start(
+     hoisted: Option<&[(String, String)]>,
+     scope: &Scope,
+     depth: usize,
+-) -> R<()> {
++) -> R<Range<usize>> {
+     // Decide the compatibility filter first, so the counters are identical
+     // whether the tag is copied or rebuilt, and so the copy is taken only when
+     // every source attribute survives unchanged.
+@@ -1590,11 +1634,14 @@ fn write_start(
+         // unescaped or normalized and no value holds markup: the source start
+         // tag already is the output start tag, so copy its bytes.
+         o.push(b'<')?;
++        let name_start = o.bytes.len();
+         o.extend_from_slice(tag)?;
+-        return o.push(b'>');
++        o.push(b'>')?;
++        return o.checked_range(name_start, q.len());
+     }
+ 
+     o.push(b'<')?;
++    let name_start = o.bytes.len();
+     o.extend_from_slice(q.as_bytes())?;
+     if let Some(hoisted) = hoisted {
+         // Only the declarations of dropped ancestors are re-emitted here; an
+@@ -1629,7 +1676,7 @@ fn write_start(
+         o.push(b'\"')?;
+     }
+     o.push(b'>')?;
+-    Ok(())
++    o.checked_range(name_start, q.len())
+ }
+ 
+ /// Whether the element already declares `prefix` itself, in which case the
+diff --git a/crates/litchi-ooxml-common/src/mce/tests.rs b/crates/litchi-ooxml-common/src/mce/tests.rs
+index 1b239ccb96..f0cfee442a 100644
+--- a/crates/litchi-ooxml-common/src/mce/tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/tests.rs
+@@ -2415,7 +2415,7 @@ mod namespace_emission_contract_tests {
+     //! `mce::self_contained_fragment`; `self_contained_fragment_tests` below
+     //! pins that.
+ 
+-    use super::super::model::{Capabilities, Error, Limits, NAMESPACE};
++    use super::super::model::{Capabilities, Error, Limits, NAMESPACE, Name};
+     use super::process_markup_compatibility;
+     use quick_xml::events::Event;
+     use quick_xml::name::ResolveResult;
+@@ -2909,6 +2909,62 @@ mod namespace_emission_contract_tests {
+             Err(Error::LimitExceeded(message)) if message == "output bytes"
+         ));
+     }
++
++    #[test]
++    fn an_emitted_name_span_survives_output_reallocation() {
++        // Numeric character references are normalized before the rebuilt
++        // child tags are written. Each `&#34;` therefore becomes the longer
++        // `&quot;`, forcing the append-only output past its input-sized hint
++        // while the root's closing name is still pending.
++        let mut xml = format!(r#"<r xmlns:mc="{MC}">"#);
++        let mut expected = format!(r#"<r xmlns:mc="{MC}">"#);
++        for _ in 0..64 {
++            xml.push_str(r#"<cell value="&#34;"/>"#);
++            expected.push_str(r#"<cell value="&quot;"></cell>"#);
++        }
++        xml.push_str("</r>");
++        expected.push_str("</r>");
++
++        let output = run(&xml);
++        assert_eq!(output, expected);
++        assert!(output.len() > xml.len());
++
++        let exact = Limits {
++            max_output_bytes: expected.len(),
++            ..Limits::default()
++        };
++        assert_eq!(
++            run_with(&xml, &Capabilities::new(), &exact).unwrap(),
++            expected
++        );
++        let under = Limits {
++            max_output_bytes: expected.len() - 1,
++            ..Limits::default()
++        };
++        assert!(matches!(
++            run_with(&xml, &Capabilities::new(), &under),
++            Err(Error::LimitExceeded(message)) if message == "output bytes"
++        ));
++    }
++
++    #[test]
++    fn inactive_and_opaque_modes_keep_their_exact_byte_branches() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:e="urn:e" xmlns:s="urn:s" mc:Ignorable="x" mc:PreserveElements="x:keep" mc:ProcessContent="x:unwrap"><x:keep><known/></x:keep><x:unwrap><known2/></x:unwrap><x:drop><e:opaque><raw/></e:opaque></x:drop><e:opaque><raw/></e:opaque><mc:AlternateContent><mc:Choice Requires="s"><choice/></mc:Choice><mc:Fallback><fallback/></mc:Fallback></mc:AlternateContent><tail/></r>"#
++        );
++        let mut capabilities = Capabilities::new();
++        capabilities.preserve_extension_element(Name {
++            namespace: "urn:e".to_owned(),
++            local_name: "opaque".to_owned(),
++        });
++        let expected = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:e="urn:e" xmlns:s="urn:s"><x:keep><known></known></x:keep><known2></known2><e:opaque><raw></raw></e:opaque><fallback></fallback><tail></tail></r>"#
++        );
++        assert_eq!(
++            run_with(&xml, &capabilities, &Limits::default()).unwrap(),
++            expected
++        );
++    }
+ }
+ 
+ #[cfg(test)]
