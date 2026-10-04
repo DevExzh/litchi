@@ -12,3 +12,12 @@
 ## S3 — OpenOptions, Locked/Signed shells (`b9951ae15f`)
 - `OpenOptions` (const `new()` = `Default`; common knobs plus feature-gated per-format limit sub-options; no credentials), `SourceMode`, `Family::of` (all 21 formats), and the pointer-sized `Locked`/`Signed` handles with redacted `Debug`. No unlock or unsign yet (S6/S6b).
 - Merge with S2: the dependency and feature lists were combined. The only new edge is `litchi-ops -> litchi-odf-common`, which brings the inventory to 256 declarations and 245 canonical edges. The ADR 0024 amendments were reconciled. The boundary checker, the non-iWork gate and the litchi-ops clippy/tests pass on the merged tree.
+
+## S4 — detection moved into `litchi_ops::detect` (`7b897d11a2`)
+- 5,942 lines moved from `crates/litchi/src/detection_smart/`. Git records all five files as renames, and `ooxml.rs` is byte-identical. iWork detection stays in the facade as a lowest-precedence ZIP tail (`detect::tail::ZipTail`), so `litchi-ops` has no iWork edge and the bulk gate stays at 47. Facade call sites resolve through `#[doc(hidden)] __migration`, which S9 deletes. The new `test-support` feature in ops is enabled only through the facade's dev-dependency.
+- Tests: 37 of the 45 in-source tests moved to ops, plus five new tail-ordering tests in ops and three Pages-precedence tests in the facade. The full facade suite passed on the S4 branch (554 passed, 11 ignored).
+- Merge with S2/S3: the dependency and feature lists were combined into 15 ops leaf edges. Inventory: 262 declarations, 250 canonical edges. The ADR 0024 amendments were reconciled. The coordinator added a `clippy::large_enum_variant` allow on `PresentationSourcePathDetection`, which only fires in odp- or ppt-only builds; S4 had checked single-feature builds with `cargo check`, not clippy.
+- Caveats:
+  - `DetectedFormat` variants are now gated on litchi-ops features, so a second dependent that turns on extra ops features could break facade matches. This matters from S5 on.
+  - Some moved doc comments still say the ops-only detectors classify iWork. Fix them in S9.
+- Disk: S4's all-features facade test build reached 114 GB before it was cleaned. Building agents now run with `CARGO_INCREMENTAL=0` and debug info off.
