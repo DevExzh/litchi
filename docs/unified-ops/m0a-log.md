@@ -8,3 +8,7 @@
   - (M2) Add a diagnostics slot.
   - Add `Source::Crypto` with the `encryption` feature.
   - The design's code list has 36 entries, not the "37 + 1" that plan 0003 states.
+
+## S3 — OpenOptions, Locked/Signed shells (`b9951ae15f`)
+- `OpenOptions` (const `new()` = `Default`; common knobs plus feature-gated per-format limit sub-options; no credentials), `SourceMode`, `Family::of` (all 21 formats), and the pointer-sized `Locked`/`Signed` handles with redacted `Debug`. No unlock or unsign yet (S6/S6b).
+- Merge with S2: the dependency and feature lists were combined. The only new edge is `litchi-ops -> litchi-odf-common`, which brings the inventory to 256 declarations and 245 canonical edges. The ADR 0024 amendments were reconciled. The boundary checker, the non-iWork gate and the litchi-ops clippy/tests pass on the merged tree.
