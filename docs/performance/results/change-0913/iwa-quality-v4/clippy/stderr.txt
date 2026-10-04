@@ -1,0 +1,3 @@
+    Checking litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-core)
+    Checking litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-archive)
+    Finished `dev` profile [unoptimized] target(s) in 2.51s

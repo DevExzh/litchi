@@ -1,0 +1,346 @@
+     Locking 344 packages to latest Rust 1.70 compatible versions
+      Adding addr2line v0.24.2
+      Adding adler2 v2.0.1
+      Adding ahash v0.8.12
+      Adding aho-corasick v1.1.5
+      Adding aliasable v0.1.3
+      Adding aligned-vec v0.5.0
+      Adding alloc-no-stdlib v2.0.4
+      Adding alloc-stdlib v0.2.4
+      Adding allocator-api2 v0.4.0
+      Adding allsorts v0.17.0
+      Adding annotate-snippets v0.12.13 (available: v0.12.16)
+      Adding anstream v0.6.21
+      Adding anstyle v1.0.14
+      Adding anstyle-parse v0.2.7
+      Adding anstyle-query v1.1.5
+      Adding anstyle-wincon v3.0.11
+      Adding anyhow v1.0.104
+      Adding approx v0.5.1
+      Adding arbitrary v1.4.2
+      Adding arg_enum_proc_macro v0.3.4
+      Adding arraydeque v0.5.1
+      Adding arrayref v0.3.9
+      Adding arrayvec v0.7.8
+      Adding av1-grain v0.2.4
+      Adding avif-serialize v0.8.4
+      Adding backtrace v0.3.74 (available: v0.3.76)
+      Adding bit-set v0.8.0
+      Adding bit-vec v0.8.0
+      Adding bit_field v0.10.3
+      Adding bitflags v1.3.2
+      Adding bitreader v0.3.11
+      Adding bitstream-io v2.3.0
+      Adding brotli-decompressor v5.0.3
+      Adding buffa v0.9.1
+      Adding buffa-build v0.9.1
+      Adding buffa-codegen v0.9.1
+      Adding buffa-descriptor v0.9.1
+      Adding built v0.7.6
+      Adding bytemuck v1.25.2
+      Adding byteorder-lite v0.1.0
+      Adding bytes v1.12.1
+      Adding cfg-expr v0.15.8
+      Adding clap v4.4.18 (available: v4.6.6)
+      Adding clap_builder v4.4.18 (available: v4.6.6)
+      Adding clap_derive v4.4.7 (available: v4.6.4)
+      Adding clap_lex v0.6.0
+      Adding color_quant v1.1.0
+      Adding colorchoice v1.0.5
+      Adding core-foundation v0.9.4
+      Adding core-graphics v0.23.2
+      Adding core-graphics-types v0.1.3
+      Adding core-text v20.1.0
+      Adding core_maths v0.1.1
+      Adding countme v3.0.1
+      Adding crunchy v0.2.4
+      Adding data-url v0.3.2
+      Adding defmt v1.1.1
+      Adding defmt-macros v1.1.1
+      Adding defmt-parser v1.0.0
+      Adding deranged v0.4.0
+      Adding dirs v6.0.0
+      Adding dirs-sys v0.5.0
+      Adding dlib v0.5.3
+      Adding dwrote v0.11.5
+      Adding encoding_rs_io v0.1.8
+      Adding enumflags2 v0.7.12
+      Adding enumflags2_derive v0.7.12
+      Adding env_logger v0.8.4
+      Adding equivalent v1.0.2
+      Adding euclid v0.22.14
+      Adding exr v1.74.0
+      Adding fdeflate v0.3.7
+      Adding float-cmp v0.9.0
+      Adding float-ord v0.3.2
+      Adding fnv v1.0.7
+      Adding foldhash v0.1.5
+      Adding font-kit v0.14.3
+      Adding fontconfig-parser v0.5.8
+      Adding fontdb v0.23.0
+      Adding foreign-types v0.5.0
+      Adding foreign-types-macros v0.2.4
+      Adding foreign-types-shared v0.3.1
+      Adding freetype-sys v0.20.1
+      Adding futures-macro v0.3.33 (requires Rust 1.71)
+      Adding futures-timer v3.0.4
+      Adding getrandom v0.3.4
+      Adding gif v0.13.3
+      Adding gimli v0.31.1
+      Adding glob v0.3.4
+      Adding glyph-names v0.2.0
+      Adding half v2.4.1
+      Adding hashbrown v0.14.5
+      Adding hashbrown v0.15.5
+      Adding hashbrown v0.16.1
+      Adding hashlink v0.10.0
+      Adding heck v0.4.1
+      Adding heck v0.5.0
+      Adding image v0.25.6
+      Adding image-webp v0.2.0
+      Adding imagesize v0.13.0
+      Adding imgref v1.12.3
+      Adding indexmap v2.11.4 (available: v2.14.2, requires Rust 1.85)
+      Adding interpolate_name v0.2.4
+      Adding io-uring v0.7.15
+      Adding is_terminal_polyfill v1.70.2
+      Adding itertools v0.12.1
+      Adding itertools v0.14.0
+      Adding jiff v0.2.37
+      Adding jiff-core v0.1.1
+      Adding jiff-static v0.2.37
+      Adding jiff-tzdb v0.1.8
+      Adding jiff-tzdb-platform v0.1.3
+      Adding jobserver v0.1.34 (available: v0.1.35)
+      Adding jpeg-decoder v0.3.2
+      Adding kurbo v0.11.3
+      Adding lebe v0.5.2
+      Adding libfuzzer-sys v0.4.13
+      Adding libloading v0.8.8
+      Adding libredox v0.1.24
+      Adding litchi-eval v0.0.1 (/tmp/litchi-0913-src/crates/litchi-eval)
+      Adding litchi-fonts v0.0.1 (/tmp/litchi-0913-src/crates/litchi-fonts)
+      Adding litchi-formula v0.0.1 (/tmp/litchi-0913-src/crates/litchi-formula)
+      Adding litchi-imgconv v0.0.1 (/tmp/litchi-0913-src/crates/litchi-imgconv)
+      Adding litchi-iwa v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa)
+      Adding litchi-iwa-archive v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-archive)
+      Adding litchi-iwa-cache v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-cache)
+      Adding litchi-iwa-common v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-common)
+      Adding litchi-iwa-core v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-core)
+      Adding litchi-iwa-detect v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-detect)
+      Adding litchi-iwa-graph v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-graph)
+      Adding litchi-iwa-index v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-index)
+      Adding litchi-iwa-package v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-package)
+      Adding litchi-iwa-protos v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-protos)
+      Adding litchi-iwa-structured v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-structured)
+      Adding litchi-iwa-text v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-text)
+      Adding litchi-iwa-text-wire v0.0.1 (/tmp/litchi-0913-src/crates/litchi-iwa-text-wire)
+      Adding litchi-keynote v0.0.1 (/tmp/litchi-0913-src/crates/litchi-keynote)
+      Adding litchi-markdown v0.0.1 (/tmp/litchi-0913-src/crates/litchi-markdown)
+      Adding litchi-numbers v0.0.1 (/tmp/litchi-0913-src/crates/litchi-numbers)
+      Adding litchi-numbers-wire v0.0.1 (/tmp/litchi-0913-src/crates/litchi-numbers-wire)
+      Adding litchi-odb v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odb)
+      Adding litchi-odc v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odc)
+      Adding litchi-odf v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odf)
+      Adding litchi-odf-formula v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odf-formula)
+      Adding litchi-odg v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odg)
+      Adding litchi-odi v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odi)
+      Adding litchi-odm v0.0.1 (/tmp/litchi-0913-src/crates/litchi-odm)
+      Adding litchi-oth v0.0.1 (/tmp/litchi-0913-src/crates/litchi-oth)
+      Adding litchi-pages v0.0.1 (/tmp/litchi-0913-src/crates/litchi-pages)
+      Adding litchi-py v0.0.1 (/tmp/litchi-0913-src/crates/pyo3-litchi)
+      Adding litchi-slide v0.0.1 (/tmp/litchi-0913-src/crates/litchi-slide)
+      Adding litchi-word v0.0.1 (/tmp/litchi-0913-src/crates/litchi-word)
+      Adding lock_api v0.4.13 (available: v0.4.14)
+      Adding loop9 v0.1.5
+      Adding matrixmultiply v0.3.10 (available: v0.3.11)
+      Adding maybe-rayon v0.1.1
+      Adding minimal-lexical v0.2.1
+      Adding miniz_oxide v0.8.9
+      Adding miniz_oxide v0.9.1
+      Adding mio v1.0.4 (available: v1.2.3)
+      Adding multimap v0.10.1
+      Adding nalgebra v0.33.3
+      Adding new_debug_unreachable v1.0.6
+      Adding nohash-hasher v0.2.0
+      Adding nom v7.1.3
+      Adding noop_proc_macro v0.3.0
+      Adding num-bigint v0.4.8
+      Adding num-complex v0.4.6
+      Adding num-conv v0.1.0
+      Adding num-derive v0.4.2
+      Adding num-rational v0.4.2
+      Adding object v0.36.7
+      Adding once_cell_polyfill v1.70.2
+      Adding option-ext v0.2.0
+      Adding ouroboros v0.18.5
+      Adding ouroboros_macro v0.18.5
+      Adding parking_lot v0.12.4 (available: v0.12.5)
+      Adding parking_lot_core v0.9.11 (available: v0.9.12)
+      Adding paste v1.0.15
+      Adding pathfinder_geometry v0.5.1
+      Adding pathfinder_simd v0.5.6
+      Adding peresil v0.3.0
+      Adding petgraph v0.8.3
+      Adding pico-args v0.5.0
+      Adding pkg-config v0.3.34
+      Adding plist v1.7.4
+      Adding png v0.17.16
+      Adding portable-atomic v1.15.0
+      Adding portable-atomic-util v0.2.8
+      Adding powerfmt v0.2.0
+      Adding prettyplease v0.2.37
+      Adding proc-macro-crate v3.4.0 (available: v3.5.0, requires Rust 1.82.0)
+      Adding proc-macro2-diagnostics v0.10.1
+      Adding profiling v1.0.18
+      Adding profiling-procmacros v1.0.18
+      Adding proptest v1.7.0
+      Adding prost v0.14.4
+      Adding prost-build v0.14.4
+      Adding prost-derive v0.14.4
+      Adding prost-types v0.14.4
+      Adding pulldown-cmark v0.13.4
+      Adding pulldown-cmark-escape v0.11.0
+      Adding pyo3 v0.29.3
+      Adding pyo3-build-config v0.29.3
+      Adding pyo3-ffi v0.29.3
+      Adding pyo3-macros v0.29.3
+      Adding pyo3-macros-backend v0.29.3
+      Adding qoi v0.4.1
+      Adding quick-error v1.2.3
+      Adding quick-error v2.0.1
+      Adding quick-xml v0.38.4
+      Adding quickcheck v1.0.3
+      Adding quickcheck_macros v1.1.0
+      Adding r-efi v5.3.0
+      Adding rand v0.9.5
+      Adding rand_chacha v0.9.0
+      Adding rand_core v0.9.5
+      Adding rand_distr v0.4.3
+      Adding rand_xorshift v0.4.0
+      Adding rav1e v0.7.1
+      Adding ravif v0.11.20
+      Adding rawpointer v0.2.1
+      Adding redox_syscall v0.5.18
+      Adding redox_users v0.5.2
+      Adding regex v1.13.1
+      Adding regex-automata v0.4.18
+      Adding regex-syntax v0.8.11
+      Adding relative-path v1.9.3
+      Adding resvg v0.45.1
+      Adding rgb v0.8.53
+      Adding roaring v0.11.1 (available: v0.11.5, requires Rust 1.90.0)
+      Adding rowan v0.16.1
+      Adding roxmltree v0.20.0
+      Adding rstest v0.26.1
+      Adding rstest_macros v0.26.1
+      Adding rustc-demangle v0.1.28
+      Adding rustc-hash v1.1.0
+      Adding rustc-hash v2.1.1 (available: v2.1.3)
+      Adding rustc_version v0.4.1
+      Adding rusty-fork v0.3.1
+      Adding rustybuzz v0.20.1
+      Adding safe_arch v0.7.4
+      Adding saphyr-parser v0.0.6
+      Adding scopeguard v1.2.0
+      Adding semver v1.0.28
+      Adding serde-saphyr v0.0.14
+      Adding serde_spanned v0.6.9
+      Adding signal-hook-registry v1.4.8
+      Adding simba v0.9.1
+      Adding simd-adler32 v0.3.10
+      Adding simd_helpers v0.1.0
+      Adding simdutf8 v0.1.5
+      Adding simplecss v0.2.2
+      Adding slotmap v1.1.1
+      Adding smallvec v2.0.0-beta.1
+      Adding smoothutf8 v0.2.3
+      Adding snap v1.1.2
+      Adding socket2 v0.6.5
+      Adding static_assertions v1.1.0
+      Adding statrs v0.18.0 (available: v0.19.1)
+      Adding strict-num v0.1.1
+      Adding strsim v0.10.0
+      Adding svgtypes v0.15.3
+      Adding sxd-document v0.3.2
+      Adding sxd-xpath v0.4.2
+      Adding system-deps v6.2.2
+      Adding target-lexicon v0.12.16
+      Adding target-lexicon v0.13.5
+      Adding text-size v1.1.1
+      Adding thiserror v1.0.69
+      Adding thiserror-impl v1.0.69
+      Adding tiff v0.9.1
+      Adding time v0.3.41 (available: v0.3.55)
+      Adding time-core v0.1.4 (available: v0.1.9)
+      Adding time-macros v0.2.22 (available: v0.2.32)
+      Adding tiny-skia v0.11.4
+      Adding tiny-skia-path v0.11.4
+      Adding tokio v1.47.5 (available: v1.53.1)
+      Adding tokio-macros v2.5.0 (available: v2.7.2)
+      Adding toml v0.8.23
+      Adding toml_datetime v0.6.11
+      Adding toml_datetime v0.7.1
+      Adding toml_edit v0.22.27
+      Adding toml_edit v0.23.5
+      Adding toml_parser v1.0.2 (available: v1.1.3+spec-1.1.0, requires Rust 1.85)
+      Adding ttf-parser v0.25.1
+      Adding typed-arena v1.7.0
+      Adding typed-path v0.12.3
+      Adding ucd-trie v0.1.7
+      Adding unarray v0.1.4
+      Adding unicase v2.9.0
+      Adding unicode-bidi v0.3.18
+      Adding unicode-bidi-mirroring v0.4.0
+      Adding unicode-canonical-combining-class v1.0.0
+      Adding unicode-ccc v0.4.0
+      Adding unicode-general-category v1.1.0
+      Adding unicode-joining-type v1.0.0
+      Adding unicode-properties v0.1.4
+      Adding unicode-script v0.5.8
+      Adding unicode-vo v0.1.0
+      Adding unicode-width v0.2.2
+      Adding urlencoding v2.1.3
+      Adding usvg v0.45.1
+      Adding utf8parse v0.2.2
+      Adding v_frame v0.3.8
+      Adding version-compare v0.2.1
+      Adding wait-timeout v0.2.1
+      Adding walkdir v2.5.0
+      Adding wasip2 v1.0.4+wasi-0.2.12
+      Adding weezl v0.1.12
+      Adding wide v0.7.33
+      Adding winapi v0.3.9
+      Adding winapi-i686-pc-windows-gnu v0.4.0
+      Adding winapi-x86_64-pc-windows-gnu v0.4.0
+      Adding windows-sys v0.59.0
+      Adding windows-targets v0.52.6
+      Adding windows-targets v0.53.5
+      Adding windows_aarch64_gnullvm v0.52.6
+      Adding windows_aarch64_gnullvm v0.53.1
+      Adding windows_aarch64_msvc v0.52.6
+      Adding windows_aarch64_msvc v0.53.1
+      Adding windows_i686_gnu v0.52.6
+      Adding windows_i686_gnu v0.53.1
+      Adding windows_i686_gnullvm v0.52.6
+      Adding windows_i686_gnullvm v0.53.1
+      Adding windows_i686_msvc v0.52.6
+      Adding windows_i686_msvc v0.53.1
+      Adding windows_x86_64_gnu v0.52.6
+      Adding windows_x86_64_gnu v0.53.1
+      Adding windows_x86_64_gnullvm v0.52.6
+      Adding windows_x86_64_gnullvm v0.53.1
+      Adding windows_x86_64_msvc v0.52.6
+      Adding windows_x86_64_msvc v0.53.1
+      Adding winnow v0.7.15
+      Adding wio v0.2.2
+      Adding wit-bindgen v0.57.1
+      Adding xmlwriter v0.1.0
+      Adding yansi v1.0.1
+      Adding yeslogic-fontconfig-sys v6.0.1
+      Adding zip v8.6.0
+      Adding zopfli v0.8.3
+      Adding zune-core v0.4.12
+      Adding zune-inflate v0.2.54
+      Adding zune-jpeg v0.4.21
+note: pass `--verbose` to see 63 unchanged dependencies behind latest

@@ -1,0 +1,17 @@
+   Compiling litchi-xlsx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xlsx)
+   Compiling litchi-docx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-docx)
+   Compiling litchi-pptx v0.0.1 (/tmp/litchi-0913-src/crates/litchi-pptx)
+   Compiling litchi-xlsb v0.0.1 (/tmp/litchi-0913-src/crates/litchi-xlsb)
+   Compiling litchi-opc v0.0.1 (/tmp/litchi-0913-src/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 9m 41s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/litchi_docx-82cfb1618279be67)
+     Running tests/alt_api.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/alt_api-832f4994531d7f7b)
+     Running tests/alt_chunk_authoring.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/alt_chunk_authoring-3df4e552055a544f)
+     Running tests/block_mutation.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/block_mutation-d92136bc427b4a54)
+     Running tests/byte_order_marked_parts.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/byte_order_marked_parts-cf5148a8530d16bb)
+     Running tests/conflict_revisions.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/conflict_revisions-9d32b5e6e45f275d)
+     Running tests/core_properties.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/core_properties-9cea7942e35a9993)
+     Running tests/custom_properties.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/custom_properties-f1dbb86ab79bb614)
+     Running tests/custom_xml_data_store.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/custom_xml_data_store-76c12e5d2e965975)
+     Running tests/drawing_svg_lifecycle.rs (/home/zhuhe/code/litchi/target/litchi-0913-build/release/deps/drawing_svg_lifecycle-63038d8a8d052ccc)
+error: test failed, to rerun pass `-p litchi-docx --test drawing_svg_lifecycle`

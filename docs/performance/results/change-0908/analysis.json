@@ -1,0 +1,2517 @@
+{
+  "binary": {
+    "bytes": 264596744,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+    "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84"
+  },
+  "captures": [
+    {
+      "binary_command_token": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+      "capture_directory": "capture/eager-a",
+      "kind": "eager",
+      "label": "eager-a",
+      "metadata": {
+        "artifacts": {
+          "callgrind.out": {
+            "bytes": 530,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/callgrind.out",
+            "sha256": "ef187991211c2cfc2f2266e7cb368e26b31a77e6876b1911b5901694860c6f95"
+          },
+          "callgrind.out.1": {
+            "bytes": 783580,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/callgrind.out.1",
+            "sha256": "ab88e84ba3c227d78eda3f754149d94a39974480153496249df54847958e9ee4"
+          },
+          "report.json": {
+            "bytes": 15604,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/report.json",
+            "sha256": "2b3f0aaa5547f5a3ef824f4e557d74f24838807eb903743efd3bf7b62e65541a"
+          },
+          "start.json": {
+            "bytes": 1855,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/start.json",
+            "sha256": "c8f18686d31f108466c06ca3b969a2c1c550f249ad6aa712c07f0e1eebfcb82e"
+          },
+          "stderr.txt": {
+            "bytes": 1027,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/stderr.txt",
+            "sha256": "12721ee7edae2be56642131c397e90a2a42eb9de96b19d1237c0355ef2dde96f"
+          },
+          "stdout.txt": {
+            "bytes": 0,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "command": {
+          "bytes": 3367,
+          "file": "capture/eager-a/command.json",
+          "sha256": "8909acb12d34dc11af122735f4a87d5f84b749c62189fd3c96a2bf9f4dcb644a"
+        },
+        "original_wrapper_failure": {
+          "bytes": 73,
+          "file": "capture/eager-a/semantic-failure.json",
+          "sha256": "2c8ecbc333b67bb76088b42d0a8d84f05f918a2ad45b3d66442611781eb0237e"
+        },
+        "semantic": {
+          "captured_sample_count": 1,
+          "file": "capture/eager-a/semantics.json",
+          "native_sample_count": 200,
+          "native_vectors_constant": true,
+          "operation_metrics_reduced": true,
+          "reference": {
+            "bytes": 81081,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-a.json",
+            "sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7"
+          },
+          "sha256": "afb94b3191e1f71e5ae29f23e9b7cda97495f70a0f9b19f8ec215457ba179397",
+          "status": "pass"
+        },
+        "start": {
+          "bytes": 1855,
+          "file": "capture/eager-a/start.json",
+          "sha256": "c8f18686d31f108466c06ca3b969a2c1c550f249ad6aa712c07f0e1eebfcb82e"
+        },
+        "validation": {
+          "all_command_artifacts_hashed": true,
+          "binary_helper_plan_bindings_exact": true,
+          "fixed_cpu_and_workload_arguments": true,
+          "native_200_to_capture_1_reduction_verified": true,
+          "semantic_status_pass": true,
+          "start_command_argv_identical": true
+        }
+      },
+      "numbered_dump_count": 1,
+      "parts": [
+        {
+          "bytes": 783580,
+          "direct_callees": {
+            "category_inclusive_ir": {
+              "harness_guard": 88813897,
+              "production": 4468999670,
+              "runtime_or_dependency": 20174691,
+              "unclassified": 1098
+            },
+            "classification_policy": {
+              "harness_guard": "perf-baseline namespace or tools/perf-baseline source path",
+              "production": "high confidence only when the reader source path is under crates/",
+              "production_candidate": "known production namespace with weaker source evidence",
+              "runtime_or_dependency": "toolchain/runtime attribution retained but excluded from production totals",
+              "unclassified": "never promoted to production without independent source review"
+            },
+            "direct_children_ir": 4577989356,
+            "rows": [
+              {
+                "callee_id": 8466,
+                "callee_records": 1,
+                "callee_self_ir": 29,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 3189476327,
+                "name": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::to_bytes",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/codec.rs"
+              },
+              {
+                "callee_id": 6260,
+                "callee_records": 1,
+                "callee_self_ir": 113,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 994945242,
+                "name": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/model.rs"
+              },
+              {
+                "callee_id": 9668,
+                "callee_records": 1,
+                "callee_self_ir": 56181,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 98544032,
+                "name": "litchi_opc::source_backed::SourceBackedPackage::into_opc_package_inner",
+                "source": "/tmp/litchi-0907-src/crates/litchi-opc/src/source_backed.rs"
+              },
+              {
+                "callee_id": 10294,
+                "callee_records": 1,
+                "callee_self_ir": 85,
+                "calls": 1,
+                "classification": {
+                  "basis": "perf-baseline namespace or source path",
+                  "class": "harness_guard",
+                  "confidence": "high",
+                  "source_caveat": "This row belongs to the measurement harness/guard path, not a production crate."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 88813897,
+                "name": "litchi_perf_baseline::publish_pptx_batch_edit::{{closure}}",
+                "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+              },
+              {
+                "callee_id": 8240,
+                "callee_records": 1,
+                "callee_self_ir": 288,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 87844295,
+                "name": "litchi_pptx::package::model::Package::publish_opened_presentation_patch",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/model.rs"
+              },
+              {
+                "callee_id": 7894,
+                "callee_records": 1,
+                "callee_self_ir": 145615,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 42871786,
+                "name": "litchi_pptx::opened::transaction::Transaction::commit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/transaction.rs"
+              },
+              {
+                "callee_id": 9066,
+                "callee_records": 1,
+                "callee_self_ir": 25223,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 32665651,
+                "name": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+                "source": "/tmp/litchi-0907-src/crates/litchi-opc/src/source_backed.rs"
+              },
+              {
+                "callee_id": 3658,
+                "callee_records": 1,
+                "callee_self_ir": 10900,
+                "calls": 260,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 17054845,
+                "name": "std::io::Write::write_all",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/mod.rs"
+              },
+              {
+                "callee_id": 10060,
+                "callee_records": 1,
+                "callee_self_ir": 992,
+                "calls": 8,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 10835948,
+                "name": "litchi_pptx::opened::transaction::Transaction::set_shape_texts",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/transaction.rs"
+              },
+              {
+                "callee_id": 8238,
+                "callee_records": 1,
+                "callee_self_ir": 94,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 7522298,
+                "name": "litchi_pptx::package::model::Package::apply_opened_presentation_commit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/model.rs"
+              },
+              {
+                "callee_id": 5426,
+                "callee_records": 1,
+                "callee_self_ir": 8772,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 2947807,
+                "name": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::from_opc_package_with_provenance",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/codec.rs"
+              },
+              {
+                "callee_id": 7168,
+                "callee_records": 1,
+                "callee_self_ir": 62,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 1326123,
+                "name": "litchi_pptx::opened::model::Snapshot::edit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/model.rs"
+              },
+              {
+                "callee_id": 7236,
+                "callee_records": 1,
+                "callee_self_ir": 39485,
+                "calls": 2,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 1101409,
+                "name": "core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 10304,
+                "callee_records": 1,
+                "callee_self_ir": 4,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 991908,
+                "name": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::opened::model::Snapshot,litchi_pptx::error::Error>>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 8574,
+                "callee_records": 1,
+                "callee_self_ir": 33,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 936624,
+                "name": "core::ptr::drop_in_place<litchi_pptx::package::model::Package>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 1428,
+                "callee_records": 1,
+                "callee_self_ir": 721680,
+                "calls": 64,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 8,
+                "inclusive_ir": 68155,
+                "name": "alloc::fmt::format::format_inner",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs"
+              },
+              {
+                "callee_id": 10266,
+                "callee_records": 1,
+                "callee_self_ir": 2022,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 20161,
+                "name": "litchi_pptx::opened::patch::Patch::inverse",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/patch.rs"
+              },
+              {
+                "callee_id": 10316,
+                "callee_records": 1,
+                "callee_self_ir": 74,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 17736,
+                "name": "core::ptr::drop_in_place<litchi_pptx::opened::patch::Patch>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 756,
+                "callee_records": 1,
+                "callee_self_ir": 5680788,
+                "calls": 81,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 11,
+                "inclusive_ir": 3774,
+                "name": "free",
+                "source": "./malloc/./malloc/malloc.c"
+              },
+              {
+                "callee_id": 722,
+                "callee_records": 1,
+                "callee_self_ir": 158125486,
+                "calls": 8,
+                "classification": {
+                  "basis": "no production or harness evidence matched",
+                  "class": "unclassified",
+                  "confidence": "low",
+                  "source_caveat": "Do not treat this row as production work without an independent source review."
+                },
+                "edge_count": 8,
+                "inclusive_ir": 786,
+                "name": "__memcpy_avx_unaligned_erms",
+                "source": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S"
+              },
+              {
+                "callee_id": 992,
+                "callee_records": 1,
+                "callee_self_ir": 137844,
+                "calls": 8,
+                "classification": {
+                  "basis": "no production or harness evidence matched",
+                  "class": "unclassified",
+                  "confidence": "low",
+                  "source_caveat": "Do not treat this row as production work without an independent source review."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 312,
+                "name": "__rustc::__rust_alloc",
+                "source": "???"
+              },
+              {
+                "callee_id": 644,
+                "callee_records": 1,
+                "callee_self_ir": 4151035,
+                "calls": 8,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 240,
+                "name": "malloc",
+                "source": "./malloc/./malloc/malloc.c"
+              }
+            ]
+          },
+          "file": "capture/eager-a/callgrind.out.1",
+          "header": {
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/report.json",
+            "events": [
+              "Ir"
+            ],
+            "part": 1,
+            "summary_ir": 4577995784,
+            "totals_ir": 4577995784,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+          },
+          "owner": {
+            "all_function_self_ir": 4577995784,
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/report.json",
+            "excluded_expected_callsite": "51143",
+            "function": {
+              "direct_children": [
+                {
+                  "callee": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::to_bytes",
+                  "callee_id": 8466,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 3189476327
+                },
+                {
+                  "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                  "callee_id": 6260,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 994945242
+                },
+                {
+                  "callee": "litchi_opc::source_backed::SourceBackedPackage::into_opc_package_inner",
+                  "callee_id": 9668,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 98544032
+                },
+                {
+                  "callee": "litchi_perf_baseline::publish_pptx_batch_edit::{{closure}}",
+                  "callee_id": 10294,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 88813897
+                },
+                {
+                  "callee": "litchi_pptx::package::model::Package::publish_opened_presentation_patch",
+                  "callee_id": 8240,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 87844295
+                },
+                {
+                  "callee": "litchi_pptx::opened::transaction::Transaction::commit",
+                  "callee_id": 7894,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 42871786
+                },
+                {
+                  "callee": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+                  "callee_id": 9066,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 32665651
+                },
+                {
+                  "callee": "std::io::Write::write_all",
+                  "callee_id": 3658,
+                  "calls": 260,
+                  "edge_count": 1,
+                  "inclusive_ir": 17054845
+                },
+                {
+                  "callee": "litchi_pptx::opened::transaction::Transaction::set_shape_texts",
+                  "callee_id": 10060,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 10835948
+                },
+                {
+                  "callee": "litchi_pptx::package::model::Package::apply_opened_presentation_commit",
+                  "callee_id": 8238,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 7522298
+                },
+                {
+                  "callee": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::from_opc_package_with_provenance",
+                  "callee_id": 5426,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 2947807
+                },
+                {
+                  "callee": "litchi_pptx::opened::model::Snapshot::edit",
+                  "callee_id": 7168,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 1326123
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>",
+                  "callee_id": 7236,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 1101409
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::opened::model::Snapshot,litchi_pptx::error::Error>>",
+                  "callee_id": 10304,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 991908
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::package::model::Package>",
+                  "callee_id": 8574,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 936624
+                },
+                {
+                  "callee": "alloc::fmt::format::format_inner",
+                  "callee_id": 1428,
+                  "calls": 64,
+                  "edge_count": 8,
+                  "inclusive_ir": 68155
+                },
+                {
+                  "callee": "litchi_pptx::opened::patch::Patch::inverse",
+                  "callee_id": 10266,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 20161
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::opened::patch::Patch>",
+                  "callee_id": 10316,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 17736
+                },
+                {
+                  "callee": "free",
+                  "callee_id": 756,
+                  "calls": 81,
+                  "edge_count": 11,
+                  "inclusive_ir": 3774
+                },
+                {
+                  "callee": "__memcpy_avx_unaligned_erms",
+                  "callee_id": 722,
+                  "calls": 8,
+                  "edge_count": 8,
+                  "inclusive_ir": 786
+                },
+                {
+                  "callee": "__rustc::__rust_alloc",
+                  "callee_id": 992,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 312
+                },
+                {
+                  "callee": "malloc",
+                  "callee_id": 644,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 240
+                }
+              ],
+              "direct_children_ir": 4577989356,
+              "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+              "id": 10522,
+              "name": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+              "records": 1,
+              "self_ir": 6428,
+              "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+            },
+            "incoming": [
+              {
+                "callee": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+                "callee_id": 10522,
+                "caller": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+                "caller_id": 9046,
+                "calls": 1,
+                "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+                "inclusive_ir": 4577995784,
+                "line": 39652,
+                "position": "51174"
+              }
+            ],
+            "measured_callsite": "51174",
+            "owner_id": 10522,
+            "part": 1,
+            "path": "capture/eager-a/callgrind.out.1",
+            "sha256": "ab88e84ba3c227d78eda3f754149d94a39974480153496249df54847958e9ee4",
+            "summary_ir": 4577995784,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+            "validation": {
+              "all_function_self_conserves": true,
+              "one_owner_call": true,
+              "one_owner_symbol": true,
+              "one_positive_owner_edge": true,
+              "owner_inclusive_matches_summary": true,
+              "owner_parent_matches": true,
+              "owner_self_plus_direct_conserves": true
+            }
+          },
+          "sha256": "ab88e84ba3c227d78eda3f754149d94a39974480153496249df54847958e9ee4"
+        }
+      ],
+      "terminal": {
+        "bytes": 530,
+        "file": "capture/eager-a/callgrind.out",
+        "header": {
+          "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/report.json",
+          "events": [
+            "Ir"
+          ],
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "sha256": "ef187991211c2cfc2f2266e7cb368e26b31a77e6876b1911b5901694860c6f95"
+      },
+      "validation": {
+        "all_scoped_triggers_match": true,
+        "one_measured_parent_per_owner": true,
+        "one_owner_per_scoped_dump": true,
+        "owner_and_direct_callee_ir_conserved": true,
+        "scoped_dump_count_is_one_or_two": true,
+        "terminal_dump_is_empty_and_retained": true
+      }
+    },
+    {
+      "binary_command_token": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+      "capture_directory": "capture/source-a",
+      "kind": "source_backed",
+      "label": "source-a",
+      "metadata": {
+        "artifacts": {
+          "callgrind.out": {
+            "bytes": 539,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/callgrind.out",
+            "sha256": "a7953c48f03f4bb172f2407b73657d230fc5ecd6554452e30ed2f20deed40865"
+          },
+          "callgrind.out.1": {
+            "bytes": 437004,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/callgrind.out.1",
+            "sha256": "1a53ae9acb517d122feb51294e0cbda47f6e6db52db108279a8683aabae89a99"
+          },
+          "report.json": {
+            "bytes": 15620,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/report.json",
+            "sha256": "4d6f97fa0249842939a7d4e995b854e9281dc05a0b148f624d1950d364f8738c"
+          },
+          "start.json": {
+            "bytes": 1891,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/start.json",
+            "sha256": "72001c4b40f87bdcc4556509d7d99d75a335e43f86f2bc99e8629d636c563911"
+          },
+          "stderr.txt": {
+            "bytes": 1030,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/stderr.txt",
+            "sha256": "938cd4bb73c8c622c01124795da757da3662fa91cc485a50d52c537cf4ea51a3"
+          },
+          "stdout.txt": {
+            "bytes": 0,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "command": {
+          "bytes": 3409,
+          "file": "capture/source-a/command.json",
+          "sha256": "4a4c3a72b6722181e39237308cc5f6cfa052b4a6d293a18c672648434e13ea66"
+        },
+        "original_wrapper_failure": null,
+        "semantic": {
+          "captured_sample_count": 1,
+          "file": "capture/source-a/semantics.json",
+          "native_sample_count": 200,
+          "native_vectors_constant": true,
+          "operation_metrics_reduced": true,
+          "reference": {
+            "bytes": 81499,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source-a.json",
+            "sha256": "d4beaa72a6b1bff4bacbb36e9e96564f234309040a6cc44bdbf12c6584ebf513"
+          },
+          "sha256": "a5352c13f7a3c9c7d57cd8b8071c6b79259f30c2419acadac92facfb62a004d5",
+          "status": "pass"
+        },
+        "start": {
+          "bytes": 1891,
+          "file": "capture/source-a/start.json",
+          "sha256": "72001c4b40f87bdcc4556509d7d99d75a335e43f86f2bc99e8629d636c563911"
+        },
+        "validation": {
+          "all_command_artifacts_hashed": true,
+          "binary_helper_plan_bindings_exact": true,
+          "fixed_cpu_and_workload_arguments": true,
+          "native_200_to_capture_1_reduction_verified": true,
+          "semantic_status_pass": true,
+          "start_command_argv_identical": true
+        }
+      },
+      "numbered_dump_count": 1,
+      "parts": [
+        {
+          "bytes": 437004,
+          "direct_callees": {
+            "category_inclusive_ir": {
+              "production": 107930907,
+              "runtime_or_dependency": 231537,
+              "unclassified": 478
+            },
+            "classification_policy": {
+              "harness_guard": "perf-baseline namespace or tools/perf-baseline source path",
+              "production": "high confidence only when the reader source path is under crates/",
+              "production_candidate": "known production namespace with weaker source evidence",
+              "runtime_or_dependency": "toolchain/runtime attribution retained but excluded from production totals",
+              "unclassified": "never promoted to production without independent source review"
+            },
+            "direct_children_ir": 108162922,
+            "rows": [
+              {
+                "callee_id": 10462,
+                "callee_records": 1,
+                "callee_self_ir": 2651,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 55654082,
+                "name": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::publish_slide_batch_commit_to_stream",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 9060,
+                "callee_records": 1,
+                "callee_self_ir": 71,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 38232988,
+                "name": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::from_read_at",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 10006,
+                "callee_records": 1,
+                "callee_self_ir": 2144,
+                "calls": 8,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 13962259,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::set_shape_texts",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 11338,
+                "callee_records": 1,
+                "callee_self_ir": 85,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 142940,
+                "name": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchCommit>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 1428,
+                "callee_records": 1,
+                "callee_self_ir": 161234,
+                "calls": 64,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 8,
+                "inclusive_ir": 69063,
+                "name": "alloc::fmt::format::format_inner",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs"
+              },
+              {
+                "callee_id": 10398,
+                "callee_records": 1,
+                "callee_self_ir": 1042,
+                "calls": 4,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 4,
+                "inclusive_ir": 53058,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::apply",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 10420,
+                "callee_records": 1,
+                "callee_self_ir": 50,
+                "calls": 2,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 21999,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::inverse",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 10428,
+                "callee_records": 1,
+                "callee_self_ir": 447,
+                "calls": 2,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 8496,
+                "name": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchPatch>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 10342,
+                "callee_records": 1,
+                "callee_self_ir": 442,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 6048,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::commit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 11332,
+                "callee_records": 1,
+                "callee_self_ir": 152,
+                "calls": 2,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 4502,
+                "name": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 756,
+                "callee_records": 1,
+                "callee_self_ir": 923727,
+                "calls": 80,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 10,
+                "inclusive_ir": 3582,
+                "name": "free",
+                "source": "./malloc/./malloc/malloc.c"
+              },
+              {
+                "callee_id": 10422,
+                "callee_records": 1,
+                "callee_self_ir": 171,
+                "calls": 3,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 3,
+                "inclusive_ir": 2474,
+                "name": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot,litchi_pptx::error::Error>>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 644,
+                "callee_records": 1,
+                "callee_self_ir": 673842,
+                "calls": 16,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 480,
+                "name": "malloc",
+                "source": "./malloc/./malloc/malloc.c"
+              },
+              {
+                "callee_id": 722,
+                "callee_records": 1,
+                "callee_self_ir": 34934287,
+                "calls": 2,
+                "classification": {
+                  "basis": "no production or harness evidence matched",
+                  "class": "unclassified",
+                  "confidence": "low",
+                  "source_caveat": "Do not treat this row as production work without an independent source review."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 478,
+                "name": "__memcpy_avx_unaligned_erms",
+                "source": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S"
+              },
+              {
+                "callee_id": 10434,
+                "callee_records": 1,
+                "callee_self_ir": 43,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 386,
+                "name": "litchi_opc::source_backed::SourceBackedPackage::cache_diagnostics",
+                "source": "/tmp/litchi-0907-src/crates/litchi-opc/src/source_backed.rs"
+              },
+              {
+                "callee_id": 10382,
+                "callee_records": 1,
+                "callee_self_ir": 26,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 87,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchCommit::is_changed",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              }
+            ]
+          },
+          "file": "capture/source-a/callgrind.out.1",
+          "header": {
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_source_backed_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/report.json",
+            "events": [
+              "Ir"
+            ],
+            "part": 1,
+            "summary_ir": 108165330,
+            "totals_ir": 108165330,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+          },
+          "owner": {
+            "all_function_self_ir": 108165330,
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_source_backed_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/report.json",
+            "excluded_expected_callsite": "51143",
+            "function": {
+              "direct_children": [
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::publish_slide_batch_commit_to_stream",
+                  "callee_id": 10462,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 55654082
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::from_read_at",
+                  "callee_id": 9060,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 38232988
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::set_shape_texts",
+                  "callee_id": 10006,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 13962259
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchCommit>",
+                  "callee_id": 11338,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 142940
+                },
+                {
+                  "callee": "alloc::fmt::format::format_inner",
+                  "callee_id": 1428,
+                  "calls": 64,
+                  "edge_count": 8,
+                  "inclusive_ir": 69063
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::apply",
+                  "callee_id": 10398,
+                  "calls": 4,
+                  "edge_count": 4,
+                  "inclusive_ir": 53058
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::inverse",
+                  "callee_id": 10420,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 21999
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchPatch>",
+                  "callee_id": 10428,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 8496
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::commit",
+                  "callee_id": 10342,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 6048
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot>",
+                  "callee_id": 11332,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 4502
+                },
+                {
+                  "callee": "free",
+                  "callee_id": 756,
+                  "calls": 80,
+                  "edge_count": 10,
+                  "inclusive_ir": 3582
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot,litchi_pptx::error::Error>>",
+                  "callee_id": 10422,
+                  "calls": 3,
+                  "edge_count": 3,
+                  "inclusive_ir": 2474
+                },
+                {
+                  "callee": "malloc",
+                  "callee_id": 644,
+                  "calls": 16,
+                  "edge_count": 2,
+                  "inclusive_ir": 480
+                },
+                {
+                  "callee": "__memcpy_avx_unaligned_erms",
+                  "callee_id": 722,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 478
+                },
+                {
+                  "callee": "litchi_opc::source_backed::SourceBackedPackage::cache_diagnostics",
+                  "callee_id": 10434,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 386
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchCommit::is_changed",
+                  "callee_id": 10382,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 87
+                }
+              ],
+              "direct_children_ir": 108162922,
+              "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+              "id": 11552,
+              "name": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+              "records": 1,
+              "self_ir": 2408,
+              "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+            },
+            "incoming": [
+              {
+                "callee": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+                "callee_id": 11552,
+                "caller": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+                "caller_id": 9042,
+                "calls": 1,
+                "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+                "inclusive_ir": 108165330,
+                "line": 27688,
+                "position": "51174"
+              }
+            ],
+            "measured_callsite": "51174",
+            "owner_id": 11552,
+            "part": 1,
+            "path": "capture/source-a/callgrind.out.1",
+            "sha256": "1a53ae9acb517d122feb51294e0cbda47f6e6db52db108279a8683aabae89a99",
+            "summary_ir": 108165330,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+            "validation": {
+              "all_function_self_conserves": true,
+              "one_owner_call": true,
+              "one_owner_symbol": true,
+              "one_positive_owner_edge": true,
+              "owner_inclusive_matches_summary": true,
+              "owner_parent_matches": true,
+              "owner_self_plus_direct_conserves": true
+            }
+          },
+          "sha256": "1a53ae9acb517d122feb51294e0cbda47f6e6db52db108279a8683aabae89a99"
+        }
+      ],
+      "terminal": {
+        "bytes": 539,
+        "file": "capture/source-a/callgrind.out",
+        "header": {
+          "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_source_backed_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-a/report.json",
+          "events": [
+            "Ir"
+          ],
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "sha256": "a7953c48f03f4bb172f2407b73657d230fc5ecd6554452e30ed2f20deed40865"
+      },
+      "validation": {
+        "all_scoped_triggers_match": true,
+        "one_measured_parent_per_owner": true,
+        "one_owner_per_scoped_dump": true,
+        "owner_and_direct_callee_ir_conserved": true,
+        "scoped_dump_count_is_one_or_two": true,
+        "terminal_dump_is_empty_and_retained": true
+      }
+    },
+    {
+      "binary_command_token": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+      "capture_directory": "capture/source-b",
+      "kind": "source_backed",
+      "label": "source-b",
+      "metadata": {
+        "artifacts": {
+          "callgrind.out": {
+            "bytes": 539,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/callgrind.out",
+            "sha256": "d2edf603697330acdf98a331a373c6eb5ae68ab8e474bccb52c515cf6c5362e4"
+          },
+          "callgrind.out.1": {
+            "bytes": 436992,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/callgrind.out.1",
+            "sha256": "9e1dc4203c176da2d948801f2387300916dc4276e818dafe06beda12747b5c43"
+          },
+          "report.json": {
+            "bytes": 15620,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/report.json",
+            "sha256": "08d8ca698c03fa7fc1674e4a0f6f0a02393e1b3347be157f508d8ef7deec3140"
+          },
+          "start.json": {
+            "bytes": 1889,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/start.json",
+            "sha256": "95ea6e5ae5a665f11b13880f9eda3fb6d50016e8f08a5779486950f4775ce33a"
+          },
+          "stderr.txt": {
+            "bytes": 1030,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/stderr.txt",
+            "sha256": "8d9b906cff7bee53e845856203a393ee75f01f7169825fcf3976f3e2482604da"
+          },
+          "stdout.txt": {
+            "bytes": 0,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "command": {
+          "bytes": 3410,
+          "file": "capture/source-b/command.json",
+          "sha256": "831a08c2f20c1a7a1d4aae5b45d1b76a64233b98c1279e4c1edb9af80949cc53"
+        },
+        "original_wrapper_failure": null,
+        "semantic": {
+          "captured_sample_count": 1,
+          "file": "capture/source-b/semantics.json",
+          "native_sample_count": 200,
+          "native_vectors_constant": true,
+          "operation_metrics_reduced": true,
+          "reference": {
+            "bytes": 81504,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source-b.json",
+            "sha256": "30220c89d9c13fa1800a9eadbfe443154ddfaacc16a0d2393ab92cfb1d063767"
+          },
+          "sha256": "cb6657757baa66bea68fa6d8c7772fe4777d08490e2a7fd0dda8f2fae9e3960c",
+          "status": "pass"
+        },
+        "start": {
+          "bytes": 1889,
+          "file": "capture/source-b/start.json",
+          "sha256": "95ea6e5ae5a665f11b13880f9eda3fb6d50016e8f08a5779486950f4775ce33a"
+        },
+        "validation": {
+          "all_command_artifacts_hashed": true,
+          "binary_helper_plan_bindings_exact": true,
+          "fixed_cpu_and_workload_arguments": true,
+          "native_200_to_capture_1_reduction_verified": true,
+          "semantic_status_pass": true,
+          "start_command_argv_identical": true
+        }
+      },
+      "numbered_dump_count": 1,
+      "parts": [
+        {
+          "bytes": 436992,
+          "direct_callees": {
+            "category_inclusive_ir": {
+              "production": 107947155,
+              "runtime_or_dependency": 231377,
+              "unclassified": 478
+            },
+            "classification_policy": {
+              "harness_guard": "perf-baseline namespace or tools/perf-baseline source path",
+              "production": "high confidence only when the reader source path is under crates/",
+              "production_candidate": "known production namespace with weaker source evidence",
+              "runtime_or_dependency": "toolchain/runtime attribution retained but excluded from production totals",
+              "unclassified": "never promoted to production without independent source review"
+            },
+            "direct_children_ir": 108179010,
+            "rows": [
+              {
+                "callee_id": 10462,
+                "callee_records": 1,
+                "callee_self_ir": 2651,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 55654546,
+                "name": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::publish_slide_batch_commit_to_stream",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 9060,
+                "callee_records": 1,
+                "callee_self_ir": 71,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 38246730,
+                "name": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::from_read_at",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 10006,
+                "callee_records": 1,
+                "callee_self_ir": 2144,
+                "calls": 8,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 13963877,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::set_shape_texts",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 11338,
+                "callee_records": 1,
+                "callee_self_ir": 85,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 142991,
+                "name": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchCommit>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 1428,
+                "callee_records": 1,
+                "callee_self_ir": 161234,
+                "calls": 64,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 8,
+                "inclusive_ir": 68761,
+                "name": "alloc::fmt::format::format_inner",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs"
+              },
+              {
+                "callee_id": 10398,
+                "callee_records": 1,
+                "callee_self_ir": 1042,
+                "calls": 4,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 4,
+                "inclusive_ir": 52960,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::apply",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 10420,
+                "callee_records": 1,
+                "callee_self_ir": 50,
+                "calls": 2,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 22491,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::inverse",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 10428,
+                "callee_records": 1,
+                "callee_self_ir": 447,
+                "calls": 2,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 8502,
+                "name": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchPatch>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 10342,
+                "callee_records": 1,
+                "callee_self_ir": 442,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 6078,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::commit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              },
+              {
+                "callee_id": 11332,
+                "callee_records": 1,
+                "callee_self_ir": 152,
+                "calls": 2,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 4494,
+                "name": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 756,
+                "callee_records": 1,
+                "callee_self_ir": 923763,
+                "calls": 80,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 10,
+                "inclusive_ir": 3560,
+                "name": "free",
+                "source": "./malloc/./malloc/malloc.c"
+              },
+              {
+                "callee_id": 10422,
+                "callee_records": 1,
+                "callee_self_ir": 171,
+                "calls": 3,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 3,
+                "inclusive_ir": 2589,
+                "name": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot,litchi_pptx::error::Error>>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 644,
+                "callee_records": 1,
+                "callee_self_ir": 673986,
+                "calls": 16,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 480,
+                "name": "malloc",
+                "source": "./malloc/./malloc/malloc.c"
+              },
+              {
+                "callee_id": 722,
+                "callee_records": 1,
+                "callee_self_ir": 34934489,
+                "calls": 2,
+                "classification": {
+                  "basis": "no production or harness evidence matched",
+                  "class": "unclassified",
+                  "confidence": "low",
+                  "source_caveat": "Do not treat this row as production work without an independent source review."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 478,
+                "name": "__memcpy_avx_unaligned_erms",
+                "source": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S"
+              },
+              {
+                "callee_id": 10434,
+                "callee_records": 1,
+                "callee_self_ir": 43,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 386,
+                "name": "litchi_opc::source_backed::SourceBackedPackage::cache_diagnostics",
+                "source": "/tmp/litchi-0907-src/crates/litchi-opc/src/source_backed.rs"
+              },
+              {
+                "callee_id": 10382,
+                "callee_records": 1,
+                "callee_self_ir": 26,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 87,
+                "name": "litchi_pptx::presentation::source::SourceBackedSlideBatchCommit::is_changed",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/presentation/source.rs"
+              }
+            ]
+          },
+          "file": "capture/source-b/callgrind.out.1",
+          "header": {
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_source_backed_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/report.json",
+            "events": [
+              "Ir"
+            ],
+            "part": 1,
+            "summary_ir": 108181418,
+            "totals_ir": 108181418,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+          },
+          "owner": {
+            "all_function_self_ir": 108181418,
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_source_backed_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/report.json",
+            "excluded_expected_callsite": "51143",
+            "function": {
+              "direct_children": [
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::publish_slide_batch_commit_to_stream",
+                  "callee_id": 10462,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 55654546
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedPresentationEditor::from_read_at",
+                  "callee_id": 9060,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 38246730
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::set_shape_texts",
+                  "callee_id": 10006,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 13963877
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchCommit>",
+                  "callee_id": 11338,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 142991
+                },
+                {
+                  "callee": "alloc::fmt::format::format_inner",
+                  "callee_id": 1428,
+                  "calls": 64,
+                  "edge_count": 8,
+                  "inclusive_ir": 68761
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::apply",
+                  "callee_id": 10398,
+                  "calls": 4,
+                  "edge_count": 4,
+                  "inclusive_ir": 52960
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchPatch::inverse",
+                  "callee_id": 10420,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 22491
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchPatch>",
+                  "callee_id": 10428,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 8502
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchEdit::commit",
+                  "callee_id": 10342,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 6078
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot>",
+                  "callee_id": 11332,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 4494
+                },
+                {
+                  "callee": "free",
+                  "callee_id": 756,
+                  "calls": 80,
+                  "edge_count": 10,
+                  "inclusive_ir": 3560
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::presentation::source::SourceBackedSlideBatchSnapshot,litchi_pptx::error::Error>>",
+                  "callee_id": 10422,
+                  "calls": 3,
+                  "edge_count": 3,
+                  "inclusive_ir": 2589
+                },
+                {
+                  "callee": "malloc",
+                  "callee_id": 644,
+                  "calls": 16,
+                  "edge_count": 2,
+                  "inclusive_ir": 480
+                },
+                {
+                  "callee": "__memcpy_avx_unaligned_erms",
+                  "callee_id": 722,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 478
+                },
+                {
+                  "callee": "litchi_opc::source_backed::SourceBackedPackage::cache_diagnostics",
+                  "callee_id": 10434,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 386
+                },
+                {
+                  "callee": "litchi_pptx::presentation::source::SourceBackedSlideBatchCommit::is_changed",
+                  "callee_id": 10382,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 87
+                }
+              ],
+              "direct_children_ir": 108179010,
+              "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+              "id": 11552,
+              "name": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+              "records": 1,
+              "self_ir": 2408,
+              "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+            },
+            "incoming": [
+              {
+                "callee": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+                "callee_id": 11552,
+                "caller": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+                "caller_id": 9042,
+                "calls": 1,
+                "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+                "inclusive_ir": 108181418,
+                "line": 35307,
+                "position": "51174"
+              }
+            ],
+            "measured_callsite": "51174",
+            "owner_id": 11552,
+            "part": 1,
+            "path": "capture/source-b/callgrind.out.1",
+            "sha256": "9e1dc4203c176da2d948801f2387300916dc4276e818dafe06beda12747b5c43",
+            "summary_ir": 108181418,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+            "validation": {
+              "all_function_self_conserves": true,
+              "one_owner_call": true,
+              "one_owner_symbol": true,
+              "one_positive_owner_edge": true,
+              "owner_inclusive_matches_summary": true,
+              "owner_parent_matches": true,
+              "owner_self_plus_direct_conserves": true
+            }
+          },
+          "sha256": "9e1dc4203c176da2d948801f2387300916dc4276e818dafe06beda12747b5c43"
+        }
+      ],
+      "terminal": {
+        "bytes": 539,
+        "file": "capture/source-b/callgrind.out",
+        "header": {
+          "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_source_backed_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/source-b/report.json",
+          "events": [
+            "Ir"
+          ],
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "sha256": "d2edf603697330acdf98a331a373c6eb5ae68ab8e474bccb52c515cf6c5362e4"
+      },
+      "validation": {
+        "all_scoped_triggers_match": true,
+        "one_measured_parent_per_owner": true,
+        "one_owner_per_scoped_dump": true,
+        "owner_and_direct_callee_ir_conserved": true,
+        "scoped_dump_count_is_one_or_two": true,
+        "terminal_dump_is_empty_and_retained": true
+      }
+    },
+    {
+      "binary_command_token": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+      "capture_directory": "capture/eager-b",
+      "kind": "eager",
+      "label": "eager-b",
+      "metadata": {
+        "artifacts": {
+          "callgrind.out": {
+            "bytes": 530,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/callgrind.out",
+            "sha256": "e9abe1fb708b0f875abf446bc3e2c60b733bac20ae97501f93a25ef7661bfde1"
+          },
+          "callgrind.out.1": {
+            "bytes": 791533,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/callgrind.out.1",
+            "sha256": "ca7e77c5c24f3205bac913f119f5855554c9b74187d9937e0c64e9ec824aec97"
+          },
+          "report.json": {
+            "bytes": 15604,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/report.json",
+            "sha256": "f833985b5843585b461d71f1ba2542fe85908e9693fa440f8912a90b33255dbb"
+          },
+          "start.json": {
+            "bytes": 1861,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/start.json",
+            "sha256": "946b6398583af047189c70641b60aa82fb0f5a1e4904f09efacc3c2c49b50d25"
+          },
+          "stderr.txt": {
+            "bytes": 1027,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/stderr.txt",
+            "sha256": "7655fa3d9916b0e5715a6dc0b5573429175601f638f357445569d465b2f6810f"
+          },
+          "stdout.txt": {
+            "bytes": 0,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "command": {
+          "bytes": 3374,
+          "file": "capture/eager-b/command.json",
+          "sha256": "bb2bdd9ffe62b98eaab2a261c401a121cd357cd2856f7b062c1f76caabf677fe"
+        },
+        "original_wrapper_failure": null,
+        "semantic": {
+          "captured_sample_count": 1,
+          "file": "capture/eager-b/semantics.json",
+          "native_sample_count": 200,
+          "native_vectors_constant": true,
+          "operation_metrics_reduced": true,
+          "reference": {
+            "bytes": 81080,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-b.json",
+            "sha256": "0b398016560f781a1312e1d8c6b6d3466ccd217c04385592d9107e24fc08948e"
+          },
+          "sha256": "8137b406c0faa67106c61a193ec42fd3164e1b1e623bc767962d1e12c29cf899",
+          "status": "pass"
+        },
+        "start": {
+          "bytes": 1861,
+          "file": "capture/eager-b/start.json",
+          "sha256": "946b6398583af047189c70641b60aa82fb0f5a1e4904f09efacc3c2c49b50d25"
+        },
+        "validation": {
+          "all_command_artifacts_hashed": true,
+          "binary_helper_plan_bindings_exact": true,
+          "fixed_cpu_and_workload_arguments": true,
+          "native_200_to_capture_1_reduction_verified": true,
+          "semantic_status_pass": true,
+          "start_command_argv_identical": true
+        }
+      },
+      "numbered_dump_count": 1,
+      "parts": [
+        {
+          "bytes": 791533,
+          "direct_callees": {
+            "category_inclusive_ir": {
+              "harness_guard": 88785796,
+              "production": 4469546790,
+              "runtime_or_dependency": 20167717,
+              "unclassified": 1098
+            },
+            "classification_policy": {
+              "harness_guard": "perf-baseline namespace or tools/perf-baseline source path",
+              "production": "high confidence only when the reader source path is under crates/",
+              "production_candidate": "known production namespace with weaker source evidence",
+              "runtime_or_dependency": "toolchain/runtime attribution retained but excluded from production totals",
+              "unclassified": "never promoted to production without independent source review"
+            },
+            "direct_children_ir": 4578501401,
+            "rows": [
+              {
+                "callee_id": 8462,
+                "callee_records": 1,
+                "callee_self_ir": 29,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 3189730670,
+                "name": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::to_bytes",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/codec.rs"
+              },
+              {
+                "callee_id": 6260,
+                "callee_records": 1,
+                "callee_self_ir": 113,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 995093332,
+                "name": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/model.rs"
+              },
+              {
+                "callee_id": 9662,
+                "callee_records": 1,
+                "callee_self_ir": 56181,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 98553345,
+                "name": "litchi_opc::source_backed::SourceBackedPackage::into_opc_package_inner",
+                "source": "/tmp/litchi-0907-src/crates/litchi-opc/src/source_backed.rs"
+              },
+              {
+                "callee_id": 10280,
+                "callee_records": 1,
+                "callee_self_ir": 85,
+                "calls": 1,
+                "classification": {
+                  "basis": "perf-baseline namespace or source path",
+                  "class": "harness_guard",
+                  "confidence": "high",
+                  "source_caveat": "This row belongs to the measurement harness/guard path, not a production crate."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 88785796,
+                "name": "litchi_perf_baseline::publish_pptx_batch_edit::{{closure}}",
+                "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+              },
+              {
+                "callee_id": 8236,
+                "callee_records": 1,
+                "callee_self_ir": 288,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 87818106,
+                "name": "litchi_pptx::package::model::Package::publish_opened_presentation_patch",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/model.rs"
+              },
+              {
+                "callee_id": 7892,
+                "callee_records": 1,
+                "callee_self_ir": 145615,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 43041459,
+                "name": "litchi_pptx::opened::transaction::Transaction::commit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/transaction.rs"
+              },
+              {
+                "callee_id": 9060,
+                "callee_records": 1,
+                "callee_self_ir": 25223,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 32667786,
+                "name": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+                "source": "/tmp/litchi-0907-src/crates/litchi-opc/src/source_backed.rs"
+              },
+              {
+                "callee_id": 3656,
+                "callee_records": 1,
+                "callee_self_ir": 10900,
+                "calls": 260,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 17054845,
+                "name": "std::io::Write::write_all",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/mod.rs"
+              },
+              {
+                "callee_id": 10046,
+                "callee_records": 1,
+                "callee_self_ir": 992,
+                "calls": 8,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 10820090,
+                "name": "litchi_pptx::opened::transaction::Transaction::set_shape_texts",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/transaction.rs"
+              },
+              {
+                "callee_id": 8234,
+                "callee_records": 1,
+                "callee_self_ir": 94,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 7526907,
+                "name": "litchi_pptx::package::model::Package::apply_opened_presentation_commit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/model.rs"
+              },
+              {
+                "callee_id": 5424,
+                "callee_records": 1,
+                "callee_self_ir": 8836,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 2950710,
+                "name": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::from_opc_package_with_provenance",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/package/codec.rs"
+              },
+              {
+                "callee_id": 7166,
+                "callee_records": 1,
+                "callee_self_ir": 62,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 1331830,
+                "name": "litchi_pptx::opened::model::Snapshot::edit",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/model.rs"
+              },
+              {
+                "callee_id": 7234,
+                "callee_records": 1,
+                "callee_self_ir": 39485,
+                "calls": 2,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 2,
+                "inclusive_ir": 1101843,
+                "name": "core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 10290,
+                "callee_records": 1,
+                "callee_self_ir": 4,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 986453,
+                "name": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::opened::model::Snapshot,litchi_pptx::error::Error>>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 8570,
+                "callee_records": 1,
+                "callee_self_ir": 33,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 935764,
+                "name": "core::ptr::drop_in_place<litchi_pptx::package::model::Package>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 1428,
+                "callee_records": 1,
+                "callee_self_ir": 721680,
+                "calls": 64,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 8,
+                "inclusive_ir": 67237,
+                "name": "alloc::fmt::format::format_inner",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs"
+              },
+              {
+                "callee_id": 10302,
+                "callee_records": 1,
+                "callee_self_ir": 74,
+                "calls": 1,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 17533,
+                "name": "core::ptr::drop_in_place<litchi_pptx::opened::patch::Patch>",
+                "source": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs"
+              },
+              {
+                "callee_id": 10252,
+                "callee_records": 1,
+                "callee_self_ir": 2022,
+                "calls": 1,
+                "classification": {
+                  "basis": "Callgrind source attribution under crates/",
+                  "class": "production",
+                  "confidence": "high",
+                  "source_caveat": "The source path identifies a production crate, but Ir remains inclusive at this call edge."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 12555,
+                "name": "litchi_pptx::opened::patch::Patch::inverse",
+                "source": "/tmp/litchi-0907-src/crates/litchi-pptx/src/opened/patch.rs"
+              },
+              {
+                "callee_id": 756,
+                "callee_records": 1,
+                "callee_self_ir": 5680643,
+                "calls": 81,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 11,
+                "inclusive_ir": 3802,
+                "name": "free",
+                "source": "./malloc/./malloc/malloc.c"
+              },
+              {
+                "callee_id": 722,
+                "callee_records": 1,
+                "callee_self_ir": 158401432,
+                "calls": 8,
+                "classification": {
+                  "basis": "no production or harness evidence matched",
+                  "class": "unclassified",
+                  "confidence": "low",
+                  "source_caveat": "Do not treat this row as production work without an independent source review."
+                },
+                "edge_count": 8,
+                "inclusive_ir": 786,
+                "name": "__memcpy_avx_unaligned_erms",
+                "source": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S"
+              },
+              {
+                "callee_id": 992,
+                "callee_records": 1,
+                "callee_self_ir": 137844,
+                "calls": 8,
+                "classification": {
+                  "basis": "no production or harness evidence matched",
+                  "class": "unclassified",
+                  "confidence": "low",
+                  "source_caveat": "Do not treat this row as production work without an independent source review."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 312,
+                "name": "__rustc::__rust_alloc",
+                "source": "???"
+              },
+              {
+                "callee_id": 644,
+                "callee_records": 1,
+                "callee_self_ir": 4148083,
+                "calls": 8,
+                "classification": {
+                  "basis": "runtime/toolchain namespace or source",
+                  "class": "runtime_or_dependency",
+                  "confidence": "medium",
+                  "source_caveat": "This row is retained for conservation and is excluded from production totals."
+                },
+                "edge_count": 1,
+                "inclusive_ir": 240,
+                "name": "malloc",
+                "source": "./malloc/./malloc/malloc.c"
+              }
+            ]
+          },
+          "file": "capture/eager-b/callgrind.out.1",
+          "header": {
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/report.json",
+            "events": [
+              "Ir"
+            ],
+            "part": 1,
+            "summary_ir": 4578507829,
+            "totals_ir": 4578507829,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+          },
+          "owner": {
+            "all_function_self_ir": 4578507829,
+            "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/report.json",
+            "excluded_expected_callsite": "51143",
+            "function": {
+              "direct_children": [
+                {
+                  "callee": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::to_bytes",
+                  "callee_id": 8462,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 3189730670
+                },
+                {
+                  "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                  "callee_id": 6260,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 995093332
+                },
+                {
+                  "callee": "litchi_opc::source_backed::SourceBackedPackage::into_opc_package_inner",
+                  "callee_id": 9662,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 98553345
+                },
+                {
+                  "callee": "litchi_perf_baseline::publish_pptx_batch_edit::{{closure}}",
+                  "callee_id": 10280,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 88785796
+                },
+                {
+                  "callee": "litchi_pptx::package::model::Package::publish_opened_presentation_patch",
+                  "callee_id": 8236,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 87818106
+                },
+                {
+                  "callee": "litchi_pptx::opened::transaction::Transaction::commit",
+                  "callee_id": 7892,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 43041459
+                },
+                {
+                  "callee": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+                  "callee_id": 9060,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 32667786
+                },
+                {
+                  "callee": "std::io::Write::write_all",
+                  "callee_id": 3656,
+                  "calls": 260,
+                  "edge_count": 1,
+                  "inclusive_ir": 17054845
+                },
+                {
+                  "callee": "litchi_pptx::opened::transaction::Transaction::set_shape_texts",
+                  "callee_id": 10046,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 10820090
+                },
+                {
+                  "callee": "litchi_pptx::package::model::Package::apply_opened_presentation_commit",
+                  "callee_id": 8234,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 7526907
+                },
+                {
+                  "callee": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::from_opc_package_with_provenance",
+                  "callee_id": 5424,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 2950710
+                },
+                {
+                  "callee": "litchi_pptx::opened::model::Snapshot::edit",
+                  "callee_id": 7166,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 1331830
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>",
+                  "callee_id": 7234,
+                  "calls": 2,
+                  "edge_count": 2,
+                  "inclusive_ir": 1101843
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::opened::model::Snapshot,litchi_pptx::error::Error>>",
+                  "callee_id": 10290,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 986453
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::package::model::Package>",
+                  "callee_id": 8570,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 935764
+                },
+                {
+                  "callee": "alloc::fmt::format::format_inner",
+                  "callee_id": 1428,
+                  "calls": 64,
+                  "edge_count": 8,
+                  "inclusive_ir": 67237
+                },
+                {
+                  "callee": "core::ptr::drop_in_place<litchi_pptx::opened::patch::Patch>",
+                  "callee_id": 10302,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 17533
+                },
+                {
+                  "callee": "litchi_pptx::opened::patch::Patch::inverse",
+                  "callee_id": 10252,
+                  "calls": 1,
+                  "edge_count": 1,
+                  "inclusive_ir": 12555
+                },
+                {
+                  "callee": "free",
+                  "callee_id": 756,
+                  "calls": 81,
+                  "edge_count": 11,
+                  "inclusive_ir": 3802
+                },
+                {
+                  "callee": "__memcpy_avx_unaligned_erms",
+                  "callee_id": 722,
+                  "calls": 8,
+                  "edge_count": 8,
+                  "inclusive_ir": 786
+                },
+                {
+                  "callee": "__rustc::__rust_alloc",
+                  "callee_id": 992,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 312
+                },
+                {
+                  "callee": "malloc",
+                  "callee_id": 644,
+                  "calls": 8,
+                  "edge_count": 1,
+                  "inclusive_ir": 240
+                }
+              ],
+              "direct_children_ir": 4578501401,
+              "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+              "id": 10508,
+              "name": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+              "records": 1,
+              "self_ir": 6428,
+              "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+            },
+            "incoming": [
+              {
+                "callee": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+                "callee_id": 10508,
+                "caller": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+                "caller_id": 9040,
+                "calls": 1,
+                "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+                "inclusive_ir": 4578507829,
+                "line": 2933,
+                "position": "51174"
+              }
+            ],
+            "measured_callsite": "51174",
+            "owner_id": 10508,
+            "part": 1,
+            "path": "capture/eager-b/callgrind.out.1",
+            "sha256": "ca7e77c5c24f3205bac913f119f5855554c9b74187d9937e0c64e9ec824aec97",
+            "summary_ir": 4578507829,
+            "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+            "validation": {
+              "all_function_self_conserves": true,
+              "one_owner_call": true,
+              "one_owner_symbol": true,
+              "one_positive_owner_edge": true,
+              "owner_inclusive_matches_summary": true,
+              "owner_parent_matches": true,
+              "owner_self_plus_direct_conserves": true
+            }
+          },
+          "sha256": "ca7e77c5c24f3205bac913f119f5855554c9b74187d9937e0c64e9ec824aec97"
+        }
+      ],
+      "terminal": {
+        "bytes": 530,
+        "file": "capture/eager-b/callgrind.out",
+        "header": {
+          "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-b/report.json",
+          "events": [
+            "Ir"
+          ],
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "sha256": "e9abe1fb708b0f875abf446bc3e2c60b733bac20ae97501f93a25ef7661bfde1"
+      },
+      "validation": {
+        "all_scoped_triggers_match": true,
+        "one_measured_parent_per_owner": true,
+        "one_owner_per_scoped_dump": true,
+        "owner_and_direct_callee_ir_conserved": true,
+        "scoped_dump_count_is_one_or_two": true,
+        "terminal_dump_is_empty_and_retained": true
+      }
+    }
+  ],
+  "cpu": 12,
+  "excluded_expected_callsite": "51143",
+  "limitations": [
+    "Callgrind Ir is a guest-instruction attribution counter, not native wall time, hardware cycles, allocations, RSS, or a speedup.",
+    "Direct-callee inclusive Ir rows are a disjoint immediate-owner partition; nested production rows must not be added to those totals.",
+    "Harness guards, runtime/dependency rows, and unclassified rows are retained for conservation and are excluded from high-confidence production totals.",
+    "Source-path classification is evidence from Callgrind records; it does not prove semantic ownership of an inclusive callee body."
+  ],
+  "measured_callsite": "51174",
+  "measured_parent": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+  "mode": "full-reduction",
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "--zero-before=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+  ],
+  "owner": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+  "plan": {
+    "file": "plan-v2.json",
+    "sha256": "5f848824764eb5884b110d1825bbe169c62639e6b282d71eb7a28eaca6f9f086"
+  },
+  "prior_admission": {
+    "file": "first-child-admission.json",
+    "sha256": "89874f6321e5c2a8af3eebc79d762f81df4b0c2fc7face3b5a6adaf9182d1f92"
+  },
+  "qualification": {
+    "accepted_counts": [
+      1,
+      2
+    ],
+    "numbered_dump_count": 1,
+    "reason": "Callgrind may emit one or two owner-scoped parts depending on emitted/inlined call structure; the first retained child determines the count.",
+    "same_count_across_reduction": true
+  },
+  "retained_reader": {
+    "file": "docs/performance/results/change-0845/reader_v2.py",
+    "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+  },
+  "schema": "litchi.pptx-multi-slide-callgrind-analysis-0908.v1",
+  "scope": "Ir counts inside the target owner only; direct-callee rows are the attribution boundary.",
+  "status": "pass",
+  "validation": {
+    "all_selected_children_reduced": true,
+    "first_child_admitted_before_full_reduction": true,
+    "fixed_cpu_bound": true,
+    "fixed_owner_and_parent": true,
+    "frozen_binary_bound": true
+  }
+}

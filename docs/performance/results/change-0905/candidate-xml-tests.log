@@ -1,0 +1,215 @@
+   Compiling xml-minifier v0.1.0 (/tmp/litchi-0905-src/crates/xml-minifier)
+    Finished `test` profile [unoptimized] target(s) in 1.22s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/xml_minifier-0cc54def2ed58554)
+
+running 33 tests
+test audit::stream_tests::authored_reader_preserves_authored_whitespace_policy ... ok
+test audit::stream_tests::aggregate_attribute_budget_remains_independent_of_token_scratch ... ok
+test audit::stream_tests::reader_matches_slice_bom_admission ... ok
+test audit::stream_tests::source_failures_are_distinguished_from_audit_failures ... ok
+test audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks ... ok
+test audit::stream_tests::streaming_memory_bound_accounts_for_depth_and_token_windows ... ok
+test audit::stream_tests::streamed_encoding_offsets_include_markup_prefixes ... ok
+test audit::stream_tests::streaming_memory_bound_caps_per_event_attribute_scratch_at_token_window ... ok
+test audit::stream_tests::streaming_memory_bound_reports_checked_arithmetic_overflow ... ok
+test audit::stream_tests::token_window_fails_before_unbounded_parser_growth ... ok
+test audit::stream_tests::total_window_fails_with_audit_limit ... ok
+test audit::wellformed::tests::attribute_values_are_normalized_as_xml_prescribes ... ok
+test audit::wellformed::tests::names_follow_the_fifth_edition_classes ... ok
+test audit::wellformed::tests::one_pass_finds_the_first_illegal_character_and_the_first_cdata_close ... ok
+test audit::wellformed::tests::references_name_a_predefined_entity_or_a_legal_character ... ok
+test xml_attributes::tests::every_copy_of_the_module_is_the_canonical_code ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test audit::wellformed::tests::a_cdata_close_is_found_wherever_it_straddles_a_block ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::unusual_duplicate_keys_keep_error_precedence_at_the_switch ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test audit::namespaces::tests::a_tag_never_reads_the_namespace_names_its_ancestors_declared ... ok
+test audit::namespaces::tests::many_tags_under_long_namespace_names_cost_no_name_reads ... ok
+test audit::namespaces::tests::a_window_replays_name_identities_without_reading_names ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+
+     Running tests/attribute_cardinality.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/attribute_cardinality-987ace2dace0880b)
+
+running 8 tests
+test bom_offsets_and_encoding_errors_remain_physical_source_offsets ... ok
+test malformed_duplicate_precedes_later_xml_space_value_error ... ok
+test source_policy_accepts_producer_spacing_but_authored_policy_keeps_compactness_errors ... ok
+test one_malformed_attribute_remains_structural_under_every_policy_and_chunking ... ok
+test duplicate_attributes_are_refused_before_and_after_many_attribute_scans ... ok
+test attribute_and_document_resource_boundaries_are_inclusive_and_chunk_stable ... ok
+test xml_space_inheritance_and_escaped_values_are_checked_after_cardinality ... ok
+test attribute_cardinality_reports_zero_one_two_many_and_aggregate_values ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/audit.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/audit-aa66ef43b2dc4664)
+
+running 19 tests
+test configuration_ceiling_is_inclusive_and_ceiling_plus_one_fails ... ok
+test accepts_semantically_meaningful_content_without_rewriting ... ok
+test authored_publication_refuses_ambiguous_spaces_but_preserves_explicit_content ... ok
+test limits_are_inclusive_and_fail_with_typed_accounting ... ok
+test malformed_and_invalid_encoding_are_typed ... ok
+test package_helper_borrows_parts_and_enforces_aggregate_limits ... ok
+test package_xml_classification_uses_names_and_media_types ... ok
+test inherited_xml_space_preserves_whitespace_and_default_resets_it ... ok
+test preserves_pi_comment_cdata_and_entity_events ... ok
+test preserves_plain_space_nodes_and_mixed_boundaries ... ok
+test rejects_cdata_outside_the_document_element ... ok
+test rejects_all_whitespace_outside_the_document_element ... ok
+test rejects_doctype_without_resolving_entities ... ok
+test rejects_each_lexical_whitespace_defect ... ok
+test source_bom_preserves_structural_refusals_and_byte_accounting ... ok
+test source_policy_accepts_every_noncompact_spelling_the_authored_contract_refuses ... ok
+test source_policy_never_reports_a_compactness_violation ... ok
+test source_policy_keeps_every_structural_encoding_doctype_and_limit_refusal ... ok
+test the_authored_and_default_contracts_are_unchanged_by_the_source_policy ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/element_attribute_limit.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/element_attribute_limit-7ee0cc0e4d0ae09a)
+
+running 8 tests
+test builder_ceiling_and_narrowing_are_typed ... ok
+test default_limit_is_documented_and_within_the_ceiling ... ok
+test a_replacement_that_adds_a_surplus_attribute_gets_the_complete_audits_verdict ... ok
+test the_declaration_pseudo_attributes_are_not_counted ... ok
+test namespace_declarations_count_as_attributes ... ok
+test the_limit_applies_to_every_tag_and_not_to_the_document_total ... ok
+test a_tag_at_the_limit_is_accepted_and_one_more_is_refused_at_the_surplus_attribute ... ok
+test a_huge_tag_is_refused_at_the_first_surplus_attribute_before_its_duplicates ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running tests/ooxml_assets.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/ooxml_assets-75a9ec5294b95ff0)
+
+running 6 tests
+test update_checked_in_assets ... ignored, explicit checked-in asset regeneration
+test registry_covers_every_checked_in_generated_xml_asset ... ok
+test explicitly_registered_compact_assets_are_compact ... ok
+test checked_in_assets_match_minifier_output ... ok
+test production_xml_includes_are_registered_compact_assets ... ok
+test streaming_audits_match_registered_producer_assets ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/source_replacement.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/source_replacement-fed304f81937e3d0)
+
+running 15 tests
+test a_window_larger_than_half_the_replacement_is_scanned_completely ... ok
+test an_insertion_between_siblings_is_proved_with_a_neighbouring_sibling ... ok
+test an_original_failure_precedes_any_replacement ... ok
+test a_window_that_would_not_start_or_end_with_markup_is_widened ... ok
+test a_length_changing_cell_edit_is_proved_by_the_enclosing_element ... ok
+test a_marked_original_keeps_physical_offsets ... ok
+test a_one_cell_value_edit_is_proved_by_its_value_element ... ok
+test identical_payloads_have_the_original_verdict ... ok
+test position_sensitive_tokens_inside_a_window_are_judged_as_the_complete_audit_judges_them ... ok
+test tampering_outside_the_edit_is_scanned_and_refused ... ok
+test a_defect_inside_the_window_is_refused_with_the_complete_audit_error ... ok
+test edits_of_the_document_element_or_between_its_children_are_scanned_completely ... ok
+test a_window_replays_the_namespace_bindings_and_position_of_its_place ... ok
+test every_budget_is_re_totalled_for_the_whole_replacement ... ok
+test the_pair_verdict_equals_two_complete_audits_on_generated_edits ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.27s
+
+     Running tests/stream_audit.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/stream_audit-b5caf6a16516eb1f)
+
+running 20 tests
+test accumulated_text_and_entity_bytes_match ... ok
+test bom_token_limit_offsets_match_slice_for_all_prefix_chunkings ... ok
+test authored_attribute_probe_keeps_duplicate_and_value_error_order ... ok
+test authored_space_and_entity_state_survive_every_chunk_boundary ... ok
+test authored_attribute_probe_covers_zero_one_many_and_namespace_attributes ... ok
+test authored_attribute_limits_remain_aggregate_and_inclusive ... ok
+test bom_raw_event_boundaries_match_slice_for_all_prefix_chunkings ... ok
+test exact_resource_boundaries_match_and_one_under_fails ... ok
+test depth_and_event_boundaries_match_slice ... ok
+test authored_attribute_probe_preserves_xml_space_state_and_limit_precedence ... ok
+test resource_limit_offsets_are_absolute_and_stream_ordered ... ok
+test interrupted_input_retries_and_permanent_input_error_is_typed ... ok
+test malformed_inputs_keep_typed_category ... ok
+test streaming_memory_bound_is_finite_and_monotonic ... ok
+test oversized_token_is_rejected_at_bounded_lookahead ... ok
+test raw_layout_cases_match_slice_for_arbitrary_tiny_chunks ... ok
+test truncated_token_kinds_are_rejected_before_unbounded_growth ... ok
+test invalid_utf8_offsets_match_slice_for_each_event_kind ... ok
+test successful_reports_match_slice_for_arbitrary_tiny_chunks ... ok
+test deterministic_ascii_mutations_keep_reader_transport_parity ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/verified_source.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/verified_source-25d72f666f440dd4)
+
+running 5 tests
+test a_proof_never_prints_its_payload ... ok
+test a_modified_payload_is_a_new_allocation_that_no_proof_covers ... ok
+test a_proof_covers_only_the_audited_allocation_under_the_audited_limits ... ok
+test a_proof_is_issued_only_for_bytes_the_source_audit_accepts ... ok
+test a_replacement_proof_has_the_pair_audits_verdict_and_order ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/well_formedness.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/deps/well_formedness-430d0243dc165d60)
+
+running 21 tests
+test a_cdata_section_close_in_character_data_is_refused ... ok
+test a_comment_holds_no_double_hyphen_and_does_not_end_with_one ... ok
+test a_mismatched_end_tag_stays_refused ... ok
+test a_malformed_or_illegal_character_reference_is_refused ... ok
+test a_character_xml_does_not_allow_is_refused_wherever_it_stands ... ok
+test a_prefix_must_not_be_undeclared ... ok
+test a_reference_outside_the_document_element_is_refused ... ok
+test a_processing_instruction_target_is_a_name_other_than_xml ... ok
+test an_empty_reference_is_refused ... ok
+test an_attribute_value_holds_no_lt_and_only_well_formed_references ... ok
+test a_reference_that_is_not_a_name_is_refused ... ok
+test an_xml_declaration_inside_the_document_is_refused ... ok
+test an_undeclared_namespace_prefix_is_refused ... ok
+test attributes_are_unique_by_namespace_name_and_local_name ... ok
+test only_the_predefined_entities_are_declared ... ok
+test the_authored_and_default_policies_keep_their_verdicts_for_fragment_callers ... ok
+test element_and_attribute_names_are_qualified_names ... ok
+test the_xml_declaration_stands_only_at_the_start_of_the_document ... ok
+test well_formed_spellings_stay_accepted ... ok
+test the_reserved_prefixes_and_namespace_names_are_used_only_as_reserved ... ok
+test the_xml_declaration_follows_its_grammar ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/attribute_summary_parity.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/examples/attribute_summary_parity-fe31551c80d58d41)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/attribute_summary_probe.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/examples/attribute_summary_probe-c9817d80075fab42)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/minify_file.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/examples/minify_file-1f00c20df1ec4c00)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/minify_inline.rs (/home/zhuhe/code/litchi/target/litchi-0905-build/xml/debug/examples/minify_inline-865633268343fd1e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

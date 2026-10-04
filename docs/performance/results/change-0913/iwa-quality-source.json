@@ -1,0 +1,53 @@
+{
+  "status": "pass",
+  "base": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "source_root": "/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution",
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0913-iwa-build",
+  "files": [
+    {
+      "path": "crates/litchi-iwa-archive/src/ingress.rs",
+      "bytes": 39996,
+      "sha256": "21756d78bc0aa92984ade9068e93a3e7d7a98c45f065a52f1c80ac8a9c191c66"
+    },
+    {
+      "path": "crates/litchi-iwa-archive/src/lib.rs",
+      "bytes": 15811,
+      "sha256": "c7b71438fb1009679b3ff6c3830753e89855e45b89f787ff25cfa2ded760906b"
+    },
+    {
+      "path": "crates/litchi-iwa-archive/src/package.rs",
+      "bytes": 298689,
+      "sha256": "8632c92c0895c55e64628570917e1ce870dfafdc4c8142245eb95b41fb51db56"
+    },
+    {
+      "path": "crates/litchi-iwa-core/src/archive.rs",
+      "bytes": 425494,
+      "sha256": "9b6b74514a86882d81de84f54efa3a82ef54df169a364ae62c1108323019afa5"
+    },
+    {
+      "path": "crates/litchi-iwa-core/src/archive/ingress.rs",
+      "bytes": 31520,
+      "sha256": "cf8ba377c41912fd06902cc689d00638404c0f38220f8f88a734a00e0ef622f5"
+    },
+    {
+      "path": "crates/litchi-iwa-core/src/archive/inventory.rs",
+      "bytes": 27487,
+      "sha256": "5423fbc5a57c72a95c04070e2489b6c38b693a9370c306d4c9db1d09f9e0c894"
+    },
+    {
+      "path": "crates/litchi-iwa-core/src/lib.rs",
+      "bytes": 1469,
+      "sha256": "5302c5c16a94d9eab235e84851a50064a8c8f311756e6edd77cdf391d72655e9"
+    },
+    {
+      "path": "crates/litchi-iwa-core/src/snappy.rs",
+      "bytes": 24709,
+      "sha256": "0f887b20311ccd0b0d920bcc51daf75052565174736f4aa249461ad58f3291e5"
+    }
+  ],
+  "helper": {
+    "path": "docs/performance/results/change-0913/iwa-quality.py",
+    "bytes": 3608,
+    "sha256": "72b91b39b2f78ff9cad8e7e40784914380752ed8da938dabf748e5fb9effe372"
+  }
+}

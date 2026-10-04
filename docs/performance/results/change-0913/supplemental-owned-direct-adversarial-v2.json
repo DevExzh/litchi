@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "kind": "supplemental-test-revision",
+  "revision": 2,
+  "path": "crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+  "previous": {
+    "path": "docs/performance/results/change-0913/quality-inputs/owned_direct_adversarial-v1.rs",
+    "bytes": 9494,
+    "sha256": "1ee70dc4fad215456de2a78db39d04491d5954af10d3f493cf40c6c83a4f4102"
+  },
+  "current": {
+    "path": "crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+    "bytes": 9756,
+    "sha256": "313b30201cfa71da020a24caf1ae635acf67d9d4fb7ac24d83a498930f1b970f"
+  },
+  "change": "Remove the blanket content-fault predicate assertion; verifier failures are exposed through an outer IO error while family, Debug, and Display parity retain the nested archive diagnostic."
+}

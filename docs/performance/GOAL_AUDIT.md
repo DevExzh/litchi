@@ -1,5 +1,108 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0913 — rejected input-span hypothesis and completed requested integration
+
+[0913](0913-pptx-owned-direct-read.md) closes the proposed copy-bypass experiment
+without adopting unproved complexity. The candidate passed correctness but
+failed both native admission conditions. Static eligibility limits the
+mechanism to small members. Broader CRUD, producer, cold/range, allocation and
+scaling coverage remains open; ODF is deferred. The separately requested iWork
+cherry-pick passed 302 tests and quality gates; it adds no performance claim.
+
+## 0912 — native backend witness and implementable payload candidate
+
+[0912](0912-pptx-native-sha-dispatch.md) resolves backend reachability for two
+guarded native processes. Lost events and missing owner chains reject the perf
+lane, so native snapshot cost attribution remains unproved. Source review
+identifies a bounded owned-source copy to test, with preservation, error,
+limit and concurrency requirements intact. No production adoption or broad
+goal completion is claimed; ODF deferred, iWork excluded.
+
+## 0911 — cold snapshot scope qualified; native attribution remains open
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) closes the profiling
+scope gap identified after 0910, with independently conserved setup and measured
+owner contexts. It adds bounded generated-fixture instruction evidence, not an
+adopted optimization or a native hotspot proof. Broader CRUD/input coverage,
+allocation and scaling remain open; ODF is deferred and iWork excluded.
+
+## 0910 — owning-route baseline closes a PPTX interpretation gap
+
+[0910](0910-pptx-owning-input-native-control.md) provides a comparable native
+control for owning versus materialized ReadAt ingress, using matched input,
+edit, save, sink and teardown boundaries. All 24 children, 480 measured samples
+and two raw ZIP controls pass. Publication cost is already much lower on owning
+input; its opened snapshot is the next attribution target. This adds bounded
+generated-fixture evidence, not production changes, broad input coverage,
+allocation/scaling proof or completion of the non-iWork goal.
+
+## 0909 — one owning-input control admitted, broader scope remains open
+
+[0909](0909-pptx-owning-input-preservation-control.md) addresses the missing
+owning-input qualification from 0908. It establishes bounded generated-fixture
+preservation and reversible-edit evidence, not producer-wide support or cost
+elimination. Owning-route timing, actual compression/copy attribution, unknown
+and adversarial variants, and broad CRUD coverage remain open. ODF is deferred,
+iWork excluded, and target integration pending the unrelated cherry-pick.
+
+## 0908 — measured instruction owners, preservation control still missing
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) adds scoped guest
+instruction attribution without converting it to native time. It exposes a
+missing owning-input eager control and retains physical ZIP fidelity, phase
+separation, producer coverage and broad CRUD coverage as open work. Temporary
+capture storage is cleaned; unrelated shared cherry-pick integration remains
+pending. OLE2/OOXML work continues, ODF is deferred and iWork excluded.
+
+## 0907 — current PPTX evidence, broad goal still open
+
+[0907](0907-pptx-multi-slide-current-baseline.md) replaces stale timing as the
+basis for the next PPTX profile: 800 fresh guarded-workflow samples with exact
+source/binary/report bindings. It does not establish raw ZIP header fidelity,
+producer representativeness, cold/range behavior, allocation/RSS improvement,
+or comprehensive CRUD coverage. Route-specific phase attribution remains
+necessary before a production candidate. ODF is deferred, iWork excluded,
+and integration is pending the unrelated target cherry-pick.
+
+## 0906 — remaining coverage is explicit
+
+[0906](0906-office-coverage-qualification.md) verifies the 534-selector registry
+and its 41 defaults without treating selectors as completion of the required
+CRUD taxonomy. PPTX timer/guard boundaries and legacy semantic coverage need
+separate qualification before broader claims. The accepted 0905 change remains
+on the Office branch while unrelated target-branch integration is pending.
+The comprehensive OLE2/OOXML goal is still active; ODF is deferred and iWork is
+excluded.
+
+## 0905 — XML audit candidate advances one scoped Office path
+
+[0905](0905-xml-attribute-summary.md) advances the active OLE2/OOXML program
+with a bounded one-file XML attribute-summary candidate. The candidate keeps
+the full first lexical pass, source-policy namespace checks, aggregate and
+per-element limits, `xml:space` decoding, malformed-input precedence and
+stream/window accounting. Exact parity covers 11,520 cases and 125,952 raw
+records; the selected XML/OPC/XLSX/DOCX/PPTX quality matrix passes, including
+134 XML tests, 6,296 Office tests and 93 documentation tests.
+
+Fresh serial warm-process captures pass both required XLSX primary native gates
+(medium **0.9543881780**, CI **0.9508342443–0.9584711179**; dense-sparse
+**0.9477553767**, CI **0.9350215878–0.9742145402**) with zero main review
+flags. The separate micro guard has no hard adverse case; its cardinality-2
+authored/compact p50 rows are **1.0371562973**/**1.0386657724**, below the
+1.05 review threshold, while their p99 flags remain visible. Allocator
+publication calls fall sharply in the three XLSX cases, but live/peak values
+are three bytes higher and the whole-process RSS decrease is descriptive.
+
+The retained offline replay passes source/archive/overlay, binary, parity,
+main-capture and micro-capture checks. Independent review found no blocker; the
+candidate is accepted and both owned roots are removed. Post-cleanup replay
+passes. Target-branch integration awaits an unrelated cherry-pick. The eight local
+gitignored binaries are retained evidence and are not assumed to exist in a
+fresh clone. Later concurrent iWork integration commits are outside this
+measurement's frozen 4f39f5a88d source scope. OLE2/OOXML remain active, ODF is
+deferred, iWork is excluded from this program, and the comprehensive goal is
+not complete.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

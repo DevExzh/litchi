@@ -1,0 +1,583 @@
+{
+  "admitted_children": 4,
+  "branch": "refs/heads/perf/0911-pptx-owning-snapshot-profile",
+  "capture_working_directories_removed": 3,
+  "cleanup_logical_bytes": 195,
+  "excluded_setup_contexts": 4,
+  "failed_attempts_retained": 2,
+  "files": [
+    {
+      "bytes": 7813,
+      "path": "docs/performance/0911-pptx-owning-snapshot-instruction-profile.md",
+      "sha256": "9adf2b9de5b30a261ae85dc96ac78638978207ece5ec3e1f85f8362b5d759967"
+    },
+    {
+      "bytes": 479116,
+      "path": "docs/performance/BASELINE.md",
+      "sha256": "1d0a440554557d07c4cc95b3fa64579ac6d5ee9632bc68573d94836066b888f8"
+    },
+    {
+      "bytes": 468830,
+      "path": "docs/performance/GOAL_AUDIT.md",
+      "sha256": "13d7226c01de2b11501b30936a97a6420db75ba8d3bd72d69860138394bfb554"
+    },
+    {
+      "bytes": 782140,
+      "path": "docs/performance/HOTSPOTS.md",
+      "sha256": "7acabca945f6e858eee0c471d36c20e3b3028e99ae71ff721a425b3834069a1b"
+    },
+    {
+      "bytes": 795181,
+      "path": "docs/performance/REPORT.md",
+      "sha256": "bca09261d1f146ed67807c649afc87ac9a504fa861bfde8f6b94b2253be29cb5"
+    },
+    {
+      "bytes": 10,
+      "path": "docs/performance/results/change-0911/.gitignore",
+      "sha256": "c45b704c7d62797d70ccdfc0f701ad78f4aad41855b0417be3785cf5dd47e5db"
+    },
+    {
+      "bytes": 4034,
+      "path": "docs/performance/results/change-0911/admission_child_v3.py",
+      "sha256": "60b1c7a14e5a1227d09b407f001b2e78bbdd09d69ad35f6bcb40b55af75f60f0"
+    },
+    {
+      "bytes": 3854,
+      "path": "docs/performance/results/change-0911/admission_v3.py",
+      "sha256": "183b53c82b4606d4fc15c2b580cd87e584fc2a4a2933c4ddc52deaed14d5584d"
+    },
+    {
+      "bytes": 643782,
+      "path": "docs/performance/results/change-0911/analysis.json",
+      "sha256": "ac6fa98aed88d9594fe2bafef7c38cb06f08dc6b84eab574b919fd11bdedf76f"
+    },
+    {
+      "bytes": 28249,
+      "path": "docs/performance/results/change-0911/analyze.py",
+      "sha256": "d52b4f1e5ccfd651c4256e89a2fdd94e2db2d32541abed85a8349cf3b317bc38"
+    },
+    {
+      "bytes": 1981,
+      "path": "docs/performance/results/change-0911/analyzer-checks.json",
+      "sha256": "98fe1bbbfa42120d7775b9f93f89778b875b49a1f6884421b741250628add321"
+    },
+    {
+      "bytes": 5072,
+      "path": "docs/performance/results/change-0911/analyzer-checks.py",
+      "sha256": "fb3a03780c67f000e1e6ecc2f3bd608a1969d01f23e3041ff95c5e1a84516665"
+    },
+    {
+      "bytes": 7484,
+      "path": "docs/performance/results/change-0911/candidate-assessment.md",
+      "sha256": "39f91c22c4250342f9c879f76746c33169618b45784f74b77d86a28b6b832084"
+    },
+    {
+      "bytes": 3179,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/artifacts/report.json",
+      "sha256": "9af5a21535a8c6d3e996c9277c80470d49a61ab0b4a738dcc15be6ea9c1acc65"
+    },
+    {
+      "bytes": 463,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/callgrind.out",
+      "sha256": "2fd0f6bb44f4dab8c6290cefebe21c8a5af5907bd26e7992a85a56ec86c321e7"
+    },
+    {
+      "bytes": 74795,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/callgrind.out.1",
+      "sha256": "319a21fa8295973e269efc2b16276cf247c4b6727d08aef14d5fdce1aa350be8"
+    },
+    {
+      "bytes": 75172,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/callgrind.out.2",
+      "sha256": "24e185756962834f47d083af89746c485ab80d13cbdb2c2f7d6b8f1a979d16d7"
+    },
+    {
+      "bytes": 4033,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/command.json",
+      "sha256": "dbdbd172d3836daca24cb2934d6c85c525f54048edb8d943b856b34bea53ac77"
+    },
+    {
+      "bytes": 1751,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/semantics.json",
+      "sha256": "f9d386ad47f9400a74749e9c6ecbb09a2265bb55dfeb9ea3c34a973e8d4514ba"
+    },
+    {
+      "bytes": 1747,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/start.json",
+      "sha256": "60867fce0df04e553c39696f0dd2322feb630ba77a3bee58f9f8050a42fef66b"
+    },
+    {
+      "bytes": 818,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/stderr.txt",
+      "sha256": "cd0b4d3017af54a6422c2e4f2c2c8604fe778ff47ec31adc375896f9e4da43f2"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3179,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/artifacts/report.json",
+      "sha256": "c324d6d5eccdfabadffc10768d4bcef3e972658d6aeebef598af3424a890b300"
+    },
+    {
+      "bytes": 466,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/callgrind.out",
+      "sha256": "4d7802d56d7b9b19f1c51026e9aac29f4de083b37ec659ba003f9bdf4b39294a"
+    },
+    {
+      "bytes": 77841,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/callgrind.out.1",
+      "sha256": "d0b1b89cb86106a717ef905f8ae975436599c77ca7e3024911a181a6ecc041cc"
+    },
+    {
+      "bytes": 3812,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/command.json",
+      "sha256": "db0611e0fab4dea345768ab6e4247f5f261feaef78a55749d0fbe310eeb9b5a3"
+    },
+    {
+      "bytes": 1754,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/semantics.json",
+      "sha256": "5b4a82108521865e9b7719795b0b4929c648210b9b3dcecba54e5cf777be61dc"
+    },
+    {
+      "bytes": 1739,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/start.json",
+      "sha256": "24f451bdebab2bdefe9b2ee76f59b7aa96dbf3b64695e40d7fc6ea7ea31086c4"
+    },
+    {
+      "bytes": 821,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/stderr.txt",
+      "sha256": "564b7ed70f64fc93a391a23c79367336c7106cee7a81f8cb21a421bbd8a49e63"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3179,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/artifacts/report.json",
+      "sha256": "7e780ca3d2a45159dcabd1e96de9ce86c6590b8e7364f2f2950d53fa01329c6f"
+    },
+    {
+      "bytes": 466,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/callgrind.out",
+      "sha256": "a10b7b9c75d4a273592816e40a2252af30c4e13ebd70d79dfe08c8382dfc33d0"
+    },
+    {
+      "bytes": 74552,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/callgrind.out.1",
+      "sha256": "a4d811d4af806c75688852504bb4abb100f06f38e08dfaffa4f1a1b8266797ae"
+    },
+    {
+      "bytes": 75199,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/callgrind.out.2",
+      "sha256": "b84197721e4e954d432917df79a2d32bdc250271228133139f221b3a758bd9ae"
+    },
+    {
+      "bytes": 4078,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/command.json",
+      "sha256": "fc2953191acafdf90956ff464e9337507b649fd79383119c9138e837719910f9"
+    },
+    {
+      "bytes": 2532,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/raw-admission.json",
+      "sha256": "9045ed9069cf66a62d7cae7d47880f2bdaf9ca9a835f951f6fbd490b8441a625"
+    },
+    {
+      "bytes": 1754,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/semantics.json",
+      "sha256": "99b64749ae43903c22949305328eb9b8b6052956b53266b40362509aa51d271f"
+    },
+    {
+      "bytes": 1766,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/start.json",
+      "sha256": "f3cd09e12b81126d8c9e5abd8165b066446594256d610603926df5cb8753486c"
+    },
+    {
+      "bytes": 821,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/stderr.txt",
+      "sha256": "d0b5c7528f1a49f6bc53ad9dd92f83fb9b059e7497445279c443b88bbd47b87e"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3179,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/artifacts/report.json",
+      "sha256": "74e1efcccd3a62df42f8d825f299b510c7cb4a2440f7d28db95311f74e8e5524"
+    },
+    {
+      "bytes": 466,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/callgrind.out",
+      "sha256": "23212f3d07e70dcae6cfac36a899eea9ee25a4bb1a2662b2e9d72759553c671b"
+    },
+    {
+      "bytes": 74837,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/callgrind.out.1",
+      "sha256": "f482a1ec7e8a7e42e5a73a62f82aef7cb3818560d4930823bc14eae986576294"
+    },
+    {
+      "bytes": 74636,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/callgrind.out.2",
+      "sha256": "24903003c546b883dd459d1d407ce3b58d7adea9d33b581b96227996e3a0cffd"
+    },
+    {
+      "bytes": 4074,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/command.json",
+      "sha256": "3a00840ecb10b086c2fc55299b933d910f61751a7035333065ad6f0b748ca805"
+    },
+    {
+      "bytes": 2532,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/raw-admission.json",
+      "sha256": "2d800007070f47408d6267b312475e7a73a9f552035ff2b0567731c730ec0e1b"
+    },
+    {
+      "bytes": 1754,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/semantics.json",
+      "sha256": "412ed7575813fc1d8c8d269e8716ca0dc8ce640423935d817bbf8b4f24cc087f"
+    },
+    {
+      "bytes": 1765,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/start.json",
+      "sha256": "884ab442e24e28d162c2d0948e13b7e971420fea6b37f1e2954e47a67585e164"
+    },
+    {
+      "bytes": 821,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/stderr.txt",
+      "sha256": "7c3edf3777b37b77e493ba3585c1c81c2d9fb3037602210a945deb5712d41fe8"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3091,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/artifacts/report.json",
+      "sha256": "eada7b87f357e8abee4c94182f26e4799290d520c5ffff932bd85dbd2d9cd47f"
+    },
+    {
+      "bytes": 452,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out",
+      "sha256": "56ab642407f10022d7937b09d3ee17a85937ccd8fdc9da867264f99914da1938"
+    },
+    {
+      "bytes": 74647,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out.1",
+      "sha256": "166bd77e4969337b24264c6b2d05901f47e7daa813db3938d255773b71aa00c4"
+    },
+    {
+      "bytes": 84889,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/callgrind.out.2",
+      "sha256": "71a7b94b0869a13ae7c8d0ed48172bb4540cb51adb1edaad7dfafe898ad08a4d"
+    },
+    {
+      "bytes": 3973,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/command.json",
+      "sha256": "d5165dba2d37d4deed6be6b181c5351146ae0bda660f01296a0b312fe8211e90"
+    },
+    {
+      "bytes": 2497,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/raw-admission.json",
+      "sha256": "9f4d8acab614998f2a9e01f50b85594257fe711a16356edb3237c9fbb63637c8"
+    },
+    {
+      "bytes": 1733,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/semantics.json",
+      "sha256": "06cd60db92c3faa0a98ffcd32c8bfc45dd2b2f52337ec7eba9b26eca65f8af4c"
+    },
+    {
+      "bytes": 1727,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/start.json",
+      "sha256": "28386338112f046846386142725577cb86b714de5f34dc3baf2bcf85ba15dae0"
+    },
+    {
+      "bytes": 807,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/stderr.txt",
+      "sha256": "e58553249352366f75aa607d1e6ea7ad972315714c56c76c42a8e863be4b6494"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3091,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/artifacts/report.json",
+      "sha256": "e8ec739497f0f5df4639dad9b8eba9dc527e68897ac761a44c68d2ed6cb9d242"
+    },
+    {
+      "bytes": 452,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out",
+      "sha256": "ad142034a89f4cf8cd8b4e74f1d12e3dea53bb72b3711b0b9ceb94c1eb409c8d"
+    },
+    {
+      "bytes": 74784,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out.1",
+      "sha256": "625166cf733554ea899eeaacc16e98f5751d9e219dbf39343bf5535efc550fc9"
+    },
+    {
+      "bytes": 85073,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out.2",
+      "sha256": "26b144a3d95cc64807a2ce53df0f17c02f656e1f581bfee5a8737d5761e37e00"
+    },
+    {
+      "bytes": 3976,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/command.json",
+      "sha256": "95cc9523f2b49d0e35813256764e62ebe43b224852e5221f57c685453da29a04"
+    },
+    {
+      "bytes": 2497,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/raw-admission.json",
+      "sha256": "158c4d498422011c0dad673b2705118ddcde1cd2f8319142275dd32a4702de4a"
+    },
+    {
+      "bytes": 1733,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/semantics.json",
+      "sha256": "6acb04f7906c0792024add81f65889fcf7766b72a0f912d003577c7740bc4149"
+    },
+    {
+      "bytes": 1726,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/start.json",
+      "sha256": "ddbe5a5ad5cfac8dbd0264e6fbf1f67eaeee6cd0132a4340a9d9926e9f3caf42"
+    },
+    {
+      "bytes": 807,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/stderr.txt",
+      "sha256": "b91048da9c13b41b3c239d0759aa904aeb7abc1470dc6678bbd2647a636f1f08"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 8178,
+      "path": "docs/performance/results/change-0911/capture.py",
+      "sha256": "d2fae5909e587d5a76627522011f7b498bb42de85695ad3b6fcb7679922c8099"
+    },
+    {
+      "bytes": 8468,
+      "path": "docs/performance/results/change-0911/capture_v2.py",
+      "sha256": "af6be91d565d481607b76b95cb9ecaa778c25378f93d16c951a0e36b1cbbd501"
+    },
+    {
+      "bytes": 8724,
+      "path": "docs/performance/results/change-0911/capture_v3.py",
+      "sha256": "fd861ce82b9eb44ea6e41cfa19e00ef7a65ab70f47785cd127cd758325a78523"
+    },
+    {
+      "bytes": 672,
+      "path": "docs/performance/results/change-0911/cleanup.json",
+      "sha256": "21dc1d563bbe1a32be5010dba7b81d46d1781b9800900b7db3f3f7b2e2dd484b"
+    },
+    {
+      "bytes": 2094,
+      "path": "docs/performance/results/change-0911/cleanup.py",
+      "sha256": "128fae36b8b401a7a35fa5854f42baba057153598a36ae4ff6ca13e025082ac0"
+    },
+    {
+      "bytes": 2526,
+      "path": "docs/performance/results/change-0911/first-child-admission-v3.json",
+      "sha256": "84d4f6c3b0622d929a3a91d493f96dc8d3cd91939db27670a32a66ad79d10205"
+    },
+    {
+      "bytes": 7270,
+      "path": "docs/performance/results/change-0911/first-child-failure-v2.json",
+      "sha256": "b90964a09744c537f5dccc695ecdb25af050b4fe0f00a4e06402a916757588bb"
+    },
+    {
+      "bytes": 2064,
+      "path": "docs/performance/results/change-0911/first-child-failure-v2.md",
+      "sha256": "5ec3688abdede10ca10810963530656d5d4021bcec7fc6242214bc8a601458b9"
+    },
+    {
+      "bytes": 8443,
+      "path": "docs/performance/results/change-0911/first-child-failure.json",
+      "sha256": "9b95c86e2575fc7aa7f6aee47b6a57492d9a1e843855f538bb5d987e0e7992e0"
+    },
+    {
+      "bytes": 2344,
+      "path": "docs/performance/results/change-0911/first-child-failure.md",
+      "sha256": "d0214064a3616cd74258208e8884018a5d4ce8abdac86d6a1d0b74089a47ee18"
+    },
+    {
+      "bytes": 1979,
+      "path": "docs/performance/results/change-0911/host-flags.json",
+      "sha256": "7ed849b9c5c4fa1f8859a86ba0bc1f2d0d84af6ddca235632f8c9e9911300e32"
+    },
+    {
+      "bytes": 168,
+      "path": "docs/performance/results/change-0911/owner-symbols-v2.txt",
+      "sha256": "0120d0338b9fde3ed088683dbdbc7457a4230b20d6a9da09e5e3ad3593d776bd"
+    },
+    {
+      "bytes": 168,
+      "path": "docs/performance/results/change-0911/owner-symbols-v3.txt",
+      "sha256": "0120d0338b9fde3ed088683dbdbc7457a4230b20d6a9da09e5e3ad3593d776bd"
+    },
+    {
+      "bytes": 168,
+      "path": "docs/performance/results/change-0911/owner-symbols.txt",
+      "sha256": "0120d0338b9fde3ed088683dbdbc7457a4230b20d6a9da09e5e3ad3593d776bd"
+    },
+    {
+      "bytes": 7187,
+      "path": "docs/performance/results/change-0911/plan-v2.json",
+      "sha256": "796615b6d15bd3c8c40961100f65ddd628d6f8435d8642004ea0381a1c1a32f1"
+    },
+    {
+      "bytes": 8262,
+      "path": "docs/performance/results/change-0911/plan-v3.json",
+      "sha256": "28366047e447183badd9d7a91f10e82bc6e17a5de82529a4ef8da859b4034089"
+    },
+    {
+      "bytes": 6031,
+      "path": "docs/performance/results/change-0911/plan.json",
+      "sha256": "f7f56da7606833fae93dc862a64d2910ed7b1c358bde3d63843891a05376a2d2"
+    },
+    {
+      "bytes": 3554,
+      "path": "docs/performance/results/change-0911/protocol-clarification.md",
+      "sha256": "aecacb5035499c38cc3fbb5c015ce8618f9cb5b19a9b0d9d83766d9d183d30c9"
+    },
+    {
+      "bytes": 8033,
+      "path": "docs/performance/results/change-0911/protocol-review-v2.md",
+      "sha256": "6ea5925abef18e3a863025ec17534396f8c2334975d17b5eac08c2272f1c148c"
+    },
+    {
+      "bytes": 7298,
+      "path": "docs/performance/results/change-0911/protocol-review-v3.md",
+      "sha256": "8c255b6f03424b73f58bc6d819c33b9ebcacfeacd0447d385b5168d80ea4c901"
+    },
+    {
+      "bytes": 10019,
+      "path": "docs/performance/results/change-0911/protocol-review.md",
+      "sha256": "184de944ccf0043954ea405f0d4f98db70acb212a24bca73498973dc777d26f5"
+    },
+    {
+      "bytes": 1707,
+      "path": "docs/performance/results/change-0911/replay-after-cleanup.json",
+      "sha256": "5820a24017c6ab7c53a85e6edccca296d44fff73e271a370a0661c164e9e50da"
+    },
+    {
+      "bytes": 1707,
+      "path": "docs/performance/results/change-0911/replay-before-cleanup.json",
+      "sha256": "5820a24017c6ab7c53a85e6edccca296d44fff73e271a370a0661c164e9e50da"
+    },
+    {
+      "bytes": 3235,
+      "path": "docs/performance/results/change-0911/replay.py",
+      "sha256": "b69b07a16140333ef0f8ac1d48576aa5de19fe02456bc3c5ca852fa8f0939d58"
+    },
+    {
+      "bytes": 5403,
+      "path": "docs/performance/results/change-0911/result-review.json",
+      "sha256": "06e86dff079968edd1a22f31cb77dafb1953a3cd8254cc77a661798434aa2a4d"
+    },
+    {
+      "bytes": 4150,
+      "path": "docs/performance/results/change-0911/result-review.md",
+      "sha256": "3b84da1e801d62b82506a3e9dd8c573f7906dc2a8ffbb27e31f1207047c2feb8"
+    },
+    {
+      "bytes": 281,
+      "path": "docs/performance/results/change-0911/reused-native-custody.json",
+      "sha256": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257"
+    },
+    {
+      "bytes": 5844,
+      "path": "docs/performance/results/change-0911/seal.py",
+      "sha256": "03e3582336faa88b51635a74dc3d08a7a0b67480719c034494d87b714bcead4f"
+    },
+    {
+      "bytes": 7255,
+      "path": "docs/performance/results/change-0911/source-audit.md",
+      "sha256": "75a196cbfc19a455decfa81b832f710d1971759a8a8e5b8b51b0c014c92ee682"
+    }
+  ],
+  "integration": "pending unrelated iWork cherry-pick resolution",
+  "local_archives": [
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0911/capture/materialized-a/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0911/capture-v2/materialized-a/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-a/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0911/capture-v3/materialized-b/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-a/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 17017145,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 17017139,
+      "path": "docs/performance/results/change-0911/capture-v3/owned-b/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    }
+  ],
+  "measured_contexts": 4,
+  "native_latency_or_speedup_claim": false,
+  "parent_commit": "52a27130589915884be5fd10bb1ade2f835ed32e",
+  "production_changes": false,
+  "replay_before_and_after_cleanup": "pass",
+  "reused_binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "shared_cherry_pick": "f2869418f0038098f4e4934b406c892ca0fe78fd",
+  "shared_head": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "shared_index_sha256": "1fa921e90b0e01ef746c28a1ec694cc00b2b8785edce496ce2d7f03a60881f39",
+  "status": "pass",
+  "worktrees_created": 0
+}

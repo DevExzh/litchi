@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "source_file_count": 9352,
+  "source_manifest": "source-v3.json",
+  "capture_artifacts_checked": 8,
+  "census_byte_exact_replays": [
+    "output",
+    "noop",
+    "inverse",
+    "forward-replay"
+  ],
+  "deleted_source_root_used": false,
+  "build_or_workload_run": false
+}

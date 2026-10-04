@@ -1,0 +1,120 @@
+{
+  "binaries": {
+    "baseline": {
+      "allocator": {
+        "binary": {
+          "bytes": 267453856,
+          "executable": true,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/baseline-allocator",
+          "sha256": "eb33fda4013ede09179e0f8f73f2afd8a4485265e326a9a56ef98a6466858456"
+        },
+        "build_receipt": {
+          "bytes": 2992,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/baseline-allocator-build-run.json",
+          "sha256": "7d5ebe6f7c79abacc045c9cc8b7c73d8828596f3bd8f598c42e3ba69974a4e6a"
+        }
+      },
+      "native": {
+        "binary": {
+          "bytes": 264413776,
+          "executable": true,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/baseline-native",
+          "sha256": "0f6322b80c0dde84118a532f9b6f724dae67a8a57297e169b5be97b927accfff"
+        },
+        "build_receipt": {
+          "bytes": 2941,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/baseline-native-build-run.json",
+          "sha256": "261f557af5b311380c5b4bd319148873a0ba9eda00f82d3f89f187b4db1f2bc9"
+        }
+      }
+    },
+    "candidate": {
+      "allocator": {
+        "binary": {
+          "bytes": 267455640,
+          "executable": true,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-allocator",
+          "sha256": "00d96372a4c80b1bf67e1cf877f8896f05c409711e8351cb25ab592998355ba6"
+        },
+        "build_receipt": {
+          "bytes": 2993,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-allocator-build-run.json",
+          "sha256": "b2074b0a4e3458452345c36fb68c375ef96a4e452fe3957e6815a920333aaa9e"
+        }
+      },
+      "native": {
+        "binary": {
+          "bytes": 264416056,
+          "executable": true,
+          "mode": 509,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-native",
+          "sha256": "1513e14c1f3cbf2ea9d984b385c69a06e84ca4b1c6c0761ed7145f490978e982"
+        },
+        "build_receipt": {
+          "bytes": 2942,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-native-build-run.json",
+          "sha256": "555e30c57f8dd9d8b73824f1ad71b9683016fbd9c3947a087f6010eb15fccf03"
+        }
+      }
+    }
+  },
+  "cases": [
+    "primary-percent-medium",
+    "primary-percent-dense-sparse",
+    "control-xlsx-one-edit-medium",
+    "control-docx-one-edit-medium"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "expected_children": {
+    "allocator": 16,
+    "native": 48,
+    "qualification": 8
+  },
+  "schema": "litchi.paired-audit-capture-0905.v1",
+  "source": {
+    "baseline_manifest": {
+      "bytes": 1880177,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/baseline-source.json",
+      "sha256": "6dba705714e7ed2d746861be5eb5652130f9c98936f8bfd921c89db3a786397e"
+    },
+    "candidate_files": [
+      "crates/xml-minifier/src/audit.rs"
+    ],
+    "candidate_manifest": {
+      "bytes": 1880267,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-source.json",
+      "sha256": "69b4be69408c11c071de46b94dee82ab19a7ac036f2e96cbaa849ddd715f275c"
+    },
+    "checked_files": 10773,
+    "full": true,
+    "root_worktree": "/home/zhuhe/code/litchi",
+    "source_root": {
+      "checked": true,
+      "file_count": 10773,
+      "path": "/tmp/litchi-0905-src",
+      "present": true
+    }
+  },
+  "status": "pass"
+}

@@ -1,0 +1,109 @@
+{
+  "canonical": {
+    "dispatch_analysis": {
+      "bytes": 17708,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch-analysis.json",
+      "sha256": "d8a59424f81c65b46ab7a955e37f66e5c7e4159dee97117488477818af37c8df"
+    },
+    "materialized_dispatch": {
+      "bytes": 10088,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch/materialized/dispatch.json",
+      "sha256": "0722fb393020fe6a2a801a9718124cafd782537cdfbc71646248665da927ac60"
+    },
+    "owned_dispatch": {
+      "bytes": 10088,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch/owned/dispatch.json",
+      "sha256": "51e797fbba18b30a29d0a7c1f7b782810bc0fa49c4edf15c2ecd77291c30f1ca"
+    },
+    "symbol_ranges": {
+      "bytes": 1206,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/symbol-ranges.json",
+      "sha256": "c96bd9b009ef818b920e3696f878feb5778497299875e25b552d640a463ae697"
+    }
+  },
+  "canonical_state_pass": true,
+  "cases": [
+    {
+      "error": "materialized_caller_ra_outside_expected_range: measured return caller is outside expected range",
+      "mutation": "caller_ra_outside_expected_range",
+      "name": "materialized_caller_ra_outside_expected_range",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized_backend_pc_outside_frozen_range: backend PC outside frozen range",
+      "mutation": "backend_pc_outside_frozen_range",
+      "name": "materialized_backend_pc_outside_frozen_range",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized_missing_return_guard: owner return count changed",
+      "mutation": "missing_return_guard",
+      "name": "materialized_missing_return_guard",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized_mismatched_return_guard: return guard PC mismatch",
+      "mutation": "mismatched_return_guard",
+      "name": "materialized_mismatched_return_guard",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized_out_of_order_enable_disable: event order changed",
+      "mutation": "out_of_order_enable_disable",
+      "name": "materialized_out_of_order_enable_disable",
+      "status": "rejected"
+    },
+    {
+      "error": "owned_caller_ra_outside_expected_range: measured return caller is outside expected range",
+      "mutation": "caller_ra_outside_expected_range",
+      "name": "owned_caller_ra_outside_expected_range",
+      "status": "rejected"
+    },
+    {
+      "error": "owned_backend_pc_outside_frozen_range: backend PC outside frozen range",
+      "mutation": "backend_pc_outside_frozen_range",
+      "name": "owned_backend_pc_outside_frozen_range",
+      "status": "rejected"
+    },
+    {
+      "error": "owned_missing_return_guard: owner return count changed",
+      "mutation": "missing_return_guard",
+      "name": "owned_missing_return_guard",
+      "status": "rejected"
+    },
+    {
+      "error": "owned_mismatched_return_guard: return guard PC mismatch",
+      "mutation": "mismatched_return_guard",
+      "name": "owned_mismatched_return_guard",
+      "status": "rejected"
+    },
+    {
+      "error": "owned_out_of_order_enable_disable: event order changed",
+      "mutation": "out_of_order_enable_disable",
+      "name": "owned_out_of_order_enable_disable",
+      "status": "rejected"
+    }
+  ],
+  "checks": {
+    "backend_pc_outside_frozen_range_rejected": true,
+    "caller_ra_outside_expected_range_rejected": true,
+    "mismatched_return_guard_rejected": true,
+    "missing_return_guard_rejected": true,
+    "out_of_order_enable_disable_rejected": true
+  },
+  "hash_bindings": {
+    "dispatch_checks": {
+      "bytes": 10631,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch-checks.py",
+      "sha256": "ffab2ec7cd6f9f99e18aa1584032d75c95ff5c7b3327044d6e8332614d7ea6ed"
+    },
+    "verify_dispatch": {
+      "bytes": 25330,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/verify_dispatch.py",
+      "sha256": "67b7ee42a8fe6ea7fbd6a2e8eae6d4e2d19e528a6107d8efffea41bfa4e2893d"
+    }
+  },
+  "schema": "litchi.native-sha-dispatch-mutation-checks-0912.v1",
+  "scope": "Canonical dispatch JSON is deep-copied in memory. Mutations are never written to retained dispatch, analysis, plan, or workload files.",
+  "status": "pass"
+}

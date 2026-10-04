@@ -1,0 +1,122 @@
+{
+  "status": "pass",
+  "adopted": false,
+  "reason": "Frozen owned-route practical and confidence gates both failed; candidate-specific production and test files restored to parent.",
+  "parent": "66b944b07fcf4c6fa37f10e7ed83a02417455f57",
+  "gate": {
+    "flags": [
+      {
+        "baseline_p95": 2915965,
+        "candidate_over_baseline": 1.055123432551488,
+        "candidate_p95": 3076703,
+        "kind": "candidate_p95_regression_over_5_percent",
+        "metric": "clone_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 3149513,
+        "candidate_over_baseline": 1.1041119690568033,
+        "candidate_p99": 3477415,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "clone_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p95": 6542008,
+        "candidate_over_baseline": 1.076658879047534,
+        "candidate_p95": 7043511,
+        "kind": "candidate_p95_regression_over_5_percent",
+        "metric": "ingress_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 6844636,
+        "candidate_over_baseline": 1.1148603081303374,
+        "candidate_p99": 7630813,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "ingress_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 15031437,
+        "candidate_over_baseline": 1.0961711777789442,
+        "candidate_p99": 16477028,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "snapshot_ns",
+        "route": "materialized"
+      },
+      {
+        "baseline_p99": 3226834,
+        "candidate_over_baseline": 1.3093453211414037,
+        "candidate_p99": 4225040,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "ingress_ns",
+        "route": "owned"
+      },
+      {
+        "baseline_p99": 16408240,
+        "candidate_over_baseline": 1.1682628362335021,
+        "candidate_p99": 19169137,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "snapshot_ns",
+        "route": "owned"
+      },
+      {
+        "baseline_p99": 6195867,
+        "candidate_over_baseline": 1.5352093581092041,
+        "candidate_p99": 9511953,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "publish_ns",
+        "route": "owned"
+      },
+      {
+        "baseline_p99": 34467653,
+        "candidate_over_baseline": 1.4626319059206032,
+        "candidate_p99": 50413489,
+        "kind": "candidate_p99_regression_over_5_percent",
+        "metric": "total_ns",
+        "route": "owned"
+      }
+    ],
+    "interpretation": "The owned route meets the descriptive gate only when its baseline-over-candidate total median is at least 1.05 and the paired bootstrap lower bound is above 1.0; route-specific >5% p50/p95/p99 or RSS flags still require review. These are controls within each route, not a cross-route claim.",
+    "owned_total_bootstrap_lower_bound": 0.9733079247831775,
+    "owned_total_bootstrap_upper_bound": 1.0174857562044162,
+    "owned_total_ci_lower_above_one": false,
+    "owned_total_gate_pass": false,
+    "owned_total_median": 1.005714080656532,
+    "owned_total_median_practical_target_met": false,
+    "threshold": 1.05
+  },
+  "candidate_retention": {
+    "path": "docs/performance/results/change-0913/candidate-retention.json",
+    "bytes": 2819,
+    "sha256": "842147a6d8f97f3894b015700d30c078e811f8634d066d356a802d10ec5cc99d"
+  },
+  "restored": [
+    {
+      "path": "crates/soapberry-zip/src/office.rs",
+      "action": "restored parent",
+      "bytes": 699729,
+      "sha256": "f72bfef6e6a072b3e88c465afb1358e4f77046e37c606ed3902fe3a1621ceac3"
+    },
+    {
+      "path": "crates/litchi-opc/src/payload.rs",
+      "action": "restored parent",
+      "bytes": 17068,
+      "sha256": "fc6e468322dcc2939b5eeb2d88ca1401fdb5c93849a131947e3e36de85779998"
+    },
+    {
+      "path": "crates/soapberry-zip/tests/owned_direct_read.rs",
+      "action": "removed candidate-only test"
+    },
+    {
+      "path": "crates/litchi-opc/tests/owned_direct_concurrency.rs",
+      "action": "removed candidate-only test"
+    },
+    {
+      "path": "crates/soapberry-zip/tests/owned_direct_adversarial.rs",
+      "action": "removed candidate-only test"
+    }
+  ],
+  "new_speedup_claim": false
+}

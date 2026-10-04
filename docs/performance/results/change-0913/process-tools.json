@@ -1,0 +1,57 @@
+{
+  "status": "pass",
+  "tools": [
+    {
+      "name": "time",
+      "executable_path": "/usr/bin/time",
+      "bytes": 27232,
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+      "argv": [
+        "/usr/bin/time",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "time (GNU Time) UNKNOWN\nCopyright (C) 2018 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David Keppel, David MacKenzie, and Assaf Gordon.\n",
+      "stderr": ""
+    },
+    {
+      "name": "taskset",
+      "executable_path": "/usr/bin/taskset",
+      "bytes": 31184,
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "argv": [
+        "/usr/bin/taskset",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "taskset from util-linux 2.41.3\n",
+      "stderr": ""
+    },
+    {
+      "name": "python3",
+      "executable_path": "/usr/bin/python3.14",
+      "bytes": 7468968,
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "argv": [
+        "/usr/bin/python3.14",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "Python 3.14.4\n",
+      "stderr": ""
+    },
+    {
+      "name": "git",
+      "executable_path": "/usr/bin/git",
+      "bytes": 4531352,
+      "sha256": "f8555b000d114def1f7b7bba52e3ce78e28a3bce21bc46a6d15553c687f26053",
+      "argv": [
+        "/usr/bin/git",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "git version 2.53.0\n",
+      "stderr": ""
+    }
+  ]
+}

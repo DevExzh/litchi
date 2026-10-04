@@ -1,0 +1,26 @@
+{
+  "operations": 1,
+  "output": {
+    "bytes": 17017145,
+    "file": "output.pptx",
+    "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+  },
+  "reference": {
+    "bytes": 10617,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-owned/artifacts/report.json",
+    "sha256": "cb6102c26074ff55d7635148790f43f52c103cfafee81b543d50219e98db5047"
+  },
+  "report": {
+    "bytes": 3082,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch/owned/artifacts/report.json",
+    "sha256": "019b198392dd77c21526a2f710662afc4d2d887782957f42ee592faa03fbd8bd"
+  },
+  "route": "owned",
+  "scope": "All native-control corpus/output/guards/sink and phase arithmetic pass. Profiled timings are not used for latency comparison.",
+  "source": {
+    "bytes": 17017139,
+    "file": "source.pptx",
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "status": "pass"
+}

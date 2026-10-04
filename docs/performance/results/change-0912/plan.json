@@ -1,0 +1,205 @@
+{
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cpu": 12,
+  "cwd": "/tmp/litchi-0912-run",
+  "decode_options": [
+    "script",
+    "--no-inline",
+    "--ns",
+    "--show-lost-events",
+    "--demangle",
+    "--max-stack",
+    "256",
+    "-F",
+    "comm,pid,tid,cpu,time,period,event,ip,sym,dso"
+  ],
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "event": "cycles:u",
+  "evidence_parent": "9a108730aa5533678b376ae097cd526c26e92b93",
+  "frequency_hz": 997,
+  "helper": {
+    "bytes": 10508,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture.py",
+    "sha256": "b4d9e23f5eec740d8c7c7da3c2bc7a6bb39d1a3953aae1d902512ab9d7c71ad6"
+  },
+  "inputs": [
+    {
+      "bytes": 1756112,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/source-v1.json",
+      "sha256": "7a6d1310fb97dde1f275ec8702efabbef2cfb643c9ee4c1178169fed53aa4586"
+    },
+    {
+      "bytes": 397,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binary.json",
+      "sha256": "b551a9bdc5b3ca1d4f2f27efdc91252edab8c280f0705cf6a14bec45f6561748"
+    },
+    {
+      "bytes": 2065,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/build-v1/command.json",
+      "sha256": "092a714b08043212bd001f7861e51e8a9d43989077855ee1a1953d0e1b951a05"
+    },
+    {
+      "bytes": 2031,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/quality-v1/fmt/command.json",
+      "sha256": "1a165923b75a839589b74d074c531b63a88b674f3715806476462d16b04c9e8a"
+    },
+    {
+      "bytes": 1920,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/quality-v1/clippy/command.json",
+      "sha256": "0da01e867f0959e4cedd8e2a2b3fed4faea9e2ab844553f18997feb4fb75ba86"
+    },
+    {
+      "bytes": 340498,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/analysis.json",
+      "sha256": "62f8dcd7ad6f226d1e5d3527bd6afdcce5ca12775d1a826bb5b6fda105f7acf2"
+    },
+    {
+      "bytes": 41191,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/closure.json",
+      "sha256": "bc23cf57306d3539d00843d9491fc76d30b15ca250c0a6d737a63772757cf36e"
+    },
+    {
+      "bytes": 10617,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-owned/artifacts/report.json",
+      "sha256": "cb6102c26074ff55d7635148790f43f52c103cfafee81b543d50219e98db5047"
+    },
+    {
+      "bytes": 10764,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-materialized/artifacts/report.json",
+      "sha256": "167b382cd000f55483cf635ffb3861cc34a552b128cdf1f4c64e04de506fd6bc"
+    },
+    {
+      "bytes": 643782,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/analysis.json",
+      "sha256": "ac6fa98aed88d9594fe2bafef7c38cb06f08dc6b84eab574b919fd11bdedf76f"
+    },
+    {
+      "bytes": 1707,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/replay-after-cleanup.json",
+      "sha256": "5820a24017c6ab7c53a85e6edccca296d44fff73e271a370a0661c164e9e50da"
+    },
+    {
+      "bytes": 23430,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/closure.json",
+      "sha256": "9107b19dd6fce8a7b3d032f81317933d06a6a95f9f9800e073d97a128777e7dc"
+    },
+    {
+      "bytes": 288,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/perf-preflight.json",
+      "sha256": "ab1c791e7a4c964cac831c801d734a2832f193836e2b70deaf3aab3e3744d4b9"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/perf-preflight.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 252,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/perf-preflight.stderr.txt",
+      "sha256": "2181c96afd5f6dbb0d71333c2d97c38e013d88584b41d9ace9cbecf3244224ad"
+    },
+    {
+      "bytes": 9958,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/protocol-review.md",
+      "sha256": "923064869bdbc67c7c7542d2a802c21255a69af1d8edea45cacaf81c0b9c6fc5"
+    },
+    {
+      "bytes": 493,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/symbols.txt",
+      "sha256": "e278ae2d029cb1657366e0fce1c4ef7ba4cb8877ae8781ec58543dc0cdb47785"
+    },
+    {
+      "bytes": 1206,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/symbol-ranges.json",
+      "sha256": "c96bd9b009ef818b920e3696f878feb5778497299875e25b552d640a463ae697"
+    },
+    {
+      "bytes": 2042,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/elf-segments.txt",
+      "sha256": "bcc4069b5be9e1c4051ac36e4155b1d5e966c6320241002cd5cbb95ad458e681"
+    }
+  ],
+  "options": [
+    "record",
+    "--no-buildid-cache",
+    "--compression-level=3",
+    "-e",
+    "cycles:u",
+    "-F",
+    "997",
+    "--strict-freq",
+    "--call-graph",
+    "dwarf,16384",
+    "--sample-cpu"
+  ],
+  "owner": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+  "parent": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+  "perf_version": "perf version 7.0.14",
+  "samples": 50,
+  "schedule": [
+    {
+      "index": 0,
+      "kind": "materialized",
+      "label": "materialized-a"
+    },
+    {
+      "index": 1,
+      "kind": "owned",
+      "label": "owned-a"
+    },
+    {
+      "index": 2,
+      "kind": "owned",
+      "label": "owned-b"
+    },
+    {
+      "index": 3,
+      "kind": "materialized",
+      "label": "materialized-b"
+    }
+  ],
+  "schema": "litchi.native-snapshot-profile-0912.v1",
+  "scope": "Whole-process native user-cycle samples retained. Measured snapshot requires exact owner and timed_iteration frames in the retained binary DSO. Setup is separate. Counts and sampled-period weights are descriptive, not exact elapsed-time or cycle totals. No debugger or modified executable.",
+  "script_max_stack": 256,
+  "setup_parent": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+  "stack_bytes": 16384,
+  "tools": [
+    {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    {
+      "bytes": 48712,
+      "path": "/usr/bin/x86_64-linux-gnu-nm",
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009"
+    },
+    {
+      "bytes": 822408,
+      "path": "/usr/bin/x86_64-linux-gnu-readelf",
+      "sha256": "2cd76fc8d9bdddc84a7eb1c4f0e80717a7475b95e047e1f67d2203a5f4ecdffd"
+    },
+    {
+      "bytes": 2206992,
+      "path": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+      "sha256": "305014d0b30755fc12cb419074f6acb4d43c4111e006f2981fd23ee21e25e508"
+    }
+  ],
+  "utc": "2026-10-04T09:54:43.320945+00:00",
+  "warmup": 0
+}

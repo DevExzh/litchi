@@ -1,0 +1,58 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/gdb",
+    "--batch",
+    "-nx",
+    "-nh",
+    "-iex",
+    "set auto-load off",
+    "-iex",
+    "set debuginfod enabled off",
+    "-x",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch_gdb.py",
+    "--args",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "owned",
+    "0",
+    "1",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch/owned/artifacts"
+  ],
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cwd": "/tmp/litchi-0912-gdb-run",
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "LITCHI_0912_DISPATCH_LOG": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch/owned/dispatch.json",
+    "LITCHI_0912_SYMBOL_RANGES": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/symbol-ranges.json",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "gdb_script": {
+    "bytes": 7658,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch_gdb.py",
+    "sha256": "d27216536e5a2290f350003d05cd608693fe2c21fb04f6c02424cf680ad4f29f"
+  },
+  "helper": {
+    "bytes": 4163,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch.py",
+    "sha256": "416345178bd004e6a7ef1284814d33b74c26f511bf31782a49174619ae490797"
+  },
+  "plan": {
+    "bytes": 3707,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/plan-gdb.json",
+    "sha256": "7ee5aa9dcbe91dcf1102c0e19767fc507a9b7a61c89fb7a4e3d15707288b4255"
+  },
+  "row": {
+    "index": 1,
+    "kind": "owned"
+  },
+  "started_utc": "2026-10-04T10:00:27.614046+00:00"
+}

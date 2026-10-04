@@ -1,0 +1,90 @@
+{
+  "status": "pass",
+  "helper": {
+    "path": "docs/performance/results/change-0910/census.py",
+    "bytes": 2382,
+    "sha256": "6f26785c350b92c35bb43b2e69c3899681509cfe7e76971681d3dc50b226df5e"
+  },
+  "runs": [
+    {
+      "label": "materialized",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-materialized/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-materialized/artifacts/output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0910/census-materialized.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0910/census-materialized.json\n",
+      "stderr": "",
+      "helper": {
+        "path": "docs/performance/results/change-0909/zip-census.py",
+        "bytes": 29840,
+        "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+      },
+      "report": {
+        "path": "docs/performance/results/change-0910/census-materialized.json",
+        "bytes": 3682271,
+        "sha256": "e0e581d8b9368c6980ac35a31e130bcb4a746688582c0e1d17654e73d730de18"
+      },
+      "physical_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "unchanged_members": 437
+    },
+    {
+      "label": "owned",
+      "argv": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/zip-census.py",
+        "--source",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-owned/artifacts/source.pptx",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-owned/artifacts/output.pptx",
+        "--report",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0910/census-owned.json",
+        "--expected-generated-slides"
+      ],
+      "exit_code": 0,
+      "stdout": "census passed: 445 members; report=/home/zhuhe/code/litchi/docs/performance/results/change-0910/census-owned.json\n",
+      "stderr": "",
+      "helper": {
+        "path": "docs/performance/results/change-0909/zip-census.py",
+        "bytes": 29840,
+        "sha256": "0cdee4682959e9a448d81bc598a810c7c16f780bf378bcd8faae294f1cf1efd3"
+      },
+      "report": {
+        "path": "docs/performance/results/change-0910/census-owned.json",
+        "bytes": 3682257,
+        "sha256": "58843ec4d50107fae674c88baa634839d8f45c5afbfa0a00c50f511ce64be036"
+      },
+      "physical_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "unchanged_members": 437
+    }
+  ]
+}

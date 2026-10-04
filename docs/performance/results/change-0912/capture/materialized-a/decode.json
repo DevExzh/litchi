@@ -1,0 +1,54 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "script",
+    "--no-inline",
+    "--ns",
+    "--show-lost-events",
+    "--demangle",
+    "--max-stack",
+    "256",
+    "-F",
+    "comm,pid,tid,cpu,time,period,event,ip,sym,dso",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/perf.data"
+  ],
+  "cwd": "/tmp/litchi-0912-run",
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "helper": {
+    "bytes": 10508,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture.py",
+    "sha256": "b4d9e23f5eec740d8c7c7da3c2bc7a6bb39d1a3953aae1d902512ab9d7c71ad6"
+  },
+  "perf": {
+    "bytes": 25221960,
+    "path": "/usr/bin/perf",
+    "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+  },
+  "raw": {
+    "bytes": 5859308,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/perf.data",
+    "sha256": "9cca1eeaadecb6ab6951c228583f595e7bf08bdcc1d68b20e72da0f03de203c4"
+  },
+  "script": {
+    "bytes": 188722,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/script.txt.gz",
+    "sha256": "7a78789a43b96afe0f35794f56da627ef72fed00d35f197b7fa717fcb4aa8aaf"
+  },
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/decode.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "uncompressed": {
+    "bytes": 1302885,
+    "sha256": "144bfb3ddef60201106ea167aba6cb88a3f3655575cc5a10400c10b65240011b"
+  }
+}

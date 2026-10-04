@@ -1,0 +1,416 @@
+{
+  "adoption_gate": "Owned total paired median ratio baseline/candidate at least 1.05 with 95% bootstrap lower bound above 1; flag any route total, p95, p99 or whole-process RSS regression above 5% for review.",
+  "attempt": "v1",
+  "blocks": 24,
+  "comparison": "Route-specific paired binary control. Ratios are baseline over candidate within one route; no materialized-versus-owned performance claim is made.",
+  "cpu": 12,
+  "created_utc": "2026-10-04T10:29:13.018499+00:00",
+  "legs": [
+    {
+      "block": 0,
+      "label": "block-00-pair-00-materialized-baseline",
+      "pair": 0,
+      "position": 0,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 0,
+      "label": "block-00-pair-00-materialized-candidate",
+      "pair": 0,
+      "position": 1,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 1,
+      "label": "block-01-pair-00-owned-baseline",
+      "pair": 0,
+      "position": 0,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 1,
+      "label": "block-01-pair-00-owned-candidate",
+      "pair": 0,
+      "position": 1,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 2,
+      "label": "block-02-pair-01-materialized-candidate",
+      "pair": 1,
+      "position": 0,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 2,
+      "label": "block-02-pair-01-materialized-baseline",
+      "pair": 1,
+      "position": 1,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 3,
+      "label": "block-03-pair-01-owned-candidate",
+      "pair": 1,
+      "position": 0,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 3,
+      "label": "block-03-pair-01-owned-baseline",
+      "pair": 1,
+      "position": 1,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 4,
+      "label": "block-04-pair-02-materialized-baseline",
+      "pair": 2,
+      "position": 0,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 4,
+      "label": "block-04-pair-02-materialized-candidate",
+      "pair": 2,
+      "position": 1,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 5,
+      "label": "block-05-pair-02-owned-baseline",
+      "pair": 2,
+      "position": 0,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 5,
+      "label": "block-05-pair-02-owned-candidate",
+      "pair": 2,
+      "position": 1,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 6,
+      "label": "block-06-pair-03-materialized-candidate",
+      "pair": 3,
+      "position": 0,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 6,
+      "label": "block-06-pair-03-materialized-baseline",
+      "pair": 3,
+      "position": 1,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 7,
+      "label": "block-07-pair-03-owned-candidate",
+      "pair": 3,
+      "position": 0,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 7,
+      "label": "block-07-pair-03-owned-baseline",
+      "pair": 3,
+      "position": 1,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 8,
+      "label": "block-08-pair-04-materialized-baseline",
+      "pair": 4,
+      "position": 0,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 8,
+      "label": "block-08-pair-04-materialized-candidate",
+      "pair": 4,
+      "position": 1,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 9,
+      "label": "block-09-pair-04-owned-baseline",
+      "pair": 4,
+      "position": 0,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 9,
+      "label": "block-09-pair-04-owned-candidate",
+      "pair": 4,
+      "position": 1,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 10,
+      "label": "block-10-pair-05-materialized-candidate",
+      "pair": 5,
+      "position": 0,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 10,
+      "label": "block-10-pair-05-materialized-baseline",
+      "pair": 5,
+      "position": 1,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 11,
+      "label": "block-11-pair-05-owned-candidate",
+      "pair": 5,
+      "position": 0,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 11,
+      "label": "block-11-pair-05-owned-baseline",
+      "pair": 5,
+      "position": 1,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 12,
+      "label": "block-12-pair-06-materialized-baseline",
+      "pair": 6,
+      "position": 0,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 12,
+      "label": "block-12-pair-06-materialized-candidate",
+      "pair": 6,
+      "position": 1,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 13,
+      "label": "block-13-pair-06-owned-baseline",
+      "pair": 6,
+      "position": 0,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 13,
+      "label": "block-13-pair-06-owned-candidate",
+      "pair": 6,
+      "position": 1,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 14,
+      "label": "block-14-pair-07-materialized-candidate",
+      "pair": 7,
+      "position": 0,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 14,
+      "label": "block-14-pair-07-materialized-baseline",
+      "pair": 7,
+      "position": 1,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 15,
+      "label": "block-15-pair-07-owned-candidate",
+      "pair": 7,
+      "position": 0,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 15,
+      "label": "block-15-pair-07-owned-baseline",
+      "pair": 7,
+      "position": 1,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 16,
+      "label": "block-16-pair-08-materialized-baseline",
+      "pair": 8,
+      "position": 0,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 16,
+      "label": "block-16-pair-08-materialized-candidate",
+      "pair": 8,
+      "position": 1,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 17,
+      "label": "block-17-pair-08-owned-baseline",
+      "pair": 8,
+      "position": 0,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 17,
+      "label": "block-17-pair-08-owned-candidate",
+      "pair": 8,
+      "position": 1,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 18,
+      "label": "block-18-pair-09-materialized-candidate",
+      "pair": 9,
+      "position": 0,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 18,
+      "label": "block-18-pair-09-materialized-baseline",
+      "pair": 9,
+      "position": 1,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 19,
+      "label": "block-19-pair-09-owned-candidate",
+      "pair": 9,
+      "position": 0,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 19,
+      "label": "block-19-pair-09-owned-baseline",
+      "pair": 9,
+      "position": 1,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 20,
+      "label": "block-20-pair-10-materialized-baseline",
+      "pair": 10,
+      "position": 0,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 20,
+      "label": "block-20-pair-10-materialized-candidate",
+      "pair": 10,
+      "position": 1,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 21,
+      "label": "block-21-pair-10-owned-baseline",
+      "pair": 10,
+      "position": 0,
+      "route": "owned",
+      "variant": "baseline"
+    },
+    {
+      "block": 21,
+      "label": "block-21-pair-10-owned-candidate",
+      "pair": 10,
+      "position": 1,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 22,
+      "label": "block-22-pair-11-materialized-candidate",
+      "pair": 11,
+      "position": 0,
+      "route": "materialized",
+      "variant": "candidate"
+    },
+    {
+      "block": 22,
+      "label": "block-22-pair-11-materialized-baseline",
+      "pair": 11,
+      "position": 1,
+      "route": "materialized",
+      "variant": "baseline"
+    },
+    {
+      "block": 23,
+      "label": "block-23-pair-11-owned-candidate",
+      "pair": 11,
+      "position": 0,
+      "route": "owned",
+      "variant": "candidate"
+    },
+    {
+      "block": 23,
+      "label": "block-23-pair-11-owned-baseline",
+      "pair": 11,
+      "position": 1,
+      "route": "owned",
+      "variant": "baseline"
+    }
+  ],
+  "pairs_per_route": 12,
+  "parent": "66b944b07fcf4c6fa37f10e7ed83a02417455f57",
+  "primary": "Matched candidate-versus-retained-0910 baseline binary timings for each route; source, output, sink, and semantic guards are required to be byte-identical.",
+  "routes": [
+    "materialized",
+    "owned"
+  ],
+  "samples": 20,
+  "schema": "litchi.performance.0913.pptx-binary-variant-plan.v1",
+  "scope": "Warm generated 200-slide media-rich PPTX fixture; CPU 12; 30 warmups and 20 measured samples per child; /usr/bin/time whole-process maximum RSS.",
+  "source_manifest": {
+    "bytes": 1758278,
+    "path": "docs/performance/results/change-0913/source-v1.json",
+    "sha256": "68de7c9416ba7763606a64780bde4e3de8476b02a809234b4a36975b9612af82"
+  },
+  "statistics": "Twelve paired processes per route, six AB and six BA; pooled p50/p95/p99 per route and variant; 10000 paired-block bootstrap draws with seed 913.",
+  "status": "frozen_before_capture",
+  "variants": [
+    "baseline",
+    "candidate"
+  ],
+  "warmup": 30
+}

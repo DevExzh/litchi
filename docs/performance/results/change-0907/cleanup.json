@@ -1,0 +1,24 @@
+{
+  "status": "pass",
+  "completed_utc": "2026-10-04T07:10:01.024954+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-0907-src",
+      "regular_files": 9350,
+      "logical_bytes": 162948361
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0907-build",
+      "regular_files": 1782,
+      "logical_bytes": 2333933336
+    }
+  ],
+  "worktrees_created": 0,
+  "binary_retained": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+    "bytes": 264596744,
+    "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84",
+    "git_tracked": false
+  },
+  "scope": "Owned marker-checked source and build roots only; unrelated worktrees untouched."
+}

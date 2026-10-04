@@ -1,0 +1,160 @@
+{
+  "status": "frozen_before_capture",
+  "created_utc": "2026-10-04T08:40:01.684003+00:00",
+  "parent": "468fe2931d6532c32f4c6608590816b8eaa88e31",
+  "warmup": 30,
+  "samples": 20,
+  "blocks": 12,
+  "cpu": 12,
+  "primary": "Both routes clone the same source bytes inside the timer, open, capture a transaction, stage 64 text replacements, commit/apply, serialize with to_bytes and write the same 64 KiB sequential sink. Route object destruction is included. Sink allocation, reservation, destruction, and semantic/replay guards are excluded.",
+  "comparison": "Existing route comparison, not a production before/after optimization.",
+  "statistics": "Pair process medians by 12 blocks; materialized/owned ratios; seed 910, 10000 paired block bootstrap draws, 95 percent interval. Pooled quantiles across 240 samples per route are descriptive.",
+  "memory": "Whole-process maximum RSS includes the generator, warmups, guards and all samples; it is not operation peak live bytes.",
+  "scope": "Warm, in-memory, generated 200 slides, 8 text boxes per slide, 8 x 2 MiB media; shared host CPU 12. No cold, range, scaling or producer qualification.",
+  "legs": [
+    {
+      "label": "block-00-materialized",
+      "block": 0,
+      "route": "materialized",
+      "position": 0
+    },
+    {
+      "label": "block-00-owned",
+      "block": 0,
+      "route": "owned",
+      "position": 1
+    },
+    {
+      "label": "block-01-owned",
+      "block": 1,
+      "route": "owned",
+      "position": 0
+    },
+    {
+      "label": "block-01-materialized",
+      "block": 1,
+      "route": "materialized",
+      "position": 1
+    },
+    {
+      "label": "block-02-materialized",
+      "block": 2,
+      "route": "materialized",
+      "position": 0
+    },
+    {
+      "label": "block-02-owned",
+      "block": 2,
+      "route": "owned",
+      "position": 1
+    },
+    {
+      "label": "block-03-owned",
+      "block": 3,
+      "route": "owned",
+      "position": 0
+    },
+    {
+      "label": "block-03-materialized",
+      "block": 3,
+      "route": "materialized",
+      "position": 1
+    },
+    {
+      "label": "block-04-materialized",
+      "block": 4,
+      "route": "materialized",
+      "position": 0
+    },
+    {
+      "label": "block-04-owned",
+      "block": 4,
+      "route": "owned",
+      "position": 1
+    },
+    {
+      "label": "block-05-owned",
+      "block": 5,
+      "route": "owned",
+      "position": 0
+    },
+    {
+      "label": "block-05-materialized",
+      "block": 5,
+      "route": "materialized",
+      "position": 1
+    },
+    {
+      "label": "block-06-materialized",
+      "block": 6,
+      "route": "materialized",
+      "position": 0
+    },
+    {
+      "label": "block-06-owned",
+      "block": 6,
+      "route": "owned",
+      "position": 1
+    },
+    {
+      "label": "block-07-owned",
+      "block": 7,
+      "route": "owned",
+      "position": 0
+    },
+    {
+      "label": "block-07-materialized",
+      "block": 7,
+      "route": "materialized",
+      "position": 1
+    },
+    {
+      "label": "block-08-materialized",
+      "block": 8,
+      "route": "materialized",
+      "position": 0
+    },
+    {
+      "label": "block-08-owned",
+      "block": 8,
+      "route": "owned",
+      "position": 1
+    },
+    {
+      "label": "block-09-owned",
+      "block": 9,
+      "route": "owned",
+      "position": 0
+    },
+    {
+      "label": "block-09-materialized",
+      "block": 9,
+      "route": "materialized",
+      "position": 1
+    },
+    {
+      "label": "block-10-materialized",
+      "block": 10,
+      "route": "materialized",
+      "position": 0
+    },
+    {
+      "label": "block-10-owned",
+      "block": 10,
+      "route": "owned",
+      "position": 1
+    },
+    {
+      "label": "block-11-owned",
+      "block": 11,
+      "route": "owned",
+      "position": 0
+    },
+    {
+      "label": "block-11-materialized",
+      "block": 11,
+      "route": "materialized",
+      "position": 1
+    }
+  ]
+}

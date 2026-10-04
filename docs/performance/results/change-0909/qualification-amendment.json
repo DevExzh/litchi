@@ -1,0 +1,10 @@
+{
+  "status": "amended_before_v3_capture",
+  "original_plan_sha256": "7461fadb9f5d0523249f006e307c74c8f9a66405fdf8ef26ccbe991a2c1a5a99",
+  "retained_failed_capture": "capture-v2/command.json",
+  "finding": "Zero-byte preservation-write errors are mapped by pkgwriter.rs to OpcError::ZipError(error.to_string()), not OpcError::IoError. No production code changed.",
+  "corrected_gate": "Require OpcError::ZipError containing the injected sink cause, zero accepted bytes and byte-identical fresh publication after refusal. Partial output still requires IncompleteOutput with the exact accepted byte count and prefix.",
+  "scope_limit": "The zero-output result does not preserve the underlying std::io::ErrorKind as a typed public field; no stronger error-taxonomy claim is made.",
+  "source_mapping": "crates/litchi-opc/src/pkgwriter.rs:953-957",
+  "other_gates_unchanged": true
+}

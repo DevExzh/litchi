@@ -1,0 +1,212 @@
+
+/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000005cb380 <_ZN4sha26sha2567x86_sha8compress17haa5656762dbea99fE>:
+  5cb380:	f3 0f 6f 07          	movdqu (%rdi),%xmm0
+  5cb384:	f3 0f 6f 4f 10       	movdqu 0x10(%rdi),%xmm1
+  5cb389:	66 0f 70 c0 b1       	pshufd $0xb1,%xmm0,%xmm0
+  5cb38e:	66 44 0f 70 e1 1b    	pshufd $0x1b,%xmm1,%xmm12
+  5cb394:	66 44 0f 6f e8       	movdqa %xmm0,%xmm13
+  5cb399:	66 45 0f 3a 0f ec 08 	palignr $0x8,%xmm12,%xmm13
+  5cb3a0:	66 44 0f 3a 0e e0 f0 	pblendw $0xf0,%xmm0,%xmm12
+  5cb3a7:	48 85 d2             	test   %rdx,%rdx
+  5cb3aa:	0f 84 66 03 00 00    	je     5cb716 <_ZN4sha26sha2567x86_sha8compress17haa5656762dbea99fE+0x396>
+  5cb3b0:	48 c1 e2 06          	shl    $0x6,%rdx
+  5cb3b4:	48 01 f2             	add    %rsi,%rdx
+  5cb3b7:	66 0f 6f 2d c1 d5 d1 	movdqa -0x2e2a3f(%rip),%xmm5        # 2e8980 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x920>
+  5cb3be:	ff 
+  5cb3bf:	66 44 0f 6f 0d 58 cd 	movdqa -0x2e32a8(%rip),%xmm9        # 2e8120 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0xc0>
+  5cb3c6:	d1 ff 
+  5cb3c8:	66 44 0f 6f 15 ff d0 	movdqa -0x2e2f01(%rip),%xmm10        # 2e84d0 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x470>
+  5cb3cf:	d1 ff 
+  5cb3d1:	66 44 0f 6f 1d c6 cf 	movdqa -0x2e303a(%rip),%xmm11        # 2e83a0 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x340>
+  5cb3d8:	d1 ff 
+  5cb3da:	66 0f 1f 44 00 00    	nopw   0x0(%rax,%rax,1)
+  5cb3e0:	f3 0f 6f 3e          	movdqu (%rsi),%xmm7
+  5cb3e4:	f3 44 0f 6f 76 10    	movdqu 0x10(%rsi),%xmm14
+  5cb3ea:	f3 0f 6f 56 20       	movdqu 0x20(%rsi),%xmm2
+  5cb3ef:	66 0f 38 00 fd       	pshufb %xmm5,%xmm7
+  5cb3f4:	66 44 0f 38 00 f5    	pshufb %xmm5,%xmm14
+  5cb3fa:	66 0f 6f c7          	movdqa %xmm7,%xmm0
+  5cb3fe:	66 0f fe 05 7a ce d1 	paddd  -0x2e3186(%rip),%xmm0        # 2e8280 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x220>
+  5cb405:	ff 
+  5cb406:	66 41 0f 6f dc       	movdqa %xmm12,%xmm3
+  5cb40b:	41 0f 38 cb dd       	sha256rnds2 %xmm0,%xmm13,%xmm3
+  5cb410:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb415:	66 41 0f 6f e5       	movdqa %xmm13,%xmm4
+  5cb41a:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb41e:	66 41 0f 6f c6       	movdqa %xmm14,%xmm0
+  5cb423:	66 0f fe 05 95 cb d1 	paddd  -0x2e346b(%rip),%xmm0        # 2e7fc0 <anon.12a2b5886461f81fa0cfc9ac8db8628d.3.llvm.7028004472766282420+0x70>
+  5cb42a:	ff 
+  5cb42b:	66 0f 38 00 d5       	pshufb %xmm5,%xmm2
+  5cb430:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb434:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb439:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb43d:	66 0f 6f c2          	movdqa %xmm2,%xmm0
+  5cb441:	66 0f fe 05 f7 d2 d1 	paddd  -0x2e2d09(%rip),%xmm0        # 2e8740 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x6e0>
+  5cb448:	ff 
+  5cb449:	f3 44 0f 6f 46 30    	movdqu 0x30(%rsi),%xmm8
+  5cb44f:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb453:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb458:	66 44 0f 38 00 c5    	pshufb %xmm5,%xmm8
+  5cb45e:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb462:	66 41 0f 6f c0       	movdqa %xmm8,%xmm0
+  5cb467:	66 0f fe 05 61 d8 d1 	paddd  -0x2e279f(%rip),%xmm0        # 2e8cd0 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0xc70>
+  5cb46e:	ff 
+  5cb46f:	66 0f 70 c8 0e       	pshufd $0xe,%xmm0,%xmm1
+  5cb474:	41 0f 38 cc fe       	sha256msg1 %xmm14,%xmm7
+  5cb479:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb47d:	66 41 0f 6f f0       	movdqa %xmm8,%xmm6
+  5cb482:	66 0f 3a 0f f2 04    	palignr $0x4,%xmm2,%xmm6
+  5cb488:	66 0f 6f c1          	movdqa %xmm1,%xmm0
+  5cb48c:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb490:	66 0f fe f7          	paddd  %xmm7,%xmm6
+  5cb494:	41 0f 38 cd f0       	sha256msg2 %xmm8,%xmm6
+  5cb499:	66 0f 6f c6          	movdqa %xmm6,%xmm0
+  5cb49d:	66 0f fe 05 8b d4 d1 	paddd  -0x2e2b75(%rip),%xmm0        # 2e8930 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x8d0>
+  5cb4a4:	ff 
+  5cb4a5:	66 0f 70 c8 0e       	pshufd $0xe,%xmm0,%xmm1
+  5cb4aa:	44 0f 38 cc f2       	sha256msg1 %xmm2,%xmm14
+  5cb4af:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb4b3:	66 0f 6f fe          	movdqa %xmm6,%xmm7
+  5cb4b7:	66 41 0f 3a 0f f8 04 	palignr $0x4,%xmm8,%xmm7
+  5cb4be:	66 0f 6f c1          	movdqa %xmm1,%xmm0
+  5cb4c2:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb4c6:	66 41 0f fe fe       	paddd  %xmm14,%xmm7
+  5cb4cb:	0f 38 cd fe          	sha256msg2 %xmm6,%xmm7
+  5cb4cf:	66 0f 6f c7          	movdqa %xmm7,%xmm0
+  5cb4d3:	66 0f fe 05 05 d8 d1 	paddd  -0x2e27fb(%rip),%xmm0        # 2e8ce0 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0xc80>
+  5cb4da:	ff 
+  5cb4db:	66 0f 70 c8 0e       	pshufd $0xe,%xmm0,%xmm1
+  5cb4e0:	41 0f 38 cc d0       	sha256msg1 %xmm8,%xmm2
+  5cb4e5:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb4e9:	66 44 0f 6f ff       	movdqa %xmm7,%xmm15
+  5cb4ee:	66 44 0f 3a 0f fe 04 	palignr $0x4,%xmm6,%xmm15
+  5cb4f5:	66 0f 6f c1          	movdqa %xmm1,%xmm0
+  5cb4f9:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb4fd:	66 44 0f fe fa       	paddd  %xmm2,%xmm15
+  5cb502:	44 0f 38 cd ff       	sha256msg2 %xmm7,%xmm15
+  5cb507:	66 41 0f 6f c7       	movdqa %xmm15,%xmm0
+  5cb50c:	66 0f fe 05 3c d2 d1 	paddd  -0x2e2dc4(%rip),%xmm0        # 2e8750 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x6f0>
+  5cb513:	ff 
+  5cb514:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb518:	44 0f 38 cc c6       	sha256msg1 %xmm6,%xmm8
+  5cb51d:	66 41 0f 6f d7       	movdqa %xmm15,%xmm2
+  5cb522:	66 0f 3a 0f d7 04    	palignr $0x4,%xmm7,%xmm2
+  5cb528:	66 41 0f fe d0       	paddd  %xmm8,%xmm2
+  5cb52d:	41 0f 38 cd d7       	sha256msg2 %xmm15,%xmm2
+  5cb532:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb537:	66 44 0f 6f c2       	movdqa %xmm2,%xmm8
+  5cb53c:	66 44 0f fe 05 4b d3 	paddd  -0x2e2cb5(%rip),%xmm8        # 2e8890 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x830>
+  5cb543:	d1 ff 
+  5cb545:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb549:	66 41 0f 6f c0       	movdqa %xmm8,%xmm0
+  5cb54e:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb552:	0f 38 cc f7          	sha256msg1 %xmm7,%xmm6
+  5cb556:	66 0f 6f ca          	movdqa %xmm2,%xmm1
+  5cb55a:	66 41 0f 3a 0f cf 04 	palignr $0x4,%xmm15,%xmm1
+  5cb561:	66 0f fe ce          	paddd  %xmm6,%xmm1
+  5cb565:	0f 38 cd ca          	sha256msg2 %xmm2,%xmm1
+  5cb569:	66 41 0f 70 c0 0e    	pshufd $0xe,%xmm8,%xmm0
+  5cb56f:	66 0f 6f f1          	movdqa %xmm1,%xmm6
+  5cb573:	66 0f fe 35 85 d5 d1 	paddd  -0x2e2a7b(%rip),%xmm6        # 2e8b00 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0xaa0>
+  5cb57a:	ff 
+  5cb57b:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb57f:	66 0f 6f c6          	movdqa %xmm6,%xmm0
+  5cb583:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb587:	41 0f 38 cc ff       	sha256msg1 %xmm15,%xmm7
+  5cb58c:	66 44 0f 6f f1       	movdqa %xmm1,%xmm14
+  5cb591:	66 44 0f 3a 0f f2 04 	palignr $0x4,%xmm2,%xmm14
+  5cb598:	66 44 0f fe f7       	paddd  %xmm7,%xmm14
+  5cb59d:	44 0f 38 cd f1       	sha256msg2 %xmm1,%xmm14
+  5cb5a2:	66 0f 70 c6 0e       	pshufd $0xe,%xmm6,%xmm0
+  5cb5a7:	66 41 0f 6f f6       	movdqa %xmm14,%xmm6
+  5cb5ac:	44 0f 38 cc fa       	sha256msg1 %xmm2,%xmm15
+  5cb5b1:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb5b5:	66 41 0f 6f fe       	movdqa %xmm14,%xmm7
+  5cb5ba:	66 0f 3a 0f f9 04    	palignr $0x4,%xmm1,%xmm7
+  5cb5c0:	66 41 0f fe ff       	paddd  %xmm15,%xmm7
+  5cb5c5:	66 0f fe 35 d3 d2 d1 	paddd  -0x2e2d2d(%rip),%xmm6        # 2e88a0 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x840>
+  5cb5cc:	ff 
+  5cb5cd:	66 44 0f 70 fe 0e    	pshufd $0xe,%xmm6,%xmm15
+  5cb5d3:	41 0f 38 cd fe       	sha256msg2 %xmm14,%xmm7
+  5cb5d8:	66 0f 6f c6          	movdqa %xmm6,%xmm0
+  5cb5dc:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb5e0:	0f 38 cc d1          	sha256msg1 %xmm1,%xmm2
+  5cb5e4:	66 0f 6f f7          	movdqa %xmm7,%xmm6
+  5cb5e8:	66 41 0f 3a 0f f6 04 	palignr $0x4,%xmm14,%xmm6
+  5cb5ef:	66 0f fe f2          	paddd  %xmm2,%xmm6
+  5cb5f3:	66 0f 6f d7          	movdqa %xmm7,%xmm2
+  5cb5f7:	66 0f fe 15 91 cd d1 	paddd  -0x2e326f(%rip),%xmm2        # 2e8390 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x330>
+  5cb5fe:	ff 
+  5cb5ff:	66 41 0f 6f c7       	movdqa %xmm15,%xmm0
+  5cb604:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb608:	0f 38 cd f7          	sha256msg2 %xmm7,%xmm6
+  5cb60c:	41 0f 38 cc ce       	sha256msg1 %xmm14,%xmm1
+  5cb611:	66 0f 6f c2          	movdqa %xmm2,%xmm0
+  5cb615:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb619:	66 44 0f 6f c6       	movdqa %xmm6,%xmm8
+  5cb61e:	66 44 0f 3a 0f c7 04 	palignr $0x4,%xmm7,%xmm8
+  5cb625:	66 44 0f fe c1       	paddd  %xmm1,%xmm8
+  5cb62a:	66 0f 70 c2 0e       	pshufd $0xe,%xmm2,%xmm0
+  5cb62f:	66 0f 6f ce          	movdqa %xmm6,%xmm1
+  5cb633:	66 0f fe 0d d5 cc d1 	paddd  -0x2e332b(%rip),%xmm1        # 2e8310 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x2b0>
+  5cb63a:	ff 
+  5cb63b:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb63f:	44 0f 38 cd c6       	sha256msg2 %xmm6,%xmm8
+  5cb644:	44 0f 38 cc f7       	sha256msg1 %xmm7,%xmm14
+  5cb649:	66 0f 6f c1          	movdqa %xmm1,%xmm0
+  5cb64d:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb651:	66 41 0f 6f d0       	movdqa %xmm8,%xmm2
+  5cb656:	66 0f 3a 0f d6 04    	palignr $0x4,%xmm6,%xmm2
+  5cb65c:	66 41 0f fe d6       	paddd  %xmm14,%xmm2
+  5cb661:	66 0f 70 c1 0e       	pshufd $0xe,%xmm1,%xmm0
+  5cb666:	41 0f 38 cd d0       	sha256msg2 %xmm8,%xmm2
+  5cb66b:	0f 38 cc fe          	sha256msg1 %xmm6,%xmm7
+  5cb66f:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb673:	66 44 0f 6f f2       	movdqa %xmm2,%xmm14
+  5cb678:	66 45 0f 3a 0f f0 04 	palignr $0x4,%xmm8,%xmm14
+  5cb67f:	41 0f 38 cc f0       	sha256msg1 %xmm8,%xmm6
+  5cb684:	66 41 0f 6f c0       	movdqa %xmm8,%xmm0
+  5cb689:	66 0f fe 05 2f ce d1 	paddd  -0x2e31d1(%rip),%xmm0        # 2e84c0 <anon.97cddeb392fd0ba077340085a7042550.73.llvm.12087383788645002237+0x460>
+  5cb690:	ff 
+  5cb691:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb695:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb69a:	66 44 0f fe f7       	paddd  %xmm7,%xmm14
+  5cb69f:	44 0f 38 cd f2       	sha256msg2 %xmm2,%xmm14
+  5cb6a4:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb6a8:	66 41 0f 6f ce       	movdqa %xmm14,%xmm1
+  5cb6ad:	66 0f 3a 0f ca 04    	palignr $0x4,%xmm2,%xmm1
+  5cb6b3:	66 0f 6f c2          	movdqa %xmm2,%xmm0
+  5cb6b7:	66 41 0f fe c1       	paddd  %xmm9,%xmm0
+  5cb6bc:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb6c0:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb6c5:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb6c9:	66 0f fe ce          	paddd  %xmm6,%xmm1
+  5cb6cd:	41 0f 38 cd ce       	sha256msg2 %xmm14,%xmm1
+  5cb6d2:	66 41 0f 6f c6       	movdqa %xmm14,%xmm0
+  5cb6d7:	66 41 0f fe c2       	paddd  %xmm10,%xmm0
+  5cb6dc:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb6e0:	66 0f 70 c0 0e       	pshufd $0xe,%xmm0,%xmm0
+  5cb6e5:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb6e9:	66 41 0f fe cb       	paddd  %xmm11,%xmm1
+  5cb6ee:	66 0f 6f c1          	movdqa %xmm1,%xmm0
+  5cb6f2:	0f 38 cb dc          	sha256rnds2 %xmm0,%xmm4,%xmm3
+  5cb6f6:	66 0f 70 c1 0e       	pshufd $0xe,%xmm1,%xmm0
+  5cb6fb:	0f 38 cb e3          	sha256rnds2 %xmm0,%xmm3,%xmm4
+  5cb6ff:	66 44 0f fe ec       	paddd  %xmm4,%xmm13
+  5cb704:	66 44 0f fe e3       	paddd  %xmm3,%xmm12
+  5cb709:	48 83 c6 40          	add    $0x40,%rsi
+  5cb70d:	48 39 d6             	cmp    %rdx,%rsi
+  5cb710:	0f 85 ca fc ff ff    	jne    5cb3e0 <_ZN4sha26sha2567x86_sha8compress17haa5656762dbea99fE+0x60>
+  5cb716:	66 41 0f 70 c5 1b    	pshufd $0x1b,%xmm13,%xmm0
+  5cb71c:	66 41 0f 70 cc b1    	pshufd $0xb1,%xmm12,%xmm1
+  5cb722:	66 0f 6f d0          	movdqa %xmm0,%xmm2
+  5cb726:	66 0f 3a 0e d1 f0    	pblendw $0xf0,%xmm1,%xmm2
+  5cb72c:	66 0f 3a 0f c8 08    	palignr $0x8,%xmm0,%xmm1
+  5cb732:	f3 0f 7f 17          	movdqu %xmm2,(%rdi)
+  5cb736:	f3 0f 7f 4f 10       	movdqu %xmm1,0x10(%rdi)
+  5cb73b:	c3                   	ret

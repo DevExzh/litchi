@@ -1,0 +1,35 @@
+crate boundaries valid for 65 workspace packages and 244 internal dependency declarations (11 explicit debt items)
+ordered migration debt:
+  [001] litchi-iwa -> litchi-core
+        reason: The legacy umbrella still hosts unified document, media, and metadata adapters over core primitives.
+        exit: Move each adapter into its concrete format owner or the root facade, then delete litchi-iwa.
+  [002] litchi-iwa -> litchi-iwa-archive
+        reason: Legacy mutation paths still coordinate physical package ingress, preservation, and reassembly.
+        exit: Move all remaining package transactions into Pages, Numbers, or Keynote and delete litchi-iwa.
+  [004] litchi-iwa -> litchi-iwa-common
+        reason: Unmigrated editors still consume neutral iWork values and wire helpers from the legacy host.
+        exit: Move every editor adapter to its concrete owner and delete litchi-iwa.
+  [008] litchi-iwa -> litchi-iwa-index
+        reason: The legacy object index still bridges raw archives to application editors.
+        exit: Adopt the focused index inside concrete package owners and delete litchi-iwa.
+  [010] litchi-iwa -> litchi-iwa-protos
+        reason: Many legacy format editors still decode generated native protobuf payloads directly.
+        exit: Replace those adapters with private bounded format codecs and delete litchi-iwa.
+  [012] litchi-iwa -> litchi-iwa-text
+        reason: Unmigrated text editors still adapt native storage graphs to focused semantic text values.
+        exit: Move application-specific text adapters into concrete package owners and delete litchi-iwa.
+  [013] litchi-iwa -> litchi-iwa-text-wire
+        reason: The legacy host still invokes the shared native text-storage wire adapter.
+        exit: Route every call through concrete format packages and delete litchi-iwa.
+  [014] litchi-iwa -> litchi-keynote
+        reason: Keynote semantic values are focused, but native mutation remains in the legacy host.
+        exit: Complete Keynote package editing and move its examples and tests before deleting litchi-iwa.
+  [015] litchi-iwa -> litchi-numbers
+        reason: Numbers semantic values are focused, but substantial native editing remains in the legacy host.
+        exit: Complete Numbers package editing and move its examples and tests before deleting litchi-iwa.
+  [016] litchi-iwa -> litchi-numbers-wire
+        reason: Legacy Numbers, Pages, and Keynote table editors still use the private BNC wire codec.
+        exit: Move all table mutation adapters into concrete format owners and delete litchi-iwa.
+  [017] litchi-iwa -> litchi-pages
+        reason: Pages semantic values are focused, but native mutation remains in the legacy host.
+        exit: Complete Pages package editing and move its examples and tests before deleting litchi-iwa.

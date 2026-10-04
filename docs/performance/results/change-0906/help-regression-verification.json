@@ -1,0 +1,77 @@
+{
+  "scope": "Exact extracted help function and registry test; not the full Cargo harness suite.",
+  "source_sha256": "f712da842169399d687eb452c7042deed61682a80efdd40b2c3c178af2c036ea",
+  "toolchain": {
+    "argv": [
+      "rustc",
+      "+1.95.0",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\n",
+    "stderr": ""
+  },
+  "legs": [
+    {
+      "label": "before_help_fix",
+      "driver_sha256": "dae6a0bc2b2e0b120249c83c4feb2c017d034a37c35e8cf583cc5bb2fd22dcfb",
+      "compile": {
+        "argv": [
+          "rustc",
+          "+1.95.0",
+          "--edition=2024",
+          "--test",
+          "--crate-name",
+          "help_registry",
+          "/tmp/litchi-0906-help-9v8f331z/driver.rs",
+          "-o",
+          "/tmp/litchi-0906-help-9v8f331z/test"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "test": {
+        "argv": [
+          "/tmp/litchi-0906-help-9v8f331z/test",
+          "--nocapture"
+        ],
+        "exit_code": 101,
+        "stdout": "\nrunning 1 test\ntest selectable_case_registry_has_complete_name_and_parse_mappings ... FAILED\n\nfailures:\n\nfailures:\n    selectable_case_registry_has_complete_name_and_parse_mappings\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s\n\n",
+        "stderr": "\nthread 'selectable_case_registry_has_complete_name_and_parse_mappings' (3477977) panicked at /tmp/litchi-0906-help-9v8f331z/driver.rs:525:13:\nselector xls_validation_report is missing from --help\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "label": "after_help_fix",
+      "driver_sha256": "6b956f7047d00f412ae3843f47a1d040ec5a745815fdcee4f78f5953f07729a4",
+      "compile": {
+        "argv": [
+          "rustc",
+          "+1.95.0",
+          "--edition=2024",
+          "--test",
+          "--crate-name",
+          "help_registry",
+          "/tmp/litchi-0906-help-9v8f331z/driver.rs",
+          "-o",
+          "/tmp/litchi-0906-help-9v8f331z/test"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "test": {
+        "argv": [
+          "/tmp/litchi-0906-help-9v8f331z/test",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "stdout": "\nrunning 1 test\ntest selectable_case_registry_has_complete_name_and_parse_mappings ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s\n\n",
+        "stderr": ""
+      }
+    }
+  ],
+  "status": "pass",
+  "temporary_directory_removed": true,
+  "worktrees_created": 0
+}

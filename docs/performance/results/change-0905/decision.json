@@ -1,0 +1,74 @@
+{
+  "status": "accepted",
+  "production_retained": true,
+  "decision": "adopt bounded XML attribute summary",
+  "measured_baseline": "4f39f5a88d9c01572d2fd24522caf214988540eb",
+  "decided_utc": "2026-10-04T06:18:51.166495+00:00",
+  "evidence": {
+    "candidate-source.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-source.json",
+      "bytes": 1880267,
+      "sha256": "69b4be69408c11c071de46b94dee82ab19a7ac036f2e96cbaa849ddd715f275c"
+    },
+    "candidate-audit.rs": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-audit.rs",
+      "bytes": 126817,
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    "analysis.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/analysis.json",
+      "bytes": 4285077,
+      "sha256": "db663b1307ba234ebc680441d32f74569094b2cf366ee58176334777a9c74208"
+    },
+    "micro-analysis.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/micro-analysis.json",
+      "bytes": 75123,
+      "sha256": "af1a00f0d8f6733677c4a0b6238fd3540b3abaaffad8abdd468e87da0bbb21c5"
+    },
+    "quality.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/quality.json",
+      "bytes": 3458,
+      "sha256": "ac5e189036eca73616ada58e1661e0b3f8f3f2a968e05876c0bbfad1b13ca498"
+    },
+    "parity-comparison.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/parity-comparison.json",
+      "bytes": 246,
+      "sha256": "9b015dc98531fb9472ef7a59d72ce8d39028e5c5e0c15a1b5b33e9619675e791"
+    },
+    "parity-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/parity-review.json",
+      "bytes": 10397,
+      "sha256": "84be54a8a47ca5b4dbf0d9995f7072f893b9cdad4eb2ae0a0b7a2dd178c75381"
+    },
+    "source-review.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/source-review.md",
+      "bytes": 7091,
+      "sha256": "afdfa64604df62b9739acaf6418230f2e0bc7e73f1af8ea81e021eb8b6adb2ff"
+    },
+    "replay.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/replay.json",
+      "bytes": 94399,
+      "sha256": "377bb88679aedaed378b93f961e1f60adcecb636cb0064fcb2d5f305e4e4dddf"
+    },
+    "diagnostics.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/diagnostics.json",
+      "bytes": 38595,
+      "sha256": "2370a882b0e03a2ff340af4efb968a7e2a28d575acdbdcdd89184675fa196603"
+    },
+    "concurrent-integration.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/concurrent-integration.json",
+      "bytes": 1260,
+      "sha256": "cd1bc7f45980d96d0494b1844dfd00f606fb7e671f56c2e0f88abd4fb36c8d6c"
+    }
+  },
+  "independent_result_verdict": "No blocker; reviewer independently reproduced raw micro and native bootstrap, identity, sample permutation, allocator deltas and serial workload intervals. Finite verdict received via agent message before decision; written review artifacts will be included in closure.",
+  "main_review_flags": [],
+  "micro_material_adverse_cases": [],
+  "accepted_tradeoffs": [
+    "Two-attribute authored/compact p50 ratios 1.0371562973/1.0386657724 and two p99 flags; no micro p50 exceeds1.05",
+    "Allocator live/peak snapshots+3bytes; no peak-live reduction claim",
+    "RSS descriptive whole-process/executable-layout-sensitive",
+    "Finite parity excludes XML-declaration branch and uses custom diagnostic multiplier; raw SHA/equality authoritative"
+  ],
+  "integration": "Candidate retained in working source. Final batch commit may use isolated branch while unrelated iWork cherry-pick is active; measured timings do not cover later shared HEAD."
+}

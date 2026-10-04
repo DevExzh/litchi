@@ -1,0 +1,7274 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 392057
+cmd:  /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native materialized 0 1 /home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-b/artifacts
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 196679028
+desc: Trigger: --dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction
+
+positions: line
+events: Ir
+summary: 126635417
+
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6) /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native
+cfi=(164) ???
+cfn=(564) (below main)
+calls=0 0 
+0 126635417
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(218) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+fn=(786) __memset_avx2_unaligned_erms
+198 512
++1 1024
++5 512
++1 512
++1 373
++1 373
++1 373
++2 342
++1 342
++1 684
++9 9
++1 9
++2 18
++5 31
++1 31
++6 31
++1 31
++12 31
++3 31
++1 31
++12 22
++1 22
++13 22
++1 22
++2 22
++3 13
++3 13
++3 13
++1 13
++1 13
++1 13
++1 13
++1 13
++1 26
++3 13
++1 13
++1 13
++1 13
++3 26
+-6 9
++1 9
++1 9
++1 9
++3 18
++35 139
++9 139
++1 139
++5 109
++1 109
++1 102
++1 102
++1 101
++1 101
++1 100
++1 10
++2 100
++17 30
++1 30
++1 30
++9 7
++1 7
++5 7
++8 1
++1 1
++5 1
++7 1
++1 1
++1 1
++5 1
+
+fl=(230) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+fn=(892) __memcmp_avx2_movbe
+73 147747
++7 147747
++1 147747
++3 38421
++1 38421
++1 38421
++4 38421
++1 38421
++2 35770
++1 35770
++3 2432
++1 2432
++1 2432
++3 2432
++1 2432
++3 2419
++1 2419
++49 9432
++10 9432
++1 9432
++1 9432
++3 18864
++4 13
++8 13
++1 13
++1 13
++2 26
+330 2419
++1 2419
++1 2419
++1 2419
++1 2419
++3 35757
++1 35757
++1 35757
++1 35757
++1 35757
++1 70272
++40 621
++1 621
++8 621
++1 621
++1 621
++2 1242
++6 109326
++1 109326
++5 27130
++1 27130
++1 27130
++1 27130
++1 27130
++3 24488
++1 24488
++1 24488
++1 24488
++3 24488
++1 24488
++1 17951
++1 35902
++6 2642
++1 2642
++2 2306
++1 2306
++2 1768
++1 1768
++2 1097
++1 1097
++1 1097
++1 1097
++1 1097
++1 1097
++1 1097
++1 1097
++1 1097
++2 1097
++2 606
++4 82196
++1 82196
++1 82196
++1 82196
++2 82196
++4 493
++1 493
++2 493
++10 538
++1 538
++1 538
++1 538
++1 536
++1 536
++1 536
++2 536
++2 536
++26 336
++1 336
++1 336
++1 336
++1 336
++4 317
++1 317
++1 317
++1 317
++1 317
++1 317
++2 317
++2 92
++24 671
++1 671
++1 671
++1 671
++1 671
++1 671
++1 671
++1 671
++1 671
++1 671
++2 671
++2 671
+
+fl=(167) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(588) (below main)
+cob=(6)
+cfi=(164)
+cfn=(596) main
+calls=0 0 
+59 126635417
+
+fl=(202) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+fn=(714) __memcpy_avx_unaligned_erms
+255 50717
++1 50717
++6 50717
++1 50717
++2 9113
++1 9113
++1 9113
++3 3805
++1 3805
++1 3805
++3 7610
++30 41604
++1 41604
++2 32554
++1 32554
++2 23732
++4 23732
++1 10037
++1 10037
++1 9783
++1 9783
++1 6626
++1 6626
++2 6626
++2 6626
+-2 3157
++2 3411
++6 13695
++1 13695
++1 13695
++1 13695
++1 13695
++7 9050
++1 9050
++1 9050
++1 9050
++2 9050
++17 8822
++1 8822
++1 8822
++1 8822
++1 8822
++7 2801
++1 2801
++1 2801
++1 2801
++1 2801
++1 2801
++1 5602
++5 5308
++1 5308
++5 5308
++1 5308
++2 4820
++1 4820
++1 4820
++2 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 2019
++1 4038
++4 488
++1 488
++4 488
++2 488
++4 488
++1 488
++11 488
++3 488
++2 488
++2 488
++4 488
++1 488
++9 463
++1 463
++2 463
++2 463
++1 463
++1 463
++3 463
++2 463
++2 463
++2 926
++6 463
++1 463
++1 463
++1 463
++1 463
++1 463
++1 463
++1 463
++1 463
++1 463
++1 463
++1 463
+-11 389
++1 389
++1 389
++1 389
++1 389
++1 389
++1 389
++1 389
++1 389
++1 389
++1 389
++1 389
++2 463
++1 463
++1 463
++1 463
++2 463
++4 926
++13 25
++1 25
++2 25
++1 25
++1 25
++2 25
++2 25
++2 50
++6 25
++1 25
++1 25
++1 25
++1 25
++1 25
++1 25
++1 25
++1 25
++1 25
++1 25
++1 25
++2 25
++1 25
++1 25
++1 25
++2 25
++1 50
+
+fl=(155) ./malloc/./malloc/malloc.c
+fn=(718) _int_free_merge_chunk
+4407 84344
++7 52715
+-6 10543
++9 31629
++5 31629
++4 21086
+-1 21086
++1 21086
+1895 31629
+4433 21086
++2 2167
++2 2167
++1 8668
++2 2167
+-4 2167
++4 2167
+cfn=(780) unlink_chunk.isra.0
+calls=6768 1592 
+* 44386
++18 21086
++6 21082
++4 8086
++4 21082
++9 1656
+-1 1656
++2 3312
++2 4968
++7 17770
++1 35540
++1 8885
++2 17770
++3 53310
++4 8885
+-1 8885
++2 8885
++1 8885
++2 26655
++1 8885
+-61 8885
+-1 17770
++1 53310
+-1 8885
+cfn=(720) _int_free_maybe_trim
+calls=25015 +83 
+* 213240
++57 1656
+-1 1656
++2 1656
++1 1656
++2 4968
++1 1656
+-61 1656
+-1 3312
++1 9936
+-1 1656
+cfn=(720)
+calls=7784 +83 
+* 39744
++1 2
+-1 4
++1 12
+-1 2
+cfn=(720)
+calls=209 +83 
+* 68
++70 2
++1 6
++1 4
+-52 2455
++1 2455
+-1 2455
+cfn=(780)
+calls=6568 1592 
+* 46813
++1 2455
+-49 52715
+
+fn=(720)
+4528 115973
++3 21086
++2 8
++3 12
++14 115973
+
+fn=(636) malloc
+3283 33887
+1269 67774
++19 33887
+3287 33887
+1288 93480
+3287 51412
++2 76968
++2 51312
++2 203022
+3030 36398
++4 72796
++4 18199
++1 18199
+3294 18199
+-7 16362
++19 15688
+cfn=(638) __libc_malloc2
+calls=39673 -59 
+* 2341807
+-17 16362
+
+fn=(638)
+3247 94128
++4 31376
++28 78440
+-26 47064
+cfn=(640) _int_malloc
+calls=39674 3790 
+* 1980983
++1 78440
+fi=(154) ./malloc/./malloc/arena.c
+151 31376
+fe=(155)
+
+fn=(706) realloc
+3380 10218
++7 10218
+-7 45981
++11 10218
+4837 5109
++1 5109
+-1 5109
++1 5109
+-1 10218
++2 15327
+3425 3868
+-22 3868
++22 19340
++4 7736
+1288 23208
+3436 7736
+fi=(154)
+151 11604
+fe=(155)
+3469 7736
+4840 5109
+3411 10218
++2 2804
++1 2804
++36 1241
++51 45981
+-30 15472
+cfn=(710) _int_realloc
+calls=16352 4559 
+* 1321373
+* 3868
++1 19340
+fi=(154)
+151 11604
+fe=(155)
+3472 7736
+
+fn=(710)
+4559 15472
++11 46416
++8 7736
++2 3868
++1 11604
++1 15472
++4 7736
++14 561
++53 1122
+-53 1122
++57 561
+-57 561
++57 1122
+-2 1122
++2 334
++1 167
++16 167
++1 668
+-1 394
++1 14804
+-79 7414
++12 7414
++12 23149
+cfn=(640)
+calls=6877 3790 
+* 524109
+* 3307
++1 6614
++3 3307
++6 9921
++36 394
+-4 394
++3 394
++5 394
+-4 394
+-1 394
++5 394
+-4 394
++4 394
+-1 394
++1 1182
+cfn=(716) _int_free_chunk
+calls=6660 4351 
+* 45994
+* 394
+-60 1384
+-1 2768
++5 2400
+cfn=(780)
+calls=7009 1592 
+* 7642
++44 2000
+-48 800
++28 3307
+fi=(213) ./malloc/../string/bits/string_fortified.h
+29 3307
+fe=(155)
+4637 3307
+fi=(213)
+29 6614
+fe=(155)
+4638 6614
+fi=(213)
+29 3307
+cob=(3) ???
+cfi=(152) ???
+cfn=(712) 0x0000000004eb0680
+calls=6867 -29 
+* 74842
+fe=(155)
+4642 19842
+cfn=(716)
+calls=6867 4351 
+* 408871
++2 6614
+
+fn=(748) free
+3319 23134
++3 46268
++15 46268
+-4 69402
++8 69402
++6 69285
++6 23095
+-3 46190
++3 23095
+-3 23095
++1 46190
++2 69285
+3007 16292
++8 16292
+-12 16292
++4 48876
++1 16292
++7 16292
+3354 16292
++10 20409
+-34 6842
++40 13684
+fi=(154)
+151 20526
+fe=(155)
+3374 20526
+cfn=(716)
+calls=19339 4351 
+* 883461
+
+fn=(780)
+1592 8350
++2 25050
+-2 8350
++2 16700
++3 8350
++3 16700
+-2 8350
++2 16700
++3 8350
++1 8350
++1 21857
++2 1268
++1 1902
++3 1268
++14 634
++1 634
++3 16700
+
+fn=(640)
+3790 170955
++32 37990
+1288 108854
+3831 27758
++16 27758
++54 345
++18 16858
+-1 16858
++12 33716
+-11 33716
+-1 50574
++12 33716
+-6 6380
++5 6380
+-7 6380
++2 12760
++9 12760
++3 12760
+-3 114
++3 114
++1 19311
+-3 6437
++5 6437
++1 25748
++2 25748
+-10 6437
++12 12874
++1 12874
++2 12874
++11 25618
++29 655
++1 655
++4 1310
++31 1308
++8 4740
++1 558
++1 558
+-1 558
++4 1116
+-4 69
++1 69
+-1 69
++4 138
++5 40
+-2 10
++3 20
++6 21
++3 21
++2 14
++33 14
++9 7
+-9 28
++1 7
++1 7
++1 7
++1 7
++6 14
+-10 3502
++9 1751
+-9 7004
++1 1751
++1 1751
++1 1751
++1 1751
++6 3502
+3053 361
+-27 361
++27 361
+-27 361
++4 722
++4 1444
++4 361
++1 361
+4113 361
+3831 20464
+1288 5116
+3850 5116
++2 5116
+-2 5116
++2 10232
+-2 13810
++2 13810
+-2 13810
++2 27620
++2 2137
++1 4274
++2 2137
++1 2137
++1 2137
++2 8548
++6 6411
++1 4274
+2919 4274
+3872 6411
++4 20990
++1 4474
++2 3794
++2 1897
++1 1897
++1 3794
++2 1897
+2999 1897
++16 1897
+3886 1897
+3003 3794
++4 7588
++1 1897
++7 1897
++32 6171
+1888 2137
+3893 2137
+1888 4274
+4340 170955
+3901 14095
+-52 82860
+4105 5274
+3930 6357
+4111 8248
++13 12179
+-2 24358
++2 136
++3 68
+-3 68
++3 136
++1 4
++3 2
++1 5
++6 2
++5 1
++1 2
+-1 4
++1 1
+cfn=(780)
+calls=34 1592 
+* 31
++3 6
+4277 170
++3 680
++2 255
++1 85
+1888 85
+4286 85
+1888 170
+4280 16408
++2 6153
++1 2051
+1888 2051
+4286 2051
+1888 5294
+4286 1192
+1888 2384
+3994 362
++1 362
+-1 362
++1 724
+2919 724
+3998 1086
++4 724
++1 1083
+3003 361
+3981 361
+3015 361
+4006 361
+3003 361
++4 1444
++1 361
++7 361
+4007 361
++24 446
+1888 3
+4083 617
+-51 617
++51 1852
+-70 2
+-54 12684
++2 5782
+-1 11564
++27 1465
++1 1465
++4 2930
++31 5520
++2 2208
++1 3312
++1 1104
+-1 1104
++1 1104
+-2 54
++1 81
++1 27
+-1 27
++1 76
++4 196
++26 9
++1 6
++6 3
++13 3
++1 6
+-47 18
++36 6
+4195 12178
++1 12178
++1 12178
+-1 12178
++1 12178
++1 24356
++1 36534
++5 48575
++16 8627
++2 17254
+-4 25572
++8 4159
++3 8318
++2 1664
++1 832
++1 832
+-2 832
+-27 832
++4 28635
++3 38116
+-3 27948
++3 37252
+-3 26544
++3 33880
+-3 16908
+4308 17702
++1 26553
++2 17702
++3 35404
++5 8844
+-2 8844
++2 17688
+-2 8844
++7 8844
+-8 8844
++3 8844
++2 8844
+-3 8844
++1 35376
++2 8844
+1888 26532
+2324 7
++12 7
+-12 14
++12 7
+4336 21
+cfn=(648) alloc_perturb
+calls=43 1887 
+* 35
+* 7
+4208 694
++5 2776
++1 1388
++24 6654
++3 6654
++2 3327
++3 6654
+-3 13308
++3 3327
+cfn=(780)
+calls=9284 1592 
+* 70641
++3 19962
++15 2136
++1 4272
++3 2136
+-9 2136
++9 4272
++1 2136
++1 2136
++3 4272
++1 2086
++1 4357
+2325 7
++36 28
++1 7
+-1 7
++1 7
++9 70
++6 21
++3 28
+2698 21
++1 7
++4 7
++1 14
++3 14
++5 14
+-2 7
++2 7
+-3 7
++2 7
++4 7
+-3 7
++1 7
+-1 21
++1 7
+4335 7
+-83 1192
+-1 1192
++1 2384
+2441 14
++8 14
++1 7
++10 14
++7 28
++8 14
+3965 4317
++3 4317
+-4 8634
++3 4317
+-1 4317
++1 8634
++1 8634
++1 8634
++2 6230
++4 3115
++6 3115
+-6 21805
++2 9345
++5 3115
+-4 3115
++4 6230
+cfn=(648)
+calls=10278 1887 
+* 15575
+-7 1202
++6 1202
+-6 8414
++2 3606
++5 1202
+-4 1202
++4 2404
+cfn=(648)
+calls=5981 1887 
+* 6010
++1 4317
+2477 28
+cfi=(187) ./malloc/./malloc/morecore.c
+cfn=(642) __glibc_morecore
+calls=39 25 
+* 308
++1 21
+-1 7
++1 7
+1912 14
+2480 7
++3 14
++38 28
++2 14
++6 7
+-6 7
++6 35
++1 42
+
+fn=(716)
+4351 42172
++8 10543
+-3 10543
++3 10543
+-3 21086
++6 21086
++6 10543
+cfn=(718)
+calls=32862 +39 
+* 1159095
++5 21086
++27 31629
+
+fn=(648)
+1887 4324
++1 12972
++2 4324
+
+fl=(165) ./csu/../csu/libc-start.c
+fn=(566) __libc_start_main@@GLIBC_2.34
+cfi=(167)
+cfn=(588)
+calls=0 30 
+360 126635417
+
+fl=(187)
+fn=(642)
+25 7
++1 14
+-1 14
++4 7
+cfi=(188) ./misc/./misc/sbrk.c
+cfn=(644) sbrk
+calls=61 +8 
+* 238
++1 14
++4 14
+
+fl=(189) ./misc/../sysdeps/unix/sysv/linux/brk.c
+fn=(646) brk
+36 7
+fi=(234) ./misc/../sysdeps/unix/sysv/linux/brk_call.h
+-12 14
+fe=(189)
++13 14
++1 14
++6 7
++1 7
+
+fl=(188)
+fn=(644)
+37 35
++6 14
+-3 14
++18 14
++4 14
++4 7
++1 7
+-1 21
++8 7
+cfi=(189)
+cfn=(646)
+calls=46 -38 
+* 63
+* 21
++4 21
+
+ob=(6)
+fl=(164)
+fn=(902) <alloc::string::String as core::fmt::Write>::write_str
+0 53138
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=19230 255 
+0 42107
+0 37107
+cfn=(1040) <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+calls=5880 0 
+0 288590
+0 6021
+
+fn=(916) alloc::raw_vec::RawVecInner<A>::finish_grow
+0 5055
+cfn=(918) __rustc::__rust_realloc
+calls=8832 0 
+0 7989
+0 698
+cfn=(818) __rustc::__rust_no_alloc_shim_is_unstable_v2
+calls=2240 0 
+0 224
+0 672
+cfn=(820) __rustc::__rust_alloc
+calls=2240 0 
+0 10693
+0 27127
+cfn=(818)
+calls=2955 0 
+0 1003
+0 3009
+cfn=(820)
+calls=2955 0 
+0 40120
+0 424288
+cfn=(918)
+calls=5666 0 
+0 1670590
+0 51195
+cfn=(818)
+calls=23950 0 
+0 14353
+0 43059
+cfn=(820)
+calls=23950 0 
+0 602482
+0 231337
+
+fn=(954) core::hash::BuildHasher::hash_one
+0 17964
+cfn=(956) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+calls=1397 0 
+0 27944
+0 71778
+cfn=(956)
+calls=206 0 
+0 6896
+0 1030
+cfn=(956)
+calls=206 0 
+0 7210
+0 33414
+cfn=(956)
+calls=1400 0 
+0 45700
+0 6000
+cfn=(956)
+calls=1400 0 
+0 42000
+0 124581
+cfn=(956)
+calls=3015 0 
+0 137538
+0 10995
+cfn=(956)
+calls=3015 0 
+0 93955
+0 170717
+cfn=(956)
+calls=863 0 
+0 48328
+0 4315
+cfn=(956)
+calls=863 0 
+0 48328
+0 72290
+cfn=(956)
+calls=880 0 
+0 18480
+0 69067
+cfn=(956)
+calls=14348 0 
+0 116531
+0 6365
+cfn=(956)
+calls=14348 0 
+0 67959
+0 108737
+cfn=(956)
+calls=4745 0 
+0 60174
+0 5500
+cfn=(956)
+calls=4745 0 
+0 51328
+0 75900
+
+fn=(1060) core::slice::sort::unstable::ipnsort
+0 21
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 22
+0 21
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 29
+0 9
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 22
+0 36
+cfn=(1062) core::slice::sort::unstable::quicksort::quicksort
+calls=1 0 
+0 100734
+0 16
+cfn=(1036) litchi_opc::part::PartMetadata::partname
+calls=1 0 
+0 6
+0 5
+cfn=(1036)
+calls=1 0 
+0 6
+0 8
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 22
+0 18
+cfn=(1036)
+calls=1 0 
+0 6
+0 10
+cfn=(1036)
+calls=2 0 
+0 12
+0 12
+cfn=(1036)
+calls=3 0 
+0 18
+0 24
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 44
+cfn=(1062)
+calls=1 0 
+0 121139
+0 31
+cfn=(1062)
+calls=1 0 
+0 37287
+0 157
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 22
+0 20
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 22
+0 10
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 22
+0 33
+cfn=(1062)
+calls=1 0 
+0 75469
+
+fn=(1130) alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+0 28
+cfn=(916)
+calls=1 0 
+0 342
+0 11
+
+fn=(1140) core::slice::sort::shared::smallsort::small_sort_general
+0 257
+cfn=(1142) core::slice::sort::shared::smallsort::sort4_stable
+calls=9 0 
+0 2344
+0 27
+cfn=(1142)
+calls=9 0 
+0 2373
+0 2335
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=58 73 
+0 1268
+0 4058
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=162 73 
+0 3677
+0 3662
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=64 73 
+0 1477
+0 6125
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=257 73 
+0 5910
+0 1886
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=10 73 
+0 221
+0 1190
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=85 73 
+0 1944
+0 3325
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=95 73 
+0 2115
+0 3501
+cfn=(1142)
+calls=8 0 
+0 2545
+0 32
+cfn=(1142)
+calls=8 0 
+0 2576
+0 40
+cfn=(2024) core::slice::sort::shared::smallsort::bidirectional_merge
+calls=8 0 
+0 4936
+0 72
+cfn=(1142)
+calls=8 0 
+0 2537
+0 48
+cfn=(1142)
+calls=8 0 
+0 2560
+0 32
+cfn=(2024)
+calls=8 0 
+0 4944
+0 60
+cfn=(1142)
+calls=2 0 
+0 642
+0 6
+cfn=(1142)
+calls=2 0 
+0 658
+0 602
+cfn=(1036)
+calls=29 0 
+0 174
+0 116
+cfn=(1036)
+calls=29 0 
+0 174
+0 203
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=29 73 
+0 646
+0 1041
+cfn=(1036)
+calls=128 0 
+0 768
+0 640
+cfn=(1036)
+calls=128 0 
+0 768
+0 896
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=128 73 
+0 2803
+0 1733
+cfn=(1036)
+calls=36 0 
+0 216
+0 144
+cfn=(1036)
+calls=36 0 
+0 216
+0 324
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=36 73 
+0 872
+0 1428
+cfn=(1036)
+calls=171 0 
+0 1026
+0 855
+cfn=(1036)
+calls=171 0 
+0 1026
+0 1197
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=171 73 
+0 3739
+0 1498
+cfn=(2024)
+calls=11 0 
+0 15270
+0 13290
+
+fn=(1180) memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2
+0 220171
+
+fn=(1976) <alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one
+0 510
+cfn=(1042) <alloc::raw_vec::RawVecInner>::finish_grow
+calls=30 0 
+0 17669
+0 300
+
+fn=(1598) quick_xml::name::NamespaceResolver::resolve_event
+0 25380
+cfn=(1176) memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+calls=1271 0 
+0 16804
+0 2532
+cfn=(1176)
+calls=228 0 
+0 316
+0 7356
+cfn=(1176)
+calls=830 0 
+0 24957
+0 7331
+cfn=(1604) quick_xml::name::NamespaceResolver::resolve_prefix
+calls=12 0 
+0 616
+0 2508
+cfn=(1604)
+calls=614 0 
+0 46893
+0 7730
+cfn=(1604)
+calls=616 0 
+0 31570
+0 16578
+
+fn=(1618) core::ptr::drop_in_place<litchi_opc::xml_attributes::CheckedAttributes>
+0 120189
+cfn=(834) __rustc::__rust_dealloc
+calls=10925 0 
+0 382517
+0 102743
+cfn=(834)
+calls=600 0 
+0 14000
+0 3600
+
+fn=(1628) quick_xml::name::NamespaceResolver::set_level
+0 679577
+
+fn=(1648) hashbrown::map::HashMap<K,V,S,A>::contains_key
+0 11152
+cfn=(954)
+calls=1194 0 
+0 158492
+0 17112
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=54 73 
+0 868
+0 15483
+cfn=(954)
+calls=597 0 
+0 45372
+0 11663
+
+fn=(1736) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::content_type
+0 3816
+
+fn=(1774) litchi_pptx::namespace::is_presentationml_name
+0 11
+cfn=(1776) quick_xml::name::QName::local_name
+calls=2 0 
+0 66
+0 6
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 19
+0 27
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 17
+0 3
+
+fn=(1782) litchi_pptx::parts::presentation::PresentationPart::scan_slide_references
+0 26
+cfn=(1762) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob
+calls=3 0 
+0 20
+0 16
+cfn=(1764) litchi_ooxml_common::mce::codec::process_part
+calls=3 0 
+0 3482
+0 50
+cfn=(1592) <quick_xml::name::NamespaceResolver as core::default::Default>::default
+calls=3 0 
+0 2739
+0 3502
+cfn=(1628)
+calls=627 0 
+0 8832
+0 1672
+cfn=(1160) quick_xml::reader::Reader<R>::read_event_impl
+calls=627 0 
+0 267658
+0 36
+cfn=(1160)
+calls=18 0 
+0 8544
+0 1720
+cfn=(1772) quick_xml::reader::ns_reader::NsReader<R>::process_event
+calls=645 0 
+0 233327
+0 8600
+cfn=(1598)
+calls=645 0 
+0 74166
+0 16040
+cfn=(1776)
+calls=615 0 
+0 27054
+0 3280
+cfn=(1776)
+calls=615 0 
+0 27054
+0 3280
+cfn=(1776)
+calls=615 0 
+0 27054
+0 5014
+cfn=(1776)
+calls=12 0 
+0 516
+0 66
+cfn=(1776)
+calls=9 0 
+0 384
+0 10
+cfn=(1776)
+calls=3 0 
+0 132
+0 58
+cfn=(1776)
+calls=9 0 
+0 384
+0 10
+cfn=(1776)
+calls=3 0 
+0 132
+0 70
+cfn=(1784) litchi_pptx::parts::presentation::reject_slide_id_list_attributes
+calls=3 0 
+0 270
+0 94
+cfn=(1776)
+calls=12 0 
+0 516
+0 60
+cfn=(1776)
+calls=9 0 
+0 384
+0 8542
+cfn=(1788) litchi_pptx::parts::presentation::append_slide_reference
+calls=600 0 
+0 4652763
+0 11920
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 34
+0 22
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 34
+0 10
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 34
+0 406
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=600 73 
+0 6800
+0 1774
+cfn=(1084) <hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop
+calls=3 0 
+0 66554
+0 4
+cfn=(1084)
+calls=3 0 
+0 73451
+0 4
+cfn=(1084)
+calls=3 0 
+0 286
+0 4
+cfn=(1632) core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>
+calls=3 0 
+0 1108
+0 8
+
+fn=(1802) hashbrown::map::HashMap<K,V,S,A>::get
+0 6000
+cfn=(954)
+calls=600 0 
+0 63320
+0 14066
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=603 73 
+0 7843
+0 5295
+cfn=(954)
+calls=1 0 
+0 187
+0 54
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 19
+0 32
+
+fn=(1934) std::sync::once::Once::call_once_force::{{closure}}
+0 30
+
+fn=(1952) litchi_pptx::notes::codec::scan_processed_xml
+0 5712
+cfn=(1592)
+calls=204 0 
+0 278503
+0 292804
+cfn=(1628)
+calls=31678 0 
+0 670745
+0 147936
+cfn=(1160)
+calls=49312 0 
+0 18841551
+0 633691
+cfn=(1600) quick_xml::name::NamespaceResolver::push
+calls=15619 0 
+0 2551336
+0 390475
+cfn=(1954) litchi_pptx::notes::codec::inspect_element
+calls=15619 0 
+0 9309197
+0 300721
+cfn=(1600)
+calls=16059 0 
+0 4222188
+0 385416
+cfn=(1954)
+calls=16059 0 
+0 20490875
+0 261316
+cfn=(1226) core::ptr::drop_in_place<quick_xml::events::Event>
+calls=204 0 
+0 816
+0 3468
+cfn=(1960) core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>
+calls=204 0 
+0 68896
+0 408
+cfn=(1888) core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>
+calls=204 0 
+0 65982
+0 1836
+
+fn=(1962) core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>
+0 3851
+cfn=(834)
+calls=202 0 
+0 29463
+0 816
+cfn=(834)
+calls=1 0 
+0 159
+0 824
+cfn=(834)
+calls=1 0 
+0 155
+0 615
+cfn=(834)
+calls=1 0 
+0 35
+0 2615
+cfn=(834)
+calls=200 0 
+0 39550
+0 819
+cfn=(834)
+calls=1 0 
+0 196
+0 3043
+cfn=(834)
+calls=202 0 
+0 31407
+0 210
+cfn=(834)
+calls=1 0 
+0 131
+0 16
+cfn=(834)
+calls=1 0 
+0 177
+0 9
+cfn=(834)
+calls=1 0 
+0 35
+0 1807
+cfn=(834)
+calls=200 0 
+0 40023
+0 213
+cfn=(834)
+calls=1 0 
+0 187
+
+fn=(1982) litchi_pptx::notes::package::relationship_target
+0 18
+cfn=(1744) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::partname
+calls=2 0 
+0 4
+0 4
+cfn=(928) litchi_opc::packuri::PackURI::base_uri
+calls=2 0 
+0 593
+0 12
+cfn=(1672) litchi_opc::packuri::PackURI::from_rel_ref
+calls=2 0 
+0 11991
+0 24
+
+fn=(2006) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob_arc
+0 5340
+
+fn=(2010) litchi_pptx::notes::transaction::Snapshot::from_parts
+0 23
+cfn=(2012) litchi_pptx::notes::validation::validate_parts
+calls=1 0 
+0 350570
+0 8
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 19
+0 160440
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 53
+0 4
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 65
+0 9
+cfn=(1242) core::slice::sort::shared::smallsort::insertion_sort_shift_left
+calls=1 0 
+0 149
+0 1
+
+fn=(2058) core::ptr::drop_in_place<alloc::vec::Vec<litchi_pptx::parts::presentation::SlideReference>>
+0 1813
+cfn=(834)
+calls=200 0 
+0 31676
+0 212
+cfn=(834)
+calls=1 0 
+0 153
+
+fn=(2064) <litchi_pptx::opened::model::Snapshot as core::clone::Clone>::clone
+0 15
+cfn=(922) <alloc::string::String as core::clone::Clone>::clone
+calls=1 0 
+0 85
+0 6
+cfn=(1006) <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+calls=1 0 
+0 124861
+0 5
+cfn=(1012) <hashbrown::raw::RawTable<T,A> as core::clone::Clone>::clone
+calls=1 0 
+0 58557
+0 72
+
+fn=(2068) core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>
+0 17
+cfn=(834)
+calls=1 0 
+0 35
+0 1807
+cfn=(834)
+calls=200 0 
+0 29680
+0 1200
+cfn=(834)
+calls=200 0 
+0 34008
+0 1200
+cfn=(834)
+calls=200 0 
+0 29680
+0 208
+cfn=(834)
+calls=1 0 
+0 131
+0 3720
+cfn=(834)
+calls=200 0 
+0 35905
+0 212
+cfn=(834)
+calls=1 0 
+0 184
+0 20
+
+fn=(596)
+cfn=(598) std::rt::lang_start_internal
+calls=0 0 
+0 126635417
+
+fn=(836) __rustc::__rdl_dealloc
+0 23134
+cob=(2)
+cfi=(155)
+cfn=(748)
+calls=69581 3319 
+0 1666785
+
+fn=(844) litchi_perf_baseline::pptx_owned_benchmark::run_from_args
+cfn=(862) litchi_perf_baseline::build_pptx_source_edit_corpus
+calls=0 0 
+0 126635417
+
+fn=(882) <&str as core::str::pattern::Pattern>::is_contained_in
+0 60660
+
+fn=(884) core::slice::memchr::memchr_aligned
+0 711650
+
+fn=(904) <&T as core::fmt::Display>::fmt
+0 10030
+cfn=(906) <str as core::fmt::Display>::fmt
+calls=4150 0 
+0 442594
+
+fn=(1084)
+0 36
+cfn=(834)
+calls=4 0 
+0 418
+0 3727
+cfn=(834)
+calls=200 0 
+0 30640
+0 219
+cfn=(834)
+calls=1 0 
+0 131
+0 18635
+cfn=(834)
+calls=1418 0 
+0 157715
+0 1095
+cfn=(834)
+calls=8 0 
+0 745
+0 3726
+
+fn=(1172) memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+0 827327
+
+fn=(1602) quick_xml::name::NamespaceResolver::add
+0 69160
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1831 255 
+0 29122
+0 23052
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1831 255 
+0 27900
+0 12132
+cfn=(996) alloc::raw_vec::RawVec<T,A>::grow_one
+calls=609 0 
+0 273663
+0 42470
+cfn=(914) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+calls=1220 0 
+0 746628
+0 2428
+
+fn=(1806) litchi_pptx::leniency::ToleranceReport::locate_in_part
+0 23
+
+fn=(2002) litchi_pptx::notes::model::Link::new
+0 3726
+cfn=(818)
+calls=207 0 
+0 207
+0 828
+cfn=(820)
+calls=207 0 
+0 34313
+0 1449
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=207 255 
+0 3101
+0 1035
+cfn=(818)
+calls=207 0 
+0 207
+0 828
+cfn=(820)
+calls=207 0 
+0 37820
+0 1449
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=207 255 
+0 4554
+0 1035
+cfn=(818)
+calls=207 0 
+0 207
+0 828
+cfn=(820)
+calls=207 0 
+0 36801
+0 1656
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=207 255 
+0 2283
+0 4761
+
+fn=(2008) <T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec
+0 17
+cfn=(818)
+calls=1 0 
+0 1
+0 4
+cfn=(820)
+calls=1 0 
+0 320
+0 1035
+cfn=(922)
+calls=205 0 
+0 45054
+0 615
+cfn=(922)
+calls=205 0 
+0 49160
+0 820
+cfn=(922)
+calls=205 0 
+0 45875
+0 6577
+
+fn=(564)
+cob=(2)
+cfi=(165)
+cfn=(566)
+calls=0 242 
+0 126635417
+
+fn=(880) litchi_opc::packuri::PackURI::new
+0 65
+cfn=(818)
+calls=227 0 
+0 5
+0 20
+cfn=(820)
+calls=227 0 
+0 639
+0 35
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=227 255 
+0 57
+0 80
+cfn=(882)
+calls=227 0 
+0 465
+0 40
+cfn=(884)
+calls=227 0 
+0 329
+0 1516
+cfn=(886) core::iter::traits::iterator::Iterator::try_fold
+calls=227 0 
+0 1869
+0 75
+cfn=(888) <core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold
+calls=227 0 
+0 2926
+0 30
+cfn=(894) litchi_opc::packuri::PackURI::validate_percent_encoding
+calls=227 0 
+0 2356
+0 179
+cfn=(890) <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+calls=446 0 
+0 1309
+0 337
+cfn=(886)
+calls=227 0 
+0 745
+0 20
+cfn=(896) core::str::iter::SplitInternal<P>::next
+calls=227 0 
+0 705
+0 35180
+cfn=(882)
+calls=3169 0 
+0 60195
+0 8024
+cfn=(884)
+calls=3165 0 
+0 77497
+0 247396
+cfn=(886)
+calls=3169 0 
+0 336525
+0 15045
+cfn=(888)
+calls=3169 0 
+0 587095
+0 6018
+cfn=(894)
+calls=3169 0 
+0 413352
+0 37105
+cfn=(890)
+calls=7159 0 
+0 259132
+0 72193
+cfn=(886)
+calls=3169 0 
+0 149447
+0 4012
+cfn=(896)
+calls=3169 0 
+0 141423
+0 6018
+
+fn=(896)
+0 60
+cfn=(890)
+calls=227 0 
+0 575
+0 12106
+cfn=(890)
+calls=3169 0 
+0 115345
+0 14042
+
+fn=(920) __rustc::__rdl_realloc
+0 112398
+cob=(2)
+cfi=(155)
+cfn=(706)
+calls=19344 3380 
+0 1655262
+
+fn=(1024) litchi_opc::package::OpcPackage::get_part
+0 15795
+cfn=(954)
+calls=1059 0 
+0 249117
+0 44558
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1059 73 
+0 20457
+0 13049
+cfn=(1758) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::ensure_payload
+calls=1058 0 
+0 14742
+0 15795
+
+fn=(1032) <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop
+0 46
+cfn=(834)
+calls=1 0 
+0 131
+
+fn=(1132) <hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+0 30
+
+fn=(1200) memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+0 1708480
+
+fn=(1216) quick_xml::events::attributes::IterState::check_for_duplicates
+0 854584
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=8160 73 
+0 67895
+0 113759
+cfn=(996)
+calls=19849 0 
+0 1262120
+0 610894
+
+fn=(1226)
+0 816
+
+fn=(1978) litchi_pptx::notes::package::validate_id
+0 13119
+
+fn=(1600)
+0 1046304
+cfn=(1214) quick_xml::events::attributes::IterState::next
+calls=33779 0 
+0 2825136
+0 76840
+cfn=(1214)
+calls=21587 0 
+0 2072180
+0 799980
+cfn=(1602)
+calls=2047 0 
+0 1226555
+0 534072
+
+fn=(1616) quick_xml::escape::normalize_attribute_value
+0 63576
+
+fn=(1632)
+0 16
+cfn=(834)
+calls=3 0 
+0 310
+0 14
+cfn=(834)
+calls=3 0 
+0 360
+0 12
+cfn=(834)
+calls=3 0 
+0 70
+0 16
+cfn=(834)
+calls=3 0 
+0 310
+
+fn=(1760) litchi_pptx::parts::presentation::PresentationPart::from_part
+0 13
+cfn=(1736)
+calls=2 0 
+0 3
+0 11
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 29
+0 5
+cfn=(1762)
+calls=2 0 
+0 10
+0 7
+cfn=(1764)
+calls=2 0 
+0 1741
+0 25
+cfn=(1592)
+calls=2 0 
+0 1360
+0 44
+cfn=(1160)
+calls=4 0 
+0 1522
+0 8
+cfn=(1772)
+calls=4 0 
+0 4084
+0 38
+cfn=(1598)
+calls=4 0 
+0 205
+0 81
+cfn=(1774)
+calls=2 0 
+0 149
+0 24
+cfn=(834)
+calls=2 0 
+0 35
+0 7
+cfn=(834)
+calls=2 0 
+0 35
+0 6
+cfn=(834)
+calls=2 0 
+0 35
+0 7
+cfn=(834)
+calls=2 0 
+0 155
+0 11
+
+fn=(1768) litchi_ooxml_common::mce::codec::process_markup_compatibility
+0 5382
+cfn=(1770) litchi_ooxml_common::mce::codec::contains_mce_namespace
+calls=210 0 
+0 436539
+0 3105
+
+fn=(1784)
+0 58
+cfn=(1786) <litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next
+calls=3 0 
+0 150
+0 10
+cfn=(1618)
+calls=3 0 
+0 32
+0 20
+
+fn=(1790) litchi_ooxml_common::xml::unqualified_attribute_value
+0 38000
+cfn=(1792) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+calls=2200 0 
+0 371976
+0 38200
+cfn=(1794) quick_xml::name::QName::prefix
+calls=1400 0 
+0 59800
+0 3800
+cfn=(1776)
+calls=800 0 
+0 39800
+0 3600
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=800 73 
+0 11810
+0 5400
+cfn=(1612) quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+calls=800 0 
+0 116048
+0 8400
+cfn=(818)
+calls=800 0 
+0 600
+0 1800
+cfn=(820)
+calls=800 0 
+0 33014
+0 4800
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=800 255 
+0 9800
+0 6600
+cfn=(834)
+calls=800 0 
+0 21000
+0 12600
+
+fn=(1792)
+0 16000
+cfn=(1214)
+calls=2200 0 
+0 304976
+0 51000
+
+fn=(1796) litchi_ooxml_common::relationships::codec::attribute_value
+0 13200
+cfn=(1786)
+calls=600 0 
+0 146000
+0 2400
+cfn=(1786)
+calls=1200 0 
+0 155176
+0 14800
+cfn=(1776)
+calls=1200 0 
+0 51600
+0 4800
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1200 73 
+0 16190
+0 7600
+cfn=(1798) quick_xml::name::QName::decompose
+calls=1200 0 
+0 55200
+0 4800
+cfn=(1604)
+calls=1200 0 
+0 53600
+0 6800
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=600 73 
+0 11600
+0 7600
+cfn=(1612)
+calls=600 0 
+0 83668
+0 5600
+cfn=(818)
+calls=600 0 
+0 400
+0 1200
+cfn=(820)
+calls=600 0 
+0 59037
+0 2800
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=600 255 
+0 6000
+0 3200
+cfn=(1618)
+calls=600 0 
+0 22000
+0 7200
+
+fn=(1808) litchi_pptx::leniency::ToleranceReport::append
+0 26
+
+fn=(1924) litchi_pptx::opened::model::capture_internal
+0 15
+cfn=(1754) litchi_opc::package::OpcPackage::main_document_part
+calls=1 0 
+0 4839
+0 9
+cfn=(1760)
+calls=1 0 
+0 9650
+0 8
+cfn=(1744)
+calls=1 0 
+0 2
+0 3
+cfn=(922)
+calls=1 0 
+0 85
+0 9
+cfn=(1782)
+calls=1 0 
+0 2779907
+0 29
+cfn=(1926) litchi_pptx::presentation::model::Presentation::catalog
+calls=1 0 
+0 2770394
+0 61
+cfn=(1130)
+calls=1 0 
+0 381
+0 5
+cfn=(1964) std::thread::local::LocalKey<T>::with
+calls=1 0 
+0 21
+0 15
+cfn=(1964)
+calls=1 0 
+0 21
+0 15
+cfn=(1964)
+calls=1 0 
+0 21
+0 4655
+cfn=(1742) <litchi_opc::part::XmlPart as litchi_opc::part::Part>::rels
+calls=200 0 
+0 400
+0 2200
+cfn=(954)
+calls=200 0 
+0 31660
+0 7240
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=201 73 
+0 3934
+0 2643
+cfn=(1966) litchi_pptx::parts::is_relationship_type
+calls=200 0 
+0 10000
+0 1200
+cfn=(1756) litchi_opc::rel::Relationship::target_partname
+calls=200 0 
+0 1015706
+0 2400
+cfn=(1744)
+calls=200 0 
+0 400
+0 600
+cfn=(922)
+calls=200 0 
+0 18363
+0 2000
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 3824
+0 1200
+cfn=(986) hashbrown::map::HashMap<K,V,S,A>::insert
+calls=200 0 
+0 72497
+0 2200
+cfn=(988) alloc::raw_vec::RawVecInner<A>::try_allocate_in
+calls=200 0 
+0 44342
+0 2400
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=200 255 
+0 3000
+0 1800
+cfn=(986)
+calls=200 0 
+0 98358
+0 1200
+cfn=(922)
+calls=200 0 
+0 47628
+0 1400
+cfn=(986)
+calls=200 0 
+0 131358
+0 2800
+cfn=(988)
+calls=200 0 
+0 44164
+0 2400
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=200 255 
+0 3000
+0 8400
+cfn=(834)
+calls=200 0 
+0 8080
+0 2608
+cfn=(916)
+calls=1 0 
+0 536
+0 12
+cfn=(1032)
+calls=1 0 
+0 158
+0 12
+cfn=(1968) litchi_pptx::notes::package::load_snapshot_with_slide_root_proofs
+calls=1 0 
+0 5596541
+0 18
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 65
+0 20
+cfn=(2018) litchi_pptx::opened::model::SlideNameIndex::build
+calls=1 0 
+0 154479
+0 15
+cfn=(1010) <litchi_opc::package::OpcPackage as core::clone::Clone>::clone
+calls=1 0 
+0 1134223
+0 7
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 101
+0 2
+cfn=(976) alloc::boxed::box_new_uninit
+calls=1 0 
+0 182
+0 5
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 101
+0 12
+cfn=(2022) litchi_pptx::opened::model::package_fingerprint_with_memo
+calls=1 0 
+0 48972831
+0 30
+cfn=(916)
+calls=1 0 
+0 331
+0 19
+cfn=(2042) litchi_pptx::parts::MceCapture::finish
+calls=1 0 
+0 27
+0 10
+cfn=(2044) litchi_pptx::notes::package::SlideRootMemo::from_records
+calls=1 0 
+0 94910
+0 14
+cfn=(976)
+calls=1 0 
+0 256
+0 15
+cfn=(834)
+calls=1 0 
+0 131
+0 17
+cfn=(976)
+calls=1 0 
+0 419
+0 14
+cfn=(976)
+calls=1 0 
+0 193
+0 51
+cfn=(2048) core::ptr::drop_in_place<litchi_pptx::notes::transaction::Snapshot>
+calls=1 0 
+0 227128
+0 7
+cfn=(1084)
+calls=1 0 
+0 34717
+0 5
+cfn=(1084)
+calls=1 0 
+0 38185
+0 2
+cfn=(1084)
+calls=1 0 
+0 168
+0 2
+cfn=(2056) core::ptr::drop_in_place<litchi_pptx::presentation::model::Presentation>
+calls=1 0 
+0 34797
+0 2
+cfn=(2058)
+calls=1 0 
+0 33854
+0 4615
+cfn=(1742)
+calls=200 0 
+0 400
+0 2800
+cfn=(954)
+calls=200 0 
+0 31660
+0 7441
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=201 73 
+0 3909
+0 2444
+cfn=(1938) litchi_pptx::parts::validate_slide_relationship
+calls=200 0 
+0 1127482
+0 2600
+cfn=(834)
+calls=200 0 
+0 20320
+0 2400
+cfn=(1940) litchi_pptx::parts::validate_content_type
+calls=200 0 
+0 13000
+0 1400
+cfn=(1942) litchi_pptx::parts::processed_xml_with_capture
+calls=200 0 
+0 446000
+0 5200
+cfn=(1944) litchi_pptx::parts::slide::SlidePart::finish_from_processed
+calls=200 0 
+0 59584633
+0 15811
+
+fn=(1936) core::ptr::drop_in_place<core::option::Option<std::sync::once_lock::OnceLock<alloc::vec::Vec<litchi_pptx::parts::presentation::SlideReference>>::initialize<std::sync::once_lock::OnceLock<alloc::vec::Vec<litchi_pptx::parts::presentation::SlideReference>>::get_or_init<litchi_pptx::presentation::model::Presentation::catalog::{{closure}}>::{{closure}},!>::{{closure}}>>
+0 15
+
+fn=(1954)
+0 823628
+cfn=(1798)
+calls=31678 0 
+0 2216840
+0 253424
+cfn=(1604)
+calls=31678 0 
+0 3519335
+0 95034
+cfn=(1956) litchi_pptx::notes::resolved
+calls=31678 0 
+0 1982358
+0 380136
+cfn=(1176)
+calls=31678 0 
+0 1298178
+0 443492
+cfn=(1152) core::str::converts::from_utf8
+calls=31678 0 
+0 2283088
+0 477820
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=204 73 
+0 3468
+0 1632
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=204 73 
+0 4344
+0 583776
+cfn=(1786)
+calls=10925 0 
+0 4118428
+0 50955
+cfn=(1786)
+calls=16985 0 
+0 2848637
+0 498941
+cfn=(1798)
+calls=16374 0 
+0 1182480
+0 130992
+cfn=(1604)
+calls=16374 0 
+0 474418
+0 49122
+cfn=(1956)
+calls=16374 0 
+0 477460
+0 147366
+cfn=(1152)
+calls=16374 0 
+0 930828
+0 130992
+cfn=(1152)
+calls=16374 0 
+0 986261
+0 98244
+cfn=(1958) quick_xml::escape::unescape
+calls=16374 0 
+0 1848963
+0 377814
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=404 73 
+0 11716
+0 199129
+cfn=(818)
+calls=404 0 
+0 404
+0 1212
+cfn=(820)
+calls=404 0 
+0 70231
+0 2828
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=404 255 
+0 6056
+0 1644
+cfn=(1976)
+calls=14 0 
+0 8881
+0 8930
+cfn=(988)
+calls=2 0 
+0 304
+0 22
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 26
+0 16
+cfn=(1676) alloc::vec::Vec<T,A>::push_mut
+calls=2 0 
+0 355
+0 6002
+cfn=(988)
+calls=400 0 
+0 87821
+0 4400
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=400 255 
+0 6000
+0 3200
+cfn=(1676)
+calls=400 0 
+0 17315
+0 22259
+cfn=(1618)
+calls=10925 0 
+0 601017
+0 21850
+
+fn=(1994) core::ptr::drop_in_place<alloc::vec::Vec<(alloc::string::String,litchi_opc::packuri::PackURI)>>
+0 1813
+cfn=(834)
+calls=200 0 
+0 38761
+0 1200
+cfn=(834)
+calls=200 0 
+0 30160
+0 213
+cfn=(834)
+calls=1 0 
+0 156
+
+fn=(2004) litchi_pptx::notes::transaction::PartState::from_part
+0 36
+cfn=(1742)
+calls=3 0 
+0 6
+0 49
+cfn=(2002)
+calls=2 0 
+0 908
+0 14
+cfn=(1744)
+calls=1 0 
+0 2
+0 4
+cfn=(1744)
+calls=2 0 
+0 4
+0 9
+cfn=(922)
+calls=3 0 
+0 637
+0 21
+cfn=(1736)
+calls=3 0 
+0 9
+0 27
+cfn=(818)
+calls=3 0 
+0 3
+0 12
+cfn=(820)
+calls=3 0 
+0 399
+0 21
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=3 255 
+0 56
+0 32
+cfn=(2006)
+calls=3 0 
+0 36
+0 76
+cfn=(818)
+calls=2 0 
+0 2
+0 6
+cfn=(820)
+calls=2 0 
+0 477
+0 7291
+cfn=(2002)
+calls=204 0 
+0 135928
+0 1256
+cfn=(1060)
+calls=1 0 
+0 100894
+0 1
+
+fn=(2016) litchi_pptx::notes::validation::validate_field
+0 270004
+
+fn=(2018)
+0 49
+cfn=(958) hashbrown::raw::RawTable<T,A>::reserve_rehash
+calls=1 0 
+0 342
+0 1560
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=8 73 
+0 174
+0 3705
+cfn=(954)
+calls=199 0 
+0 37213
+0 3190
+cfn=(1484) <alloc::string::String>::try_reserve
+calls=200 0 
+0 49726
+0 3000
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=200 255 
+0 2600
+0 1800
+cfn=(954)
+calls=200 0 
+0 38000
+0 4582
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=8 73 
+0 176
+0 8362
+
+fn=(2034) sha2::sha256::soft::unroll::compress
+0 48247480
+
+fn=(2044)
+0 27
+cfn=(2046) alloc::vec::Vec<T,A>::dedup_by
+calls=1 0 
+0 1815
+0 24
+cfn=(916)
+calls=1 0 
+0 274
+0 11913
+cfn=(954)
+calls=200 0 
+0 41800
+0 1604
+cfn=(1060)
+calls=1 0 
+0 37452
+0 1
+
+fn=(2046)
+0 1815
+
+fn=(2052) core::ptr::drop_in_place<litchi_pptx::notes::model::Graph>
+0 14
+cfn=(834)
+calls=1 0 
+0 155
+0 6
+cfn=(834)
+calls=1 0 
+0 35
+0 6
+cfn=(834)
+calls=1 0 
+0 155
+0 6
+cfn=(834)
+calls=1 0 
+0 156
+0 16
+cfn=(834)
+calls=1 0 
+0 183
+0 6
+cfn=(834)
+calls=1 0 
+0 155
+0 6
+cfn=(834)
+calls=1 0 
+0 183
+0 9
+cfn=(834)
+calls=1 0 
+0 35
+0 2
+cfn=(2054) core::ptr::drop_in_place<litchi_pptx::notes::model::Theme>
+calls=1 0 
+0 639
+0 18
+
+fn=(820)
+0 33887
+cfn=(822) __rustc::__rdl_alloc
+calls=94337 0 
+0 3504622
+
+fn=(822)
+0 304983
+cob=(2)
+cfi=(155)
+cfn=(636)
+calls=94119 3283 
+0 3199639
+
+fn=(842) litchi_perf_baseline::run_pptx_owned_benchmark
+cfn=(844)
+calls=0 0 
+0 126635417
+
+fn=(888)
+0 85
+cfn=(890)
+calls=227 0 
+0 600
+0 164
+cfn=(890)
+calls=673 0 
+0 1884
+0 17244
+cfn=(890)
+calls=3169 0 
+0 120360
+0 34096
+cfn=(890)
+calls=10328 0 
+0 374477
+0 41111
+
+fn=(906)
+0 10030
+cfn=(908) <core::fmt::Formatter>::pad
+calls=6393 0 
+0 432564
+
+fn=(928)
+0 3838
+cfn=(930) <core::str::pattern::CharSearcher as core::str::pattern::ReverseSearcher>::next_match_back
+calls=1293 0 
+0 52315
+0 4040
+
+fn=(930)
+0 7676
+cfn=(932) core::slice::memchr::memrchr
+calls=11000 0 
+0 34135
+0 4040
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=11000 73 
+0 2020
+0 4444
+
+fn=(932)
+0 34257
+
+fn=(1012)
+0 68
+cfn=(818)
+calls=2 0 
+0 2
+0 6
+cfn=(820)
+calls=2 0 
+0 441
+0 44
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 106
+0 3838
+cfn=(922)
+calls=400 0 
+0 96214
+0 9708
+cfn=(818)
+calls=3 0 
+0 2
+0 6
+cfn=(820)
+calls=3 0 
+0 358
+0 44
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=3 255 
+0 106
+0 4216
+cfn=(922)
+calls=463 0 
+0 98298
+0 1768
+cfn=(1014) alloc::boxed::iter::<impl core::iter::traits::iterator::Iterator for alloc::boxed::Box<I,A>>::next
+calls=463 0 
+0 1926223
+0 10268
+cfn=(818)
+calls=2 0 
+0 2
+0 6
+cfn=(820)
+calls=2 0 
+0 300
+0 38
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 106
+0 4106
+cfn=(922)
+calls=430 0 
+0 95608
+0 8710
+cfn=(818)
+calls=3 0 
+0 2
+0 6
+cfn=(820)
+calls=3 0 
+0 173
+0 44
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=3 255 
+0 22
+0 270
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=9 255 
+0 180
+0 96
+cfn=(922)
+calls=9 0 
+0 1455
+0 24
+cfn=(922)
+calls=9 0 
+0 1455
+0 18
+cfn=(922)
+calls=9 0 
+0 850
+0 18
+cfn=(922)
+calls=9 0 
+0 1497
+0 18
+cfn=(922)
+calls=9 0 
+0 1461
+0 130
+cfn=(818)
+calls=2 0 
+0 2
+0 6
+cfn=(820)
+calls=2 0 
+0 310
+0 36
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 106
+0 19244
+cfn=(922)
+calls=442 0 
+0 98150
+0 4018
+
+fn=(1013) <hashbrown::raw::RawTable<T,A> as core::clone::Clone>::clone'2
+0 15204
+cfn=(818)
+calls=428 0 
+0 428
+0 1284
+cfn=(820)
+calls=428 0 
+0 76965
+0 9416
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=428 255 
+0 4794
+0 45030
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=858 255 
+0 25740
+0 13938
+cfn=(922)
+calls=858 0 
+0 185803
+0 3432
+cfn=(922)
+calls=858 0 
+0 185379
+0 2574
+cfn=(922)
+calls=858 0 
+0 200099
+0 2574
+cfn=(922)
+calls=858 0 
+0 189621
+0 2574
+cfn=(922)
+calls=858 0 
+0 189721
+0 6864
+cfn=(922)
+calls=858 0 
+0 191426
+0 9530
+
+fn=(1036)
+0 15888
+cfn=(1744)
+calls=4204 0 
+0 7944
+
+fn=(1142)
+0 324
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=18 73 
+0 401
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=18 73 
+0 407
+0 522
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=18 73 
+0 404
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=18 73 
+0 397
+0 450
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=18 73 
+0 408
+0 1440
+cfn=(1036)
+calls=36 0 
+0 216
+0 144
+cfn=(1036)
+calls=36 0 
+0 216
+0 288
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=36 73 
+0 817
+0 288
+cfn=(1036)
+calls=36 0 
+0 216
+0 144
+cfn=(1036)
+calls=36 0 
+0 216
+0 288
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=36 73 
+0 784
+0 720
+cfn=(1036)
+calls=36 0 
+0 216
+0 144
+cfn=(1036)
+calls=36 0 
+0 216
+0 252
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=36 73 
+0 817
+0 216
+cfn=(1036)
+calls=36 0 
+0 216
+0 180
+cfn=(1036)
+calls=36 0 
+0 216
+0 252
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=36 73 
+0 848
+0 648
+cfn=(1036)
+calls=36 0 
+0 216
+0 144
+cfn=(1036)
+calls=36 0 
+0 216
+0 252
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=36 73 
+0 800
+0 900
+
+fn=(1152)
+0 4286259
+
+fn=(1178) memchr::arch::x86_64::avx2::memchr::One::find_raw
+0 2120528
+cfn=(1180)
+calls=4726 0 
+0 220171
+0 216498
+
+fn=(1592)
+0 8498
+cfn=(996)
+calls=826 0 
+0 82545
+0 7284
+cfn=(914)
+calls=826 0 
+0 68883
+0 42490
+cfn=(914)
+calls=826 0 
+0 263932
+0 5463
+cfn=(914)
+calls=826 0 
+0 343665
+0 1821
+
+fn=(1604)
+0 2148696
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=70933 73 
+0 703179
+0 1274557
+
+fn=(1672)
+0 22066
+cfn=(884)
+calls=1635 0 
+0 52520
+0 215370
+cfn=(890)
+calls=1639 0 
+0 150445
+0 63182
+cfn=(898) alloc::fmt::format::format_inner
+calls=1632 0 
+0 724238
+0 3
+cfn=(898)
+calls=7 0 
+0 591
+0 51159
+cfn=(890)
+calls=6995 0 
+0 495133
+0 65216
+cfn=(996)
+calls=1639 0 
+0 105315
+0 44134
+cfn=(1674) alloc::str::join_generic_copy
+calls=1639 0 
+0 391405
+0 11033
+cfn=(834)
+calls=1639 0 
+0 35105
+0 8024
+cfn=(880)
+calls=1639 0 
+0 2455582
+0 6018
+cfn=(834)
+calls=1639 0 
+0 59842
+0 1003
+
+fn=(1742)
+0 3304
+
+fn=(1756)
+0 10413
+cfn=(972) litchi_opc::rel::relationship_target_components
+calls=1005 0 
+0 128656
+0 6408
+cfn=(1672)
+calls=1005 0 
+0 3973276
+0 12015
+
+fn=(1764)
+0 12
+cfn=(1762)
+calls=5 0 
+0 30
+0 12
+cfn=(1766) litchi_ooxml_common::mce::codec::process_ooxml
+calls=5 0 
+0 5169
+
+fn=(1772)
+0 31642
+cfn=(1600)
+calls=614 0 
+0 1603065
+0 23348
+cfn=(1600)
+calls=615 0 
+0 204478
+0 9410
+
+fn=(1804) <str>::to_ascii_lowercase
+0 4800
+cfn=(818)
+calls=600 0 
+0 400
+0 1600
+cfn=(820)
+calls=600 0 
+0 36646
+0 2800
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=600 255 
+0 4400
+0 36904
+
+fn=(1926)
+0 15
+cfn=(1928) litchi_pptx::parts::presentation::PresentationPart::slide_references
+calls=1 0 
+0 2770237
+0 27
+cfn=(1930) std::sync::once_lock::OnceLock<T>::initialize
+calls=1 0 
+0 114
+0 1
+
+fn=(1928)
+0 12
+cfn=(1780) litchi_pptx::parts::presentation::PresentationPart::slide_references_with_tolerance
+calls=1 0 
+0 2770209
+0 16
+
+fn=(1964)
+0 12
+cfn=(868) core::ops::function::FnOnce::call_once
+calls=3 0 
+0 24
+0 27
+
+fn=(1992) hashbrown::raw::RawIterRange<T>::fold_impl
+0 70
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=14 73 
+0 302
+0 1290
+cfn=(1814) litchi_opc::part::PartMetadata::content_type
+calls=15 0 
+0 105
+0 2266
+cfn=(1814)
+calls=206 0 
+0 1442
+0 865
+
+fn=(2040) litchi_pptx::opened::model::PartDigests::insert
+0 9282
+cfn=(986)
+calls=442 0 
+0 130798
+0 5304
+
+fn=(2054)
+0 12
+cfn=(834)
+calls=1 0 
+0 200
+0 6
+cfn=(834)
+calls=1 0 
+0 205
+0 6
+cfn=(834)
+calls=1 0 
+0 35
+0 6
+cfn=(834)
+calls=1 0 
+0 156
+0 13
+
+fn=(2060) litchi_pptx::package::model::Package::memo_for
+0 7
+cfn=(2062) litchi_pptx::opened::model::PartDigests::project
+calls=1 0 
+0 223730
+0 21
+cfn=(818)
+calls=1 0 
+0 1
+0 3
+cfn=(820)
+calls=1 0 
+0 301
+0 14
+
+fn=(2050) core::ptr::drop_in_place<litchi_pptx::notes::transaction::PartState>
+0 36
+cfn=(834)
+calls=3 0 
+0 345
+0 18
+cfn=(834)
+calls=3 0 
+0 373
+0 1880
+cfn=(834)
+calls=206 0 
+0 36562
+0 1236
+cfn=(834)
+calls=206 0 
+0 36684
+0 1236
+cfn=(834)
+calls=206 0 
+0 36335
+0 235
+cfn=(834)
+calls=2 0 
+0 219
+0 6
+
+fn=(862)
+cfn=(1920) litchi_pptx::package::model::Package::opened_presentation_transaction
+calls=1 0 
+0 126635417
+
+fn=(898)
+0 109318
+cfn=(900) core::fmt::write
+calls=2511 0 
+0 600466
+0 15045
+
+fn=(942) <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+0 9647
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 29
+0 3
+cfn=(818)
+calls=1 0 
+0 1
+0 3
+cfn=(820)
+calls=1 0 
+0 40
+0 71
+cfn=(2002)
+calls=1 0 
+0 252
+0 40
+cfn=(818)
+calls=1 0 
+0 1
+0 3
+cfn=(820)
+calls=1 0 
+0 40
+0 2161
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 29
+0 241
+cfn=(818)
+calls=1 0 
+0 1
+0 3
+cfn=(820)
+calls=1 0 
+0 40
+0 1344
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 68
+0 192
+
+fn=(958)
+0 33
+cfn=(1294) hashbrown::raw::RawTableInner::fallible_with_capacity
+calls=1 0 
+0 271
+0 104
+cfn=(1294)
+calls=2 0 
+0 1796
+0 790
+cfn=(1294)
+calls=28 0 
+0 3614
+0 7245
+cfn=(954)
+calls=880 0 
+0 75240
+0 19086
+cfn=(834)
+calls=24 0 
+0 750
+0 479
+cfn=(818)
+calls=7 0 
+0 7
+0 21
+cfn=(820)
+calls=7 0 
+0 1070
+0 133
+cob=(2)
+cfi=(218)
+cfn=(786)
+calls=7 198 
+0 127
+0 2646
+cfn=(954)
+calls=220 0 
+0 53762
+0 7402
+cfn=(834)
+calls=6 0 
+0 424
+0 1218
+cfn=(1294)
+calls=280 0 
+0 8179
+0 14510
+cfn=(954)
+calls=2214 0 
+0 213802
+0 37010
+cfn=(834)
+calls=57 0 
+0 2206
+0 350
+
+fn=(988)
+0 17776
+cfn=(818)
+calls=821 0 
+0 808
+0 13736
+cfn=(820)
+calls=821 0 
+0 143584
+0 1616
+
+fn=(1010)
+0 13
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 30
+0 3
+cfn=(922)
+calls=2 0 
+0 216
+0 10
+cfn=(1012)
+calls=2 0 
+0 3625
+0 30
+cfn=(1012)
+calls=2 0 
+0 1014515
+0 13
+cfn=(1012)
+calls=2 0 
+0 60966
+0 16
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 30
+0 9
+cfn=(1012)
+calls=2 0 
+0 54501
+0 34
+cfn=(1006)
+calls=2 0 
+0 38
+0 3
+cfn=(1006)
+calls=2 0 
+0 32
+0 13
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 30
+0 34
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=2 255 
+0 30
+0 45
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 3
+cfn=(922)
+calls=1 0 
+0 236
+0 10
+cfn=(1012)
+calls=1 0 
+0 4104
+0 30
+cfn=(1012)
+calls=1 0 
+0 1026780
+0 13
+cfn=(1012)
+calls=1 0 
+0 60966
+0 16
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 9
+cfn=(1012)
+calls=1 0 
+0 54367
+0 34
+cfn=(1006)
+calls=1 0 
+0 38
+0 3
+cfn=(1006)
+calls=1 0 
+0 32
+0 13
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 34
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 32
+
+fn=(1160)
+0 1260635
+cfn=(1168) memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+calls=49366 0 
+0 2550671
+0 1282295
+cfn=(1176)
+calls=610 0 
+0 45518
+0 15175
+cfn=(1182) quick_xml::reader::state::ReaderState::emit_question_mark
+calls=610 0 
+0 18210
+0 2667
+cfn=(1224) quick_xml::reader::state::ReaderState::emit_text
+calls=208 0 
+0 1648
+0 24517
+cfn=(1224)
+calls=1607 0 
+0 12856
+0 131073
+cfn=(1196) memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+calls=15635 0 
+0 949755
+0 605370
+cfn=(1196)
+calls=32913 0 
+0 1961820
+0 453676
+cfn=(1196)
+calls=19633 0 
+0 1152600
+0 172890
+cfn=(1196)
+calls=19633 0 
+0 1220677
+0 1272046
+cfn=(1220) quick_xml::reader::state::ReaderState::emit_end
+calls=15635 0 
+0 1588532
+0 490226
+cfn=(1202) quick_xml::reader::state::ReaderState::emit_start
+calls=32913 0 
+0 3928099
+0 701969
+
+fn=(1970) litchi_pptx::notes::package::load_index_with_slide_root_proofs
+0 13
+cfn=(1024)
+calls=1 0 
+0 328
+0 9
+cfn=(1736)
+calls=1 0 
+0 3
+0 19
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 29
+0 6
+cfn=(1762)
+calls=1 0 
+0 10
+0 6
+cfn=(1972) litchi_pptx::notes::codec::root_conformance
+calls=1 0 
+0 938538
+0 7
+cfn=(1762)
+calls=1 0 
+0 10
+0 9
+cfn=(1974) litchi_pptx::notes::codec::scan_xml
+calls=1 0 
+0 862737
+0 43
+cfn=(988)
+calls=1 0 
+0 348
+0 34
+cfn=(1978)
+calls=1 0 
+0 54
+0 1194
+cfn=(1978)
+calls=199 0 
+0 12832
+0 1200
+cfn=(1742)
+calls=200 0 
+0 400
+0 2800
+cfn=(954)
+calls=200 0 
+0 31660
+0 6839
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=201 73 
+0 3862
+0 1835
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 5800
+0 1200
+cfn=(1744)
+calls=200 0 
+0 400
+0 400
+cfn=(928)
+calls=200 0 
+0 59600
+0 1000
+cfn=(1672)
+calls=200 0 
+0 972117
+0 2800
+cfn=(1024)
+calls=200 0 
+0 70959
+0 1400
+cfn=(1736)
+calls=200 0 
+0 600
+0 1200
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 5800
+0 1400
+cfn=(1762)
+calls=200 0 
+0 2000
+0 2000
+cfn=(1980) litchi_pptx::notes::package::resolve_slide_root
+calls=200 0 
+0 2800
+0 2000
+cfn=(922)
+calls=200 0 
+0 17000
+0 400
+cfn=(1744)
+calls=200 0 
+0 400
+0 600
+cfn=(922)
+calls=200 0 
+0 46067
+0 5800
+cfn=(834)
+calls=200 0 
+0 7000
+0 1603
+cfn=(1742)
+calls=1 0 
+0 2
+0 17
+cfn=(942)
+calls=1 0 
+0 4049
+0 10
+cfn=(1978)
+calls=1 0 
+0 179
+0 6
+cfn=(1742)
+calls=1 0 
+0 2
+0 5
+cfn=(1802)
+calls=1 0 
+0 307
+0 17
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 29
+0 12
+cfn=(834)
+calls=1 0 
+0 35
+0 2
+cfn=(1994)
+calls=1 0 
+0 72303
+0 2
+cfn=(1962)
+calls=1 0 
+0 76046
+0 5
+cfn=(1982)
+calls=1 0 
+0 6316
+0 15
+cfn=(1984) litchi_pptx::notes::package::validate_leaf_path
+calls=1 0 
+0 272
+0 6
+cfn=(1024)
+calls=1 0 
+0 365
+0 9
+cfn=(1744)
+calls=1 0 
+0 2
+0 3
+cfn=(922)
+calls=1 0 
+0 86
+0 16
+cfn=(1986) litchi_pptx::notes::package::require_content_type
+calls=1 0 
+0 59
+0 6
+cfn=(1762)
+calls=1 0 
+0 10
+0 9
+cfn=(1988) litchi_pptx::notes::codec::validate_resource_xml
+calls=1 0 
+0 679512
+0 5
+cfn=(1742)
+calls=1 0 
+0 2
+0 19
+cfn=(942)
+calls=1 0 
+0 149
+0 12
+cfn=(1978)
+calls=1 0 
+0 54
+0 16
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 29
+0 10
+cfn=(834)
+calls=1 0 
+0 35
+0 2
+cfn=(834)
+calls=1 0 
+0 35
+0 3
+cfn=(1742)
+calls=1 0 
+0 2
+0 17
+cfn=(1132)
+calls=1 0 
+0 20
+0 2
+cfn=(1132)
+calls=1 0 
+0 5
+0 12
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1 73 
+0 19
+0 7
+cfn=(1982)
+calls=1 0 
+0 6330
+0 15
+cfn=(1984)
+calls=1 0 
+0 209
+0 6
+cfn=(1024)
+calls=1 0 
+0 343
+0 9
+cfn=(1744)
+calls=1 0 
+0 2
+0 3
+cfn=(922)
+calls=1 0 
+0 314
+0 16
+cfn=(1986)
+calls=1 0 
+0 47
+0 5
+cfn=(1762)
+calls=1 0 
+0 10
+0 9
+cfn=(1988)
+calls=1 0 
+0 645329
+0 4
+cfn=(1742)
+calls=1 0 
+0 2
+0 18
+cfn=(1132)
+calls=1 0 
+0 5
+0 4
+cfn=(1762)
+calls=1 0 
+0 10
+0 3
+cfn=(1762)
+calls=1 0 
+0 10
+0 3
+cfn=(1990) litchi_pptx::notes::checked_add
+calls=1 0 
+0 12
+0 2034
+cfn=(1024)
+calls=200 0 
+0 70947
+0 1600
+cfn=(1742)
+calls=200 0 
+0 400
+0 3400
+cfn=(942)
+calls=200 0 
+0 9600
+0 1603
+cfn=(1034) litchi_opc::package::OpcPackage::iter_parts
+calls=1 0 
+0 16
+0 11
+cfn=(1992)
+calls=1 0 
+0 6340
+0 5
+cfn=(1034)
+calls=1 0 
+0 16
+0 9
+cfn=(886)
+calls=1 0 
+0 6792
+0 5
+cfn=(922)
+calls=1 0 
+0 229
+0 2
+cfn=(1736)
+calls=1 0 
+0 3
+0 8
+cfn=(988)
+calls=1 0 
+0 82
+0 11
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 22
+0 6
+cfn=(988)
+calls=1 0 
+0 213
+0 13
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 15
+0 2
+cfn=(1736)
+calls=1 0 
+0 3
+0 8
+cfn=(988)
+calls=1 0 
+0 82
+0 10
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 12
+0 37
+cfn=(1860) <alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 50
+0 6
+cfn=(834)
+calls=1 0 
+0 35
+0 7
+
+fn=(1758)
+0 14742
+
+fn=(1940)
+0 2800
+cfn=(1736)
+calls=200 0 
+0 600
+0 1200
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 5800
+0 2600
+
+fn=(1942)
+0 2600
+cfn=(1762)
+calls=200 0 
+0 2000
+0 800
+cfn=(1762)
+calls=200 0 
+0 2000
+0 2000
+cfn=(1766)
+calls=200 0 
+0 430600
+0 6000
+
+fn=(1950) litchi_pptx::notes::codec::root_conformance_from_processed
+0 4800
+cfn=(1952)
+calls=200 0 
+0 55896551
+0 1200
+cfn=(1962)
+calls=200 0 
+0 6600
+0 1800
+
+fn=(1956)
+0 1292847
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=13480 73 
+0 229160
+0 55803
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=18601 73 
+0 321065
+0 64166
+cfn=(1152)
+calls=1 0 
+0 142
+0 496635
+
+fn=(2000) litchi_pptx::notes::package::relationship_links
+0 38
+cfn=(942)
+calls=2 0 
+0 411
+0 26
+
+fn=(2026) litchi_pptx::opened::model::feed
+0 43863
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=191 255 
+0 3043
+0 955
+cfn=(2030) sha2::sha256::compress256
+calls=191 0 
+0 645198
+0 1719
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=191 255 
+0 2919
+0 20251
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1126 255 
+0 13857
+0 20205
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1277 255 
+0 15434
+0 6385
+cfn=(2030)
+calls=1277 0 
+0 4313749
+0 15101
+cfn=(2030)
+calls=259 0 
+0 40685638
+0 15348
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1279 255 
+0 16313
+
+fn=(2028) litchi_pptx::opened::model::feed_relationships
+0 10329
+cfn=(2026)
+calls=432 0 
+0 532119
+0 1728
+cfn=(2026)
+calls=432 0 
+0 2048700
+0 1728
+cfn=(2026)
+calls=432 0 
+0 370374
+0 2675
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=103 255 
+0 1648
+0 515
+cfn=(2030)
+calls=103 0 
+0 347934
+0 2838
+
+fn=(2042)
+0 27
+
+fn=(2048)
+0 12
+cfn=(834)
+calls=1 0 
+0 35
+0 6
+cfn=(834)
+calls=1 0 
+0 35
+0 6
+cfn=(834)
+calls=1 0 
+0 35
+0 1855
+cfn=(834)
+calls=205 0 
+0 33912
+0 1230
+cfn=(834)
+calls=205 0 
+0 34471
+0 1230
+cfn=(834)
+calls=205 0 
+0 36907
+0 213
+cfn=(834)
+calls=1 0 
+0 153
+0 21
+cfn=(2050)
+calls=3 0 
+0 115165
+0 14
+cfn=(834)
+calls=1 0 
+0 35
+0 8
+cfn=(2052)
+calls=1 0 
+0 1785
+
+fn=(830) pptx_owned_benchmark::main
+cfn=(842)
+calls=0 0 
+0 126635417
+
+fn=(834)
+0 23134
+cfn=(836)
+calls=69581 0 
+0 1689919
+
+fn=(894)
+0 415708
+
+fn=(1034)
+0 64
+
+fn=(1040)
+0 40140
+cfn=(1042)
+calls=5880 0 
+0 228380
+0 20070
+
+fn=(1198) memchr::arch::x86_64::avx2::memchr::Three::find_raw
+0 796595
+cfn=(1200)
+calls=183764 0 
+0 1708480
+0 177457
+
+fn=(1224)
+0 14504
+
+fn=(1968)
+0 15
+cfn=(1970)
+calls=1 0 
+0 4673692
+0 41
+cfn=(1996) litchi_pptx::notes::package::snapshot_from_index
+calls=1 0 
+0 922786
+0 7
+
+fn=(1980)
+0 2800
+
+fn=(1674)
+0 58168
+cfn=(818)
+calls=1639 0 
+0 1003
+0 4012
+cfn=(820)
+calls=1639 0 
+0 178814
+0 75211
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=4906 255 
+0 46117
+0 28080
+
+fn=(1744)
+0 9606
+
+fn=(1788)
+0 8800
+cfn=(1790)
+calls=600 0 
+0 552530
+0 7200
+cfn=(1796)
+calls=600 0 
+0 742471
+0 6000
+cfn=(834)
+calls=600 0 
+0 14000
+0 8000
+cfn=(1800) litchi_pptx::parts::parse_u32
+calls=600 0 
+0 22000
+0 4000
+cfn=(1742)
+calls=600 0 
+0 800
+0 2000
+cfn=(1802)
+calls=600 0 
+0 96509
+0 3600
+cfn=(1648)
+calls=600 0 
+0 61019
+0 2800
+cfn=(1648)
+calls=600 0 
+0 84143
+0 2000
+cfn=(1756)
+calls=600 0 
+0 2083076
+0 4400
+cfn=(1804)
+calls=600 0 
+0 87550
+0 4000
+cfn=(834)
+calls=600 0 
+0 32240
+0 4400
+cfn=(1648)
+calls=600 0 
+0 114980
+0 4000
+cfn=(986)
+calls=600 0 
+0 72861
+0 3200
+cfn=(922)
+calls=600 0 
+0 53635
+0 2000
+cfn=(986)
+calls=600 0 
+0 99901
+0 6000
+cfn=(986)
+calls=600 0 
+0 131024
+0 2800
+cfn=(1266) alloc::raw_vec::RawVecInner<A>::try_reserve
+calls=600 0 
+0 13910
+0 5200
+cfn=(1676)
+calls=600 0 
+0 8400
+0 884
+cfn=(958)
+calls=21 0 
+0 70860
+0 154
+cfn=(958)
+calls=21 0 
+0 96342
+0 98
+cfn=(958)
+calls=21 0 
+0 132906
+0 70
+
+fn=(1800)
+0 22000
+
+fn=(1814)
+0 1768
+cfn=(1736)
+calls=885 0 
+0 1326
+
+fn=(1932) <std::sys::sync::once::futex::Once>::call
+0 72
+cfn=(1934)
+calls=1 0 
+0 14
+cfn=(1934)
+calls=1 0 
+0 16
+0 24
+
+fn=(1966)
+0 2600
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 5800
+0 1600
+
+fn=(1988)
+0 18
+cfn=(1974)
+calls=2 0 
+0 1324693
+0 56
+cfn=(1962)
+calls=2 0 
+0 66
+0 8
+
+fn=(1990)
+0 12
+
+fn=(1996)
+0 19
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 4
+cfn=(1998) litchi_pptx::notes::package::materialize
+calls=1 0 
+0 5180
+0 17
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 15
+cfn=(1024)
+calls=1 0 
+0 328
+0 12
+cfn=(2004)
+calls=1 0 
+0 246454
+0 1
+cfn=(818)
+calls=1 0 
+0 1
+0 3
+cfn=(820)
+calls=1 0 
+0 182
+0 6
+cfn=(922)
+calls=1 0 
+0 227
+0 4
+cfn=(922)
+calls=1 0 
+0 238
+0 8
+cfn=(2008)
+calls=1 0 
+0 149478
+0 31
+cfn=(880)
+calls=1 0 
+0 3199
+0 15
+cfn=(1024)
+calls=1 0 
+0 365
+0 7
+cfn=(2004)
+calls=1 0 
+0 1289
+0 5
+cfn=(996)
+calls=1 0 
+0 489
+0 21
+cfn=(834)
+calls=1 0 
+0 35
+0 4
+cfn=(880)
+calls=1 0 
+0 2583
+0 14
+cfn=(1024)
+calls=1 0 
+0 343
+0 7
+cfn=(2004)
+calls=1 0 
+0 473
+0 3
+cfn=(1676)
+calls=1 0 
+0 27
+0 6
+cfn=(834)
+calls=1 0 
+0 35
+0 13
+cfn=(1744)
+calls=1 0 
+0 2
+0 3
+cfn=(922)
+calls=1 0 
+0 85
+0 23
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 53
+0 6
+cfn=(2010)
+calls=1 0 
+0 511341
+0 6
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 65
+0 1
+
+fn=(2022)
+0 20
+cfn=(1034)
+calls=1 0 
+0 16
+0 5219
+cfn=(2026)
+calls=1 0 
+0 50
+0 12
+cfn=(2028)
+calls=1 0 
+0 21002
+0 9
+cfn=(834)
+calls=1 0 
+0 35
+0 14
+cfn=(2026)
+calls=1 0 
+0 3468
+0 5
+cfn=(2026)
+calls=1 0 
+0 54
+0 16
+cfn=(2026)
+calls=1 0 
+0 54
+0 4017
+cfn=(1036)
+calls=221 0 
+0 1326
+0 884
+cfn=(1024)
+calls=221 0 
+0 78314
+0 1768
+cfn=(2006)
+calls=221 0 
+0 2652
+0 884
+cfn=(1762)
+calls=221 0 
+0 2210
+0 3978
+cfn=(2026)
+calls=221 0 
+0 11050
+0 442
+cfn=(1744)
+calls=221 0 
+0 442
+0 884
+cfn=(2026)
+calls=221 0 
+0 738368
+0 442
+cfn=(1736)
+calls=221 0 
+0 663
+0 663
+cfn=(2026)
+calls=221 0 
+0 782067
+0 2684
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=16 255 
+0 208
+0 96
+cfn=(2030)
+calls=16 0 
+0 54048
+0 176
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=16 255 
+0 208
+0 176
+cfn=(1742)
+calls=16 0 
+0 32
+0 1640
+cfn=(1742)
+calls=205 0 
+0 410
+0 1326
+cfn=(1742)
+calls=221 0 
+0 442
+0 12158
+cfn=(2028)
+calls=7 0 
+0 245
+0 856
+cfn=(2028)
+calls=214 0 
+0 3299341
+0 4641
+cfn=(2036) digest::FixedOutput::finalize_fixed
+calls=221 0 
+0 1115178
+0 3280
+cfn=(834)
+calls=214 0 
+0 7582
+0 4527
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=111 255 
+0 1332
+0 666
+cfn=(2030)
+calls=111 0 
+0 374958
+0 1221
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=111 255 
+0 1443
+0 3601
+cfn=(916)
+calls=214 0 
+0 16728
+0 3936
+cfn=(2026)
+calls=221 0 
+0 11050
+0 884
+cfn=(2026)
+calls=221 0 
+0 41322624
+0 3757
+cfn=(2036)
+calls=221 0 
+0 782064
+0 1547
+cfn=(2040)
+calls=221 0 
+0 72700
+0 894
+cfn=(1242)
+calls=1 0 
+0 1361
+0 7
+cfn=(1060)
+calls=1 0 
+0 75621
+0 9
+cfn=(834)
+calls=1 0 
+0 131
+0 17
+cfn=(2036)
+calls=1 0 
+0 3508
+0 31
+cfn=(916)
+calls=1 0 
+0 191
+0 9
+cfn=(916)
+calls=1 0 
+0 218
+0 89
+cfn=(958)
+calls=1 0 
+0 347
+0 19
+cfn=(1242)
+calls=1 0 
+0 166
+0 6
+cfn=(1060)
+calls=1 0 
+0 121412
+0 2
+
+fn=(2030)
+0 15012
+cfn=(2034)
+calls=2501 0 
+0 48244108
+0 7
+cfn=(2032) sha2::sha256::shani_cpuid::init_get::init_inner
+calls=1 0 
+0 27
+0 9
+cfn=(2034)
+calls=1 0 
+0 3372
+
+fn=(2032)
+0 27
+
+fn=(2062)
+0 40
+cfn=(1034)
+calls=1 0 
+0 16
+0 3657
+cfn=(1036)
+calls=221 0 
+0 1326
+0 884
+cfn=(1024)
+calls=221 0 
+0 78452
+0 1768
+cfn=(2006)
+calls=221 0 
+0 2652
+0 884
+cfn=(1762)
+calls=221 0 
+0 2210
+0 2652
+cfn=(954)
+calls=221 0 
+0 46189
+0 8251
+cfn=(2040)
+calls=221 0 
+0 72684
+0 464
+cfn=(958)
+calls=1 0 
+0 1591
+0 10
+
+fn=(886)
+0 3366
+cfn=(1814)
+calls=15 0 
+0 105
+0 3296
+cfn=(1814)
+calls=206 0 
+0 1442
+0 547
+cfn=(890)
+calls=227 0 
+0 600
+0 355632
+cfn=(890)
+calls=3169 0 
+0 120360
+0 10030
+
+fn=(922)
+0 140256
+cfn=(818)
+calls=19449 0 
+0 11688
+0 35064
+cfn=(820)
+calls=19449 0 
+0 1944697
+0 81816
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=19449 255 
+0 162434
+0 128568
+
+fn=(972)
+0 16821
+cfn=(884)
+calls=2296 0 
+0 41900
+0 12015
+cfn=(884)
+calls=2296 0 
+0 41900
+0 16020
+
+fn=(1006)
+0 38
+cfn=(818)
+calls=2 0 
+0 2
+0 8
+cfn=(820)
+calls=2 0 
+0 485
+0 3228
+cfn=(922)
+calls=400 0 
+0 80861
+0 1200
+cfn=(922)
+calls=400 0 
+0 82553
+0 3600
+cfn=(922)
+calls=400 0 
+0 83797
+0 11372
+
+fn=(1014)
+0 1768
+cfn=(1016) <T as litchi_opc::part::PartClone>::clone_part
+calls=442 0 
+0 1924455
+
+fn=(1016)
+0 2210
+cfn=(2020) <litchi_opc::part::XmlPart as core::clone::Clone>::clone
+calls=442 0 
+0 1812259
+0 442
+cfn=(818)
+calls=442 0 
+0 442
+0 1326
+cfn=(820)
+calls=442 0 
+0 79096
+0 3094
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=442 255 
+0 23376
+0 2210
+
+fn=(1062)
+0 14
+cfn=(1140)
+calls=1 0 
+0 6302
+0 49
+cfn=(1036)
+calls=2 0 
+0 12
+0 10
+cfn=(1036)
+calls=2 0 
+0 12
+0 16
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 10
+cfn=(1036)
+calls=2 0 
+0 12
+0 10
+cfn=(1036)
+calls=2 0 
+0 12
+0 16
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 52
+0 24
+cfn=(1036)
+calls=2 0 
+0 12
+0 8
+cfn=(1036)
+calls=2 0 
+0 12
+0 14
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 21
+cfn=(1066) core::slice::sort::shared::pivot::median3_rec
+calls=1 0 
+0 653
+0 28
+cfn=(1036)
+calls=2 0 
+0 12
+0 8
+cfn=(1036)
+calls=2 0 
+0 12
+0 18
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 52
+0 93
+cfn=(1036)
+calls=3 0 
+0 18
+0 760
+cfn=(1036)
+calls=152 0 
+0 912
+0 775
+cfn=(1036)
+calls=155 0 
+0 930
+0 1085
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=155 73 
+0 3724
+0 2015
+cfn=(1036)
+calls=155 0 
+0 930
+0 775
+cfn=(1036)
+calls=155 0 
+0 930
+0 1705
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=155 73 
+0 3748
+0 2984
+cfn=(1036)
+calls=3 0 
+0 18
+0 14
+cfn=(1036)
+calls=2 0 
+0 12
+0 20
+cfn=(1036)
+calls=5 0 
+0 30
+0 35
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 118
+0 167
+cfn=(1063) core::slice::sort::unstable::quicksort::quicksort'2
+calls=3 0 
+0 91831
+0 45
+cfn=(1140)
+calls=1 0 
+0 6806
+0 94
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 28
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 30
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 22
+cfn=(1066)
+calls=2 0 
+0 992
+0 50
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 4495
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=424 73 
+0 9742
+0 24
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 95
+0 15036
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 88
+0 320
+cfn=(1063)
+calls=4 0 
+0 62682
+0 32
+cfn=(1064) core::slice::sort::shared::smallsort::small_sort_network
+calls=1 0 
+0 5012
+0 88
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 51
+0 34
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 30
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 22
+cfn=(1066)
+calls=2 0 
+0 1016
+0 65
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 80
+0 124
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 95
+0 1872
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=208 73 
+0 4906
+0 3816
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=212 73 
+0 5044
+0 3244
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 95
+0 24
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 95
+0 200
+cfn=(1063)
+calls=4 0 
+0 49432
+0 35
+cfn=(1140)
+calls=1 0 
+0 3252
+0 183
+cfn=(1066)
+calls=3 0 
+0 676
+0 15521
+cfn=(1063)
+calls=6 0 
+0 17613
+0 19
+
+fn=(1063)
+0 140
+cfn=(1140)
+calls=10 0 
+0 54103
+0 122
+cfn=(1036)
+calls=3 0 
+0 18
+0 15
+cfn=(1036)
+calls=3 0 
+0 18
+0 24
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 15
+cfn=(1036)
+calls=3 0 
+0 18
+0 15
+cfn=(1036)
+calls=3 0 
+0 18
+0 24
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 33
+cfn=(1036)
+calls=2 0 
+0 12
+0 8
+cfn=(1036)
+calls=2 0 
+0 12
+0 14
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 30
+cfn=(1066)
+calls=4 0 
+0 2911
+0 68
+cfn=(1036)
+calls=5 0 
+0 30
+0 20
+cfn=(1036)
+calls=5 0 
+0 30
+0 45
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 118
+0 219
+cfn=(1036)
+calls=7 0 
+0 42
+0 1175
+cfn=(1036)
+calls=235 0 
+0 1410
+0 1210
+cfn=(1036)
+calls=242 0 
+0 1452
+0 1694
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=242 73 
+0 5526
+0 3146
+cfn=(1036)
+calls=242 0 
+0 1452
+0 1210
+cfn=(1036)
+calls=242 0 
+0 1452
+0 2662
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=242 73 
+0 5585
+0 4689
+cfn=(1036)
+calls=7 0 
+0 42
+0 14
+cfn=(1036)
+calls=2 0 
+0 12
+0 36
+cfn=(1036)
+calls=9 0 
+0 54
+0 63
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 339
+cfn=(1063)
+calls=7 0 
+0 96934
+0 328
+cfn=(1140)
+calls=9 0 
+0 40635
+0 131
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 42
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 37
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 22
+cfn=(1066)
+calls=2 0 
+0 988
+0 48
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 3150
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=284 73 
+0 6341
+0 30
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 117
+0 10185
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 400
+cfn=(1063)
+calls=5 0 
+0 57082
+0 226
+cfn=(1064)
+calls=9 0 
+0 34536
+0 117
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 66
+0 51
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 73
+0 37
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 22
+cfn=(1066)
+calls=2 0 
+0 990
+0 61
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 148
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 117
+0 1242
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=138 73 
+0 3166
+0 2574
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=143 73 
+0 3272
+0 2209
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 80
+0 30
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 212
+cfn=(1063)
+calls=5 0 
+0 44743
+0 268
+cfn=(1140)
+calls=11 0 
+0 9950
+0 173
+cfn=(1066)
+calls=2 0 
+0 454
+0 6764
+cfn=(1063)
+calls=5 0 
+0 15431
+0 19
+
+fn=(1064)
+0 432
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 216
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 225
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 225
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 216
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 207
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 180
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 202
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 226
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 192
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 207
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 207
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 206
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 209
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 209
+0 180
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 209
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 195
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 192
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 216
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 195
+0 207
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 202
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 203
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 195
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 205
+0 207
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 216
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 202
+0 180
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 198
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 202
+0 180
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 195
+0 207
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 210
+0 171
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 212
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 180
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 192
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 192
+0 189
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 192
+0 171
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 214
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 101
+0 105
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 124
+0 105
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 117
+0 95
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 115
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 104
+0 90
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 115
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 109
+0 100
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 80
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 117
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 115
+0 80
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 107
+0 80
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 107
+0 90
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 109
+0 95
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 124
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 80
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 117
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 85
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 107
+0 80
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 110
+0 90
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 114
+0 105
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 107
+0 95
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 104
+0 951
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=33 73 
+0 765
+0 2267
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=178 73 
+0 4144
+0 1231
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 136
+0 840
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=60 73 
+0 1362
+0 1560
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=65 73 
+0 1421
+0 1312
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=5 255 
+0 150
+0 110
+
+fn=(1066)
+0 80
+cfn=(1067) core::slice::sort::shared::pivot::median3_rec'2
+calls=4 0 
+0 470
+0 24
+cfn=(1067)
+calls=4 0 
+0 547
+0 32
+cfn=(1067)
+calls=4 0 
+0 405
+0 76
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 95
+0 56
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 88
+0 38
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 51
+0 124
+cfn=(1067)
+calls=4 0 
+0 483
+0 24
+cfn=(1067)
+calls=4 0 
+0 532
+0 32
+cfn=(1067)
+calls=4 0 
+0 396
+0 68
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 95
+0 56
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 88
+0 38
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 139
+cfn=(1067)
+calls=5 0 
+0 250
+0 30
+cfn=(1067)
+calls=5 0 
+0 250
+0 40
+cfn=(1067)
+calls=5 0 
+0 260
+0 310
+cfn=(1067)
+calls=5 0 
+0 850
+0 30
+cfn=(1067)
+calls=5 0 
+0 905
+0 40
+cfn=(1067)
+calls=5 0 
+0 819
+0 25
+cfn=(1036)
+calls=5 0 
+0 30
+0 20
+cfn=(1036)
+calls=5 0 
+0 30
+0 35
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 119
+0 25
+cfn=(1036)
+calls=5 0 
+0 30
+0 20
+cfn=(1036)
+calls=5 0 
+0 30
+0 35
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=5 73 
+0 126
+0 41
+cfn=(1036)
+calls=4 0 
+0 24
+0 20
+cfn=(1036)
+calls=4 0 
+0 24
+0 28
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=4 73 
+0 88
+0 65
+
+fn=(1067)
+0 336
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=12 73 
+0 269
+0 168
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=12 73 
+0 271
+0 114
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=6 73 
+0 132
+0 444
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=12 73 
+0 261
+0 168
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=12 73 
+0 285
+0 114
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=6 73 
+0 139
+0 1147
+cfn=(1036)
+calls=15 0 
+0 90
+0 60
+cfn=(1036)
+calls=15 0 
+0 90
+0 105
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=15 73 
+0 338
+0 75
+cfn=(1036)
+calls=15 0 
+0 90
+0 60
+cfn=(1036)
+calls=15 0 
+0 90
+0 105
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=15 73 
+0 338
+0 123
+cfn=(1036)
+calls=12 0 
+0 72
+0 60
+cfn=(1036)
+calls=12 0 
+0 72
+0 84
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=12 73 
+0 272
+0 195
+
+fn=(1168)
+0 1375731
+cfn=(1170) memchr::arch::x86_64::avx2::memchr::Two::find_raw
+calls=119746 0 
+0 2074166
+0 196533
+
+fn=(1170)
+0 1144077
+cfn=(1172)
+calls=101239 0 
+0 827327
+0 102762
+
+fn=(1196)
+0 2342088
+cfn=(1198)
+calls=185479 0 
+0 2682532
+0 260232
+
+fn=(1202)
+0 1362586
+cfn=(996)
+calls=1683 0 
+0 151206
+0 304066
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=33435 255 
+0 246780
+0 1531984
+cfn=(914)
+calls=2735 0 
+0 327211
+0 4266
+
+fn=(1214)
+0 4941109
+cfn=(1216)
+calls=57493 0 
+0 2909252
+0 2923881
+
+fn=(1266)
+0 5550
+cfn=(916)
+calls=21 0 
+0 8206
+0 154
+
+fn=(1612)
+0 3000
+cfn=(1614) quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+calls=3156 0 
+0 193716
+0 3000
+
+fn=(1614)
+0 18000
+cfn=(1152)
+calls=3156 0 
+0 75140
+0 15000
+cfn=(1616)
+calls=3156 0 
+0 63576
+0 22000
+
+fn=(1776)
+0 35959
+cfn=(1176)
+calls=4504 0 
+0 138951
+0 39766
+
+fn=(1780)
+0 18
+cfn=(1782)
+calls=2 0 
+0 2770103
+0 9
+cfn=(1744)
+calls=2 0 
+0 2
+0 4
+cfn=(1806)
+calls=2 0 
+0 23
+0 3
+cfn=(1808)
+calls=2 0 
+0 26
+0 21
+
+fn=(1860)
+0 15
+cfn=(1862) alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+calls=1 0 
+0 27
+0 8
+
+fn=(1862)
+0 27
+
+fn=(1930)
+0 32
+cfn=(1932)
+calls=1 0 
+0 64
+0 2
+cfn=(1936)
+calls=1 0 
+0 15
+0 18
+cfn=(1932)
+calls=1 0 
+0 62
+0 2
+
+fn=(1948) litchi_pptx::namespace::presentation_name
+0 5000
+cfn=(1592)
+calls=200 0 
+0 253242
+0 10200
+cfn=(1160)
+calls=600 0 
+0 424800
+0 2400
+cfn=(1772)
+calls=600 0 
+0 845121
+0 12000
+cfn=(1598)
+calls=600 0 
+0 75200
+0 13600
+cfn=(1776)
+calls=400 0 
+0 26400
+0 6600
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 3400
+0 2600
+cfn=(834)
+calls=200 0 
+0 7000
+0 1400
+cfn=(834)
+calls=200 0 
+0 7000
+0 1200
+cfn=(834)
+calls=200 0 
+0 35498
+0 1400
+cfn=(834)
+calls=200 0 
+0 31000
+0 4400
+cfn=(1790)
+calls=200 0 
+0 234518
+0 5400
+
+fn=(1986)
+0 24
+cfn=(1736)
+calls=2 0 
+0 6
+0 12
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 46
+0 18
+
+fn=(2014) litchi_pptx::notes::validation::validate_links
+0 75
+cfn=(1294)
+calls=3 0 
+0 643
+0 6016
+cfn=(2016)
+calls=206 0 
+0 213780
+0 2060
+cfn=(2016)
+calls=206 0 
+0 56224
+0 1854
+cfn=(986)
+calls=206 0 
+0 50091
+0 9788
+cfn=(834)
+calls=2 0 
+0 162
+0 27
+
+fn=(2036)
+0 13733
+cob=(2)
+cfi=(218)
+cfn=(786)
+calls=443 198 
+0 5732
+0 2110
+cfn=(2030)
+calls=102 0 
+0 344556
+0 2448
+cfn=(2030)
+calls=102 0 
+0 344556
+0 6479
+cfn=(2030)
+calls=341 0 
+0 1151898
+0 3101
+cfn=(2038) <sha2::block_api::Sha256VarCore as core::ops::drop::Drop>::drop
+calls=443 0 
+0 7974
+0 18163
+
+fn=(2066) litchi_pptx::opened::transaction::Transaction::new
+0 12
+cfn=(1010)
+calls=1 0 
+0 1146853
+0 3
+cfn=(1006)
+calls=1 0 
+0 142143
+0 5
+cfn=(1012)
+calls=1 0 
+0 51802
+0 22
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 4
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 101
+0 24
+
+fn=(598)
+cfn=(826) std::rt::lang_start::{{closure}}
+calls=0 0 
+0 126635417
+
+fn=(818)
+0 33887
+
+fn=(828) std::sys::backtrace::__rust_begin_short_backtrace
+cfn=(830)
+calls=0 0 
+0 126635417
+
+fn=(918)
+0 5109
+cfn=(920)
+calls=19344 0 
+0 1767660
+
+fn=(976)
+0 12
+cfn=(818)
+calls=25 0 
+0 4
+0 12
+cfn=(820)
+calls=25 0 
+0 1006
+0 16
+
+fn=(986)
+0 7956
+cfn=(954)
+calls=442 0 
+0 92378
+0 42500
+cfn=(954)
+calls=1421 0 
+0 192156
+0 26887
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=67 73 
+0 1147
+0 50008
+cfn=(958)
+calls=7 0 
+0 47964
+0 2412
+cfn=(954)
+calls=200 0 
+0 47352
+0 5327
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=9 73 
+0 198
+0 9976
+cfn=(958)
+calls=7 0 
+0 66098
+0 3303
+cfn=(954)
+calls=206 0 
+0 33264
+0 4687
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 15400
+cfn=(954)
+calls=800 0 
+0 68400
+0 34519
+cfn=(958)
+calls=7 0 
+0 35825
+0 14
+
+fn=(996)
+0 15
+cfn=(916)
+calls=1 0 
+0 465
+0 15054
+cfn=(916)
+calls=1639 0 
+0 81243
+0 27222
+cfn=(916)
+calls=1435 0 
+0 327096
+0 190047
+cfn=(916)
+calls=19849 0 
+0 975512
+0 119613
+cfn=(916)
+calls=1683 0 
+0 131790
+0 7281
+
+fn=(1042)
+0 804
+cfn=(918)
+calls=24 0 
+0 15613
+0 66
+cfn=(818)
+calls=6 0 
+0 6
+0 18
+cfn=(820)
+calls=6 0 
+0 820
+0 34053
+cfn=(918)
+calls=3369 0 
+0 78577
+0 5617
+cfn=(818)
+calls=10967 0 
+0 1203
+0 3609
+cfn=(820)
+calls=10967 0 
+0 120706
+0 26683
+
+fn=(1176)
+0 1173471
+cfn=(1178)
+calls=95161 0 
+0 2557197
+0 270801
+
+fn=(1972)
+0 20
+cfn=(1974)
+calls=1 0 
+0 864857
+0 6
+cfn=(1962)
+calls=1 0 
+0 73644
+0 11
+
+fn=(1754)
+0 52
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3 73 
+0 29
+0 42
+cfn=(1756)
+calls=3 0 
+0 4329
+0 17
+cfn=(1024)
+calls=3 0 
+0 328
+0 6
+cfn=(834)
+calls=3 0 
+0 35
+0 1
+
+fn=(1762)
+0 10560
+
+fn=(1766)
+0 1863
+cfn=(868)
+calls=209 0 
+0 1656
+0 4761
+cfn=(1768)
+calls=209 0 
+0 445026
+0 2277
+cfn=(1084)
+calls=209 0 
+0 3726
+0 1242
+
+fn=(1770)
+0 43071
+cfn=(1176)
+calls=3462 0 
+0 295883
+0 39138
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=3252 73 
+0 50130
+0 8317
+
+fn=(1798)
+0 586224
+cfn=(1176)
+calls=49252 0 
+0 2119662
+0 748634
+
+fn=(1920)
+0 7
+cfn=(1922) litchi_pptx::package::model::Package::opened_presentation_with_limits
+calls=1 0 
+0 124972590
+0 18
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 14
+cfn=(2064)
+calls=1 0 
+0 183601
+0 3
+cfn=(2066)
+calls=1 0 
+0 1340999
+0 4
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 137
+0 2
+cfn=(2068)
+calls=1 0 
+0 138007
+0 5
+
+fn=(1922)
+0 23
+cfn=(1924)
+calls=1 0 
+0 124748289
+0 17
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 17
+cfn=(2060)
+calls=1 0 
+0 224077
+0 14
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 30
+0 11
+cfn=(1930)
+calls=1 0 
+0 81
+0 1
+
+fn=(1938)
+0 5400
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 5800
+0 1200
+cfn=(1756)
+calls=200 0 
+0 1027657
+0 3000
+cfn=(1024)
+calls=200 0 
+0 71025
+0 1400
+cfn=(1736)
+calls=200 0 
+0 600
+0 1600
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 5800
+0 4000
+
+fn=(1946) litchi_pptx::parts::slide::root_name_from_xml
+0 5000
+cfn=(1592)
+calls=200 0 
+0 288737
+0 8600
+cfn=(1160)
+calls=400 0 
+0 298850
+0 1600
+cfn=(1772)
+calls=400 0 
+0 789411
+0 8000
+cfn=(1598)
+calls=400 0 
+0 41000
+0 13800
+cfn=(1176)
+calls=200 0 
+0 8200
+0 2800
+cfn=(1776)
+calls=200 0 
+0 13200
+0 1200
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 3818
+0 3600
+cfn=(834)
+calls=200 0 
+0 7000
+0 1400
+cfn=(834)
+calls=200 0 
+0 7000
+0 1200
+cfn=(834)
+calls=200 0 
+0 32348
+0 1400
+cfn=(834)
+calls=200 0 
+0 31000
+0 5600
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=200 73 
+0 3400
+0 1600
+cfn=(1176)
+calls=200 0 
+0 8200
+0 3000
+cfn=(818)
+calls=200 0 
+0 200
+0 800
+cfn=(820)
+calls=200 0 
+0 17539
+0 1400
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=200 255 
+0 3600
+0 1200
+cfn=(1152)
+calls=200 0 
+0 10800
+0 1600
+
+fn=(1958)
+0 409350
+cfn=(1168)
+calls=16374 0 
+0 1095759
+0 343854
+
+fn=(1960)
+0 1632
+cfn=(834)
+calls=204 0 
+0 34054
+0 1632
+cfn=(834)
+calls=204 0 
+0 31578
+
+fn=(1984)
+0 42
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 89
+cfn=(884)
+calls=1 0 
+0 103
+0 9
+cfn=(932)
+calls=2 0 
+0 122
+0 72
+
+fn=(1998)
+0 13
+cfn=(1024)
+calls=1 0 
+0 365
+0 8
+cfn=(1762)
+calls=1 0 
+0 10
+0 9
+cfn=(1024)
+calls=1 0 
+0 343
+0 7
+cfn=(1762)
+calls=1 0 
+0 10
+0 25
+cfn=(834)
+calls=1 0 
+0 155
+0 18
+cfn=(916)
+calls=1 0 
+0 709
+0 7
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 749
+0 12
+cfn=(916)
+calls=1 0 
+0 386
+0 7
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 749
+0 4
+cfn=(1032)
+calls=1 0 
+0 19
+0 16
+cfn=(988)
+calls=1 0 
+0 82
+0 11
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 12
+0 10
+cfn=(1024)
+calls=1 0 
+0 365
+0 7
+cfn=(1742)
+calls=1 0 
+0 2
+0 3
+cfn=(2000)
+calls=1 0 
+0 420
+0 16
+cfn=(988)
+calls=1 0 
+0 82
+0 13
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=1 255 
+0 11
+0 10
+cfn=(1024)
+calls=1 0 
+0 343
+0 7
+cfn=(1742)
+calls=1 0 
+0 2
+0 3
+cfn=(2000)
+calls=1 0 
+0 55
+0 63
+cfn=(834)
+calls=1 0 
+0 35
+0 7
+
+fn=(2012)
+0 23
+cfn=(1294)
+calls=1 0 
+0 134
+0 39
+cfn=(880)
+calls=3 0 
+0 8095
+0 24
+cfn=(834)
+calls=3 0 
+0 105
+0 18
+cfn=(2014)
+calls=3 0 
+0 340720
+0 27
+cfn=(818)
+calls=3 0 
+0 3
+0 9
+cfn=(820)
+calls=3 0 
+0 120
+0 21
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=3 255 
+0 34
+0 24
+cfn=(986)
+calls=3 0 
+0 927
+0 84
+cfn=(834)
+calls=3 0 
+0 105
+0 14
+cfn=(834)
+calls=1 0 
+0 35
+0 9
+
+fn=(2056)
+0 1819
+cfn=(834)
+calls=200 0 
+0 32608
+0 207
+cfn=(834)
+calls=1 0 
+0 153
+0 10
+
+fn=(826)
+cfn=(828)
+calls=0 0 
+0 126635417
+
+fn=(868)
+0 1680
+
+fn=(890)
+0 1630
+cfn=(884)
+calls=1382 0 
+0 1996
+0 494
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=1346 73 
+0 280
+0 673042
+cfn=(884)
+calls=30048 0 
+0 495405
+0 170511
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=27647 73 
+0 100290
+0 196572
+
+fn=(900)
+0 49135
+cfn=(902)
+calls=8587 0 
+0 44549
+0 34098
+cfn=(904)
+calls=4150 0 
+0 452624
+0 20060
+
+fn=(908)
+0 50150
+cfn=(902)
+calls=6393 0 
+0 382414
+
+fn=(914)
+0 120339
+cfn=(916)
+calls=6649 0 
+0 1589867
+0 40113
+
+fn=(956)
+0 772371
+
+fn=(1182)
+0 18210
+
+fn=(1220)
+0 750096
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=32833 73 
+0 307118
+0 531318
+
+fn=(1242)
+0 273
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=13 73 
+0 300
+0 340
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=20 73 
+0 458
+0 218
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=2 73 
+0 44
+0 43
+
+fn=(1294)
+0 323
+cfn=(818)
+calls=7 0 
+0 6
+0 18
+cfn=(820)
+calls=7 0 
+0 2149
+0 102
+cob=(2)
+cfi=(218)
+cfn=(786)
+calls=7 198 
+0 166
+0 1073
+cfn=(818)
+calls=28 0 
+0 21
+0 63
+cfn=(820)
+calls=28 0 
+0 1547
+0 357
+cob=(2)
+cfi=(218)
+cfn=(786)
+calls=28 198 
+0 381
+0 1907
+cfn=(818)
+calls=290 0 
+0 35
+0 105
+cfn=(820)
+calls=290 0 
+0 4734
+0 595
+cob=(2)
+cfi=(218)
+cfn=(786)
+calls=290 198 
+0 635
+0 420
+
+fn=(1974)
+0 64
+cfn=(1766)
+calls=4 0 
+0 24782
+0 64
+cfn=(1952)
+calls=4 0 
+0 3027321
+0 56
+
+fn=(1484)
+0 5600
+cfn=(1042)
+calls=1085 0 
+0 41726
+0 2400
+
+fn=(1676)
+0 11648
+cfn=(1976)
+calls=16 0 
+0 9598
+0 4851
+
+fn=(1786)
+0 586152
+cfn=(1214)
+calls=27913 0 
+0 5342374
+0 1063889
+cfn=(1214)
+calls=1800 0 
+0 229576
+0 46400
+
+fn=(1794)
+0 9000
+cfn=(1176)
+calls=1400 0 
+0 44800
+0 6000
+
+fn=(1888)
+0 1632
+cfn=(834)
+calls=204 0 
+0 31436
+0 1632
+cfn=(834)
+calls=204 0 
+0 31282
+
+fn=(1944)
+0 6000
+cfn=(1946)
+calls=200 0 
+0 1628103
+0 3400
+cfn=(834)
+calls=200 0 
+0 7000
+0 3200
+cfn=(1948)
+calls=200 0 
+0 2009379
+0 5600
+cfn=(1950)
+calls=200 0 
+0 55910951
+0 11000
+
+fn=(2020)
+0 5304
+cfn=(922)
+calls=442 0 
+0 98145
+0 1326
+cfn=(922)
+calls=442 0 
+0 99002
+0 6630
+cfn=(922)
+calls=442 0 
+0 99367
+0 2652
+cfn=(922)
+calls=442 0 
+0 98541
+0 3536
+cfn=(1013)
+calls=442 0 
+0 1362396
+0 35360
+
+fn=(2024)
+0 864
+cfn=(1036)
+calls=27 0 
+0 162
+0 1251
+cfn=(1036)
+calls=139 0 
+0 834
+0 664
+cfn=(1036)
+calls=166 0 
+0 996
+0 1328
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=166 73 
+0 3621
+0 3154
+cfn=(1036)
+calls=166 0 
+0 996
+0 830
+cfn=(1036)
+calls=166 0 
+0 996
+0 1162
+cob=(2)
+cfi=(230)
+cfn=(892)
+calls=166 73 
+0 3724
+0 4568
+
+fn=(2038)
+0 7974
+
+ob=(3)
+fl=(152)
+fn=(712)
+0 6614
+cob=(2)
+cfi=(202)
+cfn=(714)
+calls=6919 255 
+0 68228
+
+totals: 126635417

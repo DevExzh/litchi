@@ -1,0 +1,77 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-xlsb",
+    "--locked",
+    "--offline",
+    "--release",
+    "-j",
+    "2",
+    "--features",
+    "litchi-opc/sign,litchi-opc/performance-diagnostics"
+  ],
+  "cwd": "/tmp/litchi-0913-src",
+  "started_utc": "2026-10-04T10:40:12.972000+00:00",
+  "ended_utc": "2026-10-04T10:41:06.818626+00:00",
+  "exit_code": -2,
+  "helper": {
+    "path": "docs/performance/results/change-0913/quality-v2.py",
+    "bytes": 3165,
+    "sha256": "aacc158952b0c52e2edea54936c2a204c874a2d83bcc82fcb9df5d9814fc4cfa"
+  },
+  "source": {
+    "path": "docs/performance/results/change-0913/source-v1.json",
+    "bytes": 1758278,
+    "sha256": "68de7c9416ba7763606a64780bde4e3de8476b02a809234b4a36975b9612af82"
+  },
+  "fixtures": {
+    "path": "docs/performance/results/change-0913/fixtures.json",
+    "bytes": 277180,
+    "sha256": "29bbcb5ef9af8033e1141cdcff819f3ac9bcbaefc5a261ec0581df714da9756b"
+  },
+  "quality_root_lock": {
+    "path": "docs/performance/results/change-0913/quality-lock/after-Cargo.lock",
+    "bytes": 138457,
+    "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+  },
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0913-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0913/quality-v2/tests/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0913/quality-v2/tests/stderr.txt",
+      "bytes": 3707,
+      "sha256": "1ac762cc891b584fd51445449075fb5a2259d7df67793456e22dc8ffa9a47a5e"
+    }
+  ]
+}

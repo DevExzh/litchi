@@ -1,0 +1,11 @@
+    Checking litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-protos)
+    Checking litchi-iwa-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-common)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/soapberry-zip)
+    Checking litchi-iwa-package v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-package)
+    Checking litchi-iwa-cache v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-cache)
+    Checking litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-core)
+ Documenting litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-core)
+ Documenting litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi-worktrees/0913-iwa-cherry-resolution/crates/litchi-iwa-archive)
+    Finished `dev` profile [unoptimized] target(s) in 23.61s
+   Generated /home/zhuhe/code/litchi/target/litchi-0913-iwa-build/doc/litchi_iwa_archive/index.html and 1 other file

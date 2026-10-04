@@ -1,0 +1,157 @@
+{
+  "amendment": "Only semantic metadata validation and plan/helper receipt paths change: sample_count/sample_indices are checked against1/[0]; remaining operation_metrics envelope must equal native reference. First successful workload retained with original wrapper failure; no recapture or measurement changes.",
+  "binary": {
+    "bytes": 264596744,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native",
+    "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84"
+  },
+  "cpu": 12,
+  "created_utc": "2026-10-04T07:19:14.718392+00:00",
+  "cwd": "/tmp/litchi-0908-run",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 7717,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture_v2.py",
+    "sha256": "81a0b599d269e17f2f54e434c06635956faa1909dc51eb2bf5625ba12787f38f"
+  },
+  "initial_helper": {
+    "bytes": 7343,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture.py",
+    "sha256": "8ec41d5ed7dead52dfadde656ad835ba8cde23ecba88b39a499ee41ab8ce2187"
+  },
+  "initial_plan": {
+    "bytes": 5284,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/plan.json",
+    "sha256": "58a49609aead30c4b5a36e71c183f38a4c39cfbee6d029a752223d64a6ce9e15"
+  },
+  "inputs": [
+    {
+      "bytes": 1755018,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source.json",
+      "sha256": "a987e841e27283d54d977f1c0b85609f248872eede70a6271d13bee568ebd812"
+    },
+    {
+      "bytes": 196,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/binary.json",
+      "sha256": "2bd9eb9a9a0160a9c93a68b96203da5f4a7362434d30326418f72cf61b9037ef"
+    },
+    {
+      "bytes": 2934,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/native-build-v2-run.json",
+      "sha256": "d162b2eaf163c9ba7be25785b486453ad4b04a6b94624a914ce3dbc01fd459fa"
+    },
+    {
+      "bytes": 36406,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/analysis.json",
+      "sha256": "efca52a4559c7955417234ac14bad3bebff9aabd1989e9a9b9de7cc7f1dd3627"
+    },
+    {
+      "bytes": 329,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/replay-after-cleanup.json",
+      "sha256": "7d0fd4269a12edabc3cd0381fab458e15cb4f28b706e4b869ac3f70f5d197c0d"
+    },
+    {
+      "bytes": 12463,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/closure.json",
+      "sha256": "dc3a662a7d913e2a5a8148737dedc2a29bfc086d6d609ba2e34a9f1a54384b11"
+    },
+    {
+      "bytes": 81081,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-a.json",
+      "sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7"
+    },
+    {
+      "bytes": 81499,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source-a.json",
+      "sha256": "d4beaa72a6b1bff4bacbb36e9e96564f234309040a6cc44bdbf12c6584ebf513"
+    },
+    {
+      "bytes": 81504,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source-b.json",
+      "sha256": "30220c89d9c13fa1800a9eadbfe443154ddfaacc16a0d2393ab92cfb1d063767"
+    },
+    {
+      "bytes": 81080,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-b.json",
+      "sha256": "0b398016560f781a1312e1d8c6b6d3466ccd217c04385592d9107e24fc08948e"
+    },
+    {
+      "bytes": 77,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/owner-symbol.txt",
+      "sha256": "ae3e5dab01a0025818f802adb004ae2e892e3da16e3d93cf79e079a8f00e2c2c"
+    },
+    {
+      "bytes": 63017,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_v2.py",
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    }
+  ],
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "--zero-before=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+  ],
+  "owner": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+  "parent": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+  "samples": 1,
+  "schedule": [
+    {
+      "case": "pptx_eager_multi_slide_batch_edit_save",
+      "index": 0,
+      "kind": "eager",
+      "label": "eager-a"
+    },
+    {
+      "case": "pptx_source_backed_multi_slide_batch_edit_save",
+      "index": 1,
+      "kind": "source_backed",
+      "label": "source-a"
+    },
+    {
+      "case": "pptx_source_backed_multi_slide_batch_edit_save",
+      "index": 2,
+      "kind": "source_backed",
+      "label": "source-b"
+    },
+    {
+      "case": "pptx_eager_multi_slide_batch_edit_save",
+      "index": 3,
+      "kind": "eager",
+      "label": "eager-b"
+    }
+  ],
+  "schema": "litchi.pptx-instruction-profile-0908.v1",
+  "scope": "Collected Ir inside exact existing guarded helper only. Instrumented elapsed samples excluded from native timing conclusions; first child requires raw scope admission before continuing.",
+  "source_commit": "3d3650ac03be2cd8ba923a5a6e940e84b14f5eab",
+  "tools": [
+    {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    {
+      "bytes": 528,
+      "path": "/usr/bin/valgrind",
+      "sha256": "4652774bd116cb49951ef74115ad4237cad5021b2bd4d80002f09d986ec438b9"
+    },
+    {
+      "bytes": 2700304,
+      "path": "/usr/libexec/valgrind/callgrind-amd64-linux",
+      "sha256": "0b411771104cca10984c00a6c6c76bc54ebc989ae7e7a8c2f5e1ba4fec0e427d"
+    },
+    {
+      "bytes": 48712,
+      "path": "/usr/bin/x86_64-linux-gnu-nm",
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009"
+    }
+  ],
+  "valgrind_version": "valgrind-3.26.0",
+  "warmup": 0
+}

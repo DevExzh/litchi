@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "source_files_verified": 9350,
+  "source_commit": "3d3650ac03be2cd8ba923a5a6e940e84b14f5eab",
+  "raw_leg_receipts_verified": 4,
+  "analysis_reproduced": true,
+  "temporary_directory_removed": true,
+  "scope": "Source reconstruction and retained raw evidence replay; no binary rerun or live-root claim."
+}

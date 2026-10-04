@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "start_utc": "2026-10-04T07:45:33.009173+00:00",
+  "end_utc": "2026-10-04T07:45:35.286790+00:00",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0908/check-analyzer.py"
+  ],
+  "helper_sha256": "2f8c86685ca35c37b5a25a8f5c09f857f53f7fc781cd367e573b4e690b699e5c",
+  "analyzer_sha256": "487474a9b4cf897a78a106ee0cd683e3bc7d9762c874b494ac7142b75d06553a",
+  "canonical_analysis_sha256": "271bf14b3f4edc1ae08c5eea28f99af16cea7680b156be83dc7d9d0d7164b37b",
+  "exit_code": 0,
+  "stdout": "0908 analyzer checks passed: fresh equality plus four fail-closed negative mutations\n",
+  "stderr": "",
+  "post_cleanup": true
+}

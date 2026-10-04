@@ -1,0 +1,45 @@
+{
+  "corpus": {
+    "archive_bytes": 17017139,
+    "archive_member_count": 445,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "compression": "deflate",
+    "entry_bytes": 2097152,
+    "entry_count": 229,
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "name": "pptx-source-backed-media",
+    "package_format": "PPTX/OPC/ZIP",
+    "payload_kind": "deterministic-incompressible-media",
+    "shape": "media-rich",
+    "target_entry": "slide:100/shape:0",
+    "target_payload_bytes": 52,
+    "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+    "uncompressed_payload_bytes": 17568429,
+    "xlsx": null
+  },
+  "output": {
+    "bytes": 17017145,
+    "file": "output.pptx",
+    "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+  },
+  "reference": {
+    "bytes": 10764,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-00-materialized/artifacts/report.json",
+    "sha256": "167b382cd000f55483cf635ffb3861cc34a552b128cdf1f4c64e04de506fd6bc"
+  },
+  "report": {
+    "bytes": 3179,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-b/artifacts/report.json",
+    "sha256": "74e1efcccd3a62df42f8d825f299b510c7cb4a2440f7d28db95311f74e8e5524"
+  },
+  "route": "materialized",
+  "scope": "Exact source/output/corpus and guard/sink equality to the 0910 native control. Instrumented durations excluded from native conclusions.",
+  "sink_largest_write": 65536,
+  "sink_write_calls": 260,
+  "source": {
+    "bytes": 17017139,
+    "file": "source.pptx",
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "status": "pass"
+}

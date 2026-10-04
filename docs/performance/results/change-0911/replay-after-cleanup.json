@@ -1,0 +1,46 @@
+{
+  "analysis": {
+    "bytes": 643782,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/analysis.json",
+    "sha256": "ac6fa98aed88d9594fe2bafef7c38cb06f08dc6b84eab574b919fd11bdedf76f"
+  },
+  "analysis_byte_exact": true,
+  "analyzer": {
+    "bytes": 28249,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/analyze.py",
+    "sha256": "d52b4f1e5ccfd651c4256e89a2fdd94e2db2d32541abed85a8349cf3b317bc38"
+  },
+  "build_or_workload_run": false,
+  "deleted_cwd_used": false,
+  "descriptor_checks": {
+    "capture-v2/materialized-a/command.json": 11,
+    "capture-v2/materialized-a/semantics.json": 2,
+    "capture-v3/materialized-a/raw-admission.json": 8,
+    "capture-v3/materialized-b/raw-admission.json": 8,
+    "capture-v3/owned-a/raw-admission.json": 8,
+    "capture-v3/owned-b/raw-admission.json": 8,
+    "capture/materialized-a/command.json": 12,
+    "capture/materialized-a/semantics.json": 2,
+    "first-child-admission-v3.json": 8,
+    "first-child-failure-v2.json": 15,
+    "first-child-failure.json": 16,
+    "plan-v2.json": 26,
+    "plan-v3.json": 30,
+    "plan.json": 21
+  },
+  "failed_attempts_retained": 2,
+  "helper": {
+    "bytes": 3235,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/replay.py",
+    "sha256": "b69b07a16140333ef0f8ac1d48576aa5de19fe02456bc3c5ca852fa8f0939d58"
+  },
+  "native_replay": {
+    "bytes": 281,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/reused-native-custody.json",
+    "sha256": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257"
+  },
+  "raw_contexts": 8,
+  "source_files_reconstructed": 9355,
+  "status": "pass",
+  "terminal_zero_dumps": 4
+}

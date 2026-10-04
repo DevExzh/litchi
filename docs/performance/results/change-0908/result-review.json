@@ -1,0 +1,245 @@
+{
+  "schema": "litchi.pptx-multi-slide-callgrind-result-review-0908.v1",
+  "status": "pass",
+  "verdict": "pass_with_scope_caveats",
+  "review": {
+    "mode": "offline_independent_raw_evidence_review",
+    "reviewer_ran_builds": false,
+    "reviewer_ran_workloads": false,
+    "reviewer_ran_profilers": false,
+    "reviewer_reran_replay": false,
+    "independent_checks": [
+      "parsed all four numbered Callgrind dumps and terminal dumps with the retained 0845 reader grammar",
+      "recomputed positive owner edges, source positions, owner partition, direct-child rows and full function-self conservation",
+      "checked exact Ir event set, trigger, dump cardinality and zero terminal remainder",
+      "matched each 0908 corpus, sink, output and source-counter receipt to its 0907 label after the documented one-sample reduction",
+      "checked stderr warnings and duplicate probe lines against raw summaries without adding duplicate presentations"
+    ],
+    "scope": "Frozen 0907 binary and retained 0908 receipts; no claim about the dirty live workspace or a production change."
+  },
+  "canonical_analysis": {
+    "path": "docs/performance/results/change-0908/analysis.json",
+    "bytes": 113497,
+    "sha256": "271bf14b3f4edc1ae08c5eea28f99af16cea7680b156be83dc7d9d0d7164b37b",
+    "schema": "litchi.pptx-multi-slide-callgrind-analysis-0908.v1",
+    "status": "pass",
+    "mode": "full-reduction"
+  },
+  "analyzer_checks": {
+    "path": "docs/performance/results/change-0908/analyzer-checks.json",
+    "bytes": 661,
+    "sha256": "ec1938f35558679fcf6952804a4d5ae5f737f48a4145dad79d12a31bcec3c9ff",
+    "status": "pass",
+    "post_cleanup": true,
+    "negative_mutations_rejected": 4
+  },
+  "parent_report": {
+    "path": "docs/performance/0908-pptx-multi-slide-instruction-profile.md",
+    "bytes": 8114,
+    "sha256": "750d0aec1082fcc813b7759b0bdbb60e54f4d4bd6af519f90c13ac3ea3741f11"
+  },
+  "protocol": {
+    "source_commit": "3d3650ac03be2cd8ba923a5a6e940e84b14f5eab",
+    "binary": {
+      "path": "docs/performance/results/change-0907/binaries/native",
+      "bytes": 264596744,
+      "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84"
+    },
+    "cpu": 12,
+    "workers": 1,
+    "warmup": 0,
+    "samples": 1,
+    "order": ["eager-a", "source-a", "source-b", "eager-b"],
+    "environment": {"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C", "TZ": "UTC"},
+    "owner": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "measured_parent": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+    "owner_symbol_receipt": {
+      "path": "docs/performance/results/change-0908/owner-symbol.txt",
+      "bytes": 77,
+      "sha256": "ae3e5dab01a0025818f802adb004ae2e892e3da16e3d93cf79e079a8f00e2c2c",
+      "nm_symbol_count": 1
+    },
+    "options": [
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+      "--zero-before=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+      "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+    ],
+    "reader": {
+      "path": "docs/performance/results/change-0845/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    "plan_v2": {
+      "path": "docs/performance/results/change-0908/plan-v2.json",
+      "bytes": 6080,
+      "sha256": "5f848824764eb5884b110d1825bbe169c62639e6b282d71eb7a28eaca6f9f086"
+    },
+    "initial_plan": {
+      "path": "docs/performance/results/change-0908/plan.json",
+      "bytes": 5284,
+      "sha256": "58a49609aead30c4b5a36e71c183f38a4c39cfbee6d029a752223d64a6ce9e15"
+    }
+  },
+  "qualification": {
+    "accepted_numbered_dump_counts": [1, 2],
+    "observed_numbered_dump_count_each_leg": 1,
+    "raw_dump_part_each_leg": 1,
+    "terminal_dump_zero_each_leg": true,
+    "measured_callsite": "51174",
+    "expected_callsite": "51143",
+    "owner_edge_calls_each_leg": 1,
+    "expected_positive_collected_owner_edges_each_leg": 0,
+    "expected_callsite_diagnostic_present": false,
+    "expected_callsite_subtracted_or_reconstructed": false,
+    "owner_partition_conserved_each_leg": true,
+    "exclusive_function_self_conserved_each_leg": true,
+    "all_positive_owner_edges_accounted": true,
+    "scope": "Only the exact out-of-line timed owner edge at source position 51174 is measured. The expected-output position 51143 has no positive collected owner edge; this is an observed scope fact and carries no unproved inlining or monomorphization explanation.",
+    "count_authority": "Raw callgrind.out.1 summaries and parsed edges; stderr probe presentations are diagnostic duplicates and are not added."
+  },
+  "helper_lineage": {
+    "first_profile": {
+      "labels": ["eager-a"],
+      "helper": {"path": "docs/performance/results/change-0908/capture.py", "bytes": 7343, "sha256": "8ec41d5ed7dead52dfadde656ad835ba8cde23ecba88b39a499ee41ab8ce2187"},
+      "plan": {"path": "docs/performance/results/change-0908/plan.json", "bytes": 5284, "sha256": "58a49609aead30c4b5a36e71c183f38a4c39cfbee6d029a752223d64a6ce9e15"},
+      "raw_profile_uses_original_helper_and_plan": true
+    },
+    "remaining_profiles": {
+      "labels": ["source-a", "source-b", "eager-b"],
+      "helper": {"path": "docs/performance/results/change-0908/capture_v2.py", "bytes": 8245, "sha256": "805c1edc471d2c7e209f8c4b19a9730130cd11b3afb4afb3fe8209d89a76b8c3"},
+      "plan": {"path": "docs/performance/results/change-0908/plan-v2.json", "bytes": 6080, "sha256": "5f848824764eb5884b110d1825bbe169c62639e6b282d71eb7a28eaca6f9f086"},
+      "raw_profile_uses_v2_helper_and_plan": true
+    },
+    "semantic_validation_amendment": {
+      "helper": "capture_v2.py",
+      "scope": "Semantic metadata only: compare sample_count=1/sample_indices=[0] and reduce constant native 200-sample vectors to one sample; preserve statuses, scopes, counters and values.",
+      "command_or_profiling_options_changed": false,
+      "workload_recaptured": false
+    },
+    "eager_a_original_wrapper_issue": {
+      "failure_receipt": {"path": "docs/performance/results/change-0908/capture/eager-a/semantic-failure.json", "bytes": 73, "sha256": "2c8ecbc333b67bb76088b42d0a8d84f05f918a2ad45b3d66442611781eb0237e"},
+      "error": "AssertionError('operation_metrics')",
+      "workload_command_exit_code": 0,
+      "corrected_status": "pass",
+      "recaptured": false,
+      "interpretation": "Validator envelope mismatch between native 200-sample operation_metrics and one captured sample; not a workload failure."
+    },
+    "retained_preflight_diagnostic": {"path": "docs/performance/results/change-0908/plan-v2-validation-attempt.json", "bytes": 6025, "sha256": "80bc5a3ddc12764c5129c58856c6ec066a4689dfc69b62f03e602bb4baf6f6c6", "profile_or_workload_run": false}
+  },
+  "identity": {
+    "corpus": {
+      "generator": "litchi-pptx-source-edit-media-v1",
+      "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+      "archive_bytes": 17017139,
+      "archive_member_count": 445,
+      "opc_entry_count": 229,
+      "uncompressed_payload_bytes": 17568429,
+      "target_entry": "slide:100/shape:0",
+      "same_across_legs": true
+    },
+    "output": {"sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9", "accepted_bytes": 17017145, "same_across_legs": true},
+    "per_label_0907_match": {"corpus": true, "sink": true, "output": true, "source_counters_after_reduction": true}
+  },
+  "stderr_policy": {
+    "brk_segment_overflow": {"observed_all_four_legs": true, "included_in_ir_sums": false, "classification": "Recorded Valgrind warning and retained limitation."},
+    "forked_runtime_probe_duplicate_ir_lines": {"observed_all_four_legs": true, "presentations_per_summary": 2, "match_raw_summary": true, "included_in_ir_sums": false}
+  },
+  "raw_whitespace_policy": {
+    "byte_exact_raw_receipts": true,
+    "trailing_spaces_retained_in_callgrind_desc_cache_calls_and_stderr_pid_separators": true,
+    "authored_file_whitespace_gate_only": true,
+    "raw_capture_rewritten": false
+  },
+  "legs": [
+    {
+      "label": "eager-a",
+      "kind": "eager",
+      "summary_ir": 4577995784,
+      "raw_dump": {"path": "docs/performance/results/change-0908/capture/eager-a/callgrind.out.1", "bytes": 783580, "sha256": "ab88e84ba3c227d78eda3f754149d94a39974480153496249df54847958e9ee4"},
+      "terminal_dump": {"path": "docs/performance/results/change-0908/capture/eager-a/callgrind.out", "bytes": 530, "sha256": "ef187991211c2cfc2f2266e7cb368e26b31a77e6876b1911b5901694860c6f95", "summary_ir": 0},
+      "report": {"path": "docs/performance/results/change-0908/capture/eager-a/report.json", "bytes": 15604, "sha256": "2b3f0aaa5547f5a3ef824f4e557d74f24838807eb903743efd3bf7b62e65541a"},
+      "reference_0907_report": {"path": "docs/performance/results/change-0907/eager-a.json", "bytes": 81081, "sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7"},
+      "command": {"path": "docs/performance/results/change-0908/capture/eager-a/command.json", "bytes": 3367, "sha256": "8909acb12d34dc11af122735f4a87d5f84b749c62189fd3c96a2bf9f4dcb644a", "exit_code": 0},
+      "semantics": {"path": "docs/performance/results/change-0908/capture/eager-a/semantics.json", "bytes": 2749, "sha256": "afb94b3191e1f71e5ae29f23e9b7cda97495f70a0f9b19f8ec215457ba179397", "status": "pass"},
+      "stderr": {"path": "docs/performance/results/change-0908/capture/eager-a/stderr.txt", "bytes": 1027, "sha256": "12721ee7edae2be56642131c397e90a2a42eb9de96b19d1237c0355ef2dde96f"},
+      "owner": {"calls": 1, "position": "51174", "expected_51143_edges": 0, "self_ir": 6428, "direct_children_ir": 4577989356, "exclusive_sum_ir": 4577995784, "positive_direct_child_rows": 22},
+      "parity": {"corpus_0907": true, "sink_0907": true, "output_0907": true, "source_0907_after_reduction": true, "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9", "source": {"materializations": 229, "ordinary_read_calls": 741, "ordinary_read_bytes": 16907750, "read_calls": 1864, "read_bytes": 17030811, "max_in_flight": 1}, "sink": {"accepted_bytes": 17017145, "write_calls": 260, "largest_write": 65536, "over_65536": 0}},
+      "canonical_categories": {"production": 4468999670, "harness_guard": 88813897, "runtime_or_dependency": 20174691, "unclassified": 1098}
+    },
+    {
+      "label": "source-a",
+      "kind": "source_backed",
+      "summary_ir": 108165330,
+      "raw_dump": {"path": "docs/performance/results/change-0908/capture/source-a/callgrind.out.1", "bytes": 437004, "sha256": "1a53ae9acb517d122feb51294e0cbda47f6e6db52db108279a8683aabae89a99"},
+      "terminal_dump": {"path": "docs/performance/results/change-0908/capture/source-a/callgrind.out", "bytes": 539, "sha256": "a7953c48f03f4bb172f2407b73657d230fc5ecd6554452e30ed2f20deed40865", "summary_ir": 0},
+      "report": {"path": "docs/performance/results/change-0908/capture/source-a/report.json", "bytes": 15620, "sha256": "4d6f97fa0249842939a7d4e995b854e9281dc05a0b148f624d1950d364f8738c"},
+      "reference_0907_report": {"path": "docs/performance/results/change-0907/source-a.json", "bytes": 81499, "sha256": "d4beaa72a6b1bff4bacbb36e9e96564f234309040a6cc44bdbf12c6584ebf513"},
+      "command": {"path": "docs/performance/results/change-0908/capture/source-a/command.json", "bytes": 3409, "sha256": "4a4c3a72b6722181e39237308cc5f6cfa052b4a6d293a18c672648434e13ea66", "exit_code": 0},
+      "semantics": {"path": "docs/performance/results/change-0908/capture/source-a/semantics.json", "bytes": 1858, "sha256": "a5352c13f7a3c9c7d57cd8b8071c6b79259f30c2419acadac92facfb62a004d5", "status": "pass"},
+      "stderr": {"path": "docs/performance/results/change-0908/capture/source-a/stderr.txt", "bytes": 1030, "sha256": "938cd4bb73c8c622c01124795da757da3662fa91cc485a50d52c537cf4ea51a3"},
+      "owner": {"calls": 1, "position": "51174", "expected_51143_edges": 0, "self_ir": 2408, "direct_children_ir": 108162922, "exclusive_sum_ir": 108165330, "positive_direct_child_rows": 16},
+      "parity": {"corpus_0907": true, "sink_0907": true, "output_0907": true, "source_0907_after_reduction": true, "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9", "source": {"materializations": 9, "ordinary_read_calls": 486, "ordinary_read_bytes": 16909038, "read_calls": 3372, "read_bytes": 17229633, "max_in_flight": 1}, "sink": {"accepted_bytes": 17017145, "write_calls": 2053, "largest_write": 65536, "over_65536": 0}},
+      "canonical_categories": {"production": 107930907, "runtime_or_dependency": 231537, "unclassified": 478}
+    },
+    {
+      "label": "source-b",
+      "kind": "source_backed",
+      "summary_ir": 108181418,
+      "raw_dump": {"path": "docs/performance/results/change-0908/capture/source-b/callgrind.out.1", "bytes": 436992, "sha256": "9e1dc4203c176da2d948801f2387300916dc4276e818dafe06beda12747b5c43"},
+      "terminal_dump": {"path": "docs/performance/results/change-0908/capture/source-b/callgrind.out", "bytes": 539, "sha256": "d2edf603697330acdf98a331a373c6eb5ae68ab8e474bccb52c515cf6c5362e4", "summary_ir": 0},
+      "report": {"path": "docs/performance/results/change-0908/capture/source-b/report.json", "bytes": 15620, "sha256": "08d8ca698c03fa7fc1674e4a0f6f0a02393e1b3347be157f508d8ef7deec3140"},
+      "reference_0907_report": {"path": "docs/performance/results/change-0907/source-b.json", "bytes": 81504, "sha256": "30220c89d9c13fa1800a9eadbfe443154ddfaacc16a0d2393ab92cfb1d063767"},
+      "command": {"path": "docs/performance/results/change-0908/capture/source-b/command.json", "bytes": 3410, "sha256": "831a08c2f20c1a7a1d4aae5b45d1b76a64233b98c1279e4c1edb9af80949cc53", "exit_code": 0},
+      "semantics": {"path": "docs/performance/results/change-0908/capture/source-b/semantics.json", "bytes": 1858, "sha256": "cb6657757baa66bea68fa6d8c7772fe4777d08490e2a7fd0dda8f2fae9e3960c", "status": "pass"},
+      "stderr": {"path": "docs/performance/results/change-0908/capture/source-b/stderr.txt", "bytes": 1030, "sha256": "8d9b906cff7bee53e845856203a393ee75f01f7169825fcf3976f3e2482604da"},
+      "owner": {"calls": 1, "position": "51174", "expected_51143_edges": 0, "self_ir": 2408, "direct_children_ir": 108179010, "exclusive_sum_ir": 108181418, "positive_direct_child_rows": 16},
+      "parity": {"corpus_0907": true, "sink_0907": true, "output_0907": true, "source_0907_after_reduction": true, "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9", "source": {"materializations": 9, "ordinary_read_calls": 486, "ordinary_read_bytes": 16909038, "read_calls": 3372, "read_bytes": 17229633, "max_in_flight": 1}, "sink": {"accepted_bytes": 17017145, "write_calls": 2053, "largest_write": 65536, "over_65536": 0}},
+      "canonical_categories": {"production": 107947155, "runtime_or_dependency": 231377, "unclassified": 478}
+    },
+    {
+      "label": "eager-b",
+      "kind": "eager",
+      "summary_ir": 4578507829,
+      "raw_dump": {"path": "docs/performance/results/change-0908/capture/eager-b/callgrind.out.1", "bytes": 791533, "sha256": "ca7e77c5c24f3205bac913f119f5855554c9b74187d9937e0c64e9ec824aec97"},
+      "terminal_dump": {"path": "docs/performance/results/change-0908/capture/eager-b/callgrind.out", "bytes": 530, "sha256": "e9abe1fb708b0f875abf446bc3e2c60b733bac20ae97501f93a25ef7661bfde1", "summary_ir": 0},
+      "report": {"path": "docs/performance/results/change-0908/capture/eager-b/report.json", "bytes": 15604, "sha256": "f833985b5843585b461d71f1ba2542fe85908e9693fa440f8912a90b33255dbb"},
+      "reference_0907_report": {"path": "docs/performance/results/change-0907/eager-b.json", "bytes": 81080, "sha256": "0b398016560f781a1312e1d8c6b6d3466ccd217c04385592d9107e24fc08948e"},
+      "command": {"path": "docs/performance/results/change-0908/capture/eager-b/command.json", "bytes": 3374, "sha256": "bb2bdd9ffe62b98eaab2a261c401a121cd357cd2856f7b062c1f76caabf677fe", "exit_code": 0},
+      "semantics": {"path": "docs/performance/results/change-0908/capture/eager-b/semantics.json", "bytes": 1845, "sha256": "8137b406c0faa67106c61a193ec42fd3164e1b1e623bc767962d1e12c29cf899", "status": "pass"},
+      "stderr": {"path": "docs/performance/results/change-0908/capture/eager-b/stderr.txt", "bytes": 1027, "sha256": "7655fa3d9916b0e5715a6dc0b5573429175601f638f357445569d465b2f6810f"},
+      "owner": {"calls": 1, "position": "51174", "expected_51143_edges": 0, "self_ir": 6428, "direct_children_ir": 4578501401, "exclusive_sum_ir": 4578507829, "positive_direct_child_rows": 22},
+      "parity": {"corpus_0907": true, "sink_0907": true, "output_0907": true, "source_0907_after_reduction": true, "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9", "source": {"materializations": 229, "ordinary_read_calls": 741, "ordinary_read_bytes": 16907750, "read_calls": 1864, "read_bytes": 17030811, "max_in_flight": 1}, "sink": {"accepted_bytes": 17017145, "write_calls": 260, "largest_write": 65536, "over_65536": 0}},
+      "canonical_categories": {"production": 4469546790, "harness_guard": 88785796, "runtime_or_dependency": 20167717, "unclassified": 1098}
+    }
+  ],
+  "phase_attribution_targets": [
+    {"symbol": "Package::to_bytes", "legs": {"eager-a": 3189476327, "eager-b": 3189730670}, "target": "Final eager serialization/publication and nested Deflate work; inclusive Ir only."},
+    {"symbol": "Package::opened_presentation_with_limits", "legs": {"eager-a": 994945242, "eager-b": 995093332}, "target": "Initial eager opened_presentation_transaction at lib.rs:51087, including snapshot and complete-revision work. Downstream global capture_internal and fingerprinting rows can merge initial and replay contexts; nested totals alone cannot assign replay work to this direct owner."},
+    {"symbol": "SourceBackedPackage::into_opc_package_inner", "legs": {"eager-a": 98544032, "eager-b": 98553345}, "target": "ReadAt materialization into an owned package before eager publication."},
+    {"symbol": "SourceBackedPresentationEditor::publish_slide_batch_commit_to_stream", "legs": {"source-a": 55654082, "source-b": 55654546}, "target": "Source-backed publication/write control."},
+    {"symbol": "SourceBackedPresentationEditor::from_read_at", "legs": {"source-a": 38232988, "source-b": 38246730}, "target": "Source-backed open and retained-catalog control."},
+    {"symbol": "SourceBackedSlideBatchEdit::set_shape_texts", "legs": {"source-a": 13962259, "source-b": 13963877}, "target": "Selected-slide shape-text staging control."}
+  ],
+  "candidate_handoff": {
+    "priority": "owned_from_vec_control",
+    "rationale": "The eager ReadAt materialization creates an owned package without physical source provenance for preservation copying, while ordinary owned routes already retain/use the preservation writer.",
+    "scope": "One owned-ingress control and preservation proof; no optimization approval or production change.",
+    "required_gates": [
+      "retain exact source lineage, archive end, freshness, limits, cancellation, reservations and sink preflight",
+      "prove complete changed dependency closure and raw-copy eligibility for every unchanged physical member, including opaque members and ordering/compression records",
+      "preserve signed, encrypted, malformed, duplicate, unsupported-topology and source-mutated refusal identities",
+      "reopen output under limits and pass semantic, relationship, media, untouched-member, sink-failure and durable inverse checks"
+    ]
+  },
+  "limitations": [
+    "Callgrind Ir is a guest-instruction attribution counter, not native wall time, hardware cycles, allocations, RSS, physical I/O or speedup.",
+    "Each profile has one measured sample, so these are raw route observations without variance or native timing inference.",
+    "Direct-callee rows are inclusive at the immediate owner boundary; nested rows must not be added or treated as independent phases.",
+    "Source-path classification is evidence for attribution, not proof of semantic ownership of an inclusive callee body.",
+    "The timed helper includes open, commit, publication and route-specific inverse/forward guard work; downstream merged capture/fingerprint rows cannot assign initial versus replay work from nested totals alone.",
+    "Corrected semantic receipts establish the stated 0907 parity; this review did not independently reopen the PPTX or census raw ZIP headers and member ordering.",
+    "The recorded brk warning and duplicated forked probe lines remain stderr limitations; neither is an additional work count."
+  ]
+}

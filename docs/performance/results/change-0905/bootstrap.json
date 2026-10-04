@@ -1,0 +1,7 @@
+{
+  "failure": "FileNotFoundError /tmp/litchi-0905-src/Cargo.lock while assembling receipt inputs; no Cargo child launched",
+  "helper_changed": false,
+  "initial_command": "command.py baseline-native-build -- cargo +1.95.0 build ...",
+  "quality_lock_sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087",
+  "resolution": "Copied retained0902 workspace quality lock; standalone benchmark retains its independent tracked Cargo.lock"
+}

@@ -1,0 +1,64 @@
+{
+  "classification": "Exact incoming callers; no dump-order selection. Setup excluded from measured comparison.",
+  "command": {
+    "bytes": 4078,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-a/command.json",
+    "sha256": "fc2953191acafdf90956ff464e9337507b649fd79383119c9138e837719910f9"
+  },
+  "contexts": {
+    "measured": {
+      "all_function_self_ir": 1000666812,
+      "caller": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+      "calls": 1,
+      "direct_children_ir": 1000666759,
+      "owner_ir": 1000666812,
+      "owner_self_ir": 53,
+      "raw": {
+        "bytes": 75199,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-a/callgrind.out.2",
+        "sha256": "b84197721e4e954d432917df79a2d32bdc250271228133139f221b3a758bd9ae"
+      }
+    },
+    "setup": {
+      "all_function_self_ir": 126538787,
+      "caller": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+      "calls": 1,
+      "direct_children_ir": 126538734,
+      "owner_ir": 126538787,
+      "owner_self_ir": 53,
+      "raw": {
+        "bytes": 74552,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-a/callgrind.out.1",
+        "sha256": "a4d811d4af806c75688852504bb4abb100f06f38e08dfaffa4f1a1b8266797ae"
+      }
+    }
+  },
+  "helper": {
+    "bytes": 3854,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/admission_v3.py",
+    "sha256": "183b53c82b4606d4fc15c2b580cd87e584fc2a4a2933c4ddc52deaed14d5584d"
+  },
+  "plan": {
+    "bytes": 8262,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/plan-v3.json",
+    "sha256": "28366047e447183badd9d7a91f10e82bc6e17a5de82529a4ef8da859b4034089"
+  },
+  "reader": {
+    "bytes": 63017,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_v2.py",
+    "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+  },
+  "semantics": {
+    "bytes": 1754,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-a/semantics.json",
+    "sha256": "99b64749ae43903c22949305328eb9b8b6052956b53266b40362509aa51d271f"
+  },
+  "status": "pass",
+  "terminal": [
+    {
+      "bytes": 466,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/materialized-a/callgrind.out",
+      "sha256": "a10b7b9c75d4a273592816e40a2252af30c4e13ebd70d79dfe08c8382dfc33d0"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "status": "clarified",
+  "original": {
+    "path": "docs/performance/results/change-0908/eager-opportunity-v1.md",
+    "sha256": "864e922b7d2a4bbfef84a446672d34ecd4d8843ab3acd86ab30a40d553df2120"
+  },
+  "final": {
+    "path": "docs/performance/results/change-0908/eager-opportunity.md",
+    "sha256": "6c38690b5ca06d86d64cf2c4b53bfe5f9364279118ceb1f2edc3d3227e7f722d"
+  },
+  "changes": [
+    "Generic operation_metrics envelope exists; only route-specific phase vectors are absent.",
+    "Initial opened-snapshot attribution uses the direct owner edge; ambiguity is limited to merged downstream function rows."
+  ],
+  "raw_evidence_changed": false
+}

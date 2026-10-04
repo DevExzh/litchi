@@ -1,0 +1,225 @@
+{
+  "corrected_semantics": {
+    "bytes": 2749,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/semantics.json",
+    "sha256": "afb94b3191e1f71e5ae29f23e9b7cda97495f70a0f9b19f8ec215457ba179397"
+  },
+  "header": {
+    "command": " /home/zhuhe/code/litchi/docs/performance/results/change-0907/binaries/native --workers 1 --warmup 0 --samples 1 --case pptx_eager_multi_slide_batch_edit_save --json /home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/report.json",
+    "events": [
+      "Ir"
+    ],
+    "part": 1,
+    "summary_ir": 4577995784,
+    "totals_ir": 4577995784,
+    "trigger": "--dump-after=litchi_perf_baseline::publish_pptx_multi_slide_batch_edit"
+  },
+  "helper": {
+    "bytes": 2799,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/admit-first.py",
+    "sha256": "d8af67fe532d372b87538cdbf8abc11d326cf56d3ae0dcc2222c52043f603f96"
+  },
+  "measured_edge": {
+    "callee": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "callee_id": 10522,
+    "caller": "litchi_perf_baseline::run_pptx_multi_slide_batch_edit_save",
+    "caller_id": 9046,
+    "calls": 1,
+    "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+    "inclusive_ir": 4577995784,
+    "line": 39652,
+    "position": "51174"
+  },
+  "original_command": {
+    "bytes": 3367,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/command.json",
+    "sha256": "8909acb12d34dc11af122735f4a87d5f84b749c62189fd3c96a2bf9f4dcb644a"
+  },
+  "owner": {
+    "direct_children": [
+      {
+        "callee": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::to_bytes",
+        "callee_id": 8466,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 3189476327
+      },
+      {
+        "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+        "callee_id": 6260,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 994945242
+      },
+      {
+        "callee": "litchi_opc::source_backed::SourceBackedPackage::into_opc_package_inner",
+        "callee_id": 9668,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 98544032
+      },
+      {
+        "callee": "litchi_perf_baseline::publish_pptx_batch_edit::{{closure}}",
+        "callee_id": 10294,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 88813897
+      },
+      {
+        "callee": "litchi_pptx::package::model::Package::publish_opened_presentation_patch",
+        "callee_id": 8240,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 87844295
+      },
+      {
+        "callee": "litchi_pptx::opened::transaction::Transaction::commit",
+        "callee_id": 7894,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 42871786
+      },
+      {
+        "callee": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+        "callee_id": 9066,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 32665651
+      },
+      {
+        "callee": "std::io::Write::write_all",
+        "callee_id": 3658,
+        "calls": 260,
+        "edge_count": 1,
+        "inclusive_ir": 17054845
+      },
+      {
+        "callee": "litchi_pptx::opened::transaction::Transaction::set_shape_texts",
+        "callee_id": 10060,
+        "calls": 8,
+        "edge_count": 1,
+        "inclusive_ir": 10835948
+      },
+      {
+        "callee": "litchi_pptx::package::model::Package::apply_opened_presentation_commit",
+        "callee_id": 8238,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 7522298
+      },
+      {
+        "callee": "litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::from_opc_package_with_provenance",
+        "callee_id": 5426,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 2947807
+      },
+      {
+        "callee": "litchi_pptx::opened::model::Snapshot::edit",
+        "callee_id": 7168,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 1326123
+      },
+      {
+        "callee": "core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>",
+        "callee_id": 7236,
+        "calls": 2,
+        "edge_count": 2,
+        "inclusive_ir": 1101409
+      },
+      {
+        "callee": "core::ptr::drop_in_place<core::result::Result<litchi_pptx::opened::model::Snapshot,litchi_pptx::error::Error>>",
+        "callee_id": 10304,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 991908
+      },
+      {
+        "callee": "core::ptr::drop_in_place<litchi_pptx::package::model::Package>",
+        "callee_id": 8574,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 936624
+      },
+      {
+        "callee": "alloc::fmt::format::format_inner",
+        "callee_id": 1428,
+        "calls": 64,
+        "edge_count": 8,
+        "inclusive_ir": 68155
+      },
+      {
+        "callee": "litchi_pptx::opened::patch::Patch::inverse",
+        "callee_id": 10266,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 20161
+      },
+      {
+        "callee": "core::ptr::drop_in_place<litchi_pptx::opened::patch::Patch>",
+        "callee_id": 10316,
+        "calls": 1,
+        "edge_count": 1,
+        "inclusive_ir": 17736
+      },
+      {
+        "callee": "free",
+        "callee_id": 756,
+        "calls": 81,
+        "edge_count": 11,
+        "inclusive_ir": 3774
+      },
+      {
+        "callee": "__memcpy_avx_unaligned_erms",
+        "callee_id": 722,
+        "calls": 8,
+        "edge_count": 8,
+        "inclusive_ir": 786
+      },
+      {
+        "callee": "__rustc::__rust_alloc",
+        "callee_id": 992,
+        "calls": 8,
+        "edge_count": 1,
+        "inclusive_ir": 312
+      },
+      {
+        "callee": "malloc",
+        "callee_id": 644,
+        "calls": 8,
+        "edge_count": 1,
+        "inclusive_ir": 240
+      }
+    ],
+    "direct_children_ir": 4577989356,
+    "file": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs",
+    "id": 10522,
+    "name": "litchi_perf_baseline::publish_pptx_multi_slide_batch_edit",
+    "records": 1,
+    "self_ir": 6428,
+    "source": "/tmp/litchi-0907-src/tools/perf-baseline/src/lib.rs"
+  },
+  "plan": {
+    "bytes": 6080,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/plan-v2.json",
+    "sha256": "5f848824764eb5884b110d1825bbe169c62639e6b282d71eb7a28eaca6f9f086"
+  },
+  "raw_dump": {
+    "bytes": 783580,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/callgrind.out.1",
+    "sha256": "ab88e84ba3c227d78eda3f754149d94a39974480153496249df54847958e9ee4"
+  },
+  "reader": {
+    "bytes": 63017,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_v2.py",
+    "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+  },
+  "scope": "Exactly one collected measured call at51174; expected-output callsite51143 excluded. Instruction counts only. Zero terminal remainder.",
+  "status": "pass",
+  "terminal": {
+    "bytes": 530,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0908/capture/eager-a/callgrind.out",
+    "sha256": "ef187991211c2cfc2f2266e7cb368e26b31a77e6876b1911b5901694860c6f95"
+  }
+}

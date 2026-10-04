@@ -1,5 +1,92 @@
 # Performance hotspot inventory
 
+## 0913 — large media already bypass the member-span buffer
+
+[0913](0913-pptx-owned-direct-read.md) rejects the direct-owned-read candidate.
+The 64 KiB span cap already excludes all eight 2 MiB media members. A static
+one-read-per-member bound admits only 211,315 span bytes across 437 eligible
+members; it is not a dynamic copy or allocation measurement. Qualify actual
+payload-size and force-path exposure before another copy-elimination candidate.
+
+## 0912 — native SHA confirmed; owned-source copy candidate identified
+
+[0912](0912-pptx-native-sha-dispatch.md) confirms native x86 SHA reachability,
+so 0911 software-SHA guest counts cannot estimate native hashing cost. Native
+sampling failed admission. Source review identifies an intermediate allocated,
+zero-filled `MemberSpan` copy for retained owned ZIP bytes. Test a bounded
+direct owned-source read path with existing correctness and fresh native gates;
+no production change or benefit is claimed yet.
+
+## 0911 — qualify native dispatch before optimizing the snapshot
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) attributes cold snapshot
+work with exact caller gates. Software SHA-256 dominates the guest instruction
+profile; this cannot establish its native time share on a SHA-capable host.
+Owning input also exposes deferred payload access under complete-package
+fingerprinting. Confirm native dispatch and phase costs before choosing a
+production change; preserve source/revision binding and deferred-error behavior.
+
+## 0910 — owning input changes the PPTX priority
+
+[0910](0910-pptx-owning-input-native-control.md) measures publication p50 at
+236.840172 ms for materialized ReadAt and 5.575988 ms for existing owning input.
+Owning total p50 is 32.180007 ms; opened snapshot capture is its largest phase
+at 15.865198 ms. Clone and snapshot costs increase and remain disclosed.
+Profile the owning snapshot before proposing another publication change or a
+provenance bridge. No production change is adopted by this comparison.
+
+## 0909 — measure the qualified owning route before a bridge
+
+[0909](0909-pptx-owning-input-preservation-control.md) proves the existing
+owning route retains source admission through the multi-slide edit and passes
+raw preservation, inverse, limit and sink gates on the generated fixture.
+Its output matches 0907, but byte equality cannot prove avoided Deflate work.
+Next measure this control with explicit copy/replay boundaries before production
+changes; do not generalize the materialized ReadAt hotspot to all owned input.
+
+## 0908 — qualify the owning eager control next
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) attributes about 69.67%
+of eager Ir to serialization and 21.73% to the initial opened snapshot.
+The measured materialization route loses physical archive provenance; owning
+`from_vec`/`from_reader` already retain it. Qualify that missing preservation
+control before proposing a production bridge. Native phase fractions remain
+unmeasured, and full snapshot validation cannot be skipped.
+
+## 0907 — attribute current PPTX costs before optimizing
+
+[0907](0907-pptx-multi-slide-current-baseline.md) confirms the current eager
+multi-slide workflow remains expensive beside the source-backed path. The
+clock includes differing patch guards; current phase observers do not split
+this route. Profile eager materialization/serialization and source-backed
+editing/publication next, with replay separately measured. Static repeated
+comparison and planning candidates are hypotheses, not measured hotspots.
+
+## 0906 — distinguish edit timing from patch replay
+
+[0906](0906-office-coverage-qualification.md) identifies a scope boundary before
+the next PPTX capture: the source-backed edit/save helpers include forward and
+inverse patch replay inside their timers, while the retained 0829 profile
+excludes serialization. Neither establishes a pure full-save hotspot ranking.
+No cost or speedup is inferred from the source audit.
+
+## 0905 — validated XML summary removes publication iterator work
+
+[0905](0905-xml-attribute-summary.md) measures a one-file bounded XML audit
+summary after the complete lexical and namespace pass. The two XLSX primary
+workflow p50 ratios are **0.9543881780** and **0.9477553767**, with no main
+review flags. The publication phase ratios are **0.9051543375** (medium),
+**0.9083541339** (dense-sparse) and **0.9451486284** (one-edit), while reopen
+is outside the workflow timer. Publication allocation calls fall
+**19,248→416**, **36,366→416** and **2,662→308**; allocated bytes fall
+**3,970,346→2,765,098**, **5,575,801→3,275,001** and
+**1,216,622→1,065,966**. Other allocation/reallocation values are unchanged,
+and the three-byte live/peak increase means the allocator lane supplies no
+peak-live reduction claim. RSS is descriptive executable-layout-sensitive
+whole-process high water. The micro probe retains two cardinality-2 p99 flags
+but no hard adverse or spread flag. The candidate is accepted after independent
+review, cleanup and post-cleanup replay; target-branch integration is pending.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

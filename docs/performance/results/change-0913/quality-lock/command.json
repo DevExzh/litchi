@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "cargo",
+    "generate-lockfile",
+    "--offline"
+  ],
+  "cwd": "/tmp/litchi-0913-src",
+  "start_utc": "2026-10-04T10:39:57.430760+00:00",
+  "end_utc": "2026-10-04T10:39:57.726342+00:00",
+  "exit_code": 0,
+  "purpose": "Temporary root-workspace quality lock; benchmark uses unchanged separate tools/perf-baseline lock",
+  "before": {
+    "path": "docs/performance/results/change-0913/quality-lock/before-Cargo.lock",
+    "bytes": 138465,
+    "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+  },
+  "after": {
+    "path": "docs/performance/results/change-0913/quality-lock/after-Cargo.lock",
+    "bytes": 138457,
+    "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+  },
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0913/quality-lock/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0913/quality-lock/stderr.txt",
+      "bytes": 3654,
+      "sha256": "dd6fca0bcf58bf253426b467e3c4473f1437bd38aa7d74a29f155d363a502318"
+    }
+  ]
+}

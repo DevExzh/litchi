@@ -1,0 +1,3808 @@
+{
+  "qualification_admitted": true,
+  "rows": [
+    {
+      "allocator_metrics": {
+        "commit_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "commit_core_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "plan_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "publication_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "staging_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ]
+      },
+      "allocator_metrics_status": "measured",
+      "case_id": "primary-percent-medium",
+      "command": {
+        "bytes": 5569,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/command.json",
+        "sha256": "15071828af1c60e88b520d5aa0dba0f8e6d9436a838d1cd4b1ed8e7996d2c0ef"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 12576847.591000002,
+          "upper": 21565745.408999998
+        },
+        "max": 17425023,
+        "mean": 17071296.5,
+        "min": 16717570,
+        "p50": 17071296,
+        "p95": 17425023,
+        "p99": 17425023,
+        "standard_deviation": 500244.8136707666
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 9216,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-medium",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "medium",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4231168,
+          "xlsx": {
+            "columns_per_sheet": 48,
+            "one_percent_update_count": 93,
+            "rows_per_sheet": 48,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "sink": {
+          "accepted_bytes": 4226788,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 4,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 6,
+          "ordinary_payload_read_bytes": 4223551,
+          "ordinary_payload_read_calls": 79,
+          "read_bytes": 4233170,
+          "read_calls": 183,
+          "xlsx_cell_values": {
+            "budget_objects_used_after_handles_drop": 0,
+            "budget_used_after_handles_drop": 0,
+            "budget_used_after_package_drop": 0,
+            "cache_budget_managed": false,
+            "cache_budget_memory_used": 0,
+            "cache_budget_reservation_failures": 0,
+            "cache_budget_reserved_bytes": 0,
+            "cache_bypasses": 0,
+            "cache_cold_loads": 6,
+            "cache_evictions": 0,
+            "cache_failed_loads": 0,
+            "cache_hits": 0,
+            "cache_in_flight_loads": 0,
+            "cache_mode": "unmanaged-control",
+            "cache_oversized_bypasses": 0,
+            "cache_retained_bytes": 269785,
+            "cache_retained_entries": 6,
+            "cache_successful_loads": 6,
+            "cache_waiter_joins": 0,
+            "implementation": "source-backed",
+            "output_budget_refusal": {
+              "accepted_output_bytes": 0,
+              "first_output_request_bytes": 0,
+              "one_under_output_limit": 0,
+              "output_bytes_used": 0,
+              "source_identity_preserved": false,
+              "source_read_bytes": 0,
+              "source_read_calls": 0,
+              "successful_output_ceiling": 0,
+              "typed_output_resource_refusal": false,
+              "zero_output_verified": false
+            },
+            "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+            "payload_materializations": 6,
+            "post_publication_budget": {
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "pre_publication_budget": {
+              "cache_reserved_objects": 0,
+              "catalog_reserved_objects": 0,
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "selected_worksheet_count": 4,
+            "selected_worksheet_read_bytes": 27146,
+            "selected_worksheet_read_calls": 4,
+            "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+            "source_read_bytes": 4233170,
+            "source_read_calls": 183,
+            "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+            "unselected_worksheet_read_bytes": 0,
+            "unselected_worksheet_read_calls": 0,
+            "untouched_member_count": 12,
+            "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+            "update_count": 93,
+            "workbook_read_bytes": 226,
+            "workbook_read_calls": 1
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-baseline-primary-percent-medium",
+      "mean": 17071296.5,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              4226788,
+              4226788
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              65536,
+              65536
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              143,
+              143
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                64,
+                64
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                75,
+                75
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                4,
+                4
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 17071296,
+      "p95": 17425023,
+      "p99": 17425023,
+      "receipt": {
+        "bytes": 5734,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/receipt.json",
+        "sha256": "fc5119d2493f288ca01b26ee39d0cc9eda3441e7b2118db4c006d5a67edb675b"
+      },
+      "report": {
+        "bytes": 24103,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/report.json",
+        "sha256": "41f27b9c707fc43ee91da94afce3fea4ea62e4f970965a15b0625daa4bf8a5e1"
+      },
+      "resource": {
+        "elapsed_seconds": 0.66,
+        "max_rss_kib": 76004,
+        "system_seconds": 0.06,
+        "user_seconds": 0.59
+      },
+      "role": "baseline",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {
+        "commit_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "commit_core_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "plan_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "publication_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "staging_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ]
+      },
+      "allocator_metrics_status": "measured",
+      "case_id": "primary-percent-dense-sparse",
+      "command": {
+        "bytes": 5636,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/command.json",
+        "sha256": "0047cd4637143943cb8812531f866b292505a8f68fbc7cd0455fac73fb351b96"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 29165026.021,
+          "upper": 36587146.979
+        },
+        "max": 33168158,
+        "mean": 32876086.5,
+        "min": 32584015,
+        "p50": 32876086,
+        "p95": 33168158,
+        "p99": 33168158,
+        "standard_deviation": 413051.4764826534
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 4251863,
+          "archive_member_count": 17,
+          "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 17792,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-dense-sparse",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "dense-sparse",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4265472,
+          "xlsx": {
+            "columns_per_sheet": 128,
+            "one_percent_update_count": 178,
+            "rows_per_sheet": 128,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "sink": {
+          "accepted_bytes": 4252436,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 65,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 3,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 6,
+          "ordinary_payload_read_bytes": 4248985,
+          "ordinary_payload_read_calls": 79,
+          "read_bytes": 4258604,
+          "read_calls": 183,
+          "xlsx_cell_values": {
+            "budget_objects_used_after_handles_drop": 0,
+            "budget_used_after_handles_drop": 0,
+            "budget_used_after_package_drop": 0,
+            "cache_budget_managed": false,
+            "cache_budget_memory_used": 0,
+            "cache_budget_reservation_failures": 0,
+            "cache_budget_reserved_bytes": 0,
+            "cache_bypasses": 0,
+            "cache_cold_loads": 6,
+            "cache_evictions": 0,
+            "cache_failed_loads": 0,
+            "cache_hits": 0,
+            "cache_in_flight_loads": 0,
+            "cache_mode": "unmanaged-control",
+            "cache_oversized_bypasses": 0,
+            "cache_retained_bytes": 509460,
+            "cache_retained_entries": 6,
+            "cache_successful_loads": 6,
+            "cache_waiter_joins": 0,
+            "implementation": "source-backed",
+            "output_budget_refusal": {
+              "accepted_output_bytes": 0,
+              "first_output_request_bytes": 0,
+              "one_under_output_limit": 0,
+              "output_bytes_used": 0,
+              "source_identity_preserved": false,
+              "source_read_bytes": 0,
+              "source_read_calls": 0,
+              "successful_output_ceiling": 0,
+              "typed_output_resource_refusal": false,
+              "zero_output_verified": false
+            },
+            "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+            "payload_materializations": 6,
+            "post_publication_budget": {
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "pre_publication_budget": {
+              "cache_reserved_objects": 0,
+              "catalog_reserved_objects": 0,
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "selected_worksheet_count": 4,
+            "selected_worksheet_read_bytes": 52580,
+            "selected_worksheet_read_calls": 4,
+            "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+            "source_read_bytes": 4258604,
+            "source_read_calls": 183,
+            "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+            "unselected_worksheet_read_bytes": 0,
+            "unselected_worksheet_read_calls": 0,
+            "untouched_member_count": 12,
+            "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+            "update_count": 178,
+            "workbook_read_bytes": 226,
+            "workbook_read_calls": 1
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-baseline-primary-percent-dense-sparse",
+      "mean": 32876086.5,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              4252436,
+              4252436
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              65536,
+              65536
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              143,
+              143
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                65,
+                65
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                75,
+                75
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                3,
+                3
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 32876086,
+      "p95": 33168158,
+      "p99": 33168158,
+      "receipt": {
+        "bytes": 5795,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/receipt.json",
+        "sha256": "f5719f754e4ec024401ee4fae420e55af8d393fed099ec23e8ceb118db847f11"
+      },
+      "report": {
+        "bytes": 24118,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "e786c557d86601ace95e73d18a5f2e48cbbd3e99f98a58e1a757c0d1deacaa51"
+      },
+      "resource": {
+        "elapsed_seconds": 0.89,
+        "max_rss_kib": 92808,
+        "system_seconds": 0.07,
+        "user_seconds": 0.82
+      },
+      "role": "baseline",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {
+        "commit_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "commit_core_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "plan_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "publication_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "staging_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ]
+      },
+      "allocator_metrics_status": "measured",
+      "case_id": "control-xlsx-one-edit-medium",
+      "command": {
+        "bytes": 5608,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/command.json",
+        "sha256": "35c02fae3f03e58d44fe9a4eb6e56875c459c954adca7863caafd3dc4c259e0b"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 630155.9780000006,
+          "upper": 8245802.022
+        },
+        "max": 4737666,
+        "mean": 4437979,
+        "min": 4138292,
+        "p50": 4437979,
+        "p95": 4737666,
+        "p99": 4737666,
+        "standard_deviation": 423821.4198669057
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 9216,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-medium",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "medium",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4231168,
+          "xlsx": {
+            "columns_per_sheet": 48,
+            "one_percent_update_count": 93,
+            "rows_per_sheet": 48,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+        "sink": {
+          "accepted_bytes": 4226480,
+          "largest_write": 65536,
+          "write_calls": 137,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_1_to_512": 69,
+            "bytes_4097_to_16384": 4,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 3,
+          "ordinary_payload_read_bytes": 4223551,
+          "ordinary_payload_read_calls": 79,
+          "read_bytes": 4233122,
+          "read_calls": 180,
+          "xlsx_cell_values": {
+            "budget_objects_used_after_handles_drop": 0,
+            "budget_used_after_handles_drop": 0,
+            "budget_used_after_package_drop": 0,
+            "cache_budget_managed": false,
+            "cache_budget_memory_used": 0,
+            "cache_budget_reservation_failures": 0,
+            "cache_budget_reserved_bytes": 0,
+            "cache_bypasses": 0,
+            "cache_cold_loads": 3,
+            "cache_evictions": 0,
+            "cache_failed_loads": 0,
+            "cache_hits": 0,
+            "cache_in_flight_loads": 0,
+            "cache_mode": "unmanaged-control",
+            "cache_oversized_bypasses": 0,
+            "cache_retained_bytes": 64321,
+            "cache_retained_entries": 3,
+            "cache_successful_loads": 3,
+            "cache_waiter_joins": 0,
+            "implementation": "source-backed",
+            "output_budget_refusal": {
+              "accepted_output_bytes": 0,
+              "first_output_request_bytes": 0,
+              "one_under_output_limit": 0,
+              "output_bytes_used": 0,
+              "source_identity_preserved": false,
+              "source_read_bytes": 0,
+              "source_read_calls": 0,
+              "successful_output_ceiling": 0,
+              "typed_output_resource_refusal": false,
+              "zero_output_verified": false
+            },
+            "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "payload_materializations": 3,
+            "post_publication_budget": {
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "pre_publication_budget": {
+              "cache_reserved_objects": 0,
+              "catalog_reserved_objects": 0,
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "selected_worksheet_count": 1,
+            "selected_worksheet_read_bytes": 6816,
+            "selected_worksheet_read_calls": 1,
+            "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "source_read_bytes": 4233122,
+            "source_read_calls": 180,
+            "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+            "unselected_worksheet_read_bytes": 20330,
+            "unselected_worksheet_read_calls": 3,
+            "untouched_member_count": 15,
+            "untouched_member_sha256": "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "update_count": 1,
+            "workbook_read_bytes": 226,
+            "workbook_read_calls": 1
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-baseline-control-xlsx-one-edit-medium",
+      "mean": 4437979,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              4226480,
+              4226480
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              65536,
+              65536
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              137,
+              137
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                64,
+                64
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                69,
+                69
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                4,
+                4
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 4437979,
+      "p95": 4737666,
+      "p99": 4737666,
+      "receipt": {
+        "bytes": 5781,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/receipt.json",
+        "sha256": "75d725f8e4fab1ade97661432954f46ad512092b8f9e4228b65bd86376189d80"
+      },
+      "report": {
+        "bytes": 24064,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "092a3f48439e0533880512215c5c522b4c45366dab1cddfcbc6042841269a754"
+      },
+      "resource": {
+        "elapsed_seconds": 0.62,
+        "max_rss_kib": 75816,
+        "system_seconds": 0.06,
+        "user_seconds": 0.55
+      },
+      "role": "baseline",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {},
+      "allocator_metrics_status": "not_applicable",
+      "case_id": "control-docx-one-edit-medium",
+      "command": {
+        "bytes": 5563,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/command.json",
+        "sha256": "f93c5611352c0e4579b9ff007966dddb32b2f4bf6f450f37e9d51cc97b9f1f75"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 0.0,
+          "upper": 969537.5529999998
+        },
+        "max": 297022,
+        "mean": 239571.5,
+        "min": 182121,
+        "p50": 239571,
+        "p95": 297022,
+        "p99": 297022,
+        "standard_deviation": 81247.27626511549
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+          "compression": "deflate",
+          "entry_bytes": 50,
+          "entry_count": 200,
+          "generator": "litchi-docx-semantic-v1",
+          "name": "docx-semantic-medium",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "deterministic-semantic-text",
+          "shape": "medium",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+          "uncompressed_payload_bytes": 10000,
+          "xlsx": null
+        },
+        "sink": {
+          "accepted_bytes": 9060,
+          "largest_write": 1652,
+          "write_calls": 51,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_1_to_512": 45,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 6,
+            "bytes_over_65536": 0
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-baseline-control-docx-one-edit-medium",
+      "mean": 239571.5,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              9060,
+              9060
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              1652,
+              1652
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              51,
+              51
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                45,
+                45
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                6,
+                6
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 239571,
+      "p95": 297022,
+      "p99": 297022,
+      "receipt": {
+        "bytes": 5759,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/receipt.json",
+        "sha256": "87577a53641ac1e2477ae08815aa9f9aa7d7ac265f427b6f1c819a48aea98fd8"
+      },
+      "report": {
+        "bytes": 15198,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "f4926d2f2f457756ebe545a58cabf0f1fdf297bcf13c0de250c361c416200ddd"
+      },
+      "resource": {
+        "elapsed_seconds": 0.14,
+        "max_rss_kib": 27252,
+        "system_seconds": 0.01,
+        "user_seconds": 0.13
+      },
+      "role": "baseline",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {
+        "commit_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "commit_core_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "plan_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "publication_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "staging_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ]
+      },
+      "allocator_metrics_status": "measured",
+      "case_id": "primary-percent-medium",
+      "command": {
+        "bytes": 5580,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/command.json",
+        "sha256": "b6e9e7d60688cb31ebf4f35d3c57832d7b4f06a281b69303dbb4ce7d0c62a226"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 15899034.19,
+          "upper": 16099407.81
+        },
+        "max": 16007106,
+        "mean": 15999221,
+        "min": 15991336,
+        "p50": 15999221,
+        "p95": 16007106,
+        "p99": 16007106,
+        "standard_deviation": 11151.073939311855
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 9216,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-medium",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "medium",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4231168,
+          "xlsx": {
+            "columns_per_sheet": 48,
+            "one_percent_update_count": 93,
+            "rows_per_sheet": 48,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "sink": {
+          "accepted_bytes": 4226788,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 4,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 6,
+          "ordinary_payload_read_bytes": 4223551,
+          "ordinary_payload_read_calls": 79,
+          "read_bytes": 4233170,
+          "read_calls": 183,
+          "xlsx_cell_values": {
+            "budget_objects_used_after_handles_drop": 0,
+            "budget_used_after_handles_drop": 0,
+            "budget_used_after_package_drop": 0,
+            "cache_budget_managed": false,
+            "cache_budget_memory_used": 0,
+            "cache_budget_reservation_failures": 0,
+            "cache_budget_reserved_bytes": 0,
+            "cache_bypasses": 0,
+            "cache_cold_loads": 6,
+            "cache_evictions": 0,
+            "cache_failed_loads": 0,
+            "cache_hits": 0,
+            "cache_in_flight_loads": 0,
+            "cache_mode": "unmanaged-control",
+            "cache_oversized_bypasses": 0,
+            "cache_retained_bytes": 269785,
+            "cache_retained_entries": 6,
+            "cache_successful_loads": 6,
+            "cache_waiter_joins": 0,
+            "implementation": "source-backed",
+            "output_budget_refusal": {
+              "accepted_output_bytes": 0,
+              "first_output_request_bytes": 0,
+              "one_under_output_limit": 0,
+              "output_bytes_used": 0,
+              "source_identity_preserved": false,
+              "source_read_bytes": 0,
+              "source_read_calls": 0,
+              "successful_output_ceiling": 0,
+              "typed_output_resource_refusal": false,
+              "zero_output_verified": false
+            },
+            "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+            "payload_materializations": 6,
+            "post_publication_budget": {
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "pre_publication_budget": {
+              "cache_reserved_objects": 0,
+              "catalog_reserved_objects": 0,
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "selected_worksheet_count": 4,
+            "selected_worksheet_read_bytes": 27146,
+            "selected_worksheet_read_calls": 4,
+            "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+            "source_read_bytes": 4233170,
+            "source_read_calls": 183,
+            "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+            "unselected_worksheet_read_bytes": 0,
+            "unselected_worksheet_read_calls": 0,
+            "untouched_member_count": 12,
+            "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+            "update_count": 93,
+            "workbook_read_bytes": 226,
+            "workbook_read_calls": 1
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-candidate-primary-percent-medium",
+      "mean": 15999221,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          0,
+          1
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              4226788,
+              4226788
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              65536,
+              65536
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              143,
+              143
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                64,
+                64
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                75,
+                75
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                4,
+                4
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 15999221,
+      "p95": 16007106,
+      "p99": 16007106,
+      "receipt": {
+        "bytes": 5746,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/receipt.json",
+        "sha256": "edb039690d29a070a4d4a6cc1f11211300200ef56267b29826a78109da1645d1"
+      },
+      "report": {
+        "bytes": 24091,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/report.json",
+        "sha256": "9c8bb310104c0d3c76a27367958d2b809967b720681dd293deb3875445f82fa7"
+      },
+      "resource": {
+        "elapsed_seconds": 0.65,
+        "max_rss_kib": 71516,
+        "system_seconds": 0.05,
+        "user_seconds": 0.59
+      },
+      "role": "candidate",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {
+        "commit_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "commit_core_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "plan_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "publication_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "staging_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ]
+      },
+      "allocator_metrics_status": "measured",
+      "case_id": "primary-percent-dense-sparse",
+      "command": {
+        "bytes": 5646,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/command.json",
+        "sha256": "1fc759b894cf83087b9536dd71fceb2604d8158dc712eb37be713c35dd2f3633"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 28076370.204,
+          "upper": 34791897.796
+        },
+        "max": 31698400,
+        "mean": 31434134,
+        "min": 31169868,
+        "p50": 31434134,
+        "p95": 31698400,
+        "p99": 31698400,
+        "standard_deviation": 373728.56127408834
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 4251863,
+          "archive_member_count": 17,
+          "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 17792,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-dense-sparse",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "dense-sparse",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4265472,
+          "xlsx": {
+            "columns_per_sheet": 128,
+            "one_percent_update_count": 178,
+            "rows_per_sheet": 128,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "sink": {
+          "accepted_bytes": 4252436,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 65,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 3,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 6,
+          "ordinary_payload_read_bytes": 4248985,
+          "ordinary_payload_read_calls": 79,
+          "read_bytes": 4258604,
+          "read_calls": 183,
+          "xlsx_cell_values": {
+            "budget_objects_used_after_handles_drop": 0,
+            "budget_used_after_handles_drop": 0,
+            "budget_used_after_package_drop": 0,
+            "cache_budget_managed": false,
+            "cache_budget_memory_used": 0,
+            "cache_budget_reservation_failures": 0,
+            "cache_budget_reserved_bytes": 0,
+            "cache_bypasses": 0,
+            "cache_cold_loads": 6,
+            "cache_evictions": 0,
+            "cache_failed_loads": 0,
+            "cache_hits": 0,
+            "cache_in_flight_loads": 0,
+            "cache_mode": "unmanaged-control",
+            "cache_oversized_bypasses": 0,
+            "cache_retained_bytes": 509460,
+            "cache_retained_entries": 6,
+            "cache_successful_loads": 6,
+            "cache_waiter_joins": 0,
+            "implementation": "source-backed",
+            "output_budget_refusal": {
+              "accepted_output_bytes": 0,
+              "first_output_request_bytes": 0,
+              "one_under_output_limit": 0,
+              "output_bytes_used": 0,
+              "source_identity_preserved": false,
+              "source_read_bytes": 0,
+              "source_read_calls": 0,
+              "successful_output_ceiling": 0,
+              "typed_output_resource_refusal": false,
+              "zero_output_verified": false
+            },
+            "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+            "payload_materializations": 6,
+            "post_publication_budget": {
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "pre_publication_budget": {
+              "cache_reserved_objects": 0,
+              "catalog_reserved_objects": 0,
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "selected_worksheet_count": 4,
+            "selected_worksheet_read_bytes": 52580,
+            "selected_worksheet_read_calls": 4,
+            "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+            "source_read_bytes": 4258604,
+            "source_read_calls": 183,
+            "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+            "unselected_worksheet_read_bytes": 0,
+            "unselected_worksheet_read_calls": 0,
+            "untouched_member_count": 12,
+            "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+            "update_count": 178,
+            "workbook_read_bytes": 226,
+            "workbook_read_calls": 1
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-candidate-primary-percent-dense-sparse",
+      "mean": 31434134,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              4252436,
+              4252436
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              65536,
+              65536
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              143,
+              143
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                65,
+                65
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                75,
+                75
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                3,
+                3
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 31434134,
+      "p95": 31698400,
+      "p99": 31698400,
+      "receipt": {
+        "bytes": 5806,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/receipt.json",
+        "sha256": "0ccdc1454a242881fb13852081c3a6c0e3c126deb2716a95c37395d1cea03c15"
+      },
+      "report": {
+        "bytes": 24121,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "e17c8c38c52b44cbb34b0a64a78ac891490e8f154797ddcbe7bf8f4e3292c85e"
+      },
+      "resource": {
+        "elapsed_seconds": 0.89,
+        "max_rss_kib": 86148,
+        "system_seconds": 0.08,
+        "user_seconds": 0.81
+      },
+      "role": "candidate",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {
+        "commit_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "commit_core_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "plan_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "publication_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ],
+        "staging_allocation_metrics": [
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          },
+          {
+            "scope": "operation_global_system_allocator",
+            "status": "unavailable"
+          }
+        ]
+      },
+      "allocator_metrics_status": "measured",
+      "case_id": "control-xlsx-one-edit-medium",
+      "command": {
+        "bytes": 5618,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/command.json",
+        "sha256": "72e9bc58b67d08f7865731a73546e20e19a6b859f4e73cb9c776e7b5923d06e2"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 3641820.367,
+          "upper": 4420202.633
+        },
+        "max": 4061642,
+        "mean": 4031011.5,
+        "min": 4000381,
+        "p50": 4031011,
+        "p95": 4061642,
+        "p99": 4061642,
+        "standard_deviation": 43318.06852226909
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 9216,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-medium",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "medium",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4231168,
+          "xlsx": {
+            "columns_per_sheet": 48,
+            "one_percent_update_count": 93,
+            "rows_per_sheet": 48,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+        "sink": {
+          "accepted_bytes": 4226480,
+          "largest_write": 65536,
+          "write_calls": 137,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_1_to_512": 69,
+            "bytes_4097_to_16384": 4,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "max_in_flight_reads": 1,
+          "ordinary_payload_materializations": 3,
+          "ordinary_payload_read_bytes": 4223551,
+          "ordinary_payload_read_calls": 79,
+          "read_bytes": 4233122,
+          "read_calls": 180,
+          "xlsx_cell_values": {
+            "budget_objects_used_after_handles_drop": 0,
+            "budget_used_after_handles_drop": 0,
+            "budget_used_after_package_drop": 0,
+            "cache_budget_managed": false,
+            "cache_budget_memory_used": 0,
+            "cache_budget_reservation_failures": 0,
+            "cache_budget_reserved_bytes": 0,
+            "cache_bypasses": 0,
+            "cache_cold_loads": 3,
+            "cache_evictions": 0,
+            "cache_failed_loads": 0,
+            "cache_hits": 0,
+            "cache_in_flight_loads": 0,
+            "cache_mode": "unmanaged-control",
+            "cache_oversized_bypasses": 0,
+            "cache_retained_bytes": 64321,
+            "cache_retained_entries": 3,
+            "cache_successful_loads": 3,
+            "cache_waiter_joins": 0,
+            "implementation": "source-backed",
+            "output_budget_refusal": {
+              "accepted_output_bytes": 0,
+              "first_output_request_bytes": 0,
+              "one_under_output_limit": 0,
+              "output_bytes_used": 0,
+              "source_identity_preserved": false,
+              "source_read_bytes": 0,
+              "source_read_calls": 0,
+              "successful_output_ceiling": 0,
+              "typed_output_resource_refusal": false,
+              "zero_output_verified": false
+            },
+            "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "payload_materializations": 3,
+            "post_publication_budget": {
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "pre_publication_budget": {
+              "cache_reserved_objects": 0,
+              "catalog_reserved_objects": 0,
+              "input_bytes_used": 0,
+              "objects_used": 0,
+              "output_bytes_used": 0,
+              "work_used": 0
+            },
+            "selected_worksheet_count": 1,
+            "selected_worksheet_read_bytes": 6816,
+            "selected_worksheet_read_calls": 1,
+            "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "source_read_bytes": 4233122,
+            "source_read_calls": 180,
+            "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+            "unselected_worksheet_read_bytes": 20330,
+            "unselected_worksheet_read_calls": 3,
+            "untouched_member_count": 15,
+            "untouched_member_sha256": "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "update_count": 1,
+            "workbook_read_bytes": 226,
+            "workbook_read_calls": 1
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-candidate-control-xlsx-one-edit-medium",
+      "mean": 4031011.5,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              4226480,
+              4226480
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              65536,
+              65536
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              137,
+              137
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                64,
+                64
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                69,
+                69
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                4,
+                4
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 4031011,
+      "p95": 4061642,
+      "p99": 4061642,
+      "receipt": {
+        "bytes": 5792,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/receipt.json",
+        "sha256": "ac516c1717db284c0ad4c1141cc4d91f9a2c3d7a4ef8d9a36cb0bf7438ba90f8"
+      },
+      "report": {
+        "bytes": 24059,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "b699b07d2b15d11fd70fe2ce14885f25560a64593026c7d2e12de01db2a55b72"
+      },
+      "resource": {
+        "elapsed_seconds": 0.62,
+        "max_rss_kib": 66864,
+        "system_seconds": 0.05,
+        "user_seconds": 0.57
+      },
+      "role": "candidate",
+      "samples": 2,
+      "stage": "qualification"
+    },
+    {
+      "allocator_metrics": {},
+      "allocator_metrics_status": "not_applicable",
+      "case_id": "control-docx-one-edit-medium",
+      "command": {
+        "bytes": 5573,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/command.json",
+        "sha256": "a29fac15c82cffe4e90205ab9ec5c20aa008d1e60c735a01c6656cf76c86f989"
+      },
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 0.0,
+          "upper": 1097265.67
+        },
+        "max": 310681,
+        "mean": 243486,
+        "min": 176291,
+        "p50": 243486,
+        "p95": 310681,
+        "p99": 310681,
+        "standard_deviation": 95028.08032366012
+      },
+      "folder": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium",
+      "identity": {
+        "corpus": {
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+          "compression": "deflate",
+          "entry_bytes": 50,
+          "entry_count": 200,
+          "generator": "litchi-docx-semantic-v1",
+          "name": "docx-semantic-medium",
+          "package_format": "DOCX/OPC/ZIP",
+          "payload_kind": "deterministic-semantic-text",
+          "shape": "medium",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+          "uncompressed_payload_bytes": 10000,
+          "xlsx": null
+        },
+        "sink": {
+          "accepted_bytes": 9060,
+          "largest_write": 1652,
+          "write_calls": 51,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_1_to_512": 45,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 6,
+            "bytes_over_65536": 0
+          }
+        }
+      },
+      "index": 0,
+      "label": "qualification/q00-candidate-control-docx-one-edit-medium",
+      "mean": 243486,
+      "operation_metrics": {
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "cfb_phases": {
+          "atomic_publication": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "open": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "scope": "timed_cfb_phase_elapsed_ns",
+              "status": "not_applicable"
+            },
+            "logical_read_calls": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_requested_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            },
+            "logical_read_returned_bytes": {
+              "scope": "timed_cfb_phase_logical_read_at",
+              "status": "not_applicable"
+            }
+          },
+          "status": "not_applicable"
+        },
+        "latency_claim": "comparable_timed_operation",
+        "materialization": {
+          "opc_parts": {
+            "scope": "logical_materialization_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "process": {
+          "cancelled_write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "clock_ticks_per_second": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "major_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "minor_faults": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "nonvoluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "peak_rss_bytes": {
+            "scope": "process_lifetime_high_water_after_not_operation_peak",
+            "status": "not_applicable"
+          },
+          "rchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "read_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "rss_delta_bytes": {
+            "scope": "procfs_operation_delta_not_peak",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "syscr": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "syscw": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "system_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "user_cpu_ticks": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "voluntary_context_switches": {
+            "scope": "procfs_operation_delta",
+            "status": "not_applicable"
+          },
+          "wchar": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          },
+          "write_bytes": {
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead",
+            "status": "not_applicable"
+          }
+        },
+        "publication": {
+          "changed_spans": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "published_bytes": {
+            "scope": "logical_publication_counter",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        },
+        "sample_count": 2,
+        "sample_indices": [
+          1,
+          0
+        ],
+        "sink": {
+          "accepted_bytes": {
+            "scope": "logical_sink_accepted_write_bytes",
+            "status": "measured",
+            "values": [
+              9060,
+              9060
+            ]
+          },
+          "largest_write": {
+            "scope": "logical_sink_largest_accepted_write",
+            "status": "measured",
+            "values": [
+              1652,
+              1652
+            ]
+          },
+          "output_bytes": {
+            "scope": "post_operation_output_length_not_sink_write_volume",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable",
+          "write_calls": {
+            "scope": "logical_sink_accepted_write_calls",
+            "status": "measured",
+            "values": [
+              51,
+              51
+            ]
+          },
+          "write_size_buckets": {
+            "bytes_0": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_16385_to_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_1_to_512": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                45,
+                45
+              ]
+            },
+            "bytes_4097_to_16384": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "bytes_513_to_4096": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                6,
+                6
+              ]
+            },
+            "bytes_over_65536": {
+              "scope": "logical_sink_accepted_write_size_bucket_counts",
+              "status": "measured",
+              "values": [
+                0,
+                0
+              ]
+            },
+            "status": "measured"
+          },
+          "write_status": "measured"
+        },
+        "source": {
+          "compressed_bytes": {
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary",
+            "status": "not_applicable"
+          },
+          "counter_scope": "not_applicable_in_process_sink",
+          "decompressed_bytes": {
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "logical_read_calls": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_largest_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_pattern": {
+            "scope": "operation_logical_read_at_range_order_not_physical_io",
+            "status": "not_applicable"
+          },
+          "logical_read_requested_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "logical_read_returned_bytes": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "max_concurrent_reads": {
+            "scope": "operation_logical_read_at",
+            "status": "not_applicable"
+          },
+          "recompressed_bytes": {
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary",
+            "status": "not_applicable"
+          },
+          "status": "not_applicable"
+        }
+      },
+      "operation_metrics_status": "available",
+      "p50": 243486,
+      "p95": 310681,
+      "p99": 310681,
+      "receipt": {
+        "bytes": 5770,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/receipt.json",
+        "sha256": "03e2426e02804ed6531c684e604554d98db80f394ff4ab613201de49e9bd3350"
+      },
+      "report": {
+        "bytes": 15192,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "733f3881629e8c02aeb447d3d9c3f8edc070f6a3e40b008e4a61a2e3c88380bd"
+      },
+      "resource": {
+        "elapsed_seconds": 0.15,
+        "max_rss_kib": 19648,
+        "system_seconds": 0.01,
+        "user_seconds": 0.13
+      },
+      "role": "candidate",
+      "samples": 2,
+      "stage": "qualification"
+    }
+  ],
+  "schema": "litchi.paired-audit-reduction-0905.v1",
+  "scope": "semantic/statistical qualification only; no native timing reduction",
+  "source": {
+    "baseline_manifest": {
+      "bytes": 1880177,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/baseline-source.json",
+      "sha256": "6dba705714e7ed2d746861be5eb5652130f9c98936f8bfd921c89db3a786397e"
+    },
+    "candidate_files": [
+      "crates/xml-minifier/src/audit.rs"
+    ],
+    "candidate_manifest": {
+      "bytes": 1880267,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-source.json",
+      "sha256": "69b4be69408c11c071de46b94dee82ab19a7ac036f2e96cbaa849ddd715f275c"
+    },
+    "file_count": 10773,
+    "hashed_entries": 21546,
+    "root_worktree": "/home/zhuhe/code/litchi",
+    "source_root": "/tmp/litchi-0905-src"
+  },
+  "stage": "qualification",
+  "status": "pass"
+}

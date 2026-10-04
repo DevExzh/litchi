@@ -1,0 +1,11 @@
+{
+  "author": "root",
+  "original_review_retained": [
+    "result-review-v1.json",
+    "result-review-v1.md"
+  ],
+  "correction": "Counter is sampled after commit AND pre-publication forward/inverse replay, immediately before publication, not before that replay. Current review wording corrected; numerical verdict and all measurements unchanged.",
+  "source": "tools/perf-baseline/src/lib.rs:51069-51075 at3d3650ac03",
+  "source_sha256": "f712da842169399d687eb452c7042deed61682a80efdd40b2c3c178af2c036ea",
+  "review_receipt_hashes_verified": true
+}

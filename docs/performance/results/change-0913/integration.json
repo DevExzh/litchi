@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "kind": "verified merge-tree integration",
+  "target": "refs/heads/feat/office-format-completeness",
+  "parents": [
+    "1b12cef9a97bbe3597039f7e3caadc2c45c905ce",
+    "945761dcfdee089eb3f650fc447a801427b6e715"
+  ],
+  "merge_base": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "verified_existing_worktree_files": 1784,
+  "worktree_file_contents_rewritten": false,
+  "shared_index_preserved_until_publication": true
+}

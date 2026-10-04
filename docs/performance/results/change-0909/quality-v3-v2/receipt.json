@@ -1,0 +1,64 @@
+{
+  "status": "pass",
+  "helper_sha256": "98c7c4556f4c32570842033168c8db2cee3c20fdd51a9be266f93867e472bb92",
+  "rustfmt_config_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+  "build_receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/build-v3/command.json",
+  "source": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/source-v3.json",
+    "bytes": 1755712,
+    "sha256": "4361f1201859660de809f93be728715d7a09fd9c7f7833d5901be1baaf2cf0a2"
+  },
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0909-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "commands": [
+    {
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "--config-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0909/rustfmt.toml",
+        "/tmp/litchi-0909-src/tools/perf-baseline/src/lib.rs",
+        "/tmp/litchi-0909-src/tools/perf-baseline/src/pptx_owned_control.rs",
+        "/tmp/litchi-0909-src/tools/perf-baseline/examples/pptx_owned_control.rs"
+      ],
+      "start_utc": "2026-10-04T08:21:57.253917+00:00",
+      "end_utc": "2026-10-04T08:21:57.709030+00:00",
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "/tmp/litchi-0909-src/tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--release",
+        "--example",
+        "pptx_owned_control",
+        "-j",
+        "2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "start_utc": "2026-10-04T08:21:57.709059+00:00",
+      "end_utc": "2026-10-04T08:23:11.653371+00:00",
+      "exit_code": 0
+    }
+  ],
+  "scope": "Changed harness lib/example; no production implementation changed; no full workspace test claim."
+}

@@ -37,6 +37,8 @@ mod parallel_metrics;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
+mod pptx_owned_benchmark;
+mod pptx_owned_control;
 pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
 pub mod pptx_range_source;
@@ -10222,6 +10224,32 @@ pub fn write_xlsx_attribute_fixtures(
     xlsx_attribute_fixtures::export(directory, include_one_edit)
 }
 
+/// Export the untimed owning-input PPTX preservation qualification fixtures.
+///
+/// This is a standalone harness helper. It uses the fixed media-rich
+/// multi-slide corpus and refuses an existing output directory so the source,
+/// candidate, and gate receipts remain immutable custody artifacts.
+pub fn write_pptx_owned_control_fixtures(
+    directory: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
+    pptx_owned_control::export(directory)
+}
+
+/// Run one route of the opt-in PPTX owning-input benchmark control.
+///
+/// The route must be `materialized` or `owned`; one invocation measures only
+/// that route and writes a fresh report and source/output artifacts to the
+/// caller-selected directory. The normal selector registry and defaults are
+/// unchanged.
+pub fn run_pptx_owned_benchmark(
+    route: &str,
+    warmup_iterations: usize,
+    samples: usize,
+    directory: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
+    pptx_owned_benchmark::run_from_args(route, warmup_iterations, samples, directory)
+}
+
 pub fn run() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -14428,7 +14456,13 @@ fn usage_text() -> String {
                                        ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
                                        ods_file_eager_selected_media,ods_file_source_selected_media,\n\
                                        ods_file_eager_cell_sweep,ods_file_source_cell_sweep,\n\
-                                       ods_file_eager_cell_batch_sweep,ods_file_source_cell_batch_sweep\n\
+                                       ods_file_eager_cell_batch_sweep,ods_file_source_cell_batch_sweep,\n\
+                                       xls_validation_report,rtf_validation_report,\n\
+                                       docx_validation_report,docx_section_inventory,\n\
+                                       pptx_validation_report,odf_validation_report,\n\
+                                       odf_mimetype_repair_plan,\n\
+                                       rtf_logical_tail_commit_append,rtf_logical_tail_plan_append,\n\
+                                       rtf_logical_tail_commit_noop_save,rtf_logical_tail_plan_noop_save\n\
            --shape LIST                tiny,many-small,few-large,wide-root\n\
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
@@ -62418,6 +62452,14 @@ mod tests {
             assert!(
                 parse_body.contains(parse_needle.as_str()),
                 "Case::{variant} is missing from parse_case"
+            );
+        }
+        let help = usage_text();
+        for name in parse_body.split('"').skip(1).step_by(2) {
+            assert!(
+                help.split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+                    .any(|word| word == name),
+                "selector {name} is missing from --help"
             );
         }
     }

@@ -1,0 +1,14 @@
+{
+  "status": "wording-corrected",
+  "author": "root after independent reviewer finite verdict",
+  "originals": [
+    "result-review-v1.md",
+    "result-review-v1.json"
+  ],
+  "corrections": [
+    "12 TSV children are six role pairs, not twelve pairs",
+    "Flagged p99 ratios are1.0517844733869186compact and1.0547573867938778authored; earlier parentheses accidentally gave p50 ratios",
+    "No causal explanation is established for three-byte live/peak snapshot difference"
+  ],
+  "statistical_gate_or_verdict_changed": false
+}

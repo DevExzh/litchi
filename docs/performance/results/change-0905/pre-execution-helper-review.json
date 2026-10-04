@@ -1,0 +1,30 @@
+{
+  "files": {
+    "analyze_v3.py": {
+      "bytes": 56533,
+      "sha256": "9d38d1d9c02a21a334b57792852563825b611628a9127a04986be33e5575e551"
+    },
+    "micro.py": {
+      "bytes": 5680,
+      "sha256": "34a6a02ce36271bb43c2ba6c9cad8b2c874266b3e73858cd984cf338fb51c809"
+    },
+    "parity-run.py": {
+      "bytes": 1521,
+      "sha256": "780a255128b19dccb4ec190fbd25f7e16e2c69cc2d67a75f6de78e894346f2e8"
+    },
+    "run_v2.py": {
+      "bytes": 31492,
+      "sha256": "c1de78bf5ec162fc0dec90de54ac3d7e67fe1db1fcf85201b6f9ef124d8441dc"
+    }
+  },
+  "micro_review_fixes": [
+    "strict frozen protocol/job list",
+    "exact start/receipt and artifact set",
+    "role,binary,argv,helper bindings",
+    "orderedcase and6block checks",
+    "machine-readable adoption_allowed",
+    "reject Python -O"
+  ],
+  "scope": "static checks only; does not claim helpers executed successfully",
+  "status": "static-parse-pass"
+}

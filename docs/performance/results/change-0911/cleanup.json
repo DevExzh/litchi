@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T09:37:56.172564+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-0911-run",
+      "files": 1,
+      "logical_bytes": 65
+    },
+    {
+      "path": "/tmp/litchi-0911-run-v2",
+      "files": 1,
+      "logical_bytes": 65
+    },
+    {
+      "path": "/tmp/litchi-0911-run-v3",
+      "files": 1,
+      "logical_bytes": 65
+    }
+  ],
+  "worktrees_created": 0,
+  "builds_created": 0,
+  "active_cwd_processes": [],
+  "unrelated_worktrees_untouched": true,
+  "retained_evidence": "All raw profiles and generated archives retained; PPTX archives remain explicitly Gitignored with tracked identities. Reused 0910 binary unchanged."
+}

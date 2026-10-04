@@ -1,0 +1,130 @@
+{
+  "schema": "pptx-owned-control-qualification-v1",
+  "status": "probe_passed_pending_independent_raw_census",
+  "implementation": "litchi_pptx::Package::from_vec -> opened_presentation_transaction -> PackageWriter::write_to_stream",
+  "timing_scope": "untimed qualification; no elapsed-time, allocation, instruction, compression, or speedup measurement",
+  "performance_claim": "none; this owning control only establishes preservation and refusal gates",
+  "corpus": {
+    "name": "pptx-source-backed-media",
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "package_format": "PPTX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 229,
+    "archive_member_count": 445,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 17568429,
+    "archive_bytes": 17017139,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "target_entry": "slide:100/shape:0",
+    "target_payload_bytes": 52,
+    "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+    "xlsx": null
+  },
+  "slides": 200,
+  "text_boxes_per_slide": 8,
+  "media_entries": 8,
+  "selected_slide_positions": [
+    0,
+    28,
+    57,
+    85,
+    114,
+    142,
+    171,
+    199
+  ],
+  "replacement_count": 64,
+  "ownership": {
+    "ingress_unmodified_owned_source": true,
+    "ingress_exact_source_len": 17017139,
+    "ingress_exact_source_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "after_edit_unmodified_owned_source": false,
+    "after_edit_retained_source_limits": true,
+    "after_edit_exact_source_len": null,
+    "after_edit_exact_source_sha256": null,
+    "after_noop_commit_unmodified_owned_source": true
+  },
+  "coverage": {
+    "unknown_member_variant": "not_covered; independent raw census receives primary corpus only",
+    "signed_input": "not_covered",
+    "encrypted_input": "not_covered",
+    "malformed_input": "not_covered",
+    "source_mutation_during_publication": "not_covered; immutable Vec owner used"
+  },
+  "source": {
+    "file": "source.pptx",
+    "bytes": 17017139,
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "no_op": {
+    "file": "owned-control-noop.pptx",
+    "bytes": 17017139,
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "output": {
+    "file": "owned-control-output.pptx",
+    "bytes": 17017145,
+    "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+  },
+  "inverse": {
+    "file": "owned-control-inverse.pptx",
+    "bytes": 17017139,
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "forward_replay": {
+    "file": "owned-control-forward-replay.pptx",
+    "bytes": 17017145,
+    "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+  },
+  "durable_forward_patch_bytes": 60953,
+  "durable_forward_patch_sha256": "9997855655db832e443636f37b6b118b1c42a25b030096f169a4f26a49784af6",
+  "durable_inverse_patch_bytes": 60953,
+  "durable_inverse_patch_sha256": "52498fa4f0c025bac28f8a5c05012b22518d81e695457bd2f007d07472ca5a2a",
+  "raw_census_file": "raw-zip-census.json",
+  "gates": {
+    "source_identity_verified": true,
+    "source_shape_verified": true,
+    "owning_ingress_verified": true,
+    "exact_noop_verified": true,
+    "semantic_output_verified": true,
+    "untouched_logical_parts_verified": true,
+    "forward_output_verified": true,
+    "inverse_exact_source_verified": true,
+    "forward_replay_exact_output_verified": true,
+    "durable_forward_roundtrip_verified": true,
+    "durable_inverse_reopen_verified": true,
+    "finite_input_limit_verified": true,
+    "stale_source_refusal": {
+      "refused": true,
+      "output_unchanged": true,
+      "error": "unsafe PPTX edit during apply_opened_presentation_patch: an opened-presentation patch resource is stale",
+      "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }"
+    },
+    "foreign_source_refusal": {
+      "refused": true,
+      "output_unchanged": true,
+      "error": "unsafe PPTX edit during apply_opened_presentation_patch: an opened-presentation patch resource is stale",
+      "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }"
+    },
+    "partial_sink": {
+      "status": "verified",
+      "accepted_prefix_bytes": 8508572,
+      "error_kind": "OpcError::IncompleteOutput",
+      "prefix_sha256": "6286ed5e43e5a7d443392494736fc7b08887923cf0156392dfc3dddf21c26909",
+      "error": "incomplete OPC output after 8508572 byte(s): ZIP error: intentional PPTX partial sink failure"
+    },
+    "zero_sink": {
+      "status": "verified",
+      "accepted_prefix_bytes": 0,
+      "error_kind": "OpcError::ZipError (preservation writer mapping)",
+      "prefix_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "error": "ZIP error: intentional PPTX partial sink failure"
+    },
+    "input_limit_actual": 17017139,
+    "input_limit_maximum": 17017138,
+    "source_immutability_verified": true,
+    "raw_census_artifacts_exported": true
+  }
+}

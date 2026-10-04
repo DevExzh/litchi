@@ -1,5 +1,80 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0913 — direct owned-source read candidate rejected
+
+The fresh matched comparison in [0913](0913-pptx-owned-direct-read.md) fails
+the frozen gate: owned paired total ratio 1.005714×, 95% interval
+0.973308–1.017486. All 48 children and preservation checks passed; candidate
+production changes were restored. These are fresh before/after measurements
+on the updated kernel, not a comparison against historical 0910 timing.
+
+## 0912 — native PPTX SHA dispatch witness
+
+[0912](0912-pptx-native-sha-dispatch.md) observes the x86 SHA backend inside
+the measured cold snapshot for both existing routes on the unchanged 0910
+binary. The native perf attempt is rejected for lost records and missing owner
+chains. GDB witnesses establish reachability only; no new timing or cost share.
+
+## 0911 — PPTX cold snapshot instruction control
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) retains four admitted
+same-binary captures, with setup and measured transaction contexts separated by
+exact callers. Materialized snapshot counts are 1.000594–1.000667 billion Ir;
+owning counts are 1.099869–1.099913 billion Ir. These guest instruction counts
+are separate from the 0910 native timing result. No production change.
+
+## 0910 — native PPTX owning-input control
+
+[0910](0910-pptx-owning-input-native-control.md) compares existing routes in
+24 fresh processes and 480 measured samples. Total p50 is 259.703332 ms for
+materialized ReadAt and 32.180007 ms for owning input; the median paired ratio
+is 8.072147 (95% bootstrap interval 7.960538–8.240714). Both raw ZIP controls
+pass. This is a same-build route comparison, not a production optimization.
+
+## 0909 — owning-input PPTX control qualified without timing
+
+[0909](0909-pptx-owning-input-preservation-control.md) qualifies existing
+`from_vec` ingress on the exact 0907 fixture. The same 64 edits change 8 of 445 ZIP
+members;437 untouched members preserve raw components. No-op and live/durable
+inverse restore full source bytes for this fixture. No timing or speedup claim.
+
+## 0908 — same-binary PPTX instruction attribution
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) retains four exact-owner
+Callgrind captures on the 0907 binary. Eager totals are 4.578 billion Ir;
+source totals are 108.17 million Ir. All semantic and counter gates pass.
+These are guest instructions, not new native timing or a speedup result.
+
+## 0907 — current PPTX multi-slide baseline
+
+[0907](0907-pptx-multi-slide-current-baseline.md) retains 800 samples from four
+fresh CPU-12 ABBA legs on frozen `3d3650ac03`. Existing eager/source-backed
+workflows have pooled p50 263.429593/7.841286 ms with equal output hashes.
+This guarded-workflow comparison is descriptive, with shared-host and timer
+limits; it is not a new optimization or historical before/after result.
+
+## 0906 — selector and workload scope qualification
+
+[0906](0906-office-coverage-qualification.md) verifies 534 enum/name/CLI
+selectors and 41 defaults with a byte-identical source-census replay, correcting
+the current README count. This is registration evidence, not measured CRUD
+coverage. No timing population or production implementation changes.
+
+## 0905 — bounded XML attribute-summary candidate measured
+
+[0905](0905-xml-attribute-summary.md) compares the frozen 0904 baseline at
+`4f39f5a88d` with one `xml-minifier` audit-file candidate. Exact differential
+parity covers 11,520 cases and 125,952 records. Fresh paired native p50 ratios
+pass both primary gates: **0.9543881780** (medium) and **0.9477553767**
+(dense-sparse), with bootstrap upper bounds **0.9584711179** and
+**0.9742145402**; no main review flag fires. Publication allocation calls fall
+from **19,248→416**, **36,366→416** and **2,662→308** across the three XLSX
+cases, while live/peak snapshots are three bytes higher. The micro hard gate
+also passes; cardinality-2 authored/compact p50 review rows are retained.
+The candidate is accepted; independent review, cleanup and post-cleanup replay
+pass. Target-branch integration awaits an unrelated cherry-pick. Later
+concurrent iWork commits are outside this frozen measurement scope.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

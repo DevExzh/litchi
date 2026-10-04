@@ -1,0 +1,12 @@
+{
+  "original": {
+    "path": "target/litchi-0910-build/release/examples/pptx_owned_benchmark",
+    "bytes": 9301456,
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "retained": {
+    "path": "docs/performance/results/change-0910/binaries/native",
+    "bytes": 9301456,
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  }
+}

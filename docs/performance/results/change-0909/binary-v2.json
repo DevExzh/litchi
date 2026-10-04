@@ -1,0 +1,13 @@
+{
+  "original": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0909-build/release/examples/pptx_owned_control",
+    "bytes": 9627816,
+    "sha256": "1656a25df4663c298e41624b7c96b225247c934038eaf8bc1bc85c508551b04f"
+  },
+  "retained": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/binaries/probe-v2",
+    "bytes": 9627816,
+    "sha256": "1656a25df4663c298e41624b7c96b225247c934038eaf8bc1bc85c508551b04f"
+  },
+  "scope": "Retains the executable for failed zero-sink type expectation; not a successful qualification."
+}

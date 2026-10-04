@@ -1,0 +1,9 @@
+{
+  "byte_identical": true,
+  "cases": 11520,
+  "example_binding": "examples-v3.json",
+  "logical_bytes": 74265040,
+  "logical_sha256": "567535be0da4b7165e65ed9d923fb1a9f15b39ffb5451133a876a6c9d22b0bc3",
+  "records": 125952,
+  "status": "pass"
+}

@@ -1,0 +1,99 @@
+{
+  "binaries": {
+    "baseline": {
+      "bytes": 2882712,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/baseline-probe",
+      "sha256": "48a0f8be45344586bace23682dd905f26156acfa3adc2db903e5e981512e940f"
+    },
+    "candidate": {
+      "bytes": 2884928,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-probe",
+      "sha256": "98294eb768a949d59c2615af5085924ba6f499e71fbf2fa8a10c974c149ad015"
+    }
+  },
+  "build_receipts": {
+    "baseline": {
+      "bytes": 3046,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/baseline-oracles-build-run.json",
+      "sha256": "f9c3b0662470a69e857f35ab906bfe8df9089d3d3504ae8a87de8d0efc702971"
+    },
+    "candidate": {
+      "bytes": 3047,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/candidate-oracles-build-run.json",
+      "sha256": "d7c36570c8b517847355db79bb884180d6d0166f96a817a149398d938247b3ad"
+    }
+  },
+  "helper": {
+    "bytes": 5680,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/micro.py",
+    "sha256": "34a6a02ce36271bb43c2ba6c9cad8b2c874266b3e73858cd984cf338fb51c809"
+  },
+  "jobs": [
+    "cardinality-0/source",
+    "cardinality-0/compact",
+    "cardinality-0/authored",
+    "cardinality-1/source",
+    "cardinality-1/compact",
+    "cardinality-1/authored",
+    "cardinality-2/source",
+    "cardinality-2/compact",
+    "cardinality-2/authored",
+    "cardinality-8/source",
+    "cardinality-8/compact",
+    "cardinality-8/authored",
+    "cardinality-32/source",
+    "cardinality-32/compact",
+    "cardinality-32/authored",
+    "cardinality-33/source",
+    "cardinality-33/compact",
+    "cardinality-33/authored",
+    "cardinality-128/source",
+    "cardinality-128/compact",
+    "cardinality-128/authored",
+    "xml-space-valid/source",
+    "xml-space-valid/compact",
+    "xml-space-valid/authored",
+    "xml-space-invalid/source",
+    "xml-space-invalid/compact",
+    "xml-space-invalid/authored",
+    "duplicate/source",
+    "duplicate/compact",
+    "duplicate/authored",
+    "malformed-tail/source",
+    "malformed-tail/compact",
+    "malformed-tail/authored",
+    "malformed-second/source",
+    "malformed-second/compact",
+    "malformed-second/authored"
+  ],
+  "method": {
+    "bytes": 1918,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/MICRO_METHOD.md",
+    "sha256": "0ac54dc153c854006e0cbe64a5944956f689f32320f0f8993249984828e397f6"
+  },
+  "probe": {
+    "bytes": 9773,
+    "path": "/home/zhuhe/code/litchi/crates/xml-minifier/examples/attribute_summary_probe.rs",
+    "sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+  },
+  "protocol": {
+    "blocks": 6,
+    "bootstrap_draws": 10000,
+    "cpu": 12,
+    "iterations": 1000,
+    "lower_95_threshold": 1.0,
+    "p50_ratio_threshold": 1.05,
+    "review_ratio": 1.05,
+    "samples": 30,
+    "seed": 905019,
+    "spread_ratio": 1.2,
+    "warmup": 5
+  },
+  "schema": "litchi.xml-attribute-micro-plan-0905.v1",
+  "semantic_parity": {
+    "bytes": 246,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/parity-comparison.json",
+    "sha256": "9b015dc98531fb9472ef7a59d72ce8d39028e5c5e0c15a1b5b33e9619675e791"
+  },
+  "status": "frozen"
+}

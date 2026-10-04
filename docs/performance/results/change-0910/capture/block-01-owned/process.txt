@@ -1,0 +1,8 @@
+max_rss_kib=96988
+user_seconds=4.86
+system_seconds=0.77
+elapsed_seconds=5.68
+major_faults=0
+minor_faults=905338
+voluntary_context_switches=22
+involuntary_context_switches=13

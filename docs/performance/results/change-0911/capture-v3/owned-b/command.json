@@ -1,0 +1,106 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--zero-before=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "owned",
+    "0",
+    "1",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/artifacts"
+  ],
+  "artifacts": [
+    {
+      "bytes": 17017145,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 3091,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/artifacts/report.json",
+      "sha256": "e8ec739497f0f5df4639dad9b8eba9dc527e68897ac761a44c68d2ed6cb9d242"
+    },
+    {
+      "bytes": 17017139,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 452,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out",
+      "sha256": "ad142034a89f4cf8cd8b4e74f1d12e3dea53bb72b3711b0b9ceb94c1eb409c8d"
+    },
+    {
+      "bytes": 74784,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out.1",
+      "sha256": "625166cf733554ea899eeaacc16e98f5751d9e219dbf39343bf5535efc550fc9"
+    },
+    {
+      "bytes": 85073,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/callgrind.out.2",
+      "sha256": "26b144a3d95cc64807a2ce53df0f17c02f656e1f581bfee5a8737d5761e37e00"
+    },
+    {
+      "bytes": 1726,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/start.json",
+      "sha256": "ddbe5a5ad5cfac8dbd0264e6fbf1f67eaeee6cd0132a4340a9d9926e9f3caf42"
+    },
+    {
+      "bytes": 807,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/stderr.txt",
+      "sha256": "b91048da9c13b41b3c239d0759aa904aeb7abc1470dc6678bbd2647a636f1f08"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture-v3/owned-b/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cwd": "/tmp/litchi-0911-run-v3",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T09:32:53.998741+00:00",
+  "helper": {
+    "bytes": 8724,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture_v3.py",
+    "sha256": "fd861ce82b9eb44ea6e41cfa19e00ef7a65ab70f47785cd127cd758325a78523"
+  },
+  "load_after": [
+    18.74755859375,
+    21.15380859375,
+    22.4228515625
+  ],
+  "load_before": [
+    18.7109375,
+    21.3603515625,
+    22.52294921875
+  ],
+  "plan": {
+    "bytes": 8262,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/plan-v3.json",
+    "sha256": "28366047e447183badd9d7a91f10e82bc6e17a5de82529a4ef8da859b4034089"
+  },
+  "row": {
+    "index": 2,
+    "kind": "owned",
+    "label": "owned-b"
+  },
+  "started_utc": "2026-10-04T09:32:29.296008+00:00"
+}

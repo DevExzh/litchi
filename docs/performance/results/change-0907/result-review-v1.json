@@ -1,0 +1,198 @@
+{
+  "schema": "litchi.performance.0907.pptx-multi-slide-result-review.v1",
+  "status": "pass",
+  "verdict": "pass_with_scope_caveats",
+  "review": {
+    "mode": "offline_independent_raw_evidence_review",
+    "reviewer_ran_builds": false,
+    "reviewer_ran_workloads": false,
+    "reviewer_ran_profilers": false,
+    "reviewer_reran_replay": false,
+    "independent_recomputations": [
+      "per-leg p50/p95/p99/min/max/mean from retained samples",
+      "pooled eager and source-backed descriptive statistics",
+      "pooled and paired descriptive ratios",
+      "sample counts, permutations, identities, materializations, reads and sink vectors",
+      "receipt status, hashes and non-overlapping child intervals"
+    ],
+    "source_scope": "Frozen source archive and retained native capture artifacts; this review does not claim the later merged workspace state."
+  },
+  "protocol": {
+    "source_commit": "3d3650ac03be2cd8ba923a5a6e940e84b14f5eab",
+    "source_archive_sha256": "69007b852482752e96bd50208891bf3dedfc4d83df7f81a3b10f42e98e64545a",
+    "order": [["eager-a", "eager"], ["source-a", "source_backed"], ["source-b", "source_backed"], ["eager-b", "eager"]],
+    "cpu": 12,
+    "workers": 1,
+    "warmup_per_leg": 30,
+    "samples_per_leg": 200,
+    "retained_samples": 800,
+    "environment": {
+      "PATH": "/usr/bin:/bin",
+      "LANG": "C",
+      "LC_ALL": "C",
+      "TZ": "UTC"
+    },
+    "child_intervals_non_overlapping": true,
+    "stdout_bytes_per_leg": 0,
+    "stderr_bytes_per_leg": 0,
+    "timer_boundary": "The clock surrounds publish_pptx_multi_slide_batch_edit, including open, staging, commit, publication and mode-specific patch guards. Expected-output construction, sink/output allocation and reserve, full semantic reopen, digesting and preservation verification are outside the timed interval.",
+    "guard_semantics": {
+      "source_backed": "Forward then inverse succeeds before publication; after publication inverse succeeds and reapplying the original forward patch is expected to fail stale. The stale refusal is a passing gate.",
+      "eager": "The post-publication inverse and forward counterpart are both expected to succeed.",
+      "normalization": "These guard sequences are intentionally retained as measured and are not subtracted or normalized."
+    }
+  },
+  "receipt_hashes": {
+    "source.json": "a987e841e27283d54d977f1c0b85609f248872eede70a6271d13bee568ebd812",
+    "capture-plan.json": "2955bd2a73a434a9534b01f0788ee846e840c2bcb89febe6ce587c722c376aca",
+    "capture-complete.json": "74ad7fb48aad01f30f21093284e2a3f3f512068e3f62203769ae7a02a17f88c6",
+    "binary.json": "2bd9eb9a9a0160a9c93a68b96203da5f4a7362434d30326418f72cf61b9037ef",
+    "analysis.json": "efca52a4559c7955417234ac14bad3bebff9aabd1989e9a9b9de7cc7f1dd3627",
+    "analyzer-checks.json": "4af0d99d839bbadc3f31758afd46c782a40bd149e46c10c8d257ffaa0cf49920",
+    "replay-before-cleanup.json": "7d0fd4269a12edabc3cd0381fab458e15cb4f28b706e4b869ac3f70f5d197c0d",
+    "native-build-v2-start.json": "29a93ab71979cc8c94978edafed0358c1f58aedf416bb0f568b916570084fcbb",
+    "native-build-v2-run.json": "d162b2eaf163c9ba7be25785b486453ad4b04a6b94624a914ce3dbc01fd459fa"
+  },
+  "build_and_replay": {
+    "v2_build": {
+      "status": "pass",
+      "exit_code": 0,
+      "inputs_unchanged": true,
+      "profile": "release opt-level 3, fat LTO, codegen-units 1, debug 1, jobs 2, offline locked toolchain 1.95.0"
+    },
+    "initial_build": {
+      "status": "retained_preworkload_failure",
+      "exit_code": 101,
+      "reason": "two missing compile-time fixture includes",
+      "receipt_sha256": "487d63eeabf04886729135b63b7e7f8015d0ce9184152e504f719421a73a71aa"
+    },
+    "replay": {
+      "status": "pass",
+      "source_files": 9350,
+      "raw_leg_receipts": 4,
+      "temporary_output_removed": true
+    }
+  },
+  "identity": {
+    "binary": {
+      "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84",
+      "bytes": 264596744,
+      "same_across_reports_and_receipts": true
+    },
+    "corpus": {
+      "generator": "litchi-pptx-source-edit-media-v1",
+      "name": "pptx-source-backed-media",
+      "package_format": "PPTX/OPC/ZIP",
+      "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+      "archive_bytes": 17017139,
+      "archive_member_count": 445,
+      "opc_entry_count": 229,
+      "uncompressed_logical_bytes": 17568429,
+      "target": "slide:100/shape:0",
+      "target_payload_bytes": 52,
+      "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+      "same_across_legs": true
+    },
+    "output": {
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "accepted_bytes": 17017145,
+      "same_across_legs": true
+    }
+  },
+  "legs": {
+    "eager-a": {
+      "kind": "eager",
+      "report": {"path": "eager-a.json", "bytes": 81081, "sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7"},
+      "start_receipt_sha256": "87ebd9a4884a5e4faa05ed0c479a6fd2f5d928ff1bc6e8c3d9cb4f84b7a414c6",
+      "run_receipt_sha256": "00c56b2d626f641a69ce9754525ee56fc8f58d31b2ec5673650764457fa95816",
+      "exit_code": 0,
+      "samples": 200,
+      "warmup": 30,
+      "sample_order_permutation": true,
+      "elapsed_ns": {"min": 261166667, "p50": 263289679, "p95": 264759446, "p99": 278711065, "max": 313334012, "mean": 263712090.085},
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "sink": {"accepted_bytes": 17017145, "write_calls": 260, "largest_write": 65536, "bytes_over_65536": 0},
+      "source_vectors_iteration_order": {"ordinary_materializations": 229, "ordinary_payload_read_calls": 741, "ordinary_payload_read_bytes": 16907750, "all_read_calls": 1864, "all_read_bytes": 17030811, "constant_across_200": true}
+    },
+    "source-a": {
+      "kind": "source_backed",
+      "report": {"path": "source-a.json", "bytes": 81499, "sha256": "d4beaa72a6b1bff4bacbb36e9e96564f234309040a6cc44bdbf12c6584ebf513"},
+      "start_receipt_sha256": "05cb8446108a4f63e4eb47c4253380fd7bd2d162cdf155b44bcb5dbb628a29b7",
+      "run_receipt_sha256": "60ea486388223127d24ead927f5a6aa75615e287458b87bca5a4bd5662143ea0",
+      "exit_code": 0,
+      "samples": 200,
+      "warmup": 30,
+      "sample_order_permutation": true,
+      "elapsed_ns": {"min": 7415988, "p50": 7712175, "p95": 8022402, "p99": 8174263, "max": 8323143, "mean": 7743323.915},
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "sink": {"accepted_bytes": 17017145, "write_calls": 2053, "largest_write": 65536, "bytes_over_65536": 0},
+      "source_vectors_iteration_order": {"ordinary_materializations": 9, "ordinary_payload_read_calls": 486, "ordinary_payload_read_bytes": 16909038, "all_read_calls": 3372, "all_read_bytes": 17229633, "constant_across_200": true}
+    },
+    "source-b": {
+      "kind": "source_backed",
+      "report": {"path": "source-b.json", "bytes": 81504, "sha256": "30220c89d9c13fa1800a9eadbfe443154ddfaacc16a0d2393ab92cfb1d063767"},
+      "start_receipt_sha256": "332cf154fff9b12508ba08a3ba191081048f6b17e62e18d93691ac6e5650ed01",
+      "run_receipt_sha256": "3736d2c01c033c1cd5a46b8528f3ec04523247eed92b967609371afe0c1c0298",
+      "exit_code": 0,
+      "samples": 200,
+      "warmup": 30,
+      "sample_order_permutation": true,
+      "elapsed_ns": {"min": 7640510, "p50": 7927396, "p95": 9035897, "p99": 10655026, "max": 15529992, "mean": 8110229.535},
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "sink": {"accepted_bytes": 17017145, "write_calls": 2053, "largest_write": 65536, "bytes_over_65536": 0},
+      "source_vectors_iteration_order": {"ordinary_materializations": 9, "ordinary_payload_read_calls": 486, "ordinary_payload_read_bytes": 16909038, "all_read_calls": 3372, "all_read_bytes": 17229633, "constant_across_200": true}
+    },
+    "eager-b": {
+      "kind": "eager",
+      "report": {"path": "eager-b.json", "bytes": 81080, "sha256": "0b398016560f781a1312e1d8c6b6d3466ccd217c04385592d9107e24fc08948e"},
+      "start_receipt_sha256": "877b65e5c5bbfad936b11b66180cad7537665202f4e877da07e6adde485b1b88",
+      "run_receipt_sha256": "9d03b89faa15f3fe3ae1cc9e63e1e5e0084f69f0cc1b2bd3c136042ece477794",
+      "exit_code": 0,
+      "samples": 200,
+      "warmup": 30,
+      "sample_order_permutation": true,
+      "elapsed_ns": {"min": 260996360, "p50": 263581606, "p95": 265864489, "p99": 266926522, "max": 359348308, "mean": 264167398.705},
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "sink": {"accepted_bytes": 17017145, "write_calls": 260, "largest_write": 65536, "bytes_over_65536": 0},
+      "source_vectors_iteration_order": {"ordinary_materializations": 229, "ordinary_payload_read_calls": 741, "ordinary_payload_read_bytes": 16907750, "all_read_calls": 1864, "all_read_bytes": 17030811, "constant_across_200": true}
+    }
+  },
+  "pooled": {
+    "claim": "descriptive same-binary path comparison; no confidence interval or speedup claim",
+    "eager": {"samples": 400, "min": 260996360, "p50": 263429593, "p95": 265490578, "p99": 270110281, "max": 359348308, "mean": 263939744.395},
+    "source_backed": {"samples": 400, "min": 7415988, "p50": 7841286, "p95": 8550684, "p99": 9838051, "max": 15529992, "mean": 7926776.725},
+    "eager_over_source_backed": {"p50": 33.595202751181375, "p95": 31.049045666989915, "p99": 27.45566992893206, "mean": 33.297234620292656},
+    "source_backed_over_eager": {"p50": 0.029766154632444808, "p95": 0.03220710905981756, "p99": 0.03642234928480934, "mean": 0.030032524064042256},
+    "paired_p50_ratios": {"a_eager_over_source": 34.13948451636536, "b_eager_over_source": 33.24945618964916}
+  },
+  "analyzer_and_gate_checks": {
+    "analysis_status": "pass",
+    "reported_percentiles_recomputed": true,
+    "corpus_manifest_equal": true,
+    "same_binary_receipts": true,
+    "sample_count_and_order": true,
+    "materializations_229_eager_9_source": true,
+    "source_reads_nonzero_per_sample": true,
+    "output_hash_and_sink_repeat": true,
+    "sink_largest_write_at_most_65536": true,
+    "analyzer_mutation_checks_status": "pass",
+    "analyzer_mutations_rejected": ["missing sample", "bad sample order", "wrong p50", "wrong materializations", "zero payload reads", "oversized sink write", "missing binary identity"],
+    "replay_status": "pass",
+    "test_harness_note": "Two initial mutation diagnostic-substring assertions were corrected in the test-only mutation harness; analyzer and workload artifacts were unchanged."
+  },
+  "counter_scopes": {
+    "eager_materializations": "Ordinary OPC Part materializations after eager materialization; 229 per measured sample.",
+    "source_backed_materializations": "Source-backed cache load/materialization counter sampled after commit, before the pre-publication replay, and still pre-publication; 9 per measured sample. It is not a whole-workload allocation or validation count.",
+    "read_counters": "Logical in-memory ReadAt counters, not physical device I/O, cold-cache behavior, remote/range latency or allocator activity.",
+    "vector_order": "SourceSummary vectors are in measured iteration order while elapsed_ns.samples is sorted. The retained sample_order permutation must be applied before any positional correlation; current vectors are constant across all 200 samples in each leg."
+  },
+  "limitations": [
+    "The host is shared: the capture was affinity-pinned to CPU 12, but no exclusive CPU or host claim is established. Recorded start load averages were high (approximately 19-21), so this is guarded descriptive evidence rather than a reproducible absolute benchmark.",
+    "The timer includes mode-specific correctness guards and differs between paths: source-backed post-publication stale forward refusal is expected to pass, while eager inverse then forward succeeds. It is not a pure edit or publication timer.",
+    "The harness recorded semantic/OPC preservation gates and output hashes; this reviewer did not independently reopen the PPTX. Raw ZIP header/comment/member-order census is not retained, so preservation wording must remain semantic/OPC scoped.",
+    "The reported counters do not measure total allocation, RSS, physical I/O, filesystem cache state or device latency.",
+    "The pooled ratio combines two legs per path and is descriptive only; no confidence interval, statistical speedup, release qualification, producer fidelity, no-op behavior or failed-save claim follows from this packet.",
+    "Raw reports leave git and rustc fields unavailable in their per-process environment; source, build and binary receipts provide the retained identity binding.",
+    "The retained first build failure occurred before workloads; the corrected native-build-v2 passed with unchanged inputs."
+  ]
+}

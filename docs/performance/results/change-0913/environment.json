@@ -1,0 +1,119 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "uname",
+        "-a"
+      ],
+      "exit_code": 0,
+      "stdout": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "lscpu"
+      ],
+      "exit_code": 0,
+      "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9R45\nCPU family:                              26\nModel:                                   2\nThread(s) per core:                      1\nCore(s) per socket:                      32\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5200.00\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               1.5 MiB (32 instances)\nL1i cache:                               1 MiB (32 instances)\nL2 cache:                                32 MiB (32 instances)\nL3 cache:                                128 MiB (4 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "rustc",
+        "-Vv"
+      ],
+      "exit_code": 0,
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "cargo",
+        "-V"
+      ],
+      "exit_code": 0,
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "stdout": "59f75c7f79026a4d124b61e97c178c7b45de19ab\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "CHERRY_PICK_HEAD"
+      ],
+      "exit_code": 0,
+      "stdout": "f2869418f0038098f4e4934b406c892ca0fe78fd\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "worktree",
+        "list",
+        "--porcelain"
+      ],
+      "exit_code": 0,
+      "stdout": "worktree /home/zhuhe/code/litchi\nHEAD 59f75c7f79026a4d124b61e97c178c7b45de19ab\nbranch refs/heads/feat/office-format-completeness\n\nworktree /home/zhuhe/code/litchi-current-baseline-orchestration\nHEAD 654472a66acc748e27e1bba61a167380c8135db3\ndetached\n\nworktree /home/zhuhe/code/litchi-inline-images\nHEAD a555113f46660ed3f0e95cff719dae59982c9b95\ndetached\n\nworktree /home/zhuhe/code/litchi-iwa-exit\nHEAD e15c688eae7eaec6c0b5cf025686ceb0ff6410eb\nbranch refs/heads/refactor/iwa-exit-continuation\n\nworktree /home/zhuhe/code/litchi-iwa-exit-continuation\nHEAD 64b4af316d495c106c669cacee59b72a317f7459\nbranch refs/heads/agent/text-datetime-owner\n\nworktree /home/zhuhe/code/litchi-worktrees/0761-save-durability-policy\nHEAD 9aeed778b968d430ba1120343654eb26f4bac21c\nbranch refs/heads/perf/0761-save-durability-policy\n\nworktree /home/zhuhe/code/litchi-worktrees/0770-quick-xml-fail-fast-attribute-checks\nHEAD bf315b46a88e73aa5762b4640d1134a44c14e77c\nbranch refs/heads/perf/0770-quick-xml-fail-fast-attribute-checks\n\nworktree /home/zhuhe/code/litchi-worktrees/chart-appearance-retirement\nHEAD 068863b847f64c20f84ecb9771ebedf7dee2c9cb\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/deflate-admission\nHEAD 2f9ffe26a83710e68e0b4261fe207e89a939b429\nbranch refs/heads/agent/deflate-admission\n\nworktree /home/zhuhe/code/litchi-worktrees/host-media-followups\nHEAD b6dce26e5536e54285c1e3d3810dc74c44eb3e96\nbranch refs/heads/agent/host-media-followups\n\nworktree /home/zhuhe/code/litchi-worktrees/host-media-integration-final\nHEAD ba2128da08c03dace39d075f6b407f5a205fbf91\nbranch refs/heads/agent/host-media-integration-final\n\nworktree /home/zhuhe/code/litchi-worktrees/host-package-media-owners\nHEAD a57a3395e2569ceb04a54e6c9da59e7427e83db0\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-build-semantics\nHEAD 4d91d3ee432c50d90abd713d4c96a9b5a44ea6f5\nbranch refs/heads/agent/keynote-build-semantics\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-builder-final\nHEAD 2825bcadaf4446671e644edce1c1d5b59fa9b9c9\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-builder-final-v2\nHEAD 70bf4dceb559c170653358f8db74d042ed142f84\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-builder-ledger-final\nHEAD 91eb5017a16fe21053a840e98857609106bf1288\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-builder-oracle-retirement\nHEAD 5416ccc8cb9aeafba885bf919c45990c1cf14e6b\nbranch refs/heads/agent/keynote-builder-oracle-retirement\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-builder-semantic-merge\nHEAD 72ec149fddea8202a4d14dcefbf9cebf1f950d50\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-chart-lifecycle\nHEAD 0fdd792e9a3c89dac0f0c1585511b972ae7e13ee\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-hidden-axis-admission-proof\nHEAD 6f11e05854a84cf4c2cbb4f0856f0146f77a1162\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-layout-reassignment\nHEAD 084861f2caa7f363d46ee3aa6aa9b20c7a3de1dc\nbranch refs/heads/agent/keynote-layout-reassignment-parity\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-media-lifecycle-admission\nHEAD 77b100373f9026ee5093b15602aa97d38b67c849\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-package-creation\nHEAD 773eb2dafe0a317887544300cbfcbc72ab5171d9\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-package-media\nHEAD 881ea317866e09ec2299970088b125c148404cee\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-shape-properties\nHEAD 2cb6b771b1812827b4f1b56f8614624fde75595a\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-slide-creation\nHEAD 43ede441a90d4d0e867f7369f2316fb12698ae3e\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-table-cell-edit\nHEAD 33e4f961bc37e23230ec4127d7afad62ccb2a822\nbranch refs/heads/keynote-table-cell-integration\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-text-highlight\nHEAD 8f9475903a1c56b68238d16d022acd5fcd22ad44\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-text-hyperlinks\nHEAD 5ddfaf64d288998ba07c318fc2778aa8c23fa543\nbranch refs/heads/tmp/keynote-hyperlink-admission-followup\n\nworktree /home/zhuhe/code/litchi-worktrees/keynote-text-style-read\nHEAD 8adbc48fc4f372a96445ef3606fd97a03ad80bac\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-axis-insert\nHEAD d77445a5d60de66e1b488260c6970c046c138840\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-drawable-comments\nHEAD 58c3acd881127bb12d9e086e187e51e9ecad2cfd\nbranch refs/heads/numbers-drawable-comments\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-drawable-order\nHEAD 25e14f6483003a4e36129006983e44e773a936d4\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-index-admission\nHEAD b6dce26e5536e54285c1e3d3810dc74c44eb3e96\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-package-builder\nHEAD 8cb2722710689c6204de5ca5b04ec26e78bfec41\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-shape-properties\nHEAD 6838f4be8da0beb047304bfc9cb4c997c7ef762b\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-sheet-creation\nHEAD 0e10e64a29c05eb4b9d2a2ebb431ce7f6b09fffb\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/numbers-sheet-creation-integration\nHEAD 32c16e0fa1db5df2f94698c297fb9abd971987cc\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-body-font\nHEAD 358a852ea90435050ba71d8c4d1013bdba749b71\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-bookmark-migration\nHEAD 5a226665127dfcaec48400dc7d1e9d180a10f725\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-bookmark-public-tests\nHEAD efd854e2357c94d6c55e975e06f15560057868bf\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-builder-integration\nHEAD 221f53182ec1138c270a26c252aadece575695ec\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-font-integration\nHEAD eb4cb6b2d791aa150d13a449e4414a70f2f5264d\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-footnote-text\nHEAD 8935d7fceaeb837ec726135440c06d20c2c89ee9\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-package-creation\nHEAD f0ad0029a9f3d4ddf2c66b4c2e02ab8706571170\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-paragraph-alignment\nHEAD 0ac57d1559a4f6729621b55cdb3f6742fcc36aff\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-paragraph-list-level\nHEAD ebff90de5d5d186d378e63fe19da78e990561da8\nbranch refs/heads/agent/pages-paragraph-list-level\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-section-lifecycle\nHEAD 61735b018b1d07a9ec4a7228ea50b1a632ef64bd\ndetached\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-shape-properties\nHEAD f2d78997fc0d9c1c789cf65c84cee104993f7ae2\nbranch refs/heads/pages-shape-properties\n\nworktree /home/zhuhe/code/litchi-worktrees/pages-table-comment-lifecycle\nHEAD f889418923b2dea4c7b5b3b6f2bd47370d3b7246\ndetached\n\nworktree /tmp/chart-legend-shared\nHEAD ee5e71230bfbc6fb7590a4658b036a5154b1b31b\ndetached\n\nworktree /tmp/litchi-pages-body-language\nHEAD a986afeda06d20df1df14dc6081ddd3fea222b69\ndetached\n\n",
+      "stderr": ""
+    }
+  ],
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "production_parent": "66b944b07fcf4c6fa37f10e7ed83a02417455f57",
+  "preserved_files": [
+    {
+      "path": ".git/index",
+      "sha256": "1fa921e90b0e01ef746c28a1ec694cc00b2b8785edce496ce2d7f03a60881f39"
+    },
+    {
+      "path": "crates/litchi/examples/bench_word_parse.rs",
+      "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+    },
+    {
+      "path": "docs/UNIFIED_OPS_API_DESIGN.md",
+      "sha256": "be180f256dde0e22d48ad22f3cc7832da1e919b59e30f1cb6a552113b2928d0d"
+    }
+  ]
+}

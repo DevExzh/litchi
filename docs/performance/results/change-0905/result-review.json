@@ -1,0 +1,466 @@
+{
+  "schema": "litchi.xml-attribute-summary-result-review-0905.v1",
+  "status": "pass",
+  "verdict": "pass_with_scope_caveats",
+  "review": {
+    "mode": "offline_raw_evidence_review",
+    "reviewer_ran_builds": false,
+    "reviewer_ran_workloads": false,
+    "reviewer_ran_profilers": false,
+    "reviewer_reran_replay": false,
+    "raw_checks": [
+      "native paired ratios and bootstrap",
+      "micro paired ratios, bootstrap, tail and spread flags",
+      "semantic identity pairs",
+      "sample order and schedule",
+      "allocator counter scope and deltas",
+      "RSS and child interval scope"
+    ]
+  },
+  "source_scope": {
+    "plan_id": "0905",
+    "baseline_label": "4f39f5a88d retained frozen baseline",
+    "candidate_files": [
+      "crates/xml-minifier/src/audit.rs"
+    ],
+    "baseline_manifest": {
+      "bytes": 1880177,
+      "sha256": "6dba705714e7ed2d746861be5eb5652130f9c98936f8bfd921c89db3a786397e"
+    },
+    "candidate_manifest": {
+      "bytes": 1880267,
+      "sha256": "69b4be69408c11c071de46b94dee82ab19a7ac036f2e96cbaa849ddd715f275c"
+    },
+    "file_count": 10773,
+    "hashed_entries": 21546,
+    "source_root": "/tmp/litchi-0905-src",
+    "current_tree_claim": "Results are scoped to the retained frozen plan and manifests; they do not claim the later merged HEAD."
+  },
+  "evidence": {
+    "plan": {
+      "path": "plan.json",
+      "sha256": "d4a2f484e78ee744040a9c899e462593c05380580ef3954fef999000eb3f977c",
+      "status": "frozen"
+    },
+    "native_capture": {
+      "path": "native/capture.json",
+      "sha256": "a83f02db36f3b826831ff096dc38bad17c86d5d3f1029b3ab661c89235a55345"
+    },
+    "allocator_capture": {
+      "path": "allocator/capture.json",
+      "sha256": "252e6e2005912ef68a9d5d23a9c4c5f6ba1a7061b5555ab60af06e8f1aa31394"
+    },
+    "analysis": {
+      "path": "analysis.json",
+      "sha256": "db663b1307ba234ebc680441d32f74569094b2cf366ee58176334777a9c74208"
+    },
+    "micro_analysis": {
+      "path": "micro-analysis.json",
+      "sha256": "af1a00f0d8f6733677c4a0b6238fd3540b3abaaffad8abdd468e87da0bbb21c5"
+    },
+    "diagnostics": {
+      "path": "diagnostics.json",
+      "sha256": "2370a882b0e03a2ff340af4efb968a7e2a28d575acdbdcdd89184675fa196603"
+    }
+  },
+  "custody": {
+    "top_level_source_boundaries": {
+      "qualification": {
+        "source_start_full": true,
+        "source_end_full": true,
+        "checked_files": 10773
+      },
+      "native": {
+        "source_start_full": true,
+        "source_end_full": true,
+        "checked_files": 10773
+      },
+      "allocator": {
+        "source_start_full": true,
+        "source_end_full": true,
+        "checked_files": 10773
+      }
+    },
+    "child_receipts": {
+      "qualification": {
+        "children": 8,
+        "exit_code_zero": 8,
+        "stderr_empty": 8
+      },
+      "native": {
+        "children": 48,
+        "exit_code_zero": 48,
+        "stderr_empty": 48
+      },
+      "allocator": {
+        "children": 16,
+        "exit_code_zero": 16,
+        "stderr_empty": 16
+      }
+    },
+    "per_child_source_note": "Per-child receipt end checks are selected candidate-file checks; the capture-level start and end boundaries above are the full 10,773-file checks."
+  },
+  "schedule": {
+    "environment": {
+      "cpu": 12,
+      "logical_cpus_available": 1,
+      "path": "/usr/bin:/bin",
+      "lang": "C",
+      "lc_all": "C",
+      "tz": "UTC"
+    },
+    "qualification": {
+      "children": 8,
+      "samples_per_child": 2,
+      "warmup_per_child": 0,
+      "total_samples": 16,
+      "within_stage_child_interval_overlaps": 0
+    },
+    "native": {
+      "blocks": 6,
+      "children": 48,
+      "samples_per_child": 100,
+      "warmup_per_child": 10,
+      "total_samples": 4800,
+      "even_block_order": "baseline then candidate; cases medium, dense-sparse, xlsx one-edit, docx one-edit",
+      "odd_block_order": "candidate then baseline; the even-block case order reversed",
+      "within_stage_child_interval_overlaps": 0,
+      "sample_order_permutations_verified": 48
+    },
+    "allocator": {
+      "repeats": 2,
+      "children": 16,
+      "samples_per_child": 3,
+      "warmup_per_child": 2,
+      "total_samples": 48,
+      "repeat_order": "all four baseline cases followed by all four candidate cases",
+      "within_stage_child_interval_overlaps": 0,
+      "sample_order_permutations_verified": 16
+    },
+    "micro": {
+      "blocks": 6,
+      "children": 12,
+      "jobs_per_role": 36,
+      "samples_per_job": 30,
+      "warmup_per_job": 5,
+      "iterations_per_sample": 1000,
+      "total_samples": 12960,
+      "even_block_order": "baseline then candidate; cases cardinality 0,1,2,8,32,33,128, xml-space-valid, xml-space-invalid, duplicate, malformed-tail, malformed-second, each source/compact/authored",
+      "odd_block_order": "candidate then baseline; the flattened even-block job order reversed",
+      "tsv_data_rows_per_child": 1080,
+      "comment_identity_mismatches": 0,
+      "sample_indices_verified": true
+    }
+  },
+  "semantic_identity": {
+    "normalization": "analyze_v3 semantic_identity: retain corpus, sink, output digest, and non-timing source constants; omit keys ending in _ns and keys containing allocation; collapse constant evidence vectors",
+    "raw_report_byte_identity_claimed": false,
+    "qualification_pairs": 4,
+    "native_pairs": 24,
+    "allocator_pairs": 8,
+    "identity_diffs": 0,
+    "case_identities": {
+      "primary-percent-medium": {
+        "corpus": {
+          "name": "xlsx-cell-values-medium",
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "entry_count": 9216,
+          "uncompressed_payload_bytes": 4231168,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+        },
+        "update_count": 93,
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source": {
+          "read_calls": 183,
+          "read_bytes": 4233170,
+          "ordinary_payload_materializations": 6,
+          "selected_worksheet_count": 4,
+          "selected_worksheet_read_calls": 4,
+          "selected_worksheet_read_bytes": 27146,
+          "unselected_worksheet_read_calls": 0,
+          "unselected_worksheet_read_bytes": 0,
+          "cache_successful_loads": 6,
+          "cache_hits": 0,
+          "cache_retained_entries": 6,
+          "cache_retained_bytes": 269785
+        },
+        "sink": {
+          "accepted_bytes": 4226788,
+          "write_calls": 143,
+          "largest_write": 65536
+        }
+      },
+      "primary-percent-dense-sparse": {
+        "corpus": {
+          "name": "xlsx-cell-values-dense-sparse",
+          "archive_bytes": 4251863,
+          "archive_member_count": 17,
+          "entry_count": 17792,
+          "uncompressed_payload_bytes": 4265472,
+          "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+        },
+        "update_count": 178,
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source": {
+          "read_calls": 183,
+          "read_bytes": 4258604,
+          "ordinary_payload_materializations": 6,
+          "selected_worksheet_count": 4,
+          "selected_worksheet_read_calls": 4,
+          "selected_worksheet_read_bytes": 52580,
+          "unselected_worksheet_read_calls": 0,
+          "unselected_worksheet_read_bytes": 0,
+          "cache_successful_loads": 6,
+          "cache_hits": 0,
+          "cache_retained_entries": 6,
+          "cache_retained_bytes": 509460
+        },
+        "sink": {
+          "accepted_bytes": 4252436,
+          "write_calls": 143,
+          "largest_write": 65536
+        }
+      },
+      "control-xlsx-one-edit-medium": {
+        "corpus": {
+          "name": "xlsx-cell-values-medium",
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "entry_count": 9216,
+          "uncompressed_payload_bytes": 4231168,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+        },
+        "update_count": 1,
+        "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+        "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+        "source": {
+          "read_calls": 180,
+          "read_bytes": 4233122,
+          "ordinary_payload_materializations": 3,
+          "selected_worksheet_count": 1,
+          "selected_worksheet_read_calls": 1,
+          "selected_worksheet_read_bytes": 6816,
+          "unselected_worksheet_read_calls": 3,
+          "unselected_worksheet_read_bytes": 20330,
+          "cache_successful_loads": 3,
+          "cache_hits": 0,
+          "cache_retained_entries": 3,
+          "cache_retained_bytes": 64321
+        },
+        "sink": {
+          "accepted_bytes": 4226480,
+          "write_calls": 137,
+          "largest_write": 65536
+        }
+      },
+      "control-docx-one-edit-medium": {
+        "corpus": {
+          "name": "docx-semantic-medium",
+          "archive_bytes": 9051,
+          "archive_member_count": 12,
+          "entry_count": 200,
+          "uncompressed_payload_bytes": 10000,
+          "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c178391e2f27c83674e8f7d4c9431d9",
+          "target_entry": "paragraph:0",
+          "target_payload_bytes": 50,
+          "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1"
+        },
+        "source_identity_supported": false,
+        "output_sha256": null,
+        "sink": {
+          "accepted_bytes": 9060,
+          "write_calls": 51,
+          "largest_write": 1652
+        },
+        "note": "The validator intentionally provides corpus and sink identity only for this DOCX control. It does not fabricate XLSX source or output identity."
+      }
+    }
+  },
+  "native_gate": {
+    "bootstrap": {
+      "seed": 905009,
+      "draws": 10000,
+      "endpoint_indices": [249, 9749],
+      "statistic": "paired_median_ratio"
+    },
+    "thresholds": {
+      "primary_p50_median_ratio_max": 0.98,
+      "primary_upper_95_ci_lt": 1.0,
+      "review_ratio": 1.05,
+      "review_spread_ratio": 1.2
+    },
+    "primary_gate": {
+      "pass": true,
+      "max_p50_median_ratio": 0.954388178045839,
+      "max_upper_95_ci": 0.9742145401706614
+    },
+    "review_flags": [],
+    "cases": {
+      "primary-percent-medium": {
+        "paired_p50_ratios": [0.9549851179028965, 0.9537912381887814, 0.9562312766254718, 0.9607109591493086, 0.9484694046734934, 0.9531990839312233],
+        "estimate": 0.954388178045839,
+        "lower_95": 0.9508342443023583,
+        "upper_95": 0.9584711178873901,
+        "primary_gate_accepted": true
+      },
+      "primary-percent-dense-sparse": {
+        "paired_p50_ratios": [0.979572362159067, 0.9519222089066443, 0.9435885445914136, 0.9284116482331781, 0.9416315273983344, 0.9688567181822558],
+        "estimate": 0.947755376749029,
+        "lower_95": 0.9350215878157563,
+        "upper_95": 0.9742145401706614,
+        "primary_gate_accepted": true
+      },
+      "control-xlsx-one-edit-medium": {
+        "paired_p50_ratios": [0.9694870644505742, 0.9876154691530614, 0.9929929140784074, 0.9590588349017791, 0.9828159673308023, 0.9763647151426685],
+        "estimate": 0.9795903412367355,
+        "lower_95": 0.9642729496761766,
+        "upper_95": 0.9903041916157345,
+        "primary_gate_accepted": false,
+        "note": "Control case; not part of the primary adoption gate."
+      },
+      "control-docx-one-edit-medium": {
+        "paired_p50_ratios": [0.969976376881501, 0.9701538785704105, 0.9878349921030861, 0.9686833358138612, 0.9523349495096788, 0.9883692481415263],
+        "estimate": 0.9700651277259558,
+        "lower_95": 0.96050914266177,
+        "upper_95": 0.9881021201223061,
+        "primary_gate_accepted": false,
+        "note": "Control case; not part of the primary adoption gate."
+      }
+    }
+  },
+  "allocator": {
+    "children": 16,
+    "repeats": 2,
+    "samples_per_child": 3,
+    "warmup_per_child": 2,
+    "total_samples": 48,
+    "instrumentation": "system_allocator_operation_scoped",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "counter_revision": "serialized_region_peak_v3",
+    "scope": "operation_global_system_allocator",
+    "phases": ["plan", "staging", "commit", "commit_core", "publication"],
+    "sample_counter_stability": "Allocation, deallocation, reallocation, failed-allocation, and byte counters are constant across the three measured samples per child; failed allocation count is zero.",
+    "publication_counter_deltas_candidate_minus_baseline": {
+      "primary-percent-medium": {
+        "allocation_calls": -18832,
+        "deallocation_calls": -18832,
+        "reallocation_calls": 0,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": -1205248,
+        "deallocated_bytes": -1205248
+      },
+      "primary-percent-dense-sparse": {
+        "allocation_calls": -35950,
+        "deallocation_calls": -35950,
+        "reallocation_calls": 0,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": -2300800,
+        "deallocated_bytes": -2300800
+      },
+      "control-xlsx-one-edit-medium": {
+        "allocation_calls": -2354,
+        "deallocation_calls": -2354,
+        "reallocation_calls": 0,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": -150656,
+        "deallocated_bytes": -150656
+      }
+    },
+    "other_phase_counter_deltas_zero": true,
+    "live_field_note": "Live and peak fields are not used as stable allocation deltas; paired rows show a three-byte snapshot difference whose cause is not established.",
+    "docx_metrics": "not_applicable",
+    "causal_claim": false
+  },
+  "rss": {
+    "source": "/usr/bin/time max_rss_kib",
+    "scope": "whole-process lifetime high-water; descriptive and affected by executable layout",
+    "native": {
+      "primary-percent-medium": {"baseline": {"range_kib": [74988, 76484], "median_kib": 75576}, "candidate": {"range_kib": [68236, 71448], "median_kib": 68836}},
+      "primary-percent-dense-sparse": {"baseline": {"range_kib": [92276, 94716], "median_kib": 93044}, "candidate": {"range_kib": [85768, 86708], "median_kib": 85992}},
+      "control-xlsx-one-edit-medium": {"baseline": {"range_kib": [75088, 77884], "median_kib": 75820}, "candidate": {"range_kib": [68392, 70700], "median_kib": 69278}},
+      "control-docx-one-edit-medium": {"baseline": {"range_kib": [26072, 27880], "median_kib": 26760}, "candidate": {"range_kib": [16980, 19936], "median_kib": 19804}}
+    },
+    "allocator": {
+      "primary-percent-medium": {"baseline": {"range_kib": [72528, 72608], "median_kib": 72568}, "candidate": {"range_kib": [67716, 67996], "median_kib": 67856}},
+      "primary-percent-dense-sparse": {"baseline": {"range_kib": [89408, 89532], "median_kib": 89470}, "candidate": {"range_kib": [85000, 85096], "median_kib": 85048}},
+      "control-xlsx-one-edit-medium": {"baseline": {"range_kib": [72108, 74408], "median_kib": 73258}, "candidate": {"range_kib": [70452, 70800], "median_kib": 70626}},
+      "control-docx-one-edit-medium": {"baseline": {"range_kib": [23656, 25232], "median_kib": 24444}, "candidate": {"range_kib": [19444, 19944], "median_kib": 19694}}
+    }
+  },
+  "micro_gate": {
+    "protocol": {
+      "seed": 905019,
+      "bootstrap_draws": 10000,
+      "endpoint_indices": [249, 9749],
+      "hard_gate": "median_p50_ratio > 1.05 and lower_95_endpoint > 1.0",
+      "tail_review_ratio": 1.05,
+      "spread_review_ratio": 1.2
+    },
+    "children": 12,
+    "cases": 36,
+    "samples": 12960,
+    "recomputed_from_raw_tsv": true,
+    "matches_micro_analysis": true,
+    "material_adverse_cases": [],
+    "adoption_allowed": true,
+    "p50_median_greater_than_one_count": 8,
+    "p50_median_greater_than_1_05_count": 0,
+    "spread_flags": [],
+    "tail_review_flags": [
+      "cardinality-2/authored",
+      "cardinality-2/compact"
+    ],
+    "finite_regressions": {
+      "cardinality-2/compact": {"estimate": 1.0386657724245978, "lower_95": 1.0200534323970754, "upper_95": 1.0487967153178355, "p99_tail_flag": true},
+      "cardinality-2/authored": {"estimate": 1.0371562972811896, "lower_95": 1.0130410729623986, "upper_95": 1.0521512105715298, "p99_tail_flag": true},
+      "xml-space-invalid/authored": {"estimate": 1.0209577558614755, "lower_95": 1.0080195221011117, "upper_95": 1.0449488369639894, "p99_tail_flag": false},
+      "xml-space-invalid/compact": {"estimate": 1.0163117891307945, "lower_95": 1.0048561619701548, "upper_95": 1.0419780378219405, "p99_tail_flag": false},
+      "xml-space-invalid/source": {"estimate": 1.0107644809582652, "lower_95": 1.002558081177856, "upper_95": 1.0495297486607598, "p99_tail_flag": false},
+      "cardinality-128/compact": {"estimate": 1.0074061829535281, "lower_95": 0.9885433843868778, "upper_95": 1.0123013249272188, "p99_tail_flag": false},
+      "cardinality-128/source": {"estimate": 1.0059890462703218, "lower_95": 0.987362193677275, "upper_95": 1.011333297858887, "p99_tail_flag": false},
+      "cardinality-128/authored": {"estimate": 1.0053621906926007, "lower_95": 0.9854780323094493, "upper_95": 1.0137047470853688, "p99_tail_flag": false}
+    },
+    "scope": "Per-sample elapsed time is 1000 complete slice audits; output formatting and the last-outcome check are excluded, and this is separate from Office benefit estimates."
+  },
+  "workload_intervals": {
+    "qualification": {
+      "first_start": "2026-10-04T05:57:37.687096+00:00",
+      "last_finish": "2026-10-04T05:57:43.899153+00:00"
+    },
+    "native": {
+      "first_start": "2026-10-04T05:58:04.547981+00:00",
+      "last_finish": "2026-10-04T06:01:52.158852+00:00"
+    },
+    "allocator": {
+      "first_start": "2026-10-04T06:01:53.328255+00:00",
+      "last_finish": "2026-10-04T06:02:09.315730+00:00"
+    },
+    "supervisor_overlap": {
+      "allocator_supervisor_start": "2026-10-04T06:01:51.662140+00:00",
+      "overlapped_native_last_child": true,
+      "workload_child_overlap": false,
+      "host_exclusivity_proven": false
+    }
+  },
+  "limitations": [
+    "RSS is whole-process GNU time high-water data, not an operation or phase peak, and executable layout can affect it.",
+    "Allocator counters come from separate operation-scoped instrumented runs and are diagnostic; they are not causal proof of the timing result.",
+    "Phase quantiles do not sum to whole-operation quantiles.",
+    "The native environment records one available logical CPU and taskset CPU 12, but the evidence does not prove a dedicated or exclusive host.",
+    "The allocator supervisor/preflight began before the native supervisor fully terminated, while workload child intervals remained non-overlapping.",
+    "The DOCX control intentionally has no XLSX source/output semantic identity fields.",
+    "This review covers the exact retained frozen plan and source manifests, not later merged workspace state."
+  ]
+}

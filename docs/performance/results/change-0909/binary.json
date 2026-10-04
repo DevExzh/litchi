@@ -1,0 +1,13 @@
+{
+  "original": {
+    "path": "/home/zhuhe/code/litchi/target/litchi-0909-build/release/examples/pptx_owned_control",
+    "bytes": 9583784,
+    "sha256": "ee74476a9ce337e943e08b3194f9696378f5caa15c7aa30adbbf1bc3429abc16"
+  },
+  "retained": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/binaries/probe-v3",
+    "bytes": 9583784,
+    "sha256": "ee74476a9ce337e943e08b3194f9696378f5caa15c7aa30adbbf1bc3429abc16"
+  },
+  "scope": "Untimed owning-input qualification executable; locally retained, not Git-tracked."
+}

@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "cargo",
+    "update",
+    "--offline",
+    "--workspace"
+  ],
+  "cwd": "/tmp/litchi-0913-src",
+  "start_utc": "2026-10-04T10:41:47.838333+00:00",
+  "end_utc": "2026-10-04T10:41:48.150325+00:00",
+  "exit_code": 0,
+  "purpose": "Quality workspace resolved from benchmark lock, update workspace only",
+  "seed": {
+    "path": "docs/performance/results/change-0913/quality-lock-v3/seed-Cargo.lock",
+    "bytes": 56289,
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "after": {
+    "path": "docs/performance/results/change-0913/quality-lock-v3/Cargo.lock",
+    "bytes": 137417,
+    "sha256": "32e1995cfc75a490432eae1d8160376105691ad4152e6ca99a0f08e1413abe9c"
+  },
+  "baseline_registry_packages_not_retained": [],
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0913/quality-lock-v3/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0913/quality-lock-v3/stderr.txt",
+      "bytes": 13384,
+      "sha256": "c475e2d7ade08d98a3fb7bd6156fd672e5bf3dc120e875db606803c980502aaa"
+    }
+  ]
+}

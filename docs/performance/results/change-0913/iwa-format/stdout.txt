@@ -1,0 +1,299 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:1586:
+             retained_bytes: self
+                 .retained_bytes
+                 .checked_add(other.retained_bytes)
+[31m-                .ok_or_else(|| Error::InvalidBundle("catalog retained bytes overflow".to_owned()))?,
+[m[32m+                .ok_or_else(|| {
+[m[32m+                    Error::InvalidBundle("catalog retained bytes overflow".to_owned())
+[m[32m+                })?,
+[m             traversal_bytes: self
+                 .traversal_bytes
+                 .checked_add(other.traversal_bytes)
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:1593:
+[31m-                .ok_or_else(|| Error::InvalidBundle("catalog traversal bytes overflow".to_owned()))?,
+[m[32m+                .ok_or_else(|| {
+[m[32m+                    Error::InvalidBundle("catalog traversal bytes overflow".to_owned())
+[m[32m+                })?,
+[m             allocations: self
+                 .allocations
+                 .checked_add(other.allocations)
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:1597:
+[31m-                .ok_or_else(|| Error::InvalidBundle("catalog allocation count overflow".to_owned()))?,
+[m[32m+                .ok_or_else(|| {
+[m[32m+                    Error::InvalidBundle("catalog allocation count overflow".to_owned())
+[m[32m+                })?,
+[m         })
+     }
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:1992:
+             (entries, semantic_profile.is_none(), None)
+         } else if let Some(index_name) = nested_name {
+             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
+[31m-            physical_storage = physical_storage
+[m[31m-                .add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
+[m[32m+            physical_storage =
+[m[32m+                physical_storage.add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
+[m             let (entries, nested_storage) = if semantic_profile.is_some() {
+                 collect_semantic_legacy(
+                     &archive,
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2161:
+             source_metadata = source_metadata
+                 .checked_add(entry.metadata_size_hint())
+                 .and_then(|value| value.checked_add(46))
+[31m-                .ok_or_else(|| {
+[m[31m-                    Error::Reassembly("ZIP metadata length overflows u64".to_owned())
+[m[31m-                })?;
+[m[32m+                .ok_or_else(|| Error::Reassembly("ZIP metadata length overflows u64".to_owned()))?;
+[m         }
+         if source_metadata > checked_limits.zip_limits().max_metadata_bytes {
+             return Err(Error::Limit {
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2208:
+         self.check_source_total(checked_limits)?;
+         let mut final_total = self.source_total_uncompressed;
+         for edit in edits {
+[31m-            let entry = self.entries.iter().find(|entry| entry.name() == edit.name());
+[m[32m+            let entry = self
+[m[32m+                .entries
+[m[32m+                .iter()
+[m[32m+                .find(|entry| entry.name() == edit.name());
+[m             let Some(entry) = entry else {
+                 return Err(Error::Reassembly(format!(
+                     "edited member does not exist in the flat catalog: {}",
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2222:
+                         .ok()
+                         .and_then(|data_len| value.checked_add(data_len))
+                 })
+[31m-                .ok_or_else(|| Error::Reassembly("reassembled ZIP total overflows u64".to_owned()))?;
+[m[32m+                .ok_or_else(|| {
+[m[32m+                    Error::Reassembly("reassembled ZIP total overflows u64".to_owned())
+[m[32m+                })?;
+[m         }
+         for name in deleted_names {
+             let entry = self.entries.iter().find(|entry| entry.name() == *name);
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2234:
+             final_total = final_total
+                 .checked_sub(entry.metadata().uncompressed_size())
+                 .ok_or_else(|| {
+[31m-                Error::Reassembly("reassembled ZIP total underflows u64".to_owned())
+[m[32m+                    Error::Reassembly("reassembled ZIP total underflows u64".to_owned())
+[m                 })?;
+         }
+         for insertion in insertions {
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2242:
+                 .checked_add(u64::try_from(insertion.data().len()).map_err(|_error| {
+                     Error::InvalidBundle("inserted member length does not fit u64".to_owned())
+                 })?)
+[31m-                .ok_or_else(|| Error::Reassembly("reassembled ZIP total overflows u64".to_owned()))?;
+[m[32m+                .ok_or_else(|| {
+[m[32m+                    Error::Reassembly("reassembled ZIP total overflows u64".to_owned())
+[m[32m+                })?;
+[m         }
+         if final_total > checked_limits.max_total_bytes() {
+             return Err(Error::Limit {
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2291:
+         let selected_count = edits
+             .len()
+             .checked_add(deleted_names.len())
+[31m-            .ok_or_else(|| Error::Reassembly("mutation selection count overflows usize".to_owned()))?;
+[m[32m+            .ok_or_else(|| {
+[m[32m+                Error::Reassembly("mutation selection count overflows usize".to_owned())
+[m[32m+            })?;
+[m         add_preparation_map(
+             &mut requirements,
+             selected_count,
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2797:
+ ) -> Result<bool> {
+     let mut identical = true;
+     for (index, edit) in edits.iter().copied().enumerate() {
+[31m-        if edits[..index].iter().any(|previous| previous.name() == edit.name()) {
+[m[32m+        if edits[..index]
+[m[32m+            .iter()
+[m[32m+            .any(|previous| previous.name() == edit.name())
+[m[32m+        {
+[m             return Err(Error::Reassembly(format!(
+                 "member is edited more than once: {}",
+                 edit.name()
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2842:
+     limits: Limits,
+ ) -> Result<()> {
+     for (index, edit) in edits.iter().copied().enumerate() {
+[31m-        if edits[..index].iter().any(|previous| previous.name() == edit.name()) {
+[m[32m+        if edits[..index]
+[m[32m+            .iter()
+[m[32m+            .any(|previous| previous.name() == edit.name())
+[m[32m+        {
+[m             return Err(Error::Reassembly(format!(
+                 "member is edited more than once: {}",
+                 edit.name()
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2884:
+     }
+ 
+     for (index, name) in deleted_names.iter().enumerate() {
+[31m-        if deleted_names[..index].iter().any(|previous| *previous == *name) {
+[m[32m+        if deleted_names[..index]
+[m[32m+            .iter()
+[m[32m+            .any(|previous| *previous == *name)
+[m[32m+        {
+[m             return Err(Error::Reassembly(format!(
+                 "member is deleted more than once: {name}"
+             )));
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2935:
+                 "inserted member name requires ZIP64 filename fields".to_owned(),
+             ));
+         }
+[31m-        if catalog.entries.iter().any(|entry| entry.name() == insertion.name()) {
+[m[32m+        if catalog
+[m[32m+            .entries
+[m[32m+            .iter()
+[m[32m+            .any(|entry| entry.name() == insertion.name())
+[m[32m+        {
+[m             return Err(Error::Reassembly(format!(
+                 "inserted member duplicates an existing ZIP member: {}",
+                 insertion.name()
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:2982:
+         })?)
+         .and_then(|value| value.checked_mul(2))
+         .ok_or_else(|| Error::Reassembly("reassembly map storage overflows usize".to_owned()))?;
+[31m-    requirements.retained_bytes = requirements
+[m[31m-        .retained_bytes
+[m[31m-        .checked_add(bytes)
+[m[31m-        .ok_or_else(|| Error::Reassembly("reassembly retained storage overflows usize".to_owned()))?;
+[m[31m-    requirements.allocations = requirements
+[m[31m-        .allocations
+[m[31m-        .checked_add(1)
+[m[31m-        .ok_or_else(|| Error::Reassembly("reassembly allocation count overflows usize".to_owned()))?;
+[m[32m+    requirements.retained_bytes =
+[m[32m+        requirements
+[m[32m+            .retained_bytes
+[m[32m+            .checked_add(bytes)
+[m[32m+            .ok_or_else(|| {
+[m[32m+                Error::Reassembly("reassembly retained storage overflows usize".to_owned())
+[m[32m+            })?;
+[m[32m+    requirements.allocations = requirements.allocations.checked_add(1).ok_or_else(|| {
+[m[32m+        Error::Reassembly("reassembly allocation count overflows usize".to_owned())
+[m[32m+    })?;
+[m     Ok(())
+ }
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:3004:
+     let bytes = capacity
+         .checked_mul(element_size)
+         .ok_or_else(|| Error::Reassembly("reassembly vector storage overflows usize".to_owned()))?;
+[31m-    requirements.retained_bytes = requirements
+[m[31m-        .retained_bytes
+[m[31m-        .checked_add(bytes)
+[m[31m-        .ok_or_else(|| Error::Reassembly("reassembly retained storage overflows usize".to_owned()))?;
+[m[31m-    requirements.allocations = requirements
+[m[31m-        .allocations
+[m[31m-        .checked_add(1)
+[m[31m-        .ok_or_else(|| Error::Reassembly("reassembly allocation count overflows usize".to_owned()))?;
+[m[32m+    requirements.retained_bytes =
+[m[32m+        requirements
+[m[32m+            .retained_bytes
+[m[32m+            .checked_add(bytes)
+[m[32m+            .ok_or_else(|| {
+[m[32m+                Error::Reassembly("reassembly retained storage overflows usize".to_owned())
+[m[32m+            })?;
+[m[32m+    requirements.allocations = requirements.allocations.checked_add(1).ok_or_else(|| {
+[m[32m+        Error::Reassembly("reassembly allocation count overflows usize".to_owned())
+[m[32m+    })?;
+[m     Ok(())
+ }
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:3026:
+             .name()
+             .len()
+             .checked_add(edit.data().len())
+[31m-            .ok_or_else(|| Error::Reassembly("reassembly request traversal overflows usize".to_owned()))?;
+[m[32m+            .ok_or_else(|| {
+[m[32m+                Error::Reassembly("reassembly request traversal overflows usize".to_owned())
+[m[32m+            })?;
+[m         requirements.traversal_bytes = requirements
+             .traversal_bytes
+             .checked_add(bytes)
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:3043:
+             .name()
+             .len()
+             .checked_add(insertion.data().len())
+[31m-            .ok_or_else(|| Error::Reassembly("reassembly request traversal overflows usize".to_owned()))?;
+[m[32m+            .ok_or_else(|| {
+[m[32m+                Error::Reassembly("reassembly request traversal overflows usize".to_owned())
+[m[32m+            })?;
+[m         requirements.traversal_bytes = requirements
+             .traversal_bytes
+             .checked_add(bytes)
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:5170:
+             Error::InvalidBundle(format!("legacy package index: {error}"))
+         }
+     })?;
+[31m-    let storage = index
+[m[31m-        .storage_requirements()?
+[m[31m-        .add_owned(
+[m[31m-            index_source
+[m[31m-                .as_ref()
+[m[31m-                .len()
+[m[31m-                .checked_add(usize::from(index_is_deflated))
+[m[31m-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+[m[31m-            2,
+[m[31m-        )?;
+[m[32m+    let storage = index.storage_requirements()?.add_owned(
+[m[32m+        index_source
+[m[32m+            .as_ref()
+[m[32m+            .len()
+[m[32m+            .checked_add(usize::from(index_is_deflated))
+[m[32m+            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+[m[32m+        2,
+[m[32m+    )?;
+[m 
+     let mut entries = Vec::new();
+     let mut seen = HashSet::new();
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:5264:
+             Error::InvalidBundle(format!("legacy package index: {error}"))
+         }
+     })?;
+[31m-    let storage = index
+[m[31m-        .storage_requirements()?
+[m[31m-        .add_owned(
+[m[31m-            index_source
+[m[31m-                .as_ref()
+[m[31m-                .len()
+[m[31m-                .checked_add(usize::from(index_is_deflated))
+[m[31m-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+[m[31m-            2,
+[m[31m-        )?;
+[m[32m+    let storage = index.storage_requirements()?.add_owned(
+[m[32m+        index_source
+[m[32m+            .as_ref()
+[m[32m+            .len()
+[m[32m+            .checked_add(usize::from(index_is_deflated))
+[m[32m+            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+[m[32m+        2,
+[m[32m+    )?;
+[m 
+     preflight_semantic_iwa_entries(&index, true)?;
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:5349:
+         )
+         .and_then(|bytes| bytes.checked_mul(2))
+         .and_then(|bytes| {
+[31m-            seen.iter().try_fold(bytes, |total, name| {
+[m[31m-                total.checked_add(name.capacity())
+[m[31m-            })
+[m[32m+            seen.iter()
+[m[32m+                .try_fold(bytes, |total, name| total.checked_add(name.capacity()))
+[m         })
+         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+     let entry_slack = entries_capacity
+Diff in /home/zhuhe/code/litchi/crates/litchi-iwa-archive/src/package.rs:5359:
+         .and_then(|bytes| bytes.checked_mul(size_of::<Entry>()))
+         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+     let allocations = usize::from(seen.capacity() != 0)
+[31m-        .checked_add(
+[m[31m-            seen.iter()
+[m[31m-                .filter(|name| name.capacity() != 0)
+[m[31m-                .count(),
+[m[31m-        )
+[m[32m+        .checked_add(seen.iter().filter(|name| name.capacity() != 0).count())
+[m         .and_then(|value| value.checked_add(usize::from(entry_slack != 0)))
+         .ok_or_else(|| Error::InvalidBundle("entry allocation census overflow".to_owned()))?;
+     let retained = seen_bytes

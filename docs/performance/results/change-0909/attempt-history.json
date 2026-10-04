@@ -1,0 +1,12 @@
+{
+  "build_v1": "Failed E0282 for raw member collection and E0026/E0027 for root-authored ReadLimit field name. Original patch/source/logs retained.",
+  "build_v2": "Passed; source includes explicit collection type and maximum field.",
+  "capture_v2": "Source/output/no-op retained; failed overly specific zero-sink IoError expectation. Existing preservation writer maps to ZipError; qualification amendment retained.",
+  "build_v3": "Passed; same workload with corrected existing zero-sink classification.",
+  "capture_v3": "Passed all runtime gates.",
+  "census_v1": "Synthetic8checks passed, but root review found semantic slide indexes incorrectly compared to ZIP central indexes; no primarycapture used this checker. Originalversions retained.",
+  "census_v2": "Corrected namedmember check and added445member metadata-leadingregression;9checks pass.",
+  "quality_v3": "Formatting default policy failed because isolated source snapshot omitted rustfmt.toml. No code reformatted to the wrong policy.",
+  "quality_v3_v2": "Uses parentcommit rustfmt.toml explicitly, retained inpacket; formattingpasses, Clippyresultinqualityreceipt.",
+  "production_source_changed": false
+}

@@ -1,0 +1,48 @@
+{
+  "status": "pass",
+  "helper_sha256": "0ff21df36f4a76d26d10325415af5a0e81d71e42d5ec9f79966d3d8a5540cc44",
+  "raw_report_sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7",
+  "checks": [
+    {
+      "case": "unmodified",
+      "accepted": true
+    },
+    {
+      "case": "missing_sample",
+      "rejected": true,
+      "reason": "eager-a.elapsed_ns.samples: expected 200 values"
+    },
+    {
+      "case": "bad_order",
+      "rejected": true,
+      "reason": "eager-a.elapsed_ns.sample_order: not a permutation of 0..199"
+    },
+    {
+      "case": "wrong_p50",
+      "rejected": true,
+      "reason": "eager-a.elapsed_ns: reported p50 differs from raw samples"
+    },
+    {
+      "case": "wrong_materializations",
+      "rejected": true,
+      "reason": "eager-a: materialization count is not exactly 229 per sample"
+    },
+    {
+      "case": "zero_payload_reads",
+      "rejected": true,
+      "reason": "eager-a.source.ordinary_payload_read_calls: no source read in at least one sample"
+    },
+    {
+      "case": "oversized_sink_write",
+      "rejected": true,
+      "reason": "eager-a: sink largest write exceeds 64 KiB"
+    },
+    {
+      "case": "missing_binary_identity",
+      "rejected": true,
+      "reason": "eager-a: binary_identity is missing"
+    }
+  ],
+  "temporary_directory_removed": true,
+  "scope": "Offline raw-report semantic and sample checks; no benchmark, artifact mutation, or build."
+}

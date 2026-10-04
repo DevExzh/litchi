@@ -1,0 +1,16 @@
+{
+  "correction": "Agent corrected Report getter closure fn(Report)->usize before any oracle compile/execution; original frozen source retained as parity-example-v1.rs.",
+  "files": {
+    "crates/xml-minifier/examples/attribute_summary_parity.rs": {
+      "bytes": 23987,
+      "sha256": "2c921e41a09e25b46197a57f2efdc7c7605f001e1bc9a5687b016f22fdde0548"
+    },
+    "crates/xml-minifier/examples/attribute_summary_probe.rs": {
+      "bytes": 9773,
+      "sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+    }
+  },
+  "included_in_benchmark_source_inventory": false,
+  "reason": "Standalone oracle/probe examples do not compile into baseline harness; copied identically before both versions are built.",
+  "status": "frozen"
+}

@@ -1,0 +1,18 @@
+{
+  "/usr/bin/time": {
+    "bytes": 27232,
+    "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+    "version_exit_code": 0,
+    "version_stdout": "time (GNU Time) UNKNOWN\nCopyright (C) 2018 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David Keppel, David MacKenzie, and Assaf Gordon.\n",
+    "version_stderr": ""
+  },
+  "/usr/bin/taskset": {
+    "bytes": 31184,
+    "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+    "version_exit_code": 0,
+    "version_stdout": "taskset from util-linux 2.41.3\n",
+    "version_stderr": ""
+  },
+  "allocator_scope": "Rust default allocator; no allocator-metrics feature or allocator profiling requested.",
+  "relevant_environment": {}
+}

@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/bin/objdump",
+    "-d",
+    "--start-address=0x5cb380",
+    "--stop-address=0x5cb73c",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d",
+  "output_sha256": "dc03a17d033947822c0938ff401f863a29a1325f6de0e48d19e6e974150ac93d",
+  "sha256rnds2_present": true,
+  "scope": "Static instructions in the exact runtime-hit symbol range; not sampled cycle or timing evidence."
+}

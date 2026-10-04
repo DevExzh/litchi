@@ -1,0 +1,33 @@
+{
+  "status": "pass",
+  "observed_utc": "2026-10-04T06:32:20.282954+00:00",
+  "office_branch_commit": "2b974e3541517ccf032021dc5497243b315fd313",
+  "shared_head": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "files": {
+    "docs/GOAL.md": {
+      "bytes": 35839,
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+      "matches_office_branch": true
+    },
+    "docs/CRUD_Scenario_Checklist.md": {
+      "bytes": 8897,
+      "sha256": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a",
+      "matches_office_branch": true
+    },
+    "tools/perf-baseline/src/lib.rs": {
+      "bytes": 3020953,
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903",
+      "matches_office_branch": true
+    },
+    "crates/xml-minifier/src/audit.rs": {
+      "bytes": 126817,
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7",
+      "matches_office_branch": true
+    }
+  },
+  "unrelated_conflicts": [
+    "crates/litchi-iwa-core/src/archive.rs",
+    "crates/litchi-iwa-core/src/lib.rs"
+  ],
+  "scope": "Read-only source qualification; no current timing or full-source equality claim. README correction is documentation only. Existing0905source/buildroots remain removed."
+}

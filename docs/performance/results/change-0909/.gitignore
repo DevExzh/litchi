@@ -1,0 +1,4 @@
+# Reproducible local qualification archives and executable; descriptors tracked.
+binaries/
+capture-*/artifacts/**/*.pptx
+capture-*/artifacts/*.pptx

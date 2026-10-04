@@ -1,0 +1,43 @@
+{
+  "analyzer": {
+    "bytes": 28249,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/analyze.py",
+    "sha256": "d52b4f1e5ccfd651c4256e89a2fdd94e2db2d32541abed85a8349cf3b317bc38"
+  },
+  "canonical_analysis": {
+    "bytes": 643782,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/analysis.json",
+    "sha256": "ac6fa98aed88d9594fe2bafef7c38cb06f08dc6b84eab574b919fd11bdedf76f"
+  },
+  "cases": [
+    {
+      "error": "materialized-a:callgrind.out.1: unexpected owner caller 'synthetic::unknown_owner_caller'",
+      "name": "unknown_caller",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized-a:callgrind.out.1: expected one positive owner edge, got [{'caller_id': 0, 'callee_id': 1920, 'calls': 1, 'inclusive_ir': 1, 'line': 0, 'position': '0', 'file': '???', 'caller': '0x0000000000023cc0', 'callee': 'litchi_pptx::package::model::Package::opened_presentation_transaction'}, {'caller_id': 862, 'callee_id': 1920, 'calls': 1, 'inclusive_ir': 126538787, 'line': 4825, 'position': '0', 'file': '???', 'caller': 'litchi_perf_baseline::build_pptx_source_edit_corpus', 'callee': 'litchi_pptx::package::model::Package::opened_presentation_transaction'}]",
+      "name": "extra_owner_edge",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized-a:callgrind.out.1: positive summary/totals mismatch",
+      "name": "counter_mismatch",
+      "status": "rejected"
+    },
+    {
+      "error": "materialized-a: terminal dump is not empty zero Ir",
+      "name": "nonzero_terminal",
+      "status": "rejected"
+    }
+  ],
+  "checks": {
+    "counter_mismatch_rejected": true,
+    "extra_owner_edge_rejected": true,
+    "nonzero_terminal_rejected": true,
+    "unknown_caller_rejected": true
+  },
+  "schema": "litchi.pptx-snapshot-analyzer-mutation-checks-0911.v1",
+  "scope": "All mutations exist only in deep-copied in-memory Callgrind parse trees; retained packet files are never edited.",
+  "status": "pass"
+}

@@ -1,0 +1,106 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--zero-before=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--dump-after=litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/callgrind.out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "materialized",
+    "0",
+    "1",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/artifacts"
+  ],
+  "artifacts": [
+    {
+      "bytes": 17017145,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/artifacts/output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "bytes": 3179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/artifacts/report.json",
+      "sha256": "9af5a21535a8c6d3e996c9277c80470d49a61ab0b4a738dcc15be6ea9c1acc65"
+    },
+    {
+      "bytes": 17017139,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/artifacts/source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    },
+    {
+      "bytes": 463,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/callgrind.out",
+      "sha256": "2fd0f6bb44f4dab8c6290cefebe21c8a5af5907bd26e7992a85a56ec86c321e7"
+    },
+    {
+      "bytes": 74795,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/callgrind.out.1",
+      "sha256": "319a21fa8295973e269efc2b16276cf247c4b6727d08aef14d5fdce1aa350be8"
+    },
+    {
+      "bytes": 75172,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/callgrind.out.2",
+      "sha256": "24e185756962834f47d083af89746c485ab80d13cbdb2c2f7d6b8f1a979d16d7"
+    },
+    {
+      "bytes": 1747,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/start.json",
+      "sha256": "60867fce0df04e553c39696f0dd2322feb630ba77a3bee58f9f8050a42fef66b"
+    },
+    {
+      "bytes": 818,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/stderr.txt",
+      "sha256": "cd0b4d3017af54a6422c2e4f2c2c8604fe778ff47ec31adc375896f9e4da43f2"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture/materialized-a/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cwd": "/tmp/litchi-0911-run",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T09:19:29.291664+00:00",
+  "helper": {
+    "bytes": 8178,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/capture.py",
+    "sha256": "d2fae5909e587d5a76627522011f7b498bb42de85695ad3b6fcb7679922c8099"
+  },
+  "load_after": [
+    23.94091796875,
+    23.4404296875,
+    22.99658203125
+  ],
+  "load_before": [
+    23.35546875,
+    23.3544921875,
+    22.95751953125
+  ],
+  "plan": {
+    "bytes": 6031,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0911/plan.json",
+    "sha256": "f7f56da7606833fae93dc862a64d2910ed7b1c358bde3d63843891a05376a2d2"
+  },
+  "row": {
+    "index": 0,
+    "kind": "materialized",
+    "label": "materialized-a"
+  },
+  "started_utc": "2026-10-04T09:18:55.623117+00:00"
+}

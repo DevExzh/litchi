@@ -1,0 +1,106 @@
+{
+  "cwd": "/tmp/litchi-0910-src",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0910-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "source": {
+    "path": "docs/performance/results/change-0910/source-v1.json",
+    "bytes": 1756112,
+    "sha256": "7a6d1310fb97dde1f275ec8702efabbef2cfb643c9ee4c1178169fed53aa4586"
+  },
+  "helper": {
+    "path": "docs/performance/results/change-0910/run.py",
+    "bytes": 6710,
+    "sha256": "bc94209d20160834dc7b9183d544fe5bdb891176fb34d2e754f523ca175c6b36"
+  },
+  "toolchain": {
+    "cargo": {
+      "launcher": "/home/zhuhe/.cargo/bin/cargo",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    "rustc": {
+      "launcher": "/home/zhuhe/.cargo/bin/rustc",
+      "version": "rustc 1.95.0 (59807616e 2026-04-14)"
+    }
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-f",
+    "max_rss_kib=%M\nuser_seconds=%U\nsystem_seconds=%S\nelapsed_seconds=%e\nmajor_faults=%F\nminor_faults=%R\nvoluntary_context_switches=%w\ninvoluntary_context_switches=%c",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-02-owned/process.txt",
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/target/litchi-0910-build/release/examples/pptx_owned_benchmark",
+    "owned",
+    "30",
+    "20",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/capture/block-02-owned/artifacts"
+  ],
+  "start_utc": "2026-10-04T08:58:48.199805+00:00",
+  "binary": {
+    "path": "target/litchi-0910-build/release/examples/pptx_owned_benchmark",
+    "bytes": 9301456,
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "plan": {
+    "path": "docs/performance/results/change-0910/capture-plan.json",
+    "bytes": 3926,
+    "sha256": "b4666619aba3b6bbfb68955e70c9d47cad909c25c11b4affc39d9bb4f61f0370"
+  },
+  "leg": {
+    "label": "block-02-owned",
+    "block": 2,
+    "route": "owned",
+    "position": 1
+  },
+  "end_utc": "2026-10-04T08:58:53.918021+00:00",
+  "exit_code": 0,
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0910/capture/block-02-owned/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0910/capture/block-02-owned/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/performance/results/change-0910/capture/block-02-owned/artifacts/output.pptx",
+      "bytes": 17017145,
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    {
+      "path": "docs/performance/results/change-0910/capture/block-02-owned/artifacts/report.json",
+      "bytes": 10617,
+      "sha256": "f2b83d1e42eeed9a5636fb315fb89c07c85276d705a7cb22a49b2e9d1cd8cdbb"
+    },
+    {
+      "path": "docs/performance/results/change-0910/capture/block-02-owned/artifacts/source.pptx",
+      "bytes": 17017139,
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    }
+  ],
+  "process_metrics": {
+    "path": "docs/performance/results/change-0910/capture/block-02-owned/process.txt",
+    "bytes": 176,
+    "sha256": "5c5c8bfaed5831a3f8a9d132193fc9e19e928cfc92aa2cfbaa4684ff79861ffd"
+  }
+}

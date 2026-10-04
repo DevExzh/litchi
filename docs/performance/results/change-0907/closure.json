@@ -1,0 +1,335 @@
+{
+  "status": "pass",
+  "parent": "3d3650ac03be2cd8ba923a5a6e940e84b14f5eab",
+  "branch": "perf/0907-pptx-multi-slide-baseline",
+  "source_commit": "3d3650ac03be2cd8ba923a5a6e940e84b14f5eab",
+  "shared_head": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "integration": "Pending unrelated shared cherry-pick; shared index left untouched",
+  "production_changes": false,
+  "retained_samples": 800,
+  "worktrees_created": 0,
+  "temporary_source_and_build_removed": true,
+  "binary_git_tracked": false,
+  "files": [
+    {
+      "path": "docs/performance/0907-pptx-multi-slide-current-baseline.md",
+      "bytes": 8742,
+      "sha256": "2baaffd40378ab7c4865461d14fbe1fc125dc064d78b269506e6163381cac3fd"
+    },
+    {
+      "path": "docs/performance/BASELINE.md",
+      "bytes": 477502,
+      "sha256": "6b98b8f3e6c31feb5bccbdc8c361f6261a87d34fae589cc399626a4bf5ddccd3"
+    },
+    {
+      "path": "docs/performance/HOTSPOTS.md",
+      "bytes": 780073,
+      "sha256": "892ebdf18befc476853db6caac58abb6206976412babb0bd3488a4099b074d3c"
+    },
+    {
+      "path": "docs/performance/REPORT.md",
+      "bytes": 793194,
+      "sha256": "b4d1c6132489fc866f2f883438c0052c92dca5cab2736db771d2e3f45d5ec786"
+    },
+    {
+      "path": "docs/performance/GOAL_AUDIT.md",
+      "bytes": 466701,
+      "sha256": "4eb3af91bca47cdd42fa809b7bb40f7256a49384a34a4cc889e3b719d6b1333e"
+    },
+    {
+      "path": "docs/performance/results/change-0907/.gitignore",
+      "bytes": 23,
+      "sha256": "e9f7b77852e5d836fa3565f50c075bfa627ee9530847819ab0ac300567538864"
+    },
+    {
+      "path": "docs/performance/results/change-0907/0906-clarifications.json",
+      "bytes": 631,
+      "sha256": "e42c3b3805775a59b00298e05db7de161077119632841d729951e3815b834762"
+    },
+    {
+      "path": "docs/performance/results/change-0907/analysis.json",
+      "bytes": 36406,
+      "sha256": "efca52a4559c7955417234ac14bad3bebff9aabd1989e9a9b9de7cc7f1dd3627"
+    },
+    {
+      "path": "docs/performance/results/change-0907/analyze.py",
+      "bytes": 34718,
+      "sha256": "0ff21df36f4a76d26d10325415af5a0e81d71e42d5ec9f79966d3d8a5540cc44"
+    },
+    {
+      "path": "docs/performance/results/change-0907/analyzer-checks.json",
+      "bytes": 1441,
+      "sha256": "4af0d99d839bbadc3f31758afd46c782a40bd149e46c10c8d257ffaa0cf49920"
+    },
+    {
+      "path": "docs/performance/results/change-0907/binary.json",
+      "bytes": 196,
+      "sha256": "2bd9eb9a9a0160a9c93a68b96203da5f4a7362434d30326418f72cf61b9037ef"
+    },
+    {
+      "path": "docs/performance/results/change-0907/capture-complete.json",
+      "bytes": 484,
+      "sha256": "74ad7fb48aad01f30f21093284e2a3f3f512068e3f62203769ae7a02a17f88c6"
+    },
+    {
+      "path": "docs/performance/results/change-0907/capture-plan.json",
+      "bytes": 1248,
+      "sha256": "2955bd2a73a434a9534b01f0788ee846e840c2bcb89febe6ce587c722c376aca"
+    },
+    {
+      "path": "docs/performance/results/change-0907/capture.py",
+      "bytes": 3692,
+      "sha256": "25a410179fea60620edc4850b66d30c6683ffa99045020f6af93c96c089eafca"
+    },
+    {
+      "path": "docs/performance/results/change-0907/check-analyzer.py",
+      "bytes": 2556,
+      "sha256": "4fe61510ae282c341cc8b14c26e7927634cbdcfff669707c04d218bd931515f9"
+    },
+    {
+      "path": "docs/performance/results/change-0907/cleanup.json",
+      "bytes": 724,
+      "sha256": "d11ce696d2b37e7f5be24d4a965c4883c1299fcec19017507818040866834f8b"
+    },
+    {
+      "path": "docs/performance/results/change-0907/cleanup.py",
+      "bytes": 2648,
+      "sha256": "f48b878229addfc5d7c16704e57389eaa77d6990944fa9c46e4f5288bb5490c9"
+    },
+    {
+      "path": "docs/performance/results/change-0907/command.py",
+      "bytes": 2164,
+      "sha256": "0fd9828068a3af46428235f84cb33dd7168994e6684f8548379582a3befff52d"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-a-run.json",
+      "bytes": 1635,
+      "sha256": "00c56b2d626f641a69ce9754525ee56fc8f58d31b2ec5673650764457fa95816"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-a-start.json",
+      "bytes": 862,
+      "sha256": "87ebd9a4884a5e4faa05ed0c479a6fd2f5d928ff1bc6e8c3d9cb4f84b7a414c6"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-a.json",
+      "bytes": 81081,
+      "sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-a.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-a.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-b-run.json",
+      "bytes": 1638,
+      "sha256": "9d03b89faa15f3fe3ae1cc9e63e1e5e0084f69f0cc1b2bd3c136042ece477794"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-b-start.json",
+      "bytes": 861,
+      "sha256": "877b65e5c5bbfad936b11b66180cad7537665202f4e877da07e6adde485b1b88"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-b.json",
+      "bytes": 81080,
+      "sha256": "0b398016560f781a1312e1d8c6b6d3466ccd217c04385592d9107e24fc08948e"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-b.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/eager-b.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/environment.json",
+      "bytes": 5977,
+      "sha256": "286107b51f386863e9e09bbadf511591ac3b1b58f0fa22c898111129409cf145"
+    },
+    {
+      "path": "docs/performance/results/change-0907/help-check.json",
+      "bytes": 234,
+      "sha256": "c27081066b5ab76efa4f59e62010ea7674867cfc51eee357f63b1375f0920ae1"
+    },
+    {
+      "path": "docs/performance/results/change-0907/help.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/help.stdout",
+      "bytes": 19906,
+      "sha256": "adcd8bb9215728c48044e85e1b7ab8178f9985d9d9b7196ca9f15f665b2799d8"
+    },
+    {
+      "path": "docs/performance/results/change-0907/native-build-run.json",
+      "bytes": 2934,
+      "sha256": "487d63eeabf04886729135b63b7e7f8015d0ce9184152e504f719421a73a71aa"
+    },
+    {
+      "path": "docs/performance/results/change-0907/native-build-start.json",
+      "bytes": 1865,
+      "sha256": "3ebc1d1ef84020fb6dd8221c0cf9495c6fddeaa9e829dcf2c2b8f90529be9043"
+    },
+    {
+      "path": "docs/performance/results/change-0907/native-build-v2-run.json",
+      "bytes": 2934,
+      "sha256": "d162b2eaf163c9ba7be25785b486453ad4b04a6b94624a914ce3dbc01fd459fa"
+    },
+    {
+      "path": "docs/performance/results/change-0907/native-build-v2-start.json",
+      "bytes": 1865,
+      "sha256": "29a93ab71979cc8c94978edafed0358c1f58aedf416bb0f568b916570084fcbb"
+    },
+    {
+      "path": "docs/performance/results/change-0907/native-build-v2.log",
+      "bytes": 159,
+      "sha256": "d66056aa0e35bd468c3fca54f69274c15923c15cf004e02bd8e1c92929fb900f"
+    },
+    {
+      "path": "docs/performance/results/change-0907/native-build.log",
+      "bytes": 8560,
+      "sha256": "95eb7349be0dd299b66d61b2bb896f08e2d6f3ba730d4e86bc6386b6eeb34450"
+    },
+    {
+      "path": "docs/performance/results/change-0907/perf-Cargo.lock",
+      "bytes": 56289,
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    {
+      "path": "docs/performance/results/change-0907/protocol-review.md",
+      "bytes": 11326,
+      "sha256": "8fe5517f7f68e9692203ddb2efb33d984a391a50fecadc10eaed0eac3d1b1bec"
+    },
+    {
+      "path": "docs/performance/results/change-0907/replay-after-cleanup.json",
+      "bytes": 329,
+      "sha256": "7d0fd4269a12edabc3cd0381fab458e15cb4f28b706e4b869ac3f70f5d197c0d"
+    },
+    {
+      "path": "docs/performance/results/change-0907/replay-before-cleanup.json",
+      "bytes": 329,
+      "sha256": "7d0fd4269a12edabc3cd0381fab458e15cb4f28b706e4b869ac3f70f5d197c0d"
+    },
+    {
+      "path": "docs/performance/results/change-0907/replay.py",
+      "bytes": 3268,
+      "sha256": "2c627fa20f96f6878099295edb761fcd5cbe16c3d9248ff270fa8018c600e26e"
+    },
+    {
+      "path": "docs/performance/results/change-0907/restore.py",
+      "bytes": 1383,
+      "sha256": "71a554e69e71ca93d05ae4ec4ca39b89fd8b90d54a43fcfaf1e4691b097d7fc3"
+    },
+    {
+      "path": "docs/performance/results/change-0907/result-review-v1.json",
+      "bytes": 12906,
+      "sha256": "ab1186cefbcc26932d831df5af2e3448f42457d8bb1b77aff7a681c3cf22805d"
+    },
+    {
+      "path": "docs/performance/results/change-0907/result-review-v1.md",
+      "bytes": 4063,
+      "sha256": "8b0662a4394510ea0fc10604b172b2bc9b2f9cc9917305bc98998ede3e58c385"
+    },
+    {
+      "path": "docs/performance/results/change-0907/result-review.json",
+      "bytes": 12891,
+      "sha256": "d0f7ddab1b6f25d59b829176edcb77bf3aa475055f9aba173865ab6929ff4deb"
+    },
+    {
+      "path": "docs/performance/results/change-0907/result-review.md",
+      "bytes": 4048,
+      "sha256": "1ca5b7daf91d3fcb9897f122ad72acf3be92ebb88f0fccfef69f628df7742af4"
+    },
+    {
+      "path": "docs/performance/results/change-0907/review-clarifications.json",
+      "bytes": 550,
+      "sha256": "4ab523008dc2d1577c2711836b877c8fd1c3c5540017290b6df0c99882a2eb4c"
+    },
+    {
+      "path": "docs/performance/results/change-0907/root-Cargo.lock",
+      "bytes": 138465,
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-a-run.json",
+      "bytes": 1652,
+      "sha256": "60ea486388223127d24ead927f5a6aa75615e287458b87bca5a4bd5662143ea0"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-a-start.json",
+      "bytes": 872,
+      "sha256": "05cb8446108a4f63e4eb47c4253380fd7bd2d162cdf155b44bcb5dbb628a29b7"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-a.json",
+      "bytes": 81499,
+      "sha256": "d4beaa72a6b1bff4bacbb36e9e96564f234309040a6cc44bdbf12c6584ebf513"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-a.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-a.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-b-run.json",
+      "bytes": 1650,
+      "sha256": "3736d2c01c033c1cd5a46b8528f3ec04523247eed92b967609371afe0c1c0298"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-b-start.json",
+      "bytes": 874,
+      "sha256": "332cf154fff9b12508ba08a3ba191081048f6b17e62e18d93691ac6e5650ed01"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-b.json",
+      "bytes": 81504,
+      "sha256": "30220c89d9c13fa1800a9eadbfe443154ddfaacc16a0d2393ab92cfb1d063767"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-b.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-b.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-initial.json",
+      "bytes": 1754585,
+      "sha256": "602e0ba1c1d770774bf374e8e6913cece7dfeb22a207cc60e938f44cf453baba"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source-opportunities.md",
+      "bytes": 14464,
+      "sha256": "f03ce43e820aea299df5c8141296aab37784f2d70474ee3da8d403d15a284ea9"
+    },
+    {
+      "path": "docs/performance/results/change-0907/source.json",
+      "bytes": 1755018,
+      "sha256": "a987e841e27283d54d977f1c0b85609f248872eede70a6271d13bee568ebd812"
+    },
+    {
+      "path": "docs/performance/results/change-0907/verification-notes.json",
+      "bytes": 591,
+      "sha256": "0dfcb66c49d89656a52045f74d888d502f80b9e480e79badc34f618aebff2351"
+    }
+  ]
+}

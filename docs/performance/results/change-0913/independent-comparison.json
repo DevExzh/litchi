@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "metric_groups_compared": 40,
+  "analysis": {
+    "path": "docs/performance/results/change-0913/analysis.json",
+    "bytes": 614975,
+    "sha256": "21ce18d6536d392a018f583f66ff975dc978760a0473d8b65bae42c32d955123"
+  },
+  "independent_statistics": {
+    "path": "docs/performance/results/change-0913/independent-stats.json",
+    "bytes": 60742,
+    "sha256": "6bb6ff31031929f27c1a0489e9b64861b7fbabaa53fc97f77b596b53fb61c151"
+  },
+  "method": "Exact equality of every route/variant metric summary and each paired bootstrap statistic/lower/upper."
+}

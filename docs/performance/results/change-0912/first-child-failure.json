@@ -1,0 +1,519 @@
+{
+  "attempt": "perf-pilot",
+  "bindings": {
+    "binary": {
+      "bytes": 9301456,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+      "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+    },
+    "capture_helper": {
+      "bytes": 10508,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture.py",
+      "sha256": "b4d9e23f5eec740d8c7c7da3c2bc7a6bb39d1a3953aae1d902512ab9d7c71ad6"
+    },
+    "elf_segments": {
+      "bytes": 2042,
+      "path": "elf-segments.txt",
+      "sha256": "bcc4069b5be9e1c4051ac36e4155b1d5e966c6320241002cd5cbb95ad458e681"
+    },
+    "evidence_parent": "9a108730aa5533678b376ae097cd526c26e92b93",
+    "perf": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "plan": {
+      "bytes": 7238,
+      "path": "plan.json",
+      "sha256": "2e71866565416fba7545c35137892a22dcdfe8689cb2473341b0ca1fd26d3627"
+    },
+    "protocol_review": {
+      "bytes": 9958,
+      "path": "protocol-review.md",
+      "sha256": "923064869bdbc67c7c7542d2a802c21255a69af1d8edea45cacaf81c0b9c6fc5"
+    },
+    "symbol_ranges": {
+      "bytes": 1206,
+      "path": "symbol-ranges.json",
+      "sha256": "c96bd9b009ef818b920e3696f878feb5778497299875e25b552d640a463ae697"
+    },
+    "symbols": {
+      "bytes": 493,
+      "path": "symbols.txt",
+      "sha256": "e278ae2d029cb1657366e0fce1c4ef7ba4cb8877ae8781ec58543dc0cdb47785"
+    }
+  },
+  "checks": {
+    "admission": false,
+    "binary_hash_bound": true,
+    "command_and_decode_custody": true,
+    "exact_measured_parent_frame_seen": false,
+    "exact_owner_frame_seen": false,
+    "lost_records_zero": false,
+    "mapping_build_id_bound": true,
+    "measured_backend_scope_proven": false,
+    "sample_periods_positive": true,
+    "script_event_is_exactly_cycles_u": true,
+    "symbol_ranges_bound": true,
+    "workload_semantic_gates": true
+  },
+  "command": {
+    "argv_matches_plan": true,
+    "binary_matches_plan": true,
+    "buildids": {
+      "bytes": 889,
+      "path": "capture/materialized-a/buildids.json",
+      "sha256": "35fe84eb7634cf771f7fce1c5ce7caf1175c91b26c084d9ea58b24e40485e2c8"
+    },
+    "bytes": 3453,
+    "cpu_affinity_matches_plan": true,
+    "decode": {
+      "bytes": 1696,
+      "path": "capture/materialized-a/decode.json",
+      "sha256": "9b4c530b3a091f013f386007a7da8df80b5828209c2eafa72f7db75e1f0781db"
+    },
+    "environment_matches_plan": true,
+    "exit_code": 0,
+    "mappings": {
+      "bytes": 969,
+      "path": "capture/materialized-a/mappings.json",
+      "sha256": "c8da491171f9dc0f03ec0f9e11c3859a91fe618c0ffb1b2e603c58c771710a34"
+    },
+    "path": "capture/materialized-a/command.json",
+    "raw": {
+      "bytes": 5859308,
+      "path": "capture/materialized-a/perf.data",
+      "sha256": "9cca1eeaadecb6ab6951c228583f595e7bf08bdcc1d68b20e72da0f03de203c4"
+    },
+    "sample_debug": {
+      "bytes": 958,
+      "path": "capture/materialized-a/sample-debug.json",
+      "sha256": "3fe00170414033e5e4ccd5eb594872ae61295c98999402e46bc7ddb5963e6bb0"
+    },
+    "script": {
+      "bytes": 188722,
+      "path": "capture/materialized-a/script.txt.gz",
+      "sha256": "7a78789a43b96afe0f35794f56da627ef72fed00d35f197b7fa717fcb4aa8aaf"
+    },
+    "sha256": "b15249987d3d527bdd271eb822e6e2288bffd8d582ee0f237e195f708397b7a6"
+  },
+  "label": "materialized-a",
+  "native": {
+    "binary_build_id": "4327e4ba1dbbad59fd5f1655e7a2d21a3f41f9a9",
+    "lost_events": 304,
+    "lost_records": 6,
+    "lost_rows": [
+      {
+        "count": 47,
+        "cpu": 12,
+        "line": 1,
+        "pid": 542411,
+        "text": "native  542411 [012] 1999339.120705889: PERF_RECORD_LOST lost 47",
+        "timestamp": "1999339.120705889"
+      },
+      {
+        "count": 36,
+        "cpu": 12,
+        "line": 2,
+        "pid": 542411,
+        "text": "native  542411 [012] 1999340.278499403: PERF_RECORD_LOST lost 36",
+        "timestamp": "1999340.278499403"
+      },
+      {
+        "count": 64,
+        "cpu": 12,
+        "line": 3,
+        "pid": 542411,
+        "text": "native  542411 [012] 1999341.221879010: PERF_RECORD_LOST lost 64",
+        "timestamp": "1999341.221879010"
+      },
+      {
+        "count": 99,
+        "cpu": 12,
+        "line": 4,
+        "pid": 542411,
+        "text": "native  542411 [012] 1999344.893615408: PERF_RECORD_LOST lost 99",
+        "timestamp": "1999344.893615408"
+      },
+      {
+        "count": 26,
+        "cpu": 12,
+        "line": 5,
+        "pid": 542411,
+        "text": "native  542411 [012] 1999345.063588022: PERF_RECORD_LOST lost 26",
+        "timestamp": "1999345.063588022"
+      },
+      {
+        "count": 32,
+        "cpu": 12,
+        "line": 6,
+        "pid": 542411,
+        "text": "native  542411 [012] 1999348.214336960: PERF_RECORD_LOST lost 32",
+        "timestamp": "1999348.214336960"
+      }
+    ],
+    "mapping_binary_records": 5,
+    "mapping_records": 120,
+    "mmap_binary_build_ids": [
+      "4327e4ba1dbbad59fd5f1655e7a2d21a3f41f9a9"
+    ],
+    "raw_script": {
+      "period": 72417582246,
+      "samples": 16920,
+      "status_lines": [
+        "native  542411/542411  [012] 1999339.120705889: PERF_RECORD_LOST lost 47",
+        "native  542411/542411  [012] 1999340.278499403: PERF_RECORD_LOST lost 36",
+        "native  542411/542411  [012] 1999341.221879010: PERF_RECORD_LOST lost 64",
+        "native  542411/542411  [012] 1999344.893615408: PERF_RECORD_LOST lost 99",
+        "native  542411/542411  [012] 1999345.063588022: PERF_RECORD_LOST lost 26",
+        "native  542411/542411  [012] 1999348.214336960: PERF_RECORD_LOST lost 32"
+      ]
+    },
+    "reduction": {
+      "backend_hits": [
+        {
+          "backend": "sha2::sha256::x86_sha::compress",
+          "frames": [
+            {
+              "address": "0x6245dd26e410",
+              "dso": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+              "offset": null,
+              "resolution": {
+                "mapping": {
+                  "buildid": "4327e4ba1dbbad59fd5f1655e7a2d21a3f41f9a9",
+                  "end": 108052202901504,
+                  "line": 6,
+                  "offset": 3796992,
+                  "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+                  "start": 108052200304640
+                },
+                "range": {
+                  "address": 6075264,
+                  "end": 6076220,
+                  "kind": "t",
+                  "name": "sha2::sha256::x86_sha::compress",
+                  "size": 956
+                },
+                "reason": "ok",
+                "static_address": 6075408,
+                "valid": true
+              },
+              "symbol": "sha2::sha256::x86_sha::compress"
+            },
+            {
+              "address": "0x6245dd2c5ee7",
+              "dso": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+              "offset": null,
+              "symbol": "anon.7b90e29285c2d1947cef0c59efb5d0cf.140.llvm.3499463759322423789"
+            }
+          ],
+          "owner_present": false,
+          "parent_present_after_owner": false,
+          "period": 4081079,
+          "reason": "exact backend frame lacks owner and measured-parent scope frames",
+          "sample_index": 29,
+          "scope": "outside_owner",
+          "setup_parent_present_after_owner": false,
+          "timestamp": "1999330.781967496"
+        }
+      ],
+      "backend_observations": {
+        "sha2::sha256::soft::unroll::compress": {
+          "measured_owner": {
+            "period": 0,
+            "samples": 0
+          },
+          "outside_owner": {
+            "period": 0,
+            "samples": 0
+          },
+          "setup_owner": {
+            "period": 0,
+            "samples": 0
+          },
+          "unclassified_owner": {
+            "period": 0,
+            "samples": 0
+          }
+        },
+        "sha2::sha256::x86_sha::compress": {
+          "measured_owner": {
+            "period": 0,
+            "samples": 0
+          },
+          "outside_owner": {
+            "period": 4081079,
+            "samples": 1
+          },
+          "setup_owner": {
+            "period": 0,
+            "samples": 0
+          },
+          "unclassified_owner": {
+            "period": 0,
+            "samples": 0
+          }
+        }
+      },
+      "callchains_present": 1008,
+      "depth_histogram": {
+        "0": 15912,
+        "1": 836,
+        "10": 1,
+        "2": 123,
+        "3": 31,
+        "4": 8,
+        "5": 8,
+        "9": 1
+      },
+      "depth_limit_samples": 0,
+      "empty_stack": 15912,
+      "malformed_frame_samples": 0,
+      "max_stack_depth": 10,
+      "owner_scope": {
+        "exact_owner_invalid_range_samples": 0,
+        "exact_owner_named_samples": 0,
+        "measured_owner": {
+          "period": 0,
+          "samples": 0
+        },
+        "outside_owner": {
+          "period": 72417582246,
+          "samples": 16920
+        },
+        "owner_missing_samples": 16920,
+        "setup_owner": {
+          "period": 0,
+          "samples": 0
+        },
+        "unclassified_owner": {
+          "period": 0,
+          "samples": 0
+        }
+      },
+      "sample_period": 72417582246,
+      "sample_records": 16920,
+      "scope_diagnostics": {
+        "backend_hits_missing_owner_or_parent": 1,
+        "depth_limit_samples": 0,
+        "explicit_depth_limit_marker": false,
+        "interpretation": "Missing owner or parent frames are retained as scope evidence; no cause is inferred from the sampled stack alone."
+      },
+      "target_frame_diagnostics": {
+        "exact_measured_parent_samples": 0,
+        "exact_setup_parent_samples": 1,
+        "named": {
+          "litchi_perf_baseline::build_pptx_source_edit_corpus": 1,
+          "sha2::sha256::x86_sha::compress": 1
+        },
+        "range_invalid": {}
+      },
+      "top_symbols_by_period": [
+        {
+          "period": 1891940818,
+          "samples": 443,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "period": 788896364,
+          "samples": 187,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "period": 585311975,
+          "samples": 138,
+          "symbol": "__memset_avx512_unaligned_erms"
+        },
+        {
+          "period": 306399802,
+          "samples": 71,
+          "symbol": "_int_free_chunk"
+        },
+        {
+          "period": 270178159,
+          "samples": 75,
+          "symbol": "[unknown]"
+        },
+        {
+          "period": 259938992,
+          "samples": 62,
+          "symbol": "_int_malloc"
+        },
+        {
+          "period": 250554444,
+          "samples": 58,
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "period": 238003322,
+          "samples": 56,
+          "symbol": "__libc_malloc2"
+        },
+        {
+          "period": 98660977,
+          "samples": 23,
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "period": 77253014,
+          "samples": 18,
+          "symbol": "unlink_chunk.isra.0"
+        },
+        {
+          "period": 75916038,
+          "samples": 18,
+          "symbol": "realloc"
+        },
+        {
+          "period": 67456043,
+          "samples": 16,
+          "symbol": "_int_realloc"
+        },
+        {
+          "period": 64478254,
+          "samples": 15,
+          "symbol": "malloc"
+        },
+        {
+          "period": 55928739,
+          "samples": 13,
+          "symbol": "_int_free_maybe_trim"
+        },
+        {
+          "period": 17344154,
+          "samples": 4,
+          "symbol": "__posix_memalign"
+        },
+        {
+          "period": 17344154,
+          "samples": 4,
+          "symbol": "_int_memalign"
+        },
+        {
+          "period": 17344154,
+          "samples": 4,
+          "symbol": "_mid_memalign"
+        },
+        {
+          "period": 7585695,
+          "samples": 2,
+          "symbol": "zlib_rs::deflate::Heap::pqdownheap"
+        },
+        {
+          "period": 7334360,
+          "samples": 2,
+          "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+        },
+        {
+          "period": 6489198,
+          "samples": 2,
+          "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+        },
+        {
+          "period": 4325078,
+          "samples": 1,
+          "symbol": "__GI___libc_write"
+        },
+        {
+          "period": 4325078,
+          "samples": 1,
+          "symbol": "__syscall_cancel"
+        },
+        {
+          "period": 4319383,
+          "samples": 1,
+          "symbol": "syscall"
+        },
+        {
+          "period": 4081079,
+          "samples": 1,
+          "symbol": "anon.7b90e29285c2d1947cef0c59efb5d0cf.140.llvm.3499463759322423789"
+        },
+        {
+          "period": 4081079,
+          "samples": 1,
+          "symbol": "sha2::sha256::x86_sha::compress"
+        }
+      ],
+      "unknown_frame_count": 75,
+      "unknown_frame_samples": 50,
+      "user_period": 72417582246,
+      "user_samples": 16920
+    }
+  },
+  "policy": {
+    "gdb_fallback": "separate reachability-only lane; not a replacement perf result",
+    "lost_records_block_scoped_attribution": true,
+    "no_native_elapsed_or_guest_instruction_claim": true,
+    "no_route_comparison": true,
+    "outside_owner_backend_is_not_a_dispatch_claim": true,
+    "remaining_perf_legs": "stopped_after_first_child_failure"
+  },
+  "protocol": {
+    "cpu": 12,
+    "decode_options": [
+      "script",
+      "--no-inline",
+      "--ns",
+      "--show-lost-events",
+      "--demangle",
+      "--max-stack",
+      "256",
+      "-F",
+      "comm,pid,tid,cpu,time,period,event,ip,sym,dso"
+    ],
+    "event": "cycles:u",
+    "frequency_hz": 997,
+    "options": [
+      "record",
+      "--no-buildid-cache",
+      "--compression-level=3",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--strict-freq",
+      "--call-graph",
+      "dwarf,16384",
+      "--sample-cpu"
+    ],
+    "owner": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+    "required_parent": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+    "samples": 50,
+    "schema": "litchi.native-snapshot-profile-0912.v1",
+    "script_max_stack": 256,
+    "setup_parent": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+    "stack_bytes": 16384,
+    "warmup": 0
+  },
+  "reason": "The pilot reports six lost perf records totaling 304 lost events. No exact opened_presentation_transaction owner frame appears in the decoded samples; the one exact x86 SHA backend sample is outside the owner and timed_iteration scope. The child is retained but cannot admit a native snapshot attribution.",
+  "reason_code": "lost_perf_records_and_missing_snapshot_scope",
+  "route": "materialized",
+  "schema": "litchi.native-snapshot-profile-0912-first-child-failure.v1",
+  "status": "rejected",
+  "workload": {
+    "operations": 50,
+    "output": {
+      "bytes": 17017145,
+      "file": "output.pptx",
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    "report": {
+      "bytes": 22716,
+      "path": "capture/materialized-a/artifacts/report.json",
+      "sha256": "a31434a2ff904cf86fa2a088756f4ecc8e2f3ea1825132c89415ea9c96cc437b"
+    },
+    "route": "materialized",
+    "semantic_and_corpus_gates_pass": true,
+    "semantics": {
+      "bytes": 1002,
+      "path": "capture/materialized-a/semantics.json",
+      "sha256": "f7d273336f1b5a72a1938ea6656f9dd0e696d8cfaea2deabde41b68367defc6c"
+    },
+    "source": {
+      "bytes": 17017139,
+      "file": "source.pptx",
+      "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+    }
+  }
+}

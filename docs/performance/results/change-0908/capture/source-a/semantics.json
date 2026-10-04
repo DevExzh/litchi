@@ -1,0 +1,62 @@
+{
+  "case": "pptx_source_backed_multi_slide_batch_edit_save",
+  "corpus": {
+    "archive_bytes": 17017139,
+    "archive_member_count": 445,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "compression": "deflate",
+    "entry_bytes": 2097152,
+    "entry_count": 229,
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "name": "pptx-source-backed-media",
+    "package_format": "PPTX/OPC/ZIP",
+    "payload_kind": "deterministic-incompressible-media",
+    "shape": "media-rich",
+    "target_entry": "slide:100/shape:0",
+    "target_payload_bytes": 52,
+    "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+    "uncompressed_payload_bytes": 17568429,
+    "xlsx": null
+  },
+  "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+  "reference": {
+    "bytes": 81499,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/source-a.json",
+    "sha256": "d4beaa72a6b1bff4bacbb36e9e96564f234309040a6cc44bdbf12c6584ebf513"
+  },
+  "scope": "Exact corpus/output/sink and per-sample logical source-counter equality to current native reference. Instrumented duration excluded.",
+  "sink": {
+    "accepted_bytes": 17017145,
+    "largest_write": 65536,
+    "write_calls": 2053,
+    "write_size_buckets": {
+      "bytes_0": 0,
+      "bytes_16385_to_65536": 256,
+      "bytes_1_to_512": 1570,
+      "bytes_4097_to_16384": 0,
+      "bytes_513_to_4096": 227,
+      "bytes_over_65536": 0
+    }
+  },
+  "source": {
+    "max_in_flight_reads": [
+      1
+    ],
+    "ordinary_payload_materializations": [
+      9
+    ],
+    "ordinary_payload_read_bytes": [
+      16909038
+    ],
+    "ordinary_payload_read_calls": [
+      486
+    ],
+    "read_bytes": [
+      17229633
+    ],
+    "read_calls": [
+      3372
+    ]
+  },
+  "status": "pass"
+}

@@ -1,0 +1,58 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/target/litchi-0907-build/release/litchi-perf-baseline",
+    "--case",
+    "pptx_eager_multi_slide_batch_edit_save",
+    "--workers",
+    "1",
+    "--warmup",
+    "30",
+    "--samples",
+    "200",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-a.json"
+  ],
+  "binary": {
+    "bytes": 264596744,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0907-build/release/litchi-perf-baseline",
+    "sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84"
+  },
+  "cwd": "/tmp/litchi-0907-src",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T07:01:10.747639+00:00",
+  "load_after": [
+    20.9658203125,
+    19.89990234375,
+    19.37109375
+  ],
+  "load_before": [
+    21.38525390625,
+    19.28515625,
+    19.12548828125
+  ],
+  "result": {
+    "bytes": 81081,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-a.json",
+    "sha256": "36970cbb08d487db0c28e03ceecaf9e53750f36d3da4984face8ff702f5717b7"
+  },
+  "started_utc": "2026-10-04T06:59:52.908831+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-a.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0907/eager-a.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

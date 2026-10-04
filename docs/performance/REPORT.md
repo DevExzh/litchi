@@ -1,5 +1,94 @@
 # Performance program phase report
 
+## 0913 — failed native gate, production restored
+
+[0913](0913-pptx-owned-direct-read.md) retains 48 matched processes, independent
+statistics, four raw preservation censuses and 8,096 passing Office tests.
+The owned ratio 1.005714× (95% interval 0.973308–1.017486) fails adoption; all
+nine tail flags remain disclosed. Production code is restored. Separately, the
+user-requested iWork cherry-pick is resolved and its temporary worktree removed.
+
+## 0912 — dispatch uncertainty resolved, native attribution still open
+
+[0912](0912-pptx-native-sha-dispatch.md) retains a rejected perf attempt and two
+passing owner-gated native debugger witnesses. Both reach the x86 SHA backend
+and preserve all semantic/output/sink guards. No native profile or speedup is
+admitted. A concrete redundant owned-source span-copy candidate is documented
+for implementation and matched native evaluation.
+
+## 0911 — bounded snapshot attribution, no production adoption
+
+[0911](0911-pptx-owning-snapshot-instruction-profile.md) separates fixture setup
+from the measured cold opened transaction in four same-binary profiles. Both
+initial scope failures are retained, and all final semantic and raw-counter
+gates pass. Software SHA dispatch limits interpretation of guest costs; native
+attribution remains the next gate. No latency, allocation or new speedup claim.
+
+## 0910 — comparable owning-input PPTX measurement
+
+[0910](0910-pptx-owning-input-native-control.md) retains 12 alternating process
+pairs, matched timers including input copies and teardown, and 480 measured
+samples. Materialized/owned paired median ratio is 8.072147 with a 95% bootstrap
+interval of 7.960538–8.240714. All outputs match and both raw ZIP checks preserve
+437 untouched members. Process RSS is similar, but operation allocations are
+unmeasured. Existing-route evidence does not constitute a new implementation
+speedup; the broader program remains open.
+
+## 0909 — executable owning-input preservation qualification
+
+[0909](0909-pptx-owning-input-preservation-control.md) adds a standalone
+harness exporter and independent ZIP census. The generated 200-slide fixture passes
+64 edits, 437 untouched-member comparisons, exact no-op and durable inverse,
+stale/foreign refusal, input limit and sink failure gates. Formatting and Clippy
+pass; source/census replay survives cleanup. No production optimization adopted.
+
+## 0908 — PPTX profile identifies an ingress comparison gap
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) validates four serial
+same-binary Callgrind profiles, exact measured owner scope, instruction
+conservation and semantic parity with 0907. Serialization dominates the
+materialized ReadAt route because it lacks preservation provenance. The next
+step is an owning-input eager control using existing preservation APIs.
+No production change or native performance claim is adopted.
+
+## 0907 — fresh PPTX guarded workflow comparison
+
+[0907](0907-pptx-multi-slide-current-baseline.md) measures four same-binary
+ABBA legs, 30 warmups and 200 samples each. Pooled eager/source-backed p50 is
+263.429593/7.841286 ms, an observed 33.5952 ratio between existing paths.
+Both produce the same output identity and pass their semantic/OPC guards.
+Source-backed mode reports 9 versus 229 materializations but more total logical
+reads and sink writes. No new optimization, physical-I/O, or memory claim.
+
+## 0906 — Office measurement coverage qualified
+
+[0906](0906-office-coverage-qualification.md) adds a reproducible source-bound
+selector census and corrects the current registry count from 441 to 534. All
+41 defaults and all enum/name/CLI mappings agree. Workload registration remains
+separate from supported APIs, corpus representativeness and measured coverage;
+11 missing help entries are restored and the registry regression test now checks
+help coverage. Focused extracted Rust verification passes; no workload or
+production library change is introduced.
+
+## 0905 — bounded XML attribute summary passes its measured gates
+
+[0905](0905-xml-attribute-summary.md) implements a one-file `AttributeSummary`
+candidate in `xml-minifier` while preserving the complete XML layout,
+namespace, limit, error-ordering and `xml:space` checks. Baseline and candidate
+are byte-identical across 11,520 generated cases and 125,952 records. The
+fresh native comparison passes both required XLSX primary gates at p50 ratios
+**0.9543881780** (medium) and **0.9477553767** (dense-sparse), with bootstrap
+intervals **0.9508342443–0.9584711179** and **0.9350215878–0.9742145402**;
+controls are **0.9795903412** (XLSX) and **0.9700651277** (DOCX), and main
+review flags are zero. Publication allocation calls and bytes fall materially
+in the XLSX cases, but live/peak snapshots rise three bytes and RSS remains a
+descriptive executable-layout-sensitive metric. The 12-child XML micro guard
+passes with no hard adverse case; cardinality-2 authored and compact p50 rows
+are +3.72%/+3.87% and retain p99 review flags. Retained replay passes. The
+candidate is accepted after independent review, cleanup and post-cleanup replay;
+target-branch integration is pending. Later concurrent iWork commits are outside the measured source scope,
+and the broader non-iWork performance goal remains open.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

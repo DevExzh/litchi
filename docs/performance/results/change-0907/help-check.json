@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "selector_count": 534,
+  "missing": [],
+  "exit_code": 0,
+  "binary_sha256": "e0a7707dcd849c92e01c8dc9115d61414fba10584bb8415e442f4c225828af84",
+  "scope": "Newly built actual executable --help; no workload"
+}

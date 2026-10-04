@@ -1,0 +1,24 @@
+{
+  "schema": "pptx-owned-control-qualification-v1",
+  "status": "failed",
+  "implementation": "litchi_pptx::Package::from_vec owning-input control",
+  "error": "zero sink did not return the expected typed I/O error",
+  "corpus": {
+    "name": "pptx-source-backed-media",
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "package_format": "PPTX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 229,
+    "archive_member_count": 445,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 17568429,
+    "archive_bytes": 17017139,
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "target_entry": "slide:100/shape:0",
+    "target_payload_bytes": 52,
+    "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6",
+    "xlsx": null
+  }
+}

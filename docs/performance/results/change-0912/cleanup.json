@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T10:11:17.099295+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-0912-run",
+      "files": 1,
+      "logical_bytes": 65
+    },
+    {
+      "path": "/tmp/litchi-0912-gdb-run",
+      "files": 1,
+      "logical_bytes": 65
+    }
+  ],
+  "worktrees_created": 0,
+  "builds_created": 0,
+  "active_cwd_processes": [],
+  "unrelated_worktrees_untouched": true,
+  "retained_evidence": "Rejected raw perf data and generated archives retained locally and Gitignored with tracked identities; decoded streams and GDB witness logs tracked. Reused 0910 binary unchanged."
+}

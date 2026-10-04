@@ -1,0 +1,166 @@
+{
+  "bindings": [
+    {
+      "bytes": 1755712,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/source-v3.json",
+      "sha256": "4361f1201859660de809f93be728715d7a09fd9c7f7833d5901be1baaf2cf0a2"
+    },
+    {
+      "bytes": 2271,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/build-v3/command.json",
+      "sha256": "ba6ee21b5aae56fb69edfeef77861a1655afe55d9ab9c639b7c9246baa28178e"
+    },
+    {
+      "bytes": 4171,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/capture-v3/command.json",
+      "sha256": "b935fd1d52e0c36387cab1d8badbb04a57bcdbeb1958642623c1c50335b4fc85"
+    },
+    {
+      "bytes": 2110,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/quality-v3-v2/receipt.json",
+      "sha256": "bef68db9cd500096363d29e56bc196d0cbb6403080289786bbc3dfed5486f499"
+    },
+    {
+      "bytes": 4262,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/census-runs.json",
+      "sha256": "d9226c05b2c52892aec060dfc43a12d99c283175abbdf62ef1f7178a74d5f309"
+    },
+    {
+      "bytes": 2199,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/qualification-plan.json",
+      "sha256": "7461fadb9f5d0523249f006e307c74c8f9a66405fdf8ef26ccbe991a2c1a5a99"
+    },
+    {
+      "bytes": 879,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0909/qualification-amendment.json",
+      "sha256": "5678d59a27a70518fe55169b31f31fd6ec83b8570a54df5f11ccdb79027a4cb4"
+    }
+  ],
+  "censuses": [
+    {
+      "archive_comment_equal": true,
+      "central_order_equal": true,
+      "changed_members": [
+        "ppt/slides/slide1.xml",
+        "ppt/slides/slide115.xml",
+        "ppt/slides/slide143.xml",
+        "ppt/slides/slide172.xml",
+        "ppt/slides/slide200.xml",
+        "ppt/slides/slide29.xml",
+        "ppt/slides/slide58.xml",
+        "ppt/slides/slide86.xml"
+      ],
+      "data_descriptors_observed": true,
+      "label": "output",
+      "physical_order_equal": true,
+      "unchanged_members": 437,
+      "zip64_observed": false
+    },
+    {
+      "archive_comment_equal": true,
+      "central_order_equal": true,
+      "changed_members": [],
+      "data_descriptors_observed": true,
+      "label": "noop",
+      "physical_order_equal": true,
+      "unchanged_members": 445,
+      "zip64_observed": false
+    },
+    {
+      "archive_comment_equal": true,
+      "central_order_equal": true,
+      "changed_members": [],
+      "data_descriptors_observed": true,
+      "label": "inverse",
+      "physical_order_equal": true,
+      "unchanged_members": 445,
+      "zip64_observed": false
+    },
+    {
+      "archive_comment_equal": true,
+      "central_order_equal": true,
+      "changed_members": [],
+      "data_descriptors_observed": true,
+      "label": "forward-replay",
+      "physical_order_equal": true,
+      "unchanged_members": 445,
+      "zip64_observed": false
+    }
+  ],
+  "coverage_gaps": {
+    "encrypted_input": "not_covered",
+    "malformed_input": "not_covered",
+    "signed_input": "not_covered",
+    "source_mutation_during_publication": "not_covered; immutable Vec owner used",
+    "unknown_member_variant": "not_covered; independent raw census receives primary corpus only"
+  },
+  "gates": {
+    "durable_forward_roundtrip_verified": true,
+    "durable_inverse_reopen_verified": true,
+    "exact_noop_verified": true,
+    "finite_input_limit_verified": true,
+    "foreign_source_refusal": {
+      "error": "unsafe PPTX edit during apply_opened_presentation_patch: an opened-presentation patch resource is stale",
+      "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }",
+      "output_unchanged": true,
+      "refused": true
+    },
+    "forward_output_verified": true,
+    "forward_replay_exact_output_verified": true,
+    "input_limit_actual": 17017139,
+    "input_limit_maximum": 17017138,
+    "inverse_exact_source_verified": true,
+    "owning_ingress_verified": true,
+    "partial_sink": {
+      "accepted_prefix_bytes": 8508572,
+      "error": "incomplete OPC output after 8508572 byte(s): ZIP error: intentional PPTX partial sink failure",
+      "error_kind": "OpcError::IncompleteOutput",
+      "prefix_sha256": "6286ed5e43e5a7d443392494736fc7b08887923cf0156392dfc3dddf21c26909",
+      "status": "verified"
+    },
+    "raw_census_artifacts_exported": true,
+    "semantic_output_verified": true,
+    "source_identity_verified": true,
+    "source_immutability_verified": true,
+    "source_shape_verified": true,
+    "stale_source_refusal": {
+      "error": "unsafe PPTX edit during apply_opened_presentation_patch: an opened-presentation patch resource is stale",
+      "error_debug": "UnsafeEdit { operation: \"apply_opened_presentation_patch\", reason: \"an opened-presentation patch resource is stale\" }",
+      "output_unchanged": true,
+      "refused": true
+    },
+    "untouched_logical_parts_verified": true,
+    "zero_sink": {
+      "accepted_prefix_bytes": 0,
+      "error": "ZIP error: intentional PPTX partial sink failure",
+      "error_kind": "OpcError::ZipError (preservation writer mapping)",
+      "prefix_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "verified"
+    }
+  },
+  "inverse_scope": "Live and serialized/reopened inverse restore full bytes of this generated source; logical and semantic equality follow from exact equality to the admitted source. This does not certify arbitrary producer archives.",
+  "next_step": "Add and measure a comparable owning-input benchmark control with explicit input-copy and replay boundaries before considering a production provenance bridge.",
+  "output": {
+    "bytes": 17017145,
+    "file": "owned-control-output.pptx",
+    "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+  },
+  "ownership": {
+    "after_edit_exact_source_len": null,
+    "after_edit_exact_source_sha256": null,
+    "after_edit_retained_source_limits": true,
+    "after_edit_unmodified_owned_source": false,
+    "after_noop_commit_unmodified_owned_source": true,
+    "ingress_exact_source_len": 17017139,
+    "ingress_exact_source_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "ingress_unmodified_owned_source": true
+  },
+  "performance_claim": false,
+  "production_change": false,
+  "source": {
+    "bytes": 17017139,
+    "file": "source.pptx",
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+  },
+  "status": "qualified_generated_fixture"
+}

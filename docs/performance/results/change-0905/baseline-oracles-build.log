@@ -1,0 +1,9 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-0905-src/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/tmp/litchi-0905-src/crates/xml-minifier)
+    Finished `release` profile [optimized + debuginfo] target(s) in 6.19s

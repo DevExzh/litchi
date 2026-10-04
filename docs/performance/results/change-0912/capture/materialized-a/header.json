@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "script",
+    "--header-only",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/perf.data"
+  ],
+  "exit_code": 0,
+  "raw": {
+    "bytes": 5859308,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/perf.data",
+    "sha256": "9cca1eeaadecb6ab6951c228583f595e7bf08bdcc1d68b20e72da0f03de203c4"
+  },
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/header.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 1028,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/header.stdout.gz",
+    "sha256": "ff267690df1c570715394744781ecc6e8a07f2589bbb3e81505af5d2435b9702"
+  }
+}
