@@ -1,0 +1,68 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+    "--warmup",
+    "2",
+    "--samples",
+    "40",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-dense-sparse/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 120901,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-dense-sparse/report.json",
+      "sha256": "f40a4b6a6c61f6c2f90187b3bf13b76a6cec4faff8d89b68099fa4991b2085b7"
+    },
+    {
+      "bytes": 1353,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-dense-sparse/start.json",
+      "sha256": "1f6cb829302aba79b3caa73694c205ce4dca7e1c742e5e133446bfef3731b711"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "binary": {
+    "bytes": 264489024,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+    "sha256": "efcf6173bf71b3766aa84cc9a38023bf7b8ca0263f40cd80ec9c23acd4636e62"
+  },
+  "block": 0,
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T02:50:15.521426+00:00",
+  "helper": {
+    "bytes": 7998,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/run_v2.py",
+    "sha256": "4d79556f7296e59fdba374045bef1085e60cb206cb5be44b766de81760c7479d"
+  },
+  "lane": "qualification",
+  "plan": {
+    "bytes": 52946,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/plan.json",
+    "sha256": "98e13185119262783643981d85c915e937875b6ae54e6bd22b278282fa863ba0"
+  },
+  "shape": "dense-sparse",
+  "started_utc": "2026-10-04T02:50:11.954476+00:00"
+}

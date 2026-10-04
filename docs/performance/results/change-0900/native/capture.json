@@ -1,0 +1,15 @@
+{
+  "children": 12,
+  "helper": {
+    "bytes": 7998,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/run_v2.py",
+    "sha256": "4d79556f7296e59fdba374045bef1085e60cb206cb5be44b766de81760c7479d"
+  },
+  "plan": {
+    "bytes": 52946,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/plan.json",
+    "sha256": "98e13185119262783643981d85c915e937875b6ae54e6bd22b278282fa863ba0"
+  },
+  "samples": 1200,
+  "status": "pass"
+}

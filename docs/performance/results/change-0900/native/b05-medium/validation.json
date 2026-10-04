@@ -1,0 +1,186 @@
+{
+  "constants": {
+    "budget_objects_used_after_handles_drop": 0,
+    "budget_used_after_handles_drop": 0,
+    "budget_used_after_package_drop": 0,
+    "cache_allocation_bypasses": 0,
+    "cache_budget_managed": false,
+    "cache_budget_memory_limit": null,
+    "cache_budget_memory_used": 0,
+    "cache_budget_reservation_failures": 0,
+    "cache_budget_reserved_bytes": 0,
+    "cache_bypasses": 0,
+    "cache_cold_loads": 6,
+    "cache_evictions": 0,
+    "cache_failed_loads": 0,
+    "cache_hits": 0,
+    "cache_in_flight_loads": 0,
+    "cache_mode": "unmanaged-control",
+    "cache_oversized_bypasses": 0,
+    "cache_retained_bytes": 269785,
+    "cache_retained_entries": 6,
+    "cache_successful_loads": 6,
+    "cache_waiter_joins": 0,
+    "implementation": "source-backed",
+    "output_budget_refusal": {
+      "accepted_output_bytes": 0,
+      "first_output_request_bytes": 0,
+      "one_under_output_limit": 0,
+      "output_bytes_used": 0,
+      "source_identity_preserved": false,
+      "source_read_bytes": 0,
+      "source_read_calls": 0,
+      "successful_output_ceiling": 0,
+      "typed_output_resource_refusal": false,
+      "zero_output_verified": false
+    },
+    "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+    "payload_materializations": 6,
+    "payload_memory_limit": null,
+    "post_publication_budget": {
+      "cache_reserved_objects": null,
+      "catalog_reserved_objects": null,
+      "input_bytes_limit": null,
+      "input_bytes_used": 0,
+      "objects_limit": null,
+      "objects_used": 0,
+      "output_bytes_limit": null,
+      "output_bytes_used": 0,
+      "work_limit": null,
+      "work_used": 0
+    },
+    "pre_publication_budget": {
+      "cache_reserved_objects": 0,
+      "catalog_reserved_objects": 0,
+      "input_bytes_limit": null,
+      "input_bytes_used": 0,
+      "objects_limit": null,
+      "objects_used": 0,
+      "output_bytes_limit": null,
+      "output_bytes_used": 0,
+      "work_limit": null,
+      "work_used": 0
+    },
+    "publication_planning_memory_headroom": null,
+    "selected_worksheet_count": 4,
+    "selected_worksheet_read_bytes": 27146,
+    "selected_worksheet_read_calls": 4,
+    "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+    "source_read_bytes": 4233170,
+    "source_read_calls": 183,
+    "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+    "unselected_worksheet_read_bytes": 0,
+    "unselected_worksheet_read_calls": 0,
+    "untouched_member_count": 12,
+    "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+    "update_count": 93,
+    "workbook_read_bytes": 226,
+    "workbook_read_calls": 1
+  },
+  "corpus": {
+    "archive_bytes": 4226429,
+    "archive_member_count": 17,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "compression": "deflate",
+    "entry_bytes": 4,
+    "entry_count": 9216,
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "name": "xlsx-cell-values-medium",
+    "package_format": "XLSX/OPC/ZIP",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "shape": "medium",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "uncompressed_payload_bytes": 4231168,
+    "xlsx": {
+      "columns_per_sheet": 48,
+      "one_percent_update_count": 93,
+      "rows_per_sheet": 48,
+      "sheet_count": 4,
+      "source_members": {
+        "shared_strings": null,
+        "styles": "xl/styles.xml",
+        "workbook": "xl/workbook.xml",
+        "worksheets": [
+          "xl/worksheets/sheet1.xml",
+          "xl/worksheets/sheet2.xml",
+          "xl/worksheets/sheet3.xml",
+          "xl/worksheets/sheet4.xml"
+        ]
+      }
+    }
+  },
+  "lane": "native",
+  "phase_shares": {
+    "commit_ns": 0.21002610626277163,
+    "open_ns": 0.0049315922216418406,
+    "plan_ns": 0.34173758768644635,
+    "publication_ns": 0.4433047138291402
+  },
+  "phases": {
+    "commit_ns": {
+      "max": 3576688,
+      "mean": 3490282.42,
+      "min": 3454927,
+      "p50": 3488122,
+      "p95": 3520428,
+      "p99": 3574917
+    },
+    "open_ns": {
+      "max": 92230,
+      "mean": 81954.81,
+      "min": 76810,
+      "p50": 81215,
+      "p95": 86810,
+      "p99": 91521
+    },
+    "plan_ns": {
+      "max": 5725369,
+      "mean": 5679106.83,
+      "min": 5640008,
+      "p50": 5677418,
+      "p95": 5706628,
+      "p99": 5717888
+    },
+    "publication_ns": {
+      "max": 7427807,
+      "mean": 7366982.5,
+      "min": 7320216,
+      "p50": 7367141,
+      "p95": 7414777,
+      "p99": 7421957
+    },
+    "reopen_ns": {
+      "max": 23074895,
+      "mean": 22203939.82,
+      "min": 21848697,
+      "p50": 22165465,
+      "p95": 22600312,
+      "p99": 22795152
+    }
+  },
+  "samples": 100,
+  "shape": "medium",
+  "sink": {
+    "accepted_bytes": 4226788,
+    "largest_write": 65536,
+    "write_calls": 143,
+    "write_size_buckets": {
+      "bytes_0": 0,
+      "bytes_16385_to_65536": 64,
+      "bytes_1_to_512": 75,
+      "bytes_4097_to_16384": 4,
+      "bytes_513_to_4096": 0,
+      "bytes_over_65536": 0
+    }
+  },
+  "total": {
+    "max": 16798863,
+    "mean": 16618326.56,
+    "min": 16512832,
+    "p50": 16615693,
+    "p95": 16696793,
+    "p99": 16732313
+  }
+}

@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0900 — current XLSX one-percent edit/save phases
+
+[0900](0900-xlsx-edit-save-phase-refresh.md) refreshes the exact source-backed
+one-percent selector on medium and dense-sparse workbooks: twelve native
+children / 1,200 samples, plus eighty separate qualification samples. Total
+p50 medians are 16.655520 / 33.026613 ms. Publication is the largest measured
+phase in every child (43.88–44.33% / 46.26–46.81%); planning follows at about
+33–34%. No frozen p50 spread flag fires. Semantic/resource replay passes,
+with the first validator's optional Git-metadata mistake preserved and repaired
+without repeating its successful workload. This is current-source diagnosis,
+not a historical speedup comparison. Publication-owner profiling is next;
+production remains unchanged and the broader goal remains open.
+
 ## 0845 — retain indexed entry IDs through OPC publication
 
 [0845](0845-opc-indexed-entry-iteration.md) adopts direct entry iteration in two OPC scans. Across four synthetic 4,096-Part shapes, publication p50 improves 7.24–11.17% and lifecycle 2.31–4.18%, with unchanged owner allocation counts/bytes. All 512 main reports / 211,328 samples validate; no frozen latency, tail, RSS, allocation or spread flag fires. The separate instruction population and additive Callgrind reader repair preserve original captures and failure evidence. Candidate quality gates include 6,935 passing affected-owner tests. Current semantic DOCX/XLSX/PPTX mixed-catalog publication and durability diagnosis is next; the broader goal remains open.

@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+    "--warmup",
+    "2",
+    "--samples",
+    "40",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-medium/report.json"
+  ],
+  "binary": {
+    "bytes": 264489024,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/binaries/baseline-native",
+    "sha256": "efcf6173bf71b3766aa84cc9a38023bf7b8ca0263f40cd80ec9c23acd4636e62"
+  },
+  "block": 0,
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 7250,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/run.py",
+    "sha256": "65f242480eda135d5ad59478e57738560633a87a1fe392f420167c228b941608"
+  },
+  "lane": "qualification",
+  "plan": {
+    "bytes": 52946,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/plan.json",
+    "sha256": "98e13185119262783643981d85c915e937875b6ae54e6bd22b278282fa863ba0"
+  },
+  "shape": "medium",
+  "started_utc": "2026-10-04T02:48:46.926719+00:00"
+}

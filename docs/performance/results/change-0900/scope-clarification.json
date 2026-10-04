@@ -1,0 +1,7 @@
+{
+  "timing_scope": "Total sums open, planning, staged sets plus commit, and publication. Publication includes consumption of editor and drop of returned publication snapshot before elapsed is sampled. Sink preparation, remaining commit/sink/handle drops, source/oracle diagnostics and output reopen are excluded. Reopen is retained as a separate diagnostic phase.",
+  "qualification_scope": "Two separate40sample processes, excluded from native summaries. First original command succeeded, v1 metadata validator failed, same raw report admitted by additivev2 without rerun.",
+  "compiler_observation": "Fixed PATH /usr/bin:/bin has no rustc; report rustc_version is null. Compiler identity comes from original0894 build evidence, not this runtime field.",
+  "review_timing": "Methodology correspondence began before qualification; full written methodology review is retrospective to qualification and overlaps native capture. No pre-capture written approval is claimed.",
+  "performance_claim": null
+}

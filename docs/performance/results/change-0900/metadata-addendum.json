@@ -1,0 +1,28 @@
+{
+  "status": "source-bound correction",
+  "original_helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/run.py",
+    "bytes": 7250,
+    "sha256": "65f242480eda135d5ad59478e57738560633a87a1fe392f420167c228b941608"
+  },
+  "corrected_helper": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/run_v2.py",
+    "bytes": 7998,
+    "sha256": "4d79556f7296e59fdba374045bef1085e60cb206cb5be44b766de81760c7479d"
+  },
+  "first_command": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-medium/command.json",
+    "bytes": 2346,
+    "sha256": "38d904b11f4cf8ca855ab1a63061188140bd100d1b28ce0364dad625c2d43b18"
+  },
+  "failure": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-medium/validation-failure.json",
+    "bytes": 68,
+    "sha256": "cc648f0ecf6ae6f21a9126866a38df61f77f9b6abc63eb12ce113bb7001ffd12"
+  },
+  "cause": "git_output uses compile-time removed0894 build root, so runtime git_revision and dirty status null. External selected10771source census, build receipt and binary digest establish code provenance.",
+  "workload_exit_code": 0,
+  "validator_exit_code": 1,
+  "workload_repeated": false,
+  "resumption": "Replay existing first child with corrected metadata check; execute only remaining frozen schedule."
+}

@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0900 — current XLSX one-percent edit/save phases
+
+[0900](0900-xlsx-edit-save-phase-refresh.md) refreshes the exact source-backed
+one-percent selector on medium and dense-sparse workbooks: twelve native
+children / 1,200 samples, plus eighty separate qualification samples. Total
+p50 medians are 16.655520 / 33.026613 ms. Publication is the largest measured
+phase in every child (43.88–44.33% / 46.26–46.81%); planning follows at about
+33–34%. No frozen p50 spread flag fires. Semantic/resource replay passes,
+with the first validator's optional Git-metadata mistake preserved and repaired
+without repeating its successful workload. This is current-source diagnosis,
+not a historical speedup comparison. Publication-owner profiling is next;
+production remains unchanged and the broader goal remains open.
+
 ## 0899 — XML validation cost attribution
 
 [0899](0899-xml-validation-cost-attribution.md) reconciles retained allocation,

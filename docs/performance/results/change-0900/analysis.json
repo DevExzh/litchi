@@ -1,0 +1,2763 @@
+{
+  "helper": {
+    "bytes": 7998,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/run_v2.py",
+    "sha256": "4d79556f7296e59fdba374045bef1085e60cb206cb5be44b766de81760c7479d"
+  },
+  "performance_claim": null,
+  "plan": {
+    "bytes": 52946,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/plan.json",
+    "sha256": "98e13185119262783643981d85c915e937875b6ae54e6bd22b278282fa863ba0"
+  },
+  "rows": [
+    {
+      "block": 0,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "qualification",
+      "phase_shares": {
+        "commit_ns": 0.21405873048042237,
+        "open_ns": 0.00517291992986293,
+        "plan_ns": 0.34105532694601615,
+        "publication_ns": 0.43971302264369855
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3612008,
+          "mean": 3570266.675,
+          "min": 3534478,
+          "p50": 3569273,
+          "p95": 3606708,
+          "p99": 3612008
+        },
+        "open_ns": {
+          "max": 106631,
+          "mean": 86278.675,
+          "min": 76910,
+          "p50": 83535,
+          "p95": 101680,
+          "p99": 106631
+        },
+        "plan_ns": {
+          "max": 5773649,
+          "mean": 5688431.7,
+          "min": 5615299,
+          "p50": 5686419,
+          "p95": 5750819,
+          "p99": 5773649
+        },
+        "publication_ns": {
+          "max": 7467258,
+          "mean": 7333934.7,
+          "min": 7231077,
+          "p50": 7336368,
+          "p95": 7453238,
+          "p99": 7467258
+        },
+        "reopen_ns": {
+          "max": 26522265,
+          "mean": 25164872.225,
+          "min": 24061253,
+          "p50": 25450849,
+          "p95": 26419305,
+          "p99": 26522265
+        }
+      },
+      "report": {
+        "bytes": 120811,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-medium/report.json",
+        "sha256": "221acadd86b8f055ee963f8b1cb51b46d28c345f420efac28779e8d58fc2af61"
+      },
+      "samples": 40,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 16888816,
+        "mean": 16678911.75,
+        "min": 16524365,
+        "p50": 16683024,
+        "p95": 16848045,
+        "p99": 16888816
+      }
+    },
+    {
+      "block": 0,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "qualification",
+      "phase_shares": {
+        "commit_ns": 0.20271114580435923,
+        "open_ns": 0.0027422753800105,
+        "plan_ns": 0.3294729863253382,
+        "publication_ns": 0.46507359249029206
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 7039746,
+          "mean": 6686303.075,
+          "min": 6609564,
+          "p50": 6665599,
+          "p95": 6805805,
+          "p99": 7039746
+        },
+        "open_ns": {
+          "max": 113141,
+          "mean": 90452.275,
+          "min": 84170,
+          "p50": 88935,
+          "p95": 102781,
+          "p99": 113141
+        },
+        "plan_ns": {
+          "max": 11351838,
+          "mean": 10867464.8,
+          "min": 10743995,
+          "p50": 10841505,
+          "p95": 11034126,
+          "p99": 11351838
+        },
+        "publication_ns": {
+          "max": 15524689,
+          "mean": 15340167.8,
+          "min": 15246588,
+          "p50": 15329793,
+          "p95": 15420859,
+          "p99": 15524689
+        },
+        "reopen_ns": {
+          "max": 30126744,
+          "mean": 28810835.625,
+          "min": 28265975,
+          "p50": 28757226,
+          "p95": 29450190,
+          "p99": 30126744
+        }
+      },
+      "report": {
+        "bytes": 120901,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/qualification/b00-dense-sparse/report.json",
+        "sha256": "f40a4b6a6c61f6c2f90187b3bf13b76a6cec4faff8d89b68099fa4991b2085b7"
+      },
+      "samples": 40,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33842913,
+        "mean": 32984387.95,
+        "min": 32730837,
+        "p50": 32936338,
+        "p95": 33209230,
+        "p99": 33842913
+      }
+    },
+    {
+      "block": 0,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.20982923616957133,
+        "open_ns": 0.005447358999703495,
+        "plan_ns": 0.34270736309839545,
+        "publication_ns": 0.4420160417323297
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3625947,
+          "mean": 3506505.43,
+          "min": 3471097,
+          "p50": 3505026,
+          "p95": 3533826,
+          "p99": 3600187
+        },
+        "open_ns": {
+          "max": 114781,
+          "mean": 91032.09,
+          "min": 79041,
+          "p50": 89085,
+          "p95": 101701,
+          "p99": 108051
+        },
+        "plan_ns": {
+          "max": 5832187,
+          "mean": 5727062.88,
+          "min": 5663207,
+          "p50": 5727751,
+          "p95": 5764666,
+          "p99": 5813797
+        },
+        "publication_ns": {
+          "max": 7525955,
+          "mean": 7386633.43,
+          "min": 7325095,
+          "p50": 7382634,
+          "p95": 7440975,
+          "p99": 7460545
+        },
+        "reopen_ns": {
+          "max": 27054256,
+          "mean": 26064206.37,
+          "min": 25546869,
+          "p50": 25992351,
+          "p95": 26548314,
+          "p99": 26909465
+        }
+      },
+      "report": {
+        "bytes": 273519,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b00-medium/report.json",
+        "sha256": "210d7dd642121972320c950cc10e60694b8078f233575f8d03daf48fa9626b54"
+      },
+      "samples": 100,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 17033460,
+        "mean": 16711233.83,
+        "min": 16616998,
+        "p50": 16704893,
+        "p95": 16803009,
+        "p99": 16905679
+      }
+    },
+    {
+      "block": 0,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.20186452881831496,
+        "open_ns": 0.0030712903267413106,
+        "plan_ns": 0.32697287508537964,
+        "publication_ns": 0.4680913057695641
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 6951652,
+          "mean": 6666442.44,
+          "min": 6545170,
+          "p50": 6659751,
+          "p95": 6754982,
+          "p99": 6899112
+        },
+        "open_ns": {
+          "max": 148800,
+          "mean": 101427.33,
+          "min": 88340,
+          "p50": 99075,
+          "p95": 115590,
+          "p99": 145171
+        },
+        "plan_ns": {
+          "max": 10992202,
+          "mean": 10798062.76,
+          "min": 10659970,
+          "p50": 10780970,
+          "p95": 10945861,
+          "p99": 10992181
+        },
+        "publication_ns": {
+          "max": 15791924,
+          "mean": 15458405.52,
+          "min": 15241342,
+          "p50": 15431897,
+          "p95": 15674633,
+          "p99": 15755283
+        },
+        "reopen_ns": {
+          "max": 30902134,
+          "mean": 29185012.65,
+          "min": 28313272,
+          "p50": 29063765,
+          "p95": 30284291,
+          "p99": 30892844
+        }
+      },
+      "report": {
+        "bytes": 273777,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b00-dense-sparse/report.json",
+        "sha256": "3b139d321440316fc157b3c505e431721492b19b3ca56d929d2d85af0b2fa9ab"
+      },
+      "samples": 100,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33651677,
+        "mean": 33024338.05,
+        "min": 32693193,
+        "p50": 33000488,
+        "p95": 33371725,
+        "p99": 33591737
+      }
+    },
+    {
+      "block": 1,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.20146396886605497,
+        "open_ns": 0.0030186769819688904,
+        "plan_ns": 0.32786973651402906,
+        "publication_ns": 0.46764761763794704
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 6820850,
+          "mean": 6654240.72,
+          "min": 6561849,
+          "p50": 6651425,
+          "p95": 6703850,
+          "p99": 6815850
+        },
+        "open_ns": {
+          "max": 123060,
+          "mean": 99705.19,
+          "min": 88801,
+          "p50": 97275,
+          "p95": 113631,
+          "p99": 119231
+        },
+        "plan_ns": {
+          "max": 11044200,
+          "mean": 10829351.59,
+          "min": 10710128,
+          "p50": 10819818,
+          "p95": 10937029,
+          "p99": 10982389
+        },
+        "publication_ns": {
+          "max": 15652301,
+          "mean": 15446135.79,
+          "min": 15344159,
+          "p50": 15423824,
+          "p95": 15589090,
+          "p99": 15616330
+        },
+        "reopen_ns": {
+          "max": 30310366,
+          "mean": 29216805.15,
+          "min": 28686258,
+          "p50": 29124995,
+          "p95": 30090964,
+          "p99": 30227965
+        }
+      },
+      "report": {
+        "bytes": 273767,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b01-dense-sparse/report.json",
+        "sha256": "dee47ca7d24c9681de0af1a1d08bba3e3958cc656ca1b75bd91c4c073a27d474"
+      },
+      "samples": 100,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33549920,
+        "mean": 33029433.29,
+        "min": 32812967,
+        "p50": 33018393,
+        "p95": 33213309,
+        "p99": 33365780
+      }
+    },
+    {
+      "block": 1,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.21311304192245548,
+        "open_ns": 0.005004663210729153,
+        "plan_ns": 0.33894963124808924,
+        "publication_ns": 0.44293266361872613
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3643156,
+          "mean": 3555838.13,
+          "min": 3527645,
+          "p50": 3554001,
+          "p95": 3584176,
+          "p99": 3617216
+        },
+        "open_ns": {
+          "max": 95331,
+          "mean": 83503.91,
+          "min": 77671,
+          "p50": 82235,
+          "p95": 90761,
+          "p99": 93410
+        },
+        "plan_ns": {
+          "max": 5717096,
+          "mean": 5655449.39,
+          "min": 5610855,
+          "p50": 5655705,
+          "p95": 5689816,
+          "p99": 5700896
+        },
+        "publication_ns": {
+          "max": 7541554,
+          "mean": 7390429.23,
+          "min": 7301523,
+          "p50": 7377403,
+          "p95": 7488233,
+          "p99": 7530144
+        },
+        "reopen_ns": {
+          "max": 26206657,
+          "mean": 25272657.11,
+          "min": 24811441,
+          "p50": 25175378,
+          "p95": 25908756,
+          "p99": 25997466
+        }
+      },
+      "report": {
+        "bytes": 273509,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b01-medium/report.json",
+        "sha256": "a84610b7ed79e27f6a1ae8b0490b454781a50d4877d2c0ab2fc86ab51d19fd8f"
+      },
+      "samples": 100,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 16918336,
+        "mean": 16685220.66,
+        "min": 16555054,
+        "p50": 16679120,
+        "p95": 16796615,
+        "p99": 16891806
+      }
+    },
+    {
+      "block": 2,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.2092184547337468,
+        "open_ns": 0.005292148102430995,
+        "plan_ns": 0.3440029972661433,
+        "publication_ns": 0.4414863998976789
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3576296,
+          "mean": 3488954.16,
+          "min": 3434115,
+          "p50": 3483041,
+          "p95": 3530955,
+          "p99": 3557636
+        },
+        "open_ns": {
+          "max": 119421,
+          "mean": 88252.55,
+          "min": 75920,
+          "p50": 86390,
+          "p95": 102711,
+          "p99": 108340
+        },
+        "plan_ns": {
+          "max": 5898489,
+          "mean": 5736638.72,
+          "min": 5671196,
+          "p50": 5726347,
+          "p95": 5803386,
+          "p99": 5828506
+        },
+        "publication_ns": {
+          "max": 7455353,
+          "mean": 7362284.62,
+          "min": 7299995,
+          "p50": 7356898,
+          "p95": 7426583,
+          "p99": 7451423
+        },
+        "reopen_ns": {
+          "max": 27508513,
+          "mean": 25826956.53,
+          "min": 24488780,
+          "p50": 25792762,
+          "p95": 26789290,
+          "p99": 27048871
+        }
+      },
+      "report": {
+        "bytes": 273509,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b02-medium/report.json",
+        "sha256": "a4de9f9e11d3607db0dd8a24841e2d5969b8d2acc3fdf3d0826fa86ed39eae96"
+      },
+      "samples": 100,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 16882585,
+        "mean": 16676130.05,
+        "min": 16548880,
+        "p50": 16662388,
+        "p95": 16834086,
+        "p99": 16869735
+      }
+    },
+    {
+      "block": 2,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.20636071329094377,
+        "open_ns": 0.0033224551778642847,
+        "plan_ns": 0.3276768036580555,
+        "publication_ns": 0.46264002787313646
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 7026735,
+          "mean": 6827418.14,
+          "min": 6737823,
+          "p50": 6819393,
+          "p95": 6927614,
+          "p99": 6994754
+        },
+        "open_ns": {
+          "max": 135461,
+          "mean": 109923.01,
+          "min": 94121,
+          "p50": 107545,
+          "p95": 125551,
+          "p99": 131811
+        },
+        "plan_ns": {
+          "max": 11217605,
+          "mean": 10841145.67,
+          "min": 10716713,
+          "p50": 10827738,
+          "p95": 10937214,
+          "p99": 11046174
+        },
+        "publication_ns": {
+          "max": 15452736,
+          "mean": 15306386.9,
+          "min": 15184305,
+          "p50": 15294505,
+          "p95": 15417956,
+          "p99": 15452266
+        },
+        "reopen_ns": {
+          "max": 30727601,
+          "mean": 29470081.96,
+          "min": 28308839,
+          "p50": 29394989,
+          "p95": 30191739,
+          "p99": 30720191
+        }
+      },
+      "report": {
+        "bytes": 273830,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b02-dense-sparse/report.json",
+        "sha256": "f6e45276b34b426aca63c9061c3c3bda13307faf20ebfbee6735fa8936bde754"
+      },
+      "samples": 100,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33511164,
+        "mean": 33084873.72,
+        "min": 32815051,
+        "p50": 33055157,
+        "p95": 33422874,
+        "p99": 33461874
+      }
+    },
+    {
+      "block": 3,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.2060112408357753,
+        "open_ns": 0.0030381782578914863,
+        "plan_ns": 0.32556795383968157,
+        "publication_ns": 0.4653826270666516
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 7071047,
+          "mean": 6794139.59,
+          "min": 6676883,
+          "p50": 6786078,
+          "p95": 6880874,
+          "p99": 7017486
+        },
+        "open_ns": {
+          "max": 134691,
+          "mean": 100197.48,
+          "min": 83691,
+          "p50": 98831,
+          "p95": 122150,
+          "p99": 131071
+        },
+        "plan_ns": {
+          "max": 11080728,
+          "mean": 10737055.49,
+          "min": 10584582,
+          "p50": 10730943,
+          "p95": 10867837,
+          "p99": 11074488
+        },
+        "publication_ns": {
+          "max": 15590451,
+          "mean": 15348067.99,
+          "min": 15131994,
+          "p50": 15373213,
+          "p95": 15505651,
+          "p99": 15554557
+        },
+        "reopen_ns": {
+          "max": 30226788,
+          "mean": 28985463.62,
+          "min": 28143858,
+          "p50": 29067007,
+          "p95": 29665685,
+          "p99": 30177668
+        }
+      },
+      "report": {
+        "bytes": 273779,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b03-dense-sparse/report.json",
+        "sha256": "0025f86a17f7fa3c6b3627c7f47fb3b9305f41abc3c98729640ce1f50fa3d4ad"
+      },
+      "samples": 100,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33742107,
+        "mean": 32979460.55,
+        "min": 32529489,
+        "p50": 32998012,
+        "p95": 33346904,
+        "p99": 33565205
+      }
+    },
+    {
+      "block": 3,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.21266466663336323,
+        "open_ns": 0.004932816090746721,
+        "plan_ns": 0.34113441814593853,
+        "publication_ns": 0.4412680991299515
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3713159,
+          "mean": 3541704.46,
+          "min": 3502319,
+          "p50": 3537928,
+          "p95": 3577809,
+          "p99": 3621089
+        },
+        "open_ns": {
+          "max": 95551,
+          "mean": 82150.82,
+          "min": 75281,
+          "p50": 81011,
+          "p95": 92770,
+          "p99": 95001
+        },
+        "plan_ns": {
+          "max": 5775730,
+          "mean": 5681231.91,
+          "min": 5610879,
+          "p50": 5677999,
+          "p95": 5754780,
+          "p99": 5766810
+        },
+        "publication_ns": {
+          "max": 7459489,
+          "mean": 7348852.16,
+          "min": 7291748,
+          "p50": 7343803,
+          "p95": 7406388,
+          "p99": 7442019
+        },
+        "reopen_ns": {
+          "max": 26077426,
+          "mean": 25095352.63,
+          "min": 23997285,
+          "p50": 25190407,
+          "p95": 25959366,
+          "p99": 26059827
+        }
+      },
+      "report": {
+        "bytes": 273503,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b03-medium/report.json",
+        "sha256": "8c9036ae4bb84ed7badfcd622fe1b21509ebbecc1d96cf9e21376ca983d64f42"
+      },
+      "samples": 100,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 16939099,
+        "mean": 16653939.35,
+        "min": 16527456,
+        "p50": 16648652,
+        "p95": 16769808,
+        "p99": 16790868
+      }
+    },
+    {
+      "block": 4,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.21415933399863296,
+        "open_ns": 0.0049421148632002145,
+        "plan_ns": 0.342106773618238,
+        "publication_ns": 0.4387917775199288
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3670299,
+          "mean": 3564229.63,
+          "min": 3530128,
+          "p50": 3561419,
+          "p95": 3600779,
+          "p99": 3624119
+        },
+        "open_ns": {
+          "max": 93960,
+          "mean": 82251.06,
+          "min": 77261,
+          "p50": 81150,
+          "p95": 91010,
+          "p99": 93771
+        },
+        "plan_ns": {
+          "max": 5853411,
+          "mean": 5693644.43,
+          "min": 5656910,
+          "p50": 5689645,
+          "p95": 5732190,
+          "p99": 5770430
+        },
+        "publication_ns": {
+          "max": 7447379,
+          "mean": 7302762.04,
+          "min": 7247728,
+          "p50": 7299893,
+          "p95": 7343258,
+          "p99": 7395948
+        },
+        "reopen_ns": {
+          "max": 26268378,
+          "mean": 25100402.44,
+          "min": 24366598,
+          "p50": 24995005,
+          "p95": 25597183,
+          "p99": 25944055
+        }
+      },
+      "report": {
+        "bytes": 273510,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b04-medium/report.json",
+        "sha256": "1c752759c805b05a4375c0314ad3da1cc56c80811ac0b5f1ba0f9299b6108e35"
+      },
+      "samples": 100,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 16944548,
+        "mean": 16642887.16,
+        "min": 16558657,
+        "p50": 16632622,
+        "p95": 16746427,
+        "p99": 16855669
+      }
+    },
+    {
+      "block": 4,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.2048614931999711,
+        "open_ns": 0.0031857379112168187,
+        "plan_ns": 0.32526560476121485,
+        "publication_ns": 0.46668716412759725
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 6951565,
+          "mean": 6766717.03,
+          "min": 6647595,
+          "p50": 6758563,
+          "p95": 6874814,
+          "p99": 6908764
+        },
+        "open_ns": {
+          "max": 130190,
+          "mean": 105227.13,
+          "min": 90141,
+          "p50": 103840,
+          "p95": 119721,
+          "p99": 129831
+        },
+        "plan_ns": {
+          "max": 10865716,
+          "mean": 10743748.24,
+          "min": 10635976,
+          "p50": 10746424,
+          "p95": 10833703,
+          "p99": 10859863
+        },
+        "publication_ns": {
+          "max": 15667157,
+          "mean": 15415000.31,
+          "min": 15259260,
+          "p50": 15405505,
+          "p95": 15565696,
+          "p99": 15656052
+        },
+        "reopen_ns": {
+          "max": 30164568,
+          "mean": 29046845.03,
+          "min": 28238899,
+          "p50": 28952152,
+          "p95": 29798027,
+          "p99": 30108498
+        }
+      },
+      "report": {
+        "bytes": 273799,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b04-dense-sparse/report.json",
+        "sha256": "82d976a96df91e432e11e442c484764d3bbeea3a3f90a37f975ba6641633040c"
+      },
+      "samples": 100,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33481154,
+        "mean": 33030692.71,
+        "min": 32684571,
+        "p50": 33034832,
+        "p95": 33241794,
+        "p99": 33430115
+      }
+    },
+    {
+      "block": 5,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.2054885554802102,
+        "open_ns": 0.003097260308707339,
+        "plan_ns": 0.3252839127887103,
+        "publication_ns": 0.4661302714223722
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 7028935,
+          "mean": 6806894.8,
+          "min": 6745273,
+          "p50": 6799733,
+          "p95": 6880474,
+          "p99": 6970304
+        },
+        "open_ns": {
+          "max": 120901,
+          "mean": 102598.05,
+          "min": 90781,
+          "p50": 101781,
+          "p95": 113770,
+          "p99": 120511
+        },
+        "plan_ns": {
+          "max": 11067265,
+          "mean": 10775166.38,
+          "min": 10647913,
+          "p50": 10759447,
+          "p95": 10962164,
+          "p99": 11031524
+        },
+        "publication_ns": {
+          "max": 15627707,
+          "mean": 15440761.23,
+          "min": 15363496,
+          "p50": 15431875,
+          "p95": 15537557,
+          "p99": 15592776
+        },
+        "reopen_ns": {
+          "max": 30287628,
+          "mean": 29058977.82,
+          "min": 28623201,
+          "p50": 29016073,
+          "p95": 29571085,
+          "p99": 29631066
+        }
+      },
+      "report": {
+        "bytes": 273786,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b05-dense-sparse/report.json",
+        "sha256": "26ec695d2dc28ec608f6deceafdc41a06810afda777178d9e9db5aebe6c772d6"
+      },
+      "samples": 100,
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33725306,
+        "mean": 33125420.46,
+        "min": 32925692,
+        "p50": 33097997,
+        "p95": 33335534,
+        "p99": 33492104
+      }
+    },
+    {
+      "block": 5,
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "lane": "native",
+      "phase_shares": {
+        "commit_ns": 0.21002610626277163,
+        "open_ns": 0.0049315922216418406,
+        "plan_ns": 0.34173758768644635,
+        "publication_ns": 0.4433047138291402
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3576688,
+          "mean": 3490282.42,
+          "min": 3454927,
+          "p50": 3488122,
+          "p95": 3520428,
+          "p99": 3574917
+        },
+        "open_ns": {
+          "max": 92230,
+          "mean": 81954.81,
+          "min": 76810,
+          "p50": 81215,
+          "p95": 86810,
+          "p99": 91521
+        },
+        "plan_ns": {
+          "max": 5725369,
+          "mean": 5679106.83,
+          "min": 5640008,
+          "p50": 5677418,
+          "p95": 5706628,
+          "p99": 5717888
+        },
+        "publication_ns": {
+          "max": 7427807,
+          "mean": 7366982.5,
+          "min": 7320216,
+          "p50": 7367141,
+          "p95": 7414777,
+          "p99": 7421957
+        },
+        "reopen_ns": {
+          "max": 23074895,
+          "mean": 22203939.82,
+          "min": 21848697,
+          "p50": 22165465,
+          "p95": 22600312,
+          "p99": 22795152
+        }
+      },
+      "report": {
+        "bytes": 273511,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0900/native/b05-medium/report.json",
+        "sha256": "bc91e9026a6c0af3cf4ee4a2253f2d3f8a200bc0f11db7d0113a29de763473e5"
+      },
+      "samples": 100,
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 16798863,
+        "mean": 16618326.56,
+        "min": 16512832,
+        "p50": 16615693,
+        "p95": 16696793,
+        "p99": 16732313
+      }
+    }
+  ],
+  "scope": "Current-source warm in-memory native phase diagnostic; no comparison with historical timings, no optimization or adoption claim. Native sums open,plan,commit,publication; excludes reopen/oracles and remaining drops. All worksheets selected; no selective scaling claim.",
+  "status": "pass",
+  "summaries": {
+    "dense-sparse": {
+      "children": 6,
+      "p50_max_min_ratio": 1.0030300310212628,
+      "p50_ns_median": 33026612.5,
+      "p50_ns_range": [
+        32998012,
+        33097997
+      ],
+      "phase_share_ranges": {
+        "commit_ns": [
+          0.20146396886605497,
+          0.20636071329094377
+        ],
+        "open_ns": [
+          0.0030186769819688904,
+          0.0033224551778642847
+        ],
+        "plan_ns": [
+          0.32526560476121485,
+          0.32786973651402906
+        ],
+        "publication_ns": [
+          0.46264002787313646,
+          0.4680913057695641
+        ]
+      },
+      "variation_flag": false
+    },
+    "medium": {
+      "children": 6,
+      "p50_max_min_ratio": 1.0053684188796699,
+      "p50_ns_median": 16655520.0,
+      "p50_ns_range": [
+        16615693,
+        16704893
+      ],
+      "phase_share_ranges": {
+        "commit_ns": [
+          0.2092184547337468,
+          0.21415933399863296
+        ],
+        "open_ns": [
+          0.0049315922216418406,
+          0.005447358999703495
+        ],
+        "plan_ns": [
+          0.33894963124808924,
+          0.3440029972661433
+        ],
+        "publication_ns": [
+          0.4387917775199288,
+          0.4433047138291402
+        ]
+      },
+      "variation_flag": false
+    }
+  }
+}

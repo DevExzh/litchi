@@ -1,0 +1,547 @@
+{
+  "status": "pass",
+  "provenance": "root closure audit; independent numerical review separately authored and replayed by root",
+  "independent_review_input_descriptors_verified": 16,
+  "native_children": 12,
+  "native_measured_samples": 1200,
+  "qualification_children": 2,
+  "qualification_samples": 80,
+  "workloads_repeated": 0,
+  "metadata_failure_preserved": true,
+  "source_diff_empty": true,
+  "worktrees_created": 0,
+  "build_roots_created": 0,
+  "owned_replay_directory_absent": true,
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0900/README.md",
+      "bytes": 2722,
+      "sha256": "3dbe5249ce44aab758670a8c5ea6e34206314ba63cc207ae7af6b598dde39948"
+    },
+    {
+      "path": "docs/performance/results/change-0900/analysis.json",
+      "bytes": 92879,
+      "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+    },
+    {
+      "path": "docs/performance/results/change-0900/independent_review.py",
+      "bytes": 16541,
+      "sha256": "22e3ddbfacee659f517f86d7a5a367df026e7b9e51f3bcbc2c164f83a04a0421"
+    },
+    {
+      "path": "docs/performance/results/change-0900/independent_review_v2.py",
+      "bytes": 16765,
+      "sha256": "9706065db6b705db64c9b4829fd3ca2eb2c3d7dd1ed7a509806f715b5200fb1a"
+    },
+    {
+      "path": "docs/performance/results/change-0900/metadata-addendum.json",
+      "bytes": 1364,
+      "sha256": "e643760df181a269b138d6d5d7f264df676daf17b0ce763a2bb0480fe8436e59"
+    },
+    {
+      "path": "docs/performance/results/change-0900/methodology-review.md",
+      "bytes": 5212,
+      "sha256": "d615a8b28f746919f9848b5df41d8b7f72bb8295a9099e927f2c9c4eabf438a1"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-dense-sparse/command.json",
+      "bytes": 2351,
+      "sha256": "18377a69592731ac853c3e68b1bf0b64ddac6923643ec407cad999075528aa92"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-dense-sparse/report.json",
+      "bytes": 273777,
+      "sha256": "3b139d321440316fc157b3c505e431721492b19b3ca56d929d2d85af0b2fa9ab"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-dense-sparse/start.json",
+      "bytes": 1341,
+      "sha256": "d9c94940b6dd560598b8965b130c09b5571cc3447cfcd4e90fcef3d60ff107d9"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-dense-sparse/validation.json",
+      "bytes": 5491,
+      "sha256": "3e7c7b2c22abea2ffdd3abbfa635fcabfd957f6b82cc4a8295a306fe65665487"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-medium/command.json",
+      "bytes": 2309,
+      "sha256": "dcc114327cede2ace296182870a96da1d18216a618c9d881146c6b82ec741932"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-medium/report.json",
+      "bytes": 273519,
+      "sha256": "210d7dd642121972320c950cc10e60694b8078f233575f8d03daf48fa9626b54"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-medium/start.json",
+      "bytes": 1323,
+      "sha256": "1b94dfdd4dc0f9d42b2679a0b7601f84cda120502562bd2aebfe5841da12a050"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b00-medium/validation.json",
+      "bytes": 5454,
+      "sha256": "0cee82f0ca138178b51a0fe9fc485028f605ad4e3391a3015689f2f38a82762d"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-dense-sparse/command.json",
+      "bytes": 2351,
+      "sha256": "45fb5680cab7f14f29132418d45f2b3a90bc796138e50c77c0c21804132711d6"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-dense-sparse/report.json",
+      "bytes": 273767,
+      "sha256": "dee47ca7d24c9681de0af1a1d08bba3e3958cc656ca1b75bd91c4c073a27d474"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-dense-sparse/start.json",
+      "bytes": 1341,
+      "sha256": "1716bdbddc8801372f046c936d44ca5d1fa27b624d7f01156b2bfff197a48d01"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-dense-sparse/validation.json",
+      "bytes": 5491,
+      "sha256": "e4b7eeb0b458ec1098c2c9d33453cef1ff96c8fa5dfa05ef4e5d15944fbeee5a"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-medium/command.json",
+      "bytes": 2309,
+      "sha256": "020f7d8203e1972bc25875a8f8731703c7f359a1f8e094938dc31135b5f802c0"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-medium/report.json",
+      "bytes": 273509,
+      "sha256": "a84610b7ed79e27f6a1ae8b0490b454781a50d4877d2c0ab2fc86ab51d19fd8f"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-medium/start.json",
+      "bytes": 1323,
+      "sha256": "8b07b2ea685f5c2f28c6dfda9bcd9726d77f4a373382f5793682d2daee522924"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b01-medium/validation.json",
+      "bytes": 5452,
+      "sha256": "7c3be8bfa47d943fa007a6c23b8e5d663cd9d288593eb09043f9b34bbf049654"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-dense-sparse/command.json",
+      "bytes": 2351,
+      "sha256": "21e6b17fe0aba9d94281e820a65ef2858cc48cc7ff7611018a4b99076ce8ebd2"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-dense-sparse/report.json",
+      "bytes": 273830,
+      "sha256": "f6e45276b34b426aca63c9061c3c3bda13307faf20ebfbee6735fa8936bde754"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-dense-sparse/start.json",
+      "bytes": 1341,
+      "sha256": "2b4b339a67f3791182a887b7c74f93f353a6b0a0c6c85540eeaed0eb2c6a849f"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-dense-sparse/validation.json",
+      "bytes": 5491,
+      "sha256": "dbcf0ee6a8f6856cc78ffa949d36cf3c7f0baaeb3ca466b1d6a6ad4eed79692c"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-medium/command.json",
+      "bytes": 2309,
+      "sha256": "4f4d9e445cb20abdda3dd5c2971d56b9598af6ee7937415bd2e8371e13e35ace"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-medium/report.json",
+      "bytes": 273509,
+      "sha256": "a4de9f9e11d3607db0dd8a24841e2d5969b8d2acc3fdf3d0826fa86ed39eae96"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-medium/start.json",
+      "bytes": 1323,
+      "sha256": "61b952a8b84113ce2ded01c36315c5a099b8e978fdda6184af5b536813d6b76b"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b02-medium/validation.json",
+      "bytes": 5452,
+      "sha256": "38aafe6aba97312e131d4b5219bd738bbede6e181f11820ac147632dc2ff4740"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-dense-sparse/command.json",
+      "bytes": 2351,
+      "sha256": "2828ff5e7d372572b01aabe8f5b92d9a7cbb2169a0f2a46e6938da79bb8b2949"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-dense-sparse/report.json",
+      "bytes": 273779,
+      "sha256": "0025f86a17f7fa3c6b3627c7f47fb3b9305f41abc3c98729640ce1f50fa3d4ad"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-dense-sparse/start.json",
+      "bytes": 1341,
+      "sha256": "41b58574847a900d808fd9889a300e84df463ec3d3b292663c3f7a9f0fec8271"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-dense-sparse/validation.json",
+      "bytes": 5490,
+      "sha256": "15a64ee3aea7ab0595666ecf01fdb7629b04605925314466914062c0ed2a2033"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-medium/command.json",
+      "bytes": 2309,
+      "sha256": "05d438e91ce5343196dc9a941ec1be453ea49b6634b1eca3f2b8a95807a128a9"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-medium/report.json",
+      "bytes": 273503,
+      "sha256": "8c9036ae4bb84ed7badfcd622fe1b21509ebbecc1d96cf9e21376ca983d64f42"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-medium/start.json",
+      "bytes": 1323,
+      "sha256": "21c5a8d3f91a99fc219e4a765f0187c9dc74d995f6402d82a7b8744f1d8f9b20"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b03-medium/validation.json",
+      "bytes": 5451,
+      "sha256": "e537ec5133a72c9d46f5ac67d1da04d4a644c206024695c413640b35af70323b"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-dense-sparse/command.json",
+      "bytes": 2351,
+      "sha256": "f2d5e49325dcdf80a7cfd1fca97958fa7ea13af4469d5ebe11b57db9820ce793"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-dense-sparse/report.json",
+      "bytes": 273799,
+      "sha256": "82d976a96df91e432e11e442c484764d3bbeea3a3f90a37f975ba6641633040c"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-dense-sparse/start.json",
+      "bytes": 1341,
+      "sha256": "d465a2311778de8ada9b66795ddf01185d27b4ce2ffe2069bf84e34501930701"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-dense-sparse/validation.json",
+      "bytes": 5492,
+      "sha256": "2873608a1b96ca414d28dd85bd03ec0091c943909bf8ff2d8e985788a6cbea9d"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-medium/command.json",
+      "bytes": 2309,
+      "sha256": "6972661a8fdad645a85fb9731697358d8067d09de1f704e991be6342910d87bf"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-medium/report.json",
+      "bytes": 273510,
+      "sha256": "1c752759c805b05a4375c0314ad3da1cc56c80811ac0b5f1ba0f9299b6108e35"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-medium/start.json",
+      "bytes": 1323,
+      "sha256": "c61d9341854ba9c85c5b969a752e2dcaa762dba58f5d1c4ed83774e6167f46f2"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b04-medium/validation.json",
+      "bytes": 5450,
+      "sha256": "d1eca35d055e53d0dae64f67d5e13ef6c4377af9b9095cc9560d301b8b090682"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-dense-sparse/command.json",
+      "bytes": 2351,
+      "sha256": "f1a9a8c9273a1233b81a0c4a6fcf79545208f50afe0962c604d53bc6c922dafe"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-dense-sparse/report.json",
+      "bytes": 273786,
+      "sha256": "26ec695d2dc28ec608f6deceafdc41a06810afda777178d9e9db5aebe6c772d6"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-dense-sparse/start.json",
+      "bytes": 1341,
+      "sha256": "fcdb924a622931d9728e2da4af7de7f61a2824f8af296bf16af794fea10b9f8f"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-dense-sparse/validation.json",
+      "bytes": 5488,
+      "sha256": "20cf0bc82a04b0a55ff51755b0c034d170021138dd089745bc6d19b0b8baf00b"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-medium/command.json",
+      "bytes": 2309,
+      "sha256": "b2b720cde10e8b2558f705c800a0ef97a269550086a3ea1df991b4c8fe120879"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-medium/report.json",
+      "bytes": 273511,
+      "sha256": "bc91e9026a6c0af3cf4ee4a2253f2d3f8a200bc0f11db7d0113a29de763473e5"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-medium/start.json",
+      "bytes": 1323,
+      "sha256": "112d96d0f02116c24d5a647cac2c0758017cd378a04d1c3fe57fb1d203b4a75c"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/b05-medium/validation.json",
+      "bytes": 5451,
+      "sha256": "3809a1a6aebd3b7450524a8c0b787c641c4a639491abcce432da2b7b3c5e1d26"
+    },
+    {
+      "path": "docs/performance/results/change-0900/native/capture.json",
+      "bytes": 469,
+      "sha256": "6b7b578ff4239ad684a74eb2ad7bd38fb0122896e14b9acf8cdbd12f418a8fc9"
+    },
+    {
+      "path": "docs/performance/results/change-0900/plan.json",
+      "bytes": 52946,
+      "sha256": "98e13185119262783643981d85c915e937875b6ae54e6bd22b278282fa863ba0"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-dense-sparse/command.json",
+      "bytes": 2391,
+      "sha256": "f6b73953823b651a79579dfe620a0c318f72fcfe9a1021331767b160f3429dc3"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-dense-sparse/report.json",
+      "bytes": 120901,
+      "sha256": "f40a4b6a6c61f6c2f90187b3bf13b76a6cec4faff8d89b68099fa4991b2085b7"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-dense-sparse/start.json",
+      "bytes": 1353,
+      "sha256": "1f6cb829302aba79b3caa73694c205ce4dca7e1c742e5e133446bfef3731b711"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-dense-sparse/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-dense-sparse/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-dense-sparse/validation.json",
+      "bytes": 5494,
+      "sha256": "d154cf8616c6059f28193e05a46b33e20383decbca7ecf39cc2b5bd1d4df1390"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/command.json",
+      "bytes": 2346,
+      "sha256": "38d904b11f4cf8ca855ab1a63061188140bd100d1b28ce0364dad625c2d43b18"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/report.json",
+      "bytes": 120811,
+      "sha256": "221acadd86b8f055ee963f8b1cb51b46d28c345f420efac28779e8d58fc2af61"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/start.json",
+      "bytes": 1332,
+      "sha256": "d29a5ae70fb074378c963fd69894a5be63638b46fb636ab84f0a3d961d8609de"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/validation-failure.json",
+      "bytes": 68,
+      "sha256": "cc648f0ecf6ae6f21a9126866a38df61f77f9b6abc63eb12ce113bb7001ffd12"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/b00-medium/validation.json",
+      "bytes": 5461,
+      "sha256": "72ead358d33c2047528b3f012d75fdb5e9f72299c7147919d6a670fa84f8a4db"
+    },
+    {
+      "path": "docs/performance/results/change-0900/qualification/capture.json",
+      "bytes": 466,
+      "sha256": "7ea907ccbe0182925253516ddccaf0d66fc786a551ec1995dc03607d989088e9"
+    },
+    {
+      "path": "docs/performance/results/change-0900/replay-cleanup.json",
+      "bytes": 348,
+      "sha256": "64fbe0b299326fdbfdb3758422a3199ab7cb4ffb8cfb2dddc20c0212f6c925c1"
+    },
+    {
+      "path": "docs/performance/results/change-0900/review-final.json",
+      "bytes": 65561,
+      "sha256": "20d4a0a54e532d65b4da6ebe9a73dc3b05bd09882c2b080a349d49b68d67d22b"
+    },
+    {
+      "path": "docs/performance/results/change-0900/review.json",
+      "bytes": 65040,
+      "sha256": "2cce5471d2b8b84b72f264b26adf13e78b37a9716f84cea68eff031b8a096fe2"
+    },
+    {
+      "path": "docs/performance/results/change-0900/run.py",
+      "bytes": 7250,
+      "sha256": "65f242480eda135d5ad59478e57738560633a87a1fe392f420167c228b941608"
+    },
+    {
+      "path": "docs/performance/results/change-0900/run_v2.py",
+      "bytes": 7998,
+      "sha256": "4d79556f7296e59fdba374045bef1085e60cb206cb5be44b766de81760c7479d"
+    },
+    {
+      "path": "docs/performance/results/change-0900/scope-clarification.json",
+      "bytes": 1003,
+      "sha256": "a9caed12a31464d8a7ed19e7461908eec4fc97cbee5317d9c462c4e6c39ff94a"
+    },
+    {
+      "path": "docs/performance/results/change-0900/source-scope.md",
+      "bytes": 8263,
+      "sha256": "30666fa163b9519326ae98a6defcd6febec6a33091168dffb7b1c35c149bbaeb"
+    },
+    {
+      "path": "docs/performance/0900-xlsx-edit-save-phase-refresh.md",
+      "bytes": 8314,
+      "sha256": "fc083ee99f27e412c8a2acd98611782353bdc49aeacfec206e71766d147a0b8d"
+    },
+    {
+      "path": "docs/performance/BASELINE.md",
+      "bytes": 473033,
+      "sha256": "707b7cdfad6945d60e65322255bf4ce5a69bfc4bf8737367912389a3c713e239"
+    },
+    {
+      "path": "docs/performance/HOTSPOTS.md",
+      "bytes": 775300,
+      "sha256": "b472fd93054a0fce0a47f10e9e6155db0cf432ced62781eb39d4f3b75a043509"
+    },
+    {
+      "path": "docs/performance/REPORT.md",
+      "bytes": 788080,
+      "sha256": "fef15bce82d98d5d6b79806044b38284a2e8df0595756734d98a6795674bd93a"
+    },
+    {
+      "path": "docs/performance/GOAL_AUDIT.md",
+      "bytes": 461048,
+      "sha256": "3f62ed62551ec25a393780881a7be51d5997c721e38d3d7b951abf2d67f93154"
+    }
+  ]
+}

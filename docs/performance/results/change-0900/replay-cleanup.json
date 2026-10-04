@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "byte_identical": true,
+  "analysis_sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a",
+  "removed_directory": "/tmp/litchi-0900-replay-9wf049i9",
+  "removed_bytes": 92879,
+  "worktrees_created": 0,
+  "build_roots_created": 0,
+  "source_check_replayed": true,
+  "temporary_directory_absent": true
+}

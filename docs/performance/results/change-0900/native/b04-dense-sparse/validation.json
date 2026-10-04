@@ -1,0 +1,186 @@
+{
+  "constants": {
+    "budget_objects_used_after_handles_drop": 0,
+    "budget_used_after_handles_drop": 0,
+    "budget_used_after_package_drop": 0,
+    "cache_allocation_bypasses": 0,
+    "cache_budget_managed": false,
+    "cache_budget_memory_limit": null,
+    "cache_budget_memory_used": 0,
+    "cache_budget_reservation_failures": 0,
+    "cache_budget_reserved_bytes": 0,
+    "cache_bypasses": 0,
+    "cache_cold_loads": 6,
+    "cache_evictions": 0,
+    "cache_failed_loads": 0,
+    "cache_hits": 0,
+    "cache_in_flight_loads": 0,
+    "cache_mode": "unmanaged-control",
+    "cache_oversized_bypasses": 0,
+    "cache_retained_bytes": 509460,
+    "cache_retained_entries": 6,
+    "cache_successful_loads": 6,
+    "cache_waiter_joins": 0,
+    "implementation": "source-backed",
+    "output_budget_refusal": {
+      "accepted_output_bytes": 0,
+      "first_output_request_bytes": 0,
+      "one_under_output_limit": 0,
+      "output_bytes_used": 0,
+      "source_identity_preserved": false,
+      "source_read_bytes": 0,
+      "source_read_calls": 0,
+      "successful_output_ceiling": 0,
+      "typed_output_resource_refusal": false,
+      "zero_output_verified": false
+    },
+    "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+    "payload_materializations": 6,
+    "payload_memory_limit": null,
+    "post_publication_budget": {
+      "cache_reserved_objects": null,
+      "catalog_reserved_objects": null,
+      "input_bytes_limit": null,
+      "input_bytes_used": 0,
+      "objects_limit": null,
+      "objects_used": 0,
+      "output_bytes_limit": null,
+      "output_bytes_used": 0,
+      "work_limit": null,
+      "work_used": 0
+    },
+    "pre_publication_budget": {
+      "cache_reserved_objects": 0,
+      "catalog_reserved_objects": 0,
+      "input_bytes_limit": null,
+      "input_bytes_used": 0,
+      "objects_limit": null,
+      "objects_used": 0,
+      "output_bytes_limit": null,
+      "output_bytes_used": 0,
+      "work_limit": null,
+      "work_used": 0
+    },
+    "publication_planning_memory_headroom": null,
+    "selected_worksheet_count": 4,
+    "selected_worksheet_read_bytes": 52580,
+    "selected_worksheet_read_calls": 4,
+    "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+    "source_read_bytes": 4258604,
+    "source_read_calls": 183,
+    "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+    "unselected_worksheet_read_bytes": 0,
+    "unselected_worksheet_read_calls": 0,
+    "untouched_member_count": 12,
+    "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+    "update_count": 178,
+    "workbook_read_bytes": 226,
+    "workbook_read_calls": 1
+  },
+  "corpus": {
+    "archive_bytes": 4251863,
+    "archive_member_count": 17,
+    "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+    "compression": "deflate",
+    "entry_bytes": 4,
+    "entry_count": 17792,
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "name": "xlsx-cell-values-dense-sparse",
+    "package_format": "XLSX/OPC/ZIP",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "shape": "dense-sparse",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "uncompressed_payload_bytes": 4265472,
+    "xlsx": {
+      "columns_per_sheet": 128,
+      "one_percent_update_count": 178,
+      "rows_per_sheet": 128,
+      "sheet_count": 4,
+      "source_members": {
+        "shared_strings": null,
+        "styles": "xl/styles.xml",
+        "workbook": "xl/workbook.xml",
+        "worksheets": [
+          "xl/worksheets/sheet1.xml",
+          "xl/worksheets/sheet2.xml",
+          "xl/worksheets/sheet3.xml",
+          "xl/worksheets/sheet4.xml"
+        ]
+      }
+    }
+  },
+  "lane": "native",
+  "phase_shares": {
+    "commit_ns": 0.2048614931999711,
+    "open_ns": 0.0031857379112168187,
+    "plan_ns": 0.32526560476121485,
+    "publication_ns": 0.46668716412759725
+  },
+  "phases": {
+    "commit_ns": {
+      "max": 6951565,
+      "mean": 6766717.03,
+      "min": 6647595,
+      "p50": 6758563,
+      "p95": 6874814,
+      "p99": 6908764
+    },
+    "open_ns": {
+      "max": 130190,
+      "mean": 105227.13,
+      "min": 90141,
+      "p50": 103840,
+      "p95": 119721,
+      "p99": 129831
+    },
+    "plan_ns": {
+      "max": 10865716,
+      "mean": 10743748.24,
+      "min": 10635976,
+      "p50": 10746424,
+      "p95": 10833703,
+      "p99": 10859863
+    },
+    "publication_ns": {
+      "max": 15667157,
+      "mean": 15415000.31,
+      "min": 15259260,
+      "p50": 15405505,
+      "p95": 15565696,
+      "p99": 15656052
+    },
+    "reopen_ns": {
+      "max": 30164568,
+      "mean": 29046845.03,
+      "min": 28238899,
+      "p50": 28952152,
+      "p95": 29798027,
+      "p99": 30108498
+    }
+  },
+  "samples": 100,
+  "shape": "dense-sparse",
+  "sink": {
+    "accepted_bytes": 4252436,
+    "largest_write": 65536,
+    "write_calls": 143,
+    "write_size_buckets": {
+      "bytes_0": 0,
+      "bytes_16385_to_65536": 65,
+      "bytes_1_to_512": 75,
+      "bytes_4097_to_16384": 0,
+      "bytes_513_to_4096": 3,
+      "bytes_over_65536": 0
+    }
+  },
+  "total": {
+    "max": 33481154,
+    "mean": 33030692.71,
+    "min": 32684571,
+    "p50": 33034832,
+    "p95": 33241794,
+    "p99": 33430115
+  }
+}
