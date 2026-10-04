@@ -1,0 +1,3239 @@
+{
+  "baseline_source_files_verified": 10771,
+  "bindings": [
+    {
+      "bytes": 8282,
+      "path": "docs/performance/0902-xlsx-upfront-stopped-audit-candidate.md",
+      "sha256": "d0c78b52a125615bb9315a29672788e241067c51fdb3f407be5614e16e441824"
+    },
+    {
+      "bytes": 474586,
+      "path": "docs/performance/BASELINE.md",
+      "sha256": "1cf1f821b636e12a5ad8ea92e334da9016a1a30bd696ad567f21ef1d936727a5"
+    },
+    {
+      "bytes": 462601,
+      "path": "docs/performance/GOAL_AUDIT.md",
+      "sha256": "5ec973c2d68c6aff0d5a634c5931b344230beb568b21aa656c3955fb7df12823"
+    },
+    {
+      "bytes": 776853,
+      "path": "docs/performance/HOTSPOTS.md",
+      "sha256": "020787c967f80aa7a1bfb1fc0646afed4bd06420c574ee1cbcacc049cd03ba60"
+    },
+    {
+      "bytes": 789633,
+      "path": "docs/performance/REPORT.md",
+      "sha256": "b491df72b04ae6e707b1f6908347d0295cee745e0cbb57651466d73567622189"
+    },
+    {
+      "bytes": 3090,
+      "path": "docs/performance/results/change-0902/METHOD.md",
+      "sha256": "58d8d45c8b1053d92261b94d506260f5d7797ad5ebde82c1a761150d70da032f"
+    },
+    {
+      "bytes": 7142,
+      "path": "docs/performance/results/change-0902/README.md",
+      "sha256": "3d02d2f5ebe66ac64d19e9e0d7b685a69014b2fca42fd6f7d4f8d7144d0ec56b"
+    },
+    {
+      "bytes": 4114,
+      "path": "docs/performance/results/change-0902/RESULT.md",
+      "sha256": "8bf7ee35abbb92cfbfe52eeedb38f3bde361729672007514b20b42f6f4ece8eb"
+    },
+    {
+      "bytes": 2339,
+      "path": "docs/performance/results/change-0902/adr-review.md",
+      "sha256": "cffcb02efa5d7c3c0679f51b610688dafd8430d4825f64bdcc2415432bfb6f2c"
+    },
+    {
+      "bytes": 2892,
+      "path": "docs/performance/results/change-0902/allocator-capture-run.json",
+      "sha256": "b77eb3faa3716181ff2b5f5a1c2d2aac31191ba5711db145168679573a1033fb"
+    },
+    {
+      "bytes": 1807,
+      "path": "docs/performance/results/change-0902/allocator-capture-start.json",
+      "sha256": "3d9648db3a24611e57be98a0feaa5414fd83f8812539ddd31b74f80af701b69b"
+    },
+    {
+      "bytes": 43,
+      "path": "docs/performance/results/change-0902/allocator-capture.log",
+      "sha256": "b0fe9d1ef5d25d6c1e614e75453a8c7fd7b0b0bfd45e60c101e7241aa651996d"
+    },
+    {
+      "bytes": 112692,
+      "path": "docs/performance/results/change-0902/allocator/capture.json",
+      "sha256": "eca6ea0197f27e6414f6960f5e79c0f41541185bf99d7044ab4b49105782ad6e"
+    },
+    {
+      "bytes": 5638,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "f393a8be21f891c5ccbc8834ea453174cc9318fd2ff875130f84a1bf06931548"
+    },
+    {
+      "bytes": 5830,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "4dc72e48f11415e32503f2086cbf4984f0a03df4d0973b1a6584e19477c596d3"
+    },
+    {
+      "bytes": 15565,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "0317abcd33e36cf2a5a3f227170cd3e9f435f3821aae1e574bc27660efd1810b"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "ec7a097b66e507196860f47d32190c5ac9a96a6d1155bef2cb68773335f1f6fc"
+    },
+    {
+      "bytes": 3019,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "068d0445b264742811eefc54d6a965623a0bb971668b49243e1f0c1c55c5d768"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5682,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "ad8007c45512f0eb65ee93a68485cdb6f83bca84f1a6eaddeffe37fa7fd583c2"
+    },
+    {
+      "bytes": 5851,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "768df121a6088f93de1fa81a24dd2765311666136270f01757bfececfc42c76f"
+    },
+    {
+      "bytes": 34014,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "934569fd513bd14a1c36aa278e498dd56c876694899f4595ec8435728f7e3680"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "dc41084a5df320067be2d38559822b84d32e3defbf085d4622a93c9c8ed8e6aa"
+    },
+    {
+      "bytes": 3065,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "71000a0415d83f45ea7b5f841dbcbf7cd57b1b6341991abe09419139b0d832f4"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5711,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "ef13681c6efd6f1ced1475c10888440c2ebd23f4b622304a84d03077a501c13e"
+    },
+    {
+      "bytes": 5866,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "036e75994f3aad1e38581b4e263aba71c0d8711151192856eeb4f34423501042"
+    },
+    {
+      "bytes": 34147,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "db60af7b7b1f780c29d1d4c6db11005922be18500bbc6b82f59b3304f41f278c"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "86dc5052dbbf42901f8034dd27ac23b714c9094621363117114444d8e60ca912"
+    },
+    {
+      "bytes": 3093,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "83d310adaf53bdfc9427882d1fd36c803fb20011503284298ff8eb7deb61ad53"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5646,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/command.json",
+      "sha256": "be02c94466b44c40793506c4b7815c153047d85d3168e0ee8a14985734322c83"
+    },
+    {
+      "bytes": 5807,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/receipt.json",
+      "sha256": "9b70a537c699b0706f137322f94347f216653f7db3c2cae077d455a1c2842e58"
+    },
+    {
+      "bytes": 34115,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/report.json",
+      "sha256": "0cfaac02a52a0f7d96fef2511acfe123f59bf8f3cc88111112dce938d06683e6"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/resource.json",
+      "sha256": "8f563a7584af3e31b326bac66f4ee1e3be8face980f69e2c28d814c2488bf1b8"
+    },
+    {
+      "bytes": 3057,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/start.json",
+      "sha256": "dcc2a057e04dbffaf9a9dd81cb343c7dbab5854a0da1cced30c6ada23e3b65ce"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5648,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "5459a2354db05bf3eca78be9d73ba81b1242799e220dd703cf36dcedab41df70"
+    },
+    {
+      "bytes": 5841,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "76925bdb7b551d37fc76bfe4e6695819354759d78dba19ad382d0dd2ba80e466"
+    },
+    {
+      "bytes": 15563,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "10063d7bee19ef23922dfdd817e234f3d4fe3da9b114833cacb94327b531a3c4"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "9f98e028967f2fe395a09d5af800c2feadfc08d42061d27a98665dd16a8e4915"
+    },
+    {
+      "bytes": 3024,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "cd976e2affa60042d1d6a183ef224261ddf2b0b4659b90a220e0a03ef126ef51"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5694,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "d36002d500bc41c9f1dd0a93a9d6f20ff713323fe44228444373336b91cd7e46"
+    },
+    {
+      "bytes": 5864,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "cad167f296ff09f56268dc0a18685566d070aaffec15750f67bb86e83e8edeb0"
+    },
+    {
+      "bytes": 34018,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "2c7b2185cce972327c06ebb1579c8fbffeadde70ce5099c5ddbe0f1cad6a7c13"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "95ff510658a3648962eb78d3f4a0b3076dcd75762ffc2b81da554a574c370ddb"
+    },
+    {
+      "bytes": 3070,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "2225859095b8ee394ae2119e2d081e21fae9892a55ad471b00064e19f733718e"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5722,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "e3320bce7041baacff26aaee6a8ea1d3711fa76b102e4ceec0ecddfa26d02a3c"
+    },
+    {
+      "bytes": 5878,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "f6432cd5c6f3144ecf5969c7d74be6b816f6c320e6028085565577a4cfc2f6bf"
+    },
+    {
+      "bytes": 34156,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "1593f1a1af4c56b485576dfba5db4ee327ea1012841a7b6ec680b8ca49780d76"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "1214ba150d3e73b08265b64554c8a85787f54cbad692c6bf91bcacaf083906dc"
+    },
+    {
+      "bytes": 3098,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "a5b47a4a30ad97875e0c8e3230ffe4f26ba2aba17e8543ba10966551edf0fa50"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5656,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/command.json",
+      "sha256": "837a7e42d9870b704d6b770ef7c9d4c70a0da4db882cdfe067bd85f1a46bfa62"
+    },
+    {
+      "bytes": 5818,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/receipt.json",
+      "sha256": "679d4075d205ab274cddfda7cc6f427c5525214b8818049babd7b5f7f78f0c36"
+    },
+    {
+      "bytes": 34115,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/report.json",
+      "sha256": "30b5a8b6db49d8b26583898be937c6c84fbba60ebe3174220db519e6652c4eda"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/resource.json",
+      "sha256": "98e8208270f8f64f871d18931051521d27b64922b680730f01671640d3cf4fbf"
+    },
+    {
+      "bytes": 3062,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/start.json",
+      "sha256": "0359396a848d2be2ffd6bedc730fb0891802e57b340f6fc2184a4b1af3003ffd"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5639,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "f6080ce73335388e43440d27429f967fd1bc70e373148009da13473b8249eb31"
+    },
+    {
+      "bytes": 5831,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "7b14712a494e001b2f3caf38973ca3540bc65e57d3603acb0c89e8cfb66a0b04"
+    },
+    {
+      "bytes": 15564,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "5d9daceab2668eb70c7d43790526233cd455ef1426c0a4a9eaf9709d21ef0d4f"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "139f067b90f02d8b83e5a2f6ef24082e8b004019113d1849d479209f14e828a6"
+    },
+    {
+      "bytes": 3019,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "6a7dea22730268a8c5a026b718e07b7fdea89ccfd6d6c128cf631ae98cd73520"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5684,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "b47e29c3e3c91adeb516ca11d6ac709272da62b4b41f7d31a9e712da12dbde68"
+    },
+    {
+      "bytes": 5853,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "fcff771175b27bc4e838e859d4ab91beade516b5167741115988cd323e38cdc2"
+    },
+    {
+      "bytes": 34009,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "0522c3404f78c027a9158a9e6c2364a08b3d524a38d8d870dfe24f302042c28f"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "aee2e537b4612d2361cb5c27c97b98f59489faecf544fcc8f6403b45928bc4c7"
+    },
+    {
+      "bytes": 3065,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "83ca12242c9f7d5cb401cb4172a4746b37c5b0925348a7db6ae5d0f3f1d65aba"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5712,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "6eea922e18e1bd123e92c489b93dc1dd7481dc27a6a952f77638dfb895581236"
+    },
+    {
+      "bytes": 5867,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "1d1a7cb958537214e7377c48e49d383b0fbc9df20e235e844f6e049e18911fa5"
+    },
+    {
+      "bytes": 34153,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "0b8ab73b980e2729e3022b3783935736e9489f7780a9c94b80e41365d9c10da0"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "d7fd987505849bcdcdb7b29282bc8e45fd9205f48086b55d54d648b5595793e4"
+    },
+    {
+      "bytes": 3093,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "352979990a3733520ce913208e158d5bec53f23a06d891993fa4037cb682a8db"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5645,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/command.json",
+      "sha256": "f4549890c638a52bf7a8cd8cfd55c3fb108ba25775e43b4c42d93bf03e6c8ea2"
+    },
+    {
+      "bytes": 5806,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/receipt.json",
+      "sha256": "b4acf54515bb13227008a0660dca036a793e5144a15b61e9e703341f5aa25d31"
+    },
+    {
+      "bytes": 34113,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/report.json",
+      "sha256": "57fe563d261868ffee2d2d8fb773de2c92355ffd1111c35b40e671dc26a1914b"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/resource.json",
+      "sha256": "de201137197dbb2cbab78defc26ab88f471317f627ceb566a5a0505d92117b3d"
+    },
+    {
+      "bytes": 3057,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/start.json",
+      "sha256": "9c32570707d74993d530daeef1d48136a9f0efdcdc3ffe55e2a3d57bade0f37d"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5649,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "bee90e7adc89d9386bc845535bf66a044eb66d1640fea280bd87a31913ad03c6"
+    },
+    {
+      "bytes": 5842,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "d79218b0654f82c3bbf392b73221be49a1e31943e8b9a863f68ced4dd4db894e"
+    },
+    {
+      "bytes": 15566,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "86b63463c25fa2eee4f6298ab6a99f106cd5c0918f68188090a25213726897f7"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "51a2872c4d9a93f614a4ae96a374b58baf99e6c976c139965a08569f4dc881a2"
+    },
+    {
+      "bytes": 3024,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "1bf8070d38fd82bbfadf5106910d91dc573a1b322c15d7abf50635ec9d17d87c"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5694,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "6f5fa7e8589eab28182dc1cf64e60310ece91df761d8109ccbeef0d9e5523b1d"
+    },
+    {
+      "bytes": 5864,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "8265b7870bd7d25b6c9ea5a9829dd66fd5416360f8dcfa14811cbd6545dc2767"
+    },
+    {
+      "bytes": 34021,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "85c613868e1c25da2b394206a88def6a184021f998cfa953d02f0ae3436e3e89"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "0f7a4c40ac9fafc2b118963b1aa22d1e28bacf153eaca9e167afbbdb2c9d512c"
+    },
+    {
+      "bytes": 3070,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "605d7b0b356b071c2643cbd2a431017c6c9f4b66ae947fc18cababe580392574"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5722,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "d5f61ee7997b3173ee1ee8be99584655728e4856c6b0f5a3c60a50ead3434c4c"
+    },
+    {
+      "bytes": 5878,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "1314967953c56c846f86115039379811a5fedd07a0e8c38e22ba19f0befa3244"
+    },
+    {
+      "bytes": 34154,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "1df04cc15ab42fa995eace247101253d31753051bd9d5b550ae3bf86647f424d"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "d695f70bc227a5535f82c1f38d266518c2023ac1abb3991765d78ef60c759733"
+    },
+    {
+      "bytes": 3098,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "18c4fc51acd11791413222a087c7d85c1d4d17def6edb821cf900062731b1633"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5656,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/command.json",
+      "sha256": "d9ed8810d1afcd8bf743ffb56266f0df54ade4b13dee940d018631ddb7c069ba"
+    },
+    {
+      "bytes": 5818,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/receipt.json",
+      "sha256": "60facc9d9e9d3ac8bacb3c56797252d971ecdcbf6b2693615d308659ae7025b8"
+    },
+    {
+      "bytes": 34116,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/report.json",
+      "sha256": "542503e99ea39fce6dc8134b03198411b68aeba23000e8379cfd5bf4e42b7db2"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/resource.json",
+      "sha256": "1c94e7f5e549746e2822516f9a074ae4a3acc8433d157a25e8e882f05e1d6b3d"
+    },
+    {
+      "bytes": 3062,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/start.json",
+      "sha256": "358aa79d27de9425c779a96fd16fa7acab6bc161e98f8206d2f5a5662b31fbca"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4285256,
+      "path": "docs/performance/results/change-0902/analysis.json",
+      "sha256": "9ab725ba8790245fe9f7cca0adaf1f21d458c0e715f9aceed17ea1cac52e14bc"
+    },
+    {
+      "bytes": 55083,
+      "path": "docs/performance/results/change-0902/analyze.py",
+      "sha256": "d035220b5a3ae5a85c06eaa213d0fe5549002d068334c94d4cf0e770aadf24c5"
+    },
+    {
+      "bytes": 55094,
+      "path": "docs/performance/results/change-0902/analyze_v2.py",
+      "sha256": "157ab8b51fc10b2a7c1dd1448dc9dad3b03e9676d240babf25c99d1ced1e742e"
+    },
+    {
+      "bytes": 55464,
+      "path": "docs/performance/results/change-0902/analyze_v3.py",
+      "sha256": "4d96e5ac9031a60c6a5b7024cf8aaefd05bd12280760b9f3a1cf6d01bd72829b"
+    },
+    {
+      "bytes": 2904,
+      "path": "docs/performance/results/change-0902/baseline-xml-tests-run.json",
+      "sha256": "6be919577a93b2e4385c7bae007263c9bc83a2eb7f128812bc0325594901343d"
+    },
+    {
+      "bytes": 1815,
+      "path": "docs/performance/results/change-0902/baseline-xml-tests-start.json",
+      "sha256": "b2a77a6df8ea4504ae7e01370bd8026855639d8527a741f10ed5af3554a1faac"
+    },
+    {
+      "bytes": 13049,
+      "path": "docs/performance/results/change-0902/baseline-xml-tests.log",
+      "sha256": "51062e1e945da56bc6ea1cd4c48c62ca2e8a594a1eb6d7076ab47c65cb409117"
+    },
+    {
+      "bytes": 267458480,
+      "path": "docs/performance/results/change-0902/binaries/candidate-allocator",
+      "sha256": "2a595b43210c477bb3ff048b2094a28db9e4e0ed89afc6869ca5175ac9056056"
+    },
+    {
+      "bytes": 264421768,
+      "path": "docs/performance/results/change-0902/binaries/candidate-native",
+      "sha256": "3f7f22a43238cab9698139eacc1e3617a8448fbaebbd8f331c0fe24c161a4e2a"
+    },
+    {
+      "bytes": 326,
+      "path": "docs/performance/results/change-0902/candidate-allocator-binary.json",
+      "sha256": "84bb2bc96b4c8edd177ddb64a596bb4ebe0a8c8b2038b2b52756ec069b96699f"
+    },
+    {
+      "bytes": 3027,
+      "path": "docs/performance/results/change-0902/candidate-allocator-build-run.json",
+      "sha256": "596eabdece453d0d1991a71182d71a78556220ab80299f9d79267250f9824549"
+    },
+    {
+      "bytes": 1933,
+      "path": "docs/performance/results/change-0902/candidate-allocator-build-start.json",
+      "sha256": "eacdb9ee76f1a0f77b54d7a80ca3c6074cbccbf7e8c17ac521f70ccae2e2e3ef"
+    },
+    {
+      "bytes": 159,
+      "path": "docs/performance/results/change-0902/candidate-allocator-build.log",
+      "sha256": "28724116f251c75bd39bb2e379b58c7e9deb45ef4eb0745b133d33bc3d0a36a9"
+    },
+    {
+      "bytes": 264596,
+      "path": "docs/performance/results/change-0902/candidate-allocator.d",
+      "sha256": "1487f037418b5e2884626c53c92fb451101be81f44ac713db2d37547332db918"
+    },
+    {
+      "bytes": 2864,
+      "path": "docs/performance/results/change-0902/candidate-boundaries-run.json",
+      "sha256": "a7894d64580d39d5b37eaeac964d319b23d855a8a8ac2685149f638a65e306f6"
+    },
+    {
+      "bytes": 1775,
+      "path": "docs/performance/results/change-0902/candidate-boundaries-start.json",
+      "sha256": "ffbf5783d4a2b8b973795275c66aec8a97997423dc4ed939938f34fc88c2a788"
+    },
+    {
+      "bytes": 565,
+      "path": "docs/performance/results/change-0902/candidate-boundaries.log",
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    {
+      "bytes": 3061,
+      "path": "docs/performance/results/change-0902/candidate-clippy-run.json",
+      "sha256": "e8559c6aa009eb85d22693a8e9b5b5f9bbf88f283609ce83631c089ea1ada7d0"
+    },
+    {
+      "bytes": 1975,
+      "path": "docs/performance/results/change-0902/candidate-clippy-start.json",
+      "sha256": "dc3800af32451e8c01567266af6360710f0a645892b0c01b95e8afffa5ac23ab"
+    },
+    {
+      "bytes": 4260,
+      "path": "docs/performance/results/change-0902/candidate-clippy.log",
+      "sha256": "cf67c22f09bc1b49776972ece427bfe3a79a2986bdbf73d7d652d2274a4f3fe7"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/candidate-doc-tests-run.json",
+      "sha256": "a40f95859a0f55f6221a52e0181dc27df92d51265be7f27fe2ab93398627c523"
+    },
+    {
+      "bytes": 1922,
+      "path": "docs/performance/results/change-0902/candidate-doc-tests-start.json",
+      "sha256": "d2e77b93e132fd1973e1d3d5ce6d3c03fffe6dce0b43faf1b233661e309183bc"
+    },
+    {
+      "bytes": 15835,
+      "path": "docs/performance/results/change-0902/candidate-doc-tests.log",
+      "sha256": "5cd6c692394887dd8cd7f4f1efd85cb957f038fd13ef8af00b8b61280abf6de8"
+    },
+    {
+      "bytes": 2911,
+      "path": "docs/performance/results/change-0902/candidate-final-xml-tests-run.json",
+      "sha256": "c6cd5bd12880183f4b3a3d60cbbe6af5e95cfbf698940e5ae062590b2c55996b"
+    },
+    {
+      "bytes": 1815,
+      "path": "docs/performance/results/change-0902/candidate-final-xml-tests-start.json",
+      "sha256": "64b01c952bf96e74986d3458a8693af78bf8077d3e04431cb2f5449492f76b8b"
+    },
+    {
+      "bytes": 13057,
+      "path": "docs/performance/results/change-0902/candidate-final-xml-tests.log",
+      "sha256": "529b7c68dc1d91933ddac420653f3e122529547831a83f8fe7a9660dc7ae7ec3"
+    },
+    {
+      "bytes": 2846,
+      "path": "docs/performance/results/change-0902/candidate-fmt-run.json",
+      "sha256": "babc02335798b9877574b708ec21202d182c436a51a4ff80b5defd8077814632"
+    },
+    {
+      "bytes": 1766,
+      "path": "docs/performance/results/change-0902/candidate-fmt-start.json",
+      "sha256": "22faa5df7d992a3fdfcdef21eca07bac89ab95dd9bba15cc85b03188998d27c1"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/candidate-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 320,
+      "path": "docs/performance/results/change-0902/candidate-native-binary.json",
+      "sha256": "a53844b76a447865cc89fbb9f014eea81ae3b63b587fee1e49aa5730e323294c"
+    },
+    {
+      "bytes": 2976,
+      "path": "docs/performance/results/change-0902/candidate-native-build-run.json",
+      "sha256": "5f1345a692739f1b30f6d1105852f60e66e40a501456698e94c3c3aaa1f49642"
+    },
+    {
+      "bytes": 1884,
+      "path": "docs/performance/results/change-0902/candidate-native-build-start.json",
+      "sha256": "6953b384c0ce595ba1c8cdc0a8a58154b13e3a2874fcf8b6d7bc6be35158bbd6"
+    },
+    {
+      "bytes": 7847,
+      "path": "docs/performance/results/change-0902/candidate-native-build.log",
+      "sha256": "706694a0dd2df03402f4d2cd4650a5aa59b4c38bcecb86677e53058209632eaf"
+    },
+    {
+      "bytes": 264485,
+      "path": "docs/performance/results/change-0902/candidate-native.d",
+      "sha256": "3e329cc67f0028ff99b2b493b961c70634065b0bec98a511f1388a15dc1021f7"
+    },
+    {
+      "bytes": 3001,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-run.json",
+      "sha256": "bc0f440dd38d830d96c864c1ef70fdce87bc4e0527d2183502cd20577b22dba6"
+    },
+    {
+      "bytes": 1907,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-start.json",
+      "sha256": "f8453b55fa3d3f4f866cb4ea9cc41ea3eb18fa8770fd367de266b9ccd6a8fc51"
+    },
+    {
+      "bytes": 3003,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-v2-run.json",
+      "sha256": "f53154fa5e3d7f55568477245ce806e96def19cb83e72e2a554bf19691f0e3fa"
+    },
+    {
+      "bytes": 1907,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-v2-start.json",
+      "sha256": "6032e557d6083bef07e3ca2d79ced95ae2bde96e0806a9d1fd455264d6eaa3eb"
+    },
+    {
+      "bytes": 660,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-v2.log",
+      "sha256": "944874865d71712f5eaa22a2394125b3e3625636553d0e0a1ed342c5c6b07e84"
+    },
+    {
+      "bytes": 3004,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-v3-run.json",
+      "sha256": "e1144d0e2c4a94b6aff1df9639c70bf00b0d9ee3b0fd67e32d9ed112e6b784c1"
+    },
+    {
+      "bytes": 1907,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-v3-start.json",
+      "sha256": "1350f8b9a67137a4cc172c9431422b2bcd13ad38d3c7c24493e82bf0e7e57269"
+    },
+    {
+      "bytes": 619246,
+      "path": "docs/performance/results/change-0902/candidate-office-tests-v3.log",
+      "sha256": "954d9dc9cc34ee79711c2421573e7b7412fa8d86482b0d67992da38e89a978d9"
+    },
+    {
+      "bytes": 5216,
+      "path": "docs/performance/results/change-0902/candidate-office-tests.log",
+      "sha256": "e7a7a18ddda57f14f7df5b1630318c3a7eb46f44b91d90d899267445a06122a5"
+    },
+    {
+      "bytes": 125062,
+      "path": "docs/performance/results/change-0902/candidate-overlay/crates/xml-minifier/src/audit.rs",
+      "sha256": "e1d73295becd05347dfa6c07910089f16e60b44a6eeb50d92938a3a50cb10fdb"
+    },
+    {
+      "bytes": 38959,
+      "path": "docs/performance/results/change-0902/candidate-overlay/crates/xml-minifier/tests/source_replacement.rs",
+      "sha256": "f7f05d3e2f733c1586c9402f79b29ba4087c8148b7afc88bc8a2c86c6e246d20"
+    },
+    {
+      "bytes": 6422,
+      "path": "docs/performance/results/change-0902/candidate-preformat.patch",
+      "sha256": "07b7772943debdc0daaab8ecfaa40a53c934c85a487986bbaa0088d9d1f3532f"
+    },
+    {
+      "bytes": 3055,
+      "path": "docs/performance/results/change-0902/candidate-rustdoc-run.json",
+      "sha256": "536f0695c664a02581f0d37ad19f236d06f2d6d2f4e740c764a8122c92b12223"
+    },
+    {
+      "bytes": 1968,
+      "path": "docs/performance/results/change-0902/candidate-rustdoc-start.json",
+      "sha256": "cf14b8e1e033d63540c5496d01c3c47b73348550a6e2c6f5d219130ebf26fbc1"
+    },
+    {
+      "bytes": 1423,
+      "path": "docs/performance/results/change-0902/candidate-rustdoc.log",
+      "sha256": "a28742a41432e1a13d51191d6f8e4a5dab34082ffa0c4dca1845159a415ae6b6"
+    },
+    {
+      "bytes": 3323129,
+      "path": "docs/performance/results/change-0902/candidate-source-v2.json",
+      "sha256": "ebcb1f10dd80d61e058fa81e4de0fd299c7be438a22391913c722f197776635b"
+    },
+    {
+      "bytes": 3323129,
+      "path": "docs/performance/results/change-0902/candidate-source.json",
+      "sha256": "bca42b4123c91b89c04be2a074572e08084b10e970c2f72233c005eae7afc6e5"
+    },
+    {
+      "bytes": 6408,
+      "path": "docs/performance/results/change-0902/candidate-v1.patch",
+      "sha256": "bcf7c6673399dfd805ddb1383c7c51ae7075b0816303092515e1bb281b5c36b5"
+    },
+    {
+      "bytes": 2905,
+      "path": "docs/performance/results/change-0902/candidate-xml-tests-run.json",
+      "sha256": "4a88b813510c138fad5cd3b935700651916721d6dc699dc41d34e3bb152ee64d"
+    },
+    {
+      "bytes": 1815,
+      "path": "docs/performance/results/change-0902/candidate-xml-tests-start.json",
+      "sha256": "b39ac3dfb028d84b01bb9feae4283ea683139539474bb06abccb03bb4677b1ed"
+    },
+    {
+      "bytes": 2908,
+      "path": "docs/performance/results/change-0902/candidate-xml-tests-v2-run.json",
+      "sha256": "312c87ac772aea5b513512f8002e5a1546c2a4939f1f481ff097b6d8fdab5d39"
+    },
+    {
+      "bytes": 1815,
+      "path": "docs/performance/results/change-0902/candidate-xml-tests-v2-start.json",
+      "sha256": "9079f983658c007202615b3a67a8a628a3b85c1f261e6f6059a09f1b69e4a84b"
+    },
+    {
+      "bytes": 13057,
+      "path": "docs/performance/results/change-0902/candidate-xml-tests-v2.log",
+      "sha256": "e63e77618028b30145cb4eb393775a6fd50ff5b0230722ff318df35dc7716961"
+    },
+    {
+      "bytes": 806,
+      "path": "docs/performance/results/change-0902/candidate-xml-tests.log",
+      "sha256": "548ef52ed05a9041222631846ffb1cf353143516f78b2bf3adcf3a3dab8a9c74"
+    },
+    {
+      "bytes": 6420,
+      "path": "docs/performance/results/change-0902/candidate.patch",
+      "sha256": "240a4f9ff4e63f75c700f5f954a07a54af8fd4bdddc883fc2d8a9ee7ce59003e"
+    },
+    {
+      "bytes": 1076,
+      "path": "docs/performance/results/change-0902/cleanup.json",
+      "sha256": "26d179e2dac312386013604e0519fba1bb3203a7043bceb5ff38d90fbb0a7993"
+    },
+    {
+      "bytes": 1717,
+      "path": "docs/performance/results/change-0902/cleanup.py",
+      "sha256": "fa26f7bcb10e17b45bd48d6baad00fa159b81cd24fcfc37df205497b275322ad"
+    },
+    {
+      "bytes": 2181,
+      "path": "docs/performance/results/change-0902/command.py",
+      "sha256": "5ba178aa879176b116954c6a3e23729319f62ce445f5c995aeb2420c4a4f581f"
+    },
+    {
+      "bytes": 1923,
+      "path": "docs/performance/results/change-0902/decision-and-restore.py",
+      "sha256": "d23053060ced6d35714cc859c66bea489dc8cece719c9767ae7b67f700b26a7a"
+    },
+    {
+      "bytes": 7208,
+      "path": "docs/performance/results/change-0902/decision.json",
+      "sha256": "8d79ae722b8576b1567ca6720007484d09031b0f9a432eaefae31e6ed17bc037"
+    },
+    {
+      "bytes": 347,
+      "path": "docs/performance/results/change-0902/empty-attempt-cleanup.json",
+      "sha256": "9819893435cc34964470a3e68ee86aa70116960104beebe0c591ded18753d959"
+    },
+    {
+      "bytes": 6592,
+      "path": "docs/performance/results/change-0902/environment.json",
+      "sha256": "7cb8803a2e655f0210863e15d0218893c731c0fd1e261b9728daa1d586191972"
+    },
+    {
+      "bytes": 2887,
+      "path": "docs/performance/results/change-0902/final-analysis-run.json",
+      "sha256": "acbe51570236188665ec1dee13d82ab3dc27f124353fb8483ac1cf2a59b19f44"
+    },
+    {
+      "bytes": 1805,
+      "path": "docs/performance/results/change-0902/final-analysis-start.json",
+      "sha256": "53180d282546e837ec83e4b543bc1d107e3de966721511c6e9acb4079e7fc046"
+    },
+    {
+      "bytes": 35,
+      "path": "docs/performance/results/change-0902/final-analysis.log",
+      "sha256": "d6caaca4808c95125afceb5389d0bf30cc9362d6a6bbd081ff1ed1cb35f81d14"
+    },
+    {
+      "bytes": 536,
+      "path": "docs/performance/results/change-0902/finish-capture.py",
+      "sha256": "86cb5c8b6731b6f018f3f8411d93500651ded02f9683e61af3242149f63a7b81"
+    },
+    {
+      "bytes": 1663,
+      "path": "docs/performance/results/change-0902/freeze-plan.py",
+      "sha256": "66b2b7b7cd69135c23ffdb4923510216d4498e8a68636883c12ade58ea83ca35"
+    },
+    {
+      "bytes": 6156,
+      "path": "docs/performance/results/change-0902/helper-review.md",
+      "sha256": "fede1d41a0d30d76f7149adae566f8e2865d01c24284d59bb4df6b9f6b666cf1"
+    },
+    {
+      "bytes": 796,
+      "path": "docs/performance/results/change-0902/helper-v2-amendment.json",
+      "sha256": "27f321baf5c75bdd70779058339d9d9705d8a5620065fd573307aa742e2a6166"
+    },
+    {
+      "bytes": 2458,
+      "path": "docs/performance/results/change-0902/helper-v2-review.md",
+      "sha256": "9a7e5e2510b25fbc8ba436b82c08681c09e28d5f34cef1c2c09a48c1e1584c5d"
+    },
+    {
+      "bytes": 533,
+      "path": "docs/performance/results/change-0902/helper-v3-amendment.json",
+      "sha256": "40c68a7d5e37d42080018dd101857d6cde54fe04c6f7f916c7e88e53b803b51a"
+    },
+    {
+      "bytes": 3140,
+      "path": "docs/performance/results/change-0902/helper-v3-review.md",
+      "sha256": "7859d9ba820fcd6ac98b7cad77f0971b214966cb69adce8c74b2ad9363e16842"
+    },
+    {
+      "bytes": 2886,
+      "path": "docs/performance/results/change-0902/native-capture-run.json",
+      "sha256": "1f8a9d9978cbc47d0a7da253c0bfd5462c8d6c86a0186a8146e681aa3d755650"
+    },
+    {
+      "bytes": 1804,
+      "path": "docs/performance/results/change-0902/native-capture-start.json",
+      "sha256": "85cb55f33c3283cf7647c55b0e041c4db204e0345f48cc6eac8f4d5e481727a7"
+    },
+    {
+      "bytes": 42,
+      "path": "docs/performance/results/change-0902/native-capture.log",
+      "sha256": "7227e09b5c51b1875cd79818b2e4000f66ebacfbedd7e59eed3ae04cbd8872e9"
+    },
+    {
+      "bytes": 5612,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "fe72371ea3ab83a43a30adcb5e1fd8787c195385deae62db7504685e90a7938d"
+    },
+    {
+      "bytes": 5801,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "2e846fc66e1947a3a5e181f569ad2b9473b3af461f4be31711fecd5a1c314944"
+    },
+    {
+      "bytes": 36675,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "32fb2c7e3f7ebabad4a882de1a4444fb8902fc2ebaab8d3cb6739bb45f655bbc"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "2ba2993dd1e081813f3044c367fbeb9b1dee6d70844eaef40bd2643a0a683e45"
+    },
+    {
+      "bytes": 3007,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "dd4051aaa880b6dfdd9ef17f9c33afa8004fadfabf79f572032e21942094be7d"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5657,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "fc42506a0590d8f4f281699f6548535a0c2d836cb789342139fd71c1063a7016"
+    },
+    {
+      "bytes": 5823,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "97782c835408310f422ed9f17f7b5ab6d77adff057db18bc2127bae814f3f328"
+    },
+    {
+      "bytes": 273480,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "c1815741d79dc9534f5174bc25671288acc11d4d60a38ce82d21ad2cc3e0aca5"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "88d0b3075b72bcdca4407c9d73d90f75909cb4bdbf50bb72335faf800fc03f1d"
+    },
+    {
+      "bytes": 3053,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "b3d273c31143ef93458e628e33c00cf5b607ddcf261205b17b2101afc872287e"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5685,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "16ab354e254959584e22b52f87b20e075c522af92790a1b0bcedd47c1d072f3d"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "b39659ce122bf4b24d4861d272f0ff1775f90564c0331ae8b460426515189b80"
+    },
+    {
+      "bytes": 273791,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "f321d4b2b5a72b3e68a82005ad010c8a6cb12bf1364352d9fca3adc524414817"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "9fdd4c6cbd9297d600d82972643c260ad8cf5640c0bf45f8eb82d472f07f1d7a"
+    },
+    {
+      "bytes": 3081,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "0a222740a60ca47bf7c7542d3cd8375c5eef40c2ab8d0f833c2edb4aac4a5ba7"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5619,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/command.json",
+      "sha256": "1f8737f21b18cd04e798b6c66ae3f6a8917a94756a0896865ab3d5a6b16d02ac"
+    },
+    {
+      "bytes": 5777,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/receipt.json",
+      "sha256": "b81034a6c10ebd42163ed68df8b64b9d0747996dcd8fcd3287558184e15a71ff"
+    },
+    {
+      "bytes": 273528,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/report.json",
+      "sha256": "249aef0650a57c010c5e12c7ee2137cd7bb95d1b1c7b7509802c2e3676892068"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/resource.json",
+      "sha256": "b8f9fe8177ebd209bf67e2f7dfd8c5deb8756dbe82fcc81c01dc14737e6215cd"
+    },
+    {
+      "bytes": 3045,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/start.json",
+      "sha256": "07996e3e5d17e612b84e44ac3a385a51c7c1d0a08de64a07e5eadfee5a221300"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5621,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "ef86801795906926648dbc087a2f2a7df59042828dc6d1f0d8b2e4a658094dd8"
+    },
+    {
+      "bytes": 5811,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "069333860ae6c7cbe7bbc8b12166952b2d7cfb88cbfb923cde5334fadb3ad479"
+    },
+    {
+      "bytes": 36677,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "f46f33e7388147f4ea2b2c41cac1161ccbdec8f193b9f3fb8b079167c3592808"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "45f5c7d7f0c08db35a4705c85a4098927d7105a81bf930a0b0735ff3fd778d5f"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "7ba9e98b9805ca1988728a574a558f1867b2f4337d607972b2105563c68239fb"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5667,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "c2101bc7f02402bdce054daba83fe922812d2866d9a0ddac2d81ca6d7565ecdc"
+    },
+    {
+      "bytes": 5834,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "8e17ff932122b9741dfc012c862208bbe7db82c2a787d62f839fdbeb343ef589"
+    },
+    {
+      "bytes": 273482,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "54f038233a6bd76bed514013214a9456c69e290b729c6f350d8ebcdac13a0f60"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "3ed6effd2b71ec11b94d05a3dbc8ec1bdc792ad2f2a1642f4c7f83c55de1ba7b"
+    },
+    {
+      "bytes": 3058,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "c74525829d1a29f6144bc076dc359d83ee7c2c8adf09cddac01624a4f5fa4015"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5695,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "791e8a2bbb9aea44250125aee27b1777dbb349f6b56426b0c9113bffa101ee6b"
+    },
+    {
+      "bytes": 5848,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "7b11cf6c7f7a82ecbdad079e48d79af7cc020e9b89551e5e751f9bd69492a319"
+    },
+    {
+      "bytes": 273780,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "718607be5a2ed2db61f76a2337db91d4782dd0e431ce26df6fb8058dbcd512fc"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "46915f7ced1ecb75df8016d352e63d2cf9d4f38488f8a73e4fa002ee1f5c824e"
+    },
+    {
+      "bytes": 3086,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "b09aa5970084e4b2b0bede6afd080967ae0dd0be1c4fcee8ff02694a2373337f"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5629,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/command.json",
+      "sha256": "c80d2d8f1b506c3c681dd56ec71a4f9d9be052201548c08937e7d76d8172d13a"
+    },
+    {
+      "bytes": 5788,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/receipt.json",
+      "sha256": "f62feaec98e20d2cfa2553fc0b33530d1c51e9ce57a389d89e206a8a8ab5e3c7"
+    },
+    {
+      "bytes": 273510,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/report.json",
+      "sha256": "c54118a6b4855a75da57cb1dd9ef170e7cd213ae3faeb3a5b1fb4a088b7c0249"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/resource.json",
+      "sha256": "fee64001097fbe952543544bf5981d62ddafdf9260a4ca7bbb19a5cd74112301"
+    },
+    {
+      "bytes": 3050,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/start.json",
+      "sha256": "4fdc6f11de97ae1f09e418768f1d89e254e1eff30cead4f882025a356540eed7"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5612,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "05eb42318cc860b9ec9f05db98ed9b156246dfd3889308ba98231ad537cea860"
+    },
+    {
+      "bytes": 5801,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "23428a7e40c8a5db8643cd85c3464ee3ebeedfa68c1c325d385c208b253c2ca5"
+    },
+    {
+      "bytes": 36673,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "4029703985cd62619f86caf6e2a8fa942d03f2445011e5721b174f5a9f1393b3"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "a269efbfdc3c59a1c6f27b7af6dd31b11a7aeab7b506f79734d3ad1586e4eaef"
+    },
+    {
+      "bytes": 3007,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "854db6d1ecff8b91efbcd271e1b53549c8e42a61076faeb56811c61dc6f7c988"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5657,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "56dc14b9a8ce8c639a562537ffc81e45b0c0c0bdb459b67590dd6479bc4dbcbb"
+    },
+    {
+      "bytes": 5823,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "ab0847f1ce2b41f1fae1b800a8b8f464e239918df2b3d52336996c21014a6e70"
+    },
+    {
+      "bytes": 273484,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "ef1bc85d982da3a9f76609be126abefe76d200de2a8fa2e8f2c60207f0111022"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "9510f13851118f588d034b9fbdac6a391f4e35b6c364652a32573d00bb356574"
+    },
+    {
+      "bytes": 3053,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "5f097e6dd2474f86036fc6cff11b21e5be367dd5c3f010236ecbb8b0f2dd7239"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5685,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "8abe4eb8e7ec14fdce163fad01c0e2b64bbb7b000599790f9327ded4f17c7b68"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "15f6c16bcfdb73a6f036d69bda64abe62ac75723a0929575b0f5f13d052ef4cc"
+    },
+    {
+      "bytes": 273851,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "4d70850559284c30ec2de031c4be838a33ad4a52468cce54e4c8c5ba2f066fa9"
+    },
+    {
+      "bytes": 88,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "d37e4b886008d2340a13f3a46d8de29548e5493d95ee7f42599c2cedf0c959e0"
+    },
+    {
+      "bytes": 3081,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "167a7f268fe331d8f0a679f0cb25b9da6e6d2f107291a694bd87d2dab1d6604b"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5619,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/command.json",
+      "sha256": "cb2838f2f7495cf0184fc30e15246312befa9ad1d2bb7c8d85105317c1130f38"
+    },
+    {
+      "bytes": 5777,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/receipt.json",
+      "sha256": "841c4944411e9da911a7c163f1daeb89b92f41545f35de24309388292fcdce44"
+    },
+    {
+      "bytes": 273510,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/report.json",
+      "sha256": "6082a090bb9f475786e92eb725b0b70f1e5e633cf54e15e58e2569b2d9ac0c6e"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/resource.json",
+      "sha256": "d32d993aea848eeff2cf07d0d0b442a3447d4243198ec668b9bbcb2bdd59f9ae"
+    },
+    {
+      "bytes": 3045,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/start.json",
+      "sha256": "a6e53a7c367189cdfe856ad86d9427c49abc0bf86b76e3a611e51645bfdb88ad"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5622,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "e17172739ba2cc92fdd61ac7a22217522e746cb4e91683a39b28057ebcd995cc"
+    },
+    {
+      "bytes": 5812,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "2bc5749a04ee3b63e7bb4b19cebabbb6f9af7878f3abc70cd96be3c37c8cc969"
+    },
+    {
+      "bytes": 36676,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "ea1d906d9a041ce0e2755e04244abec7d1fa0c1d337afd7fd6505852e00b2103"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "88a4d06b1b3f353f56711755a5c4367b5a69010ad6b123825a5286356c72bd0f"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "7b88672905bbce5e369fab84b1cbd72c73e3812a00cd2d61c8bed5247cb19be0"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5667,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "73f62d7b93c5d5e31917deab86775f9a4775fa46ea4f5f788bfc3cddcf2e2830"
+    },
+    {
+      "bytes": 5834,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "bbf10f83fe9ab9e0781672f38e13a98cd3503f671f566684cf000f6d50825ce1"
+    },
+    {
+      "bytes": 273481,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "311e2c1a5a766d31bcf802f7dda43ae6e084dd5659d044d12cf87c35f4b69577"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "688ee25a5b002df6f17f5e2abf93d9f73c4ffedc46ad7654dac0849968481b7a"
+    },
+    {
+      "bytes": 3058,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "ca74bd8018d8448f35e3e373ead45fce9e4e2f6a7dd8dbf28e6d95351b89235a"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5694,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "c82695393ea477b72c4cd95b62cfdaa4954388af3a4bc6eb8de07d5c661fd0c5"
+    },
+    {
+      "bytes": 5847,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "5bf54eb3600cfb68e3531d783ca9fcee68bfdc26d0d6c636b47c7c0a90a7543f"
+    },
+    {
+      "bytes": 273831,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "2291cbc195dfa53da8b87bb1504dbca5f488fd0d94d526757c655731cc9acb64"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "7b553c56dbd57109998dd7ac38bd9809eea371d8529c474d7322f2f921e56883"
+    },
+    {
+      "bytes": 3086,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "23e7c84c858c03acf98fb6cd2af32aa0333e789dde23a41b00354de2318f1267"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5629,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/command.json",
+      "sha256": "cdf9868075186258097dafbdc5209b4b8694a82459153ab35984d2c08105db36"
+    },
+    {
+      "bytes": 5788,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/receipt.json",
+      "sha256": "52042f91e652fec660ff37d16f691b50e96abc11d743a15a18d10028159d880a"
+    },
+    {
+      "bytes": 273527,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/report.json",
+      "sha256": "aa008da38b7f34e505b97b897a51894cc9d91e411ad7edee42fa048d35879e7b"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/resource.json",
+      "sha256": "2ba9ec5e9c80d5459afefe1ac1cee19fa971a21a4bffaf8119a055c0d2b13cef"
+    },
+    {
+      "bytes": 3050,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/start.json",
+      "sha256": "fa20e77846494b489ad1be0748e1dc811e4a37d2e0c45effaca53b7a467bd015"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5610,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "ee857608eb48e0e61ad54bcf7b764d1470adb6c06555b0fb53e5ee476e4c7e47"
+    },
+    {
+      "bytes": 5799,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "5695824d7821c7f4872d08e961c2161fc4beac563422e72cdb712307a8e8af53"
+    },
+    {
+      "bytes": 36675,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "356fbd613270f10072f341145241ac741a794c1174f6d5958ee592d6b9885af5"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "33622749abf5b4a5c251ae6d0365522403980537f50aabf8dd8f4c61c4b8a46e"
+    },
+    {
+      "bytes": 3007,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "bd8e3d614b188a4a29b660dad12dcc0bd2bb57e0be13648025cd0e4340f86613"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5657,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "34d61ba8df827b09c767fc6d0aba4acf73f8328199e643e47b05f88eb68560cc"
+    },
+    {
+      "bytes": 5823,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "865663353c045788fa76d1cd35bcf9eabe3e5e4e2cf8bcb3cb3a996a0309dd56"
+    },
+    {
+      "bytes": 273490,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "7449d5d385d6e7ac0eb5407d361ef01734ceab4d785660fe7c7677783b9414e3"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "eebb4bd1ce78f99ddc7e019b81ec8ba7445550a85d7a127f310ec5973bd94115"
+    },
+    {
+      "bytes": 3053,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "ee61f7aa12d8249bc3ab4d47da7e9934faf878c13e23620d88045146a72b724e"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5685,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "562903a7d9b69133d0defb9c8e967d1caae51c0fc14e3ca881aeee6fc54a3b06"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "c97b8d315b85c58845bf6b2b21658626a6f9f05751ead958b66f81262ae3d2f2"
+    },
+    {
+      "bytes": 273777,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "d0ed7b66ec236a355c5a9125c8e574286cc70f77b3ab99bd20f957f5cc71b70a"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "4db35409e95258de6794017ffaab8b2b85b2834c56cafabe485172d91e27c32d"
+    },
+    {
+      "bytes": 3081,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "8580d4f2c74b00188a176c1270e581c13c9a2bb4251cf0abb04819f7db429a47"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5619,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/command.json",
+      "sha256": "1775875062bb46b85e88bf3206bff9a6e9180a42077d557ea79b7838cf65a67a"
+    },
+    {
+      "bytes": 5777,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/receipt.json",
+      "sha256": "c2b38aa6696e5a6a6b542960c5b719b422008ddf44b4bf61d85d80d05f972487"
+    },
+    {
+      "bytes": 273512,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/report.json",
+      "sha256": "efa16b35a72c9273300584306b582a7e88f3797ae16ed5b455c1dda8c6262431"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/resource.json",
+      "sha256": "d57fedfe52b0092c996c0ea8e9e1c3c5946d1594d8f9e861ef59eba393651c9f"
+    },
+    {
+      "bytes": 3045,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/start.json",
+      "sha256": "9bf99db63e4a3334860edd2eb9be9823d4af4c12a83ab43bbc8f61aa7830c9b2"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5622,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "b565727d68e9260e043e2947a20b285113b31d387c7758bba15e0afbe558dda8"
+    },
+    {
+      "bytes": 5812,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "7a68e7b5ec73047259612fb26b3164e090d0fa1f4cec5244b2d2029f9331392f"
+    },
+    {
+      "bytes": 36667,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "7d9f89d0e42bf5ef094f9a0f021fa592ad9ede3fc0e4eac754019d98cf52f8d4"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "98cd8f124421b14ee28594caef7268dee3154f2a2f039211fcce05d209732399"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "1d536c61758db43952d1aad351af6a6e78659721a9d0fd883676ef06429f5070"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5667,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "8cd7ec0254f478e5decda92fa37fe7636ba0195c7b44c8cd775cc12a19c4a898"
+    },
+    {
+      "bytes": 5834,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "bbd4bcb2e028406066125937e8eec6b34157734e89d8004f26ac4b3d621352a9"
+    },
+    {
+      "bytes": 273491,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "1b8373056fb3356fc3ac9f612a51c74fab396d41960c6cd4001a6d8d7b82d752"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "81e814163c84fdf8691511f136ecd96492d5843ef31334c016dd9544518d3097"
+    },
+    {
+      "bytes": 3058,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "0f4e696180c0ef9e9cadf96b288d2608b5eb456c0beed27409d9dbb0d18d1c69"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5695,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "059e0f5d83a3f8c6786fec4cc6a63c547036f4b3b54e15c0c97833efe5b14f04"
+    },
+    {
+      "bytes": 5848,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "9e1926080dbac6f38c88f2f5a183ed867da129b25c88b395e249e1e803ae7638"
+    },
+    {
+      "bytes": 273767,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "d53ae81bce9e1efa0f4564dad248979a9480e273f6def422ec5f8736d7ac0c3b"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "c7d2f97a9e2b81b2861742ab164be890e9299bc9c991120e6d5beb25e78a17b0"
+    },
+    {
+      "bytes": 3086,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "e4b4abc527824194cc3d07674c6b618d70f3d4c1b39afa3833e8825bf20af8ab"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5630,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/command.json",
+      "sha256": "89083db038ec2961b8e0d594c1fcfb27b23e8ece3c436d64d1679174b3bc693b"
+    },
+    {
+      "bytes": 5789,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/receipt.json",
+      "sha256": "db2f68228d9d88f9212e00d7fed7bebfc7e250079b42de7d3c297051852cae33"
+    },
+    {
+      "bytes": 273517,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/report.json",
+      "sha256": "105852148d5acc0ccb2f3ebbb1f272ea06bf4dafd1c234671c5c0e55d88087d2"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/resource.json",
+      "sha256": "89f61abf2769ce261317a7b6c7c6cc530fc5790260260561da4de3d728269e67"
+    },
+    {
+      "bytes": 3050,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/start.json",
+      "sha256": "235d7002deb368681a9684a0dfa1997cad232a942a47457c43645bd8e14f2a31"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5611,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "57ee55093a1fa32cb9ade31898e1057ab33f0e547b50de31a59a742ae19b82d5"
+    },
+    {
+      "bytes": 5800,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "e20174de635c47ea2380aa4fb4f3751e8d3ee42592cee00f233dde3a286dffab"
+    },
+    {
+      "bytes": 36674,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "c463ce663175e3c1144b4b4a8b09272fe0199bd442ddb8cb84be6ef0f542bdd7"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "392318c8911d758ce9e10e0cb544edbc2f73e59543ea89d50ec3deb87feb9897"
+    },
+    {
+      "bytes": 3007,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "f47357c77f86653c8f9a2d239bb4784a4adee695b0180724b445c516333f198c"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5658,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "a57ea033c8cfaae23e60dfab4deae544ea3d7607ec59bbcb80c2f026974a6cd2"
+    },
+    {
+      "bytes": 5824,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "92ef14230f9269436860694fa6d423400386b630e480ef159a63c0e79bbfc3d0"
+    },
+    {
+      "bytes": 273480,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "a1ff26422898d87741fe615c9ca7171ac22f6fea53c4389b12f46641a1f9cdea"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "b7f5be9f62163c6e5cf7b39881cef433e3a91a814af1f3e910eb2c1f3ffb38f0"
+    },
+    {
+      "bytes": 3053,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "a07925690fde4b04b88325189825e69bb1926d5a51167f6392dbf7f0467b9a7f"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5685,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "94f20c53a2b6843a515e7ff1a1746a31bd635674455c658b58a2c077c11d538d"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "be69d3913b6b1acc51728ab85d1cbbd366894c41fca5fe1c6789126a934175d4"
+    },
+    {
+      "bytes": 273825,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "1f122ea4c875f6a3913b4187b9ee15fae8cf76d511f81159bda69e6c6c0bbfd7"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "9eba7a1f8e2064453a9dde6ddd9a875a9f356b8d310d829137bc6ee213c5f635"
+    },
+    {
+      "bytes": 3081,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "d139706ee5af3f0aaf59f5753d77ed844e02aebd7c20fd7d7350aecf990a15b7"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5619,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/command.json",
+      "sha256": "66b5242b4fe781f099ce1551b9ba674b4f7fbbc1dc542edb46cd9eab2c8e0c99"
+    },
+    {
+      "bytes": 5777,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/receipt.json",
+      "sha256": "f96489ecf0e1b6ea6a25e0051d2d68c48b4333e102ff5293d7b5af10c6c16470"
+    },
+    {
+      "bytes": 273527,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/report.json",
+      "sha256": "fb6e5958ac96e7b2f47daa74b23a5b20d53d55f1b32585e34da3b98016fbb2d5"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/resource.json",
+      "sha256": "94a0573b4b03636e14f62a923747deaa518aee4f0e0461f4ba18881801d30ac8"
+    },
+    {
+      "bytes": 3045,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/start.json",
+      "sha256": "d83f2c89b2f2ac95f842aedaebe97be79ce5c9790e95077f27c6810800aa4ddc"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5622,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "e8143b08e8c08e6f7a69173cc14a7e8191e12f1d464c467845d33259e5cd08cf"
+    },
+    {
+      "bytes": 5812,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "c1f4ed159ffd6759654b0e1127611efba5efa6a79352177c6c593b576ce37b18"
+    },
+    {
+      "bytes": 36676,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "b63fcace43e475107daee97b71e6be0a99f0236009d516b9eb45e4fa8bef2668"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "3aeb3d5ce5ed71861695375946ea402b83284c05cef46e0f0a529069031bdd8d"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "233a7a737961abc04ea01206f89e2a45f47074e06ed6aa54bae41e14111e71f1"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5667,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "b0335f26a6011523bb8b9081df2ad2d237432d5e956cd9cb1ccdaffe30eb6996"
+    },
+    {
+      "bytes": 5834,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "38b81e96c263e6fedbc67fefa130afa686d1249171779bb2b6e635f5a5dea83f"
+    },
+    {
+      "bytes": 273485,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "7b3051f055b6809d461ebf150f39b12a6c7d431e5b112a09b0777f032e930bd4"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "81e3eb142be889e4f4a5e99cba0aae559c847a07f5595de8595b8afd0c688cf4"
+    },
+    {
+      "bytes": 3058,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "f518eb8e1c3de7fbab2f1680826a516068fc3eb92aaa9aaf55e160301201807e"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5695,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "819360e968530812a6436a515ebadd51e61f4ffe33e10ffdaf02e010deacec9a"
+    },
+    {
+      "bytes": 5848,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "f6ed6b7c0dc974a25b68f1a71572e0ca11f222d25cedbf4479e7e4e2c7ea5afb"
+    },
+    {
+      "bytes": 273812,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "42cc500abc2f7b7f2702a8c016f18a99b2261c32de4ca503f9871972f8aa507f"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "9b1af4847d8c85788012c5e727641030bf222100cc0641a45b77591f8605c915"
+    },
+    {
+      "bytes": 3086,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "c7b641b0756dfb00aa7673a2ccd2270fd98aa55e24b762cfef8da15804f0f354"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5630,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/command.json",
+      "sha256": "9c9a1c8fcd684e2e35f9305f9a04d770790418e1c39f45c0c60da5bc11740d26"
+    },
+    {
+      "bytes": 5789,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/receipt.json",
+      "sha256": "40e6050387fbd1ccd480e2b84344c18850a860533d7c3ea31b0a489187b312d0"
+    },
+    {
+      "bytes": 273505,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/report.json",
+      "sha256": "1423b32b96629139ad9ddcf7a3841d5c33f5c51cead60310a44c9b6b8e4a913d"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/resource.json",
+      "sha256": "5b2d4766a17e3ef78d3b6fc964ee236c796a16763ee1cccfe8a3de56f72de9e0"
+    },
+    {
+      "bytes": 3050,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/start.json",
+      "sha256": "b3193cbf8688d42d20c0dcdc0f1e624b94436cefe88f2cb36d7148c498b8fbf0"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5612,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "4cd00d5b1cb8e784e549a647b26a0ef1bf624e856c812b566c244438a5fd7e15"
+    },
+    {
+      "bytes": 5801,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "9dc80f6ecf103db0eb0b1c9dd33b85dcf37b9d670178059b9d6c6ed598c97f87"
+    },
+    {
+      "bytes": 36673,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "ff05821c9f55fc23a54fa0891e7940a9d2f1b24b8ca8c89c97b934624cd8d0fd"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "dc9c0ff56d4dff7cae49f577a0997b27e6dbf089bc4da840d5e7ce645da02899"
+    },
+    {
+      "bytes": 3007,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "0d2a7bc5a210dc02aff70d46efcd2d3cf3cb6ef58e5df2a61af2251eb7974466"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5658,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "9c1f7e340325307f6303bc9a831fa3ba063e2494c9de3a851713810bd711f88c"
+    },
+    {
+      "bytes": 5824,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "cf91c824213e0a7d1c046d0225406a72b4c0527be02e8d552d39cb149c0a222d"
+    },
+    {
+      "bytes": 273480,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "d3f01bf8a3ae1fbc97eba9166ba5602b2b5ce1ad8a9b4c15d09a7d72ac795071"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "49881f18b0ddb5a04f5d13231a20b14b85bd83559065229634ba323552bf1dca"
+    },
+    {
+      "bytes": 3053,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "ee2706bdd6b13770e56e8187a78359c75e1564467bc7ce8edf01e83f134f55c3"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5685,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "2a7d9b5e75e9a29ba20c9d2669d9a2667e18fdcce7c1688b8a51afc466d0af2c"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "0cf0f12319438faac6a311ee3b1fdf73efc61b0dfc8ff0bd53f2b9d15b6627b1"
+    },
+    {
+      "bytes": 273745,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "4c868971dbda32b05b373f828850105cf7abf845ef1f132960a8355d9ab3b94e"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "892cd4576320e184f503bebbb7615ca1320b6a89ca45a7b5f0aae33d0d5ecbc6"
+    },
+    {
+      "bytes": 3081,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "d9fb82e38128f659023b41a0e45cec1521976e2dd8d4507246d51f692acb6c88"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5619,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/command.json",
+      "sha256": "e58c9a4ec8691a02ba2b7a96fea30eeb2ffb2b9ad2829df85ff7e903d8ac4fd5"
+    },
+    {
+      "bytes": 5777,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/receipt.json",
+      "sha256": "05d297ffd47958dde5f2029a9917d0fbb911a09b7a7884610c9d4b6e91a0ba89"
+    },
+    {
+      "bytes": 273511,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/report.json",
+      "sha256": "35db6a148eaa03124a24d6c33ec90998a5fe3b6a5ed5fe57f04034ef5ead24a0"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/resource.json",
+      "sha256": "5735c0adf1a5a1a77815be071146708a250c9f36e8bfbc784f9a4aa62cc16cb0"
+    },
+    {
+      "bytes": 3045,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/start.json",
+      "sha256": "6c2cbd86b2ad9b264fd04d8bfe694160f203933751f954acd70bb5a90b0d6838"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5622,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "b6badcca18cd1a498ab1dfeafc0ed3ad6b5e8911a369bfe13fb8e10d756110c3"
+    },
+    {
+      "bytes": 5812,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "1c1e636479a97eb87db39b39ac8f56337bd4a206c12198099f7c8bef1939f374"
+    },
+    {
+      "bytes": 36675,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "c8796842a400ca35408c87a42f3f68b637044b4ed9f7a520deb693f3d6265f26"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "61b4c77f7adcaad90444fa81908a5736053c312d9e9d81144df56936a6875021"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "1b434ec45afdad31a05f0338ab96e8d216c863ef1762df7a9710fe68513a239d"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5668,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "f41c9a458851d914cafdc16b55f7c8e3777fad3a22c2f4730208373a0c02af17"
+    },
+    {
+      "bytes": 5835,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "326980d05d2879609c0571fc6078033a6207face8530689489a75163f0b5c7ae"
+    },
+    {
+      "bytes": 273483,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "25559b81d71a2405cfb64085b7602e96bd6d78aaa03f76b08e15092baa49e47c"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "9b9f3d4ec0d454e9b9ed7634bb07a6089ef4f1929f530ba4f565553b868ae501"
+    },
+    {
+      "bytes": 3058,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "44ee57b2282d351a887cde2ebe5995f9d4f9a39528861058552f9ec94bb0f64c"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5695,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "b2fe67eb17ddf954ad1b1bc48d8281f2617dc34bd5a0c15f48de70420161f99d"
+    },
+    {
+      "bytes": 5848,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "16e3bbffe3b549bb9c62e9eedeb574b0bf5594cc1a4fa9bf2081066ee66c0a0e"
+    },
+    {
+      "bytes": 273739,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "617085cfd77d449a4195f9b785d41e58587728bc0a4029325941d577e21b274c"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "a14487a83bcc8ee534f1ff0004e75f505c2d111b5ee3ecfc46340b8f6f84546d"
+    },
+    {
+      "bytes": 3086,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "7bc7d144281b10124d6cf5fb967b32ab5a522bce6020a0bc9b09c3f8bdb56926"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5629,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/command.json",
+      "sha256": "5e02671abaee77e5bcecf536c9bf90c63031c85910dbed21fb72d714a539dd0d"
+    },
+    {
+      "bytes": 5788,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/receipt.json",
+      "sha256": "4541dd2d2d010a00aa874b747de37d93ec0025523cf2a258cceb865ca012251f"
+    },
+    {
+      "bytes": 273504,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/report.json",
+      "sha256": "c7ea9c2a73de9a4aaf6a11059bb9a12e03e7135e823479ef004f46b7187eeaec"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/resource.json",
+      "sha256": "aa6efdbbcac1b3f25cc3156048bb784a2e976040c3e5944a7ae9705719cdf453"
+    },
+    {
+      "bytes": 3050,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/start.json",
+      "sha256": "839e29da36652b16a5df61dd51800d1590a1682893a9d9cedb1facc262e129b4"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5612,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "74fe7c5e5f49243995fcd39997f8574b50887c0ff373739854da086e32303df4"
+    },
+    {
+      "bytes": 5801,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "fbc2c25855e985f078b3933a431dcbfb30bf51f3e27d2fcbcac6ba0b48b8a6ad"
+    },
+    {
+      "bytes": 36665,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "d72944c783777f8cd7dd79f684dc11238623c818c9421defb6f7c8576c0389db"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "fc12799b0428623ee8e93a5e0b7c6bf528a7d9e44f4f2c11278b73a096364416"
+    },
+    {
+      "bytes": 3007,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "c2cf6d5fa842cf55af54003badb4f32018dd0d6859e79e907501c4e75280623b"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5657,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "2e7ec706aacf86c48b6b27e3567de4d12f6d40a9a4306ede45e1be33a23d15f3"
+    },
+    {
+      "bytes": 5823,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "9df6bfddea0317e69137f15ba9379b4d20d7c1e47bdafe10ef6d26af9f19e8b7"
+    },
+    {
+      "bytes": 273480,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "d6982f8107691818e5fbcf9945d8b99881ee0c67195644e4202113b3aa359286"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "129c09118f97b6f237dfeae5bb9ab8c3cc12f13f8ec93c336e97dd777d652e44"
+    },
+    {
+      "bytes": 3053,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "66cbfaf130cf5104aa4ac00f9b31f1838850eef221a80afa61c98f0924c24fa7"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5685,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "231b2b12f29f93d7dc0fc2302b320110bce69b7ff0b2141b0293d5c08379af51"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "b4fc3b89c2c61beb7913e883200a90ac80cdb1ed6648dc9b87be133287b750f6"
+    },
+    {
+      "bytes": 273743,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "f5f1220a1fa66edfdc035f0af105682a62866b0ee2f6ca96fdca97c8dc07df0b"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "652ce8cde5944f4d0ecd140a1ffd54c13f768aa2ac45ebffb66ef125523d6bce"
+    },
+    {
+      "bytes": 3081,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "337b098d10e0f7021b17c23d8e9b627afdd89e251c063e56468d1959c28ee3ef"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5619,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/command.json",
+      "sha256": "420f0aecb3aacabd478cd0cfc56f5b57d846c7c56dd774b9fb0e9e0e3fdf65fd"
+    },
+    {
+      "bytes": 5777,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/receipt.json",
+      "sha256": "d4eeabc922fc8a538e70084731b86bbad2476661f4198101817adb6bac357f57"
+    },
+    {
+      "bytes": 273519,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/report.json",
+      "sha256": "ca57d9c5ffd249275dd3a4c5fc3348b9015b1ae8642358047266f39a02984cc2"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/resource.json",
+      "sha256": "c19e3da615dd2c1d6d3307b8b30282868f11adc0b363904c363d22d41f8b8134"
+    },
+    {
+      "bytes": 3045,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/start.json",
+      "sha256": "467c70f67b01e22bfcef33db4f8fb04f6ee810da7c82eb45e62696987590a4ee"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5622,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "9c5e17e738dbdd21ced07c89008f95ddcd11edec57cfaa8f7e96b21fe20cc6c7"
+    },
+    {
+      "bytes": 5812,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "c07590131698caf54385ef9a21f1412e5dd38ba4874a80afb450e2904b64fa54"
+    },
+    {
+      "bytes": 36675,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "8cb84f4bb6911dee144110336ffecd374a1718ef2133ac9f737bc9e459e9feef"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "0f7fa01d42034923fb6da7945416f9b057c110697910742f1fea33001fb1a5ce"
+    },
+    {
+      "bytes": 3012,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "2b8a25c8bf0193750d55e13d556dc72c093e396d765161e3ee28c5ab58ef3fc5"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5667,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "15eee9886bb5de3af11b5e44ad664f342f9a8d05c946eab9633a276cf1a14535"
+    },
+    {
+      "bytes": 5834,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "cad68545459eab9d42296c7c0ac6f0a1e70343a50a69c1299e45d16fd3d85cfb"
+    },
+    {
+      "bytes": 273480,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "6962198b608d7d1922e523e22439f3a9e83c1d06a2ef619f8bc2844118633009"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "c48ff5ef195895dfb7587d5ce578e03adfba89a147f821bb962a7fd2efebdb84"
+    },
+    {
+      "bytes": 3058,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "26045b450b9dd04de0ce68ea0123628c7cb65f6e8340c81d505a0d07935c6426"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5695,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "e3591e515e4fee1815956a3a5d3283f6ca1eb8b39cf9565dd1fe3f62baa00e90"
+    },
+    {
+      "bytes": 5848,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "9d44a040f9753f11455b9e8809fbaaccfca746ca6cd1b3d3c910cbe7b31de87c"
+    },
+    {
+      "bytes": 273737,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "868297b85f0eb2639301b91df0dcc6f546000d465b90853834a68d89ec9d9313"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "dddd14619cdb986209980afed555412130f87a841355e050289aa3f533cb5086"
+    },
+    {
+      "bytes": 3086,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "68f295a638c40ef6d3d0ffa7ccb0bba2d73ba754546781718c9cf17e5510866c"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5629,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/command.json",
+      "sha256": "a73a385e951f327de64b39e48e3598bfabf1382af66eae294a7aa164c593a435"
+    },
+    {
+      "bytes": 5788,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/receipt.json",
+      "sha256": "f639f46e79b9f956e7d591e3f9edde4187d4a521658adf0cd97bc1b5917bd34b"
+    },
+    {
+      "bytes": 273503,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/report.json",
+      "sha256": "f713319e83e11ba1ce8f91dc1c81cdc453c904ee08ab2eb2a0bef4376d913306"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/resource.json",
+      "sha256": "e9c0cdd7eea516ca98c66f36564b5202ca9f38ea0bd881e46d1dc3e363776fcc"
+    },
+    {
+      "bytes": 3050,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/start.json",
+      "sha256": "9704e1d581da7f1aa819ceb6cda6b68c79c43b6ecf9f24af7bb699a067cd73a8"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 325516,
+      "path": "docs/performance/results/change-0902/native/capture.json",
+      "sha256": "5cb36d9ccf5061ac48cfa629fd67b638e4ce5903fd20280ea997bbba57177d72"
+    },
+    {
+      "bytes": 2523,
+      "path": "docs/performance/results/change-0902/plan-template.json",
+      "sha256": "524d46fbdfe9b2890098f1a65381fa4df57e5ea6a58a8dfefd347c2e54e972fb"
+    },
+    {
+      "bytes": 6499,
+      "path": "docs/performance/results/change-0902/plan.json",
+      "sha256": "a7f743d6989d844bbdc1095711a75aafbf14344b4ff33139bdd7ad668cffbcd3"
+    },
+    {
+      "bytes": 590,
+      "path": "docs/performance/results/change-0902/post-cleanup-replay-command.json",
+      "sha256": "53f74bca8cb7d3fe104d50361f749215c56166bf266bb57b9f4e5689b3b47885"
+    },
+    {
+      "bytes": 6529,
+      "path": "docs/performance/results/change-0902/post-cleanup-replay.json",
+      "sha256": "1e06ac15760ef365cd20b9cc0a5eea081097f98e823a2df292d00c1dbbf88a3d"
+    },
+    {
+      "bytes": 23,
+      "path": "docs/performance/results/change-0902/post-cleanup-replay.log",
+      "sha256": "b04a7296babefa33aa7860d0df752b3d33fbfed72cdb3fc118059a4d97c99bfd"
+    },
+    {
+      "bytes": 2879,
+      "path": "docs/performance/results/change-0902/preflight-run.json",
+      "sha256": "c14c25126562a6e1c55b27cba502bcf9b3f5f73d735d0fb4cc7a5fdf79c46a13"
+    },
+    {
+      "bytes": 1800,
+      "path": "docs/performance/results/change-0902/preflight-start.json",
+      "sha256": "a6bd0d9414a64ea5d771463e568e8b6d1e09ab69e439254db5bb85fcaeaf6095"
+    },
+    {
+      "bytes": 4079,
+      "path": "docs/performance/results/change-0902/preflight.log",
+      "sha256": "1e22d8f29590f80c487737414eeb57bc75c622d25a18cd63620a5983e2aa43f2"
+    },
+    {
+      "bytes": 2906,
+      "path": "docs/performance/results/change-0902/qualification-analysis-run.json",
+      "sha256": "44f5a7f95c78b1033ef73da041369372d100961a8ac07c21049f55809ecc73ee"
+    },
+    {
+      "bytes": 1815,
+      "path": "docs/performance/results/change-0902/qualification-analysis-start.json",
+      "sha256": "889e2d51c7585aa743389a62c27641f028a46b50431013a30659d982e708f44f"
+    },
+    {
+      "bytes": 2908,
+      "path": "docs/performance/results/change-0902/qualification-analysis-v3-run.json",
+      "sha256": "2e8eeb91397adfce38ef158e15bc6e9af8b66f12e635fe19528f81aecdf889e8"
+    },
+    {
+      "bytes": 1815,
+      "path": "docs/performance/results/change-0902/qualification-analysis-v3-start.json",
+      "sha256": "f1b17ca05c6b7ad1e6cc32c1b82d40fbeab2c1d275faf65b3e1115acb5998d59"
+    },
+    {
+      "bytes": 45,
+      "path": "docs/performance/results/change-0902/qualification-analysis-v3.log",
+      "sha256": "95a21190d0a7ae63c2842bfcaad67218e845cc1f7cf702d85e2e6caa5f527a33"
+    },
+    {
+      "bytes": 132922,
+      "path": "docs/performance/results/change-0902/qualification-analysis.json",
+      "sha256": "20294668ca487d6ecf57f9ce7024e904b42105ccf55fe411194b8ac8f67cb61b"
+    },
+    {
+      "bytes": 128,
+      "path": "docs/performance/results/change-0902/qualification-analysis.log",
+      "sha256": "28a61adc5d771c6aa225eb6098be0e180a24513063ea65267e757f2a69f61ff7"
+    },
+    {
+      "bytes": 2897,
+      "path": "docs/performance/results/change-0902/qualification-capture-run.json",
+      "sha256": "b6bd28a56ecb18bd321360ae28cc418621b7cdcaa340b5b5921361e9ad151842"
+    },
+    {
+      "bytes": 1808,
+      "path": "docs/performance/results/change-0902/qualification-capture-start.json",
+      "sha256": "9a870e8d45bc48c3e2e5f3ac4e72d6c1294cdb46ab29ca1ec20ecf47989798f6"
+    },
+    {
+      "bytes": 2903,
+      "path": "docs/performance/results/change-0902/qualification-capture-v2-run.json",
+      "sha256": "274fed125f714c425382c390639a5460352619681e26eaf617fb65a894284b67"
+    },
+    {
+      "bytes": 1811,
+      "path": "docs/performance/results/change-0902/qualification-capture-v2-start.json",
+      "sha256": "839a1675b6f100f3533d7cb2bd4f2da2021bdcc23883b379f773e6c42bd25d09"
+    },
+    {
+      "bytes": 46,
+      "path": "docs/performance/results/change-0902/qualification-capture-v2.log",
+      "sha256": "dab3d5dabb00c3e52abaa551834643760d2b27ef1fe1371d677c0a4fc6f7102b"
+    },
+    {
+      "bytes": 55,
+      "path": "docs/performance/results/change-0902/qualification-capture.log",
+      "sha256": "e70bad1281a9ad4250216d43218a23f634cb7750c4bb09fcfe7437dc71fa75fe"
+    },
+    {
+      "bytes": 59369,
+      "path": "docs/performance/results/change-0902/qualification/capture.json",
+      "sha256": "82da7bf516b941d9693c48a260293f6e1a04000e94a9f8452a33b3e1c04ac476"
+    },
+    {
+      "bytes": 5665,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/command.json",
+      "sha256": "8f828dea41a6c53ef3091b8e4d2a7bd8faf33d129a3517928b8f85b9b734b55a"
+    },
+    {
+      "bytes": 5861,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/receipt.json",
+      "sha256": "595cd8df38fc8541af2e6cc365bc405baa73436e0ee1e3beaa3cfc4a8d2ab052"
+    },
+    {
+      "bytes": 15199,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/report.json",
+      "sha256": "f3a24cd1b4951b4e0f0603a496c508cec63255cafaa623e756c1a321d5dce1cf"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/resource.json",
+      "sha256": "8c4370072f9292593afa6faf13d9ae096ab578aad5ec73a414485788ff024c47"
+    },
+    {
+      "bytes": 3025,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/start.json",
+      "sha256": "0e921d921baad7917fdf11b6652fb9378f716ab712e0adfe97047c12c3107021"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5710,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/command.json",
+      "sha256": "52e5f72b4324a765519df80b028dea33d4988cdffb7fc67ae0c57e642b07cd15"
+    },
+    {
+      "bytes": 5883,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "877a5b697956b06d53683b3fb2dbae441385f41cf2f4786f7681d9d41a42ca6e"
+    },
+    {
+      "bytes": 24057,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/report.json",
+      "sha256": "3244cb5adfcc3aacd06567a1bb4cd5ad876faa7d8678fe72f62c1d4de2eb21d7"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "e98e6eb212b1fe6bee1609e2f8d7fa882081a17bfcd3bc7252e59a84baab65c7"
+    },
+    {
+      "bytes": 3071,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/start.json",
+      "sha256": "230cc6cfdd824b7b92e508fa3e151198f9d9f6f3c4fcd98b28436a455046689a"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5738,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/command.json",
+      "sha256": "f493dff8f7c7ce28408e2c683315a2e16a5e9791f00ef9db31bc5902570b8cf2"
+    },
+    {
+      "bytes": 5897,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/receipt.json",
+      "sha256": "a8aeca3c4f935d66a5fcf34b52bf0bdd97d494347681c48b0e9b1e239483edde"
+    },
+    {
+      "bytes": 24119,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "6879e3a1318e30b91a0e30df34c1bc551d50d065660430323a76a65c067c23f2"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/resource.json",
+      "sha256": "810382fbb22fbb37781636cf17368d3b2a7c79be22265c3b5095fe50fbc69ca9"
+    },
+    {
+      "bytes": 3099,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "d4dd1ca1bca0215a12f7e0a77e9528732927798220c7ec2a81a2ada2fbcc2483"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5672,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/command.json",
+      "sha256": "4074f8090b6994211df4847db9cb8442775c4d17f875b5e88caa2d0af8ea6026"
+    },
+    {
+      "bytes": 5837,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/receipt.json",
+      "sha256": "66bd8b14953e2783c201fbc7e5d5e1cb5be20de62298ab164e002e3669fed4cf"
+    },
+    {
+      "bytes": 24091,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/report.json",
+      "sha256": "fc1634dfbd7ea11fa7f5348f99ad91bd2a42486d3b0492994fc969826d42b4fc"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/resource.json",
+      "sha256": "697cb06b7ff137a159e1be8f890ecfabe15b3b9b502e428564ef6da5f5dc79f9"
+    },
+    {
+      "bytes": 3063,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/start.json",
+      "sha256": "35769b3522c84fa3322dfd40038ad64a11809215ee9f91615298f6c66525fc23"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5673,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/command.json",
+      "sha256": "5134319a914b9c620540f5d749fe2edabd69fd205aea3f1e69199d7d4f432ba8"
+    },
+    {
+      "bytes": 5870,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/receipt.json",
+      "sha256": "69bbbc9d90dcf2791f64b469e0ece83d4242e169d1f394515bf941208a01d622"
+    },
+    {
+      "bytes": 15199,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/report.json",
+      "sha256": "c31d221ba93438015abe87887565dd9c74eab7ef01423aa28d8e12f3074ec0fb"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/resource.json",
+      "sha256": "1ae7d158fb4db0c4069e3fe29cd59d9db80956a578e8b2ee03f5802385b03cb5"
+    },
+    {
+      "bytes": 3030,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/start.json",
+      "sha256": "304273349b9c9f80d9a406e393a64d45644b2c95dbaca7a6e6cf7f675a5974a6"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5718,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/command.json",
+      "sha256": "126fdf05daddff93a1d3faa1bcc60c55f99620e4af470322c06377e8824c0784"
+    },
+    {
+      "bytes": 5892,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/receipt.json",
+      "sha256": "66ae9d0cf411d05d06f595d21a912f9ada85aa75717f3380b403b164ef034790"
+    },
+    {
+      "bytes": 24066,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/report.json",
+      "sha256": "b3d687094837fc5962ab4f704b42b27955adeb1f4366d6a7d4f677c032d326db"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/resource.json",
+      "sha256": "8f615be3060b3b4665943fbe42ac6aad2b2ad95370fd762eaa024c4936e3f13f"
+    },
+    {
+      "bytes": 3076,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/start.json",
+      "sha256": "2271aa86c64909f81e33eeccc53ef4dd9c1db089600e7eb183c117783a0fab2a"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5748,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/command.json",
+      "sha256": "d4f0398b500a7195188d1a34bd14ad86acb9dcf5a9ec40cd1b18ac23ff8ac02d"
+    },
+    {
+      "bytes": 5908,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/receipt.json",
+      "sha256": "86e6252474a2fd80f9d9f3d0a632f660b845dc5de93f5d16fadc66543f2ddbb3"
+    },
+    {
+      "bytes": 24120,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "99a18fd598a42367c733710cafe7e72976150685938f25d894d5b48b5826bd0d"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/resource.json",
+      "sha256": "09e0fadc3f6effaa94659aca22bbc4f8534fa2dabd0b4405c6f2aafbcab0d7cf"
+    },
+    {
+      "bytes": 3104,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "11daf8e4e8171f447e7205eb095b1db51db474b02c8e8f700cd7dafd8fbb566f"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5682,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/command.json",
+      "sha256": "2cfcf2a34f86f083950adefd42db68ae407ae76986fa815604eadf7f02597360"
+    },
+    {
+      "bytes": 5848,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/receipt.json",
+      "sha256": "077edbf1d7c4d58e9abd0840cbe726f0e111fc2eeaf84a9ada23e038f098c31f"
+    },
+    {
+      "bytes": 24098,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/report.json",
+      "sha256": "207a92365532436e49a5ca88339ec15cfe4e7d3f030c4ac2a04d851f524b3b8f"
+    },
+    {
+      "bytes": 87,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/resource.json",
+      "sha256": "26db93d71bd8dfe5bf86717e53c9bd49594d9fbf3d29746a3891d1bb82646192"
+    },
+    {
+      "bytes": 3068,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/start.json",
+      "sha256": "0576f6674dc358288650079970e11d04427bb91543258ca4adc69598c88cd6f4"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 138457,
+      "path": "docs/performance/results/change-0902/quality-Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    {
+      "bytes": 2099,
+      "path": "docs/performance/results/change-0902/quality-and-build.py",
+      "sha256": "b274d5aa2dfaa6a6abef11c2f89b04b9dffa9490750de1df49676a6b804b0838"
+    },
+    {
+      "bytes": 252,
+      "path": "docs/performance/results/change-0902/quality-docs-fixture-link.json",
+      "sha256": "a8598bea5c1f1b402374529dd54ab092e2abc5e4ac40f20c3691944a7da8a405"
+    },
+    {
+      "bytes": 281,
+      "path": "docs/performance/results/change-0902/quality-fixture-link.json",
+      "sha256": "7d0a7fb9c5879f1c4922a5677cd8adf3d558f22a6c15964f51b07aa08a96476a"
+    },
+    {
+      "bytes": 2769,
+      "path": "docs/performance/results/change-0902/quality-summary.json",
+      "sha256": "aec5388ff22456f9b17fd064f3f446b2545cb550ce01a73df5562bf70da58b3a"
+    },
+    {
+      "bytes": 2968,
+      "path": "docs/performance/results/change-0902/raw-replay-run.json",
+      "sha256": "cad2b945bcc5036002e581d9517d0e31cd6107b09e8b6583b0d7369500e0f69e"
+    },
+    {
+      "bytes": 1890,
+      "path": "docs/performance/results/change-0902/raw-replay-start.json",
+      "sha256": "6822df4784e0ef67efb61a0ce1772b3192e21bcc8840746de0977cdaf469ca43"
+    },
+    {
+      "bytes": 6529,
+      "path": "docs/performance/results/change-0902/raw-replay.json",
+      "sha256": "1e06ac15760ef365cd20b9cc0a5eea081097f98e823a2df292d00c1dbbf88a3d"
+    },
+    {
+      "bytes": 23,
+      "path": "docs/performance/results/change-0902/raw-replay.log",
+      "sha256": "b04a7296babefa33aa7860d0df752b3d33fbfed72cdb3fc118059a4d97c99bfd"
+    },
+    {
+      "bytes": 2464,
+      "path": "docs/performance/results/change-0902/replay.py",
+      "sha256": "e10cbd3b0c5c8b57fb80e44e9cb6cce4367c9c3a8d9a8021170e94662c86017b"
+    },
+    {
+      "bytes": 172542,
+      "path": "docs/performance/results/change-0902/result-review.json",
+      "sha256": "f3e5ac35ff07654569c2d368568e0e3dd585a0535f366fde474f70972c71b461"
+    },
+    {
+      "bytes": 4616,
+      "path": "docs/performance/results/change-0902/result-review.md",
+      "sha256": "e2e4ba3d14735119b24b2ab3b7f524368a933dfb8636dde8d26069378de0fdeb"
+    },
+    {
+      "bytes": 30896,
+      "path": "docs/performance/results/change-0902/run.py",
+      "sha256": "3418daf9a5f83e166a31846c3d94b96769a218db64b206fac7f484c8b463fcd7"
+    },
+    {
+      "bytes": 30904,
+      "path": "docs/performance/results/change-0902/run_v2.py",
+      "sha256": "28a83f7f50d2fecdad4aa65cd10c176f42348b92574dbf14369243a4410f365a"
+    },
+    {
+      "bytes": 2938,
+      "path": "docs/performance/results/change-0902/seal.py",
+      "sha256": "68172e64422f0e0cf2920a39f1af46aa98ee830bfeceab9bc7d0760d08c71d7c"
+    },
+    {
+      "bytes": 384,
+      "path": "docs/performance/results/change-0902/setup.json",
+      "sha256": "272f8db917794ac935e4c83110cec553d980980e51af9b6111e3a1c2c537831f"
+    },
+    {
+      "bytes": 802,
+      "path": "docs/performance/results/change-0902/source-final.json",
+      "sha256": "d4aabd8c1fe6dc44d961e9e36c3aa1857f49faf6cf447897a07cccf481edfd51"
+    },
+    {
+      "bytes": 4548,
+      "path": "docs/performance/results/change-0902/source-review.md",
+      "sha256": "274d926275a45a487140797155ad9e5fe1bf57d13f779c713725a455ad487fd2"
+    },
+    {
+      "bytes": 779,
+      "path": "docs/performance/results/change-0902/staging-whitespace-check.json",
+      "sha256": "f4b2092cb144bb71c72d907926518197538c0b95720b6066443aec6de2403060"
+    },
+    {
+      "bytes": 780,
+      "path": "docs/performance/results/change-0902/staging-whitespace-initial.json",
+      "sha256": "80735cbaf900ae43ec2b9735fb141c5489e966fa46ff20b28558b08e14a7adec"
+    },
+    {
+      "bytes": 374,
+      "path": "docs/performance/results/change-0902/summarize-v1-failure.json",
+      "sha256": "c071144a9d167e1ae60699badc8a2c994d6dd142f85cdb8d5ddd404c621e2b03"
+    },
+    {
+      "bytes": 3062,
+      "path": "docs/performance/results/change-0902/summarize.py",
+      "sha256": "637a256429137afbf2175f9a6cf98e8e011e6cbc409aed35d50d0e8dca4a2e0d"
+    },
+    {
+      "bytes": 3110,
+      "path": "docs/performance/results/change-0902/summarize_v2.py",
+      "sha256": "8e98295a5a285a7462b62da2f673b8a04777051cd45cd22e9963ff2b860bb756"
+    },
+    {
+      "bytes": 64018,
+      "path": "docs/performance/results/change-0902/summary.json",
+      "sha256": "813cb98554951ed44da0908302690e90725f544d9c8afcc9907edc85c9afd9e9"
+    },
+    {
+      "bytes": 326,
+      "path": "docs/performance/results/change-0902/unrelated-preservation.json",
+      "sha256": "f34933ae0f61e057b00600298de2e30ab878ace835870f419fd9b2faa27679f3"
+    }
+  ],
+  "bound_files_before_closure": 644,
+  "closure_excluded_from_own_bindings": true,
+  "decision": "rejected; production restored",
+  "ignored_binary_artifacts": "retained by plan/capture/replay SHA256 custody, intentionally outside Git",
+  "independent_review": {
+    "bytes": 172542,
+    "path": "docs/performance/results/change-0902/result-review.json",
+    "sha256": "f3e5ac35ff07654569c2d368568e0e3dd585a0535f366fde474f70972c71b461"
+  },
+  "owned_roots_absent": true,
+  "parent_head": "23bf87661ed9fe17c15d8cf4ab8f6e478138347d",
+  "status": "pass",
+  "unrelated_files_preserved": true,
+  "worktrees_created": 0
+}

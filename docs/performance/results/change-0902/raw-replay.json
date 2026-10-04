@@ -1,0 +1,236 @@
+{
+  "analysis": {
+    "bytes": 4285256,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/analysis.json",
+    "sha256": "9ab725ba8790245fe9f7cca0adaf1f21d458c0e715f9aceed17ea1cac52e14bc"
+  },
+  "analyzer": {
+    "bytes": 55464,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/analyze_v3.py",
+    "sha256": "4d96e5ac9031a60c6a5b7024cf8aaefd05bd12280760b9f3a1cf6d01bd72829b"
+  },
+  "baseline_archive": {
+    "bytes": 89047170,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.tar.gz",
+    "sha256": "f6f9d13813866ea24fd9cc108fc949aa42cdd042bacd3ca960897e8c88c63ce9"
+  },
+  "baseline_source_files_verified": 10771,
+  "candidate_override_files_verified": [
+    "crates/xml-minifier/src/audit.rs",
+    "crates/xml-minifier/tests/source_replacement.rs"
+  ],
+  "children": {
+    "allocator": 16,
+    "native": 48,
+    "qualification": 8
+  },
+  "mode": "retained artifact/semantic/numeric replay; no live source-root claim",
+  "reduction": {
+    "cases": {
+      "control-docx-one-edit-medium": {
+        "accepted": false,
+        "blocks": [
+          {
+            "baseline": 166641,
+            "block": 0,
+            "candidate": 157116,
+            "ratio": 0.9428411975444219
+          },
+          {
+            "baseline": 164936,
+            "block": 1,
+            "candidate": 158926,
+            "ratio": 0.9635616239026047
+          },
+          {
+            "baseline": 165721,
+            "block": 2,
+            "candidate": 157420,
+            "ratio": 0.9499097881378944
+          },
+          {
+            "baseline": 165281,
+            "block": 3,
+            "candidate": 157536,
+            "ratio": 0.9531404093634477
+          },
+          {
+            "baseline": 165541,
+            "block": 4,
+            "candidate": 158326,
+            "ratio": 0.956415631172942
+          },
+          {
+            "baseline": 168786,
+            "block": 5,
+            "candidate": 157831,
+            "ratio": 0.9350953278115484
+          }
+        ],
+        "estimate": 0.951525098750671,
+        "lower_95": 0.9389682626779852,
+        "replicates": 10000,
+        "seed": 902009,
+        "statistic": "paired_median_ratio",
+        "upper_95": 0.9599886275377734
+      },
+      "control-xlsx-one-edit-medium": {
+        "accepted": false,
+        "blocks": [
+          {
+            "baseline": 4147051,
+            "block": 0,
+            "candidate": 4173356,
+            "ratio": 1.0063430616117333
+          },
+          {
+            "baseline": 4155711,
+            "block": 1,
+            "candidate": 4088250,
+            "ratio": 0.9837666767491772
+          },
+          {
+            "baseline": 4152686,
+            "block": 2,
+            "candidate": 4224587,
+            "ratio": 1.0173143358298702
+          },
+          {
+            "baseline": 4134506,
+            "block": 3,
+            "candidate": 4108217,
+            "ratio": 0.9936415620149057
+          },
+          {
+            "baseline": 4095291,
+            "block": 4,
+            "candidate": 4108212,
+            "ratio": 1.0031550871476533
+          },
+          {
+            "baseline": 4082466,
+            "block": 5,
+            "candidate": 4120807,
+            "ratio": 1.009391627511411
+          }
+        ],
+        "estimate": 1.0047490743796934,
+        "lower_95": 0.9887041193820414,
+        "replicates": 10000,
+        "seed": 902009,
+        "statistic": "paired_median_ratio",
+        "upper_95": 1.0133529816706406
+      },
+      "primary-percent-dense-sparse": {
+        "accepted": false,
+        "blocks": [
+          {
+            "baseline": 32959875,
+            "block": 0,
+            "candidate": 34078575,
+            "ratio": 1.0339412694981398
+          },
+          {
+            "baseline": 33511028,
+            "block": 1,
+            "candidate": 34208883,
+            "ratio": 1.0208246371910763
+          },
+          {
+            "baseline": 32997243,
+            "block": 2,
+            "candidate": 32521039,
+            "ratio": 0.9855683700604926
+          },
+          {
+            "baseline": 33261357,
+            "block": 3,
+            "candidate": 32840245,
+            "ratio": 0.9873393018811589
+          },
+          {
+            "baseline": 32844888,
+            "block": 4,
+            "candidate": 33007742,
+            "ratio": 1.0049582753943322
+          },
+          {
+            "baseline": 32782808,
+            "block": 5,
+            "candidate": 32793452,
+            "ratio": 1.0003246823762015
+          }
+        ],
+        "estimate": 1.002641478885267,
+        "lower_95": 0.9864538359708257,
+        "replicates": 10000,
+        "seed": 902009,
+        "statistic": "paired_median_ratio",
+        "upper_95": 1.027382953344608
+      },
+      "primary-percent-medium": {
+        "accepted": false,
+        "blocks": [
+          {
+            "baseline": 16703700,
+            "block": 0,
+            "candidate": 16638275,
+            "ratio": 0.9960832031226614
+          },
+          {
+            "baseline": 16628545,
+            "block": 1,
+            "candidate": 16730031,
+            "ratio": 1.0061031196656112
+          },
+          {
+            "baseline": 16621451,
+            "block": 2,
+            "candidate": 16733042,
+            "ratio": 1.006713673794183
+          },
+          {
+            "baseline": 16697087,
+            "block": 3,
+            "candidate": 16690741,
+            "ratio": 0.9996199337046037
+          },
+          {
+            "baseline": 16618036,
+            "block": 4,
+            "candidate": 16643462,
+            "ratio": 1.001530024366297
+          },
+          {
+            "baseline": 16525516,
+            "block": 5,
+            "candidate": 16612323,
+            "ratio": 1.0052529070801783
+          }
+        ],
+        "estimate": 1.0033914657232377,
+        "lower_95": 0.9978515684136325,
+        "replicates": 10000,
+        "seed": 902009,
+        "statistic": "paired_median_ratio",
+        "upper_95": 1.0064083967298971
+      }
+    },
+    "primary_gate_pass": false,
+    "review_flags": []
+  },
+  "replay_helper": {
+    "bytes": 2464,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/replay.py",
+    "sha256": "e10cbd3b0c5c8b57fb80e44e9cb6cce4367c9c3a8d9a8021170e94662c86017b"
+  },
+  "status": "pass"
+}

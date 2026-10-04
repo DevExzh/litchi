@@ -1,0 +1,1123 @@
+//! `verify_source_replacement` returns exactly what auditing the original and
+//! then the replacement with `verify_source` returns, and proves a local
+//! edit by scanning only the replaced element.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "each test states one fixed expected verdict"
+)]
+
+use xml_minifier::audit::{
+    Error, Limits, ReplacementError, ReplacementProof, Resource, verify_source,
+    verify_source_replacement,
+};
+
+/// The two audits the pair API replaces, in their order.
+fn oracle(original: &[u8], replacement: &[u8], limits: Limits) -> Result<(), ReplacementError> {
+    let _original = verify_source(original, limits).map_err(ReplacementError::Original)?;
+    let _replacement = verify_source(replacement, limits).map_err(ReplacementError::Replacement)?;
+    Ok(())
+}
+
+/// Run the pair API and require its verdict to be the oracle's.
+fn checked(
+    original: &[u8],
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<ReplacementProof, ReplacementError> {
+    let actual = verify_source_replacement(original, replacement, limits);
+    let expected = oracle(original, replacement, limits);
+    match (&actual, &expected) {
+        (Ok(_), Ok(())) => {},
+        (Err(actual_error), Err(expected_error)) => assert_eq!(actual_error, expected_error),
+        _ => panic!(
+            "pair verdict {actual:?} differs from the oracle {expected:?}\noriginal: {}\nreplacement: {}",
+            String::from_utf8_lossy(original),
+            String::from_utf8_lossy(replacement)
+        ),
+    }
+    actual
+}
+
+fn window(
+    original: std::ops::Range<usize>,
+    replacement: std::ops::Range<usize>,
+) -> ReplacementProof {
+    ReplacementProof::Window {
+        original,
+        replacement,
+    }
+}
+
+fn span(document: &str, needle: &str) -> std::ops::Range<usize> {
+    let start = document.find(needle).expect("fixture needle");
+    start..start + needle.len()
+}
+
+const WORKSHEET_HEAD: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<worksheet xmlns=\"urn:sml\"><dimension ref=\"A1:C3\"/>\n  <sheetData>\n";
+
+fn worksheet(a1: &str) -> String {
+    let mut sheet = String::from(WORKSHEET_HEAD);
+    for row in 1..=3 {
+        sheet.push_str(&format!("    <row r=\"{row}\">"));
+        for column in ["A", "B", "C"] {
+            if row == 1 && column == "A" {
+                sheet.push_str(a1);
+            } else {
+                sheet.push_str(&format!("<c r=\"{column}{row}\"><v>{row}</v></c>"));
+            }
+        }
+        sheet.push_str("</row>\n");
+    }
+    sheet.push_str("  </sheetData>\n  <extLst><ext uri=\"{X}\"><x:y xmlns:x=\"urn:x\" a=\"1\"/></ext></extLst>\n</worksheet>");
+    sheet
+}
+
+#[test]
+fn a_one_cell_value_edit_is_proved_by_its_value_element() {
+    let original = worksheet("<c r=\"A1\"><v>0</v></c>");
+    let replacement = worksheet("<c r=\"A1\"><v>1</v></c>");
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    let value = span(&original, "<v>0</v>");
+    assert_eq!(proof, window(value.clone(), value));
+}
+
+#[test]
+fn a_length_changing_cell_edit_is_proved_by_the_enclosing_element() {
+    let original = worksheet("<c r=\"A1\" s=\"1\"><v>7</v></c>");
+    let replacement = worksheet("<c r=\"A1\"><v>123456</v></c>");
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    let cell = span(&original, "<c r=\"A1\" s=\"1\"><v>7</v></c>");
+    let edited = span(&replacement, "<c r=\"A1\"><v>123456</v></c>");
+    assert_eq!(proof, window(cell, edited));
+}
+
+#[test]
+fn identical_payloads_have_the_original_verdict() {
+    let original = worksheet("<c r=\"A1\"><v>0</v></c>");
+    assert_eq!(
+        checked(original.as_bytes(), original.as_bytes(), Limits::default()),
+        Ok(ReplacementProof::Identical)
+    );
+    let broken = b"<root><!DOCTYPE x></root>";
+    assert!(matches!(
+        checked(broken, broken, Limits::default()),
+        Err(ReplacementError::Original(Error::Doctype { .. }))
+    ));
+}
+
+#[test]
+fn an_original_failure_precedes_any_replacement() {
+    let original = worksheet("<c r=\"A1\"><v xml:space=\"bogus\">0</v></c>");
+    let replacement = worksheet("<c r=\"A1\"><v>1</v></c>");
+    let error = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect_err("the original is refused");
+    assert!(matches!(
+        error,
+        ReplacementError::Original(Error::Malformed { .. })
+    ));
+}
+
+#[test]
+fn a_defect_inside_the_window_is_refused_with_the_complete_audit_error() {
+    let original = worksheet("<c r=\"A1\"><v>0</v></c>");
+    for edited in [
+        "<c r=\"A1\"><v xml:space=\"bogus\">1</v></c>",
+        "<c r=\"A1\"><v>1</w></c>",
+        "<c r=\"A1\"><v>1</v></c></c>",
+        "<c r=\"A1\"><v><!DOCTYPE x>1</v></c>",
+        "<c r=\"A1\"><v a=\"1\"b=\"2\">1</v></c>",
+        "<c r=\"A1\"><v>1&unclosed</v></c>",
+        "<c r=\"A1\"><v>1<</v></c>",
+    ] {
+        let replacement = worksheet(edited);
+        let error = checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+        )
+        .expect_err("the replacement is refused");
+        assert!(
+            matches!(error, ReplacementError::Replacement(_)),
+            "{edited}: {error:?}"
+        );
+    }
+    let mut invalid = worksheet("<c r=\"A1\"><v>0</v></c>").into_bytes();
+    let at = invalid.windows(3).position(|w| w == b">0<").unwrap() + 1;
+    invalid[at] = 0xFF;
+    assert_eq!(
+        checked(original.as_bytes(), &invalid, Limits::default()),
+        Err(ReplacementError::Replacement(Error::Encoding {
+            valid_up_to: at
+        }))
+    );
+}
+
+#[test]
+fn tampering_outside_the_edit_is_scanned_and_refused() {
+    // The intended edit is one value; a second, distant change carries a
+    // defect. The window must cover both, so the defect is audited.
+    let original = worksheet("<c r=\"A1\"><v>0</v></c>");
+    let tampered = worksheet("<c r=\"A1\"><v>1</v></c>").replace(
+        "<x:y xmlns:x=\"urn:x\" a=\"1\"/>",
+        "<x:y xmlns:x=\"urn:x\" xml:space=\"x\"/>",
+    );
+    let expected = verify_source(tampered.as_bytes(), Limits::default())
+        .expect_err("the substituted bytes are invalid");
+    assert_eq!(
+        checked(original.as_bytes(), tampered.as_bytes(), Limits::default()),
+        Err(ReplacementError::Replacement(expected))
+    );
+
+    // A distant valid substitution is audited too: the proof no longer
+    // claims the small window.
+    let substituted = worksheet("<c r=\"A1\"><v>1</v></c>").replace(" a=\"1\"", " a=\"2\"");
+    let proof = checked(
+        original.as_bytes(),
+        substituted.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    assert!(
+        !matches!(&proof, ReplacementProof::Window { original: covered, .. } if covered.len() < 100),
+        "{proof:?}"
+    );
+}
+
+#[test]
+fn edits_of_the_document_element_or_between_its_children_are_scanned_completely() {
+    let original = worksheet("<c r=\"A1\"><v>0</v></c>");
+    for replacement in [
+        original.replace(
+            "<worksheet xmlns=\"urn:sml\">",
+            "<worksheet xmlns=\"urn:sml\" x=\"1\">",
+        ),
+        original.replace("</worksheet>", "</worksheet >"),
+        original.replace("\n  <sheetData>", "\n\n  <sheetData>"),
+        original.replacen("\r\n", "\n", 1),
+        original
+            .replace("<dimension ref=\"A1:C3\"/>", "<dimension ref=\"A1:D3\"/>")
+            .replace("<v>0</v>", "<v>1</v>"),
+    ] {
+        assert_eq!(
+            checked(
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Limits::default()
+            ),
+            Ok(ReplacementProof::Complete),
+            "{replacement}"
+        );
+    }
+}
+
+#[test]
+fn a_window_that_would_not_start_or_end_with_markup_is_widened() {
+    // An element replaced by text: the bytes that took its place begin with
+    // character data, which would merge with the text before it.
+    let original = "<r><s> <p/></s><t/></r>";
+    let replacement = "<r><s> x</s><t/></r>";
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    assert_eq!(
+        proof,
+        window(
+            span(original, "<s> <p/></s>"),
+            span(replacement, "<s> x</s>")
+        )
+    );
+
+    // An element followed by new text: the window must end with markup.
+    let original = "<r><s><p/></s>tail<pad>padding that keeps the window small</pad></r>";
+    let replacement = "<r><s><p/>x</s>tail<pad>padding that keeps the window small</pad></r>";
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    assert_eq!(
+        proof,
+        window(
+            span(original, "<s><p/></s>"),
+            span(replacement, "<s><p/>x</s>")
+        )
+    );
+
+    // Text replacing the only child of the document element leaves no
+    // window at all.
+    let original = "<r><p/></r>";
+    let replacement = "<r>x</r>";
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default()
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn an_insertion_between_siblings_is_proved_with_a_neighbouring_sibling() {
+    // The common prefix ends inside the `<` both payloads share, so the
+    // following sibling is the innermost element covering the difference.
+    let original = "<r><s><a/><b/></s><z/></r>";
+    let replacement = "<r><s><a/><n>1</n><b/></s><z/></r>";
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    assert_eq!(
+        proof,
+        window(span(original, "<b/>"), span(replacement, "<n>1</n><b/>"))
+    );
+
+    // After a text node the difference starts after the shared `>`, so the
+    // preceding sibling covers it.
+    let original = "<r><s><a/>t</s><z/></r>";
+    let replacement = "<r><s><a/><n>1</n>t</s><z/></r>";
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    assert_eq!(
+        proof,
+        window(span(original, "<a/>"), span(replacement, "<a/><n>1</n>"))
+    );
+}
+
+#[test]
+fn a_window_larger_than_half_the_replacement_is_scanned_completely() {
+    let original = "<r><s><a/></s></r>";
+    let replacement = "<r><s><a/><b/><c/><d/><e/></s></r>";
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default()
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn a_broad_change_keeps_original_first_errors_and_limits() {
+    let original = "<root><a/></root>";
+    let replacement = "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>";
+
+    // Both sides are bad, but the original error is still the one exposed.
+    let error = checked(
+        b"<root><a/></root><broken>",
+        b"<root><long-element><x:item>alpha</long-element></root>",
+        Limits::default(),
+    )
+    .expect_err("the original is audited first");
+    assert!(matches!(
+        error,
+        ReplacementError::Original(Error::Malformed { .. })
+    ));
+
+    // A broad replacement does not change which side owns a byte-budget
+    // failure: an original failure is returned before the replacement runs.
+    let error = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default().narrow(Resource::Bytes, original.len() - 1),
+    )
+    .expect_err("the original exceeds its byte budget");
+    assert!(matches!(
+        error,
+        ReplacementError::Original(Error::Limit {
+            resource: Resource::Bytes,
+            ..
+        })
+    ));
+
+    // Once the original fits, the same broad path reports a replacement
+    // budget failure with the complete-audit error.
+    let error = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default().narrow(Resource::Bytes, original.len()),
+    )
+    .expect_err("the replacement exceeds its byte budget");
+    assert!(matches!(
+        error,
+        ReplacementError::Replacement(Error::Limit {
+            resource: Resource::Bytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn a_broad_valid_change_returns_the_complete_proof() {
+    let original = "<root><a/></root>";
+    let replacement = "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>";
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default()
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn exact_half_and_just_over_half_changes_keep_the_same_verdict() {
+    let original = "<r><x/></r>";
+    // The common prefix is `<r><`, the common suffix is `/></r>`, and the
+    // differing replacement span is exactly ten bytes: half of this
+    // twenty-byte replacement. The strict boundary must remain eligible for
+    // the ordinary window search, even though this candidate's enclosing
+    // window is too large to prove locally.
+    let exact_half = "<r><abcdefghij/></r>";
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            exact_half.as_bytes(),
+            Limits::default()
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+
+    // One more differing byte makes the pre-scan decision strict, so this
+    // follows the two complete source audits directly.
+    let just_over_half = "<r><abcdefghijk/></r>";
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            just_over_half.as_bytes(),
+            Limits::default()
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn broad_namespace_unicode_and_malformed_changes_match_complete_audits() {
+    let original = "<root><a/></root>";
+    let valid = "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>";
+    assert_eq!(
+        checked(original.as_bytes(), valid.as_bytes(), Limits::default()),
+        Ok(ReplacementProof::Complete)
+    );
+
+    for malformed in [
+        // The changed subtree uses a prefix that is not declared in scope.
+        "<root><long-element><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>",
+        // The changed subtree has a mismatched end tag.
+        "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</long-element></root>",
+    ] {
+        let expected = verify_source(malformed.as_bytes(), Limits::default())
+            .expect_err("the broad replacement is malformed");
+        assert_eq!(
+            checked(original.as_bytes(), malformed.as_bytes(), Limits::default()),
+            Err(ReplacementError::Replacement(expected)),
+            "{malformed}"
+        );
+    }
+
+    let mut invalid_utf8 = valid.as_bytes().to_vec();
+    let at = invalid_utf8
+        .iter()
+        .position(|byte| *byte == b'\xC3')
+        .expect("the valid fixture contains a two-byte Unicode character");
+    invalid_utf8[at] = 0xFF;
+    let expected = verify_source(&invalid_utf8, Limits::default())
+        .expect_err("the broad replacement has invalid UTF-8");
+    assert_eq!(
+        checked(original.as_bytes(), &invalid_utf8, Limits::default()),
+        Err(ReplacementError::Replacement(expected))
+    );
+}
+
+#[test]
+fn a_marked_original_keeps_physical_offsets() {
+    let original = format!("\u{feff}{}", worksheet("<c r=\"A1\"><v>0</v></c>"));
+    let replacement = format!("\u{feff}{}", worksheet("<c r=\"A1\"><v>1</v></c>"));
+    let proof = checked(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect("both sides are valid");
+    let value = span(&original, "<v>0</v>");
+    assert_eq!(proof, window(value.clone(), value));
+}
+
+/// Constructs whose verdict could depend on where a token sits, placed
+/// inside the edited element. Today's source policy judges them by their own
+/// bytes, so the window and the complete scan agree. A future check that
+/// reads position must keep them agreeing (see the invariant documented at
+/// the auditor's token loop); the oracle comparison here, and the debug
+/// cross-check inside `verify_source_replacement`, fail if it does not.
+#[test]
+fn position_sensitive_tokens_inside_a_window_are_judged_as_the_complete_audit_judges_them() {
+    let pad = "<pad>padding padding padding padding padding padding</pad>";
+    let original = format!("<r><a/>{pad}</r>");
+    for inserted in [
+        "<?xml version=\"1.0\"?>",
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<?xml-stylesheet href=\"s\"?>",
+        "<!--c-->",
+        "\u{feff}",
+        "<![CDATA[ ]]>",
+        "<!DOCTYPE r>",
+        "</r><r>",
+    ] {
+        for replacement in [
+            format!("<r>{inserted}{pad}</r>"),
+            format!("<r><a>{inserted}</a>{pad}</r>"),
+        ] {
+            let _verdict = checked(
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Limits::default(),
+            );
+        }
+    }
+}
+
+/// Change 0750: under the source policy a token's verdict also depends on the
+/// namespace bindings in scope and on whether it is the document's first. A
+/// window starts with the bindings the original's audit had in scope there
+/// and knows it is not at the start of the document, so it reaches the
+/// complete audit's verdict: a proof where the edit is well-formed in its
+/// place, and the complete audit's own error where it is not.
+#[test]
+fn a_window_replays_the_namespace_bindings_and_position_of_its_place() {
+    let pad = "<w:pad>padding padding padding padding padding padding padding padding</w:pad>";
+    let document = |first: &str, cell: &str| {
+        format!(
+            "<?xml version=\"1.0\"?>\n<w:document xmlns:w=\"urn:w\"><w:body>{first}<w:tbl xmlns:x=\"urn:x\"><w:tc>{cell}</w:tc></w:tbl>{pad}{pad}</w:body></w:document>"
+        )
+    };
+    let first = "<w:p><w:r><w:t>keep</w:t></w:r></w:p>";
+    let cell = "<w:p><w:r><w:t>0</w:t></w:r></w:p>";
+    let original = document(first, cell);
+
+    // Bound by the document element, by an enclosing element, or inside the
+    // window itself: each edit is proved by a window.
+    for edited in [
+        "<w:p><w:r><w:t>1</w:t></w:r></w:p>",
+        "<w:p><x:y w:a=\"1\" x:b=\"2\"/></w:p>",
+        "<w:p xmlns:z=\"urn:z\"><z:q z:a=\"1\"/><w:r><w:t>0</w:t></w:r></w:p>",
+        "<w:p xmlns:x=\"urn:other\"><x:y x:a=\"1\"/><w:r><w:t>0</w:t></w:r></w:p>",
+    ] {
+        let replacement = document(first, edited);
+        let proof = checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("{edited}: {error:?}"));
+        assert!(
+            matches!(proof, ReplacementProof::Window { .. }),
+            "{edited}: {proof:?}"
+        );
+    }
+
+    // Defects that depend on the place: each is refused with the complete
+    // audit's error, whether or not a window was found first.
+    for edited in [
+        // `q` is bound nowhere.
+        "<w:p><q:r/></w:p>",
+        // Two prefixes bound to one namespace name, the same local name.
+        "<w:p><w:r xmlns:a=\"u\" xmlns:b=\"u\" a:x=\"1\" b:x=\"2\"/></w:p>",
+        // The window is never at the start of the document.
+        "<w:p><?xml version=\"1.0\"?></w:p>",
+        // Lexical defects inside the window.
+        "<w:p>&nbsp;</w:p>",
+        "<w:p>\u{1}</w:p>",
+        "<w:p><!--a--b--></w:p>",
+        "<w:p a=\"&#0;\"/>",
+    ] {
+        let replacement = document(first, edited);
+        let expected = verify_source(replacement.as_bytes(), Limits::default())
+            .expect_err("the replacement is not well-formed");
+        assert!(matches!(expected, Error::Malformed { .. }), "{expected:?}");
+        assert_eq!(
+            checked(
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Limits::default()
+            ),
+            Err(ReplacementError::Replacement(expected)),
+            "{edited}"
+        );
+    }
+
+    // `x` is bound only inside the table, so the first paragraph, a sibling
+    // subtree the window's copy of the bindings must not see, cannot use it.
+    let replacement = document("<w:p><x:y/></w:p>", cell);
+    let expected = verify_source(replacement.as_bytes(), Limits::default())
+        .expect_err("x is not bound in the first paragraph");
+    assert_eq!(
+        checked(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default()
+        ),
+        Err(ReplacementError::Replacement(expected))
+    );
+}
+
+fn narrow(resource: Resource, maximum: usize) -> Limits {
+    Limits::default().narrow(resource, maximum)
+}
+
+/// Every aggregate budget is re-totalled for the whole replacement: an edit
+/// that stays inside the window can still push the document over a budget,
+/// and exactly-at-budget stays accepted.
+#[test]
+fn every_budget_is_re_totalled_for_the_whole_replacement() {
+    let original = worksheet("<c r=\"A1\"><v>0</v></c>");
+    let at = |edited: &str| worksheet(edited);
+
+    let report = verify_source(original.as_bytes(), Limits::default()).unwrap();
+    // Events: the edit adds a comment event inside the value element.
+    let grown = at("<c r=\"A1\"><v>1<!--x--></v></c>");
+    let limits = narrow(Resource::Events, report.events() + 1);
+    assert!(matches!(
+        checked(original.as_bytes(), grown.as_bytes(), limits),
+        Ok(ReplacementProof::Window { .. })
+    ));
+    let limits = narrow(Resource::Events, report.events());
+    assert!(matches!(
+        checked(original.as_bytes(), grown.as_bytes(), limits),
+        Err(ReplacementError::Replacement(Error::Limit {
+            resource: Resource::Events,
+            ..
+        }))
+    ));
+
+    // Attributes.
+    let grown = at("<c r=\"A1\"><v t=\"1\">1</v></c>");
+    let limits = narrow(Resource::Attributes, report.attributes() + 1);
+    assert!(matches!(
+        checked(original.as_bytes(), grown.as_bytes(), limits),
+        Ok(ReplacementProof::Window { .. })
+    ));
+    let limits = narrow(Resource::Attributes, report.attributes());
+    assert!(matches!(
+        checked(original.as_bytes(), grown.as_bytes(), limits),
+        Err(ReplacementError::Replacement(Error::Limit {
+            resource: Resource::Attributes,
+            ..
+        }))
+    ));
+
+    // Character data.
+    let grown = at("<c r=\"A1\"><v>12</v></c>");
+    let limits = narrow(Resource::TextBytes, report.text_bytes() + 1);
+    assert!(matches!(
+        checked(original.as_bytes(), grown.as_bytes(), limits),
+        Ok(ReplacementProof::Window { .. })
+    ));
+    let limits = narrow(Resource::TextBytes, report.text_bytes());
+    assert!(matches!(
+        checked(original.as_bytes(), grown.as_bytes(), limits),
+        Err(ReplacementError::Replacement(Error::Limit {
+            resource: Resource::TextBytes,
+            ..
+        }))
+    ));
+
+    // Depth: the value element sits at depth five; nesting inside it is
+    // checked against the absolute limit.
+    let deeper = at("<c r=\"A1\"><v><w>1</w></v></c>");
+    assert!(matches!(
+        checked(
+            original.as_bytes(),
+            deeper.as_bytes(),
+            narrow(Resource::Depth, 6)
+        ),
+        Ok(ReplacementProof::Window { .. })
+    ));
+    assert!(matches!(
+        checked(
+            original.as_bytes(),
+            deeper.as_bytes(),
+            narrow(Resource::Depth, 5)
+        ),
+        Err(ReplacementError::Replacement(Error::Limit {
+            resource: Resource::Depth,
+            ..
+        }))
+    ));
+
+    // One token. The original's longest token is its 55-byte declaration.
+    let limits = narrow(Resource::TokenBytes, 64);
+    let long = at(&format!("<c r=\"A1\"><v>{}</v></c>", "9".repeat(64)));
+    assert!(matches!(
+        checked(original.as_bytes(), long.as_bytes(), limits),
+        Ok(ReplacementProof::Window { .. })
+    ));
+    let longer = at(&format!("<c r=\"A1\"><v>{}</v></c>", "9".repeat(65)));
+    assert!(matches!(
+        checked(original.as_bytes(), longer.as_bytes(), limits),
+        Err(ReplacementError::Replacement(Error::Limit {
+            resource: Resource::TokenBytes,
+            ..
+        }))
+    ));
+
+    // Total length.
+    let longer = at("<c r=\"A1\"><v>10</v></c>");
+    assert!(matches!(
+        checked(
+            original.as_bytes(),
+            longer.as_bytes(),
+            narrow(Resource::Bytes, longer.len())
+        ),
+        Ok(ReplacementProof::Window { .. })
+    ));
+    assert!(matches!(
+        checked(
+            original.as_bytes(),
+            longer.as_bytes(),
+            narrow(Resource::Bytes, original.len())
+        ),
+        Err(ReplacementError::Replacement(Error::Limit {
+            resource: Resource::Bytes,
+            ..
+        }))
+    ));
+}
+
+// ------------------------------------------------------------ differential
+
+/// A small deterministic generator (xorshift64*), so the differential test
+/// needs no dependency and every failure is reproducible from its seed.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.0 = x;
+        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+
+    fn below(&mut self, bound: usize) -> usize {
+        (self.next() % bound as u64) as usize
+    }
+
+    fn chance(&mut self, percent: usize) -> bool {
+        self.below(100) < percent
+    }
+
+    fn pick<'a>(&mut self, items: &[&'a str]) -> &'a str {
+        items[self.below(items.len())]
+    }
+}
+
+/// Element names. `x:y` is bound only where some enclosing element (usually
+/// the document element) declares `x`.
+const NAMES: &[&str] = &["a", "b", "c", "row", "v", "x:y", "p", "q"];
+/// `ATTRIBUTES[0]` and `[1]` have distinct keys, `[2..4]` share
+/// `xml:space`, `[4]` is valid with a `>` in its value; the rest are
+/// malformed or refused by the audit (the prefixed ones where no enclosing
+/// element binds their prefix).
+const ATTRIBUTES: &[&str] = &[
+    " r=\"1\"",
+    " s='2'",
+    " xml:space=\"preserve\"",
+    " xml:space=\"default\"",
+    " g=\"a>b\"",
+    " xml:space=\"bogus\"",
+    " xmlns:x=\"urn:x\"",
+    " t=\"a&amp;b\"",
+    " u = \"3\"",
+    " w=\"4\"z=\"5\"",
+    " k",
+    " m=\"",
+    " e='<'",
+    " f=\"&bogus;\"",
+    " xmlns:n=\"\"",
+    " n:k=\"1\"",
+    " 9=\"1\"",
+];
+/// Namespace attributes that are valid wherever `x` is bound: a declaration,
+/// a prefixed attribute, and an alias of `x`'s namespace name whose attribute
+/// repeats the expanded name of `x:k` when both are present.
+const NAMESPACE_ATTRIBUTES: &[&str] = &[
+    " xmlns:x=\"urn:x\"",
+    " x:k=\"1\"",
+    " xmlns:z=\"urn:x\" z:k=\"2\"",
+];
+/// The first nine are valid character data; the rest are not, or are
+/// refused outside the document element.
+const TEXTS: &[&str] = &[
+    "0", "12", " ", "\n  ", "a&amp;b", "&#65;", "a>b", "&lt;&gt;", "\u{e9}", "&bogus;", "x]]>y",
+    "t\tt", "&", "<", "&#0;", "a\u{b}b", "\u{ffff}",
+];
+const VALID_TEXTS: usize = 9;
+/// The first seven are valid markup, several with a `>` or `<` inside the
+/// token; the rest are refused or unbalanced.
+const MISC: &[&str] = &[
+    "<!--c-->",
+    "<![CDATA[d]]>",
+    "<![CDATA[ ]]>",
+    "<?pi x?>",
+    "<!--a>b<c-->",
+    "<![CDATA[x>y<z]]>",
+    "<?pi a>b?>",
+    "<?xml version=\"1.0\"?>",
+    "<!DOCTYPE z>",
+    "</a>",
+    "<a>",
+    "<a/>",
+    "<b></b>",
+    "<v>1</v>",
+    "<c r=\"A1\"><v>7</v></c>",
+    "<!--a--b-->",
+    "<?XML x?>",
+    "<n:e/>",
+];
+const VALID_MISC: usize = 7;
+
+fn element(rng: &mut Rng, depth: usize, out: &mut String, spans: &mut Vec<(usize, usize)>) {
+    let start = out.len();
+    let name = rng.pick(NAMES);
+    out.push('<');
+    out.push_str(name);
+    // Distinct valid keys, and now and then one attribute from the whole
+    // pool, which may be malformed or repeat a key.
+    if rng.chance(50) {
+        out.push_str(ATTRIBUTES[0]);
+    }
+    if rng.chance(30) {
+        out.push_str(ATTRIBUTES[1]);
+    }
+    if rng.chance(20) {
+        out.push_str(rng.pick(&ATTRIBUTES[2..4]));
+    }
+    if rng.chance(10) {
+        out.push_str(ATTRIBUTES[4]);
+    }
+    // Two picks now and then: `x:k` with the alias repeats an expanded
+    // name, and a repeated pick repeats a qualified name.
+    for chance in [8, 2] {
+        if rng.chance(chance) {
+            out.push_str(rng.pick(NAMESPACE_ATTRIBUTES));
+        }
+    }
+    if rng.chance(3) {
+        out.push_str(rng.pick(ATTRIBUTES));
+    }
+    if depth == 0 || rng.chance(25) {
+        out.push_str("/>");
+        spans.push((start, out.len()));
+        return;
+    }
+    out.push('>');
+    for _ in 0..rng.below(4) {
+        match rng.below(10) {
+            0..=4 => element(rng, depth - 1, out, spans),
+            5..=7 => out.push_str(if rng.chance(97) {
+                rng.pick(&TEXTS[..VALID_TEXTS])
+            } else {
+                rng.pick(TEXTS)
+            }),
+            _ => out.push_str(if rng.chance(97) {
+                rng.pick(&MISC[..VALID_MISC])
+            } else {
+                rng.pick(MISC)
+            }),
+        }
+    }
+    out.push_str("</");
+    out.push_str(if rng.chance(99) { name } else { "zz" });
+    out.push('>');
+    spans.push((start, out.len()));
+}
+
+/// A generated document and the byte span of every element in it.
+fn document(rng: &mut Rng) -> (Vec<u8>, Vec<(usize, usize)>) {
+    let mut out = String::new();
+    let mut spans = Vec::new();
+    if rng.chance(5) {
+        out.push('\u{feff}');
+    }
+    if rng.chance(50) {
+        out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        if rng.chance(50) {
+            out.push('\n');
+        }
+    }
+    // The document element binds `x` for its whole tree 19 times in 20;
+    // otherwise an `x:y` element is bound only where an ancestor declares it.
+    out.push_str(if rng.chance(95) {
+        "<root xmlns:x=\"urn:x\">"
+    } else {
+        "<root>"
+    });
+    for _ in 0..1 + rng.below(4) {
+        element(rng, 4, &mut out, &mut spans);
+        if rng.chance(30) {
+            out.push_str("\n  ");
+        }
+    }
+    out.push_str("</root>");
+    if rng.chance(3) {
+        out.push_str(rng.pick(&["<extra/>", " x", "<![CDATA[ ]]>", "\n", "<!--t-->"]));
+    }
+    let mut bytes = out.into_bytes();
+    if rng.chance(1) && !bytes.is_empty() {
+        let at = rng.below(bytes.len());
+        bytes[at] = 0xC0;
+    }
+    (bytes, spans)
+}
+
+fn fragment(rng: &mut Rng) -> String {
+    let mut fragment = String::new();
+    match rng.below(5) {
+        0 | 1 => element(rng, 2, &mut fragment, &mut Vec::new()),
+        2 => fragment.push_str(rng.pick(TEXTS)),
+        3 => fragment.push_str(rng.pick(MISC)),
+        _ => {},
+    }
+    fragment
+}
+
+/// Where one local edit goes and what it inserts: most often a whole element
+/// replaced, inserted, deleted or retouched, otherwise an arbitrary span
+/// replaced.
+fn edit_site(rng: &mut Rng, original: &[u8], spans: &[(usize, usize)]) -> (usize, usize, String) {
+    let length = original.len();
+    match rng.below(10) {
+        _ if spans.is_empty() => {
+            let start = rng.below(length + 1);
+            (start, (start + rng.below(6)).min(length), fragment(rng))
+        },
+        0..=3 => {
+            let (start, end) = spans[rng.below(spans.len())];
+            (start, end, fragment(rng))
+        },
+        4 | 5 => {
+            let (start, end) = spans[rng.below(spans.len())];
+            let at = if rng.chance(50) { start } else { end };
+            (at, at, fragment(rng))
+        },
+        6 => {
+            let (start, end) = spans[rng.below(spans.len())];
+            (start, end, String::new())
+        },
+        7 => {
+            // Retouch one byte inside an element: a value, a name, a quote.
+            let (start, end) = spans[rng.below(spans.len())];
+            let at = start + rng.below(end - start);
+            let byte = rng.pick(&["0", "7", "a", " ", "\"", "/", "<", ">", "&"]);
+            (at, at + 1, byte.to_string())
+        },
+        _ => {
+            let start = rng.below(length + 1);
+            (start, (start + rng.below(6)).min(length), fragment(rng))
+        },
+    }
+}
+
+/// A second edit site inside the smallest element that contains `first`, so
+/// that the two edits often share a small enclosing element: another element
+/// in it replaced, or an insertion before or after one, or at any byte.
+fn nearby_site(
+    rng: &mut Rng,
+    original: &[u8],
+    spans: &[(usize, usize)],
+    first: &(usize, usize, String),
+) -> (usize, usize, String) {
+    let container = spans
+        .iter()
+        .filter(|(start, end)| {
+            *start <= first.0 && first.1 <= *end && end - start > first.1 - first.0
+        })
+        .min_by_key(|(start, end)| end - start);
+    let Some(&(start, end)) = container else {
+        return edit_site(rng, original, spans);
+    };
+    let inner: Vec<(usize, usize)> = spans
+        .iter()
+        .copied()
+        .filter(|(a, b)| start < *a && *b < end)
+        .collect();
+    if !inner.is_empty() && rng.chance(70) {
+        let (a, b) = inner[rng.below(inner.len())];
+        return match rng.below(3) {
+            0 => (a, b, fragment(rng)),
+            1 => (a, a, fragment(rng)),
+            _ => (b, b, fragment(rng)),
+        };
+    }
+    let at = start + 1 + rng.below(end - start - 1);
+    (at, at, fragment(rng))
+}
+
+/// An edit of `original` and the number of separated sites it changed: one
+/// local edit, or in a quarter of the cases two, with at least one original
+/// byte left between them so that a window must cover both. Half of the
+/// second sites are drawn inside the first site's enclosing element.
+fn edit(rng: &mut Rng, original: &[u8], spans: &[(usize, usize)]) -> (Vec<u8>, usize) {
+    let first = edit_site(rng, original, spans);
+    let mut sites = vec![first];
+    if rng.chance(25) {
+        let second = if rng.chance(50) {
+            nearby_site(rng, original, spans, &sites[0])
+        } else {
+            edit_site(rng, original, spans)
+        };
+        let first = sites.remove(0);
+        let (earlier, later) = if first.0 <= second.0 {
+            (first, second)
+        } else {
+            (second, first)
+        };
+        if earlier.1 < later.0 {
+            sites.push(earlier);
+            sites.push(later);
+        } else {
+            sites.push(earlier);
+        }
+    }
+    let mut replacement = Vec::new();
+    let mut cursor = 0;
+    for (start, end, insert) in &sites {
+        replacement.extend_from_slice(&original[cursor..*start]);
+        replacement.extend_from_slice(insert.as_bytes());
+        cursor = *end;
+    }
+    replacement.extend_from_slice(&original[cursor..]);
+    (replacement, sites.len())
+}
+
+/// Default limits half the time; otherwise every budget within two of what
+/// the original or the replacement needs, so budget boundaries are crossed
+/// in both directions.
+fn limits(rng: &mut Rng, original: &[u8], replacement: &[u8]) -> Limits {
+    if rng.chance(50) {
+        return Limits::default();
+    }
+    let basis = if rng.chance(50) {
+        original
+    } else {
+        replacement
+    };
+    let Ok(report) = verify_source(basis, Limits::default()) else {
+        return Limits::default();
+    };
+    let around = |rng: &mut Rng, value: usize| value.saturating_sub(2) + rng.below(5);
+    let (bytes, depth, events, attributes, text) = (
+        around(rng, basis.len()),
+        around(rng, report.max_depth()),
+        around(rng, report.events()),
+        around(rng, report.attributes()),
+        around(rng, report.text_bytes()),
+    );
+    let mut limits = Limits::default();
+    for (resource, value) in [
+        (Resource::Bytes, bytes),
+        (Resource::Depth, depth),
+        (Resource::Events, events),
+        (Resource::Attributes, attributes),
+        (Resource::TextBytes, text),
+        (Resource::TokenBytes, 24 + rng.below(48)),
+    ] {
+        if rng.chance(40) {
+            limits = limits.narrow(resource, value);
+        }
+    }
+    limits
+}
+
+/// A campaign size or seed from the environment, for longer runs than the
+/// default; the default is what the suite runs.
+fn setting(name: &str, default: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(default)
+}
+
+#[test]
+fn the_pair_verdict_equals_two_complete_audits_on_generated_edits() {
+    let cases = setting("XML_MINIFIER_REPLACEMENT_CASES", 40_000);
+    let mut rng = Rng(setting(
+        "XML_MINIFIER_REPLACEMENT_SEED",
+        0x0747_5eed_0747_5eed,
+    ));
+    let scale = |count: u64| count * cases / 40_000;
+    let mut original_refused = 0u64;
+    let mut replacement_refused = 0u64;
+    let mut identical = 0u64;
+    let mut windows = 0u64;
+    let mut complete = 0u64;
+    let mut two_sites = 0u64;
+    let mut two_site_windows = 0u64;
+    for _ in 0..cases {
+        let (original, spans) = document(&mut rng);
+        let (replacement, sites) = edit(&mut rng, &original, &spans);
+        let limits = limits(&mut rng, &original, &replacement);
+        if sites == 2 {
+            two_sites += 1;
+        }
+        match checked(&original, &replacement, limits) {
+            Err(ReplacementError::Original(_)) => original_refused += 1,
+            Err(_) => replacement_refused += 1,
+            Ok(ReplacementProof::Identical) => identical += 1,
+            Ok(ReplacementProof::Window { .. }) => {
+                windows += 1;
+                if sites == 2 {
+                    two_site_windows += 1;
+                }
+            },
+            Ok(_) => complete += 1,
+        }
+    }
+    eprintln!(
+        "cases {cases}: refused on the original {original_refused}, refused on the replacement \
+         {replacement_refused}, identical {identical}, window {windows}, complete {complete}; \
+         two separated edits {two_sites} (window {two_site_windows})"
+    );
+    // The generator must exercise every path, and the window path often,
+    // including windows that cover two separated edits.
+    assert!(identical + windows + complete > scale(8_000));
+    assert!(original_refused + replacement_refused > scale(8_000));
+    assert!(
+        replacement_refused > scale(2_000),
+        "replacement refusals {replacement_refused}"
+    );
+    assert!(windows > scale(4_000), "windows {windows}");
+    assert!(complete > scale(2_000), "complete {complete}");
+    assert!(
+        two_site_windows > scale(200),
+        "two-edit windows {two_site_windows}"
+    );
+}

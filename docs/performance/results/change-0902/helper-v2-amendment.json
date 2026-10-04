@@ -1,0 +1,17 @@
+{
+  "reason": "Path objects used for internal descriptors were rejected by helpers expecting str or dict",
+  "workload_children_launched": 0,
+  "preserved_failure": "qualification-capture-run.json",
+  "preserved_empty_attempt": "attempts/qualification-v1-prelaunch",
+  "changes": [
+    "run_v2 accepts str or Path descriptors",
+    "analyze_v2 accepts str or Path descriptors and binds run_v2"
+  ],
+  "method_or_gate_changed": false,
+  "helpers": {
+    "run.py": "3418daf9a5f83e166a31846c3d94b96769a218db64b206fac7f484c8b463fcd7",
+    "analyze.py": "d035220b5a3ae5a85c06eaa213d0fe5549002d068334c94d4cf0e770aadf24c5",
+    "run_v2.py": "28a83f7f50d2fecdad4aa65cd10c176f42348b92574dbf14369243a4410f365a",
+    "analyze_v2.py": "157ab8b51fc10b2a7c1dd1448dc9dad3b03e9676d240babf25c99d1ced1e742e"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "path": "/tmp/litchi-0902-src/docs",
+  "target": "/home/zhuhe/code/litchi/docs",
+  "reason": "OPC forced_zip64_failures includes retained 0416 corpus absent from compiler archive",
+  "scope": "read-only test fixtures; not release workload input"
+}

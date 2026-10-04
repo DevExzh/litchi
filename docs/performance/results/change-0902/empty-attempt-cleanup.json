@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "removed_empty_directories": [
+    "docs/performance/results/change-0902/attempts/qualification-v1-prelaunch/q00-baseline-primary-percent-medium",
+    "docs/performance/results/change-0902/attempts/qualification-v1-prelaunch",
+    "docs/performance/results/change-0902/attempts"
+  ],
+  "failure_receipts_preserved": true
+}

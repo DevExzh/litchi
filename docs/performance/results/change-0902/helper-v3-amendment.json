@@ -1,0 +1,8 @@
+{
+  "reason": "one-edit control correctly reads three untouched compressed worksheet members during preservation publication; validator wrongly inherited all-selected zero-unselected assumption",
+  "failed_analysis": "qualification-analysis-run.json",
+  "workload_repeated": false,
+  "changes": "one-edit requires three unselected compressed-member reads and positive bytes; exact cross-role identities still required",
+  "gate_changed": false,
+  "helper_sha256": "4d96e5ac9031a60c6a5b7024cf8aaefd05bd12280760b9f3a1cf6d01bd72829b"
+}

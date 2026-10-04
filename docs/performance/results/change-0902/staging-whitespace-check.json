@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "editable_staged_text_exit_code": 0,
+  "immutable_tool_output_exceptions": [
+    "docs/performance/results/change-0902/baseline-xml-tests.log",
+    "docs/performance/results/change-0902/candidate-doc-tests.log",
+    "docs/performance/results/change-0902/candidate-final-xml-tests.log",
+    "docs/performance/results/change-0902/candidate-office-tests-v3.log",
+    "docs/performance/results/change-0902/candidate-preformat.patch",
+    "docs/performance/results/change-0902/candidate-v1.patch",
+    "docs/performance/results/change-0902/candidate-xml-tests-v2.log",
+    "docs/performance/results/change-0902/candidate.patch"
+  ],
+  "reason": "retain exact compiler/test logs and Git-generated patch context bytes; initial full check preserved separately"
+}

@@ -1,0 +1,6 @@
+{
+  "path": "/tmp/litchi-0902-src/3rdparty",
+  "target": "/home/zhuhe/code/litchi/3rdparty",
+  "reason": "initial Office test compilation requires root native fixture absent from selected compiler source archive",
+  "scope": "read-only test fixtures; not release workload input"
+}

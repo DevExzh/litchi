@@ -1,0 +1,34 @@
+{
+  "status": "pass",
+  "roots": [
+    {
+      "path": "/tmp/litchi-0902-src",
+      "files": 10773,
+      "logical_bytes": 259535059,
+      "symlinks_unlinked_without_following": [
+        {
+          "path": "/tmp/litchi-0902-src/docs",
+          "target": "/home/zhuhe/code/litchi/docs"
+        },
+        {
+          "path": "/tmp/litchi-0902-src/3rdparty",
+          "target": "/home/zhuhe/code/litchi/3rdparty"
+        }
+      ],
+      "marker_sha256": "3ed9f7e1b91dc4a63a2cb9d2ee990feb0e495328a58417d94e2923febdb91376",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0902-build",
+      "files": 17034,
+      "logical_bytes": 7055448346,
+      "symlinks_unlinked_without_following": [],
+      "marker_sha256": "3ed9f7e1b91dc4a63a2cb9d2ee990feb0e495328a58417d94e2923febdb91376",
+      "removed": true
+    }
+  ],
+  "worktrees_created": 0,
+  "worktrees_removed": 0,
+  "retained_results_binaries": "intentional hash-bound experiment artifacts, not temporary build directories",
+  "finished_utc": "2026-10-04T04:20:39.489890+00:00"
+}

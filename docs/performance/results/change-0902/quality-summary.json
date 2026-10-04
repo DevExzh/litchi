@@ -1,0 +1,106 @@
+[
+  {
+    "label": "baseline-xml-tests",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "6be919577a93b2e4385c7bae007263c9bc83a2eb7f128812bc0325594901343d",
+    "tests": {
+      "passed": 134,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  {
+    "label": "candidate-xml-tests",
+    "exit_code": 101,
+    "inputs_unchanged": true,
+    "receipt_sha256": "4a88b813510c138fad5cd3b935700651916721d6dc699dc41d34e3bb152ee64d",
+    "tests": null
+  },
+  {
+    "label": "candidate-xml-tests-v2",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "312c87ac772aea5b513512f8002e5a1546c2a4939f1f481ff097b6d8fdab5d39",
+    "tests": {
+      "passed": 138,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  {
+    "label": "candidate-office-tests",
+    "exit_code": 101,
+    "inputs_unchanged": true,
+    "receipt_sha256": "bc0f440dd38d830d96c864c1ef70fdce87bc4e0527d2183502cd20577b22dba6",
+    "tests": null
+  },
+  {
+    "label": "candidate-office-tests-v2",
+    "exit_code": 101,
+    "inputs_unchanged": true,
+    "receipt_sha256": "f53154fa5e3d7f55568477245ce806e96def19cb83e72e2a554bf19691f0e3fa",
+    "tests": null
+  },
+  {
+    "label": "candidate-office-tests-v3",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "e1144d0e2c4a94b6aff1df9639c70bf00b0d9ee3b0fd67e32d9ed112e6b784c1",
+    "tests": {
+      "passed": 6296,
+      "failed": 0,
+      "ignored": 3
+    }
+  },
+  {
+    "label": "candidate-final-xml-tests",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "c6cd5bd12880183f4b3a3d60cbbe6af5e95cfbf698940e5ae062590b2c55996b",
+    "tests": {
+      "passed": 138,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  {
+    "label": "candidate-fmt",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "babc02335798b9877574b708ec21202d182c436a51a4ff80b5defd8077814632",
+    "tests": null
+  },
+  {
+    "label": "candidate-clippy",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "e8559c6aa009eb85d22693a8e9b5b5f9bbf88f283609ce83631c089ea1ada7d0",
+    "tests": null
+  },
+  {
+    "label": "candidate-doc-tests",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "a40f95859a0f55f6221a52e0181dc27df92d51265be7f27fe2ab93398627c523",
+    "tests": {
+      "passed": 93,
+      "failed": 0,
+      "ignored": 33
+    }
+  },
+  {
+    "label": "candidate-rustdoc",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "536f0695c664a02581f0d37ad19f236d06f2d6d2f4e740c764a8122c92b12223",
+    "tests": null
+  },
+  {
+    "label": "candidate-boundaries",
+    "exit_code": 0,
+    "inputs_unchanged": true,
+    "receipt_sha256": "a7894d64580d39d5b37eaeac964d319b23d855a8a8ac2685149f638a65e306f6",
+    "tests": null
+  }
+]

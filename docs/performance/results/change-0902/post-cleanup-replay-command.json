@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0902/replay.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0902/post-cleanup-replay.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "started_utc": "2026-10-04T04:21:03.841655+00:00",
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T04:21:05.860669+00:00",
+  "log_sha256": "b04a7296babefa33aa7860d0df752b3d33fbfed72cdb3fc118059a4d97c99bfd"
+}

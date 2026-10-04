@@ -1,0 +1,24 @@
+{
+  "baseline_manifest": {
+    "bytes": 3325536,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "candidate_files": [
+    "crates/xml-minifier/src/audit.rs",
+    "crates/xml-minifier/tests/source_replacement.rs"
+  ],
+  "candidate_manifest": {
+    "bytes": 3323129,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/candidate-source-v2.json",
+    "sha256": "ebcb1f10dd80d61e058fa81e4de0fd299c7be438a22391913c722f197776635b"
+  },
+  "file_count": 10771,
+  "hashed_entries": 21542,
+  "root_worktree": "/home/zhuhe/code/litchi",
+  "source_root": "/tmp/litchi-0902-src"
+}

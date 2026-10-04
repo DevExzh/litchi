@@ -1,0 +1,2296 @@
+{
+  "cases": {
+    "control-docx-one-edit-medium": {
+      "baseline": {
+        "allocator_metrics_status": [
+          "not_applicable"
+        ],
+        "native": {
+          "p50": {
+            "max": 168786,
+            "median": 165631.0,
+            "min": 164936
+          },
+          "p95": {
+            "max": 178491,
+            "median": 175210.5,
+            "min": 169671
+          },
+          "p99": {
+            "max": 181891,
+            "median": 178231.0,
+            "min": 173111
+          }
+        },
+        "p50_spread": 1.023342387350245,
+        "phase_allocations": {},
+        "phase_p50_ns": {},
+        "rss_kib": {
+          "max": 18900,
+          "median": 18760.0,
+          "min": 18400
+        }
+      },
+      "candidate": {
+        "allocator_metrics_status": [
+          "not_applicable"
+        ],
+        "native": {
+          "p50": {
+            "max": 158926,
+            "median": 157683.5,
+            "min": 157116
+          },
+          "p95": {
+            "max": 168581,
+            "median": 167296.0,
+            "min": 166401
+          },
+          "p99": {
+            "max": 176351,
+            "median": 170896.0,
+            "min": 167031
+          }
+        },
+        "p50_spread": 1.011520150716668,
+        "phase_allocations": {},
+        "phase_p50_ns": {},
+        "rss_kib": {
+          "max": 26688,
+          "median": 25320.0,
+          "min": 25160
+        }
+      },
+      "ratios_of_native_medians": {
+        "p50": 0.9520168325977625,
+        "p95": 0.9548286204308531,
+        "p99": 0.9588455431434487
+      }
+    },
+    "control-xlsx-one-edit-medium": {
+      "baseline": {
+        "allocator_metrics_status": [
+          "measured"
+        ],
+        "native": {
+          "p50": {
+            "max": 4155711,
+            "median": 4140778.5,
+            "min": 4082466
+          },
+          "p95": {
+            "max": 4222852,
+            "median": 4184301.5,
+            "min": 4127502
+          },
+          "p99": {
+            "max": 4282643,
+            "median": 4206141.5,
+            "min": 4147332
+          }
+        },
+        "p50_spread": 1.0179413619121385,
+        "phase_allocations": {
+          "commit_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 749638,
+              "median": 749638.0,
+              "min": 749638
+            },
+            "allocation_calls": {
+              "max": 10181,
+              "median": 10181.0,
+              "min": 10181
+            },
+            "deallocated_bytes": {
+              "max": 245137,
+              "median": 245137.0,
+              "min": 245137
+            },
+            "deallocation_calls": {
+              "max": 7795,
+              "median": 7795.0,
+              "min": 7795
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22729905,
+              "median": 22729649.0,
+              "min": 22723185
+            },
+            "live_bytes_before": {
+              "max": 22225404,
+              "median": 22225148.0,
+              "min": 22218684
+            },
+            "peak_live_bytes_after": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "peak_live_bytes_before": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "reallocation_calls": {
+              "max": 50,
+              "median": 50.0,
+              "min": 50
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 507624,
+              "median": 507624.0,
+              "min": 507624
+            },
+            "region_peak_live_bytes": {
+              "max": 22733028,
+              "median": 22732772.0,
+              "min": 22726308
+            }
+          },
+          "commit_core_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 724315,
+              "median": 724315.0,
+              "min": 724315
+            },
+            "allocation_calls": {
+              "max": 10175,
+              "median": 10175.0,
+              "min": 10175
+            },
+            "deallocated_bytes": {
+              "max": 220535,
+              "median": 220535.0,
+              "min": 220535
+            },
+            "deallocation_calls": {
+              "max": 7793,
+              "median": 7793.0,
+              "min": 7793
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22729905,
+              "median": 22729649.0,
+              "min": 22723185
+            },
+            "live_bytes_before": {
+              "max": 22226125,
+              "median": 22225869.0,
+              "min": 22219405
+            },
+            "peak_live_bytes_after": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "peak_live_bytes_before": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "reallocation_calls": {
+              "max": 49,
+              "median": 49.0,
+              "min": 49
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 506903,
+              "median": 506903.0,
+              "min": 506903
+            },
+            "region_peak_live_bytes": {
+              "max": 22733028,
+              "median": 22732772.0,
+              "min": 22726308
+            }
+          },
+          "plan_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 3196069,
+              "median": 3196069.0,
+              "min": 3196069
+            },
+            "allocation_calls": {
+              "max": 17135,
+              "median": 17135.0,
+              "min": 17135
+            },
+            "deallocated_bytes": {
+              "max": 2650678,
+              "median": 2650678.0,
+              "min": 2650678
+            },
+            "deallocation_calls": {
+              "max": 14682,
+              "median": 14682.0,
+              "min": 14682
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22225404,
+              "median": 22225148.0,
+              "min": 22218684
+            },
+            "live_bytes_before": {
+              "max": 21680013,
+              "median": 21679757.0,
+              "min": 21673293
+            },
+            "peak_live_bytes_after": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "peak_live_bytes_before": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "reallocation_calls": {
+              "max": 70,
+              "median": 70.0,
+              "min": 70
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 1546332,
+              "median": 1546332.0,
+              "min": 1546332
+            },
+            "region_peak_live_bytes": {
+              "max": 23226345,
+              "median": 23226089.0,
+              "min": 23219625
+            }
+          },
+          "publication_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 1216622,
+              "median": 1216622.0,
+              "min": 1216622
+            },
+            "allocation_calls": {
+              "max": 2662,
+              "median": 2662.0,
+              "min": 2662
+            },
+            "deallocated_bytes": {
+              "max": 1232320,
+              "median": 1232320.0,
+              "min": 1232320
+            },
+            "deallocation_calls": {
+              "max": 2810,
+              "median": 2810.0,
+              "min": 2810
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22714207,
+              "median": 22713951.0,
+              "min": 22707487
+            },
+            "live_bytes_before": {
+              "max": 22729905,
+              "median": 22729649.0,
+              "min": 22723185
+            },
+            "peak_live_bytes_after": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "peak_live_bytes_before": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "reallocation_calls": {
+              "max": 29,
+              "median": 29.0,
+              "min": 29
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 634046,
+              "median": 634046.0,
+              "min": 634046
+            },
+            "region_peak_live_bytes": {
+              "max": 23363951,
+              "median": 23363695.0,
+              "min": 23357231
+            }
+          },
+          "staging_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 25323,
+              "median": 25323.0,
+              "min": 25323
+            },
+            "allocation_calls": {
+              "max": 6,
+              "median": 6.0,
+              "min": 6
+            },
+            "deallocated_bytes": {
+              "max": 24602,
+              "median": 24602.0,
+              "min": 24602
+            },
+            "deallocation_calls": {
+              "max": 2,
+              "median": 2.0,
+              "min": 2
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22226125,
+              "median": 22225869.0,
+              "min": 22219405
+            },
+            "live_bytes_before": {
+              "max": 22225404,
+              "median": 22225148.0,
+              "min": 22218684
+            },
+            "peak_live_bytes_after": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "peak_live_bytes_before": {
+              "max": 52334296,
+              "median": 52334296.0,
+              "min": 52334296
+            },
+            "reallocation_calls": {
+              "max": 1,
+              "median": 1.0,
+              "min": 1
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 25313,
+              "median": 25313.0,
+              "min": 25313
+            },
+            "region_peak_live_bytes": {
+              "max": 22250717,
+              "median": 22250461.0,
+              "min": 22243997
+            }
+          }
+        },
+        "phase_p50_ns": {
+          "commit_ns": {
+            "max": 828904.5,
+            "median": 821861.75,
+            "min": 812364.0
+          },
+          "open_ns": {
+            "max": 87575.5,
+            "median": 83958.0,
+            "min": 76825.5
+          },
+          "plan_ns": {
+            "max": 1469947.5,
+            "median": 1461430.0,
+            "min": 1447062.0
+          },
+          "publication_ns": {
+            "max": 1776994.0,
+            "median": 1767327.0,
+            "min": 1747154.5
+          },
+          "reopen_ns": {
+            "max": 25159115.5,
+            "median": 24914554.5,
+            "min": 20711173.0
+          }
+        },
+        "rss_kib": {
+          "max": 69336,
+          "median": 67230.0,
+          "min": 66832
+        }
+      },
+      "candidate": {
+        "allocator_metrics_status": [
+          "measured"
+        ],
+        "native": {
+          "p50": {
+            "max": 4224587,
+            "median": 4114512.0,
+            "min": 4088250
+          },
+          "p95": {
+            "max": 4307443,
+            "median": 4228346.5,
+            "min": 4146882
+          },
+          "p99": {
+            "max": 4329593,
+            "median": 4280112.5,
+            "min": 4214901
+          }
+        },
+        "p50_spread": 1.0333484987464074,
+        "phase_allocations": {
+          "commit_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 749638,
+              "median": 749638.0,
+              "min": 749638
+            },
+            "allocation_calls": {
+              "max": 10181,
+              "median": 10181.0,
+              "min": 10181
+            },
+            "deallocated_bytes": {
+              "max": 245137,
+              "median": 245137.0,
+              "min": 245137
+            },
+            "deallocation_calls": {
+              "max": 7795,
+              "median": 7795.0,
+              "min": 7795
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22729908,
+              "median": 22729652.0,
+              "min": 22723188
+            },
+            "live_bytes_before": {
+              "max": 22225407,
+              "median": 22225151.0,
+              "min": 22218687
+            },
+            "peak_live_bytes_after": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "peak_live_bytes_before": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "reallocation_calls": {
+              "max": 50,
+              "median": 50.0,
+              "min": 50
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 507624,
+              "median": 507624.0,
+              "min": 507624
+            },
+            "region_peak_live_bytes": {
+              "max": 22733031,
+              "median": 22732775.0,
+              "min": 22726311
+            }
+          },
+          "commit_core_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 724315,
+              "median": 724315.0,
+              "min": 724315
+            },
+            "allocation_calls": {
+              "max": 10175,
+              "median": 10175.0,
+              "min": 10175
+            },
+            "deallocated_bytes": {
+              "max": 220535,
+              "median": 220535.0,
+              "min": 220535
+            },
+            "deallocation_calls": {
+              "max": 7793,
+              "median": 7793.0,
+              "min": 7793
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22729908,
+              "median": 22729652.0,
+              "min": 22723188
+            },
+            "live_bytes_before": {
+              "max": 22226128,
+              "median": 22225872.0,
+              "min": 22219408
+            },
+            "peak_live_bytes_after": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "peak_live_bytes_before": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "reallocation_calls": {
+              "max": 49,
+              "median": 49.0,
+              "min": 49
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 506903,
+              "median": 506903.0,
+              "min": 506903
+            },
+            "region_peak_live_bytes": {
+              "max": 22733031,
+              "median": 22732775.0,
+              "min": 22726311
+            }
+          },
+          "plan_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 3196069,
+              "median": 3196069.0,
+              "min": 3196069
+            },
+            "allocation_calls": {
+              "max": 17135,
+              "median": 17135.0,
+              "min": 17135
+            },
+            "deallocated_bytes": {
+              "max": 2650678,
+              "median": 2650678.0,
+              "min": 2650678
+            },
+            "deallocation_calls": {
+              "max": 14682,
+              "median": 14682.0,
+              "min": 14682
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22225407,
+              "median": 22225151.0,
+              "min": 22218687
+            },
+            "live_bytes_before": {
+              "max": 21680016,
+              "median": 21679760.0,
+              "min": 21673296
+            },
+            "peak_live_bytes_after": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "peak_live_bytes_before": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "reallocation_calls": {
+              "max": 70,
+              "median": 70.0,
+              "min": 70
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 1546332,
+              "median": 1546332.0,
+              "min": 1546332
+            },
+            "region_peak_live_bytes": {
+              "max": 23226348,
+              "median": 23226092.0,
+              "min": 23219628
+            }
+          },
+          "publication_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 1216622,
+              "median": 1216622.0,
+              "min": 1216622
+            },
+            "allocation_calls": {
+              "max": 2662,
+              "median": 2662.0,
+              "min": 2662
+            },
+            "deallocated_bytes": {
+              "max": 1232320,
+              "median": 1232320.0,
+              "min": 1232320
+            },
+            "deallocation_calls": {
+              "max": 2810,
+              "median": 2810.0,
+              "min": 2810
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22714210,
+              "median": 22713954.0,
+              "min": 22707490
+            },
+            "live_bytes_before": {
+              "max": 22729908,
+              "median": 22729652.0,
+              "min": 22723188
+            },
+            "peak_live_bytes_after": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "peak_live_bytes_before": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "reallocation_calls": {
+              "max": 29,
+              "median": 29.0,
+              "min": 29
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 634046,
+              "median": 634046.0,
+              "min": 634046
+            },
+            "region_peak_live_bytes": {
+              "max": 23363954,
+              "median": 23363698.0,
+              "min": 23357234
+            }
+          },
+          "staging_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 25323,
+              "median": 25323.0,
+              "min": 25323
+            },
+            "allocation_calls": {
+              "max": 6,
+              "median": 6.0,
+              "min": 6
+            },
+            "deallocated_bytes": {
+              "max": 24602,
+              "median": 24602.0,
+              "min": 24602
+            },
+            "deallocation_calls": {
+              "max": 2,
+              "median": 2.0,
+              "min": 2
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 22226128,
+              "median": 22225872.0,
+              "min": 22219408
+            },
+            "live_bytes_before": {
+              "max": 22225407,
+              "median": 22225151.0,
+              "min": 22218687
+            },
+            "peak_live_bytes_after": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "peak_live_bytes_before": {
+              "max": 52334299,
+              "median": 52334299.0,
+              "min": 52334299
+            },
+            "reallocation_calls": {
+              "max": 1,
+              "median": 1.0,
+              "min": 1
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 25313,
+              "median": 25313.0,
+              "min": 25313
+            },
+            "region_peak_live_bytes": {
+              "max": 22250720,
+              "median": 22250464.0,
+              "min": 22244000
+            }
+          }
+        },
+        "phase_p50_ns": {
+          "commit_ns": {
+            "max": 825639.5,
+            "median": 813129.5,
+            "min": 798584.0
+          },
+          "open_ns": {
+            "max": 90501.0,
+            "median": 78022.5,
+            "min": 76215.5
+          },
+          "plan_ns": {
+            "max": 1540187.5,
+            "median": 1493920.25,
+            "min": 1472237.5
+          },
+          "publication_ns": {
+            "max": 1769634.0,
+            "median": 1742981.5,
+            "min": 1736414.0
+          },
+          "reopen_ns": {
+            "max": 25195113.0,
+            "median": 24171965.5,
+            "min": 20791808.5
+          }
+        },
+        "rss_kib": {
+          "max": 80204,
+          "median": 77160.0,
+          "min": 75896
+        }
+      },
+      "ratios_of_native_medians": {
+        "p50": 0.9936566276124164,
+        "p95": 1.0105262491242564,
+        "p99": 1.0175864268950534
+      }
+    },
+    "primary-percent-dense-sparse": {
+      "baseline": {
+        "allocator_metrics_status": [
+          "measured"
+        ],
+        "native": {
+          "p50": {
+            "max": 33511028,
+            "median": 32978559.0,
+            "min": 32782808
+          },
+          "p95": {
+            "max": 100491201,
+            "median": 33341398.5,
+            "min": 33125954
+          },
+          "p99": {
+            "max": 106404112,
+            "median": 33609429.5,
+            "min": 33241685
+          }
+        },
+        "p50_spread": 1.0222134723785712,
+        "phase_allocations": {
+          "commit_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 8738737,
+              "median": 8738737.0,
+              "min": 8738737
+            },
+            "allocation_calls": {
+              "max": 80022,
+              "median": 80022.0,
+              "min": 80022
+            },
+            "deallocated_bytes": {
+              "max": 4809640,
+              "median": 4809640.0,
+              "min": 4809640
+            },
+            "deallocation_calls": {
+              "max": 61611,
+              "median": 61611.0,
+              "min": 61611
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 34159805,
+              "median": 34159549.0,
+              "min": 34153085
+            },
+            "live_bytes_before": {
+              "max": 30230708,
+              "median": 30230452.0,
+              "min": 30223988
+            },
+            "peak_live_bytes_after": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "peak_live_bytes_before": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "reallocation_calls": {
+              "max": 503,
+              "median": 503.0,
+              "min": 503
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 3957913,
+              "median": 3957913.0,
+              "min": 3957913
+            },
+            "region_peak_live_bytes": {
+              "max": 34188621,
+              "median": 34188365.0,
+              "min": 34181901
+            }
+          },
+          "commit_core_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 5822693,
+              "median": 5822693.0,
+              "min": 5822693
+            },
+            "allocation_calls": {
+              "max": 79297,
+              "median": 79297.0,
+              "min": 79297
+            },
+            "deallocated_bytes": {
+              "max": 1919540,
+              "median": 1919540.0,
+              "min": 1919540
+            },
+            "deallocation_calls": {
+              "max": 61255,
+              "median": 61255.0,
+              "min": 61255
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 34159805,
+              "median": 34159549.0,
+              "min": 34153085
+            },
+            "live_bytes_before": {
+              "max": 30256652,
+              "median": 30256396.0,
+              "min": 30249932
+            },
+            "peak_live_bytes_after": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "peak_live_bytes_before": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "reallocation_calls": {
+              "max": 317,
+              "median": 317.0,
+              "min": 317
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 3931969,
+              "median": 3931969.0,
+              "min": 3931969
+            },
+            "region_peak_live_bytes": {
+              "max": 34188621,
+              "median": 34188365.0,
+              "min": 34181901
+            }
+          },
+          "plan_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 15847944,
+              "median": 15847944.0,
+              "min": 15847944
+            },
+            "allocation_calls": {
+              "max": 129369,
+              "median": 129369.0,
+              "min": 129369
+            },
+            "deallocated_bytes": {
+              "max": 11647465,
+              "median": 11647465.0,
+              "min": 11647465
+            },
+            "deallocation_calls": {
+              "max": 111276,
+              "median": 111276.0,
+              "min": 111276
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 30230708,
+              "median": 30230452.0,
+              "min": 30223988
+            },
+            "live_bytes_before": {
+              "max": 26030229,
+              "median": 26029973.0,
+              "min": 26023509
+            },
+            "peak_live_bytes_after": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "peak_live_bytes_before": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "reallocation_calls": {
+              "max": 162,
+              "median": 162.0,
+              "min": 162
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 7604118,
+              "median": 7604118.0,
+              "min": 7604118
+            },
+            "region_peak_live_bytes": {
+              "max": 33634347,
+              "median": 33634091.0,
+              "min": 33627627
+            }
+          },
+          "publication_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 5575801,
+              "median": 5575801.0,
+              "min": 5575801
+            },
+            "allocation_calls": {
+              "max": 36366,
+              "median": 36366.0,
+              "min": 36366
+            },
+            "deallocated_bytes": {
+              "max": 5591663,
+              "median": 5591663.0,
+              "min": 5591663
+            },
+            "deallocation_calls": {
+              "max": 36494,
+              "median": 36494.0,
+              "min": 36494
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 34143943,
+              "median": 34143687.0,
+              "min": 34137223
+            },
+            "live_bytes_before": {
+              "max": 34159805,
+              "median": 34159549.0,
+              "min": 34153085
+            },
+            "peak_live_bytes_after": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "peak_live_bytes_before": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "reallocation_calls": {
+              "max": 49,
+              "median": 49.0,
+              "min": 49
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 1596330,
+              "median": 1596330.0,
+              "min": 1596330
+            },
+            "region_peak_live_bytes": {
+              "max": 35756135,
+              "median": 35755879.0,
+              "min": 35749415
+            }
+          },
+          "staging_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 2916044,
+              "median": 2916044.0,
+              "min": 2916044
+            },
+            "allocation_calls": {
+              "max": 725,
+              "median": 725.0,
+              "min": 725
+            },
+            "deallocated_bytes": {
+              "max": 2890100,
+              "median": 2890100.0,
+              "min": 2890100
+            },
+            "deallocation_calls": {
+              "max": 356,
+              "median": 356.0,
+              "min": 356
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 30256652,
+              "median": 30256396.0,
+              "min": 30249932
+            },
+            "live_bytes_before": {
+              "max": 30230708,
+              "median": 30230452.0,
+              "min": 30223988
+            },
+            "peak_live_bytes_after": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "peak_live_bytes_before": {
+              "max": 69103858,
+              "median": 69103858.0,
+              "min": 69103858
+            },
+            "reallocation_calls": {
+              "max": 186,
+              "median": 186.0,
+              "min": 186
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 35828,
+              "median": 35828.0,
+              "min": 35828
+            },
+            "region_peak_live_bytes": {
+              "max": 30266536,
+              "median": 30266280.0,
+              "min": 30259816
+            }
+          }
+        },
+        "phase_p50_ns": {
+          "commit_ns": {
+            "max": 6927041.0,
+            "median": 6708787.25,
+            "min": 6625245.0
+          },
+          "open_ns": {
+            "max": 122856.0,
+            "median": 101075.25,
+            "min": 89825.5
+          },
+          "plan_ns": {
+            "max": 10909562.0,
+            "median": 10781533.25,
+            "min": 10625236.0
+          },
+          "publication_ns": {
+            "max": 15539466.0,
+            "median": 15403525.0,
+            "min": 15358751.0
+          },
+          "reopen_ns": {
+            "max": 30403333.0,
+            "median": 29455865.75,
+            "min": 28862102.0
+          }
+        },
+        "rss_kib": {
+          "max": 84932,
+          "median": 84196.0,
+          "min": 84080
+        }
+      },
+      "candidate": {
+        "allocator_metrics_status": [
+          "measured"
+        ],
+        "native": {
+          "p50": {
+            "max": 34208883,
+            "median": 32923993.5,
+            "min": 32521039
+          },
+          "p95": {
+            "max": 34432589,
+            "median": 33151572.0,
+            "min": 32701655
+          },
+          "p99": {
+            "max": 34602439,
+            "median": 33425541.0,
+            "min": 32758695
+          }
+        },
+        "p50_spread": 1.051900063832524,
+        "phase_allocations": {
+          "commit_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 8738737,
+              "median": 8738737.0,
+              "min": 8738737
+            },
+            "allocation_calls": {
+              "max": 80022,
+              "median": 80022.0,
+              "min": 80022
+            },
+            "deallocated_bytes": {
+              "max": 4809640,
+              "median": 4809640.0,
+              "min": 4809640
+            },
+            "deallocation_calls": {
+              "max": 61611,
+              "median": 61611.0,
+              "min": 61611
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 34159808,
+              "median": 34159552.0,
+              "min": 34153088
+            },
+            "live_bytes_before": {
+              "max": 30230711,
+              "median": 30230455.0,
+              "min": 30223991
+            },
+            "peak_live_bytes_after": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "peak_live_bytes_before": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "reallocation_calls": {
+              "max": 503,
+              "median": 503.0,
+              "min": 503
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 3957913,
+              "median": 3957913.0,
+              "min": 3957913
+            },
+            "region_peak_live_bytes": {
+              "max": 34188624,
+              "median": 34188368.0,
+              "min": 34181904
+            }
+          },
+          "commit_core_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 5822693,
+              "median": 5822693.0,
+              "min": 5822693
+            },
+            "allocation_calls": {
+              "max": 79297,
+              "median": 79297.0,
+              "min": 79297
+            },
+            "deallocated_bytes": {
+              "max": 1919540,
+              "median": 1919540.0,
+              "min": 1919540
+            },
+            "deallocation_calls": {
+              "max": 61255,
+              "median": 61255.0,
+              "min": 61255
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 34159808,
+              "median": 34159552.0,
+              "min": 34153088
+            },
+            "live_bytes_before": {
+              "max": 30256655,
+              "median": 30256399.0,
+              "min": 30249935
+            },
+            "peak_live_bytes_after": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "peak_live_bytes_before": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "reallocation_calls": {
+              "max": 317,
+              "median": 317.0,
+              "min": 317
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 3931969,
+              "median": 3931969.0,
+              "min": 3931969
+            },
+            "region_peak_live_bytes": {
+              "max": 34188624,
+              "median": 34188368.0,
+              "min": 34181904
+            }
+          },
+          "plan_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 15847944,
+              "median": 15847944.0,
+              "min": 15847944
+            },
+            "allocation_calls": {
+              "max": 129369,
+              "median": 129369.0,
+              "min": 129369
+            },
+            "deallocated_bytes": {
+              "max": 11647465,
+              "median": 11647465.0,
+              "min": 11647465
+            },
+            "deallocation_calls": {
+              "max": 111276,
+              "median": 111276.0,
+              "min": 111276
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 30230711,
+              "median": 30230455.0,
+              "min": 30223991
+            },
+            "live_bytes_before": {
+              "max": 26030232,
+              "median": 26029976.0,
+              "min": 26023512
+            },
+            "peak_live_bytes_after": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "peak_live_bytes_before": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "reallocation_calls": {
+              "max": 162,
+              "median": 162.0,
+              "min": 162
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 7604118,
+              "median": 7604118.0,
+              "min": 7604118
+            },
+            "region_peak_live_bytes": {
+              "max": 33634350,
+              "median": 33634094.0,
+              "min": 33627630
+            }
+          },
+          "publication_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 5575801,
+              "median": 5575801.0,
+              "min": 5575801
+            },
+            "allocation_calls": {
+              "max": 36366,
+              "median": 36366.0,
+              "min": 36366
+            },
+            "deallocated_bytes": {
+              "max": 5591663,
+              "median": 5591663.0,
+              "min": 5591663
+            },
+            "deallocation_calls": {
+              "max": 36494,
+              "median": 36494.0,
+              "min": 36494
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 34143946,
+              "median": 34143690.0,
+              "min": 34137226
+            },
+            "live_bytes_before": {
+              "max": 34159808,
+              "median": 34159552.0,
+              "min": 34153088
+            },
+            "peak_live_bytes_after": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "peak_live_bytes_before": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "reallocation_calls": {
+              "max": 49,
+              "median": 49.0,
+              "min": 49
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 1596330,
+              "median": 1596330.0,
+              "min": 1596330
+            },
+            "region_peak_live_bytes": {
+              "max": 35756138,
+              "median": 35755882.0,
+              "min": 35749418
+            }
+          },
+          "staging_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 2916044,
+              "median": 2916044.0,
+              "min": 2916044
+            },
+            "allocation_calls": {
+              "max": 725,
+              "median": 725.0,
+              "min": 725
+            },
+            "deallocated_bytes": {
+              "max": 2890100,
+              "median": 2890100.0,
+              "min": 2890100
+            },
+            "deallocation_calls": {
+              "max": 356,
+              "median": 356.0,
+              "min": 356
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 30256655,
+              "median": 30256399.0,
+              "min": 30249935
+            },
+            "live_bytes_before": {
+              "max": 30230711,
+              "median": 30230455.0,
+              "min": 30223991
+            },
+            "peak_live_bytes_after": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "peak_live_bytes_before": {
+              "max": 69103861,
+              "median": 69103861.0,
+              "min": 69103861
+            },
+            "reallocation_calls": {
+              "max": 186,
+              "median": 186.0,
+              "min": 186
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 35828,
+              "median": 35828.0,
+              "min": 35828
+            },
+            "region_peak_live_bytes": {
+              "max": 30266539,
+              "median": 30266283.0,
+              "min": 30259819
+            }
+          }
+        },
+        "phase_p50_ns": {
+          "commit_ns": {
+            "max": 7211307.5,
+            "median": 6800468.0,
+            "min": 6734270.0
+          },
+          "open_ns": {
+            "max": 120246.0,
+            "median": 97366.0,
+            "min": 85776.0
+          },
+          "plan_ns": {
+            "max": 11680096.0,
+            "median": 11107443.25,
+            "min": 10831786.5
+          },
+          "publication_ns": {
+            "max": 15325140.0,
+            "median": 15162151.5,
+            "min": 14645039.0
+          },
+          "reopen_ns": {
+            "max": 34706923.5,
+            "median": 30509993.25,
+            "min": 29234503.0
+          }
+        },
+        "rss_kib": {
+          "max": 94388,
+          "median": 93806.0,
+          "min": 93392
+        }
+      },
+      "ratios_of_native_medians": {
+        "p50": 0.9983454249774831,
+        "p95": 0.9943065825508189,
+        "p99": 0.9945286634514281
+      }
+    },
+    "primary-percent-medium": {
+      "baseline": {
+        "allocator_metrics_status": [
+          "measured"
+        ],
+        "native": {
+          "p50": {
+            "max": 16703700,
+            "median": 16624998.0,
+            "min": 16525516
+          },
+          "p95": {
+            "max": 16886428,
+            "median": 16845811.5,
+            "min": 16737966
+          },
+          "p99": {
+            "max": 17076219,
+            "median": 16946017.5,
+            "min": 16823606
+          }
+        },
+        "p50_spread": 1.010782356206003,
+        "phase_allocations": {
+          "commit_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 5018120,
+              "median": 5018120.0,
+              "min": 5018120
+            },
+            "allocation_calls": {
+              "max": 42293,
+              "median": 42293.0,
+              "min": 42293
+            },
+            "deallocated_bytes": {
+              "max": 2959255,
+              "median": 2959255.0,
+              "min": 2959255
+            },
+            "deallocation_calls": {
+              "max": 32615,
+              "median": 32615.0,
+              "min": 32615
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 25942034,
+              "median": 25941778.0,
+              "min": 25935314
+            },
+            "live_bytes_before": {
+              "max": 23883169,
+              "median": 23882913.0,
+              "min": 23876449
+            },
+            "peak_live_bytes_after": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "peak_live_bytes_before": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "reallocation_calls": {
+              "max": 346,
+              "median": 346.0,
+              "min": 346
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 2071092,
+              "median": 2071092.0,
+              "min": 2071092
+            },
+            "region_peak_live_bytes": {
+              "max": 25954261,
+              "median": 25954005.0,
+              "min": 25947541
+            }
+          },
+          "commit_core_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 3118739,
+              "median": 3118739.0,
+              "min": 3118739
+            },
+            "allocation_calls": {
+              "max": 41904,
+              "median": 41904.0,
+              "min": 41904
+            },
+            "deallocated_bytes": {
+              "max": 1072101,
+              "median": 1072101.0,
+              "min": 1072101
+            },
+            "deallocation_calls": {
+              "max": 32429,
+              "median": 32429.0,
+              "min": 32429
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 25942034,
+              "median": 25941778.0,
+              "min": 25935314
+            },
+            "live_bytes_before": {
+              "max": 23895396,
+              "median": 23895140.0,
+              "min": 23888676
+            },
+            "peak_live_bytes_after": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "peak_live_bytes_before": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "reallocation_calls": {
+              "max": 241,
+              "median": 241.0,
+              "min": 241
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 2058865,
+              "median": 2058865.0,
+              "min": 2058865
+            },
+            "region_peak_live_bytes": {
+              "max": 25954261,
+              "median": 25954005.0,
+              "min": 25947541
+            }
+          },
+          "plan_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 12137336,
+              "median": 12137336.0,
+              "min": 12137336
+            },
+            "allocation_calls": {
+              "max": 67803,
+              "median": 67803.0,
+              "min": 67803
+            },
+            "deallocated_bytes": {
+              "max": 9937008,
+              "median": 9937008.0,
+              "min": 9937008
+            },
+            "deallocation_calls": {
+              "max": 58249,
+              "median": 58249.0,
+              "min": 58249
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 23883169,
+              "median": 23882913.0,
+              "min": 23876449
+            },
+            "live_bytes_before": {
+              "max": 21682841,
+              "median": 21682585.0,
+              "min": 21676121
+            },
+            "peak_live_bytes_after": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "peak_live_bytes_before": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "reallocation_calls": {
+              "max": 199,
+              "median": 199.0,
+              "min": 199
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 3193920,
+              "median": 3193920.0,
+              "min": 3193920
+            },
+            "region_peak_live_bytes": {
+              "max": 24876761,
+              "median": 24876505.0,
+              "min": 24870041
+            }
+          },
+          "publication_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 3970346,
+              "median": 3970346.0,
+              "min": 3970346
+            },
+            "allocation_calls": {
+              "max": 19248,
+              "median": 19248.0,
+              "min": 19248
+            },
+            "deallocated_bytes": {
+              "max": 3986208,
+              "median": 3986208.0,
+              "min": 3986208
+            },
+            "deallocation_calls": {
+              "max": 19375,
+              "median": 19375.0,
+              "min": 19375
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 25926172,
+              "median": 25925916.0,
+              "min": 25919452
+            },
+            "live_bytes_before": {
+              "max": 25942034,
+              "median": 25941778.0,
+              "min": 25935314
+            },
+            "peak_live_bytes_after": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "peak_live_bytes_before": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "reallocation_calls": {
+              "max": 50,
+              "median": 50.0,
+              "min": 50
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 1087019,
+              "median": 1087019.0,
+              "min": 1087019
+            },
+            "region_peak_live_bytes": {
+              "max": 27029053,
+              "median": 27028797.0,
+              "min": 27022333
+            }
+          },
+          "staging_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 1899381,
+              "median": 1899381.0,
+              "min": 1899381
+            },
+            "allocation_calls": {
+              "max": 389,
+              "median": 389.0,
+              "min": 389
+            },
+            "deallocated_bytes": {
+              "max": 1887154,
+              "median": 1887154.0,
+              "min": 1887154
+            },
+            "deallocation_calls": {
+              "max": 186,
+              "median": 186.0,
+              "min": 186
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 23895396,
+              "median": 23895140.0,
+              "min": 23888676
+            },
+            "live_bytes_before": {
+              "max": 23883169,
+              "median": 23882913.0,
+              "min": 23876449
+            },
+            "peak_live_bytes_after": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "peak_live_bytes_before": {
+              "max": 52336500,
+              "median": 52336500.0,
+              "min": 52336500
+            },
+            "reallocation_calls": {
+              "max": 105,
+              "median": 105.0,
+              "min": 105
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 28521,
+              "median": 28521.0,
+              "min": 28521
+            },
+            "region_peak_live_bytes": {
+              "max": 23911690,
+              "median": 23911434.0,
+              "min": 23904970
+            }
+          }
+        },
+        "phase_p50_ns": {
+          "commit_ns": {
+            "max": 3571063.5,
+            "median": 3531318.5,
+            "min": 3476343.5
+          },
+          "open_ns": {
+            "max": 93840.5,
+            "median": 79507.75,
+            "min": 76835.0
+          },
+          "plan_ns": {
+            "max": 5697365.0,
+            "median": 5660359.5,
+            "min": 5637329.0
+          },
+          "publication_ns": {
+            "max": 7389493.5,
+            "median": 7356428.0,
+            "min": 7315113.5
+          },
+          "reopen_ns": {
+            "max": 26725907.0,
+            "median": 23507522.0,
+            "min": 21675184.0
+          }
+        },
+        "rss_kib": {
+          "max": 67440,
+          "median": 67104.0,
+          "min": 66992
+        }
+      },
+      "candidate": {
+        "allocator_metrics_status": [
+          "measured"
+        ],
+        "native": {
+          "p50": {
+            "max": 16733042,
+            "median": 16667101.5,
+            "min": 16612323
+          },
+          "p95": {
+            "max": 16856206,
+            "median": 16804853.0,
+            "min": 16698318
+          },
+          "p99": {
+            "max": 17008977,
+            "median": 16856587.0,
+            "min": 16827197
+          }
+        },
+        "p50_spread": 1.0072668343855342,
+        "phase_allocations": {
+          "commit_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 5018120,
+              "median": 5018120.0,
+              "min": 5018120
+            },
+            "allocation_calls": {
+              "max": 42293,
+              "median": 42293.0,
+              "min": 42293
+            },
+            "deallocated_bytes": {
+              "max": 2959255,
+              "median": 2959255.0,
+              "min": 2959255
+            },
+            "deallocation_calls": {
+              "max": 32615,
+              "median": 32615.0,
+              "min": 32615
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 25942037,
+              "median": 25941781.0,
+              "min": 25935317
+            },
+            "live_bytes_before": {
+              "max": 23883172,
+              "median": 23882916.0,
+              "min": 23876452
+            },
+            "peak_live_bytes_after": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "peak_live_bytes_before": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "reallocation_calls": {
+              "max": 346,
+              "median": 346.0,
+              "min": 346
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 2071092,
+              "median": 2071092.0,
+              "min": 2071092
+            },
+            "region_peak_live_bytes": {
+              "max": 25954264,
+              "median": 25954008.0,
+              "min": 25947544
+            }
+          },
+          "commit_core_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 3118739,
+              "median": 3118739.0,
+              "min": 3118739
+            },
+            "allocation_calls": {
+              "max": 41904,
+              "median": 41904.0,
+              "min": 41904
+            },
+            "deallocated_bytes": {
+              "max": 1072101,
+              "median": 1072101.0,
+              "min": 1072101
+            },
+            "deallocation_calls": {
+              "max": 32429,
+              "median": 32429.0,
+              "min": 32429
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 25942037,
+              "median": 25941781.0,
+              "min": 25935317
+            },
+            "live_bytes_before": {
+              "max": 23895399,
+              "median": 23895143.0,
+              "min": 23888679
+            },
+            "peak_live_bytes_after": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "peak_live_bytes_before": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "reallocation_calls": {
+              "max": 241,
+              "median": 241.0,
+              "min": 241
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 2058865,
+              "median": 2058865.0,
+              "min": 2058865
+            },
+            "region_peak_live_bytes": {
+              "max": 25954264,
+              "median": 25954008.0,
+              "min": 25947544
+            }
+          },
+          "plan_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 12137336,
+              "median": 12137336.0,
+              "min": 12137336
+            },
+            "allocation_calls": {
+              "max": 67803,
+              "median": 67803.0,
+              "min": 67803
+            },
+            "deallocated_bytes": {
+              "max": 9937008,
+              "median": 9937008.0,
+              "min": 9937008
+            },
+            "deallocation_calls": {
+              "max": 58249,
+              "median": 58249.0,
+              "min": 58249
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 23883172,
+              "median": 23882916.0,
+              "min": 23876452
+            },
+            "live_bytes_before": {
+              "max": 21682844,
+              "median": 21682588.0,
+              "min": 21676124
+            },
+            "peak_live_bytes_after": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "peak_live_bytes_before": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "reallocation_calls": {
+              "max": 199,
+              "median": 199.0,
+              "min": 199
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 3193920,
+              "median": 3193920.0,
+              "min": 3193920
+            },
+            "region_peak_live_bytes": {
+              "max": 24876764,
+              "median": 24876508.0,
+              "min": 24870044
+            }
+          },
+          "publication_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 3970346,
+              "median": 3970346.0,
+              "min": 3970346
+            },
+            "allocation_calls": {
+              "max": 19248,
+              "median": 19248.0,
+              "min": 19248
+            },
+            "deallocated_bytes": {
+              "max": 3986208,
+              "median": 3986208.0,
+              "min": 3986208
+            },
+            "deallocation_calls": {
+              "max": 19375,
+              "median": 19375.0,
+              "min": 19375
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 25926175,
+              "median": 25925919.0,
+              "min": 25919455
+            },
+            "live_bytes_before": {
+              "max": 25942037,
+              "median": 25941781.0,
+              "min": 25935317
+            },
+            "peak_live_bytes_after": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "peak_live_bytes_before": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "reallocation_calls": {
+              "max": 50,
+              "median": 50.0,
+              "min": 50
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 1087019,
+              "median": 1087019.0,
+              "min": 1087019
+            },
+            "region_peak_live_bytes": {
+              "max": 27029056,
+              "median": 27028800.0,
+              "min": 27022336
+            }
+          },
+          "staging_allocation_metrics": {
+            "allocated_bytes": {
+              "max": 1899381,
+              "median": 1899381.0,
+              "min": 1899381
+            },
+            "allocation_calls": {
+              "max": 389,
+              "median": 389.0,
+              "min": 389
+            },
+            "deallocated_bytes": {
+              "max": 1887154,
+              "median": 1887154.0,
+              "min": 1887154
+            },
+            "deallocation_calls": {
+              "max": 186,
+              "median": 186.0,
+              "min": 186
+            },
+            "failed_allocation_calls": {
+              "max": 0,
+              "median": 0.0,
+              "min": 0
+            },
+            "live_bytes_after": {
+              "max": 23895399,
+              "median": 23895143.0,
+              "min": 23888679
+            },
+            "live_bytes_before": {
+              "max": 23883172,
+              "median": 23882916.0,
+              "min": 23876452
+            },
+            "peak_live_bytes_after": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "peak_live_bytes_before": {
+              "max": 52336503,
+              "median": 52336503.0,
+              "min": 52336503
+            },
+            "reallocation_calls": {
+              "max": 105,
+              "median": 105.0,
+              "min": 105
+            },
+            "region_peak_above_entry_live_bytes": {
+              "max": 28521,
+              "median": 28521.0,
+              "min": 28521
+            },
+            "region_peak_live_bytes": {
+              "max": 23911693,
+              "median": 23911437.0,
+              "min": 23904973
+            }
+          }
+        },
+        "phase_p50_ns": {
+          "commit_ns": {
+            "max": 3553469.0,
+            "median": 3550182.0,
+            "min": 3536444.0
+          },
+          "open_ns": {
+            "max": 94555.5,
+            "median": 80898.0,
+            "min": 77081.0
+          },
+          "plan_ns": {
+            "max": 5824923.0,
+            "median": 5807478.0,
+            "min": 5786115.5
+          },
+          "publication_ns": {
+            "max": 7272648.5,
+            "median": 7224574.25,
+            "min": 7202258.0
+          },
+          "reopen_ns": {
+            "max": 26444499.0,
+            "median": 22546635.0,
+            "min": 21931887.5
+          }
+        },
+        "rss_kib": {
+          "max": 77944,
+          "median": 76646.0,
+          "min": 76416
+        }
+      },
+      "ratios_of_native_medians": {
+        "p50": 1.0025325416580502,
+        "p95": 0.9975686241057606,
+        "p99": 0.9947226243570207
+      }
+    }
+  },
+  "scope": "descriptive medians/ranges; frozen acceptance remains analysis.reduction paired ratios",
+  "status": "pass"
+}

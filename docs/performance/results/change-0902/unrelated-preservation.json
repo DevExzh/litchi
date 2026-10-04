@@ -1,0 +1,12 @@
+[
+  {
+    "path": "crates/litchi/examples/bench_word_parse.rs",
+    "bytes": 6390,
+    "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+  },
+  {
+    "path": "docs/UNIFIED_OPS_API_DESIGN.md",
+    "bytes": 29396,
+    "sha256": "be180f256dde0e22d48ad22f3cc7832da1e919b59e30f1cb6a552113b2928d0d"
+  }
+]

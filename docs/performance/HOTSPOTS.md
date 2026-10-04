@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0902 — rejected upfront-stopped XML audit candidate
+
+[0902](0902-xlsx-upfront-stopped-audit-candidate.md) tested a bounded observer
+bypass while preserving both complete XML audits. All correctness gates and
+72 captured children pass validation, but the primary paired p50 ratios are
+1.003391 (medium) and 1.002641 (dense-sparse), failing the frozen 2% benefit gate.
+No timing regression/spread flags fire; phase allocation counters are unchanged,
+and higher candidate process RSS remains disclosed. The candidate source and
+tests are restored exactly. Raw evidence, helper failures and corrected replays
+remain available. Further branch-specific audit attribution is needed before
+another specialization; the broader non-iWork goal remains open.
+
 ## 0901 — current XLSX publication instruction attribution
 
 [0901](0901-xlsx-publication-instruction-profile.md) profiles four current-source

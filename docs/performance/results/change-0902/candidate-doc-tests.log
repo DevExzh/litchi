@@ -1,0 +1,181 @@
+    Finished `test` profile [unoptimized] target(s) in 0.23s
+   Doc-tests litchi_docx
+
+running 108 tests
+test crates/litchi-docx/src/bookmark.rs - bookmark::Bookmark (line 17) - compile ... ok
+test crates/litchi-docx/src/bibliography/writer.rs - bibliography::writer::BibliographySourceBuilder (line 178) - compile ... ok
+test crates/litchi-docx/src/comment.rs - comment::Comment (line 54) - compile ... ok
+test crates/litchi-docx/src/comment.rs - comment::Comment::text (line 180) - compile ... ok
+test crates/litchi-docx/src/content_control.rs - content_control::ContentControl (line 362) - compile ... ok
+test crates/litchi-docx/src/document/model.rs - document::model::Document (line 18) - compile ... ok
+test crates/litchi-docx/src/custom_xml.rs - custom_xml::Part (line 43) - compile ... ok
+test crates/litchi-docx/src/document/package/codec.rs - document::package::codec::Document<'a>::chart_graph (line 1585) - compile ... ok
+test crates/litchi-docx/src/document/package/codec.rs - document::package::codec::Document<'a>::content_controls (line 1620) - compile ... ok
+test crates/litchi-docx/src/document/package/codec.rs - document::package::codec::Document<'a>::field_count (line 146) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::elements (line 406) ... ignored
+test crates/litchi-docx/src/document/package/codec.rs - document::package::codec::Document<'a>::sections (line 29) - compile ... ok
+test crates/litchi-docx/src/document/package/codec.rs - document::package::codec::Document<'a>::styles (line 84) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::has_tables (line 557) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::paragraph (line 463) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::paragraph_count (line 227) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::paragraphs (line 281) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::search (line 594) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::statistics (line 696) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::search_ignore_case (line 637) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::table (line 490) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::table_count (line 248) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::tables (line 349) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::text (line 35) - compile ... ok
+test crates/litchi-docx/src/document/package/model.rs - document::package::model::Document<'a>::text_range (line 519) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::bookmark_count (line 489) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::bookmarks (line 465) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::comment_count (line 441) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::comments (line 404) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::custom_xml (line 780) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::document_variables (line 690) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::endnote_count (line 380) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::endnotes (line 322) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::footer (line 197) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::footers (line 144) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::footnote_count (line 359) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::footnotes (line 282) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::header (line 170) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::headers (line 73) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::hyperlink_count (line 258) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::hyperlinks (line 225) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::numbering (line 513) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::settings (line 592) - compile ... ok
+test crates/litchi-docx/src/document/package/package.rs - document::package::package::Document<'_>::theme (line 741) - compile ... ok
+test crates/litchi-docx/src/document/package/validation.rs - document::package::validation::Document<'_>::is_protected (line 87) - compile ... ok
+test crates/litchi-docx/src/document/transaction.rs - document::transaction::CompactionPolicy (line 2095) - compile ... ok
+test crates/litchi-docx/src/field/model/base.rs - field::model::base::Field (line 8) - compile ... ok
+test crates/litchi-docx/src/footnote.rs - footnote::Note (line 78) - compile ... ok
+test crates/litchi-docx/src/footnote.rs - footnote::Note::paragraphs (line 244) - compile ... ok
+test crates/litchi-docx/src/footnote.rs - footnote::Note::text (line 215) - compile ... ok
+test crates/litchi-docx/src/hyperlink.rs - hyperlink::Hyperlink (line 26) - compile ... ok
+test crates/litchi-docx/src/image.rs - image::ImageFormat (line 20) ... ignored
+test crates/litchi-docx/src/package/codec.rs - package::codec::Package::from_opc_package (line 359) - compile ... ok
+test crates/litchi-docx/src/package/codec.rs - package::codec::Package::from_reader (line 407) - compile ... ok
+test crates/litchi-docx/src/package/codec.rs - package::codec::Package::new (line 46) - compile ... ok
+test crates/litchi-docx/src/package/codec.rs - package::codec::Package::open (line 267) - compile ... ok
+test crates/litchi-docx/src/package/codec.rs - package::codec::Package::save (line 510) - compile ... ok
+test crates/litchi-docx/src/package/codec.rs - package::codec::Package::to_stream (line 592) - compile ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package (line 105) - compile ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package (line 118) - compile ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package::custom_props (line 861) - compile ... ok
+test crates/litchi-docx/src/alt/mod.rs - alt (line 7) ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package::custom_props_mut (line 881) - compile ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package::document (line 562) - compile ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package::props (line 815) - compile ... ok
+test crates/litchi-docx/src/package/model.rs - package::model::Package::props_mut (line 831) - compile ... ok
+test crates/litchi-docx/src/paragraph/codec/content.rs - paragraph::codec::content::Paragraph::drawing_objects (line 110) ... ignored
+test crates/litchi-docx/src/paragraph/codec/content.rs - paragraph::codec::content::Paragraph::images (line 82) ... ignored
+test crates/litchi-docx/src/paragraph/codec/content.rs - paragraph::codec::content::Paragraph::paragraph_level_formulas (line 198) ... ignored
+test crates/litchi-docx/src/paragraph/codec/content.rs - paragraph::codec::content::Paragraph::revisions (line 156) ... ignored
+test crates/litchi-docx/src/package/package/document.rs - package::package::document::Package::document_mut (line 405) - compile ... ok
+test crates/litchi-docx/src/paragraph/codec/run.rs - paragraph::codec::run::Run::get_properties (line 391) ... ignored
+test crates/litchi-docx/src/paragraph/codec/run.rs - paragraph::codec::run::Run::get_text_and_properties (line 286) ... ignored
+test crates/litchi-docx/src/paragraph/model.rs - paragraph::model::Paragraph (line 432) ... ignored
+test crates/litchi-docx/src/paragraph/model.rs - paragraph::model::Run (line 900) ... ignored
+test crates/litchi-docx/src/paragraph/package.rs - paragraph::package::Paragraph::hyperlinks (line 55) ... ignored
+test crates/litchi-docx/src/revision.rs - revision (line 31) - compile ... ok
+test crates/litchi-docx/src/revision.rs - revision::Error (line 31) - compile ... ok
+test crates/litchi-docx/src/revision.rs - revision::Result (line 31) - compile ... ok
+test crates/litchi-docx/src/settings/document/model.rs - settings::document::model::DocumentSettings (line 40) - compile ... ok
+test crates/litchi-docx/src/styles.rs - styles::Styles (line 149) ... ignored
+test crates/litchi-docx/src/table.rs - table::Table (line 171) ... ignored
+test crates/litchi-docx/src/writer/content_control.rs - writer::content_control::MutableContentControl::dropdown (line 132) ... ignored
+test crates/litchi-docx/src/theme.rs - theme::Theme (line 21) - compile ... ok
+test crates/litchi-docx/src/writer/content_control.rs - writer::content_control::MutableContentControl::rich_text (line 79) ... ignored
+test crates/litchi-docx/src/writer/doc/model.rs - writer::doc::model::MutableDocument::add_comment (line 950) ... ignored
+test crates/litchi-docx/src/writer/doc/model.rs - writer::doc::model::MutableDocument::add_toc (line 1184) ... ignored
+test crates/litchi-docx/src/writer/doc/model.rs - writer::doc::model::MutableDocument::set_protection (line 1020) ... ignored
+test crates/litchi-docx/src/writer/doc/model.rs - writer::doc::model::MutableDocument::set_theme (line 1095) ... ignored
+test crates/litchi-docx/src/writer/doc/model.rs - writer::doc::model::MutableDocument::set_watermark (line 1126) ... ignored
+test crates/litchi-docx/src/writer/paragraph.rs - writer::paragraph::MutableParagraph::add_bookmark_start (line 711) ... ignored
+test crates/litchi-docx/src/writer/ole_object.rs - writer::ole_object::MutableOleObject (line 50) - compile ... ok
+test crates/litchi-docx/src/writer/paragraph.rs - writer::paragraph::MutableParagraph::add_field (line 739) ... ignored
+test crates/litchi-docx/src/writer/style.rs - writer::style::MutableStyle (line 26) ... ignored
+test crates/litchi-docx/src/writer/smartart.rs - writer::smartart::MutableSmartArt (line 73) - compile ... ok
+test crates/litchi-docx/src/writer/style.rs - writer::style::MutableStyle::new (line 99) ... ignored
+test crates/litchi-docx/src/writer/theme.rs - writer::theme::MutableTheme (line 20) ... ignored
+test crates/litchi-docx/src/writer/theme.rs - writer::theme::MutableTheme::new (line 71) ... ignored
+test crates/litchi-docx/src/writer/textbox.rs - writer::textbox::MutableTextBox (line 49) - compile ... ok
+test crates/litchi-docx/src/writer/toc.rs - writer::toc::TableOfContents (line 34) ... ignored
+test crates/litchi-docx/src/writer/toc.rs - writer::toc::TableOfContents::heading_levels (line 94) ... ignored
+test crates/litchi-docx/src/writer/toc.rs - writer::toc::TableOfContents::new (line 69) ... ignored
+test crates/litchi-docx/src/writer/watermark.rs - writer::watermark::Watermark (line 58) ... ignored
+test crates/litchi-docx/src/writer/watermark.rs - writer::watermark::Watermark::text (line 88) ... ignored
+test crates/litchi-docx/src/writer/vml_shape.rs - writer::vml_shape::MutableVmlShape (line 91) - compile ... ok
+test crates/litchi-docx/src/ink/mod.rs - ink (line 16) ... ok
+test crates/litchi-docx/src/field/model/base.rs - field::model::base::Field::field_type (line 100) ... ok
+test crates/litchi-docx/src/lib.rs - web_extensions (line 75) ... ok
+
+test result: ok. 77 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 1 test
+test crates/litchi-docx/src/drawing/source.rs - drawing::source::SourceDrawing (line 811) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.80s; merged doctests compilation took 0.74s
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 2299) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 2361) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 1007) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 2409) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 1177) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-opc/src/source_backed.rs - source_backed::SourceBackedPackage::with_prepared_topology (line 8044) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.31s; merged doctests compilation took 0.28s
+   Doc-tests litchi_pptx
+
+running 7 tests
+test crates/litchi-pptx/src/chart/codec.rs - chart::codec::Part<'_>::chart_info (line 46) ... ignored
+test crates/litchi-pptx/src/shape/theme/part.rs - shape::theme::part::Part<'a>::read (line 80) ... ignored
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::linear_gradient (line 225) ... ok
+test crates/litchi-pptx/src/tag/mod.rs - tag (line 7) ... ok
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::solid (line 206) ... ok
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+all doctests ran in 0.33s; merged doctests compilation took 0.27s
+   Doc-tests litchi_xlsx
+
+running 2 tests
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-xlsx/src/drawing/source.rs - drawing::source::PictureSource (line 465) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.23s; merged doctests compilation took 0.21s
+   Doc-tests xml_minifier
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,5 @@
+{
+  "exit_code": 2,
+  "stdout": "docs/performance/results/change-0902/baseline-xml-tests.log:210: new blank line at EOF.\ndocs/performance/results/change-0902/candidate-doc-tests.log:181: new blank line at EOF.\ndocs/performance/results/change-0902/candidate-final-xml-tests.log:207: new blank line at EOF.\ndocs/performance/results/change-0902/candidate-office-tests-v3.log:7913: new blank line at EOF.\ndocs/performance/results/change-0902/candidate-preformat.patch:25: trailing whitespace.\n+ \ndocs/performance/results/change-0902/candidate-v1.patch:25: trailing whitespace.\n+ \ndocs/performance/results/change-0902/candidate-xml-tests-v2.log:207: new blank line at EOF.\ndocs/performance/results/change-0902/candidate.patch:25: trailing whitespace.\n+ \n",
+  "stderr": ""
+}

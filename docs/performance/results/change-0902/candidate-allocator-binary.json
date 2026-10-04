@@ -1,0 +1,6 @@
+{
+  "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/binaries/candidate-allocator",
+  "bytes": 267458480,
+  "sha256": "2a595b43210c477bb3ff048b2094a28db9e4e0ed89afc6869ca5175ac9056056",
+  "build_receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/candidate-allocator-build-run.json"
+}

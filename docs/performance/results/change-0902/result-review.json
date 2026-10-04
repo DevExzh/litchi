@@ -1,0 +1,4529 @@
+{
+  "allocator": {
+    "allocator_is_diagnostic_only": true,
+    "counter_revision": "serialized_region_peak_v3",
+    "failed_allocation_calls_zero": true,
+    "instrumentation": "system_allocator_operation_scoped",
+    "peak_live_boundary_violations": [],
+    "phase_metric_records": 12,
+    "phase_vectors_checked": 60,
+    "records": 16,
+    "records_without_phase_metrics": 4,
+    "records_detail": [
+      {
+        "case_id": "control-docx-one-edit-medium",
+        "folder": "r00-baseline-control-docx-one-edit-medium",
+        "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+        "index": 0,
+        "report": {
+          "bytes": 15565,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/report.json",
+          "sha256": "0317abcd33e36cf2a5a3f227170cd3e9f435f3821aae1e574bc27660efd1810b"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "control-xlsx-one-edit-medium",
+        "folder": "r00-baseline-control-xlsx-one-edit-medium",
+        "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+        "index": 0,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723185,
+              "live_bytes_before": 22218684,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22726308
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729649,
+              "live_bytes_before": 22225148,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22732772
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729905,
+              "live_bytes_before": 22225404,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22733028
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723185,
+              "live_bytes_before": 22219405,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22726308
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729649,
+              "live_bytes_before": 22225869,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22732772
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729905,
+              "live_bytes_before": 22226125,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22733028
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22218684,
+              "live_bytes_before": 21673293,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23219625
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225148,
+              "live_bytes_before": 21679757,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226089
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225404,
+              "live_bytes_before": 21680013,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226345
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22707487,
+              "live_bytes_before": 22723185,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23357231
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22713951,
+              "live_bytes_before": 22729649,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363695
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22714207,
+              "live_bytes_before": 22729905,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363951
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22219405,
+              "live_bytes_before": 22218684,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22243997
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225869,
+              "live_bytes_before": 22225148,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250461
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22226125,
+              "live_bytes_before": 22225404,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250717
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34014,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/report.json",
+          "sha256": "934569fd513bd14a1c36aa278e498dd56c876694899f4595ec8435728f7e3680"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-dense-sparse",
+        "folder": "r00-baseline-primary-percent-dense-sparse",
+        "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+        "index": 0,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153085,
+              "live_bytes_before": 30223988,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34181901
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159549,
+              "live_bytes_before": 30230452,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188365
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159805,
+              "live_bytes_before": 30230708,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188621
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153085,
+              "live_bytes_before": 30249932,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34181901
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159549,
+              "live_bytes_before": 30256396,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188365
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159805,
+              "live_bytes_before": 30256652,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188621
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30223988,
+              "live_bytes_before": 26023509,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33627627
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230452,
+              "live_bytes_before": 26029973,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634091
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230708,
+              "live_bytes_before": 26030229,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634347
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34137223,
+              "live_bytes_before": 34153085,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35749415
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143687,
+              "live_bytes_before": 34159549,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35755879
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143943,
+              "live_bytes_before": 34159805,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35756135
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30249932,
+              "live_bytes_before": 30223988,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30259816
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256396,
+              "live_bytes_before": 30230452,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266280
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256652,
+              "live_bytes_before": 30230708,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266536
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34147,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/report.json",
+          "sha256": "db60af7b7b1f780c29d1d4c6db11005922be18500bbc6b82f59b3304f41f278c"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-medium",
+        "folder": "r00-baseline-primary-percent-medium",
+        "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+        "index": 0,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935314,
+              "live_bytes_before": 23876449,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25947541
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941778,
+              "live_bytes_before": 23882913,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954005
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942034,
+              "live_bytes_before": 23883169,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954261
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935314,
+              "live_bytes_before": 23888676,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25947541
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941778,
+              "live_bytes_before": 23895140,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954005
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942034,
+              "live_bytes_before": 23895396,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954261
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23876449,
+              "live_bytes_before": 21676121,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24870041
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23882913,
+              "live_bytes_before": 21682585,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876505
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23883169,
+              "live_bytes_before": 21682841,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876761
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25919452,
+              "live_bytes_before": 25935314,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27022333
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25925916,
+              "live_bytes_before": 25941778,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27028797
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25926172,
+              "live_bytes_before": 25942034,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27029053
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23888676,
+              "live_bytes_before": 23876449,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23904970
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895140,
+              "live_bytes_before": 23882913,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911434
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895396,
+              "live_bytes_before": 23883169,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911690
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34115,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/report.json",
+          "sha256": "0cfaac02a52a0f7d96fef2511acfe123f59bf8f3cc88111112dce938d06683e6"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "control-docx-one-edit-medium",
+        "folder": "r00-candidate-control-docx-one-edit-medium",
+        "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+        "index": 0,
+        "report": {
+          "bytes": 15563,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/report.json",
+          "sha256": "10063d7bee19ef23922dfdd817e234f3d4fe3da9b114833cacb94327b531a3c4"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "control-xlsx-one-edit-medium",
+        "folder": "r00-candidate-control-xlsx-one-edit-medium",
+        "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+        "index": 0,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723188,
+              "live_bytes_before": 22218687,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22726311
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729652,
+              "live_bytes_before": 22225151,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22732775
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729908,
+              "live_bytes_before": 22225407,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22733031
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723188,
+              "live_bytes_before": 22219408,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22726311
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729652,
+              "live_bytes_before": 22225872,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22732775
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729908,
+              "live_bytes_before": 22226128,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22733031
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22218687,
+              "live_bytes_before": 21673296,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23219628
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225151,
+              "live_bytes_before": 21679760,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226092
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225407,
+              "live_bytes_before": 21680016,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226348
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22707490,
+              "live_bytes_before": 22723188,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23357234
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22713954,
+              "live_bytes_before": 22729652,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363698
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22714210,
+              "live_bytes_before": 22729908,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363954
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22219408,
+              "live_bytes_before": 22218687,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22244000
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225872,
+              "live_bytes_before": 22225151,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250464
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22226128,
+              "live_bytes_before": 22225407,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250720
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34018,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/report.json",
+          "sha256": "2c7b2185cce972327c06ebb1579c8fbffeadde70ce5099c5ddbe0f1cad6a7c13"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-dense-sparse",
+        "folder": "r00-candidate-primary-percent-dense-sparse",
+        "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+        "index": 0,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153088,
+              "live_bytes_before": 30223991,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34181904
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159552,
+              "live_bytes_before": 30230455,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188368
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159808,
+              "live_bytes_before": 30230711,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188624
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153088,
+              "live_bytes_before": 30249935,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34181904
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159552,
+              "live_bytes_before": 30256399,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188368
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159808,
+              "live_bytes_before": 30256655,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188624
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30223991,
+              "live_bytes_before": 26023512,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33627630
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230455,
+              "live_bytes_before": 26029976,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634094
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230711,
+              "live_bytes_before": 26030232,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634350
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34137226,
+              "live_bytes_before": 34153088,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35749418
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143690,
+              "live_bytes_before": 34159552,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35755882
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143946,
+              "live_bytes_before": 34159808,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35756138
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30249935,
+              "live_bytes_before": 30223991,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30259819
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256399,
+              "live_bytes_before": 30230455,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266283
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256655,
+              "live_bytes_before": 30230711,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266539
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34156,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/report.json",
+          "sha256": "1593f1a1af4c56b485576dfba5db4ee327ea1012841a7b6ec680b8ca49780d76"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-medium",
+        "folder": "r00-candidate-primary-percent-medium",
+        "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+        "index": 0,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935317,
+              "live_bytes_before": 23876452,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25947544
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941781,
+              "live_bytes_before": 23882916,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954008
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942037,
+              "live_bytes_before": 23883172,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954264
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935317,
+              "live_bytes_before": 23888679,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25947544
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941781,
+              "live_bytes_before": 23895143,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954008
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942037,
+              "live_bytes_before": 23895399,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954264
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23876452,
+              "live_bytes_before": 21676124,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24870044
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23882916,
+              "live_bytes_before": 21682588,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876508
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23883172,
+              "live_bytes_before": 21682844,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876764
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25919455,
+              "live_bytes_before": 25935317,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27022336
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25925919,
+              "live_bytes_before": 25941781,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27028800
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25926175,
+              "live_bytes_before": 25942037,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27029056
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23888679,
+              "live_bytes_before": 23876452,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23904973
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895143,
+              "live_bytes_before": 23882916,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911437
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895399,
+              "live_bytes_before": 23883172,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911693
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34115,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/report.json",
+          "sha256": "30b5a8b6db49d8b26583898be937c6c84fbba60ebe3174220db519e6652c4eda"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "control-docx-one-edit-medium",
+        "folder": "r01-baseline-control-docx-one-edit-medium",
+        "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+        "index": 1,
+        "report": {
+          "bytes": 15564,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/report.json",
+          "sha256": "5d9daceab2668eb70c7d43790526233cd455ef1426c0a4a9eaf9709d21ef0d4f"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "control-xlsx-one-edit-medium",
+        "folder": "r01-baseline-control-xlsx-one-edit-medium",
+        "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+        "index": 1,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723185,
+              "live_bytes_before": 22218684,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22726308
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729649,
+              "live_bytes_before": 22225148,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22732772
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729905,
+              "live_bytes_before": 22225404,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22733028
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723185,
+              "live_bytes_before": 22219405,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22726308
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729649,
+              "live_bytes_before": 22225869,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22732772
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729905,
+              "live_bytes_before": 22226125,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22733028
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22218684,
+              "live_bytes_before": 21673293,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23219625
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225148,
+              "live_bytes_before": 21679757,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226089
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225404,
+              "live_bytes_before": 21680013,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226345
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22707487,
+              "live_bytes_before": 22723185,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23357231
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22713951,
+              "live_bytes_before": 22729649,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363695
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22714207,
+              "live_bytes_before": 22729905,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363951
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22219405,
+              "live_bytes_before": 22218684,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22243997
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225869,
+              "live_bytes_before": 22225148,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250461
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22226125,
+              "live_bytes_before": 22225404,
+              "peak_live_bytes_after": 52334296,
+              "peak_live_bytes_before": 52334296,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250717
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34009,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/report.json",
+          "sha256": "0522c3404f78c027a9158a9e6c2364a08b3d524a38d8d870dfe24f302042c28f"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-dense-sparse",
+        "folder": "r01-baseline-primary-percent-dense-sparse",
+        "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+        "index": 1,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153085,
+              "live_bytes_before": 30223988,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34181901
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159549,
+              "live_bytes_before": 30230452,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188365
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159805,
+              "live_bytes_before": 30230708,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188621
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153085,
+              "live_bytes_before": 30249932,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34181901
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159549,
+              "live_bytes_before": 30256396,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188365
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159805,
+              "live_bytes_before": 30256652,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188621
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30223988,
+              "live_bytes_before": 26023509,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33627627
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230452,
+              "live_bytes_before": 26029973,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634091
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230708,
+              "live_bytes_before": 26030229,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634347
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34137223,
+              "live_bytes_before": 34153085,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35749415
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143687,
+              "live_bytes_before": 34159549,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35755879
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143943,
+              "live_bytes_before": 34159805,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35756135
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30249932,
+              "live_bytes_before": 30223988,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30259816
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256396,
+              "live_bytes_before": 30230452,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266280
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256652,
+              "live_bytes_before": 30230708,
+              "peak_live_bytes_after": 69103858,
+              "peak_live_bytes_before": 69103858,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266536
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34153,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/report.json",
+          "sha256": "0b8ab73b980e2729e3022b3783935736e9489f7780a9c94b80e41365d9c10da0"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-medium",
+        "folder": "r01-baseline-primary-percent-medium",
+        "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+        "index": 1,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935314,
+              "live_bytes_before": 23876449,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25947541
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941778,
+              "live_bytes_before": 23882913,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954005
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942034,
+              "live_bytes_before": 23883169,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954261
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935314,
+              "live_bytes_before": 23888676,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25947541
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941778,
+              "live_bytes_before": 23895140,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954005
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942034,
+              "live_bytes_before": 23895396,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954261
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23876449,
+              "live_bytes_before": 21676121,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24870041
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23882913,
+              "live_bytes_before": 21682585,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876505
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23883169,
+              "live_bytes_before": 21682841,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876761
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25919452,
+              "live_bytes_before": 25935314,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27022333
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25925916,
+              "live_bytes_before": 25941778,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27028797
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25926172,
+              "live_bytes_before": 25942034,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27029053
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23888676,
+              "live_bytes_before": 23876449,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23904970
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895140,
+              "live_bytes_before": 23882913,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911434
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895396,
+              "live_bytes_before": 23883169,
+              "peak_live_bytes_after": 52336500,
+              "peak_live_bytes_before": 52336500,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911690
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34113,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/report.json",
+          "sha256": "57fe563d261868ffee2d2d8fb773de2c92355ffd1111c35b40e671dc26a1914b"
+        },
+        "role": "baseline",
+        "samples": 3
+      },
+      {
+        "case_id": "control-docx-one-edit-medium",
+        "folder": "r01-candidate-control-docx-one-edit-medium",
+        "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+        "index": 1,
+        "report": {
+          "bytes": 15566,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/report.json",
+          "sha256": "86b63463c25fa2eee4f6298ab6a99f106cd5c0918f68188090a25213726897f7"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "control-xlsx-one-edit-medium",
+        "folder": "r01-candidate-control-xlsx-one-edit-medium",
+        "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+        "index": 1,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723188,
+              "live_bytes_before": 22218687,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22726311
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729652,
+              "live_bytes_before": 22225151,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22732775
+            },
+            {
+              "allocated_bytes": 749638,
+              "allocation_calls": 10181,
+              "deallocated_bytes": 245137,
+              "deallocation_calls": 7795,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729908,
+              "live_bytes_before": 22225407,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 22733031
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22723188,
+              "live_bytes_before": 22219408,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22726311
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729652,
+              "live_bytes_before": 22225872,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22732775
+            },
+            {
+              "allocated_bytes": 724315,
+              "allocation_calls": 10175,
+              "deallocated_bytes": 220535,
+              "deallocation_calls": 7793,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22729908,
+              "live_bytes_before": 22226128,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 22733031
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22218687,
+              "live_bytes_before": 21673296,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23219628
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225151,
+              "live_bytes_before": 21679760,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226092
+            },
+            {
+              "allocated_bytes": 3196069,
+              "allocation_calls": 17135,
+              "deallocated_bytes": 2650678,
+              "deallocation_calls": 14682,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225407,
+              "live_bytes_before": 21680016,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 70,
+              "region_peak_live_bytes": 23226348
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22707490,
+              "live_bytes_before": 22723188,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23357234
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22713954,
+              "live_bytes_before": 22729652,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363698
+            },
+            {
+              "allocated_bytes": 1216622,
+              "allocation_calls": 2662,
+              "deallocated_bytes": 1232320,
+              "deallocation_calls": 2810,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22714210,
+              "live_bytes_before": 22729908,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 29,
+              "region_peak_live_bytes": 23363954
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22219408,
+              "live_bytes_before": 22218687,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22244000
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22225872,
+              "live_bytes_before": 22225151,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250464
+            },
+            {
+              "allocated_bytes": 25323,
+              "allocation_calls": 6,
+              "deallocated_bytes": 24602,
+              "deallocation_calls": 2,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 22226128,
+              "live_bytes_before": 22225407,
+              "peak_live_bytes_after": 52334299,
+              "peak_live_bytes_before": 52334299,
+              "reallocation_calls": 1,
+              "region_peak_live_bytes": 22250720
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34021,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/report.json",
+          "sha256": "85c613868e1c25da2b394206a88def6a184021f998cfa953d02f0ae3436e3e89"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-dense-sparse",
+        "folder": "r01-candidate-primary-percent-dense-sparse",
+        "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+        "index": 1,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153088,
+              "live_bytes_before": 30223991,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34181904
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159552,
+              "live_bytes_before": 30230455,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188368
+            },
+            {
+              "allocated_bytes": 8738737,
+              "allocation_calls": 80022,
+              "deallocated_bytes": 4809640,
+              "deallocation_calls": 61611,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159808,
+              "live_bytes_before": 30230711,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 503,
+              "region_peak_live_bytes": 34188624
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34153088,
+              "live_bytes_before": 30249935,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34181904
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159552,
+              "live_bytes_before": 30256399,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188368
+            },
+            {
+              "allocated_bytes": 5822693,
+              "allocation_calls": 79297,
+              "deallocated_bytes": 1919540,
+              "deallocation_calls": 61255,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34159808,
+              "live_bytes_before": 30256655,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 317,
+              "region_peak_live_bytes": 34188624
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30223991,
+              "live_bytes_before": 26023512,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33627630
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230455,
+              "live_bytes_before": 26029976,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634094
+            },
+            {
+              "allocated_bytes": 15847944,
+              "allocation_calls": 129369,
+              "deallocated_bytes": 11647465,
+              "deallocation_calls": 111276,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30230711,
+              "live_bytes_before": 26030232,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 162,
+              "region_peak_live_bytes": 33634350
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34137226,
+              "live_bytes_before": 34153088,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35749418
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143690,
+              "live_bytes_before": 34159552,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35755882
+            },
+            {
+              "allocated_bytes": 5575801,
+              "allocation_calls": 36366,
+              "deallocated_bytes": 5591663,
+              "deallocation_calls": 36494,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 34143946,
+              "live_bytes_before": 34159808,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 49,
+              "region_peak_live_bytes": 35756138
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30249935,
+              "live_bytes_before": 30223991,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30259819
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256399,
+              "live_bytes_before": 30230455,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266283
+            },
+            {
+              "allocated_bytes": 2916044,
+              "allocation_calls": 725,
+              "deallocated_bytes": 2890100,
+              "deallocation_calls": 356,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 30256655,
+              "live_bytes_before": 30230711,
+              "peak_live_bytes_after": 69103861,
+              "peak_live_bytes_before": 69103861,
+              "reallocation_calls": 186,
+              "region_peak_live_bytes": 30266539
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34154,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/report.json",
+          "sha256": "1df04cc15ab42fa995eace247101253d31753051bd9d5b550ae3bf86647f424d"
+        },
+        "role": "candidate",
+        "samples": 3
+      },
+      {
+        "case_id": "primary-percent-medium",
+        "folder": "r01-candidate-primary-percent-medium",
+        "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+        "index": 1,
+        "phase_metrics": {
+          "commit_allocation_metrics": [
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935317,
+              "live_bytes_before": 23876452,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25947544
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941781,
+              "live_bytes_before": 23882916,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954008
+            },
+            {
+              "allocated_bytes": 5018120,
+              "allocation_calls": 42293,
+              "deallocated_bytes": 2959255,
+              "deallocation_calls": 32615,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942037,
+              "live_bytes_before": 23883172,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 346,
+              "region_peak_live_bytes": 25954264
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25935317,
+              "live_bytes_before": 23888679,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25947544
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25941781,
+              "live_bytes_before": 23895143,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954008
+            },
+            {
+              "allocated_bytes": 3118739,
+              "allocation_calls": 41904,
+              "deallocated_bytes": 1072101,
+              "deallocation_calls": 32429,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25942037,
+              "live_bytes_before": 23895399,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 241,
+              "region_peak_live_bytes": 25954264
+            }
+          ],
+          "plan_allocation_metrics": [
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23876452,
+              "live_bytes_before": 21676124,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24870044
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23882916,
+              "live_bytes_before": 21682588,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876508
+            },
+            {
+              "allocated_bytes": 12137336,
+              "allocation_calls": 67803,
+              "deallocated_bytes": 9937008,
+              "deallocation_calls": 58249,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23883172,
+              "live_bytes_before": 21682844,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 199,
+              "region_peak_live_bytes": 24876764
+            }
+          ],
+          "publication_allocation_metrics": [
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25919455,
+              "live_bytes_before": 25935317,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27022336
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25925919,
+              "live_bytes_before": 25941781,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27028800
+            },
+            {
+              "allocated_bytes": 3970346,
+              "allocation_calls": 19248,
+              "deallocated_bytes": 3986208,
+              "deallocation_calls": 19375,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 25926175,
+              "live_bytes_before": 25942037,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 50,
+              "region_peak_live_bytes": 27029056
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23888679,
+              "live_bytes_before": 23876452,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23904973
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895143,
+              "live_bytes_before": 23882916,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911437
+            },
+            {
+              "allocated_bytes": 1899381,
+              "allocation_calls": 389,
+              "deallocated_bytes": 1887154,
+              "deallocation_calls": 186,
+              "failed_allocation_calls": 0,
+              "live_bytes_after": 23895399,
+              "live_bytes_before": 23883172,
+              "peak_live_bytes_after": 52336503,
+              "peak_live_bytes_before": 52336503,
+              "reallocation_calls": 105,
+              "region_peak_live_bytes": 23911693
+            }
+          ]
+        },
+        "report": {
+          "bytes": 34116,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/report.json",
+          "sha256": "542503e99ea39fce6dc8134b03198411b68aeba23000e8379cfd5bf4e42b7db2"
+        },
+        "role": "candidate",
+        "samples": 3
+      }
+    ],
+    "sample_metric_records_checked": 180,
+    "samples_per_record": 3,
+    "sink_limits_pass": true,
+    "warmup_per_record": 2
+  },
+  "artifacts": {
+    "allocator/capture.json": {
+      "bytes": 112692,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/capture.json",
+      "sha256": "eca6ea0197f27e6414f6960f5e79c0f41541185bf99d7044ab4b49105782ad6e"
+    },
+    "analysis.json": {
+      "bytes": 4285256,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/analysis.json",
+      "sha256": "9ab725ba8790245fe9f7cca0adaf1f21d458c0e715f9aceed17ea1cac52e14bc"
+    },
+    "analyze_v3.py": {
+      "bytes": 55464,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/analyze_v3.py",
+      "sha256": "4d96e5ac9031a60c6a5b7024cf8aaefd05bd12280760b9f3a1cf6d01bd72829b"
+    },
+    "candidate-overlay/crates/xml-minifier/src/audit.rs": {
+      "bytes": 125062,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/candidate-overlay/crates/xml-minifier/src/audit.rs",
+      "sha256": "e1d73295becd05347dfa6c07910089f16e60b44a6eeb50d92938a3a50cb10fdb"
+    },
+    "candidate-overlay/crates/xml-minifier/tests/source_replacement.rs": {
+      "bytes": 38959,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/candidate-overlay/crates/xml-minifier/tests/source_replacement.rs",
+      "sha256": "f7f05d3e2f733c1586c9402f79b29ba4087c8148b7afc88bc8a2c86c6e246d20"
+    },
+    "candidate-source-v2.json": {
+      "bytes": 3323129,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/candidate-source-v2.json",
+      "sha256": "ebcb1f10dd80d61e058fa81e4de0fd299c7be438a22391913c722f197776635b"
+    },
+    "decision.json": {
+      "bytes": 7208,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/decision.json",
+      "sha256": "8d79ae722b8576b1567ca6720007484d09031b0f9a432eaefae31e6ed17bc037"
+    },
+    "native/capture.json": {
+      "bytes": 325516,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/capture.json",
+      "sha256": "5cb36d9ccf5061ac48cfa629fd67b638e4ce5903fd20280ea997bbba57177d72"
+    },
+    "plan.json": {
+      "bytes": 6499,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/plan.json",
+      "sha256": "a7f743d6989d844bbdc1095711a75aafbf14344b4ff33139bdd7ad668cffbcd3"
+    },
+    "qualification/capture.json": {
+      "bytes": 59369,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/capture.json",
+      "sha256": "82da7bf516b941d9693c48a260293f6e1a04000e94a9f8452a33b3e1c04ac476"
+    },
+    "raw-replay.json": {
+      "bytes": 6529,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/raw-replay.json",
+      "sha256": "1e06ac15760ef365cd20b9cc0a5eea081097f98e823a2df292d00c1dbbf88a3d"
+    },
+    "source-final.json": {
+      "bytes": 802,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/source-final.json",
+      "sha256": "d4aabd8c1fe6dc44d961e9e36c3aa1857f49faf6cf447897a07cccf481edfd51"
+    }
+  },
+  "decision": {
+    "performance_claim": "no adopted improvement; control observation does not override failed primary gate",
+    "primary_gate_pass": false,
+    "production_retained": false,
+    "reason": "Neither primary meets paired p50 median ratio <=0.98 and 95% upper <1.0",
+    "review_flags": [],
+    "status": "rejected"
+  },
+  "findings": [],
+  "native": {
+    "blocks": 6,
+    "numeric_checks": {
+      "integer_p50_floor_recomputed": true,
+      "nearest_rank_p95_p99_recomputed": true,
+      "operation_metric_alignment": true,
+      "phase_alignment": true,
+      "positive_elapsed_samples": true,
+      "sample_order_permutations": true,
+      "sink_largest_write_limit": 65536,
+      "sink_over_limit_buckets": 0
+    },
+    "reduction": {
+      "cases": {
+        "control-docx-one-edit-medium": {
+          "accepted": false,
+          "blocks": [
+            {
+              "baseline": 166641,
+              "block": 0,
+              "candidate": 157116,
+              "ratio": 0.9428411975444219
+            },
+            {
+              "baseline": 164936,
+              "block": 1,
+              "candidate": 158926,
+              "ratio": 0.9635616239026047
+            },
+            {
+              "baseline": 165721,
+              "block": 2,
+              "candidate": 157420,
+              "ratio": 0.9499097881378944
+            },
+            {
+              "baseline": 165281,
+              "block": 3,
+              "candidate": 157536,
+              "ratio": 0.9531404093634477
+            },
+            {
+              "baseline": 165541,
+              "block": 4,
+              "candidate": 158326,
+              "ratio": 0.956415631172942
+            },
+            {
+              "baseline": 168786,
+              "block": 5,
+              "candidate": 157831,
+              "ratio": 0.9350953278115484
+            }
+          ],
+          "estimate": 0.951525098750671,
+          "lower_95": 0.9389682626779852,
+          "p50_spread": {
+            "baseline": 1.023342387350245,
+            "candidate": 1.011520150716668
+          },
+          "ratios": [
+            0.9428411975444219,
+            0.9635616239026047,
+            0.9499097881378944,
+            0.9531404093634477,
+            0.956415631172942,
+            0.9350953278115484
+          ],
+          "replicates": 10000,
+          "review_tail_ratios": {
+            "p50": 0.9520168325977625,
+            "p95": 0.9548286204308531,
+            "p99": 0.9588455431434487
+          },
+          "seed": 902009,
+          "upper_95": 0.9599886275377734
+        },
+        "control-xlsx-one-edit-medium": {
+          "accepted": false,
+          "blocks": [
+            {
+              "baseline": 4147051,
+              "block": 0,
+              "candidate": 4173356,
+              "ratio": 1.0063430616117333
+            },
+            {
+              "baseline": 4155711,
+              "block": 1,
+              "candidate": 4088250,
+              "ratio": 0.9837666767491772
+            },
+            {
+              "baseline": 4152686,
+              "block": 2,
+              "candidate": 4224587,
+              "ratio": 1.0173143358298702
+            },
+            {
+              "baseline": 4134506,
+              "block": 3,
+              "candidate": 4108217,
+              "ratio": 0.9936415620149057
+            },
+            {
+              "baseline": 4095291,
+              "block": 4,
+              "candidate": 4108212,
+              "ratio": 1.0031550871476533
+            },
+            {
+              "baseline": 4082466,
+              "block": 5,
+              "candidate": 4120807,
+              "ratio": 1.009391627511411
+            }
+          ],
+          "estimate": 1.0047490743796934,
+          "lower_95": 0.9887041193820414,
+          "p50_spread": {
+            "baseline": 1.0179413619121385,
+            "candidate": 1.0333484987464074
+          },
+          "ratios": [
+            1.0063430616117333,
+            0.9837666767491772,
+            1.0173143358298702,
+            0.9936415620149057,
+            1.0031550871476533,
+            1.009391627511411
+          ],
+          "replicates": 10000,
+          "review_tail_ratios": {
+            "p50": 0.9936566276124164,
+            "p95": 1.0105262491242564,
+            "p99": 1.0175864268950534
+          },
+          "seed": 902009,
+          "upper_95": 1.0133529816706406
+        },
+        "primary-percent-dense-sparse": {
+          "accepted": false,
+          "blocks": [
+            {
+              "baseline": 32959875,
+              "block": 0,
+              "candidate": 34078575,
+              "ratio": 1.0339412694981398
+            },
+            {
+              "baseline": 33511028,
+              "block": 1,
+              "candidate": 34208883,
+              "ratio": 1.0208246371910763
+            },
+            {
+              "baseline": 32997243,
+              "block": 2,
+              "candidate": 32521039,
+              "ratio": 0.9855683700604926
+            },
+            {
+              "baseline": 33261357,
+              "block": 3,
+              "candidate": 32840245,
+              "ratio": 0.9873393018811589
+            },
+            {
+              "baseline": 32844888,
+              "block": 4,
+              "candidate": 33007742,
+              "ratio": 1.0049582753943322
+            },
+            {
+              "baseline": 32782808,
+              "block": 5,
+              "candidate": 32793452,
+              "ratio": 1.0003246823762015
+            }
+          ],
+          "estimate": 1.002641478885267,
+          "lower_95": 0.9864538359708257,
+          "p50_spread": {
+            "baseline": 1.0222134723785712,
+            "candidate": 1.051900063832524
+          },
+          "ratios": [
+            1.0339412694981398,
+            1.0208246371910763,
+            0.9855683700604926,
+            0.9873393018811589,
+            1.0049582753943322,
+            1.0003246823762015
+          ],
+          "replicates": 10000,
+          "review_tail_ratios": {
+            "p50": 0.9983454249774831,
+            "p95": 0.9943065825508189,
+            "p99": 0.9945286634514281
+          },
+          "seed": 902009,
+          "upper_95": 1.027382953344608
+        },
+        "primary-percent-medium": {
+          "accepted": false,
+          "blocks": [
+            {
+              "baseline": 16703700,
+              "block": 0,
+              "candidate": 16638275,
+              "ratio": 0.9960832031226614
+            },
+            {
+              "baseline": 16628545,
+              "block": 1,
+              "candidate": 16730031,
+              "ratio": 1.0061031196656112
+            },
+            {
+              "baseline": 16621451,
+              "block": 2,
+              "candidate": 16733042,
+              "ratio": 1.006713673794183
+            },
+            {
+              "baseline": 16697087,
+              "block": 3,
+              "candidate": 16690741,
+              "ratio": 0.9996199337046037
+            },
+            {
+              "baseline": 16618036,
+              "block": 4,
+              "candidate": 16643462,
+              "ratio": 1.001530024366297
+            },
+            {
+              "baseline": 16525516,
+              "block": 5,
+              "candidate": 16612323,
+              "ratio": 1.0052529070801783
+            }
+          ],
+          "estimate": 1.0033914657232377,
+          "lower_95": 0.9978515684136325,
+          "p50_spread": {
+            "baseline": 1.010782356206003,
+            "candidate": 1.0072668343855342
+          },
+          "ratios": [
+            0.9960832031226614,
+            1.0061031196656112,
+            1.006713673794183,
+            0.9996199337046037,
+            1.001530024366297,
+            1.0052529070801783
+          ],
+          "replicates": 10000,
+          "review_tail_ratios": {
+            "p50": 1.0025325416580502,
+            "p95": 0.9975686241057606,
+            "p99": 0.9947226243570207
+          },
+          "seed": 902009,
+          "upper_95": 1.0064083967298971
+        }
+      },
+      "gate": {
+        "bootstrap_replicates": 10000,
+        "bootstrap_seed": 902009,
+        "nearest_rank_indices": {
+          "lower_95": 249,
+          "upper_95": 9749
+        },
+        "p50_median_ratio_max": 0.98,
+        "upper_95_ci_lt": 1.0
+      },
+      "primary_gate_pass": false,
+      "review_flags": []
+    },
+    "rows": 48,
+    "samples_per_child": 100,
+    "warmup_per_child": 10
+  },
+  "raw_replay_custody": {
+    "analysis_descriptor": {
+      "bytes": 4285256,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/analysis.json",
+      "sha256": "9ab725ba8790245fe9f7cca0adaf1f21d458c0e715f9aceed17ea1cac52e14bc"
+    },
+    "analyzer_descriptor": {
+      "bytes": 55464,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/analyze_v3.py",
+      "sha256": "4d96e5ac9031a60c6a5b7024cf8aaefd05bd12280760b9f3a1cf6d01bd72829b"
+    },
+    "baseline_archive_descriptor": {
+      "bytes": 89047170,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.tar.gz",
+      "sha256": "f6f9d13813866ea24fd9cc108fc949aa42cdd042bacd3ca960897e8c88c63ce9"
+    },
+    "baseline_source_files_verified": 10771,
+    "candidate_override_files_verified": [
+      "crates/xml-minifier/src/audit.rs",
+      "crates/xml-minifier/tests/source_replacement.rs"
+    ],
+    "children": {
+      "allocator": 16,
+      "native": 48,
+      "qualification": 8
+    },
+    "mode": "retained artifact/semantic/numeric replay; no live source-root claim",
+    "status": "pass"
+  },
+  "raw_reports": [
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "r00-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 0,
+      "p50": 180341,
+      "p95": 198901,
+      "p99": 198901,
+      "report": {
+        "bytes": 15565,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "0317abcd33e36cf2a5a3f227170cd3e9f435f3821aae1e574bc27660efd1810b"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "r00-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 0,
+      "p50": 4637615,
+      "p95": 4640854,
+      "p99": 4640854,
+      "report": {
+        "bytes": 34014,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "934569fd513bd14a1c36aa278e498dd56c876694899f4595ec8435728f7e3680"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "r00-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 0,
+      "p50": 37733077,
+      "p95": 37847859,
+      "p99": 37847859,
+      "report": {
+        "bytes": 34147,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "db60af7b7b1f780c29d1d4c6db11005922be18500bbc6b82f59b3304f41f278c"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "r00-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 0,
+      "p50": 18985839,
+      "p95": 19002340,
+      "p99": 19002340,
+      "report": {
+        "bytes": 34115,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-baseline-primary-percent-medium/report.json",
+        "sha256": "0cfaac02a52a0f7d96fef2511acfe123f59bf8f3cc88111112dce938d06683e6"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "r00-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 0,
+      "p50": 183251,
+      "p95": 195821,
+      "p99": 195821,
+      "report": {
+        "bytes": 15563,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "10063d7bee19ef23922dfdd817e234f3d4fe3da9b114833cacb94327b531a3c4"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "r00-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 0,
+      "p50": 4580974,
+      "p95": 4583924,
+      "p99": 4583924,
+      "report": {
+        "bytes": 34018,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "2c7b2185cce972327c06ebb1579c8fbffeadde70ce5099c5ddbe0f1cad6a7c13"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "r00-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 0,
+      "p50": 38118190,
+      "p95": 38154290,
+      "p99": 38154290,
+      "report": {
+        "bytes": 34156,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "1593f1a1af4c56b485576dfba5db4ee327ea1012841a7b6ec680b8ca49780d76"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "r00-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 0,
+      "p50": 18820129,
+      "p95": 18827539,
+      "p99": 18827539,
+      "report": {
+        "bytes": 34115,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r00-candidate-primary-percent-medium/report.json",
+        "sha256": "30b5a8b6db49d8b26583898be937c6c84fbba60ebe3174220db519e6652c4eda"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "r01-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 1,
+      "p50": 184271,
+      "p95": 193191,
+      "p99": 193191,
+      "report": {
+        "bytes": 15564,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "5d9daceab2668eb70c7d43790526233cd455ef1426c0a4a9eaf9709d21ef0d4f"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "r01-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 1,
+      "p50": 4620994,
+      "p95": 4632014,
+      "p99": 4632014,
+      "report": {
+        "bytes": 34009,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "0522c3404f78c027a9158a9e6c2364a08b3d524a38d8d870dfe24f302042c28f"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "r01-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 1,
+      "p50": 37178535,
+      "p95": 37490356,
+      "p99": 37490356,
+      "report": {
+        "bytes": 34153,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "0b8ab73b980e2729e3022b3783935736e9489f7780a9c94b80e41365d9c10da0"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "r01-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 1,
+      "p50": 18755018,
+      "p95": 18769728,
+      "p99": 18769728,
+      "report": {
+        "bytes": 34113,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-baseline-primary-percent-medium/report.json",
+        "sha256": "57fe563d261868ffee2d2d8fb773de2c92355ffd1111c35b40e671dc26a1914b"
+      },
+      "role": "baseline",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "r01-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 1,
+      "p50": 178211,
+      "p95": 184431,
+      "p99": 184431,
+      "report": {
+        "bytes": 15566,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "86b63463c25fa2eee4f6298ab6a99f106cd5c0918f68188090a25213726897f7"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "r01-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 1,
+      "p50": 4648655,
+      "p95": 4666234,
+      "p99": 4666234,
+      "report": {
+        "bytes": 34021,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "85c613868e1c25da2b394206a88def6a184021f998cfa953d02f0ae3436e3e89"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "r01-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 1,
+      "p50": 36957974,
+      "p95": 37033904,
+      "p99": 37033904,
+      "report": {
+        "bytes": 34154,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "1df04cc15ab42fa995eace247101253d31753051bd9d5b550ae3bf86647f424d"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "r01-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 1,
+      "p50": 19055029,
+      "p95": 19087180,
+      "p99": 19087180,
+      "report": {
+        "bytes": 34116,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/allocator/r01-candidate-primary-percent-medium/report.json",
+        "sha256": "542503e99ea39fce6dc8134b03198411b68aeba23000e8379cfd5bf4e42b7db2"
+      },
+      "role": "candidate",
+      "stage": "allocator"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b00-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 0,
+      "p50": 166641,
+      "p95": 176901,
+      "p99": 180331,
+      "report": {
+        "bytes": 36675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "32fb2c7e3f7ebabad4a882de1a4444fb8902fc2ebaab8d3cb6739bb45f655bbc"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b00-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 0,
+      "p50": 4147051,
+      "p95": 4200961,
+      "p99": 4240702,
+      "report": {
+        "bytes": 273480,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "c1815741d79dc9534f5174bc25671288acc11d4d60a38ce82d21ad2cc3e0aca5"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b00-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 0,
+      "p50": 32959875,
+      "p95": 33327512,
+      "p99": 33662103,
+      "report": {
+        "bytes": 273791,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "f321d4b2b5a72b3e68a82005ad010c8a6cb12bf1364352d9fca3adc524414817"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b00-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 0,
+      "p50": 16703700,
+      "p95": 16858316,
+      "p99": 16913777,
+      "report": {
+        "bytes": 273528,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-baseline-primary-percent-medium/report.json",
+        "sha256": "249aef0650a57c010c5e12c7ee2137cd7bb95d1b1c7b7509802c2e3676892068"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b00-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 0,
+      "p50": 157116,
+      "p95": 167561,
+      "p99": 174240,
+      "report": {
+        "bytes": 36677,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "f46f33e7388147f4ea2b2c41cac1161ccbdec8f193b9f3fb8b079167c3592808"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b00-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 0,
+      "p50": 4173356,
+      "p95": 4238921,
+      "p99": 4255441,
+      "report": {
+        "bytes": 273482,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "54f038233a6bd76bed514013214a9456c69e290b729c6f350d8ebcdac13a0f60"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b00-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 0,
+      "p50": 34078575,
+      "p95": 34287177,
+      "p99": 34518818,
+      "report": {
+        "bytes": 273780,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "718607be5a2ed2db61f76a2337db91d4782dd0e431ce26df6fb8058dbcd512fc"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b00-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 0,
+      "p50": 16638275,
+      "p95": 16856206,
+      "p99": 17008977,
+      "report": {
+        "bytes": 273510,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b00-candidate-primary-percent-medium/report.json",
+        "sha256": "c54118a6b4855a75da57cb1dd9ef170e7cd213ae3faeb3a5b1fb4a088b7c0249"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b01-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 1,
+      "p50": 164936,
+      "p95": 174080,
+      "p99": 176131,
+      "report": {
+        "bytes": 36673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "4029703985cd62619f86caf6e2a8fa942d03f2445011e5721b174f5a9f1393b3"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b01-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 1,
+      "p50": 4155711,
+      "p95": 4208281,
+      "p99": 4221681,
+      "report": {
+        "bytes": 273484,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "ef1bc85d982da3a9f76609be126abefe76d200de2a8fa2e8f2c60207f0111022"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b01-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 1,
+      "p50": 33511028,
+      "p95": 100491201,
+      "p99": 106404112,
+      "report": {
+        "bytes": 273851,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "4d70850559284c30ec2de031c4be838a33ad4a52468cce54e4c8c5ba2f066fa9"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b01-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 1,
+      "p50": 16628545,
+      "p95": 16770277,
+      "p99": 16823606,
+      "report": {
+        "bytes": 273510,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-baseline-primary-percent-medium/report.json",
+        "sha256": "6082a090bb9f475786e92eb725b0b70f1e5e633cf54e15e58e2569b2d9ac0c6e"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b01-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 1,
+      "p50": 158926,
+      "p95": 168581,
+      "p99": 176351,
+      "report": {
+        "bytes": 36676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "ea1d906d9a041ce0e2755e04244abec7d1fa0c1d337afd7fd6505852e00b2103"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b01-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 1,
+      "p50": 4088250,
+      "p95": 4174291,
+      "p99": 4214901,
+      "report": {
+        "bytes": 273481,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "311e2c1a5a766d31bcf802f7dda43ae6e084dd5659d044d12cf87c35f4b69577"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b01-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 1,
+      "p50": 34208883,
+      "p95": 34432589,
+      "p99": 34602439,
+      "report": {
+        "bytes": 273831,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "2291cbc195dfa53da8b87bb1504dbca5f488fd0d94d526757c655731cc9acb64"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b01-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 1,
+      "p50": 16730031,
+      "p95": 16822606,
+      "p99": 16860406,
+      "report": {
+        "bytes": 273527,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b01-candidate-primary-percent-medium/report.json",
+        "sha256": "aa008da38b7f34e505b97b897a51894cc9d91e411ad7edee42fa048d35879e7b"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b02-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 2,
+      "p50": 165721,
+      "p95": 169671,
+      "p99": 173111,
+      "report": {
+        "bytes": 36675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "356fbd613270f10072f341145241ac741a794c1174f6d5958ee592d6b9885af5"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b02-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 2,
+      "p50": 4152686,
+      "p95": 4222852,
+      "p99": 4282643,
+      "report": {
+        "bytes": 273490,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "7449d5d385d6e7ac0eb5407d361ef01734ceab4d785660fe7c7677783b9414e3"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b02-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 2,
+      "p50": 32997243,
+      "p95": 33355285,
+      "p99": 33422866,
+      "report": {
+        "bytes": 273777,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "d0ed7b66ec236a355c5a9125c8e574286cc70f77b3ab99bd20f957f5cc71b70a"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b02-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 2,
+      "p50": 16621451,
+      "p95": 16737966,
+      "p99": 16867327,
+      "report": {
+        "bytes": 273512,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-baseline-primary-percent-medium/report.json",
+        "sha256": "efa16b35a72c9273300584306b582a7e88f3797ae16ed5b455c1dda8c6262431"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b02-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 2,
+      "p50": 157420,
+      "p95": 166431,
+      "p99": 167031,
+      "report": {
+        "bytes": 36667,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "7d9f89d0e42bf5ef094f9a0f021fa592ad9ede3fc0e4eac754019d98cf52f8d4"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b02-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 2,
+      "p50": 4224587,
+      "p95": 4307443,
+      "p99": 4329593,
+      "report": {
+        "bytes": 273491,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "1b8373056fb3356fc3ac9f612a51c74fab396d41960c6cd4001a6d8d7b82d752"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b02-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 2,
+      "p50": 32521039,
+      "p95": 32701655,
+      "p99": 32758695,
+      "report": {
+        "bytes": 273767,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "d53ae81bce9e1efa0f4564dad248979a9480e273f6def422ec5f8736d7ac0c3b"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b02-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 2,
+      "p50": 16733042,
+      "p95": 16805949,
+      "p99": 16836188,
+      "report": {
+        "bytes": 273517,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b02-candidate-primary-percent-medium/report.json",
+        "sha256": "105852148d5acc0ccb2f3ebbb1f272ea06bf4dafd1c234671c5c0e55d88087d2"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b03-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 3,
+      "p50": 165281,
+      "p95": 170521,
+      "p99": 174190,
+      "report": {
+        "bytes": 36674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "c463ce663175e3c1144b4b4a8b09272fe0199bd442ddb8cb84be6ef0f542bdd7"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b03-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 3,
+      "p50": 4134506,
+      "p95": 4167642,
+      "p99": 4190602,
+      "report": {
+        "bytes": 273480,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "a1ff26422898d87741fe615c9ca7171ac22f6fea53c4389b12f46641a1f9cdea"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b03-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 3,
+      "p50": 33261357,
+      "p95": 70135413,
+      "p99": 81289011,
+      "report": {
+        "bytes": 273825,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "1f122ea4c875f6a3913b4187b9ee15fae8cf76d511f81159bda69e6c6c0bbfd7"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b03-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 3,
+      "p50": 16697087,
+      "p95": 16868777,
+      "p99": 16978258,
+      "report": {
+        "bytes": 273527,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-baseline-primary-percent-medium/report.json",
+        "sha256": "fb6e5958ac96e7b2f47daa74b23a5b20d53d55f1b32585e34da3b98016fbb2d5"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b03-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 3,
+      "p50": 157536,
+      "p95": 167031,
+      "p99": 168511,
+      "report": {
+        "bytes": 36676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "b63fcace43e475107daee97b71e6be0a99f0236009d516b9eb45e4fa8bef2668"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b03-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 3,
+      "p50": 4108217,
+      "p95": 4217772,
+      "p99": 4282553,
+      "report": {
+        "bytes": 273485,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "7b3051f055b6809d461ebf150f39b12a6c7d431e5b112a09b0777f032e930bd4"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b03-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 3,
+      "p50": 32840245,
+      "p95": 33103282,
+      "p99": 33206045,
+      "report": {
+        "bytes": 273812,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "42cc500abc2f7b7f2702a8c016f18a99b2261c32de4ca503f9871972f8aa507f"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b03-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 3,
+      "p50": 16690741,
+      "p95": 16803757,
+      "p99": 16827197,
+      "report": {
+        "bytes": 273505,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b03-candidate-primary-percent-medium/report.json",
+        "sha256": "1423b32b96629139ad9ddcf7a3841d5c33f5c51cead60310a44c9b6b8e4a913d"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b04-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 4,
+      "p50": 165541,
+      "p95": 176341,
+      "p99": 181891,
+      "report": {
+        "bytes": 36673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "ff05821c9f55fc23a54fa0891e7940a9d2f1b24b8ca8c89c97b934624cd8d0fd"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b04-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 4,
+      "p50": 4095291,
+      "p95": 4137912,
+      "p99": 4161362,
+      "report": {
+        "bytes": 273480,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "d3f01bf8a3ae1fbc97eba9166ba5602b2b5ce1ad8a9b4c15d09a7d72ac795071"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b04-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 4,
+      "p50": 32844888,
+      "p95": 33125954,
+      "p99": 33241685,
+      "report": {
+        "bytes": 273745,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "4c868971dbda32b05b373f828850105cf7abf845ef1f132960a8355d9ab3b94e"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b04-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 4,
+      "p50": 16618036,
+      "p95": 16833307,
+      "p99": 17076219,
+      "report": {
+        "bytes": 273511,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-baseline-primary-percent-medium/report.json",
+        "sha256": "35db6a148eaa03124a24d6c33ec90998a5fe3b6a5ed5fe57f04034ef5ead24a0"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b04-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 4,
+      "p50": 158326,
+      "p95": 167831,
+      "p99": 173281,
+      "report": {
+        "bytes": 36675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "c8796842a400ca35408c87a42f3f68b637044b4ed9f7a520deb693f3d6265f26"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b04-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 4,
+      "p50": 4108212,
+      "p95": 4146882,
+      "p99": 4277672,
+      "report": {
+        "bytes": 273483,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "25559b81d71a2405cfb64085b7602e96bd6d78aaa03f76b08e15092baa49e47c"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b04-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 4,
+      "p50": 33007742,
+      "p95": 33199862,
+      "p99": 33645037,
+      "report": {
+        "bytes": 273739,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "617085cfd77d449a4195f9b785d41e58587728bc0a4029325941d577e21b274c"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b04-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 4,
+      "p50": 16643462,
+      "p95": 16738818,
+      "p99": 16939669,
+      "report": {
+        "bytes": 273504,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b04-candidate-primary-percent-medium/report.json",
+        "sha256": "c7ea9c2a73de9a4aaf6a11059bb9a12e03e7135e823479ef004f46b7187eeaec"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b05-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 5,
+      "p50": 168786,
+      "p95": 178491,
+      "p99": 180831,
+      "report": {
+        "bytes": 36665,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "d72944c783777f8cd7dd79f684dc11238623c818c9421defb6f7c8576c0389db"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b05-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 5,
+      "p50": 4082466,
+      "p95": 4127502,
+      "p99": 4147332,
+      "report": {
+        "bytes": 273480,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "d6982f8107691818e5fbcf9945d8b99881ee0c67195644e4202113b3aa359286"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b05-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 5,
+      "p50": 32782808,
+      "p95": 33138275,
+      "p99": 33556756,
+      "report": {
+        "bytes": 273743,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "f5f1220a1fa66edfdc035f0af105682a62866b0ee2f6ca96fdca97c8dc07df0b"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b05-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 5,
+      "p50": 16525516,
+      "p95": 16886428,
+      "p99": 17014030,
+      "report": {
+        "bytes": 273519,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-baseline-primary-percent-medium/report.json",
+        "sha256": "ca57d9c5ffd249275dd3a4c5fc3348b9015b1ae8642358047266f39a02984cc2"
+      },
+      "role": "baseline",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "b05-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 5,
+      "p50": 157831,
+      "p95": 166401,
+      "p99": 168421,
+      "report": {
+        "bytes": 36675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "8cb84f4bb6911dee144110336ffecd374a1718ef2133ac9f737bc9e459e9feef"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "b05-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 5,
+      "p50": 4120807,
+      "p95": 4242622,
+      "p99": 4300303,
+      "report": {
+        "bytes": 273480,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "6962198b608d7d1922e523e22439f3a9e83c1d06a2ef619f8bc2844118633009"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "b05-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 5,
+      "p50": 32793452,
+      "p95": 32933613,
+      "p99": 32993212,
+      "report": {
+        "bytes": 273737,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "868297b85f0eb2639301b91df0dcc6f546000d465b90853834a68d89ec9d9313"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "b05-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 5,
+      "p50": 16612323,
+      "p95": 16698318,
+      "p99": 16852768,
+      "report": {
+        "bytes": 273503,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/native/b05-candidate-primary-percent-medium/report.json",
+        "sha256": "f713319e83e11ba1ce8f91dc1c81cdc453c904ee08ab2eb2a0bef4376d913306"
+      },
+      "role": "candidate",
+      "stage": "native"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "q00-baseline-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 0,
+      "p50": 253441,
+      "p95": 321482,
+      "p99": 321482,
+      "report": {
+        "bytes": 15199,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-baseline-control-docx-one-edit-medium/report.json",
+        "sha256": "f3a24cd1b4951b4e0f0603a496c508cec63255cafaa623e756c1a321d5dce1cf"
+      },
+      "role": "baseline",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "q00-baseline-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 0,
+      "p50": 4010070,
+      "p95": 4022310,
+      "p99": 4022310,
+      "report": {
+        "bytes": 24057,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-baseline-control-xlsx-one-edit-medium/report.json",
+        "sha256": "3244cb5adfcc3aacd06567a1bb4cd5ad876faa7d8678fe72f62c1d4de2eb21d7"
+      },
+      "role": "baseline",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "q00-baseline-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 0,
+      "p50": 32174006,
+      "p95": 32452597,
+      "p99": 32452597,
+      "report": {
+        "bytes": 24119,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "6879e3a1318e30b91a0e30df34c1bc551d50d065660430323a76a65c067c23f2"
+      },
+      "role": "baseline",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "q00-baseline-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 0,
+      "p50": 16844987,
+      "p95": 17120799,
+      "p99": 17120799,
+      "report": {
+        "bytes": 24091,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-baseline-primary-percent-medium/report.json",
+        "sha256": "fc1634dfbd7ea11fa7f5348f99ad91bd2a42486d3b0492994fc969826d42b4fc"
+      },
+      "role": "baseline",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "control-docx-one-edit-medium",
+      "folder": "q00-candidate-control-docx-one-edit-medium",
+      "identity_sha256": "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387",
+      "index": 0,
+      "p50": 233956,
+      "p95": 289391,
+      "p99": 289391,
+      "report": {
+        "bytes": 15199,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-candidate-control-docx-one-edit-medium/report.json",
+        "sha256": "c31d221ba93438015abe87887565dd9c74eab7ef01423aa28d8e12f3074ec0fb"
+      },
+      "role": "candidate",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "control-xlsx-one-edit-medium",
+      "folder": "q00-candidate-control-xlsx-one-edit-medium",
+      "identity_sha256": "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1",
+      "index": 0,
+      "p50": 4349592,
+      "p95": 4634954,
+      "p99": 4634954,
+      "report": {
+        "bytes": 24066,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "b3d687094837fc5962ab4f704b42b27955adeb1f4366d6a7d4f677c032d326db"
+      },
+      "role": "candidate",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "primary-percent-dense-sparse",
+      "folder": "q00-candidate-primary-percent-dense-sparse",
+      "identity_sha256": "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf",
+      "index": 0,
+      "p50": 32318666,
+      "p95": 32549748,
+      "p99": 32549748,
+      "report": {
+        "bytes": 24120,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "99a18fd598a42367c733710cafe7e72976150685938f25d894d5b48b5826bd0d"
+      },
+      "role": "candidate",
+      "stage": "qualification"
+    },
+    {
+      "case_id": "primary-percent-medium",
+      "folder": "q00-candidate-primary-percent-medium",
+      "identity_sha256": "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118",
+      "index": 0,
+      "p50": 16990162,
+      "p95": 17286279,
+      "p99": 17286279,
+      "report": {
+        "bytes": 24098,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/qualification/q00-candidate-primary-percent-medium/report.json",
+        "sha256": "207a92365532436e49a5ca88339ec15cfe4e7d3f030c4ac2a04d851f524b3b8f"
+      },
+      "role": "candidate",
+      "stage": "qualification"
+    }
+  ],
+  "reviewer": "independent source reviewer 0902",
+  "schema": "litchi.change-0902.independent-result-review.v1",
+  "scope": {
+    "allocator_records_reviewed": 16,
+    "builds_invoked": false,
+    "helpers_invoked": false,
+    "native_rows_reviewed": 48,
+    "offline_numeric_recomputation": true,
+    "production_adoption": false,
+    "qualification_rows_reviewed": 8,
+    "raw_retained_reports": true,
+    "workloads_invoked": false
+  },
+  "semantic_identity": {
+    "all_72_retained_rows_equal_within_case": true,
+    "case_groups": {
+      "control-docx-one-edit-medium": {
+        "rows": 18,
+        "unique_count": 1,
+        "unique_identity_sha256": [
+          "9e203dfdaa7db2e8f4bf86d9363e6be5930ebd88d548ab384aac6bdf93d76387"
+        ]
+      },
+      "control-xlsx-one-edit-medium": {
+        "rows": 18,
+        "unique_count": 1,
+        "unique_identity_sha256": [
+          "dfd4607c21d9887c2b7a5050d07ff7b88e798aed421766f51205297d62b05ed1"
+        ]
+      },
+      "primary-percent-dense-sparse": {
+        "rows": 18,
+        "unique_count": 1,
+        "unique_identity_sha256": [
+          "9a482883171e119899657db415c2b666a38aa0e99afeb3761d9bf85abc830fbf"
+        ]
+      },
+      "primary-percent-medium": {
+        "rows": 18,
+        "unique_count": 1,
+        "unique_identity_sha256": [
+          "2f37e92f7aeb977761298a22e5d9f63f2301473dc54e5ab4202f1b47b3287118"
+        ]
+      }
+    },
+    "docx_source_and_output_digest_absent": true,
+    "native_allocator_qualification_population_lengths_normalized": true,
+    "xlsx_source_output_semantic_digests_and_cache_counters_checked": true
+  },
+  "source_final": {
+    "baseline_manifest": {
+      "bytes": 3325536,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+      "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+    },
+    "candidate_files": [
+      "crates/xml-minifier/src/audit.rs",
+      "crates/xml-minifier/tests/source_replacement.rs"
+    ],
+    "candidate_overlay_checked_before_restoration": true,
+    "candidate_manifest": {
+      "bytes": 3323129,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/candidate-source-v2.json",
+      "sha256": "ebcb1f10dd80d61e058fa81e4de0fd299c7be438a22391913c722f197776635b"
+    },
+    "file_count": 10771,
+    "hashed_entries": 21542,
+    "production_restoration_recorded_in": "decision.json"
+  },
+  "status": "pass"
+}

@@ -1,0 +1,161 @@
+diff --git a/crates/xml-minifier/src/audit.rs b/crates/xml-minifier/src/audit.rs
+index c74d09d5b3..495ef9a57f 100644
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -1061,6 +1061,12 @@ pub fn verify_source_replacement(
+     // larger than half the replacement is never used: when the difference
+     // alone is that large, do not look for one.
+     search.stopped = (replacement.len() - suffix - prefix).saturating_mul(2) > replacement.len();
++    if search.stopped {
++        let _report = verify_source(original, limits).map_err(ReplacementError::Original)?;
++        return verify_source(replacement, limits)
++            .map(|_report| ReplacementProof::Complete)
++            .map_err(ReplacementError::Replacement);
++    }
+     let report = verify_observed(original, limits, Policy::SOURCE, &mut search)
+         .map_err(ReplacementError::Original)?;
+     if let Some(proof) = search
+diff --git a/crates/xml-minifier/tests/source_replacement.rs b/crates/xml-minifier/tests/source_replacement.rs
+index 5eb85a4be1..9582e418ef 100644
+--- a/crates/xml-minifier/tests/source_replacement.rs
++++ b/crates/xml-minifier/tests/source_replacement.rs
+@@ -323,6 +323,139 @@ fn a_window_larger_than_half_the_replacement_is_scanned_completely() {
+     );
+ }
+ 
++#[test]
++fn a_broad_change_keeps_original_first_errors_and_limits() {
++    let original = "<root><a/></root>";
++    let replacement =
++        "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>";
++
++    // Both sides are bad, but the original error is still the one exposed.
++    let error = checked(
++        b"<root><a/></root><broken>",
++        b"<root><long-element><x:item>alpha</long-element></root>",
++        Limits::default(),
++    )
++    .expect_err("the original is audited first");
++    assert!(matches!(error, ReplacementError::Original(Error::Malformed { .. })));
++
++    // A broad replacement does not change which side owns a byte-budget
++    // failure: an original failure is returned before the replacement runs.
++    let error = checked(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default().narrow(Resource::Bytes, original.len() - 1),
++    )
++    .expect_err("the original exceeds its byte budget");
++    assert!(matches!(
++        error,
++        ReplacementError::Original(Error::Limit {
++            resource: Resource::Bytes,
++            ..
++        })
++    ));
++
++    // Once the original fits, the same broad path reports a replacement
++    // budget failure with the complete-audit error.
++    let error = checked(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default().narrow(Resource::Bytes, original.len()),
++    )
++    .expect_err("the replacement exceeds its byte budget");
++    assert!(matches!(
++        error,
++        ReplacementError::Replacement(Error::Limit {
++            resource: Resource::Bytes,
++            ..
++        })
++    ));
++}
++
++#[test]
++fn a_broad_valid_change_returns_the_complete_proof() {
++    let original = "<root><a/></root>";
++    let replacement =
++        "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>";
++    assert_eq!(
++        checked(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default()
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn exact_half_and_just_over_half_changes_keep_the_same_verdict() {
++    let original = "<r><x/></r>";
++    // The common prefix is `<r><`, the common suffix is `/></r>`, and the
++    // differing replacement span is exactly ten bytes: half of this
++    // twenty-byte replacement. The strict boundary must remain eligible for
++    // the ordinary window search, even though this candidate's enclosing
++    // window is too large to prove locally.
++    let exact_half = "<r><abcdefghij/></r>";
++    assert_eq!(
++        checked(
++            original.as_bytes(),
++            exact_half.as_bytes(),
++            Limits::default()
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++
++    // One more differing byte makes the pre-scan decision strict, so this
++    // follows the two complete source audits directly.
++    let just_over_half = "<r><abcdefghijk/></r>";
++    assert_eq!(
++        checked(
++            original.as_bytes(),
++            just_over_half.as_bytes(),
++            Limits::default()
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn broad_namespace_unicode_and_malformed_changes_match_complete_audits() {
++    let original = "<root><a/></root>";
++    let valid =
++        "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>";
++    assert_eq!(
++        checked(original.as_bytes(), valid.as_bytes(), Limits::default()),
++        Ok(ReplacementProof::Complete)
++    );
++
++    for malformed in [
++        // The changed subtree uses a prefix that is not declared in scope.
++        "<root><long-element><x:item>alpha é</x:item><x:item>β</x:item><tail>0123456789</tail></long-element></root>",
++        // The changed subtree has a mismatched end tag.
++        "<root><long-element xmlns:x=\"urn:x\"><x:item>alpha é</long-element></root>",
++    ] {
++        let expected = verify_source(malformed.as_bytes(), Limits::default())
++            .expect_err("the broad replacement is malformed");
++        assert_eq!(
++            checked(original.as_bytes(), malformed.as_bytes(), Limits::default()),
++            Err(ReplacementError::Replacement(expected)),
++            "{malformed}"
++        );
++    }
++
++    let mut invalid_utf8 = valid.as_bytes().to_vec();
++    let at = invalid_utf8
++        .iter()
++        .position(|byte| *byte == b'\xC3')
++        .expect("the valid fixture contains a two-byte Unicode character");
++    invalid_utf8[at] = 0xFF;
++    let expected = verify_source(&invalid_utf8, Limits::default())
++        .expect_err("the broad replacement has invalid UTF-8");
++    assert_eq!(
++        checked(original.as_bytes(), &invalid_utf8, Limits::default()),
++        Err(ReplacementError::Replacement(expected))
++    );
++}
++
+ #[test]
+ fn a_marked_original_keeps_physical_offsets() {
+     let original = format!("\u{feff}{}", worksheet("<c r=\"A1\"><v>0</v></c>"));

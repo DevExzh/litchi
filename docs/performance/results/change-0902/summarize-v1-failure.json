@@ -1,0 +1,8 @@
+{
+  "exit_code": 1,
+  "error": "AssertionError at raw phase total versus elapsed samples; source vectors use iteration order whereas elapsed samples sorted",
+  "helper_sha256": "637a256429137afbf2175f9a6cf98e8e011e6cbc409aed35d50d0e8dca4a2e0d",
+  "output_created": false,
+  "workload_repeated": false,
+  "correction": "align total by elapsed.sample_order before equality"
+}

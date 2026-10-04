@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "source_root": "/tmp/litchi-0902-src",
+  "target_root": "/home/zhuhe/code/litchi/target/litchi-0902-build",
+  "source_manifest_sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453",
+  "selected_files_verified": 10771,
+  "quality_lock_sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087",
+  "worktrees_created": 0
+}
