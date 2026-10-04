@@ -1,0 +1,23 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-0905-src/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/tmp/litchi-0905-src/crates/xml-minifier)
+error: unnecessary qualification
+  --> crates/xml-minifier/examples/attribute_summary_parity.rs:50:6
+   |
+50 | impl std::io::Read for Chunked {
+   |      ^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+   |
+50 - impl std::io::Read for Chunked {
+50 + impl io::Read for Chunked {
+   |
+
+error: could not compile `xml-minifier` (example "attribute_summary_parity" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

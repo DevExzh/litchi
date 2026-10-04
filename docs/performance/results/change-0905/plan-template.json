@@ -1,0 +1,133 @@
+{
+  "schema": "litchi.paired-audit-capture-0905.v1",
+  "status": "template-only",
+  "plan_id": "0905",
+  "seed": 905009,
+  "cpu": 12,
+  "workload_cwd": "REPLACE_WITH_REPOSITORY_ROOT",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "source": {
+    "baseline_manifest": {
+      "path": "REPLACE_WITH_BASELINE_SOURCE_MANIFEST",
+      "bytes": 0,
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "candidate_manifest": {
+      "path": "REPLACE_WITH_CANDIDATE_SOURCE_MANIFEST",
+      "bytes": 0,
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "file_count": 0,
+    "candidate_files": [
+      "REPLACE_WITH_CANDIDATE_SOURCE_FILE_1"
+    ],
+    "root_worktree": "REPLACE_WITH_REPOSITORY_ROOT",
+    "source_root": "REPLACE_WITH_ISOLATED_CANDIDATE_SOURCE_ROOT"
+  },
+  "semantic_validator": {
+    "path": "REPLACE_WITH_SEMANTIC_VALIDATOR",
+    "bytes": 0,
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "roles": {
+    "baseline": {
+      "native": {
+        "path": "binaries/baseline-native",
+        "bytes": 0,
+        "sha256": "REPLACE_WITH_SHA256",
+        "build_receipt": {
+          "path": "baseline-native-build.json",
+          "bytes": 0,
+          "sha256": "REPLACE_WITH_SHA256"
+        }
+      },
+      "allocator": {
+        "path": "binaries/baseline-allocator",
+        "bytes": 0,
+        "sha256": "REPLACE_WITH_SHA256",
+        "build_receipt": {
+          "path": "baseline-allocator-build.json",
+          "bytes": 0,
+          "sha256": "REPLACE_WITH_SHA256"
+        }
+      }
+    },
+    "candidate": {
+      "native": {
+        "path": "binaries/candidate-native",
+        "bytes": 0,
+        "sha256": "REPLACE_WITH_SHA256",
+        "build_receipt": {
+          "path": "candidate-native-build.json",
+          "bytes": 0,
+          "sha256": "REPLACE_WITH_SHA256"
+        }
+      },
+      "allocator": {
+        "path": "binaries/candidate-allocator",
+        "bytes": 0,
+        "sha256": "REPLACE_WITH_SHA256",
+        "build_receipt": {
+          "path": "candidate-allocator-build.json",
+          "bytes": 0,
+          "sha256": "REPLACE_WITH_SHA256"
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "primary-percent-medium",
+      "kind": "primary",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "id": "primary-percent-dense-sparse",
+      "kind": "primary",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "xlsx_cell_crud_shape": "dense-sparse"
+    },
+    {
+      "id": "control-xlsx-one-edit-medium",
+      "kind": "control",
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "id": "control-docx-one-edit-medium",
+      "kind": "control",
+      "case": "docx_semantic_one_edit_save",
+      "semantic_shape": "medium"
+    }
+  ],
+  "qualification": {"samples": 2, "warmup": 0},
+  "native": {"blocks": 6, "samples": 100, "warmup": 10},
+  "allocator": {"repeats": 2, "samples": 3, "warmup": 2},
+  "resource": {
+    "enabled": true,
+    "time_path": "/usr/bin/time",
+    "format": "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}"
+  },
+  "gate": {
+    "bootstrap": {
+      "replicates": 10000,
+      "seed": 905009,
+      "statistic": "paired_median_ratio"
+    },
+    "primary": {
+      "p50_median_ratio_max": 0.98,
+      "upper_95_ci_lt": 1.0
+    },
+    "review": {
+      "regression_ratio": 1.05,
+      "p50_spread": 1.2,
+      "tail_metrics": ["p50", "p95", "p99"]
+    }
+  }
+}

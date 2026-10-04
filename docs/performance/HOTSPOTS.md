@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0905 — validated XML summary removes publication iterator work
+
+[0905](0905-xml-attribute-summary.md) measures a one-file bounded XML audit
+summary after the complete lexical and namespace pass. The two XLSX primary
+workflow p50 ratios are **0.9543881780** and **0.9477553767**, with no main
+review flags. The publication phase ratios are **0.9051543375** (medium),
+**0.9083541339** (dense-sparse) and **0.9451486284** (one-edit), while reopen
+is outside the workflow timer. Publication allocation calls fall
+**19,248→416**, **36,366→416** and **2,662→308**; allocated bytes fall
+**3,970,346→2,765,098**, **5,575,801→3,275,001** and
+**1,216,622→1,065,966**. Other allocation/reallocation values are unchanged,
+and the three-byte live/peak increase means the allocator lane supplies no
+peak-live reduction claim. RSS is descriptive executable-layout-sensitive
+whole-process high water. The micro probe retains two cardinality-2 p99 flags
+but no hard adverse or spread flag. The candidate is accepted after independent
+review, cleanup and post-cleanup replay; target-branch integration is pending.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

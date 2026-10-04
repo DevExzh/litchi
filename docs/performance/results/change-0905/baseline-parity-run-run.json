@@ -1,0 +1,86 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0905/parity-run.py",
+    "baseline",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/baseline-parity"
+  ],
+  "cwd": "/tmp/litchi-0905-src",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0905-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-04T05:38:11.576270+00:00",
+  "helper": {
+    "bytes": 2164,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/command.py",
+    "sha256": "0de51437977c6e76411c3873df373d1fb9ccb85d55fc6dbbf54944f19c0ce80e"
+  },
+  "inputs_after": [
+    {
+      "bytes": 124782,
+      "path": "/tmp/litchi-0905-src/crates/xml-minifier/src/audit.rs",
+      "sha256": "91424b57dfcecaf6cb204429e6d779a0c81a8b55c6546d616c694f4ea2455ac0"
+    },
+    {
+      "bytes": 3020953,
+      "path": "/tmp/litchi-0905-src/tools/perf-baseline/src/lib.rs",
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    {
+      "bytes": 138457,
+      "path": "/tmp/litchi-0905-src/Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    {
+      "bytes": 56289,
+      "path": "/tmp/litchi-0905-src/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    }
+  ],
+  "inputs_before": [
+    {
+      "bytes": 124782,
+      "path": "/tmp/litchi-0905-src/crates/xml-minifier/src/audit.rs",
+      "sha256": "91424b57dfcecaf6cb204429e6d779a0c81a8b55c6546d616c694f4ea2455ac0"
+    },
+    {
+      "bytes": 3020953,
+      "path": "/tmp/litchi-0905-src/tools/perf-baseline/src/lib.rs",
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    {
+      "bytes": 138457,
+      "path": "/tmp/litchi-0905-src/Cargo.lock",
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    {
+      "bytes": 56289,
+      "path": "/tmp/litchi-0905-src/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    }
+  ],
+  "inputs_unchanged": true,
+  "log": {
+    "bytes": 716,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/baseline-parity-run.log",
+    "sha256": "df6230a8e8e27d850457cb4405e76bea8a251839b18e3022cf61b7e156a137f0"
+  },
+  "started_utc": "2026-10-04T05:38:10.852568+00:00"
+}

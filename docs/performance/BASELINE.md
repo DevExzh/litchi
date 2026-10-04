@@ -1,5 +1,20 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0905 — bounded XML attribute-summary candidate measured
+
+[0905](0905-xml-attribute-summary.md) compares the frozen 0904 baseline at
+`4f39f5a88d` with one `xml-minifier` audit-file candidate. Exact differential
+parity covers 11,520 cases and 125,952 records. Fresh paired native p50 ratios
+pass both primary gates: **0.9543881780** (medium) and **0.9477553767**
+(dense-sparse), with bootstrap upper bounds **0.9584711179** and
+**0.9742145402**; no main review flag fires. Publication allocation calls fall
+from **19,248→416**, **36,366→416** and **2,662→308** across the three XLSX
+cases, while live/peak snapshots are three bytes higher. The micro hard gate
+also passes; cardinality-2 authored/compact p50 review rows are retained.
+The candidate is accepted; independent review, cleanup and post-cleanup replay
+pass. Target-branch integration awaits an unrelated cherry-pick. Later
+concurrent iWork commits are outside this frozen measurement scope.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

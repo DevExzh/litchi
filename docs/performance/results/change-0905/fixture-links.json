@@ -1,0 +1,12 @@
+[
+  {
+    "path": "/tmp/litchi-0905-src/docs",
+    "target": "/home/zhuhe/code/litchi/docs",
+    "use": "read-only quality fixtures; cleanup unlinks without following"
+  },
+  {
+    "path": "/tmp/litchi-0905-src/3rdparty",
+    "target": "/home/zhuhe/code/litchi/3rdparty",
+    "use": "read-only quality fixtures; cleanup unlinks without following"
+  }
+]

@@ -1,5 +1,34 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0905 — XML audit candidate advances one scoped Office path
+
+[0905](0905-xml-attribute-summary.md) advances the active OLE2/OOXML program
+with a bounded one-file XML attribute-summary candidate. The candidate keeps
+the full first lexical pass, source-policy namespace checks, aggregate and
+per-element limits, `xml:space` decoding, malformed-input precedence and
+stream/window accounting. Exact parity covers 11,520 cases and 125,952 raw
+records; the selected XML/OPC/XLSX/DOCX/PPTX quality matrix passes, including
+134 XML tests, 6,296 Office tests and 93 documentation tests.
+
+Fresh serial warm-process captures pass both required XLSX primary native gates
+(medium **0.9543881780**, CI **0.9508342443–0.9584711179**; dense-sparse
+**0.9477553767**, CI **0.9350215878–0.9742145402**) with zero main review
+flags. The separate micro guard has no hard adverse case; its cardinality-2
+authored/compact p50 rows are **1.0371562973**/**1.0386657724**, below the
+1.05 review threshold, while their p99 flags remain visible. Allocator
+publication calls fall sharply in the three XLSX cases, but live/peak values
+are three bytes higher and the whole-process RSS decrease is descriptive.
+
+The retained offline replay passes source/archive/overlay, binary, parity,
+main-capture and micro-capture checks. Independent review found no blocker; the
+candidate is accepted and both owned roots are removed. Post-cleanup replay
+passes. Target-branch integration awaits an unrelated cherry-pick. The eight local
+gitignored binaries are retained evidence and are not assumed to exist in a
+fresh clone. Later concurrent iWork integration commits are outside this
+measurement's frozen 4f39f5a88d source scope. OLE2/OOXML remain active, ODF is
+deferred, iWork is excluded from this program, and the comprehensive goal is
+not complete.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

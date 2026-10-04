@@ -1,0 +1,24 @@
+{
+  "status": "recorded",
+  "observed_utc": "2026-10-04T06:11:33.288364+00:00",
+  "measured_baseline": "4f39f5a88d9c01572d2fd24522caf214988540eb",
+  "observed_shared_head": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "committed_changes_since_baseline": [
+    "crates/litchi-iwa-archive/src/lib.rs",
+    "crates/litchi-iwa-archive/src/package.rs",
+    "crates/litchi-iwa-archive/src/zip.rs",
+    "crates/soapberry-zip/src/office.rs"
+  ],
+  "changed_manifest_paths": [
+    "crates/litchi-iwa-archive/src/lib.rs",
+    "crates/litchi-iwa-archive/src/package.rs",
+    "crates/litchi-iwa-archive/src/zip.rs",
+    "crates/soapberry-zip/src/office.rs"
+  ],
+  "scope": "Concurrent iWork integration after all0905timing captures and final-source-check. Measured artifact inventory remains frozen; no performance claim for combined later HEAD. Unrelated staged/conflicted files are preserved.",
+  "commit_timestamps": [
+    "59f75c7f79026a4d124b61e97c178c7b45de19ab 2026-10-04T06:08:04Z feat(iwa-archive): census eager ZIP catalog storage",
+    "0e1f7a87a15be892bf52d1b3db24f1ec42d9bb6d 2026-10-04T06:08:04Z feat(iwa-archive): expose physical catalog storage census"
+  ],
+  "candidate_audit_sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+}

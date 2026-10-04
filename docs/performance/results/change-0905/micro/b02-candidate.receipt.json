@@ -1,0 +1,42 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-probe",
+    "--samples",
+    "30",
+    "--warmup",
+    "5",
+    "--iterations",
+    "1000"
+  ],
+  "binary": {
+    "bytes": 2884928,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-probe",
+    "sha256": "98294eb768a949d59c2615af5085924ba6f499e71fbf2fa8a10c974c149ad015"
+  },
+  "block": 2,
+  "exit_code": 0,
+  "helper": {
+    "bytes": 5680,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/micro.py",
+    "sha256": "34a6a02ce36271bb43c2ba6c9cad8b2c874266b3e73858cd984cf338fb51c809"
+  },
+  "plan": {
+    "bytes": 3297,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/micro-plan.json",
+    "sha256": "96d89a386c5280058154ff1b6f5beb9c0c47e84e5d1e7854345cb2a8de53dee4"
+  },
+  "role": "candidate",
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/micro/b02-candidate.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 49849,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/micro/b02-candidate.tsv",
+    "sha256": "57fe03d6c5462b5a11202a2cf77503203490a1877b515105dd1d3f12b7f1b034"
+  }
+}

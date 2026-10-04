@@ -1,0 +1,351 @@
+{
+  "schema": "litchi.xml-attribute-summary-parity-review-0905.v1",
+  "status": "pass_with_coverage_limitations",
+  "audit_scope": "Offline inspection of the retained baseline and candidate JSONL gzip captures, their receipts, and the frozen generator source. No build, workload, profiler, or capture was run by this review.",
+  "captures": {
+    "baseline": {
+      "gzip_path": "baseline-parity.jsonl.gz",
+      "gzip_bytes": 1416383,
+      "gzip_sha256": "4e1cc9e25cf600e4afa43a5e3e1649a05a8344d6dd92de67b234e1843b709904",
+      "logical_bytes": 74265040,
+      "logical_sha256": "567535be0da4b7165e65ed9d923fb1a9f15b39ffb5451133a876a6c9d22b0bc3",
+      "lines": 125954,
+      "records": 125952,
+      "cases": 11520,
+      "receipt_metadata_match": true
+    },
+    "candidate": {
+      "gzip_path": "candidate-parity.jsonl.gz",
+      "gzip_bytes": 1416383,
+      "gzip_sha256": "4e1cc9e25cf600e4afa43a5e3e1649a05a8344d6dd92de67b234e1843b709904",
+      "logical_bytes": 74265040,
+      "logical_sha256": "567535be0da4b7165e65ed9d923fb1a9f15b39ffb5451133a876a6c9d22b0bc3",
+      "lines": 125954,
+      "records": 125952,
+      "cases": 11520,
+      "receipt_metadata_match": true
+    }
+  },
+  "identity": {
+    "compressed_bytes_equal": true,
+    "decompressed_bytes_equal": true,
+    "json_objects_equal": true,
+    "comparison_receipt_agrees": true,
+    "schema_header_lines": 1,
+    "schema_footer_lines": 1,
+    "record_schema_lines": 125952
+  },
+  "record_integrity": {
+    "case_ids": {
+      "unique": 11520,
+      "min": 0,
+      "max": 11519,
+      "ordered": true
+    },
+    "case_api_set_mismatches": 0,
+    "record_hash": {
+      "input": "UTF-8(debug) + one NUL byte + UTF-8(text)",
+      "seed": "0xcbf29ce484222325",
+      "multiplier": "0x1000_0000_01b3",
+      "algorithm_label": "custom FNV-like recurrence; multiplier is nonstandard",
+      "baseline_mismatches": 0,
+      "candidate_mismatches": 0
+    },
+    "input_hash_unique_per_case": true,
+    "replacement_hash_unique_per_case": true,
+    "replacement_hash_null_on_nonreplacement_records": true
+  },
+  "coverage": {
+    "generator_dimensions": {
+      "cardinality_values": [0, 1, 2, 31, 32, 33],
+      "cases_per_cardinality": 1920,
+      "style_count": 128,
+      "style_range": [0, 127],
+      "cases_per_style": 90,
+      "profile_count": 15,
+      "cases_per_profile": 768,
+      "profiles": [
+        "default",
+        "attributes-exact",
+        "attributes-under",
+        "element-attributes-exact",
+        "element-attributes-under",
+        "depth-exact",
+        "depth-under",
+        "events-exact",
+        "events-under",
+        "text-exact",
+        "text-under",
+        "bytes-exact",
+        "bytes-under",
+        "token-exact",
+        "token-under"
+      ],
+      "replacement_kind_count": 8,
+      "cases_per_replacement_kind": 1440,
+      "replacement_kinds": [
+        "identical",
+        "window-nested",
+        "window-text",
+        "replacement-failure",
+        "window-retotal-attributes",
+        "complete-fallback",
+        "original-failure",
+        "original-malformed"
+      ],
+      "empty_root_cases": 720,
+      "bom_condition_hits": 218,
+      "invalid_utf8_condition_hits": 51,
+      "xml_declaration_condition_hits": 0
+    },
+    "records_per_case": {
+      "default_profile": {
+        "cases": 768,
+        "records_per_case": 10,
+        "records": 7680
+      },
+      "nondefault_profiles": {
+        "cases": 10752,
+        "records_per_case": 11,
+        "records": 118272
+      }
+    },
+    "apis": {
+      "slice/source/default": {
+        "records": 11520,
+        "report": 3766,
+        "error": 7754,
+        "error_variants": {
+          "Doctype": 1440,
+          "Malformed": 6279,
+          "Encoding": 35
+        },
+        "limit_resources": {}
+      },
+      "slice/source/profile": {
+        "records": 10752,
+        "report": 2030,
+        "error": 8722,
+        "error_variants": {
+          "Limit": 2579,
+          "Doctype": 1224,
+          "Malformed": 4888,
+          "Encoding": 31
+        },
+        "limit_resources": {
+          "Depth": 415,
+          "Events": 250,
+          "Bytes": 768,
+          "Attributes": 231,
+          "ElementAttributes": 327,
+          "TokenBytes": 264,
+          "TextBytes": 324
+        }
+      },
+      "slice/authored": {
+        "records": 11520,
+        "report": 2281,
+        "error": 9239,
+        "error_variants": {
+          "Limit": 2982,
+          "Doctype": 1320,
+          "Malformed": 3168,
+          "Encoding": 33,
+          "NotCompact": 1736
+        },
+        "limit_resources": {
+          "Depth": 548,
+          "Events": 354,
+          "Bytes": 768,
+          "Attributes": 287,
+          "ElementAttributes": 342,
+          "TokenBytes": 264,
+          "TextBytes": 419
+        }
+      },
+      "slice/compact": {
+        "records": 11520,
+        "report": 2617,
+        "error": 8903,
+        "error_variants": {
+          "Limit": 3032,
+          "Doctype": 1320,
+          "Malformed": 3216,
+          "Encoding": 33,
+          "NotCompact": 1302
+        },
+        "limit_resources": {
+          "Depth": 548,
+          "Events": 404,
+          "Bytes": 768,
+          "Attributes": 287,
+          "ElementAttributes": 342,
+          "TokenBytes": 264,
+          "TextBytes": 419
+        }
+      },
+      "reader/authored/one": {
+        "records": 11520,
+        "report": 2281,
+        "error": 9239,
+        "error_variants": {
+          "Limit": 2685,
+          "Doctype": 1416,
+          "Malformed": 3231,
+          "Encoding": 21,
+          "NotCompact": 1886
+        },
+        "limit_resources": {
+          "Depth": 549,
+          "Events": 354,
+          "Bytes": 443,
+          "Attributes": 288,
+          "ElementAttributes": 344,
+          "TokenBytes": 288,
+          "TextBytes": 419
+        }
+      },
+      "reader/authored/uneven": {
+        "records": 11520,
+        "report": 2281,
+        "error": 9239,
+        "error_variants": {
+          "Limit": 2685,
+          "Doctype": 1416,
+          "Malformed": 3231,
+          "Encoding": 21,
+          "NotCompact": 1886
+        },
+        "limit_resources": {
+          "Depth": 549,
+          "Events": 354,
+          "Bytes": 443,
+          "Attributes": 288,
+          "ElementAttributes": 344,
+          "TokenBytes": 288,
+          "TextBytes": 419
+        }
+      },
+      "reader/authored/prefix": {
+        "records": 11520,
+        "report": 2281,
+        "error": 9239,
+        "error_variants": {
+          "Limit": 2685,
+          "Doctype": 1416,
+          "Malformed": 3231,
+          "Encoding": 21,
+          "NotCompact": 1886
+        },
+        "limit_resources": {
+          "Depth": 549,
+          "Events": 354,
+          "Bytes": 443,
+          "Attributes": 288,
+          "ElementAttributes": 344,
+          "TokenBytes": 288,
+          "TextBytes": 419
+        }
+      },
+      "reader/compact/one": {
+        "records": 11520,
+        "report": 2617,
+        "error": 8903,
+        "error_variants": {
+          "Limit": 2777,
+          "Doctype": 1416,
+          "Malformed": 3279,
+          "Encoding": 21,
+          "NotCompact": 1410
+        },
+        "limit_resources": {
+          "Depth": 549,
+          "Events": 404,
+          "Bytes": 485,
+          "Attributes": 288,
+          "ElementAttributes": 344,
+          "TokenBytes": 288,
+          "TextBytes": 419
+        }
+      },
+      "reader/compact/uneven": {
+        "records": 11520,
+        "report": 2617,
+        "error": 8903,
+        "error_variants": {
+          "Limit": 2777,
+          "Doctype": 1416,
+          "Malformed": 3279,
+          "Encoding": 21,
+          "NotCompact": 1410
+        },
+        "limit_resources": {
+          "Depth": 549,
+          "Events": 404,
+          "Bytes": 485,
+          "Attributes": 288,
+          "ElementAttributes": 344,
+          "TokenBytes": 288,
+          "TextBytes": 419
+        }
+      },
+      "reader/compact/prefix": {
+        "records": 11520,
+        "report": 2617,
+        "error": 8903,
+        "error_variants": {
+          "Limit": 2777,
+          "Doctype": 1416,
+          "Malformed": 3279,
+          "Encoding": 21,
+          "NotCompact": 1410
+        },
+        "limit_resources": {
+          "Depth": 549,
+          "Events": 404,
+          "Bytes": 485,
+          "Attributes": 288,
+          "ElementAttributes": 344,
+          "TokenBytes": 288,
+          "TextBytes": 419
+        }
+      }
+    },
+    "readers": {
+      "policies": ["authored", "compact"],
+      "chunk_shapes": ["one", "uneven", "prefix"],
+      "source_policy_reader_present": false,
+      "same_counts_across_chunk_shapes": true
+    },
+    "replacement": {
+      "api": "replacement/source",
+      "records": 11520,
+      "limit_resources": {
+        "Depth": 447,
+        "Events": 289,
+        "Bytes": 913,
+        "Attributes": 296,
+        "ElementAttributes": 375,
+        "TokenBytes": 288,
+        "TextBytes": 412
+      },
+      "proof_successes": {
+        "Identical": 706,
+        "Window": 308,
+        "Complete": 611
+      },
+      "error_records": {
+        "Original": 9239,
+        "Replacement": 656
+      }
+    }
+  },
+  "limitations": [
+    "The frozen generator computes style=(id/(PROFILE_COUNT*CARDINALITIES.len()))%128, so style is always 0..127. Its style & 0x80 XML-declaration branches are unreachable; declaration coverage is zero even though parity-method.md lists declarations.",
+    "The public crate has no source-policy streaming-reader API, so the reader matrix covers authored and compact policies only.",
+    "Profile exact/under limits use the default source Report when that source succeeds and fixed Case estimates when it fails. The counts exercise those configurations but do not provide an independent exact boundary oracle for every malformed input.",
+    "The capture proves baseline/candidate equality for this generator and API matrix. It does not prove that either implementation is semantically correct without an independent expected-result oracle.",
+    "parity-method.md calls the embedded digest FNV-1a, but the frozen source uses the custom multiplier 0x1000_0000_01b3. The review verified the fields against the implemented recurrence; the standard FNV-64 prime is not the algorithm used by these captures.",
+    "These captures contain no allocator, throughput, or native-code quality measurement."
+  ]
+}

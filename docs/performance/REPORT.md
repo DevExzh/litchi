@@ -1,5 +1,24 @@
 # Performance program phase report
 
+## 0905 — bounded XML attribute summary passes its measured gates
+
+[0905](0905-xml-attribute-summary.md) implements a one-file `AttributeSummary`
+candidate in `xml-minifier` while preserving the complete XML layout,
+namespace, limit, error-ordering and `xml:space` checks. Baseline and candidate
+are byte-identical across 11,520 generated cases and 125,952 records. The
+fresh native comparison passes both required XLSX primary gates at p50 ratios
+**0.9543881780** (medium) and **0.9477553767** (dense-sparse), with bootstrap
+intervals **0.9508342443–0.9584711179** and **0.9350215878–0.9742145402**;
+controls are **0.9795903412** (XLSX) and **0.9700651277** (DOCX), and main
+review flags are zero. Publication allocation calls and bytes fall materially
+in the XLSX cases, but live/peak snapshots rise three bytes and RSS remains a
+descriptive executable-layout-sensitive metric. The 12-child XML micro guard
+passes with no hard adverse case; cardinality-2 authored and compact p50 rows
+are +3.72%/+3.87% and retain p99 review flags. Retained replay passes. The
+candidate is accepted after independent review, cleanup and post-cleanup replay;
+target-branch integration is pending. Later concurrent iWork commits are outside the measured source scope,
+and the broader non-iWork performance goal remains open.
+
 ## 0904 — exact XLSX attribute census
 
 [0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three

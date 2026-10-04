@@ -1,0 +1,15 @@
+{
+  "files": {
+    "crates/xml-minifier/examples/attribute_summary_parity.rs": {
+      "bytes": 24007,
+      "sha256": "b21679fce4c5c3851d42ca5b37c75fb902857fc916bee3f3a6b363e4294d9516"
+    },
+    "crates/xml-minifier/examples/attribute_summary_probe.rs": {
+      "bytes": 9773,
+      "sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+    }
+  },
+  "included_in_benchmark_source_inventory": false,
+  "reason": "Standalone oracle/probe examples do not compile into baseline harness; copied identically before both versions are built.",
+  "status": "frozen"
+}

@@ -1,0 +1,1582 @@
+{
+  "analysis": {
+    "bytes": 4285077,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/analysis.json",
+    "sha256": "db663b1307ba234ebc680441d32f74569094b2cf366ee58176334777a9c74208"
+  },
+  "cases": {
+    "control-docx-one-edit-medium": {
+      "allocator": {},
+      "native": {
+        "p50": {
+          "median_paired_ratio": 0.9700651277259558,
+          "role_median_ns": {
+            "baseline": 161308.5,
+            "candidate": 156796.0
+          }
+        },
+        "p95": {
+          "median_paired_ratio": 0.9739090259942476,
+          "role_median_ns": {
+            "baseline": 170226.0,
+            "candidate": 166730.5
+          }
+        },
+        "p99": {
+          "median_paired_ratio": 0.9677383895850463,
+          "role_median_ns": {
+            "baseline": 172471.0,
+            "candidate": 169246.0
+          }
+        }
+      },
+      "phases": {},
+      "rss_kib": {
+        "baseline": [
+          26728,
+          26792,
+          26072,
+          27880,
+          26512,
+          26812
+        ],
+        "candidate": [
+          19804,
+          19936,
+          19584,
+          19804,
+          19916,
+          16980
+        ]
+      }
+    },
+    "control-xlsx-one-edit-medium": {
+      "allocator": {
+        "commit_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              749638
+            ],
+            "allocation_calls": [
+              10181
+            ],
+            "deallocated_bytes": [
+              245137
+            ],
+            "deallocation_calls": [
+              7795
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22723185,
+              22729649,
+              22729905
+            ],
+            "live_bytes_before": [
+              22218684,
+              22225148,
+              22225404
+            ],
+            "peak_live_bytes_after": [
+              52334296
+            ],
+            "peak_live_bytes_before": [
+              52334296
+            ],
+            "reallocation_calls": [
+              50
+            ],
+            "region_peak_live_bytes": [
+              22726308,
+              22732772,
+              22733028
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              749638
+            ],
+            "allocation_calls": [
+              10181
+            ],
+            "deallocated_bytes": [
+              245137
+            ],
+            "deallocation_calls": [
+              7795
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22723188,
+              22729652,
+              22729908
+            ],
+            "live_bytes_before": [
+              22218687,
+              22225151,
+              22225407
+            ],
+            "peak_live_bytes_after": [
+              52334299
+            ],
+            "peak_live_bytes_before": [
+              52334299
+            ],
+            "reallocation_calls": [
+              50
+            ],
+            "region_peak_live_bytes": [
+              22726311,
+              22732775,
+              22733031
+            ]
+          }
+        },
+        "commit_core_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              724315
+            ],
+            "allocation_calls": [
+              10175
+            ],
+            "deallocated_bytes": [
+              220535
+            ],
+            "deallocation_calls": [
+              7793
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22723185,
+              22729649,
+              22729905
+            ],
+            "live_bytes_before": [
+              22219405,
+              22225869,
+              22226125
+            ],
+            "peak_live_bytes_after": [
+              52334296
+            ],
+            "peak_live_bytes_before": [
+              52334296
+            ],
+            "reallocation_calls": [
+              49
+            ],
+            "region_peak_live_bytes": [
+              22726308,
+              22732772,
+              22733028
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              724315
+            ],
+            "allocation_calls": [
+              10175
+            ],
+            "deallocated_bytes": [
+              220535
+            ],
+            "deallocation_calls": [
+              7793
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22723188,
+              22729652,
+              22729908
+            ],
+            "live_bytes_before": [
+              22219408,
+              22225872,
+              22226128
+            ],
+            "peak_live_bytes_after": [
+              52334299
+            ],
+            "peak_live_bytes_before": [
+              52334299
+            ],
+            "reallocation_calls": [
+              49
+            ],
+            "region_peak_live_bytes": [
+              22726311,
+              22732775,
+              22733031
+            ]
+          }
+        },
+        "plan_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              3196069
+            ],
+            "allocation_calls": [
+              17135
+            ],
+            "deallocated_bytes": [
+              2650678
+            ],
+            "deallocation_calls": [
+              14682
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22218684,
+              22225148,
+              22225404
+            ],
+            "live_bytes_before": [
+              21673293,
+              21679757,
+              21680013
+            ],
+            "peak_live_bytes_after": [
+              52334296
+            ],
+            "peak_live_bytes_before": [
+              52334296
+            ],
+            "reallocation_calls": [
+              70
+            ],
+            "region_peak_live_bytes": [
+              23219625,
+              23226089,
+              23226345
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              3196069
+            ],
+            "allocation_calls": [
+              17135
+            ],
+            "deallocated_bytes": [
+              2650678
+            ],
+            "deallocation_calls": [
+              14682
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22218687,
+              22225151,
+              22225407
+            ],
+            "live_bytes_before": [
+              21673296,
+              21679760,
+              21680016
+            ],
+            "peak_live_bytes_after": [
+              52334299
+            ],
+            "peak_live_bytes_before": [
+              52334299
+            ],
+            "reallocation_calls": [
+              70
+            ],
+            "region_peak_live_bytes": [
+              23219628,
+              23226092,
+              23226348
+            ]
+          }
+        },
+        "publication_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              1216622
+            ],
+            "allocation_calls": [
+              2662
+            ],
+            "deallocated_bytes": [
+              1232320
+            ],
+            "deallocation_calls": [
+              2810
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22707487,
+              22713951,
+              22714207
+            ],
+            "live_bytes_before": [
+              22723185,
+              22729649,
+              22729905
+            ],
+            "peak_live_bytes_after": [
+              52334296
+            ],
+            "peak_live_bytes_before": [
+              52334296
+            ],
+            "reallocation_calls": [
+              29
+            ],
+            "region_peak_live_bytes": [
+              23357231,
+              23363695,
+              23363951
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              1065966
+            ],
+            "allocation_calls": [
+              308
+            ],
+            "deallocated_bytes": [
+              1081664
+            ],
+            "deallocation_calls": [
+              456
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22707490,
+              22713954,
+              22714210
+            ],
+            "live_bytes_before": [
+              22723188,
+              22729652,
+              22729908
+            ],
+            "peak_live_bytes_after": [
+              52334299
+            ],
+            "peak_live_bytes_before": [
+              52334299
+            ],
+            "reallocation_calls": [
+              29
+            ],
+            "region_peak_live_bytes": [
+              23357234,
+              23363698,
+              23363954
+            ]
+          }
+        },
+        "staging_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              25323
+            ],
+            "allocation_calls": [
+              6
+            ],
+            "deallocated_bytes": [
+              24602
+            ],
+            "deallocation_calls": [
+              2
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22219405,
+              22225869,
+              22226125
+            ],
+            "live_bytes_before": [
+              22218684,
+              22225148,
+              22225404
+            ],
+            "peak_live_bytes_after": [
+              52334296
+            ],
+            "peak_live_bytes_before": [
+              52334296
+            ],
+            "reallocation_calls": [
+              1
+            ],
+            "region_peak_live_bytes": [
+              22243997,
+              22250461,
+              22250717
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              25323
+            ],
+            "allocation_calls": [
+              6
+            ],
+            "deallocated_bytes": [
+              24602
+            ],
+            "deallocation_calls": [
+              2
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              22219408,
+              22225872,
+              22226128
+            ],
+            "live_bytes_before": [
+              22218687,
+              22225151,
+              22225407
+            ],
+            "peak_live_bytes_after": [
+              52334299
+            ],
+            "peak_live_bytes_before": [
+              52334299
+            ],
+            "reallocation_calls": [
+              1
+            ],
+            "region_peak_live_bytes": [
+              22244000,
+              22250464,
+              22250720
+            ]
+          }
+        }
+      },
+      "native": {
+        "p50": {
+          "median_paired_ratio": 0.9795903412367355,
+          "role_median_ns": {
+            "baseline": 4194264.5,
+            "candidate": 4109109.0
+          }
+        },
+        "p95": {
+          "median_paired_ratio": 0.9736649693618671,
+          "role_median_ns": {
+            "baseline": 4288063.0,
+            "candidate": 4199547.5
+          }
+        },
+        "p99": {
+          "median_paired_ratio": 0.9773057177437595,
+          "role_median_ns": {
+            "baseline": 4323118.0,
+            "candidate": 4233412.5
+          }
+        }
+      },
+      "phases": {
+        "commit_ns": {
+          "median_paired_ratio": 0.9959845395182225,
+          "role_median_ns": {
+            "baseline": 822507.0,
+            "candidate": 819201.5
+          }
+        },
+        "open_ns": {
+          "median_paired_ratio": 0.9910171449574702,
+          "role_median_ns": {
+            "baseline": 89075.5,
+            "candidate": 88275.75
+          }
+        },
+        "plan_ns": {
+          "median_paired_ratio": 0.9931908070767465,
+          "role_median_ns": {
+            "baseline": 1514291.0,
+            "candidate": 1509785.25
+          }
+        },
+        "publication_ns": {
+          "median_paired_ratio": 0.9451486283949093,
+          "role_median_ns": {
+            "baseline": 1773624.5,
+            "candidate": 1679404.0
+          }
+        },
+        "reopen_ns": {
+          "median_paired_ratio": 0.9969456165757482,
+          "role_median_ns": {
+            "baseline": 23497423.5,
+            "candidate": 23599809.5
+          }
+        }
+      },
+      "rss_kib": {
+        "baseline": [
+          77884,
+          75744,
+          75896,
+          77424,
+          75360,
+          75088
+        ],
+        "candidate": [
+          70620,
+          68620,
+          70700,
+          68728,
+          68392,
+          69828
+        ]
+      }
+    },
+    "primary-percent-dense-sparse": {
+      "allocator": {
+        "commit_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              8738737
+            ],
+            "allocation_calls": [
+              80022
+            ],
+            "deallocated_bytes": [
+              4809640
+            ],
+            "deallocation_calls": [
+              61611
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              34153085,
+              34159549,
+              34159805
+            ],
+            "live_bytes_before": [
+              30223988,
+              30230452,
+              30230708
+            ],
+            "peak_live_bytes_after": [
+              69103858
+            ],
+            "peak_live_bytes_before": [
+              69103858
+            ],
+            "reallocation_calls": [
+              503
+            ],
+            "region_peak_live_bytes": [
+              34181901,
+              34188365,
+              34188621
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              8738737
+            ],
+            "allocation_calls": [
+              80022
+            ],
+            "deallocated_bytes": [
+              4809640
+            ],
+            "deallocation_calls": [
+              61611
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              34153088,
+              34159552,
+              34159808
+            ],
+            "live_bytes_before": [
+              30223991,
+              30230455,
+              30230711
+            ],
+            "peak_live_bytes_after": [
+              69103861
+            ],
+            "peak_live_bytes_before": [
+              69103861
+            ],
+            "reallocation_calls": [
+              503
+            ],
+            "region_peak_live_bytes": [
+              34181904,
+              34188368,
+              34188624
+            ]
+          }
+        },
+        "commit_core_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              5822693
+            ],
+            "allocation_calls": [
+              79297
+            ],
+            "deallocated_bytes": [
+              1919540
+            ],
+            "deallocation_calls": [
+              61255
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              34153085,
+              34159549,
+              34159805
+            ],
+            "live_bytes_before": [
+              30249932,
+              30256396,
+              30256652
+            ],
+            "peak_live_bytes_after": [
+              69103858
+            ],
+            "peak_live_bytes_before": [
+              69103858
+            ],
+            "reallocation_calls": [
+              317
+            ],
+            "region_peak_live_bytes": [
+              34181901,
+              34188365,
+              34188621
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              5822693
+            ],
+            "allocation_calls": [
+              79297
+            ],
+            "deallocated_bytes": [
+              1919540
+            ],
+            "deallocation_calls": [
+              61255
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              34153088,
+              34159552,
+              34159808
+            ],
+            "live_bytes_before": [
+              30249935,
+              30256399,
+              30256655
+            ],
+            "peak_live_bytes_after": [
+              69103861
+            ],
+            "peak_live_bytes_before": [
+              69103861
+            ],
+            "reallocation_calls": [
+              317
+            ],
+            "region_peak_live_bytes": [
+              34181904,
+              34188368,
+              34188624
+            ]
+          }
+        },
+        "plan_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              15847944
+            ],
+            "allocation_calls": [
+              129369
+            ],
+            "deallocated_bytes": [
+              11647465
+            ],
+            "deallocation_calls": [
+              111276
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              30223988,
+              30230452,
+              30230708
+            ],
+            "live_bytes_before": [
+              26023509,
+              26029973,
+              26030229
+            ],
+            "peak_live_bytes_after": [
+              69103858
+            ],
+            "peak_live_bytes_before": [
+              69103858
+            ],
+            "reallocation_calls": [
+              162
+            ],
+            "region_peak_live_bytes": [
+              33627627,
+              33634091,
+              33634347
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              15847944
+            ],
+            "allocation_calls": [
+              129369
+            ],
+            "deallocated_bytes": [
+              11647465
+            ],
+            "deallocation_calls": [
+              111276
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              30223991,
+              30230455,
+              30230711
+            ],
+            "live_bytes_before": [
+              26023512,
+              26029976,
+              26030232
+            ],
+            "peak_live_bytes_after": [
+              69103861
+            ],
+            "peak_live_bytes_before": [
+              69103861
+            ],
+            "reallocation_calls": [
+              162
+            ],
+            "region_peak_live_bytes": [
+              33627630,
+              33634094,
+              33634350
+            ]
+          }
+        },
+        "publication_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              5575801
+            ],
+            "allocation_calls": [
+              36366
+            ],
+            "deallocated_bytes": [
+              5591663
+            ],
+            "deallocation_calls": [
+              36494
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              34137223,
+              34143687,
+              34143943
+            ],
+            "live_bytes_before": [
+              34153085,
+              34159549,
+              34159805
+            ],
+            "peak_live_bytes_after": [
+              69103858
+            ],
+            "peak_live_bytes_before": [
+              69103858
+            ],
+            "reallocation_calls": [
+              49
+            ],
+            "region_peak_live_bytes": [
+              35749415,
+              35755879,
+              35756135
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              3275001
+            ],
+            "allocation_calls": [
+              416
+            ],
+            "deallocated_bytes": [
+              3290863
+            ],
+            "deallocation_calls": [
+              544
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              34137226,
+              34143690,
+              34143946
+            ],
+            "live_bytes_before": [
+              34153088,
+              34159552,
+              34159808
+            ],
+            "peak_live_bytes_after": [
+              69103861
+            ],
+            "peak_live_bytes_before": [
+              69103861
+            ],
+            "reallocation_calls": [
+              49
+            ],
+            "region_peak_live_bytes": [
+              35749418,
+              35755882,
+              35756138
+            ]
+          }
+        },
+        "staging_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              2916044
+            ],
+            "allocation_calls": [
+              725
+            ],
+            "deallocated_bytes": [
+              2890100
+            ],
+            "deallocation_calls": [
+              356
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              30249932,
+              30256396,
+              30256652
+            ],
+            "live_bytes_before": [
+              30223988,
+              30230452,
+              30230708
+            ],
+            "peak_live_bytes_after": [
+              69103858
+            ],
+            "peak_live_bytes_before": [
+              69103858
+            ],
+            "reallocation_calls": [
+              186
+            ],
+            "region_peak_live_bytes": [
+              30259816,
+              30266280,
+              30266536
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              2916044
+            ],
+            "allocation_calls": [
+              725
+            ],
+            "deallocated_bytes": [
+              2890100
+            ],
+            "deallocation_calls": [
+              356
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              30249935,
+              30256399,
+              30256655
+            ],
+            "live_bytes_before": [
+              30223991,
+              30230455,
+              30230711
+            ],
+            "peak_live_bytes_after": [
+              69103861
+            ],
+            "peak_live_bytes_before": [
+              69103861
+            ],
+            "reallocation_calls": [
+              186
+            ],
+            "region_peak_live_bytes": [
+              30259819,
+              30266283,
+              30266539
+            ]
+          }
+        }
+      },
+      "native": {
+        "p50": {
+          "median_paired_ratio": 0.947755376749029,
+          "role_median_ns": {
+            "baseline": 33543653.0,
+            "candidate": 32163377.0
+          }
+        },
+        "p95": {
+          "median_paired_ratio": 0.9339464185655959,
+          "role_median_ns": {
+            "baseline": 34500488.5,
+            "candidate": 32535103.5
+          }
+        },
+        "p99": {
+          "median_paired_ratio": 0.9216059799250987,
+          "role_median_ns": {
+            "baseline": 35217316.0,
+            "candidate": 32898090.0
+          }
+        }
+      },
+      "phases": {
+        "commit_ns": {
+          "median_paired_ratio": 1.000458988929048,
+          "role_median_ns": {
+            "baseline": 6771948.25,
+            "candidate": 6792315.75
+          }
+        },
+        "open_ns": {
+          "median_paired_ratio": 1.0053281821107034,
+          "role_median_ns": {
+            "baseline": 109465.75,
+            "candidate": 100035.25
+          }
+        },
+        "plan_ns": {
+          "median_paired_ratio": 0.9831136471523572,
+          "role_median_ns": {
+            "baseline": 11305544.75,
+            "candidate": 11114476.75
+          }
+        },
+        "publication_ns": {
+          "median_paired_ratio": 0.9083541339118996,
+          "role_median_ns": {
+            "baseline": 15375375.75,
+            "candidate": 14046474.0
+          }
+        },
+        "reopen_ns": {
+          "median_paired_ratio": 0.9980439207618073,
+          "role_median_ns": {
+            "baseline": 30033821.5,
+            "candidate": 29537764.25
+          }
+        }
+      },
+      "rss_kib": {
+        "baseline": [
+          94716,
+          92952,
+          93712,
+          93136,
+          92848,
+          92276
+        ],
+        "candidate": [
+          86708,
+          86080,
+          85848,
+          86072,
+          85912,
+          85768
+        ]
+      }
+    },
+    "primary-percent-medium": {
+      "allocator": {
+        "commit_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              5018120
+            ],
+            "allocation_calls": [
+              42293
+            ],
+            "deallocated_bytes": [
+              2959255
+            ],
+            "deallocation_calls": [
+              32615
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              25935314,
+              25941778,
+              25942034
+            ],
+            "live_bytes_before": [
+              23876449,
+              23882913,
+              23883169
+            ],
+            "peak_live_bytes_after": [
+              52336500
+            ],
+            "peak_live_bytes_before": [
+              52336500
+            ],
+            "reallocation_calls": [
+              346
+            ],
+            "region_peak_live_bytes": [
+              25947541,
+              25954005,
+              25954261
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              5018120
+            ],
+            "allocation_calls": [
+              42293
+            ],
+            "deallocated_bytes": [
+              2959255
+            ],
+            "deallocation_calls": [
+              32615
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              25935317,
+              25941781,
+              25942037
+            ],
+            "live_bytes_before": [
+              23876452,
+              23882916,
+              23883172
+            ],
+            "peak_live_bytes_after": [
+              52336503
+            ],
+            "peak_live_bytes_before": [
+              52336503
+            ],
+            "reallocation_calls": [
+              346
+            ],
+            "region_peak_live_bytes": [
+              25947544,
+              25954008,
+              25954264
+            ]
+          }
+        },
+        "commit_core_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              3118739
+            ],
+            "allocation_calls": [
+              41904
+            ],
+            "deallocated_bytes": [
+              1072101
+            ],
+            "deallocation_calls": [
+              32429
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              25935314,
+              25941778,
+              25942034
+            ],
+            "live_bytes_before": [
+              23888676,
+              23895140,
+              23895396
+            ],
+            "peak_live_bytes_after": [
+              52336500
+            ],
+            "peak_live_bytes_before": [
+              52336500
+            ],
+            "reallocation_calls": [
+              241
+            ],
+            "region_peak_live_bytes": [
+              25947541,
+              25954005,
+              25954261
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              3118739
+            ],
+            "allocation_calls": [
+              41904
+            ],
+            "deallocated_bytes": [
+              1072101
+            ],
+            "deallocation_calls": [
+              32429
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              25935317,
+              25941781,
+              25942037
+            ],
+            "live_bytes_before": [
+              23888679,
+              23895143,
+              23895399
+            ],
+            "peak_live_bytes_after": [
+              52336503
+            ],
+            "peak_live_bytes_before": [
+              52336503
+            ],
+            "reallocation_calls": [
+              241
+            ],
+            "region_peak_live_bytes": [
+              25947544,
+              25954008,
+              25954264
+            ]
+          }
+        },
+        "plan_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              12137336
+            ],
+            "allocation_calls": [
+              67803
+            ],
+            "deallocated_bytes": [
+              9937008
+            ],
+            "deallocation_calls": [
+              58249
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              23876449,
+              23882913,
+              23883169
+            ],
+            "live_bytes_before": [
+              21676121,
+              21682585,
+              21682841
+            ],
+            "peak_live_bytes_after": [
+              52336500
+            ],
+            "peak_live_bytes_before": [
+              52336500
+            ],
+            "reallocation_calls": [
+              199
+            ],
+            "region_peak_live_bytes": [
+              24870041,
+              24876505,
+              24876761
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              12137336
+            ],
+            "allocation_calls": [
+              67803
+            ],
+            "deallocated_bytes": [
+              9937008
+            ],
+            "deallocation_calls": [
+              58249
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              23876452,
+              23882916,
+              23883172
+            ],
+            "live_bytes_before": [
+              21676124,
+              21682588,
+              21682844
+            ],
+            "peak_live_bytes_after": [
+              52336503
+            ],
+            "peak_live_bytes_before": [
+              52336503
+            ],
+            "reallocation_calls": [
+              199
+            ],
+            "region_peak_live_bytes": [
+              24870044,
+              24876508,
+              24876764
+            ]
+          }
+        },
+        "publication_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              3970346
+            ],
+            "allocation_calls": [
+              19248
+            ],
+            "deallocated_bytes": [
+              3986208
+            ],
+            "deallocation_calls": [
+              19375
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              25919452,
+              25925916,
+              25926172
+            ],
+            "live_bytes_before": [
+              25935314,
+              25941778,
+              25942034
+            ],
+            "peak_live_bytes_after": [
+              52336500
+            ],
+            "peak_live_bytes_before": [
+              52336500
+            ],
+            "reallocation_calls": [
+              50
+            ],
+            "region_peak_live_bytes": [
+              27022333,
+              27028797,
+              27029053
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              2765098
+            ],
+            "allocation_calls": [
+              416
+            ],
+            "deallocated_bytes": [
+              2780960
+            ],
+            "deallocation_calls": [
+              543
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              25919455,
+              25925919,
+              25926175
+            ],
+            "live_bytes_before": [
+              25935317,
+              25941781,
+              25942037
+            ],
+            "peak_live_bytes_after": [
+              52336503
+            ],
+            "peak_live_bytes_before": [
+              52336503
+            ],
+            "reallocation_calls": [
+              50
+            ],
+            "region_peak_live_bytes": [
+              27022336,
+              27028800,
+              27029056
+            ]
+          }
+        },
+        "staging_allocation_metrics": {
+          "baseline": {
+            "allocated_bytes": [
+              1899381
+            ],
+            "allocation_calls": [
+              389
+            ],
+            "deallocated_bytes": [
+              1887154
+            ],
+            "deallocation_calls": [
+              186
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              23888676,
+              23895140,
+              23895396
+            ],
+            "live_bytes_before": [
+              23876449,
+              23882913,
+              23883169
+            ],
+            "peak_live_bytes_after": [
+              52336500
+            ],
+            "peak_live_bytes_before": [
+              52336500
+            ],
+            "reallocation_calls": [
+              105
+            ],
+            "region_peak_live_bytes": [
+              23904970,
+              23911434,
+              23911690
+            ]
+          },
+          "candidate": {
+            "allocated_bytes": [
+              1899381
+            ],
+            "allocation_calls": [
+              389
+            ],
+            "deallocated_bytes": [
+              1887154
+            ],
+            "deallocation_calls": [
+              186
+            ],
+            "failed_allocation_calls": [
+              0
+            ],
+            "live_bytes_after": [
+              23888679,
+              23895143,
+              23895399
+            ],
+            "live_bytes_before": [
+              23876452,
+              23882916,
+              23883172
+            ],
+            "peak_live_bytes_after": [
+              52336503
+            ],
+            "peak_live_bytes_before": [
+              52336503
+            ],
+            "reallocation_calls": [
+              105
+            ],
+            "region_peak_live_bytes": [
+              23904973,
+              23911437,
+              23911693
+            ]
+          }
+        }
+      },
+      "native": {
+        "p50": {
+          "median_paired_ratio": 0.954388178045839,
+          "role_median_ns": {
+            "baseline": 16878458.0,
+            "candidate": 16113960.0
+          }
+        },
+        "p95": {
+          "median_paired_ratio": 0.9581640753379146,
+          "role_median_ns": {
+            "baseline": 17084980.0,
+            "candidate": 16335511.0
+          }
+        },
+        "p99": {
+          "median_paired_ratio": 0.960968617146172,
+          "role_median_ns": {
+            "baseline": 17167046.0,
+            "candidate": 16580534.5
+          }
+        }
+      },
+      "phases": {
+        "commit_ns": {
+          "median_paired_ratio": 0.99679389361463,
+          "role_median_ns": {
+            "baseline": 3560216.25,
+            "candidate": 3550521.5
+          }
+        },
+        "open_ns": {
+          "median_paired_ratio": 0.954512988354681,
+          "role_median_ns": {
+            "baseline": 88745.75,
+            "candidate": 84652.75
+          }
+        },
+        "plan_ns": {
+          "median_paired_ratio": 0.9909808179385666,
+          "role_median_ns": {
+            "baseline": 5882387.25,
+            "candidate": 5826452.25
+          }
+        },
+        "publication_ns": {
+          "median_paired_ratio": 0.9051543375274225,
+          "role_median_ns": {
+            "baseline": 7334528.25,
+            "candidate": 6634444.75
+          }
+        },
+        "reopen_ns": {
+          "median_paired_ratio": 1.0067361262275505,
+          "role_median_ns": {
+            "baseline": 22650845.5,
+            "candidate": 23900146.75
+          }
+        }
+      },
+      "rss_kib": {
+        "baseline": [
+          76100,
+          76484,
+          76276,
+          75012,
+          75052,
+          74988
+        ],
+        "candidate": [
+          68964,
+          68708,
+          69200,
+          68392,
+          71448,
+          68236
+        ]
+      }
+    }
+  },
+  "helper": {
+    "bytes": 4341,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/diagnostics.py",
+    "sha256": "89840b9dab72cf7dc38bcd93e4b945a104746b66157d38aa6865b8185d9d60ab"
+  },
+  "scope": "Phase child medians and RSS are descriptive. Phase quantiles do not sum to whole-operation quantiles. RSS is whole-process GNU time high water, affected by executable layout. Allocator values are separate instrumented runs; commit includes staging and core.",
+  "status": "pass",
+  "supervisor_overlap_note": "Allocator supervisor/preflight started 2026-10-04T06:01:51.662140+00:00 before the final native child finished at 06:01:52.158852. The first allocator workload began at 06:01:53.328255; workload children did not overlap. This does not prove host exclusivity.",
+  "workload_intervals": {
+    "allocator": {
+      "first_start": "2026-10-04T06:01:53.328255+00:00",
+      "last_finish": "2026-10-04T06:02:09.315730+00:00"
+    },
+    "native": {
+      "first_start": "2026-10-04T05:58:04.547981+00:00",
+      "last_finish": "2026-10-04T06:01:52.158852+00:00"
+    },
+    "qualification": {
+      "first_start": "2026-10-04T05:57:37.687096+00:00",
+      "last_finish": "2026-10-04T05:57:43.899153+00:00"
+    }
+  }
+}

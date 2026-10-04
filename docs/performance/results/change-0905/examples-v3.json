@@ -1,0 +1,16 @@
+{
+  "correction": "Baseline all-targets compile rejected unnecessary std::io::Read qualification; changed to io::Read. Original source retained parity-example-v2.rs; no oracle execution occurred.",
+  "files": {
+    "crates/xml-minifier/examples/attribute_summary_parity.rs": {
+      "bytes": 23982,
+      "sha256": "173f8ef878104334968970090135966f7f5b077c11c0c451a9ba2a65c0d977d8"
+    },
+    "crates/xml-minifier/examples/attribute_summary_probe.rs": {
+      "bytes": 9773,
+      "sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+    }
+  },
+  "included_in_benchmark_source_inventory": false,
+  "reason": "Standalone oracle/probe examples do not compile into baseline harness; copied identically before both versions are built.",
+  "status": "frozen"
+}

@@ -1,0 +1,2883 @@
+{
+  "commit_branch": "perf/0905-xml-attribute-summary",
+  "ignored_binaries": "Retained and verified by main/micro/parity plans and replays; intentionally excluded from Git",
+  "integration_status": "pending unrelated shared-checkout cherry-pick",
+  "intended_commit_parent": "59f75c7f79026a4d124b61e97c178c7b45de19ab",
+  "measured_baseline": "4f39f5a88d9c01572d2fd24522caf214988540eb",
+  "production_candidate_retained": true,
+  "shared_index": "Will not be used by batch commit; isolated temporary index removed after commit",
+  "source_build_roots_removed": true,
+  "status": "pass",
+  "tracked_evidence_files": {
+    "crates/xml-minifier/examples/attribute_summary_parity.rs": {
+      "bytes": 23982,
+      "sha256": "173f8ef878104334968970090135966f7f5b077c11c0c451a9ba2a65c0d977d8"
+    },
+    "crates/xml-minifier/examples/attribute_summary_probe.rs": {
+      "bytes": 9773,
+      "sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+    },
+    "crates/xml-minifier/src/audit.rs": {
+      "bytes": 126817,
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    "docs/performance/0905-xml-attribute-summary.md": {
+      "bytes": 11245,
+      "sha256": "6646861515359f8eb23fc38c016338fbb419192b938fd37f290c89bf49b1e0f0"
+    },
+    "docs/performance/BASELINE.md": {
+      "bytes": 476721,
+      "sha256": "97b64cee0c0b2492fd9041f34089206b2813d8ff7dd86baff84538d24d0e6288"
+    },
+    "docs/performance/GOAL_AUDIT.md": {
+      "bytes": 465596,
+      "sha256": "70e2bc5a32da15ccbe3833646db3c69439637eb381293a9a475fa393804ca965"
+    },
+    "docs/performance/HOTSPOTS.md": {
+      "bytes": 779140,
+      "sha256": "143b3660403326cce05414dd97530ef9b8036df251f9ca3dbc461b746fca3042"
+    },
+    "docs/performance/REPORT.md": {
+      "bytes": 792121,
+      "sha256": "50d4c54dfd381f86d746aff2adf7cb3a0f825cfff5347fea8d45f8364fa37379"
+    },
+    "docs/performance/results/change-0905/.gitignore": {
+      "bytes": 11,
+      "sha256": "801e954f1288eaeca2690f79ea8db85e3ce0dfbac09af508de21788760ce1cd2"
+    },
+    "docs/performance/results/change-0905/METHOD.md": {
+      "bytes": 2662,
+      "sha256": "a827688fb869948f51071553011ffcdf39a5ec1402066af37b9e70efa9aeb578"
+    },
+    "docs/performance/results/change-0905/MICRO_METHOD.md": {
+      "bytes": 1918,
+      "sha256": "0ac54dc153c854006e0cbe64a5944956f689f32320f0f8993249984828e397f6"
+    },
+    "docs/performance/results/change-0905/README.md": {
+      "bytes": 5613,
+      "sha256": "13b437e2aa9647f14f3ae4c1ac498de12879a9cbd4dfc8fd1ac4e744df753545"
+    },
+    "docs/performance/results/change-0905/RESULTS.md": {
+      "bytes": 2826,
+      "sha256": "c07ab3ce0c574f5655662d1dae511bb18ca59d6926a50472a5b49a4fc6ecd9d1"
+    },
+    "docs/performance/results/change-0905/allocator-capture-run.json": {
+      "bytes": 2862,
+      "sha256": "db21ed73ebc81636f9b92c5064244211844ba374c0a778a53eb440a40434d28b"
+    },
+    "docs/performance/results/change-0905/allocator-capture-start.json": {
+      "bytes": 1792,
+      "sha256": "9b4f9ac1a2c015d9fae66c06c7a3fd807c4861f10e1a4392d45ea661da264435"
+    },
+    "docs/performance/results/change-0905/allocator-capture.log": {
+      "bytes": 43,
+      "sha256": "b0fe9d1ef5d25d6c1e614e75453a8c7fd7b0b0bfd45e60c101e7241aa651996d"
+    },
+    "docs/performance/results/change-0905/allocator/capture.json": {
+      "bytes": 110856,
+      "sha256": "252e6e2005912ef68a9d5d23a9c4c5f6ba1a7061b5555ab60af06e8f1aa31394"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5536,
+      "sha256": "e8e990c02fb5a0f0607ed51ed024c74ecdf6843c47bd23b6789e8a2b987a279f"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5728,
+      "sha256": "274e66dfffdd9f18b28b687636ec2baa3e1ab03e9a2056022fbf024a3a464e9e"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 15564,
+      "sha256": "05487f292de73da9bcdbd8b59099f77694538aa3c099f271149c5b759ba8d795"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "0fbb47e6e454e90c72f7886849babcddbc1ee731582b67719fd50e0309461062"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2968,
+      "sha256": "6688ab7a5b1658b4dfa8bbb5dd786a412d117c1828a0f910ec3914d4be873d65"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5582,
+      "sha256": "d9c0c30cbcc5ffbf05de80de154c869c451b7ec215ab47bf38e22b5ca13501be"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5751,
+      "sha256": "e3db87b11e72102626efa3e3f06ace3e9a6d24923c18da632ac9d0de64120af6"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 34014,
+      "sha256": "3e3c434f93997ab3e6d66c5328ee5be28fe048f0e4f0a12692572fc72d5c538a"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "1c2dca98cdc931430c174e7180205cf6133bec8fbf7cf237d26d154d961e77db"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3014,
+      "sha256": "70e5b29001089a0adc58e0dfa6ead053727966c4daf20bd62c81a5cd28e80d5b"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5610,
+      "sha256": "31192ba0d970fb85d92b004bf9748647258886106695921e37d2df99ff9ce43f"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5765,
+      "sha256": "3303f01c8f0212f084c018e99eb5d2917547a8f6ff1887a4e793204269e770ed"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 34148,
+      "sha256": "98341775227e1a5184ff5a78330c7a71f386b4a5dc6c118ee5c7bcdafc65647b"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "39f260179293892636f8113d55d263dee6dc6f838e141d5f8bb78d0291a93249"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3042,
+      "sha256": "a371e53e1eee010af2371662210b25ea65a8c0062e392aba5902f2aeaa97f4e4"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/command.json": {
+      "bytes": 5544,
+      "sha256": "2403d58da72c56162c74cf6a12d47d32cfed3d4b228fd8270fa957873c31a3a6"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5705,
+      "sha256": "6c195fb6faa9b98d2d5acff51c1bb5d1d0cab7ab8e1cdd0008579c0bd06a7032"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/report.json": {
+      "bytes": 34118,
+      "sha256": "696e8fa3e0b8ce5c727fff576fad6fd542d01a116cf1ad9fe66ff2af6b4d9628"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "5fdf96651feefb95b57ec3c4040742996cfb0f80467290da143e3a50945f8329"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/start.json": {
+      "bytes": 3006,
+      "sha256": "7769c83b78d8298c2f1c1ba31076cda851952ca0e0e90b61b896312955275abd"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5547,
+      "sha256": "242876f41a4fbb6adf05ad9ae4f72c58c9b29988f572267982c7415a9268a3b5"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5740,
+      "sha256": "2c729da40dcc53abd0fb42b7698fcc3e0c9a8c7d15a8ea046a37fb903167a513"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 15566,
+      "sha256": "8657c1ae731e30271c57ed52692e35f532b3d11484258eddc9a6ace515f6c96e"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "fd8b5feffb0ca45c5e2fb7b42b3df1e833c0f67d9bdfa93d9b10f3ffb25e0d46"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2973,
+      "sha256": "06b8f2a1970a70ecdce30499d3388bce30947b2beb14c02d6905c1d8211da21f"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5592,
+      "sha256": "84a8ff3f19f9bd7dcd6e181f6cadf50470885a5568d81f19e1311a429dddb236"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5762,
+      "sha256": "4382e30a95b0d93a08f84424385ed0ecd368ba771fddf88849eacb3a844aea13"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 34017,
+      "sha256": "b287ddd5c60b8c146b7f42c0fd95fe6d28b7270e7f9ceec5c9236cb21f06506e"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "e485905cff922156ab2315958d027c0481f98015c5d6334b6ef06cf38d39e6ea"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3019,
+      "sha256": "04306845741056399465865a82e6cd988780ab6f76af2b75339af26eff0a563e"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5619,
+      "sha256": "d6d67d12c1d4238ee68cc2bbef04519ba9a721e01b3a4162bf559c28901ebb11"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5775,
+      "sha256": "a29f3573dee2cfe0f294c30b817fa1147242c2600b83175612c1cd8f5b95a8c7"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 34142,
+      "sha256": "58665aca63a616fafcbb102b97f5905782738927e830faaf1999c36e494e70e8"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "b9be42ac8fa53b5d128f96d29988c15aaa7bc6de79dc5a9e4a750401a4245568"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3047,
+      "sha256": "f4bc3f81b8c9fdc39438bb199aadea831e9a98569bc24ca039806d84db6db3af"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/command.json": {
+      "bytes": 5552,
+      "sha256": "7015a5a72ec189ab5ded01eaff22ed485409e2091006ed5eab5a8267020d39d4"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5714,
+      "sha256": "5f9b4790bfe30975bdc8f676369fd8709b5ac56bc79bb1df845679a3ccae944d"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/report.json": {
+      "bytes": 34108,
+      "sha256": "e074a31d68ed8cb9a0a960db997d87fa4798d23b8c6243d30ed4922f79ed2142"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "5c308f390655310fabaed18a319174ca9a3644a014bba2903f1e6e2179581685"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/start.json": {
+      "bytes": 3011,
+      "sha256": "a72d371a914239519f3f4b28be478d780262d77f81775b2c0c4ebae0149669ee"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r00-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5537,
+      "sha256": "0a95fc268b520c03554e26bae694654f5caee790b2b4c7300b2a353f76f686b4"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5729,
+      "sha256": "a4470b0d92bb2f4790f832ce3e61db524308b7f7e3008d3ab614112b7db28a90"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 15554,
+      "sha256": "ab4bac272ad03be63235404fa3308349d52fc8a854a4e4176ec92005f3366daa"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "90b7aa0c7d8ec4c60aa72b5d1602bce2771c7f35a91e75fd75fa04ca88decb44"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2968,
+      "sha256": "fda7f78b4e9d1e03c63c203461fd4ea948bc34a985909082bed03980339984cf"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5582,
+      "sha256": "b2174518191dd4d901c2afb55adfbf5cfb30c53d9158883a390671c78ae83582"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5751,
+      "sha256": "f8a8a41ca2f6b4612493a3563901a9f2de998a30b240173e71a25b9ab61194a6"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 34019,
+      "sha256": "a79dabc17b0b66999dcc89aca3164a4674b269eda2417b5ec09b34ebe56de226"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "defc0aa02d9be11be67ae3b9b6ec0355479d3f91f8af4c18d120a14ac7d8b2b2"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3014,
+      "sha256": "26efc7ec71ef7b130c2d0b649734318f68a9ac2980593d583f629f262fca5605"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5610,
+      "sha256": "e00ff3d1fd522a6da58cfc689705fe4d859656d45caa590faed943e817895b4a"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5765,
+      "sha256": "8684f817b74abe56c4c5ab841e88a2d727f58e7160ab2c1598ce262405f1fd7c"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 34155,
+      "sha256": "0ec928a2fcdf3be877b4dee9fd0c57174bd115eeb898388470ba10fcdcccd9bb"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "e3a324a1ef7e019203b3b456f3ca07afd465a3d2c9c5df847dd1fd224657c078"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3042,
+      "sha256": "89bfebded72b597af91c27a51592a4279808879fbdcee40ed5ce7e3c8e1af2f2"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/command.json": {
+      "bytes": 5544,
+      "sha256": "9d8f5278c34092d0da9ba0d83c9c9acbca49274a935f9683a900b8eb551044fd"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5705,
+      "sha256": "8abd562b697a16920b81b2b12067ec9eb496ab4589b91e431cfac40e3372967e"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/report.json": {
+      "bytes": 34110,
+      "sha256": "f63ef54c815d7b16bde04d49dbd6808214abc69cf44f84856f7c8f7ee9133ba0"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "7ba1920d945ce9a5eb5a51f33b5124db4686749eb25e35669aae480e7e17c1cc"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/start.json": {
+      "bytes": 3006,
+      "sha256": "bd97d3a70ec37c3d63c5ceb56c209f147557107a7aca99dc416827a085bdc35d"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5546,
+      "sha256": "654f9269399f5f2af82d3011f09125a8b7f0f02f47bb71d80e5b70491c27c84f"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5739,
+      "sha256": "b47be13929a56b7815e94caaaaa4df9706089c7fbda85d96d27ccd5c0cd596ee"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 15565,
+      "sha256": "abb3bd61a8d12b0986109062e012de3f7ce66258d9493f790e62d745636a9492"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "4a2135abb4fd0133f087040722bc902d7ab0436b0e8b39a463475532790b9f61"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2973,
+      "sha256": "4084c4f076ba1187b2e99515a8ea5233c8fd53ec5251bf5944249022a1184408"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5592,
+      "sha256": "70fb6e259bdec0b35e4e9bbd8d54d3d653cb9ce2f530aa16af4d6199510fa0ec"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5762,
+      "sha256": "e5a306aaa5b69a917b7f0e8fc58f1eb1bd3edcba391590bdb6a796db43398aba"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 34007,
+      "sha256": "7413c6a1fc32b5c26c08f16bf5a6b4b3bd2d7f0c46e398ec50ea0bfbc2304ad4"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "53fad1970875694e1315de986b9c9ebe2f314f8bc4c3280a768c595c455e0395"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3019,
+      "sha256": "0bc0f33e524d05aa85361a92ee6e9ef5380e47d176fa2a1eb88043839fa34a19"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5620,
+      "sha256": "749ca79f17cb135b9baccf117572ed779e41b12d5d7ca4feafb62a3512c0e632"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5776,
+      "sha256": "35e4783aa4a33414620d9428a97e4fba264feab5f4243f0faec6296c49ce2426"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 34141,
+      "sha256": "c95233e5389d65b3bcfe638719bead14ee991a4d03635788d420ac8744202993"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "e151b20c67dc3fb60df72eeb487a0b9427f8ff77bbaf5535073c01a17780958e"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3047,
+      "sha256": "f4c5bef5e3a890826d0e24a247c3978bf9ba79cbf73bca4c7fb99b343becbf1e"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/command.json": {
+      "bytes": 5553,
+      "sha256": "d037239d483087821fb6e6fc946249f3e3e1d08a62c1d77f109b98e80eb2abcf"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5715,
+      "sha256": "4f8ed8389d16cf0e21eb3a697ab672624a34924521663f202bd87b2b623ee48a"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/report.json": {
+      "bytes": 34097,
+      "sha256": "f42fbf43ad9d6659d44710cfc9325d97577e351fa0fe023016d41c4fd656ed72"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "a06f747a66d1a6707e9dadaa599b8609147008dcaddc121a2967f35ca108da0c"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/start.json": {
+      "bytes": 3011,
+      "sha256": "ff60c9f6d114f04b591a099dde0152ac8175b0ed566e154cace3f72fa674e1e6"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/allocator/r01-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/analysis.json": {
+      "bytes": 4285077,
+      "sha256": "db663b1307ba234ebc680441d32f74569094b2cf366ee58176334777a9c74208"
+    },
+    "docs/performance/results/change-0905/analyze_v3.py": {
+      "bytes": 56533,
+      "sha256": "9d38d1d9c02a21a334b57792852563825b611628a9127a04986be33e5575e551"
+    },
+    "docs/performance/results/change-0905/baseline-allocator-binary.json": {
+      "bytes": 207,
+      "sha256": "4467b47fe70cd6fb9b5ca57c7c301c5460e01414ca81e7576e5bf49bee171e29"
+    },
+    "docs/performance/results/change-0905/baseline-allocator-build-run.json": {
+      "bytes": 2992,
+      "sha256": "7d5ebe6f7c79abacc045c9cc8b7c73d8828596f3bd8f598c42e3ba69974a4e6a"
+    },
+    "docs/performance/results/change-0905/baseline-allocator-build-start.json": {
+      "bytes": 1914,
+      "sha256": "eff54c42e1c47ea9e8b87453399a87834958208c2677de43a3374064df2196bb"
+    },
+    "docs/performance/results/change-0905/baseline-allocator-build.log": {
+      "bytes": 159,
+      "sha256": "894139242e7f494b7bdc83c59a0a6f469d48c8abbdfe509ea6252acd508b4de6"
+    },
+    "docs/performance/results/change-0905/baseline-audit.rs": {
+      "bytes": 124782,
+      "sha256": "91424b57dfcecaf6cb204429e6d779a0c81a8b55c6546d616c694f4ea2455ac0"
+    },
+    "docs/performance/results/change-0905/baseline-native-binary.json": {
+      "bytes": 204,
+      "sha256": "3b5cead1c09e64a7e7689c9d2f8672e7382880a88755455ebd42fbdbdca4912e"
+    },
+    "docs/performance/results/change-0905/baseline-native-build-run.json": {
+      "bytes": 2941,
+      "sha256": "261f557af5b311380c5b4bd319148873a0ba9eda00f82d3f89f187b4db1f2bc9"
+    },
+    "docs/performance/results/change-0905/baseline-native-build-start.json": {
+      "bytes": 1865,
+      "sha256": "2a4c76ae73d0c8ca9e8b14fd4d1c074fb66d86ce4470433388936334c12169b0"
+    },
+    "docs/performance/results/change-0905/baseline-native-build.log": {
+      "bytes": 7847,
+      "sha256": "4e6aca09afc0185da9df2f6e2c4722b6127dd05d1c6fcd435e79d291fda2596e"
+    },
+    "docs/performance/results/change-0905/baseline-oracles-build-run.json": {
+      "bytes": 3046,
+      "sha256": "f9c3b0662470a69e857f35ab906bfe8df9089d3d3504ae8a87de8d0efc702971"
+    },
+    "docs/performance/results/change-0905/baseline-oracles-build-start.json": {
+      "bytes": 1970,
+      "sha256": "fa93a81c9c5a5e377e400729f85503fc6304ef8c689efcce6dc3006f412c76ce"
+    },
+    "docs/performance/results/change-0905/baseline-oracles-build.log": {
+      "bytes": 420,
+      "sha256": "7ff6bb7ffba08f9ebc3d996715bf56cb8fd9d5ecb125a4ab47b95c06196d1033"
+    },
+    "docs/performance/results/change-0905/baseline-overlay/tools/perf-baseline/README.md": {
+      "bytes": 320394,
+      "sha256": "899c48ec904f8c62714401d9b5d897fc0eeb990d62f0d69830b6e9a948a48c91"
+    },
+    "docs/performance/results/change-0905/baseline-overlay/tools/perf-baseline/examples/xlsx_attribute_fixtures.rs": {
+      "bytes": 788,
+      "sha256": "9b705f3fc42a360653cdb8c3be2d9042f5df5febce69b2f692fdf8046e478da6"
+    },
+    "docs/performance/results/change-0905/baseline-overlay/tools/perf-baseline/src/lib.rs": {
+      "bytes": 3020953,
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    "docs/performance/results/change-0905/baseline-overlay/tools/perf-baseline/src/xlsx_attribute_fixtures.rs": {
+      "bytes": 14154,
+      "sha256": "b26fcc0257431a08a2ee4f0d5cc4e8fc11780ce0d15693b6cd198ea33594a841"
+    },
+    "docs/performance/results/change-0905/baseline-parity-run-run.json": {
+      "bytes": 2961,
+      "sha256": "0b4ef4ffdb8219be5f36d0f7ee3516ce4a766ac656b3239a701abe378bbd59a5"
+    },
+    "docs/performance/results/change-0905/baseline-parity-run-start.json": {
+      "bytes": 1888,
+      "sha256": "1c8c2bce94eab12fa09c8084bc4981199f47a2abcd93eb3813831796f7f16bd9"
+    },
+    "docs/performance/results/change-0905/baseline-parity-run.log": {
+      "bytes": 716,
+      "sha256": "df6230a8e8e27d850457cb4405e76bea8a251839b18e3022cf61b7e156a137f0"
+    },
+    "docs/performance/results/change-0905/baseline-parity.json": {
+      "bytes": 788,
+      "sha256": "2287aeb78721fcab2dfc2ddfe20d5eb572c51eae88f415fb5d146230a7056dc7"
+    },
+    "docs/performance/results/change-0905/baseline-parity.jsonl.gz": {
+      "bytes": 1416383,
+      "sha256": "4e1cc9e25cf600e4afa43a5e3e1649a05a8344d6dd92de67b234e1843b709904"
+    },
+    "docs/performance/results/change-0905/baseline-parity.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/baseline-source.json": {
+      "bytes": 1880177,
+      "sha256": "6dba705714e7ed2d746861be5eb5652130f9c98936f8bfd921c89db3a786397e"
+    },
+    "docs/performance/results/change-0905/baseline-xml-tests-run.json": {
+      "bytes": 2950,
+      "sha256": "b51923e36ab8c4a8b95eb31930d0edc46dbc5b151d6826fc1251f7c66b0bbde5"
+    },
+    "docs/performance/results/change-0905/baseline-xml-tests-start.json": {
+      "bytes": 1876,
+      "sha256": "87d4d8d72e11fd771dbc341eeddab0bf7e8a69bcf273cda7da33409a7579a320"
+    },
+    "docs/performance/results/change-0905/baseline-xml-tests-v2-run.json": {
+      "bytes": 2953,
+      "sha256": "cbe2a549299b025f068b01888a173c88781076d33317066528167cee859a347a"
+    },
+    "docs/performance/results/change-0905/baseline-xml-tests-v2-start.json": {
+      "bytes": 1876,
+      "sha256": "c866b355a1347d97b6ba4ba414c3b843303b5db79d0f0c1c3e825d5046ebc951"
+    },
+    "docs/performance/results/change-0905/baseline-xml-tests-v2.log": {
+      "bytes": 13391,
+      "sha256": "65aa30c63be6ebd74161e90c5524db8af98f496265aa57a19a12659f37a17fe5"
+    },
+    "docs/performance/results/change-0905/baseline-xml-tests.log": {
+      "bytes": 882,
+      "sha256": "2023c4055d7a7425e736ccf5a0e79df18a52641b74593aeb238977c8f146a609"
+    },
+    "docs/performance/results/change-0905/bootstrap.json": {
+      "bytes": 457,
+      "sha256": "4c40d62920de1476d0d7fe8d83bee73febbb080ba5c321388d7b579f9f08a923"
+    },
+    "docs/performance/results/change-0905/candidate-allocator-binary.json": {
+      "bytes": 208,
+      "sha256": "1d72feb2d1d435979f598de42c5ffc6619de3fba39013bdc183edf649f82f3b6"
+    },
+    "docs/performance/results/change-0905/candidate-allocator-build-run.json": {
+      "bytes": 2993,
+      "sha256": "b2074b0a4e3458452345c36fb68c375ef96a4e452fe3957e6815a920333aaa9e"
+    },
+    "docs/performance/results/change-0905/candidate-allocator-build-start.json": {
+      "bytes": 1914,
+      "sha256": "3fedaf0b278eb0d398552cabb8b9deab07f6fc5d8400781fdde64801dd121c69"
+    },
+    "docs/performance/results/change-0905/candidate-allocator-build.log": {
+      "bytes": 159,
+      "sha256": "7c410ec7b277c633aa13af7eae37d7ad8610536a8a9e0e94eb124860295303c4"
+    },
+    "docs/performance/results/change-0905/candidate-audit.rs": {
+      "bytes": 126817,
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    "docs/performance/results/change-0905/candidate-boundaries-run.json": {
+      "bytes": 2834,
+      "sha256": "038a3d7a5ebbbff9a6e5eebe1c088a7f6f24eb45635cce00403712b8c5dd4017"
+    },
+    "docs/performance/results/change-0905/candidate-boundaries-start.json": {
+      "bytes": 1760,
+      "sha256": "b1ed970f41fc125ef3b07a54332453902f14a78ac2bd2168d2bc4da4493f530e"
+    },
+    "docs/performance/results/change-0905/candidate-boundaries.log": {
+      "bytes": 565,
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    "docs/performance/results/change-0905/candidate-clippy-run.json": {
+      "bytes": 3107,
+      "sha256": "bdceb4d3cc0dc1d17f2ea11c3cd34cca8387f5e82d0e956fcee30886f5b52770"
+    },
+    "docs/performance/results/change-0905/candidate-clippy-start.json": {
+      "bytes": 2036,
+      "sha256": "e5d17d2c82ae2e6cded211c49989379379f5c625a7fc931e1da90a3421aeff75"
+    },
+    "docs/performance/results/change-0905/candidate-clippy.log": {
+      "bytes": 4260,
+      "sha256": "74b048306c533e0bf8ea64e0b97aadc29c69c6511ec747b2a0b87f2d8947a12a"
+    },
+    "docs/performance/results/change-0905/candidate-doc-tests-run.json": {
+      "bytes": 3058,
+      "sha256": "02258634060ab65a69a6847b4163c7b60ba05f36999ab5734e5a2f05c09515d5"
+    },
+    "docs/performance/results/change-0905/candidate-doc-tests-start.json": {
+      "bytes": 1983,
+      "sha256": "dbd8d703d50e2e0e7112e5ef3c9d285a2056bfa81492ef4c6717e8276db164c1"
+    },
+    "docs/performance/results/change-0905/candidate-doc-tests.log": {
+      "bytes": 15835,
+      "sha256": "5f480abfcc4f1a330029de49b2db2658f3154c6b713c6ebf0d63ca11b50412dc"
+    },
+    "docs/performance/results/change-0905/candidate-fmt-run.json": {
+      "bytes": 2831,
+      "sha256": "a6a408084f0b9e2e0031429ac90e06e71cf21b6d4896e8b8c5df2345ed8607ba"
+    },
+    "docs/performance/results/change-0905/candidate-fmt-start.json": {
+      "bytes": 1766,
+      "sha256": "36b489b106c7f5df92080b2c15e17528dc7e99cff6d397ac597c13f1def0a58a"
+    },
+    "docs/performance/results/change-0905/candidate-fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/candidate-native-binary.json": {
+      "bytes": 205,
+      "sha256": "13f76500932edaa0e8cf48720e9db610704b4d6f0b6af9759c28a3b64c3a547e"
+    },
+    "docs/performance/results/change-0905/candidate-native-build-run.json": {
+      "bytes": 2942,
+      "sha256": "555e30c57f8dd9d8b73824f1ad71b9683016fbd9c3947a087f6010eb15fccf03"
+    },
+    "docs/performance/results/change-0905/candidate-native-build-start.json": {
+      "bytes": 1865,
+      "sha256": "3098c2bbc6de67b795c6261969330fb77a5c268a06033ce709fd5204fdad4162"
+    },
+    "docs/performance/results/change-0905/candidate-native-build.log": {
+      "bytes": 1320,
+      "sha256": "5fb224c3efa8e129df094c4feea7744abad30cbe5cc8aeb924bf02ae19f2956e"
+    },
+    "docs/performance/results/change-0905/candidate-office-tests-run.json": {
+      "bytes": 3047,
+      "sha256": "105e2e50fe3ed8757b72d51123e0d781425e2ca02cfefde2e5770885267cd952"
+    },
+    "docs/performance/results/change-0905/candidate-office-tests-start.json": {
+      "bytes": 1968,
+      "sha256": "86e8ed1d6f0d343ed543da708a37a776286810a9f8d11565d6920fd581e6e080"
+    },
+    "docs/performance/results/change-0905/candidate-office-tests.log": {
+      "bytes": 624651,
+      "sha256": "7cb2ab9f469a64825829030b5cb47994ad5737e9b11a597154f4c6a723155db8"
+    },
+    "docs/performance/results/change-0905/candidate-oracles-build-run.json": {
+      "bytes": 3047,
+      "sha256": "d7c36570c8b517847355db79bb884180d6d0166f96a817a149398d938247b3ad"
+    },
+    "docs/performance/results/change-0905/candidate-oracles-build-start.json": {
+      "bytes": 1970,
+      "sha256": "6a9ece69fd5b01d6036819b4eee70680808e12672d1ccb7965162c60e68e63f7"
+    },
+    "docs/performance/results/change-0905/candidate-oracles-build.log": {
+      "bytes": 150,
+      "sha256": "658a437870c916526e0a7e836ae333b39c880a154a5a1bb298ebe55d2675c370"
+    },
+    "docs/performance/results/change-0905/candidate-parity-run-run.json": {
+      "bytes": 2964,
+      "sha256": "fb5b2005f2f70291da094d3f356efc38f2fdc8878e65c3df2e0c3967e8fb03d1"
+    },
+    "docs/performance/results/change-0905/candidate-parity-run-start.json": {
+      "bytes": 1890,
+      "sha256": "92af5a3aea1196d691dac672078ada59817893e77f879bd6c41d24f44679a043"
+    },
+    "docs/performance/results/change-0905/candidate-parity-run.log": {
+      "bytes": 719,
+      "sha256": "be79f72e2841e3e0c8c6b4ba95c3986d275026e16295c8679fa82c128e49d3de"
+    },
+    "docs/performance/results/change-0905/candidate-parity.json": {
+      "bytes": 791,
+      "sha256": "4666d62a267338e7d21d32f2a3852a5db231361f5c86e2d0018130fc7f430dd2"
+    },
+    "docs/performance/results/change-0905/candidate-parity.jsonl.gz": {
+      "bytes": 1416383,
+      "sha256": "4e1cc9e25cf600e4afa43a5e3e1649a05a8344d6dd92de67b234e1843b709904"
+    },
+    "docs/performance/results/change-0905/candidate-parity.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/candidate-rustdoc-run.json": {
+      "bytes": 3101,
+      "sha256": "8722f632c436b70e8d7477489b78eb153b349a4f95e3067275f926e65effe429"
+    },
+    "docs/performance/results/change-0905/candidate-rustdoc-start.json": {
+      "bytes": 2029,
+      "sha256": "9903f7bc85dfe7558354046c654ba1b8019dbadb881eca4b8741c250281f12e7"
+    },
+    "docs/performance/results/change-0905/candidate-rustdoc.log": {
+      "bytes": 1427,
+      "sha256": "f0066e58c58c76538585456cdf253ba0acf99549cf59cdabfdacf571385228ef"
+    },
+    "docs/performance/results/change-0905/candidate-source.json": {
+      "bytes": 1880267,
+      "sha256": "69b4be69408c11c071de46b94dee82ab19a7ac036f2e96cbaa849ddd715f275c"
+    },
+    "docs/performance/results/change-0905/candidate-xml-tests-run.json": {
+      "bytes": 2951,
+      "sha256": "bf9a6e0daedc5cb231da6acb3d0e9d0df6fccca4cd91845031981d5778f3ecfd"
+    },
+    "docs/performance/results/change-0905/candidate-xml-tests-start.json": {
+      "bytes": 1876,
+      "sha256": "a506c47afefd41ef23a1bcbc189c9871e4edda3540914f268ee8e8bbac112c82"
+    },
+    "docs/performance/results/change-0905/candidate-xml-tests.log": {
+      "bytes": 13391,
+      "sha256": "7637faed0b99ada9c373abc520b2a4063a312372888fff742986e9bc85d9500d"
+    },
+    "docs/performance/results/change-0905/candidate.patch": {
+      "bytes": 7549,
+      "sha256": "7319cb522dd2e3e81274dbf23fd247dc1e0c7cb88a97b6e19b20445fa17bf3d3"
+    },
+    "docs/performance/results/change-0905/capture-preflight-run.json": {
+      "bytes": 2860,
+      "sha256": "f2f6bde946fd122cf51adb5dce6cdd92c153ec214cb75bb2cca37d6e3e0bf32d"
+    },
+    "docs/performance/results/change-0905/capture-preflight-start.json": {
+      "bytes": 1788,
+      "sha256": "512ed558a76aa34f179f3b7bc0ca9882f7cc34e8b0d35f9dde1e24010a1950b9"
+    },
+    "docs/performance/results/change-0905/capture-preflight.log": {
+      "bytes": 4054,
+      "sha256": "226d66670ac0803fe60995cc46f116db6669a8ccb211e32018e1e4bc3cd964ae"
+    },
+    "docs/performance/results/change-0905/cleanup-plan.log": {
+      "bytes": 10870,
+      "sha256": "9111a01741978ef22232f58de0e01329c9559fc20c23d10f699f7b37df819f8f"
+    },
+    "docs/performance/results/change-0905/cleanup-start.json": {
+      "bytes": 11653,
+      "sha256": "1c09fa68d735cfeb6304a13cfd9108c34772b0d4911791cbdacb2a74c75da771"
+    },
+    "docs/performance/results/change-0905/cleanup.json": {
+      "bytes": 13117,
+      "sha256": "34aac167a5ee6864ee766620b1dc53ca2055109050dfa11c5bfd1b06869bc13e"
+    },
+    "docs/performance/results/change-0905/cleanup.log": {
+      "bytes": 39,
+      "sha256": "a2fdd1599a9a7e0cfb2d8ee89113c6bc4bc1daf5709a27897a8061f4fdae3e84"
+    },
+    "docs/performance/results/change-0905/cleanup.py": {
+      "bytes": 23548,
+      "sha256": "585ba63d2f474664296356d5126d2af3996cdd9aa2213822ad3282dad8b3eb85"
+    },
+    "docs/performance/results/change-0905/command.py": {
+      "bytes": 2164,
+      "sha256": "0de51437977c6e76411c3873df373d1fb9ccb85d55fc6dbbf54944f19c0ce80e"
+    },
+    "docs/performance/results/change-0905/concurrent-integration.json": {
+      "bytes": 1260,
+      "sha256": "cd1bc7f45980d96d0494b1844dfd00f606fb7e671f56c2e0f88abd4fb36c8d6c"
+    },
+    "docs/performance/results/change-0905/decision.json": {
+      "bytes": 3823,
+      "sha256": "54a182133bfbbef6c5449a2ea3355351ceb4bfe6ef746aa0ae57e1b005f4c2ed"
+    },
+    "docs/performance/results/change-0905/diagnostics.json": {
+      "bytes": 38595,
+      "sha256": "2370a882b0e03a2ff340af4efb968a7e2a28d575acdbdcdd89184675fa196603"
+    },
+    "docs/performance/results/change-0905/diagnostics.py": {
+      "bytes": 4341,
+      "sha256": "89840b9dab72cf7dc38bcd93e4b945a104746b66157d38aa6865b8185d9d60ab"
+    },
+    "docs/performance/results/change-0905/environment.json": {
+      "bytes": 5871,
+      "sha256": "d85c39d24646995bda255d2b23b0afddbe6f80a049e37e1cf9291743a0037fc1"
+    },
+    "docs/performance/results/change-0905/examples-v2.json": {
+      "bytes": 753,
+      "sha256": "81420ba284d706bb8777191dec4937d6c7e8165274fc559ffb46168aec8c761d"
+    },
+    "docs/performance/results/change-0905/examples-v3.json": {
+      "bytes": 780,
+      "sha256": "beaf177baffb0476929240db15aa0e5d884356edaf93104e5eb1230806c2c8a2"
+    },
+    "docs/performance/results/change-0905/examples.json": {
+      "bytes": 584,
+      "sha256": "982415fee5e1ec50ec02afcaeda444376cfcf50c8fabcd2b22e33b8a2ee2be61"
+    },
+    "docs/performance/results/change-0905/final-source-check-run.json": {
+      "bytes": 2861,
+      "sha256": "978ca4592807ff3a7aa6efcf489769b4f0550c253dfa5e0d934144697dc8b80a"
+    },
+    "docs/performance/results/change-0905/final-source-check-start.json": {
+      "bytes": 1788,
+      "sha256": "2f903325463bcb0fe9ee1511551504da8829db58e6695e6b4148550e75a84797"
+    },
+    "docs/performance/results/change-0905/final-source-check.log": {
+      "bytes": 4054,
+      "sha256": "226d66670ac0803fe60995cc46f116db6669a8ccb211e32018e1e4bc3cd964ae"
+    },
+    "docs/performance/results/change-0905/fixture-links.json": {
+      "bytes": 353,
+      "sha256": "f3512ec4e50c598c83ad66bd6afbca20f8fd6902725ed6584a32e4ba4c362c58"
+    },
+    "docs/performance/results/change-0905/freeze.py": {
+      "bytes": 2122,
+      "sha256": "f220fe359848eb511a201f3c6a96858c393d591c3c86ec77ad49457514b8f37d"
+    },
+    "docs/performance/results/change-0905/helper-review.md": {
+      "bytes": 4518,
+      "sha256": "e1235611d17d213ddf4a98a850f7bab1613363ee87c81e144c99d89c645415e3"
+    },
+    "docs/performance/results/change-0905/main-reduce-run.json": {
+      "bytes": 2854,
+      "sha256": "c6942eb6b8839d2cc3ac0f6cde44ae7e5bef72c382412a437ebb1374d6cc64bc"
+    },
+    "docs/performance/results/change-0905/main-reduce-start.json": {
+      "bytes": 1790,
+      "sha256": "6e51de77e628b9c4834d960db5fc6b31314f5bb49797539663b0596b21560c94"
+    },
+    "docs/performance/results/change-0905/main-reduce.log": {
+      "bytes": 35,
+      "sha256": "d6caaca4808c95125afceb5389d0bf30cc9362d6a6bbd081ff1ed1cb35f81d14"
+    },
+    "docs/performance/results/change-0905/micro-analysis.json": {
+      "bytes": 75123,
+      "sha256": "af1a00f0d8f6733677c4a0b6238fd3540b3abaaffad8abdd468e87da0bbb21c5"
+    },
+    "docs/performance/results/change-0905/micro-capture-run.json": {
+      "bytes": 2856,
+      "sha256": "89843b004b0e1669ad7d55bec28baf33212d88b287c8cbab99265dc6db8c451b"
+    },
+    "docs/performance/results/change-0905/micro-capture-start.json": {
+      "bytes": 1789,
+      "sha256": "a32fe5a51204dcb8c3b217153a8444defba6e28781c91210424a4d78bb14b569"
+    },
+    "docs/performance/results/change-0905/micro-capture.log": {
+      "bytes": 270,
+      "sha256": "024d670f5433e3a0fa4d4c300cef6c01e3aab12b723444473d94c7747aeaa471"
+    },
+    "docs/performance/results/change-0905/micro-plan.json": {
+      "bytes": 3297,
+      "sha256": "96d89a386c5280058154ff1b6f5beb9c0c47e84e5d1e7854345cb2a8de53dee4"
+    },
+    "docs/performance/results/change-0905/micro-reduce-run.json": {
+      "bytes": 2956,
+      "sha256": "a265d7b2638d9f8931cda84b18a4ff3b9d518431ef8e44ce7eac75c694a79764"
+    },
+    "docs/performance/results/change-0905/micro-reduce-start.json": {
+      "bytes": 1892,
+      "sha256": "fb4af477986c8b05c10b5a7125456516069420133886929918a76dcb000454c9"
+    },
+    "docs/performance/results/change-0905/micro-reduce.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro.py": {
+      "bytes": 5680,
+      "sha256": "34a6a02ce36271bb43c2ba6c9cad8b2c874266b3e73858cd984cf338fb51c809"
+    },
+    "docs/performance/results/change-0905/micro/b00-baseline.receipt.json": {
+      "bytes": 1356,
+      "sha256": "43a57338658ef3db8e432bc828504309684b892a1155d5c0287be00cc4152145"
+    },
+    "docs/performance/results/change-0905/micro/b00-baseline.start.json": {
+      "bytes": 901,
+      "sha256": "78c9dca12ddd346e936d876a3a35b0d9356082913b01e182479060f84a7578dd"
+    },
+    "docs/performance/results/change-0905/micro/b00-baseline.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b00-baseline.tsv": {
+      "bytes": 49851,
+      "sha256": "ff7d97fe312a9ca5c296ca1209f1cbec7a243a39f5f0a2bed2cbd8481a48b807"
+    },
+    "docs/performance/results/change-0905/micro/b00-candidate.receipt.json": {
+      "bytes": 1361,
+      "sha256": "723ce877c58ede0d03a7777162f8e0c72acf89f66322e092c92d31b5267a828a"
+    },
+    "docs/performance/results/change-0905/micro/b00-candidate.start.json": {
+      "bytes": 904,
+      "sha256": "54abaaa6fd2fd9a0e97aa8173e017b6bb6ddb7c2e270c1bcdc7d854590ae5492"
+    },
+    "docs/performance/results/change-0905/micro/b00-candidate.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b00-candidate.tsv": {
+      "bytes": 49848,
+      "sha256": "55872329da0b0313a0c8950242dd8935c3279f5a49e72c87149cb1a3a531264f"
+    },
+    "docs/performance/results/change-0905/micro/b01-baseline.receipt.json": {
+      "bytes": 1373,
+      "sha256": "26c028352d3e69becaad1c6a9f89173e90cdacf7cced5d3630f5a202731b7dca"
+    },
+    "docs/performance/results/change-0905/micro/b01-baseline.start.json": {
+      "bytes": 918,
+      "sha256": "9090171bf6089cc24487352ffd880accf5ef220c6c0875fc8b1d3ca9df8e3c59"
+    },
+    "docs/performance/results/change-0905/micro/b01-baseline.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b01-baseline.tsv": {
+      "bytes": 49850,
+      "sha256": "916a35a85733563f6f43b53521eabbd5cc7c407eda14d056098530d71c6cceae"
+    },
+    "docs/performance/results/change-0905/micro/b01-candidate.receipt.json": {
+      "bytes": 1378,
+      "sha256": "fb23f55463cfee4ebbaa093eaa8cdf914453c4de1afe31be03e0b19dff7a886d"
+    },
+    "docs/performance/results/change-0905/micro/b01-candidate.start.json": {
+      "bytes": 921,
+      "sha256": "a9630972dbeb22525ff8c83851b053dff0cad984a5fafa662cf3587ca4a8fd82"
+    },
+    "docs/performance/results/change-0905/micro/b01-candidate.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b01-candidate.tsv": {
+      "bytes": 49848,
+      "sha256": "7019682a8b0e09718457a6667b029beb1f7a6308bd42ebd7786bffcbf7ad5c57"
+    },
+    "docs/performance/results/change-0905/micro/b02-baseline.receipt.json": {
+      "bytes": 1356,
+      "sha256": "da891a0c0129fc89bc16d18d9633c2eacbc6f75ed1001857e435eeceb5cf6c0e"
+    },
+    "docs/performance/results/change-0905/micro/b02-baseline.start.json": {
+      "bytes": 901,
+      "sha256": "97517e91a18968f831b9133e67923157b2bc1fed25e9a5b9fa4864aa67bd1f0f"
+    },
+    "docs/performance/results/change-0905/micro/b02-baseline.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b02-baseline.tsv": {
+      "bytes": 49852,
+      "sha256": "607a96251b015ad5c40ee35cf9d2025fd0ccfb09cf8eeda5927d74548961429c"
+    },
+    "docs/performance/results/change-0905/micro/b02-candidate.receipt.json": {
+      "bytes": 1361,
+      "sha256": "88a5b18c50328ace0df8a9c681d0c40dd251a651bede6a12631120b2cd2a05f9"
+    },
+    "docs/performance/results/change-0905/micro/b02-candidate.start.json": {
+      "bytes": 904,
+      "sha256": "1d8c0a4b167738c65c5eb2c152b4e0e326fce08ef69463cd40475dd72c447113"
+    },
+    "docs/performance/results/change-0905/micro/b02-candidate.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b02-candidate.tsv": {
+      "bytes": 49849,
+      "sha256": "57fe03d6c5462b5a11202a2cf77503203490a1877b515105dd1d3f12b7f1b034"
+    },
+    "docs/performance/results/change-0905/micro/b03-baseline.receipt.json": {
+      "bytes": 1373,
+      "sha256": "a198678127b1f0497f291115964955e9fbf0a29b18b5637569b54ba07a1eeecf"
+    },
+    "docs/performance/results/change-0905/micro/b03-baseline.start.json": {
+      "bytes": 918,
+      "sha256": "24b8db4032b229ee6060398f905e564d6cf4668acca308ca239c18e60e120e6c"
+    },
+    "docs/performance/results/change-0905/micro/b03-baseline.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b03-baseline.tsv": {
+      "bytes": 49848,
+      "sha256": "24c4f8a313a857640fd588bba5aeb6b035ad1bbde1ffe32ebcc8d24f947acc8e"
+    },
+    "docs/performance/results/change-0905/micro/b03-candidate.receipt.json": {
+      "bytes": 1378,
+      "sha256": "3ba1379f41eb19ccfca3564f8eb3c1297f8b86a846159b07770f1921ae12bd80"
+    },
+    "docs/performance/results/change-0905/micro/b03-candidate.start.json": {
+      "bytes": 921,
+      "sha256": "954b943fc5abcf3aeba6b737fd27a6eea1abc31eb4f9e2053356c8f1b4f23155"
+    },
+    "docs/performance/results/change-0905/micro/b03-candidate.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b03-candidate.tsv": {
+      "bytes": 49847,
+      "sha256": "ea738f465e756b44914fecfb7d963cb8beeb59cc2b700f6babf3c0545fc83f64"
+    },
+    "docs/performance/results/change-0905/micro/b04-baseline.receipt.json": {
+      "bytes": 1356,
+      "sha256": "54508350fa6e9f061a9eb791a44d3a30a413ac06b859f9973b7d52104a53e3dd"
+    },
+    "docs/performance/results/change-0905/micro/b04-baseline.start.json": {
+      "bytes": 901,
+      "sha256": "21c61f0c00c62bdafdf5e463b6ec83ba46d382249911c65d4f40e9c5e866f731"
+    },
+    "docs/performance/results/change-0905/micro/b04-baseline.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b04-baseline.tsv": {
+      "bytes": 49851,
+      "sha256": "e4c0fe86b39ff992deced196b3a3aa7dbe9b18912e6ffce62721a6982f079b2d"
+    },
+    "docs/performance/results/change-0905/micro/b04-candidate.receipt.json": {
+      "bytes": 1361,
+      "sha256": "e88f5e56126c20b8eda840ddb7f2cb978ec2b0c58d1a307ed96231c06e49006f"
+    },
+    "docs/performance/results/change-0905/micro/b04-candidate.start.json": {
+      "bytes": 904,
+      "sha256": "98adbdc5b6680e858270757b16c7445abd9abe024b9897c8cd7f7b06adeef21d"
+    },
+    "docs/performance/results/change-0905/micro/b04-candidate.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b04-candidate.tsv": {
+      "bytes": 49848,
+      "sha256": "980fd113132465eab5af0931d27abc2d35c89bf169454bd389fe9bd3c77c117f"
+    },
+    "docs/performance/results/change-0905/micro/b05-baseline.receipt.json": {
+      "bytes": 1373,
+      "sha256": "75dd32d6fd0b6ec6f6fc25a04e782ab7d478ab3bd3b82f23ee77b8dc0cbc4396"
+    },
+    "docs/performance/results/change-0905/micro/b05-baseline.start.json": {
+      "bytes": 918,
+      "sha256": "a6ce604f38091c52cb5765ff946b13db3d239439ef4e7f02c3b83db98161719f"
+    },
+    "docs/performance/results/change-0905/micro/b05-baseline.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b05-baseline.tsv": {
+      "bytes": 49851,
+      "sha256": "526311ce1d253a0dcad80e86d2bf93cc55bb2cecead26ef6863660eb90025123"
+    },
+    "docs/performance/results/change-0905/micro/b05-candidate.receipt.json": {
+      "bytes": 1378,
+      "sha256": "396d735960be43a656116be3a4f7efb92f79d7135328cb26579167a753563bf8"
+    },
+    "docs/performance/results/change-0905/micro/b05-candidate.start.json": {
+      "bytes": 921,
+      "sha256": "0292f40b8e7e2d7569b3d20a3133d6c74d6a20a91bc0932d717413c0879b81e6"
+    },
+    "docs/performance/results/change-0905/micro/b05-candidate.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/micro/b05-candidate.tsv": {
+      "bytes": 49848,
+      "sha256": "db2ff1569c14a8272dd8c495c5c11877c0325d81bb6abe63c17fd532597885a2"
+    },
+    "docs/performance/results/change-0905/native-capture-run.json": {
+      "bytes": 2856,
+      "sha256": "490e4ccfa3e9510cd407f3fb57872b6d95dfb92ac835a84aaae31d38ab46057c"
+    },
+    "docs/performance/results/change-0905/native-capture-start.json": {
+      "bytes": 1789,
+      "sha256": "be973227f6903e068d4d0f53c82839feb2a405c7a2672dff5ec3044610dd8da1"
+    },
+    "docs/performance/results/change-0905/native-capture.log": {
+      "bytes": 42,
+      "sha256": "7227e09b5c51b1875cd79818b2e4000f66ebacfbedd7e59eed3ae04cbd8872e9"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5510,
+      "sha256": "26a8247f15e93bde8c3f2bf1bc497fc60c9290d8272e04bff8a9b741f7bf18d8"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5699,
+      "sha256": "649c42896d8b1de067fcc99f312b939bb6c14af27d7f1c4f5c9532bbd2b3c75a"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 36674,
+      "sha256": "8638f29f806fca293df5c563af288bc0ceadf195e59e682b58329ce976f1c92e"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "59862a3f71ac45bd7180b8413f708239f2c079c6b580bedb9d943116b22961ac"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2956,
+      "sha256": "98a8a61faecb029ad3c32d337f77318fc77d337a53bd9ba3f701492efe55bc55"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5555,
+      "sha256": "e2aa85a09080a67dadd45926752a48932820354785a93a27fe0365d0d6225702"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5721,
+      "sha256": "08f640e8da1e1182d551b2ac0267aef6e5dc7f08f841a3906ad4e232e5b84e61"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273485,
+      "sha256": "779ca1071c112a5f4f220cb0fcb82d0817cfb7af0e2084d1c62be5f713d8e342"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "158e710aec51c4280e498e3ced7f6595e2544dc4f098d5362ce216732eefb0f5"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3002,
+      "sha256": "13b96774502ee68d94c8031e3490d8af50a58eed1ca5d9f75c190e7195ee267b"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5583,
+      "sha256": "634c1f7b429ecee398e7b8005a1de535f6bf1bf687a2ecd52dee5f20968b1536"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5735,
+      "sha256": "80fa960f8e1e6bcaf1284b1e383e77eb7bdfa90c90918e8c6f4c901bed1a8d25"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 273787,
+      "sha256": "6da5d14d90e76f1ef9fb892c2d4b626b242d2cc7d6d86ffff073cddd4ed4dd9f"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "c965a23c9e8f9fa1992ed0f81eb4d00d07ddfb4a999184b16b4ded0e2ce7167f"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3030,
+      "sha256": "7fa305972c94d66c8e9cde9a6cf4b0bcc438595e6989431b1591c14b5b469a9b"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/command.json": {
+      "bytes": 5517,
+      "sha256": "a18dd269d0ce4a89d0c419c5f90634ccf97743f4eaeb82b398bb0bba3a6c9a6f"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5675,
+      "sha256": "74dd05e9ffbdb3d19d1127cce4a5d70a04caeeca601506e9492d4588dce6320c"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/report.json": {
+      "bytes": 273516,
+      "sha256": "be5af6beec2c90973dc669d080603e0c2092c29c8f76c5006bdd23ac363dc2cc"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "c10b75763447753fbf5d7a0f7489c4beebe2dbb695214e7c4154807523d5e229"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/start.json": {
+      "bytes": 2994,
+      "sha256": "738c44fbe3e3a6e5b829be08770abb9274a795d06108ce8afed731811faec146"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5520,
+      "sha256": "5aba18f2fd3840602ed9bef5499f3369e6bb4411d1a613712689fb61410a07b5"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5710,
+      "sha256": "c6eab8a69a379e61022b5f63a975448cb715e0a5f3cf46ac55f3e4a5a718c34b"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 36675,
+      "sha256": "4e2ed24e957fb5efdab2b83dcdd1c8b1f575b982e44f5f0cda6667a66358b898"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "5ae8c1758384e8af93e0a292b3f28de01db484ed79f222d32ef1c25fbbe9c9a5"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2961,
+      "sha256": "398c42d4a089f95d69f209c1a9f86f2ff8f3d1718edf300ed958229eb0d9fa7d"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5565,
+      "sha256": "76fad9b52f8291f11077ace32c1b192240831c6cfab13616d0aeac3169e21b8a"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5732,
+      "sha256": "6fd12af7cc159b7c280568286af0f78229a3e4daf48a78743975e815cb8e05c3"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273486,
+      "sha256": "aadd89c8016fbe8713eed2a05e35acb9674d444c3d465462c01c121842d3c7e1"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "db007ba2d8a6855ddb208ed76303ddea5b3455276d5d4f490939342d802162d2"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3007,
+      "sha256": "b5f08a6ae26c7b63fb2f0a5e0bc2f5141a702b18b4c587388822e55dba51030c"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5593,
+      "sha256": "4b384012361a3ac3bab9f19dfa084c78703cbbc9f166a9f703cd43910df79546"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5746,
+      "sha256": "a0abad0593500fbbb86efc8d40a8820ed0e014179ada08c5ff3896fd9536e961"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 273812,
+      "sha256": "fc6c7dd4ba3967977f11f95a5e59c56599e67da938b1e09f5eed204f7347d91c"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "25ef2b59ab3b3f8b5a68c4950d8662d637098f26cd1d2b04b5842c6064c91bc9"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3035,
+      "sha256": "9ab7788bd4bf381b1a83f0757a6599175b2b349114079cfef5eeee85f5605a18"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/command.json": {
+      "bytes": 5528,
+      "sha256": "369b40c1ee1208411b6b140fb30c76c5a42cdcd6baf68057799d977887744a0c"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5687,
+      "sha256": "6facecf4fef36b86b06e5321dbc7b9a39eb77e690ce2567864834bd5306b9510"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/report.json": {
+      "bytes": 273568,
+      "sha256": "9c85c8aae95118917888930385730cf56c68b265f0f059f5e89e07b8ca65b84a"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "eeb63aa8867e1c44b893bdf051a2ca16bc1f9e1f9d09c98a37e1fee82b7ba244"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/start.json": {
+      "bytes": 2999,
+      "sha256": "187c2a14c492fe0257ec22e0b3e66dfff92f70cf642cafcffa4fc4facef2393c"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b00-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5510,
+      "sha256": "9caaa8009d9c95cee1d027ccf895564f801a74593a7909681901b1ca33adee80"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5699,
+      "sha256": "1371a794b58c972a280b41708f113d13b432570f897f2383f46b83c261aad1a5"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 36675,
+      "sha256": "920cc4b638108cc0d9b5d95d0cb52f74d47057cdc0f483c15566a295cfacb880"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "2a95a1e14d29ddfd0cbaff68a80bbd8bbd9c9c7adf751f8703f65c94a029020c"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2956,
+      "sha256": "ef84cd2967ebdc57843d7ebe405b32256486996e257946e5222e9de87782764f"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5555,
+      "sha256": "6a3521414bbeec20beb2837ff353e6cc047cd3ef3bb6b308dcd85ecd75cf2275"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5721,
+      "sha256": "198462e35d953baa6df4c6043e79cb6862feb6cd7e0e99297e102f248f600144"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273484,
+      "sha256": "2ed8ed86452454db8d2c3bcf661653a8697da81c9a99028af11fa18eb702c6b3"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "852fcace4efd2ec12a8e142e07077712dd798bd2dfc44a7968056636c6021f34"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3002,
+      "sha256": "9a282de600b1271854862b60ce535ccc58320ad24d7c85bb4e96348b33275f79"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5583,
+      "sha256": "1a5c1be91306df6ef8edb17510e9b29b0699d2cd805e1ba7137e2ba3645243bc"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5735,
+      "sha256": "ecccc1a6183a1768d70b339869c7e36e15848061bde732862d0cb71c9f76d93e"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 273844,
+      "sha256": "c0093a6dea7a3e3e8967417cbdfa5d0dce2f66932973a10756e6c95de2c9a308"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "de2e035bff2dbf50579df77f57df42a046a1b0cc367b5fb903d85e0261f214c0"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3030,
+      "sha256": "3e379d0548a7c1860470c313a26ceac4ca3723d02e104aa6193dbf3100ee6226"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/command.json": {
+      "bytes": 5517,
+      "sha256": "fab0a8e5a11c12c78403eb64b51315989c2d75db6215ade6162ac7319230ffe7"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5675,
+      "sha256": "de21fe74a2a034656e678d442c7db6b02222a58196f7404234851de2c38d15a8"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/report.json": {
+      "bytes": 273516,
+      "sha256": "d741d998e78ec0f9fe3c889526d6136b430c654f4a7b288bfd3355784edab0a0"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "90a455b06b5cce31ef5be90662f2ab16e698cf4b566f16ef50324e953114b9f0"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/start.json": {
+      "bytes": 2994,
+      "sha256": "3b3f7dd0dd3e7ab654c5fe1741754ae4e508d7239b1258af5b32e589aa5a0df5"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5520,
+      "sha256": "cf8423d031c304d47393e98ac72a3192073e0f39abd06c07430e7bb4c7495b36"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5710,
+      "sha256": "a35b1ec7d5f04bab64f6bc5640924a84c0f8481c752cfabf3d2a9f9e52efecfb"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 36676,
+      "sha256": "d39a5684e851aba0e7d8f62b1bd2b1abee77e28a17f333394856adc654d29510"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "a87da6f85c3b59260c6a974d6d1767e52368c288fe6588d04603e840cbb15d4f"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2961,
+      "sha256": "6783c21604cdeefeb099447124c6e18654c1afe9dfc68b9b92e9df8bc707cec7"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5565,
+      "sha256": "7c651aed65d202fad40dbc2a6cd3d6a05a0f5ea62d490d9b56470d24c93c98a5"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5732,
+      "sha256": "2b99392c7c2f41d14384a9f24d56680fca147446355aa4c6a5804ae63aa024a9"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273514,
+      "sha256": "120ba0da1ed3e1f938315fe729ed51b61c995587eeffd73f5d4ab2750c52370f"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "507884cd26f9ab5d7d8283a3b2889089f11c3250a9138d765e0be1c1f20db427"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3007,
+      "sha256": "4f644bed48ed915d5ea4f0a20ca84f37c70833aeede50f7ada4d6dc324e884fa"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5593,
+      "sha256": "688c7bd0b7e216e5eea3e6fc6a8d9274d1389af61a345089e789d23182d76490"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5746,
+      "sha256": "d54445d64f556f885a1795d9d90c914da74a286b4be45cf5997bfcdd5001e49a"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 273787,
+      "sha256": "1f53234dbf8740c6586c5dc8bf7c440e58feb8869e4ee9e9ee231c0496f93faa"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "459350c6dded09d3ebc2b65e9ea0bb5df786246ccba98e1e832e011380df1a3f"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3035,
+      "sha256": "36ce0af7165ebaab08977643a0a74722e93ce1d4493b14a39ea31168b978577e"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/command.json": {
+      "bytes": 5526,
+      "sha256": "bdb10a3a6f1b5923526f9ddd176e924e0ce6cf9f6e9155c621d6e54cb61ea203"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5685,
+      "sha256": "27a488036bf202c4e8274da312f80059e86b0b43242d989fbe7ae8796175dd7b"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/report.json": {
+      "bytes": 273534,
+      "sha256": "8d91208ec1e23cb55b5e59db1b603c5e3dfac13d6c23702170db9e85f3e8cb1b"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "75dfc437654f84f49f49344c061c207819c97a19063320696d154b7b129fe14a"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/start.json": {
+      "bytes": 2999,
+      "sha256": "e8478e9fa28c6537842eb281d92a1be87c38e9e7abf52752aeac6d91df223fe0"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b01-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5510,
+      "sha256": "17925d1b852a30a450a7c280c5e5b321b54eebc547097b41155383f649ee4496"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5699,
+      "sha256": "03ec60a24b3ca47588ad8cc4281cf3b90266fe84d1a7a9c97f134edeb00ef560"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 36672,
+      "sha256": "b4f4e4617fc01b7a4da83930d12db924b99e8e7e5e45c0c54854252503734069"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "361da7b9a391fc7532a7c6aebbd454b69a3ee67b3938978cae9ecf48245f3135"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2956,
+      "sha256": "af4edff5b6a945d21098f02935de972acd6786a37cfd9f1af71e0ca6db0e4fd2"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5555,
+      "sha256": "0b4d2344f1803fd987b2bb3def656bf0d6d508fd73496a263822fc86a0d84de2"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5721,
+      "sha256": "1dc896cedd7db250171228e78ed45717a3f664c5a38e42c22982623704291482"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273546,
+      "sha256": "50b9d256aaac8c9723697ae357cae87dea05f62886e39bc4b75b6556fabe8f7a"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "e224781d26ab5abe6bcd36b88ab7e48404dcafe2e6db73aa8e8c1875b6dba0ba"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3002,
+      "sha256": "9c669e59fb36a2e36f27eac9838878d29c991a1ecf3493fd4f6be8528f0b1894"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5583,
+      "sha256": "d0af59344912c320f3032958eec0bab804b52bdfd1ecc93e5c80f07e8857e4d6"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5735,
+      "sha256": "15bc374c59157bd20135392ffb85ef382ed4648c804f577f6d08aab37da8d759"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 273753,
+      "sha256": "5a9a5c840df6c2473862fd38c2b32cdc744a357cf075090e78ed15070ad0a253"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "ead39e5f8294a9ff31c1288996a68ff7cada73b7e681a05c0371d2a36adf9279"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3030,
+      "sha256": "a152b2bffe87e948c75f2bf16728929ac37be203284edc1d0271c450f2567352"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/command.json": {
+      "bytes": 5517,
+      "sha256": "365f2d6c6ebdf68f730601779a5a6102d66b81782c330a6d8a535e6c98dded26"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5675,
+      "sha256": "26897dfaf8e3b04062639a8fb982a834a727040c9a0b880276ec8bb953d41820"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/report.json": {
+      "bytes": 273513,
+      "sha256": "546845bf1389f14ae2765e9ea59d64c6e5113f0d086321084c9f996999fbe591"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "61770880f6bc7982161fee8ebb281d7424d4e2f8fba9bc790d67ac5436c7f84c"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/start.json": {
+      "bytes": 2994,
+      "sha256": "9a355cd07f58d06b32487c9323837203650ae79aea32d48bb6ea0272ae4e0c4b"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5519,
+      "sha256": "200fb7400e800a2eac2cfef45c99b26d30864ad8e9d070401837d1006d56cef6"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5709,
+      "sha256": "04d1eb6a8eab549534a6c4fd8fb79bca29910ecdfd05f6afa7ef68530279c99e"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 36668,
+      "sha256": "0998c1010f7ad72cc48ce13189d988e44e94c2358a92471841bb2fbdb9e7d5d3"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "68a0aa8d6440bdad9c12a37efe03d9b06d9eb812a6aa383199abe1584217fc6b"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2961,
+      "sha256": "9df425dfdc872091ea1e9caa331f5e1ca650f6fd31b07522b6dc2f012899733c"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5565,
+      "sha256": "3cda72050e22669868243160a24dc756da16557c856298a399b52996a3b4ed64"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5732,
+      "sha256": "21bdc156f036c43b90376fb8d754d38400962f3e7361583d96dc172c60d72f41"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273483,
+      "sha256": "191b3c73bc14093589576e19ff0468d6f58d7f03499c9709954549611702a4be"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "789a395b3460cb7786dbf8224cb28162647b889bd23702b57e3c3179c35db9ce"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3007,
+      "sha256": "311bee5650e054f3a00102ebbd366e44b9a6636f7afeab749a81c87c36427918"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5593,
+      "sha256": "0a78facdc41fbd4f8a8f5e978c13e12d880ee589ba7f339658cae4efac748d5b"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5746,
+      "sha256": "fffc7250c277c4a24f67b0447103c96e8f0f253453b55c0a06b874d87bdcb796"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 273783,
+      "sha256": "3f4ed67d1f041480eeaa01186eee62b4e40f79bde5bf1e2e43733e39cb3d2c71"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "415b0d8303e48ddca280bcba0343aa64b0bd56d5bdee12bfe82b40c1254a2933"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3035,
+      "sha256": "c45b07bc614a301b4b390f88ee9addda51306ea576c2cb15037c1a5eca494c7e"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/command.json": {
+      "bytes": 5526,
+      "sha256": "59477acb3e738a2552542b5c49aecb035a879900d565fa0e37176b18932db71a"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5685,
+      "sha256": "f1bc304a59463d9c32362cdf1c9c8f96d83251ba5f45e30b0237953fb43d955c"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/report.json": {
+      "bytes": 273515,
+      "sha256": "280f9fa1479f642410629603bfac6f6b08e7097b9e6e298ab6e94242b6d6e638"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "b502d617648a173c81e01f0d7d74176cc9aad60364674d06050652efad4870e3"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/start.json": {
+      "bytes": 2999,
+      "sha256": "f17e77ca9d6e908e61f0e3b441583d8af40938248005b5af0449265c564e76f5"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b02-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5510,
+      "sha256": "f9b18ed33298307cf9af6ffa1f3a4d863346708d775ed83f358abfc6109d8bf9"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5699,
+      "sha256": "48a35451b49d69c32db3860d10c25339473c574a2a1f323579ff386fcce42df2"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 36675,
+      "sha256": "c49ab881e700e48cce632fdfac574604acfcfa5c33b8d515e80df6e879a03f5f"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "62302cbc85353513ed30685940dfd1a5700ae0d1581f00085c4393f77de81b87"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2956,
+      "sha256": "7d4ba9f8c4e7db90e3b101df576bcc3ad545622bad6173a9850369aecd331aa0"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5555,
+      "sha256": "f23e62ac437805e09958c5991176e88e146c9ea224d7d62d5cb9746409f605b9"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5721,
+      "sha256": "fbb87357c7dc0297a52c257a0b07990941883d7ede9376179ceb3e281f47d590"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273558,
+      "sha256": "420a1c9013465c2a944d920b30ffe48fc0fd59b9c1288d6e9ee1eabf6389b56d"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "cb7ca2b4d1cd0529ab7af594cdab3f62af2ff68a4677b395dbcaa4d347346c68"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3002,
+      "sha256": "1fe362f2ce1b70092981a1c6f5dbe59c8785bb04c5d86c00150102ff02d3df58"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5583,
+      "sha256": "4dfe7c5b26143854717e1abf60b424d7ac97e60561e3d36a611c67f6b7bd6641"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5735,
+      "sha256": "1315b9898c4a5af877ed533a507b9e4f8a7eaa1c758b36d49fbf062391496ac6"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 273829,
+      "sha256": "3832521d6d663a769408d5aa0ac7ced5890a97253c56850ef518634a0c825191"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "2bdc502fdf04e7bb08dbc1f34744b5d7e12f0ca6d70dd19df1006e29d11a4888"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3030,
+      "sha256": "91b12c650bc5695ab02b68609ea07197a766418275889e73c6ec600b84b1f548"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/command.json": {
+      "bytes": 5517,
+      "sha256": "1685bf3793edb9547cbcd268220474d2bf39c91b5c1a4b24af0c94474bb225f7"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5675,
+      "sha256": "77d7be75fe5dcf9fffb2f262a77f9b58b013db5fc88c6c0a87c3cdf1171a7cdb"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/report.json": {
+      "bytes": 273525,
+      "sha256": "dd06f7f60345541f9b135dd8020b116dc0dd9bedd02ee7c50caec8be24dcf277"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "b73cb0209987cb3d7f1fe0e5fc814e9437b5dd282c51f1a0f2fe5779f364abd8"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/start.json": {
+      "bytes": 2994,
+      "sha256": "28ea42a9be7ee06850dbedde640ae84656f92c0e998c1ea12f12a5f690791b63"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5520,
+      "sha256": "b68e5797ba53efde297fb01452a7522d14c73cc59e2d374060fbf1fc2022db12"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5710,
+      "sha256": "7ddf5e60e38fa4b48365ebff5c52aac2d129c861848ab26cc784fa29521c415f"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 36675,
+      "sha256": "5df48b69b9a592f9f8104fcb4121e26453277d93137a056791cdf3cc792b4fc2"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "882de6125df2220911d277b8cbff17ffb7aa95e9cc4539f38da71dafb9eb4c16"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2961,
+      "sha256": "2b891cf80bc8de50f65330158d27e05d3e60f5b35e0f9fb1a11d2cb56f8742d2"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5565,
+      "sha256": "9665f51bdf2e04f522422856392a6deb09eb924412334a068649e70db137165b"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5732,
+      "sha256": "8cb26b9fce9089807724c09f1bb9d593247b1976b5b735cd3a0de72a17899268"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273493,
+      "sha256": "937c74b923fd210161452d0be90d873438f3835b233f8fc5cb9159809697c77f"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "6ee06c1c6953c65b12e897fbca778ae2ddf70696953ffd9098d4f26e713eddec"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3007,
+      "sha256": "8b1fa86b97ae7a5fbdc9f81f632b1cb35f916b37009743431e82c53b8a010720"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5593,
+      "sha256": "cbbc28aa4939d09e3eb23a8d27f98a12ce3c9db72ddeb8280ea84c5f5c88d72a"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5746,
+      "sha256": "c774dbb68529e80d674f0379ae8ae8fc4bafd801dc999812c13ecbc7a01cac41"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 273771,
+      "sha256": "3b664a7d3395b0adc13747c984f9e38a38c48ec69001662d3d40d5a74b233389"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "a9e6bf6837a559e0bbda24d623c0310fe70dc032fee19e5993b1a90e48ee95bb"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3035,
+      "sha256": "2c3e8593b53eee4085ad2eaac843a0bb6c568517a92c74866fab6d71f6bc839c"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/command.json": {
+      "bytes": 5527,
+      "sha256": "7bd4eea448b24588d1d32f70d181f318e59d12f3a8ebff59262cdbf74dc43056"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5686,
+      "sha256": "fe7630e111ac675ef683bb7421e08a3c3bc9aa88ad8d0f38d07f523d11e26bf2"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/report.json": {
+      "bytes": 273559,
+      "sha256": "3b7d7c65b5b7ec39096ec0427602eb698fd57cb20d1a3521ecfd66732be67996"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "7276132202de7b6292965c35055978a67e559dbd2f9894c37f33bca25b4ccc76"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/start.json": {
+      "bytes": 2999,
+      "sha256": "4cc8ff44a38334fd3330d2b309d7a4538be4585e404283b701cce8b302904435"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b03-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5510,
+      "sha256": "d4355037b8294c0b80531f2fac39d962dd70d5ab0c69d748216c0e7ddeb2b612"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5699,
+      "sha256": "d0f8f3e68e1b8aa68684746775ce40454989dfa3bf73e79865d72e826293220c"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 36673,
+      "sha256": "ecce1c31989742dfb430524da89c0c477cb134c23f67f657fa802789e8a081d8"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "214b43072d5a1315b654d3714bca7e7e32a9f3ef6d60da096a12dc59291d2e42"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2956,
+      "sha256": "e6347d4f00311433384266344baad9a300f5d5e8965cf83d543828a6140d01aa"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5555,
+      "sha256": "e8247a0803a9f12ca646a576f4fc2d2e6c497daf381a6c04e34feb5c3920aca3"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5721,
+      "sha256": "ba3068fff7d14d88a4295d43b154e5b87d2c511d21111b467c421b6504df01b9"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273485,
+      "sha256": "cd5c640d4e3b06cf0532af116a9da993aaf332f98ea72475a81caaab7e76d215"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "1ef5a3c64e120bd7576c1989ed468927aab79934e7231a5bbdb16ce4fd7fc3de"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3002,
+      "sha256": "4694b3139352bff45f5bbf76530e8cc82d97194d9718869227687486c2c6f197"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5582,
+      "sha256": "762a86511e178d4af1a44a01bb669e11b1e4c3f161835b6f2534f7fd7d01f873"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5734,
+      "sha256": "43b30db78424610b6b28a8b1efaf0aa8695a4292003b6b13870d56118ff71b43"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 273825,
+      "sha256": "96db7d93716d44605d0610d2ce57393ed306146617cabe6c36da0c3bf66d30fc"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "4f9c6a5a42d08095a9079bb3067f6f12975571f078f51ae7dd660770b3d85652"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3030,
+      "sha256": "d339a456459a63b1818419d001f77732f010327c3b2704b29848e7365b924a50"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/command.json": {
+      "bytes": 5517,
+      "sha256": "ea86e9f68676e2b268175d62fa62b6372ec4c46c550ffb244f01c63d75ef0284"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5675,
+      "sha256": "79bb8a9aa79b3c73bcc6296a6b847aa4130a08a3fa39f4ac9caeb88ac0bfe7aa"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/report.json": {
+      "bytes": 273540,
+      "sha256": "cf84529037ce25bb3fa3667ec54e4cec4fb8acf0e110576586ed6c8f7d040e62"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "9ed61e7fdf1397a3d4b23e944cc894363f539959be8df9fd7d91fc3a91343303"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/start.json": {
+      "bytes": 2994,
+      "sha256": "91105aae97eae63c45110ee6df2460fc90d9d348a404df453a25030078528f91"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5519,
+      "sha256": "99906369b8d2cf8c4f4ed98d6397ac3aed76f42c2ee1dd7e1df023b0430675c6"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5709,
+      "sha256": "f8e7ce11435f858694db7f900951c5d21f6d3b10c74ca6b84d8a02ea23f8240a"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 36675,
+      "sha256": "2862885a0f1af6fa93525bca15a8868f794e21c2965802c92195d2b1d7302c90"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "e0d5f6e7da39bf99e4855af8c604b117afd939d314efaab9983e06600789d97b"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2961,
+      "sha256": "79558555453978924f9875de596e8ca182c35e697984e92179eb1637dfa5adc5"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5565,
+      "sha256": "5f51e79618c27e922c0bb2c2f45c2d946b1a2ebfeac3cd444e59011ae814af82"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5732,
+      "sha256": "e8272abebdbf6bcb78492bebbc6b2a55beb010f11217925142a0095aa2954b74"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273483,
+      "sha256": "99171d0ac42660b33e0c2b725bfbe0a2e45dbea1bbe2dceff8303e9dbb7efc41"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "828d59bec028ea48cacfc6073a2dce3ee75d5de772ded2b504f3dc4580ab4216"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3007,
+      "sha256": "71f9f240375f083e751f8bac060a83ef2f6ed21b13ec602c00c7efb6b2cc1222"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5593,
+      "sha256": "a7fad6580292aabb282230b61c3efc5c28cf625e7ca34d80ada03d3383b00873"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5746,
+      "sha256": "80c1eac096a645840ee37196d658ff25391a6a373dbed9f16aefa2600e68353e"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 273835,
+      "sha256": "547633679c4d14144d106496bd715c25a52fffcafdfb9fdfe941718e9792feaf"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "02c25e4484e52c991f8c58c9b5e7d96116b4abb2170a449c8bdd1dbf93072f8e"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3035,
+      "sha256": "4539401d9faea6379b5d1a380f072de1647d492c0d8d2d3790fa6fe8d11f7dfe"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/command.json": {
+      "bytes": 5527,
+      "sha256": "352dd3bf6c8a2afe6dfae7ad7eb98fbd83e3bca0c9c70f53e00ca2854ad0ee6e"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5686,
+      "sha256": "8396f5d7b3cedabf37bffe31e4ed40a58f4e55631fababcda1b0458006b8971e"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/report.json": {
+      "bytes": 273538,
+      "sha256": "67d638ee47ce8a0083340a0e9b611dd149775d8c339ed0b68f4cd2fda6a4ada5"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "72478b46348c32b421601e75e6b0419c917897747cf1dd88bf64993821411eba"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/start.json": {
+      "bytes": 2999,
+      "sha256": "02c7df6ca5780800cbddf8679b30018339570c1c24f83f51424563c785a37651"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b04-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5509,
+      "sha256": "d1de7851457fcded1fc010a78ce4e14d627ef4f23946b5c504ffa111f6ac941b"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5698,
+      "sha256": "cc108cd7a47ec3ca7fa7e47104b99ef98dbfec27119d7f3218c94bc9b23b28a3"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 36673,
+      "sha256": "cd2831da8aa5b953aa05b9a7fd30362b09b7d3e3a68291cc6d3a26f7163b2d8e"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "ec02ffea679e70e3e94b00e56616dd8b5a6146af98bb63f218ddbb475198b721"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2956,
+      "sha256": "afbbffa20a6cbb4927750e4303ddc24346b536db97fce2070ae6321ac20b50b8"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5555,
+      "sha256": "0fa83895071b40605a8670714ccacc00316991463db5740cc77391d69a865166"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5721,
+      "sha256": "e9136f2bee709518e17b666ac76f2ca7323df1deafea01b0510eb088c849293a"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273484,
+      "sha256": "67784731bdcfc06fe18ccaab5ada021c9585f61adab32cc3456ca2faef092907"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "d5fa6805ca9d9a91212096723b2a89a24bbe1a5ce813b2a36fa23a1135f8f190"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3002,
+      "sha256": "55f4e7d1d1039a8fd5cd0533fbb9e37945ea86eaac82f8e2aea262993c44a5fe"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5583,
+      "sha256": "1fe15f72a079dc397bf8663b289cb45d5c2160e5392d978fef0aa21187d02c79"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5735,
+      "sha256": "e5fac599750493616e5c80224750594d98f100669e9b66efd74ecabb63622cf4"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 273767,
+      "sha256": "f65f8bdbf12fecf4b11fd61a4c767bbe25bb4fc6148702a91c41695729ad5173"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "159159e808d14465b5eeb0aae48e01646b04b2952ca6d98071a84e766aa37b5f"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3030,
+      "sha256": "15d56236dc25fba3214e5598229a18801420bd2de649b6105485ef8d982bfb54"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/command.json": {
+      "bytes": 5518,
+      "sha256": "0a4f74f052d3533e605d047eb40464707361e11792a395d315db0ac23ed55972"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5676,
+      "sha256": "c40ecbe2986bc60cb710694d6a181d51e6584837f68b5a94c83e5cbc837c0d96"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/report.json": {
+      "bytes": 273518,
+      "sha256": "4970d0e10f0a1ee94ae870fab6fe6dac369fa34d8daf14f40f4a6a03f4064414"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "8c224b505a7486a033706501284355fb47f478135d4473aa8750702fca33b21c"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/start.json": {
+      "bytes": 2994,
+      "sha256": "baeb0ddb2cdd836a7a17c7def74f4bb6d54adb0d50c8a8685efa39a5bf8b36fc"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5519,
+      "sha256": "bf14bc8c7843282c6842a10ec8af71b8fcb790229ebfe92af968b0ed0013181a"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5709,
+      "sha256": "b816437d79ea875938ede140922f9bae0d2a40660fbaa86b68b4b1a275990c29"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 36672,
+      "sha256": "2d3175cfc8a761eca5344682f3ea7964b253449bea0d231b4bcff1d99ffb2cb4"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "aa235c275db5fbd795022ffff2e4463270703d1ab87650724b66bb34d5fa173e"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2961,
+      "sha256": "2d1dad0dd4e92fe9db13aeeb6e401eeb991e7846f837a35c973401df7259d772"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5566,
+      "sha256": "4e22e485d705873bdee03b2f5d8f83626852bed06df71df3ecc39ee0029bc225"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5733,
+      "sha256": "e66f1bc250174633c3a6948d1cc15ff5c4f93fe7a6d36745567a93f8298655d5"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 273509,
+      "sha256": "a74a06382b904ee291bddb650cd712ea2e0a9fabac16a09392056a3bf5ed69a6"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "f085229baffd783fce99fdfd3486a771410bb6ecedaef78d10ab687e9a450807"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3007,
+      "sha256": "1a68b7b773b0a85152f727ce19ac3a2426def60c1b0302e256c90002cc7039a4"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5593,
+      "sha256": "98e9254bbfe5e66bcc59bea5849dafd3baf74147eacd6dc32f946925e16e4dda"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5746,
+      "sha256": "41b003c71019560b36ab59af6c13cfcf22f49a1100512be5f6e8f247faf3d415"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 273766,
+      "sha256": "8a43346f4b981dc4577fef0686bc78f043115fb7e0b3eaae860c0f49170c06f5"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "6932b4363d60eec76f75490ee329c848f53f331b7c899c23311ae6cf389c5d8d"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3035,
+      "sha256": "2421b221b777cea720445253059f8d056cbfbbb246e73d5f6de8000f7b553007"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/command.json": {
+      "bytes": 5527,
+      "sha256": "d509d9b085d2dae86c90a0ebd69b05a958fe3ea676497ec80cae6f91d6a37a9b"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5686,
+      "sha256": "6d261aca2f7b0faf68e811f5a820ec625448d84f4227323fe22a9494e68ffe22"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/report.json": {
+      "bytes": 273518,
+      "sha256": "6c62b093a1b3d13f03064209a9b2323dd7c1b610cd5cf9d914a7cf619083c7bb"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "d8196797bb05a73f06ef532c49ca7c06a29fbfc7b7b8e0fc0bc784314f888132"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/start.json": {
+      "bytes": 2999,
+      "sha256": "f74d4f651bba505dcaeee92bc6c293058cdd9831bf7b44bbe261b37d33ea4d04"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/b05-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/native/capture.json": {
+      "bytes": 320156,
+      "sha256": "a83f02db36f3b826831ff096dc38bad17c86d5d3f1029b3ab661c89235a55345"
+    },
+    "docs/performance/results/change-0905/parity-comparison.json": {
+      "bytes": 246,
+      "sha256": "9b015dc98531fb9472ef7a59d72ce8d39028e5c5e0c15a1b5b33e9619675e791"
+    },
+    "docs/performance/results/change-0905/parity-example-v1.rs": {
+      "bytes": 24007,
+      "sha256": "b21679fce4c5c3851d42ca5b37c75fb902857fc916bee3f3a6b363e4294d9516"
+    },
+    "docs/performance/results/change-0905/parity-example-v2.rs": {
+      "bytes": 23987,
+      "sha256": "2c921e41a09e25b46197a57f2efdc7c7605f001e1bc9a5687b016f22fdde0548"
+    },
+    "docs/performance/results/change-0905/parity-method.md": {
+      "bytes": 3218,
+      "sha256": "47833441443c851358de1d52c0f66630fd9ad588bebcef9484463e572f40d65f"
+    },
+    "docs/performance/results/change-0905/parity-review.json": {
+      "bytes": 10397,
+      "sha256": "84be54a8a47ca5b4dbf0d9995f7072f893b9cdad4eb2ae0a0b7a2dd178c75381"
+    },
+    "docs/performance/results/change-0905/parity-review.md": {
+      "bytes": 3032,
+      "sha256": "e6bda6153c232e80965330ccbfa0c417482153ac295960b41cd10f1f574628ca"
+    },
+    "docs/performance/results/change-0905/parity-run.py": {
+      "bytes": 1521,
+      "sha256": "780a255128b19dccb4ec190fbd25f7e16e2c69cc2d67a75f6de78e894346f2e8"
+    },
+    "docs/performance/results/change-0905/plan-template.json": {
+      "bytes": 3586,
+      "sha256": "d7c4fb59beb543dacaa0d793464c9c7fe798ff07e6410641dfb9c3f361e7071b"
+    },
+    "docs/performance/results/change-0905/plan.json": {
+      "bytes": 6148,
+      "sha256": "d4a2f484e78ee744040a9c899e462593c05380580ef3954fef999000eb3f977c"
+    },
+    "docs/performance/results/change-0905/post-cleanup-replay.json": {
+      "bytes": 94399,
+      "sha256": "377bb88679aedaed378b93f961e1f60adcecb636cb0064fcb2d5f305e4e4dddf"
+    },
+    "docs/performance/results/change-0905/post-cleanup-replay.log": {
+      "bytes": 26,
+      "sha256": "0e6592b1dbdc760c947ebfe9cbd7bd4b4ffcda4d99c69e89e113f3a16800bfa9"
+    },
+    "docs/performance/results/change-0905/pre-execution-helper-review.json": {
+      "bytes": 915,
+      "sha256": "b58f1c1f5d63ed3064c907a2852d43cdaf270e2af873fdf3d08aa732eea5507a"
+    },
+    "docs/performance/results/change-0905/qualification-analysis.json": {
+      "bytes": 132869,
+      "sha256": "38ea5451a327058208fbc270e6ca88175f7e6c6645d6f3d10b93724a9591e5b9"
+    },
+    "docs/performance/results/change-0905/qualification-capture-run.json": {
+      "bytes": 2870,
+      "sha256": "3092f8d9ff2fba7299cc1015c7d6a8a3585e7f544679a2cdd006d50dd585c214"
+    },
+    "docs/performance/results/change-0905/qualification-capture-start.json": {
+      "bytes": 1796,
+      "sha256": "1c4905067b6bb631e95f6245388f5382b0081696acb7f484a8b04ff8ca08203c"
+    },
+    "docs/performance/results/change-0905/qualification-capture.log": {
+      "bytes": 46,
+      "sha256": "dab3d5dabb00c3e52abaa551834643760d2b27ef1fe1371d677c0a4fc6f7102b"
+    },
+    "docs/performance/results/change-0905/qualification-reduce-run.json": {
+      "bytes": 2873,
+      "sha256": "6156509d83ae0d13ddcf880f22f8c08f7ea015c7c99268893878455057361e1e"
+    },
+    "docs/performance/results/change-0905/qualification-reduce-start.json": {
+      "bytes": 1800,
+      "sha256": "5fdadfa08d503b7c2c6e94c5e288dc610e75d991200331364e7d58e5186a8177"
+    },
+    "docs/performance/results/change-0905/qualification-reduce.log": {
+      "bytes": 45,
+      "sha256": "95a21190d0a7ae63c2842bfcaad67218e845cc1f7cf702d85e2e6caa5f527a33"
+    },
+    "docs/performance/results/change-0905/qualification/capture.json": {
+      "bytes": 58416,
+      "sha256": "a880b4888600605b051426c19d5775d927a7d6459b60a95553044189184d1cb2"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/command.json": {
+      "bytes": 5563,
+      "sha256": "f93c5611352c0e4579b9ff007966dddb32b2f4bf6f450f37e9d51cc97b9f1f75"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5759,
+      "sha256": "87577a53641ac1e2477ae08815aa9f9aa7d7ac265f427b6f1c819a48aea98fd8"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/report.json": {
+      "bytes": 15198,
+      "sha256": "f4926d2f2f457756ebe545a58cabf0f1fdf297bcf13c0de250c361c416200ddd"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "3097e2d3980d2d4c75cc34dc4f0d5145208d42b11b45f672657fc91fb6a63b97"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/start.json": {
+      "bytes": 2974,
+      "sha256": "8b7f9aaa9947faf4abaa932abaf2678d527e839608ecaf7ace338b97ff64ff5c"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5608,
+      "sha256": "35c02fae3f03e58d44fe9a4eb6e56875c459c954adca7863caafd3dc4c259e0b"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5781,
+      "sha256": "75d725f8e4fab1ade97661432954f46ad512092b8f9e4228b65bd86376189d80"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 24064,
+      "sha256": "092a3f48439e0533880512215c5c522b4c45366dab1cddfcbc6042841269a754"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "5e1acd8501ccd08a3d873296cb412eb577df331310464097fb5e6e9c8f698b44"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3020,
+      "sha256": "6521e8f353cfe778364719132c725a412fb6e4e1a07af2d8a7a1aab848bb1450"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/command.json": {
+      "bytes": 5636,
+      "sha256": "0047cd4637143943cb8812531f866b292505a8f68fbc7cd0455fac73fb351b96"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5795,
+      "sha256": "f5719f754e4ec024401ee4fae420e55af8d393fed099ec23e8ceb118db847f11"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/report.json": {
+      "bytes": 24118,
+      "sha256": "e786c557d86601ace95e73d18a5f2e48cbbd3e99f98a58e1a757c0d1deacaa51"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "0fad6abd917c7ba8755cfb1a8e13cdb255ed4e7eacf274a02f1d0e0aefa59808"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/start.json": {
+      "bytes": 3048,
+      "sha256": "ba7fdd767de52dc79c4427f7e14cd308e787a26bea8db00a50045e6a08117881"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/command.json": {
+      "bytes": 5569,
+      "sha256": "15071828af1c60e88b520d5aa0dba0f8e6d9436a838d1cd4b1ed8e7996d2c0ef"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/receipt.json": {
+      "bytes": 5734,
+      "sha256": "fc5119d2493f288ca01b26ee39d0cc9eda3441e7b2118db4c006d5a67edb675b"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/report.json": {
+      "bytes": 24103,
+      "sha256": "41f27b9c707fc43ee91da94afce3fea4ea62e4f970965a15b0625daa4bf8a5e1"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "0f60a7f5525a2284b60d2e80a86dee89f9f8e3e1826810eff879bb87b02aaff8"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/start.json": {
+      "bytes": 3012,
+      "sha256": "8eea0bae5a18f44d8e0e54d7a0a06f288e7cbb0c274089fa97ceadd49c337a99"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-baseline-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/command.json": {
+      "bytes": 5573,
+      "sha256": "a29fac15c82cffe4e90205ab9ec5c20aa008d1e60c735a01c6656cf76c86f989"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/receipt.json": {
+      "bytes": 5770,
+      "sha256": "03e2426e02804ed6531c684e604554d98db80f394ff4ab613201de49e9bd3350"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/report.json": {
+      "bytes": 15192,
+      "sha256": "733f3881629e8c02aeb447d3d9c3f8edc070f6a3e40b008e4a61a2e3c88380bd"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "b053fcfdc262f6d6a0c6d22bc8f07234ee57158c2b9cd00a4d46d2fbff285934"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/start.json": {
+      "bytes": 2979,
+      "sha256": "ab04f9786c75a697a2ad651e7f316c930964e46fea64183714e7f448a00f4455"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-docx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/command.json": {
+      "bytes": 5618,
+      "sha256": "72e9bc58b67d08f7865731a73546e20e19a6b859f4e73cb9c776e7b5923d06e2"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/receipt.json": {
+      "bytes": 5792,
+      "sha256": "ac516c1717db284c0ad4c1141cc4d91f9a2c3d7a4ef8d9a36cb0bf7438ba90f8"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/report.json": {
+      "bytes": 24059,
+      "sha256": "b699b07d2b15d11fd70fe2ce14885f25560a64593026c7d2e12de01db2a55b72"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "b14ffec69987e33abdf15b2e3a7cee35cd90ee69a0f654f9df290d70553e50a7"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/start.json": {
+      "bytes": 3025,
+      "sha256": "6578992274c2213cb6663fab6822ded918ea765de045bef454e9e2340f3c394f"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-control-xlsx-one-edit-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/command.json": {
+      "bytes": 5646,
+      "sha256": "1fc759b894cf83087b9536dd71fceb2604d8158dc712eb37be713c35dd2f3633"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/receipt.json": {
+      "bytes": 5806,
+      "sha256": "0ccdc1454a242881fb13852081c3a6c0e3c126deb2716a95c37395d1cea03c15"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/report.json": {
+      "bytes": 24121,
+      "sha256": "e17c8c38c52b44cbb34b0a64a78ac891490e8f154797ddcbe7bf8f4e3292c85e"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/resource.json": {
+      "bytes": 87,
+      "sha256": "ddc6dcc478cd774a3daeeddebc3234562fec8e635af3eeab6a6f5ded1c861719"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/start.json": {
+      "bytes": 3053,
+      "sha256": "b5d0626ac03e900aa6d247633165d7a077c459e08be9a29575d5d8365ef21095"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-dense-sparse/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/command.json": {
+      "bytes": 5580,
+      "sha256": "b6e9e7d60688cb31ebf4f35d3c57832d7b4f06a281b69303dbb4ce7d0c62a226"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/receipt.json": {
+      "bytes": 5746,
+      "sha256": "edb039690d29a070a4d4a6cc1f11211300200ef56267b29826a78109da1645d1"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/report.json": {
+      "bytes": 24091,
+      "sha256": "9c8bb310104c0d3c76a27367958d2b809967b720681dd293deb3875445f82fa7"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/resource.json": {
+      "bytes": 87,
+      "sha256": "677386e5c505ccab858ed637a672b666d5ce811750ac046aebff8d1cb9ab365c"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/start.json": {
+      "bytes": 3017,
+      "sha256": "3f6880e8feda64fcea56e7a8e3d501c03a1cd1cb3aa72f709ffaa8df3ae02f82"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/qualification/q00-candidate-primary-percent-medium/stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0905/quality-Cargo.lock": {
+      "bytes": 138457,
+      "sha256": "16a6e972e1a9d291c08d7589e0d5196783c2d1c0ed9c1a2ae2dd9a38ea7e0087"
+    },
+    "docs/performance/results/change-0905/quality.json": {
+      "bytes": 3458,
+      "sha256": "ac5e189036eca73616ada58e1661e0b3f8f3f2a968e05876c0bbfad1b13ca498"
+    },
+    "docs/performance/results/change-0905/replay-method.md": {
+      "bytes": 3413,
+      "sha256": "f08bdea78bb42e692141f8cbbd56adcced19bf90c1e368d99a462b0af913a267"
+    },
+    "docs/performance/results/change-0905/replay.json": {
+      "bytes": 94399,
+      "sha256": "377bb88679aedaed378b93f961e1f60adcecb636cb0064fcb2d5f305e4e4dddf"
+    },
+    "docs/performance/results/change-0905/replay.py": {
+      "bytes": 32425,
+      "sha256": "d3dcf2d85b3c5a16f1ac39d18cc4e42cc3c4adee503b0c45678b8f28e9fea427"
+    },
+    "docs/performance/results/change-0905/result-review-v1.json": {
+      "bytes": 19696,
+      "sha256": "c0b0e0c7acf90d29b3f28926f1dd456fc124ce99b53cccfdefc65aea9876189c"
+    },
+    "docs/performance/results/change-0905/result-review-v1.md": {
+      "bytes": 5725,
+      "sha256": "ed3baad2484cb6b37fc43c954198a15ff7d8aceafc16b977592ea287b3cd81a2"
+    },
+    "docs/performance/results/change-0905/result-review.json": {
+      "bytes": 19703,
+      "sha256": "1eaa6c9f9f71f7198c2bb32e6b5eef7225c7b478d2116c560b5e4381186e5031"
+    },
+    "docs/performance/results/change-0905/result-review.md": {
+      "bytes": 5826,
+      "sha256": "570663d95395f5f50b16fd4ee708c0d492307d7b35d48cce0ff28d78f0af804f"
+    },
+    "docs/performance/results/change-0905/retained-replay-run.json": {
+      "bytes": 2939,
+      "sha256": "450fbe3ee907f31b5a38cbb94368a5a91ddafbd6766237d33a20e458f070411d"
+    },
+    "docs/performance/results/change-0905/retained-replay-start.json": {
+      "bytes": 1871,
+      "sha256": "5e8fffcd7b0927fca0b08402b5399d8abca709084080a480e1e47f70ad0350e7"
+    },
+    "docs/performance/results/change-0905/retained-replay.log": {
+      "bytes": 26,
+      "sha256": "0e6592b1dbdc760c947ebfe9cbd7bd4b4ffcda4d99c69e89e113f3a16800bfa9"
+    },
+    "docs/performance/results/change-0905/review-clarifications.json": {
+      "bytes": 530,
+      "sha256": "1a8ce57f2c9ae63089761eb8e03f9dadd8d0086c883f8717d6dd14afa16d6c4b"
+    },
+    "docs/performance/results/change-0905/run_v2.py": {
+      "bytes": 31492,
+      "sha256": "c1de78bf5ec162fc0dec90de54ac3d7e67fe1db1fcf85201b6f9ef124d8441dc"
+    },
+    "docs/performance/results/change-0905/source-review.md": {
+      "bytes": 7091,
+      "sha256": "afdfa64604df62b9739acaf6418230f2e0bc7e73f1af8ea81e021eb8b6adb2ff"
+    }
+  },
+  "unrelated_files_preserved": [
+    "crates/litchi/examples/bench_word_parse.rs",
+    "docs/UNIFIED_OPS_API_DESIGN.md"
+  ],
+  "worktrees_created": 0,
+  "worktrees_removed": 0
+}
