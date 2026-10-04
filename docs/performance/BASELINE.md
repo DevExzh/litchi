@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0906 — selector and workload scope qualification
+
+[0906](0906-office-coverage-qualification.md) verifies 534 enum/name/CLI
+selectors and 41 defaults with a byte-identical source-census replay, correcting
+the current README count. This is registration evidence, not measured CRUD
+coverage. No timing population or production implementation changes.
+
 ## 0905 — bounded XML attribute-summary candidate measured
 
 [0905](0905-xml-attribute-summary.md) compares the frozen 0904 baseline at

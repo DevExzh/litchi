@@ -1,0 +1,30 @@
+{
+  "status": "failed",
+  "argv": [
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-native",
+    "--help"
+  ],
+  "exit_code": 0,
+  "binary": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0905/binaries/candidate-native",
+    "bytes": 264416056,
+    "sha256": "1513e14c1f3cbf2ea9d984b385c69a06e84ca4b1c6c0761ed7145f490978e982"
+  },
+  "missing_registered_selectors_in_help": [
+    "xls_validation_report",
+    "rtf_logical_tail_commit_append",
+    "rtf_logical_tail_plan_append",
+    "rtf_logical_tail_commit_noop_save",
+    "rtf_logical_tail_plan_noop_save",
+    "rtf_validation_report",
+    "docx_validation_report",
+    "docx_section_inventory",
+    "pptx_validation_report",
+    "odf_validation_report",
+    "odf_mimetype_repair_plan"
+  ],
+  "selector_count": 534,
+  "scope": "Read-only --help from retained0905candidatebinary with identical harnesslib source. No workload/sample/build or current merged-source performance claim.",
+  "stdout_sha256": "c0240d6cf55fb3e649061febfdd34ca49ff61a12e3ed65b0ffa786ea15ad8e21",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0906 — Office measurement coverage qualified
+
+[0906](0906-office-coverage-qualification.md) adds a reproducible source-bound
+selector census and corrects the current registry count from 441 to 534. All
+41 defaults and all enum/name/CLI mappings agree. Workload registration remains
+separate from supported APIs, corpus representativeness and measured coverage;
+11 missing help entries are restored and the registry regression test now checks
+help coverage. Focused extracted Rust verification passes; no workload or
+production library change is introduced.
+
 ## 0905 — bounded XML attribute summary passes its measured gates
 
 [0905](0905-xml-attribute-summary.md) implements a one-file `AttributeSummary`

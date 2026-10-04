@@ -1,5 +1,13 @@
 # Performance hotspot inventory
 
+## 0906 — distinguish edit timing from patch replay
+
+[0906](0906-office-coverage-qualification.md) identifies a scope boundary before
+the next PPTX capture: the source-backed edit/save helpers include forward and
+inverse patch replay inside their timers, while the retained 0829 profile
+excludes serialization. Neither establishes a pure full-save hotspot ranking.
+No cost or speedup is inferred from the source audit.
+
 ## 0905 — validated XML summary removes publication iterator work
 
 [0905](0905-xml-attribute-summary.md) measures a one-file bounded XML audit

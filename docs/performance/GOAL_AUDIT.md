@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0906 — remaining coverage is explicit
+
+[0906](0906-office-coverage-qualification.md) verifies the 534-selector registry
+and its 41 defaults without treating selectors as completion of the required
+CRUD taxonomy. PPTX timer/guard boundaries and legacy semantic coverage need
+separate qualification before broader claims. The accepted 0905 change remains
+on the Office branch while unrelated target-branch integration is pending.
+The comprehensive OLE2/OOXML goal is still active; ODF is deferred and iWork is
+excluded.
+
 ## 0905 — XML audit candidate advances one scoped Office path
 
 [0905](0905-xml-attribute-summary.md) advances the active OLE2/OOXML program

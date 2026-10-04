@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "byte_identical": true,
+  "registry_sha256": "f665ef02f335035ed35eaf3f76254a10110868614af699f79dc9e640c649565a",
+  "helper_sha256": "57b7c3568b42988d5b9cc081509337b5f93a55bb0bde01d9284be6be4129a458",
+  "temporary_root_removed": true,
+  "workloads_executed": 0,
+  "builds_executed": 0,
+  "worktrees_created": 0
+}

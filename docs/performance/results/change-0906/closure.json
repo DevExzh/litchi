@@ -1,0 +1,109 @@
+{
+  "status": "pass",
+  "parent": "2b974e3541517ccf032021dc5497243b315fd313",
+  "branch": "perf/0906-office-coverage-qualification",
+  "integration": "Pending; shared unrelated cherry-pick left untouched",
+  "worktrees_created": 0,
+  "files": [
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "bytes": 3021844,
+      "sha256": "f712da842169399d687eb452c7042deed61682a80efdd40b2c3c178af2c036ea"
+    },
+    {
+      "path": "tools/perf-baseline/README.md",
+      "bytes": 320667,
+      "sha256": "09450b852ae3c862694b8f9bba8060fa7efccd98b15ac5d028f8fd8219bc1a53"
+    },
+    {
+      "path": "docs/performance/0906-office-coverage-qualification.md",
+      "bytes": 4388,
+      "sha256": "a777b7fa6a7c8131b801f95607d9713cabbfb4da166a60b84d29aaf0e9143fcf"
+    },
+    {
+      "path": "docs/performance/BASELINE.md",
+      "bytes": 477075,
+      "sha256": "3fa8a4114f2dd06fe05e2edd8b4ca18874b8a05b1b16e049f29bd4c0eeb0f79d"
+    },
+    {
+      "path": "docs/performance/HOTSPOTS.md",
+      "bytes": 779562,
+      "sha256": "dc900e4d5fcd398c347d926b96bf1dc377974b8095da9cdf36646aa613db2712"
+    },
+    {
+      "path": "docs/performance/REPORT.md",
+      "bytes": 792684,
+      "sha256": "cccf864ef3715ee257aa16051f01c67c22c0ba3353f7b3890ffab99494236ec2"
+    },
+    {
+      "path": "docs/performance/GOAL_AUDIT.md",
+      "bytes": 466120,
+      "sha256": "c567afb734edf997b7db2c5af0f07ab4621c9bb6eb2f1a3e1399c1a06d2041e3"
+    },
+    {
+      "path": "docs/performance/results/change-0906/help-check.json",
+      "bytes": 1170,
+      "sha256": "4904db1093b64007417b46bd140235163b2b0874bc404e8f2caa2b68d0dd61b2"
+    },
+    {
+      "path": "docs/performance/results/change-0906/help-regression-verification.json",
+      "bytes": 2666,
+      "sha256": "89e3f9dbd6d16f9717b559c5afe0193baa1e55b8d808dd7b49365038392db48a"
+    },
+    {
+      "path": "docs/performance/results/change-0906/help.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0906/help.stdout",
+      "bytes": 19614,
+      "sha256": "c0240d6cf55fb3e649061febfdd34ca49ff61a12e3ed65b0ffa786ea15ad8e21"
+    },
+    {
+      "path": "docs/performance/results/change-0906/legacy-coverage.md",
+      "bytes": 18255,
+      "sha256": "d8c1371e7b3e40ddccd1f0411ab6f2bde936a761d8df4735045b1216b4410b79"
+    },
+    {
+      "path": "docs/performance/results/change-0906/ooxml-opportunity.md",
+      "bytes": 12509,
+      "sha256": "18aa4a7f08e07acb3045279945588143ddec7bd662ac134dea1269fa6c65978f"
+    },
+    {
+      "path": "docs/performance/results/change-0906/registry-final-replay.json",
+      "bytes": 168,
+      "sha256": "2c98345c69d1e5c49299103e614d901e0338599efe4b5e025a76a5aa8c845349"
+    },
+    {
+      "path": "docs/performance/results/change-0906/registry-final.json",
+      "bytes": 86802,
+      "sha256": "88e7f15f59551b95c07f3035b9506d8bad0479ea2a6a63726adb72c13f13c931"
+    },
+    {
+      "path": "docs/performance/results/change-0906/registry-replay.json",
+      "bytes": 336,
+      "sha256": "0806372d20bcdf2f106e041d979a8784e9d4aff6a7db0f885eb0ec45d42a778b"
+    },
+    {
+      "path": "docs/performance/results/change-0906/registry.json",
+      "bytes": 86802,
+      "sha256": "f665ef02f335035ed35eaf3f76254a10110868614af699f79dc9e640c649565a"
+    },
+    {
+      "path": "docs/performance/results/change-0906/registry.py",
+      "bytes": 3192,
+      "sha256": "57b7c3568b42988d5b9cc081509337b5f93a55bb0bde01d9284be6be4129a458"
+    },
+    {
+      "path": "docs/performance/results/change-0906/source-context.json",
+      "bytes": 1267,
+      "sha256": "710a84f9a5ec6d4e8693da2c8fd5d6ba55917348df4b7642c8e34ee7b3603b02"
+    },
+    {
+      "path": "docs/performance/results/change-0906/verify-help.py",
+      "bytes": 2514,
+      "sha256": "dedc7b79fb7802be323fbbacda08efcff5d083f46092e62ccd092be9d1f2a810"
+    }
+  ]
+}

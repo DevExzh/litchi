@@ -25,7 +25,11 @@ The checked default is 41 cases, 213 rows and 43 deterministic corpora.
 appends the existing plain RTF, ODT, ODS and ODP `semantic_text_to_sink`
 selectors across three sizes, preserving every old 201-row identity. Two full
 serial runs retain 6,390 samples and pass report/catalog and CRUD timing gates.
-The registry has 441 selectors; the coverage index's minimum remains 439.
+The registry has 534 selectors; the coverage index's minimum remains 439.
+The source-bound [0906 census](../../docs/performance/results/change-0906/registry-final.json)
+checks all enum/name/CLI mappings and the 41 default selectors. Selector counts
+do not establish measured CRUD coverage; older change notes below retain their
+historical counts.
 RTF uses a bounded retained sink; ODF uses a bounded hashing discard sink.
 Opening, setup and output verification are outside the export timer. This is
 synthetic descriptive coverage, not a before/after speedup or native-producer
