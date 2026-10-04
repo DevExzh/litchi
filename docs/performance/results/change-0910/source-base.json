@@ -1,0 +1,30 @@
+{
+  "status": "base_prepared",
+  "commit": "468fe2931d6532c32f4c6608590816b8eaa88e31",
+  "archive_paths": [
+    "Cargo.toml",
+    "rust-toolchain.toml",
+    "clippy.toml",
+    ".cargo",
+    "crates",
+    "tools/perf-baseline",
+    "test-data/rtf/watermark.rtf",
+    "test-data/poi/test-data/spreadsheet/54016.xls",
+    "rustfmt.toml"
+  ],
+  "archive_sha256": "481af4d0ba1f85cb05ea3249678548842ba59113860eb9be25ffc05679463342",
+  "lock_overlays": {
+    "Cargo.lock": {
+      "artifact": "docs/performance/results/change-0907/root-Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "tools/perf-baseline/Cargo.lock": {
+      "artifact": "docs/performance/results/change-0907/perf-Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    }
+  },
+  "source_root": "/tmp/litchi-0910-src",
+  "build_root": "/home/zhuhe/code/litchi/target/litchi-0910-build",
+  "created_utc": "2026-10-04T08:34:39.386259+00:00",
+  "worktrees_created": 0
+}

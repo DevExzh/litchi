@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0910 — owning-route baseline closes a PPTX interpretation gap
+
+[0910](0910-pptx-owning-input-native-control.md) provides a comparable native
+control for owning versus materialized ReadAt ingress, using matched input,
+edit, save, sink and teardown boundaries. All 24 children, 480 measured samples
+and two raw ZIP controls pass. Publication cost is already much lower on owning
+input; its opened snapshot is the next attribution target. This adds bounded
+generated-fixture evidence, not production changes, broad input coverage,
+allocation/scaling proof or completion of the non-iWork goal.
+
 ## 0909 — one owning-input control admitted, broader scope remains open
 
 [0909](0909-pptx-owning-input-preservation-control.md) addresses the missing

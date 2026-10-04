@@ -1,0 +1,66 @@
+{
+  "cwd": "/tmp/litchi-0910-src",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0910-build",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "removed_environment_keys": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "source": {
+    "path": "docs/performance/results/change-0910/source-v1.json",
+    "bytes": 1756112,
+    "sha256": "7a6d1310fb97dde1f275ec8702efabbef2cfb643c9ee4c1178169fed53aa4586"
+  },
+  "helper": {
+    "path": "docs/performance/results/change-0910/run.py",
+    "bytes": 6710,
+    "sha256": "bc94209d20160834dc7b9183d544fe5bdb891176fb34d2e754f523ca175c6b36"
+  },
+  "toolchain": {
+    "cargo": {
+      "launcher": "/home/zhuhe/.cargo/bin/cargo",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    "rustc": {
+      "launcher": "/home/zhuhe/.cargo/bin/rustc",
+      "version": "rustc 1.95.0 (59807616e 2026-04-14)"
+    }
+  },
+  "argv": [
+    "rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "--config",
+    "skip_children=true",
+    "--config-path",
+    "/tmp/litchi-0910-src/rustfmt.toml",
+    "/tmp/litchi-0910-src/tools/perf-baseline/src/lib.rs",
+    "/tmp/litchi-0910-src/tools/perf-baseline/src/pptx_owned_benchmark.rs",
+    "/tmp/litchi-0910-src/tools/perf-baseline/examples/pptx_owned_benchmark.rs"
+  ],
+  "start_utc": "2026-10-04T08:56:05.185608+00:00",
+  "end_utc": "2026-10-04T08:56:05.640208+00:00",
+  "exit_code": 0,
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0910/quality-v1/fmt/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0910/quality-v1/fmt/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

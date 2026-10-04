@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T09:04:38.042188+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-0910-src",
+      "files": 9355,
+      "logical_bytes": 162996656
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0910-build",
+      "files": 2904,
+      "logical_bytes": 1375502196
+    }
+  ],
+  "active_cwd_processes": [],
+  "source_inventory_verified": 9355,
+  "worktrees_created": 0,
+  "unrelated_worktrees_untouched": true,
+  "retained_evidence": "Native binary and generated archive evidence remain Gitignored under this packet, with tracked descriptors."
+}

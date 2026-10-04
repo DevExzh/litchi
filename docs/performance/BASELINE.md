@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0910 — native PPTX owning-input control
+
+[0910](0910-pptx-owning-input-native-control.md) compares existing routes in
+24 fresh processes and 480 measured samples. Total p50 is 259.703332 ms for
+materialized ReadAt and 32.180007 ms for owning input; the median paired ratio
+is 8.072147 (95% bootstrap interval 7.960538–8.240714). Both raw ZIP controls
+pass. This is a same-build route comparison, not a production optimization.
+
 ## 0909 — owning-input PPTX control qualified without timing
 
 [0909](0909-pptx-owning-input-preservation-control.md) qualifies existing

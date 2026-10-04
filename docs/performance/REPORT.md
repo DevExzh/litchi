@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0910 — comparable owning-input PPTX measurement
+
+[0910](0910-pptx-owning-input-native-control.md) retains 12 alternating process
+pairs, matched timers including input copies and teardown, and 480 measured
+samples. Materialized/owned paired median ratio is 8.072147 with a 95% bootstrap
+interval of 7.960538–8.240714. All outputs match and both raw ZIP checks preserve
+437 untouched members. Process RSS is similar, but operation allocations are
+unmeasured. Existing-route evidence does not constitute a new implementation
+speedup; the broader program remains open.
+
 ## 0909 — executable owning-input preservation qualification
 
 [0909](0909-pptx-owning-input-preservation-control.md) adds a standalone

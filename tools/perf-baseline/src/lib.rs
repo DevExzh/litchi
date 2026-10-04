@@ -37,6 +37,7 @@ mod parallel_metrics;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
+mod pptx_owned_benchmark;
 mod pptx_owned_control;
 pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
@@ -10232,6 +10233,21 @@ pub fn write_pptx_owned_control_fixtures(
     directory: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     pptx_owned_control::export(directory)
+}
+
+/// Run one route of the opt-in PPTX owning-input benchmark control.
+///
+/// The route must be `materialized` or `owned`; one invocation measures only
+/// that route and writes a fresh report and source/output artifacts to the
+/// caller-selected directory. The normal selector registry and defaults are
+/// unchanged.
+pub fn run_pptx_owned_benchmark(
+    route: &str,
+    warmup_iterations: usize,
+    samples: usize,
+    directory: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
+    pptx_owned_benchmark::run_from_args(route, warmup_iterations, samples, directory)
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {

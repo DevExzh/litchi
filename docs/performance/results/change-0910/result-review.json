@@ -1,0 +1,186 @@
+{
+  "schema": "litchi.performance.0910.pptx-owned-input-result-review.v1",
+  "status": "pass",
+  "decision": "approved_with_no_blocker",
+  "reviewer": "owning_protocol_review_0910",
+  "review_scope": {
+    "read_only": true,
+    "workload_run": false,
+    "build_run": false,
+    "replay_run": false,
+    "profiler_run": false,
+    "final_report_bound": true
+  },
+  "independent_checks": {
+    "raw_capture": {
+      "legs": 24,
+      "paired_blocks": 12,
+      "warmups_per_leg": 30,
+      "measured_samples_per_leg": 20,
+      "retained_measured_samples": 480,
+      "guarded_executions": 1200,
+      "process_exit_zero": true,
+      "serial_nonoverlap": true,
+      "source_binary_plan_helper_bindings_equal": true,
+      "sample_digest_size_sink_and_phase_checks": "pass"
+    },
+    "pooled_p50_ns": {
+      "materialized": {
+        "clone_ns": 810824,
+        "ingress_ns": 6194567,
+        "snapshot_ns": 12349500,
+        "edit_commit_ns": 2868150,
+        "publish_ns": 236840172,
+        "total_ns": 259703332
+      },
+      "owned": {
+        "clone_ns": 2903215,
+        "ingress_ns": 2971650,
+        "snapshot_ns": 15865198,
+        "edit_commit_ns": 2942265,
+        "publish_ns": 5575988,
+        "total_ns": 32180007
+      }
+    },
+    "paired_median_ratios_materialized_over_owned": {
+      "total_ns": {
+        "statistic": 8.072147309280234,
+        "lower_95": 7.960537979439635,
+        "upper_95": 8.240713911304484,
+        "draws": 10000,
+        "seed": 910,
+        "unit": "complete paired process block"
+      },
+      "publish_ns": {
+        "statistic": 42.49750398549157,
+        "lower_95": 41.59312967328569,
+        "upper_95": 43.23913717035323
+      },
+      "snapshot_ns": {
+        "statistic": 0.7779356672638595,
+        "lower_95": 0.7739728838532017,
+        "upper_95": 0.7864195740557656
+      },
+      "clone_ns": {
+        "statistic": 0.2884187824881835,
+        "lower_95": 0.273646303317345,
+        "upper_95": 0.9140218148660605,
+        "interpretation": "no isolated route mechanism; allocator/cache-sensitive"
+      },
+      "ingress_ns": {
+        "statistic": 2.103250647127085,
+        "lower_95": 2.068271983194414,
+        "upper_95": 2.133390667137354
+      },
+      "edit_commit_ns": {
+        "statistic": 0.9775559840619597,
+        "lower_95": 0.9585372713719098,
+        "upper_95": 0.9937344629847571
+      }
+    },
+    "order_drift_ba_over_ab_p50": {
+      "materialized": {
+        "clone_ns": 1.0044850040024795,
+        "ingress_ns": 0.9858137367005277,
+        "snapshot_ns": 0.9990761696691489,
+        "edit_commit_ns": 0.9922049712609279,
+        "publish_ns": 1.0000751416712481,
+        "total_ns": 0.9990572996736018
+      },
+      "owned": {
+        "clone_ns": 0.9588333193241994,
+        "ingress_ns": 0.9810941601196108,
+        "snapshot_ns": 1.0061968377474038,
+        "edit_commit_ns": 0.9886251239747752,
+        "publish_ns": 0.9636223708618458,
+        "total_ns": 0.9821612166325439
+      }
+    },
+    "rss": {
+      "materialized": {
+        "p50_kib": 95990,
+        "min_kib": 94984,
+        "max_kib": 96956,
+        "mean_kib": 95975.0
+      },
+      "owned": {
+        "p50_kib": 96166,
+        "min_kib": 95080,
+        "max_kib": 96988,
+        "mean_kib": 96112.0
+      },
+      "owned_over_materialized_p50_delta_kib": 176,
+      "owned_over_materialized_p50_delta_percent": 0.18335243254505862,
+      "scope": "whole-process maximum including generation, warmups, guards, samples and artifact work"
+    },
+    "guards": {
+      "source_bytes": 17017139,
+      "source_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+      "output_bytes": 17017145,
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "sink_write_calls": 260,
+      "sink_largest_write_bytes": 65536,
+      "phase_sum_not_above_total": true,
+      "raw_census": {
+        "routes": ["owned", "materialized"],
+        "member_count": 445,
+        "changed_member_count": 8,
+        "unchanged_member_count": 437,
+        "physical_order_equal": true,
+        "central_order_equal": true,
+        "archive_comment_equal": true,
+        "data_descriptors_present": true,
+        "zip64": false,
+        "status": "pass"
+      },
+      "semantic_marker_binding": "final source review binds verification call; report markers are proof-state fields and reducer independently binds digest, size, sink and source identity"
+    },
+    "custody": {
+      "parent": "468fe2931d6532c32f4c6608590816b8eaa88e31",
+      "source_file_count": 9355,
+      "binary_sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d",
+      "quality_receipts_exit_zero": true,
+      "replay_before_cleanup": "pass",
+      "replay_after_cleanup": "pass",
+      "cleanup": "pass",
+      "capture_artifacts_checked": 72,
+      "cleanup_removed_logical_bytes": 1538498852,
+      "worktrees_created": 0,
+      "unrelated_worktrees_untouched": true
+    }
+  },
+  "findings": [
+    "The total and publication ratios are independently reproduced from the raw vectors and the canonical analysis.",
+    "Owning clone and opened-snapshot p50 values exceed the 5 percent review threshold and are disclosed; clone ratios are broad and cache/allocator-sensitive.",
+    "The order split shows no materialized order drift and only modest owning total drift; no order blocker is present.",
+    "RSS differs by about 0.18 percent at the whole-process p50 and cannot support an operation-memory claim.",
+    "Both independent raw ZIP censuses pass with exactly eight selected slide changes and 437 raw-unchanged members.",
+    "Custody, cleanup, and before/after cleanup replay receipts are internally consistent."
+  ],
+  "recommendations": [
+    "Keep the report framed as a same-build existing-route comparison on the qualified generated fixture.",
+    "Use the owning opened-snapshot phase as the next attribution target while preserving the same teardown, sink, semantic and raw census boundaries.",
+    "Do not infer route-specific clone cost, allocation savings, or a production provenance bridge from this capture."
+  ],
+  "limitations": [
+    "Warm in-memory generated fixture only; no cold, filesystem, remote/range, producer, concurrency, allocation-counter, signed/encrypted/malformed, ZIP64 or adversarial descriptor qualification.",
+    "Pooled tails and RSS are descriptive; inference uses 12 paired process medians on a shared KVM host.",
+    "The retained report vectors cover measured samples; warmup timings are not retained."
+  ],
+  "hash_bindings": {
+    "final_report": "3c155ffd3a97a2c9f9bb99eb8ceb21d2ef1d42bfc581f921d5a91e41c14ef5e6",
+    "analysis": "62f8dcd7ad6f226d1e5d3527bd6afdcce5ca12775d1a826bb5b6fda105f7acf2",
+    "analysis_method": "0842bb233ed6b31f870dfebcccc5889ae34275ea074d82c9fea11934ee5370b6",
+    "capture_plan": "b4666619aba3b6bbfb68955e70c9d47cad909c25c11b4affc39d9bb4f61f0370",
+    "census_runs": "9e124d3488623767fe1d43f68761ca8bcfa7eb567fc2eb9e5e1bab3db44642dc",
+    "census_owned": "58843ec4d50107fae674c88baa634839d8f45c5afbfa0a00c50f511ce64be036",
+    "census_materialized": "e0e581d8b9368c6980ac35a31e130bcb4a746688582c0e1d17654e73d730de18",
+    "replay_before_cleanup": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257",
+    "replay_after_cleanup": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257",
+    "cleanup": "1bcf0e8756db10349a3f10eb2c01df1b04aaf26273463ee98305ccd74c302f03",
+    "binary_receipt": "b551a9bdc5b3ca1d4f2f27efdc91252edab8c280f0705cf6a14bec45f6561748",
+    "source_manifest": "7a6d1310fb97dde1f275ec8702efabbef2cfb643c9ee4c1178169fed53aa4586",
+    "source_review": "0ddf5d1d3f313e59d16b875fbae4f6b32d1753e8ee7f8d07be1582b59d385888",
+    "protocol_review": "d527584ebeeb835e5a8db5c9bbe118f3658059de35c731da42fab129e12cf6aa"
+  }
+}

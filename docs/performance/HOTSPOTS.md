@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0910 — owning input changes the PPTX priority
+
+[0910](0910-pptx-owning-input-native-control.md) measures publication p50 at
+236.840172 ms for materialized ReadAt and 5.575988 ms for existing owning input.
+Owning total p50 is 32.180007 ms; opened snapshot capture is its largest phase
+at 15.865198 ms. Clone and snapshot costs increase and remain disclosed.
+Profile the owning snapshot before proposing another publication change or a
+provenance bridge. No production change is adopted by this comparison.
+
 ## 0909 — measure the qualified owning route before a bridge
 
 [0909](0909-pptx-owning-input-preservation-control.md) proves the existing

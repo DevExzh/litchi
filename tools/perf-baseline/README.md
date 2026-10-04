@@ -18,6 +18,30 @@ benchmark selector and does not change its workload or timer.
 See [0909](../../docs/performance/0909-pptx-owning-input-preservation-control.md)
 for the retained fixture qualification and its coverage limits.
 
+## Paired PPTX owning-input benchmark control
+
+Run one route per fresh process on the same qualified corpus. The input clone
+is inside the timed region for both routes, and the report retains raw clone,
+ingress, snapshot, edit/commit, publication, and total nanosecond samples:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release \
+  --example pptx_owned_benchmark -- owned 30 20 /path/to/new-owned-run
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release \
+  --example pptx_owned_benchmark -- materialized 30 20 /path/to/new-materialized-run
+```
+
+The route performs the same 64 text replacements, opened transaction, commit,
+publication, `to_bytes`, and writes to an identical preallocated 64 KiB
+sequential sink. Sink allocation and reservation, semantic checks, hashes, and
+source/output artifact writes are outside the measured samples. Use separate
+fresh child processes and an AB/BA schedule for paired analysis; this control
+reports descriptive phase evidence and makes no speedup or production
+recommendation.
+
+See [0910](../../docs/performance/0910-pptx-owning-input-native-control.md)
+for the frozen process protocol, measurements, and limitations.
+
 ## Untimed XLSX attribute fixtures
 
 Export the deterministic medium and dense-sparse one-percent cell-edit inputs
