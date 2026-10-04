@@ -4734,3 +4734,21 @@ The current inventory is 66 workspace packages, 245 internal dependency
 declarations, 234 canonical edges, 12 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.
+
+## 2026-10-04 amendment: `litchi-ops` unified error leaf edges
+
+Step S2 of unified-ops record
+[0003](../unified-ops/0003-m0a-migration-plan.md) implements
+`litchi_ops::error`, the unified error whose `From` conversions keep each leaf
+error typed. It adds ten optional normal edges from `litchi-ops`, each enabled
+only by the format features that need it: `litchi-docx`, `litchi-pptx`,
+`litchi-xlsx`, `litchi-xlsb`, `litchi-doc`, `litchi-xls`, `litchi-ppt` and
+`litchi-rtf` behind their own features, `litchi-opc` behind the four OOXML
+features, and `litchi-cfb` behind the three legacy binary features. ODT, ODS
+and ODP report `litchi_core::Error` and add no edge. `litchi-ops` stays
+runtime-neutral and iWork-free, so the non-iWork release gate is unchanged.
+
+The current inventory is 66 workspace packages, 255 internal dependency
+declarations, 244 canonical edges, 12 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.

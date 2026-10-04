@@ -239,7 +239,17 @@
       "xml-minifier"
     ],
     "litchi-ops": [
-      "litchi-core"
+      "litchi-cfb",
+      "litchi-core",
+      "litchi-doc",
+      "litchi-docx",
+      "litchi-opc",
+      "litchi-ppt",
+      "litchi-pptx",
+      "litchi-rtf",
+      "litchi-xls",
+      "litchi-xlsb",
+      "litchi-xlsx"
     ],
     "litchi-oth": [
       "litchi-core",

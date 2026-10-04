@@ -12,9 +12,9 @@
 //!
 //! # Status
 //!
-//! The crate is a scaffold. It exposes no public API yet: the module layout
-//! below only fixes where each part of the design will live. Format features
-//! are declared but do not yet pull in any leaf crate.
+//! The crate is a scaffold. Its only public API so far is the unified
+//! [`error`] module; the rest of the module layout below only fixes where each
+//! part of the design will live.
 //!
 //! # Layout
 //!
@@ -31,9 +31,11 @@
 
 mod batch;
 mod capabilities;
-mod error;
+pub mod error;
 mod file;
 mod handler;
 mod node;
 mod path;
 mod registry;
+
+pub use error::{Code, Error, Result};
