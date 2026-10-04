@@ -21,3 +21,9 @@
   - `DetectedFormat` variants are now gated on litchi-ops features, so a second dependent that turns on extra ops features could break facade matches. This matters from S5 on.
   - Some moved doc comments still say the ops-only detectors classify iWork. Fix them in S9.
 - Disk: S4's all-features facade test build reached 114 GB before it was cleaned. Building agents now run with `CARGO_INCREMENTAL=0` and debug info off.
+
+## S5a — `Docx` handle (`5f7c0523f4`)
+- `Docx(Arc<DocxState>)` holds a `Source`/`Eager` owner, lazy metadata, eager-route tolerance and the ported `finish` freshness guard. Constructors cover the source (path/bytes), eager (`OpcPackage`) and prepared routes; nothing is loaded at open. Typed reads: `text`, `metadata`, `tolerance_report`, `section_inventory`. A crate-internal `edit_document` builder works on both owners and refuses when `retain_source(false)`. 15 tests.
+- `error.rs` gains `Source::DocxTransaction`. No leaf or dependency changes.
+- Deferred: the Markdown materialization cache goes to S6/S7, since ops has no `markdown` feature. The paragraph/table/run `map_ooxml_error` sites go to S6's family views.
+- **M2 blocker:** source-backed `edit_document()` refuses all 19 Word-authored fixtures with `UnsafeEdit` (markup-compatibility branch selection; every fixture declares `mc:Ignorable`). M2 needs a leaf fix, or a fallback that materializes the eager owner at first edit. Cross-check against the perf program's MCE rewrite (owner decision 2026-09-16 #1).
