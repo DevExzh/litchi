@@ -1473,8 +1473,9 @@ impl LogicalEntryLimits {
 }
 
 /// The report is deliberately small and allocation-free. It describes the
-/// temporary physical ZIP census performed while a catalog is built; the
-/// logical [`Entry`] table is charged separately by callers that retain it.
+/// eager physical ZIP reader/census state and temporary normalized-name
+/// deduplication storage performed while a catalog is built; the logical
+/// [`Entry`] contents are charged separately by callers that retain them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CatalogStorageRequirements {
     retained_bytes: usize,
@@ -1915,11 +1916,12 @@ impl Catalog {
             }
         }
         let (entries, source_is_exact, legacy_outer_prefix) = if has_direct_iwa {
-            let entries = if semantic_profile.is_some() {
+            let (entries, entry_storage) = if semantic_profile.is_some() {
                 collect_semantic_flat(&archive, &source, logical_entry_limits)?
             } else {
                 collect_flat(&archive, &source)?
             };
+            physical_storage = physical_storage.add(entry_storage)?;
             (entries, semantic_profile.is_none(), None)
         } else if let Some(index_name) = nested_name {
             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
@@ -1940,11 +1942,12 @@ impl Catalog {
             physical_storage = physical_storage.add(nested_storage)?;
             (entries, false, Some(prefix))
         } else {
-            let entries = if semantic_profile.is_some() {
+            let (entries, entry_storage) = if semantic_profile.is_some() {
                 collect_semantic_flat(&archive, &source, logical_entry_limits)?
             } else {
                 collect_flat(&archive, &source)?
             };
+            physical_storage = physical_storage.add(entry_storage)?;
             (entries, semantic_profile.is_none(), None)
         };
         Ok(Catalog {
@@ -2001,10 +2004,14 @@ impl Catalog {
 
     /// Return the physical ZIP census admitted while this catalog was built.
     ///
-    /// The report includes owned physical-entry names, local and central
-    /// header-box payloads, central-order storage, and temporary nested
-    /// `Index.zip` catalog state. Logical entry payloads are exposed through
-    /// [`Entry`] and remain the responsibility of the retaining format owner.
+    /// The report includes eager reader maps/order/layout storage, owned
+    /// physical-entry names, local and central header-box payloads,
+    /// central-order storage, temporary catalog-name deduplication, and nested
+    /// `Index.zip` state. Logical entry payloads are exposed through [`Entry`]
+    /// and remain the responsibility of the retaining format owner. This is a
+    /// post-construction census: callers may use it to admit a candidate only
+    /// after proving that the candidate has the same physical shape and hence
+    /// cannot require more source-side storage than this report describes.
     #[must_use]
     pub const fn storage_requirements(&self) -> CatalogStorageRequirements {
         self.physical_storage
@@ -4505,7 +4512,10 @@ fn preflight_logical_entry(
     Ok(())
 }
 
-fn collect_flat(archive: &ZipArchive<'_>, source: &SharedBytes) -> Result<Vec<Entry>> {
+fn collect_flat(
+    archive: &ZipArchive<'_>,
+    source: &SharedBytes,
+) -> Result<(Vec<Entry>, CatalogStorageRequirements)> {
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
     for entry in archive
@@ -4521,14 +4531,15 @@ fn collect_flat(archive: &ZipArchive<'_>, source: &SharedBytes) -> Result<Vec<En
             &mut seen,
         )?;
     }
-    Ok(entries)
+    let storage = entry_collection_storage(&entries, entries.capacity(), &seen)?;
+    Ok((entries, storage))
 }
 
 fn collect_semantic_flat(
     archive: &ZipArchive<'_>,
     source: &SharedBytes,
     logical_entry_limits: Option<LogicalEntryLimits>,
-) -> Result<Vec<Entry>> {
+) -> Result<(Vec<Entry>, CatalogStorageRequirements)> {
     preflight_semantic_iwa_entries(archive, false)?;
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -4559,7 +4570,8 @@ fn collect_semantic_flat(
             &mut seen,
         )?;
     }
-    Ok(entries)
+    let storage = entry_collection_storage(&entries, entries.capacity(), &seen)?;
+    Ok((entries, storage))
 }
 
 fn collect_legacy(
@@ -4571,15 +4583,16 @@ fn collect_legacy(
     let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
         Error::InvalidBundle(format!("invalid legacy package index name: {index_name}"))
     })?;
-    let declared_index_size = archive
+    let index_entry = archive
         .physical_entries()
         .find(|entry| entry.name() == index_name)
         .ok_or_else(|| {
             Error::InvalidBundle(format!(
                 "legacy package index has no physical member: {index_name}"
             ))
-        })?
-        .uncompressed_size();
+        })?;
+    let declared_index_size = index_entry.uncompressed_size();
+    let index_is_deflated = index_entry.central_header().compression_method == 8;
     limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
     let index_data = archive.read(index_name)?;
     let index_size = u64::try_from(index_data.len()).map_err(|error| {
@@ -4598,7 +4611,14 @@ fn collect_legacy(
     })?;
     let storage = index
         .storage_requirements()?
-        .add_owned(index_source.as_ref().len(), 1)?;
+        .add_owned(
+            index_source
+                .as_ref()
+                .len()
+                .checked_add(usize::from(index_is_deflated))
+                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+            2,
+        )?;
 
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -4644,7 +4664,8 @@ fn collect_legacy(
             &mut seen,
         )?;
     }
-    Ok((entries, storage))
+    let entry_storage = entry_collection_storage(&entries, entries.capacity(), &seen)?;
+    Ok((entries, storage.add(entry_storage)?))
 }
 
 fn collect_semantic_legacy(
@@ -4665,6 +4686,7 @@ fn collect_semantic_legacy(
         })?;
     preflight_semantic_container(index_entry, index_name)?;
     let declared_index_size = index_entry.uncompressed_size();
+    let index_is_deflated = index_entry.central_header().compression_method == 8;
     limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
     let index_data = archive.read_entry(index_entry)?;
     let index_size = u64::try_from(index_data.len()).map_err(|error| {
@@ -4683,7 +4705,14 @@ fn collect_semantic_legacy(
     })?;
     let storage = index
         .storage_requirements()?
-        .add_owned(index_source.as_ref().len(), 1)?;
+        .add_owned(
+            index_source
+                .as_ref()
+                .len()
+                .checked_add(usize::from(index_is_deflated))
+                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+            2,
+        )?;
 
     preflight_semantic_iwa_entries(&index, true)?;
 
@@ -4736,7 +4765,58 @@ fn collect_semantic_legacy(
             &mut seen,
         )?;
     }
-    Ok((entries, storage))
+    let entry_storage = entry_collection_storage(&entries, entries.capacity(), &seen)?;
+    Ok((entries, storage.add(entry_storage)?))
+}
+
+/// Admit temporary normalized-name deduplication state and any slack in the
+/// logical entry vector. The entry contents themselves remain the caller's
+/// logical catalog responsibility; this report covers the source-side peak
+/// where `seen` overlaps the retained entries while the catalog is built.
+fn entry_collection_storage(
+    entries: &[Entry],
+    entries_capacity: usize,
+    seen: &HashSet<String>,
+) -> Result<CatalogStorageRequirements> {
+    let map_slot_overhead = size_of::<usize>().saturating_mul(2).max(16);
+    let seen_bytes = seen
+        .capacity()
+        .checked_mul(
+            size_of::<String>()
+                .checked_add(map_slot_overhead)
+                .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?,
+        )
+        .and_then(|bytes| bytes.checked_mul(2))
+        .and_then(|bytes| {
+            seen.iter().try_fold(bytes, |total, name| {
+                total.checked_add(name.capacity())
+            })
+        })
+        .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+    let entry_slack = entries_capacity
+        .checked_sub(entries.len())
+        .and_then(|bytes| bytes.checked_mul(size_of::<Entry>()))
+        .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+    let allocations = usize::from(seen.capacity() != 0)
+        .checked_add(
+            seen.iter()
+                .filter(|name| name.capacity() != 0)
+                .count(),
+        )
+        .and_then(|value| value.checked_add(usize::from(entry_slack != 0)))
+        .ok_or_else(|| Error::InvalidBundle("entry allocation census overflow".to_owned()))?;
+    let retained = seen_bytes
+        .checked_add(entry_slack)
+        .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+    let traversal = retained
+        .checked_add(entries.len())
+        .and_then(|value| value.checked_add(seen.len()))
+        .ok_or_else(|| Error::InvalidBundle("entry traversal census overflow".to_owned()))?;
+    Ok(CatalogStorageRequirements::from_parts(
+        retained,
+        traversal,
+        allocations,
+    ))
 }
 
 const fn is_semantic_metadata_authority(raw_name: &[u8]) -> bool {
@@ -5193,6 +5273,27 @@ mod tests {
         assert!(nested_requirements.retained_bytes() > flat_requirements.retained_bytes());
         assert!(nested_requirements.allocations() > flat_requirements.allocations());
         assert!(nested_requirements.traversal_bytes() > flat_requirements.traversal_bytes());
+        Ok(())
+    }
+
+    #[test]
+    fn nested_deflate_storage_keeps_the_reader_sentinel_and_arc_owner() -> Result<()> {
+        let index = zip(&[("Index/Document.iwa", b"nested component")])?;
+        let stored_source = zip(&[("legacy.pages/Index.zip", index.as_slice())])?;
+        let mut deflated_writer = StreamingArchiveWriter::new();
+        deflated_writer.write_deflated("legacy.pages/Index.zip", &index)?;
+        let deflated_source = deflated_writer.finish_to_bytes()?;
+
+        let stored = Catalog::from_bytes(&stored_source)?.storage_requirements();
+        let deflated = Catalog::from_bytes(&deflated_source)?.storage_requirements();
+        assert_eq!(
+            deflated.retained_bytes(),
+            stored
+                .retained_bytes()
+                .checked_add(1)
+                .expect("nested payload sentinel")
+        );
+        assert_eq!(deflated.allocations(), stored.allocations());
         Ok(())
     }
 

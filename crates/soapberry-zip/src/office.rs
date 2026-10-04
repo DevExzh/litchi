@@ -661,6 +661,7 @@ pub struct ArchiveReader<'data> {
     /// is used only to prove non-overlap before publishing a borrowed slice.
     layout: Vec<BorrowedLayoutEntry>,
     has_encrypted_entries: bool,
+    storage_requirements: ArchiveReaderStorageRequirements,
     /// A successful strict local-layout proof. The slice source is immutable,
     /// so the proof remains valid for the reader lifetime.
     strict_layout_cache: StrictLayoutCache,
@@ -697,6 +698,43 @@ impl<'a> Iterator for ArchiveReaderNames<'a> {
 
 impl ExactSizeIterator for ArchiveReaderNames<'_> {}
 
+/// Heap storage retained by an [`ArchiveReader`] index and its construction
+/// scratch.
+///
+/// The source ZIP bytes and lazy member payloads are borrowed and are not part
+/// of this report. The report covers the eager file/directory maps, physical
+/// order and layout vectors, normalized-name clones, and the temporary
+/// `(offset, name)` vector that overlaps the final order vector while the
+/// reader is constructed. A package owner can use the report to admit the
+/// reader before reopening an equal-shape candidate without depending on the
+/// private map and layout types; it must establish that equal shape first.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ArchiveReaderStorageRequirements {
+    retained_bytes: usize,
+    traversal_bytes: usize,
+    allocations: usize,
+}
+
+impl ArchiveReaderStorageRequirements {
+    /// Heap bytes retained or staged by the eager reader index.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Bytes inspected while constructing the eager reader index.
+    #[must_use]
+    pub const fn traversal_bytes(self) -> usize {
+        self.traversal_bytes
+    }
+
+    /// Logical allocation events represented by the index and scratch.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+}
+
 /// Information about an archive entry for fast lookup
 #[derive(Debug, Clone)]
 struct EntryInfo {
@@ -711,6 +749,128 @@ struct EntryInfo {
 struct BorrowedLayoutEntry {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     central_name: Vec<u8>,
+}
+
+fn archive_reader_storage_requirements(
+    index: &HashMap<String, EntryInfo>,
+    directories: &HashMap<String, Metadata>,
+    order: &[String],
+    order_capacity: usize,
+    layout: &[BorrowedLayoutEntry],
+    layout_capacity: usize,
+    ordered_names_capacity: usize,
+) -> Result<ArchiveReaderStorageRequirements, Error> {
+    let mut retained = 0usize;
+    let mut allocations = 0usize;
+    // `HashMap::capacity` is an element capacity rather than the raw bucket
+    // count. The factor of two covers the load-factor slack and control bytes
+    // while keeping the census independent of the map implementation details.
+    let map_slot_overhead = size_of::<usize>().saturating_mul(2).max(16);
+
+    let mut add_retained = |amount: usize| -> Result<(), Error> {
+        retained = retained.checked_add(amount).ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "archive reader storage census overflows usize".to_string(),
+            })
+        })?;
+        Ok(())
+    };
+    let mut add_allocation = |amount: usize| -> Result<(), Error> {
+        allocations = allocations.checked_add(amount).ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "archive reader allocation census overflows usize".to_string(),
+            })
+        })?;
+        Ok(())
+    };
+    let mut add_map = |capacity: usize, entry_bytes: usize| -> Result<(), Error> {
+        let bytes = capacity
+            .checked_mul(
+                entry_bytes
+                    .checked_add(map_slot_overhead)
+                    .ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "archive reader map census overflows usize".to_string(),
+                        })
+                    })?,
+            )
+            .and_then(|bytes| bytes.checked_mul(2))
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive reader map census overflows usize".to_string(),
+                })
+            })?;
+        add_retained(bytes)?;
+        add_allocation(usize::from(capacity != 0))
+    };
+
+    add_map(index.capacity(), size_of::<(String, EntryInfo)>())?;
+    add_map(directories.capacity(), size_of::<(String, Metadata)>())?;
+    add_retained(
+        order_capacity
+            .checked_mul(size_of::<String>())
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive reader order census overflows usize".to_string(),
+                })
+            })?,
+    )?;
+    add_allocation(usize::from(order_capacity != 0))?;
+    add_retained(
+        layout_capacity
+            .checked_mul(size_of::<BorrowedLayoutEntry>())
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive reader layout census overflows usize".to_string(),
+                })
+            })?,
+    )?;
+    add_allocation(usize::from(layout_capacity != 0))?;
+    add_retained(
+        ordered_names_capacity
+            .checked_mul(size_of::<(u64, String)>())
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive reader order scratch census overflows usize".to_string(),
+                })
+            })?,
+    )?;
+    add_allocation(usize::from(ordered_names_capacity != 0))?;
+
+    for (name, info) in index {
+        add_retained(name.capacity())?;
+        add_allocation(usize::from(name.capacity() != 0))?;
+        add_retained(info.central_name.capacity())?;
+        add_allocation(usize::from(info.central_name.capacity() != 0))?;
+    }
+    for name in directories.keys() {
+        add_retained(name.capacity())?;
+        add_allocation(usize::from(name.capacity() != 0))?;
+    }
+    for name in order {
+        add_retained(name.capacity())?;
+        add_allocation(usize::from(name.capacity() != 0))?;
+    }
+    for entry in layout {
+        add_retained(entry.central_name.capacity())?;
+        add_allocation(usize::from(entry.central_name.capacity() != 0))?;
+    }
+
+    let traversal_bytes = retained
+        .checked_add(index.len())
+        .and_then(|value| value.checked_add(directories.len()))
+        .and_then(|value| value.checked_add(order.len()))
+        .and_then(|value| value.checked_add(layout.len()))
+        .ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "archive reader traversal census overflows usize".to_string(),
+            })
+        })?;
+    Ok(ArchiveReaderStorageRequirements {
+        retained_bytes: retained,
+        traversal_bytes,
+        allocations,
+    })
 }
 
 /// ZIP general-purpose bits that indicate an encrypted member.
@@ -2941,8 +3101,20 @@ impl<'data> ArchiveReader<'data> {
 
         validate_declared_entry_count(layout.len(), declared_entry_count)?;
         ordered_names.sort_by_key(|(offset, _)| *offset);
+        let ordered_names_capacity = ordered_names.capacity();
         let order = collect_order_fallibly(ordered_names, "archive reader file order")?;
+        let order_capacity = order.capacity();
+        let layout_capacity = layout.capacity();
         layout.sort_unstable_by_key(|entry| entry.wayfinder.local_header_offset());
+        let storage_requirements = archive_reader_storage_requirements(
+            &index,
+            &directories,
+            &order,
+            order_capacity,
+            &layout,
+            layout_capacity,
+            ordered_names_capacity,
+        )?;
 
         Ok(Self {
             archive,
@@ -2951,6 +3123,7 @@ impl<'data> ArchiveReader<'data> {
             order,
             layout,
             has_encrypted_entries,
+            storage_requirements,
             strict_layout_cache: StrictLayoutCache::new(),
         })
     }
@@ -2965,6 +3138,12 @@ impl<'data> ArchiveReader<'data> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.index.is_empty()
+    }
+
+    /// Return the eager index and construction-scratch storage census.
+    #[must_use]
+    pub const fn storage_requirements(&self) -> ArchiveReaderStorageRequirements {
+        self.storage_requirements
     }
 
     /// Whether any central-directory entry declares ZIP encryption through

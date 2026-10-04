@@ -198,25 +198,38 @@ impl<'data> ZipArchive<'data> {
 
     /// Census the owned physical ZIP structures retained while this archive
     /// is parsed. The source bytes themselves are borrowed and therefore are
-    /// intentionally excluded; names, six header-box payloads per member,
-    /// physical-entry structs, and central-order storage are included.
+    /// intentionally excluded; eager reader maps/order/layout storage,
+    /// normalized names, six header-box payloads per member, physical-entry
+    /// structs, and central-order storage are included. The result describes
+    /// an already-built archive; a caller must establish equal physical shape
+    /// before using it as a candidate admission bound.
     pub(crate) fn storage_requirements(&self) -> Result<CatalogStorageRequirements> {
         let physical_count = self.physical_entries.len();
-        let mut retained = physical_count
+        let reader = self.reader.storage_requirements();
+        let physical_vector_bytes = self
+            .physical_entries
+            .capacity()
             .checked_mul(size_of::<PhysicalEntry>())
-            .and_then(|bytes| {
-                bytes.checked_add(
-                    self.central_order
-                        .len()
-                        .checked_mul(size_of::<usize>())?,
-                )
-            })
             .ok_or_else(|| Error::InvalidBundle("physical ZIP storage overflow".to_owned()))?;
-        let mut traversal = physical_count
-            .checked_add(self.central_order.len())
+        let central_order_bytes = self
+            .central_order
+            .capacity()
+            .checked_mul(size_of::<usize>())
+            .ok_or_else(|| Error::InvalidBundle("physical ZIP storage overflow".to_owned()))?;
+        let mut retained = reader
+            .retained_bytes()
+            .checked_add(physical_vector_bytes)
+            .and_then(|bytes| bytes.checked_add(central_order_bytes))
+            .ok_or_else(|| Error::InvalidBundle("physical ZIP storage overflow".to_owned()))?;
+        let mut traversal = reader
+            .traversal_bytes()
+            .checked_add(physical_count)
+            .and_then(|bytes| bytes.checked_add(self.central_order.len()))
             .ok_or_else(|| Error::InvalidBundle("physical ZIP work overflow".to_owned()))?;
-        let mut allocations = usize::from(physical_count != 0)
-            .checked_add(usize::from(!self.central_order.is_empty()))
+        let mut allocations = reader
+            .allocations()
+            .checked_add(usize::from(self.physical_entries.capacity() != 0))
+            .and_then(|value| value.checked_add(usize::from(self.central_order.capacity() != 0)))
             .ok_or_else(|| Error::InvalidBundle("physical ZIP allocation overflow".to_owned()))?;
 
         for entry in &self.physical_entries {
@@ -235,7 +248,7 @@ impl<'data> ZipArchive<'data> {
                 })
             })?;
             retained = retained
-                .checked_add(entry.name.len())
+                .checked_add(entry.name.capacity())
                 .and_then(|value| value.checked_add(header_bytes))
                 .ok_or_else(|| Error::InvalidBundle("physical ZIP storage overflow".to_owned()))?;
             traversal = traversal
@@ -245,7 +258,7 @@ impl<'data> ZipArchive<'data> {
                 .and_then(|value| value.checked_add(entry.central_record.len()))
                 .ok_or_else(|| Error::InvalidBundle("physical ZIP work overflow".to_owned()))?;
             allocations = allocations
-                .checked_add(usize::from(!entry.name.is_empty()))
+                .checked_add(usize::from(entry.name.capacity() != 0))
                 .and_then(|value| {
                     value.checked_add(
                         [
