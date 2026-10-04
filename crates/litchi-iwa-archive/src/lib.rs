@@ -16,6 +16,7 @@
 mod catalog;
 mod directory;
 mod error;
+mod ingress;
 mod limits;
 mod logical;
 pub mod package;
@@ -59,6 +60,25 @@ pub use package::LogicalEntryLimits;
 pub use package::SourceProvenance;
 #[doc(hidden)]
 pub use semantic::{SemanticMetadataSidecars, SemanticProfile, SemanticProjection};
+
+/// Explicitly unstable neutral physical candidate ingress.
+///
+/// This module is intended for the root coordinator and focused format
+/// owners while the migration host is retired. It exposes storage facts and
+/// admission callbacks only; it does not publish generated messages, native
+/// object identifiers, or format semantic values through a supported facade.
+#[doc(hidden)]
+pub mod unstable {
+    pub use crate::ingress::{
+        AdmittedCandidateEntry, CandidateCompression, CandidateEntry, CandidateEntryKind,
+        CandidateIngressCharge, CandidateIngressError, CandidateIngressPhase, CandidateIngressPlan,
+        CandidateIngressRequirements, CandidateIngressVisitor, SnappyIngressRequirements,
+    };
+    pub use crate::package::{
+        EntryEdit, EntryInsertion, PreparedReassembly, ReassemblyExecutionRequirements,
+        ReassemblyPreparationRequirements,
+    };
+}
 
 use litchi_iwa_core::{Archive, SnappyStream};
 use soapberry_zip::office::ArchiveReader;

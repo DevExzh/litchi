@@ -15,6 +15,7 @@ use std::sync::Arc;
 use flate2::Compression;
 use flate2::write::DeflateEncoder;
 use litchi_core::ReadAt;
+use soapberry_zip::ZipArchive as RawZipArchive;
 
 use crate::zip::{PhysicalEntry, PhysicalHeader, ZipArchive};
 use crate::{Error, Limits, Result};
@@ -1483,6 +1484,72 @@ pub struct CatalogStorageRequirements {
     allocations: usize,
 }
 
+/// Allocation and traversal facts for the preparation phase of one physical
+/// ZIP reassembly.
+///
+/// The report excludes the caller's borrowed source bytes and the final ZIP
+/// output. It includes the second physical ZIP reader opened by preparation,
+/// the mutation and insertion indexes that are retained while the plan is
+/// assembled, and the borrowed replacement/name bytes traversed while those
+/// indexes are validated. A caller can therefore charge this report before
+/// calling a `prepare_reassembly*` method; execution has a separate exact
+/// [`ReassemblyExecutionRequirements`] report.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ReassemblyPreparationRequirements {
+    physical_entries: usize,
+    edits: usize,
+    deletions: usize,
+    insertions: usize,
+    retained_bytes: usize,
+    traversal_bytes: usize,
+    allocations: usize,
+}
+
+impl ReassemblyPreparationRequirements {
+    /// Number of physical source ZIP records reopened during preparation.
+    #[must_use]
+    pub const fn physical_entries(self) -> usize {
+        self.physical_entries
+    }
+
+    /// Number of replacement requests validated by preparation.
+    #[must_use]
+    pub const fn edits(self) -> usize {
+        self.edits
+    }
+
+    /// Number of deletion requests validated by preparation.
+    #[must_use]
+    pub const fn deletions(self) -> usize {
+        self.deletions
+    }
+
+    /// Number of insertion requests validated by preparation.
+    #[must_use]
+    pub const fn insertions(self) -> usize {
+        self.insertions
+    }
+
+    /// Heap bytes retained or staged before the prepared plan is returned.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Bytes traversed by the preparation phase.
+    #[must_use]
+    pub const fn traversal_bytes(self) -> usize {
+        self.traversal_bytes
+    }
+
+    /// Fallible logical allocation events represented by preparation.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+}
+
 impl CatalogStorageRequirements {
     /// Heap bytes retained or staged by the physical catalog census.
     #[must_use]
@@ -2017,6 +2084,245 @@ impl Catalog {
         self.physical_storage
     }
 
+    /// Census the allocations performed by reassembly preparation without
+    /// opening a second eager ZIP reader or allocating mutation indexes.
+    ///
+    /// This is the pre-admission half of the `prepare_reassembly*` family.
+    /// The returned report covers the second physical reader and every
+    /// request-index collection that preparation retains. The final ZIP
+    /// output and local-offset workspace remain in
+    /// [`PreparedReassembly::execution_requirements`].
+    #[doc(hidden)]
+    pub(crate) fn __reassembly_preparation_requirements<'data>(
+        &self,
+        insertions: &[EntryInsertion<'data>],
+        edits: &[EntryEdit<'data>],
+        deleted_names: &[&'data str],
+        limits: Limits,
+    ) -> Result<ReassemblyPreparationRequirements> {
+        let checked_limits = limits.validate()?;
+        let source_size = u64::try_from(self.source.len()).map_err(|_error| {
+            Error::InvalidBundle("catalog source length does not fit u64".to_owned())
+        })?;
+        checked_limits.check_input_size(source_size, "catalog source")?;
+
+        let mut requirements = ReassemblyPreparationRequirements {
+            edits: edits.len(),
+            deletions: deleted_names.len(),
+            insertions: insertions.len(),
+            ..ReassemblyPreparationRequirements::default()
+        };
+        validate_reassembly_request_shape(self, insertions, edits, deleted_names, checked_limits)?;
+
+        if insertions.is_empty() && edits.is_empty() && deleted_names.is_empty() {
+            self.check_source_total(checked_limits)?;
+            checked_limits.check_output_size(source_size)?;
+            return Ok(requirements);
+        }
+
+        let identical = insertions.is_empty()
+            && deleted_names.is_empty()
+            && !edits.is_empty()
+            && identical_edits_are_noop_without_allocation(&self.entries, edits, checked_limits)?;
+        if identical {
+            // The legacy no-op path still validates duplicate edit names with
+            // one bounded HashSet before it returns its empty prepared plan.
+            add_preparation_map(
+                &mut requirements,
+                edits.len(),
+                size_of::<(&'static str, ())>(),
+            )?;
+            add_request_traversal(&mut requirements, insertions, edits, deleted_names)?;
+            return Ok(requirements);
+        }
+        if !self.source_is_exact {
+            return Err(Error::Reassembly(
+                "reassembly preparation requires an exact flat ZIP source".to_owned(),
+            ));
+        }
+
+        let raw_archive = RawZipArchive::from_slice(self.source.as_ref())?;
+        let mut physical_entries = 0usize;
+        let mut source_metadata = 0u64;
+        for result in raw_archive.entries() {
+            let entry = result?;
+            physical_entries = physical_entries.checked_add(1).ok_or_else(|| {
+                Error::Reassembly("ZIP physical entry count overflows usize".to_owned())
+            })?;
+            if physical_entries > checked_limits.max_entries() {
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::Entries,
+                    observed: u64::try_from(physical_entries).unwrap_or(u64::MAX),
+                    maximum: u64::try_from(checked_limits.max_entries()).unwrap_or(u64::MAX),
+                });
+            }
+            // Prove local framing while the raw archive is still borrowed.
+            let _ = raw_archive.get_entry(entry.wayfinder())?;
+            source_metadata = source_metadata
+                .checked_add(entry.metadata_size_hint())
+                .and_then(|value| value.checked_add(46))
+                .ok_or_else(|| Error::Reassembly("ZIP metadata length overflows u64".to_owned()))?;
+        }
+        if source_metadata > checked_limits.zip_limits().max_metadata_bytes {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::MetadataBytes,
+                observed: source_metadata,
+                maximum: checked_limits.zip_limits().max_metadata_bytes,
+            });
+        }
+        let added_metadata = insertions.iter().try_fold(0u64, |sum, insertion| {
+            let name_len = u64::try_from(insertion.name().len()).map_err(|_error| {
+                Error::InvalidBundle("inserted member name length does not fit u64".to_owned())
+            })?;
+            let doubled_name_len = name_len.checked_mul(2).ok_or_else(|| {
+                Error::Reassembly("inserted ZIP metadata length overflows u64".to_owned())
+            })?;
+            sum.checked_add(doubled_name_len).ok_or_else(|| {
+                Error::Reassembly("inserted ZIP metadata length overflows u64".to_owned())
+            })
+        })?;
+        let metadata_total = source_metadata.checked_add(added_metadata).ok_or_else(|| {
+            Error::Reassembly("reassembled ZIP metadata length overflows u64".to_owned())
+        })?;
+        if metadata_total > checked_limits.zip_limits().max_metadata_bytes {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::MetadataBytes,
+                observed: metadata_total,
+                maximum: checked_limits.zip_limits().max_metadata_bytes,
+            });
+        }
+        requirements.physical_entries = physical_entries;
+        let final_physical_entries = physical_entries
+            .checked_add(insertions.len())
+            .ok_or_else(|| Error::Reassembly("ZIP entry count overflows usize".to_owned()))?;
+        if final_physical_entries > checked_limits.max_entries() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Entries,
+                observed: u64::try_from(final_physical_entries).unwrap_or(u64::MAX),
+                maximum: u64::try_from(checked_limits.max_entries()).unwrap_or(u64::MAX),
+            });
+        }
+
+        self.check_source_total(checked_limits)?;
+        let mut final_total = self.source_total_uncompressed;
+        for edit in edits {
+            let entry = self
+                .entries
+                .iter()
+                .find(|entry| entry.name() == edit.name());
+            let Some(entry) = entry else {
+                return Err(Error::Reassembly(format!(
+                    "edited member does not exist in the flat catalog: {}",
+                    edit.name()
+                )));
+            };
+            final_total = final_total
+                .checked_sub(entry.metadata().uncompressed_size())
+                .and_then(|value| {
+                    u64::try_from(edit.data().len())
+                        .ok()
+                        .and_then(|data_len| value.checked_add(data_len))
+                })
+                .ok_or_else(|| {
+                    Error::Reassembly("reassembled ZIP total overflows u64".to_owned())
+                })?;
+        }
+        for name in deleted_names {
+            let entry = self.entries.iter().find(|entry| entry.name() == *name);
+            let Some(entry) = entry else {
+                return Err(Error::Reassembly(format!(
+                    "deleted member does not exist in the flat catalog: {name}"
+                )));
+            };
+            final_total = final_total
+                .checked_sub(entry.metadata().uncompressed_size())
+                .ok_or_else(|| {
+                    Error::Reassembly("reassembled ZIP total underflows u64".to_owned())
+                })?;
+        }
+        for insertion in insertions {
+            final_total = final_total
+                .checked_add(u64::try_from(insertion.data().len()).map_err(|_error| {
+                    Error::InvalidBundle("inserted member length does not fit u64".to_owned())
+                })?)
+                .ok_or_else(|| {
+                    Error::Reassembly("reassembled ZIP total overflows u64".to_owned())
+                })?;
+        }
+        if final_total > checked_limits.max_total_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::TotalBytes,
+                observed: final_total,
+                maximum: checked_limits.max_total_bytes(),
+            });
+        }
+
+        // `physical_storage` is the post-construction census of the same
+        // immutable source. It is a shape-proven upper bound for the second
+        // ZipArchive opened by preparation and avoids reopening it during this
+        // allocation-free census.
+        requirements.retained_bytes = self.physical_storage.retained_bytes;
+        requirements.traversal_bytes = self.physical_storage.traversal_bytes;
+        requirements.allocations = self.physical_storage.allocations;
+        if insertions.is_empty() && deleted_names.is_empty() && !edits.is_empty() {
+            // The replacement-only path runs the duplicate-name no-op check
+            // before `prepare_mutations`, so retain that bounded index too.
+            add_preparation_map(
+                &mut requirements,
+                edits.len(),
+                size_of::<(&'static str, ())>(),
+            )?;
+        }
+        add_preparation_map(
+            &mut requirements,
+            edits.len(),
+            size_of::<(&'static str, EntryEdit<'static>)>(),
+        )?;
+        add_preparation_map(
+            &mut requirements,
+            deleted_names.len(),
+            size_of::<(&'static str, ())>(),
+        )?;
+        add_preparation_vec(
+            &mut requirements,
+            edits.len(),
+            size_of::<MatchedEdit<'static>>(),
+        )?;
+        add_preparation_map(
+            &mut requirements,
+            deleted_names.len(),
+            size_of::<(usize, ())>(),
+        )?;
+        let selected_count = edits
+            .len()
+            .checked_add(deleted_names.len())
+            .ok_or_else(|| {
+                Error::Reassembly("mutation selection count overflows usize".to_owned())
+            })?;
+        add_preparation_map(
+            &mut requirements,
+            selected_count,
+            size_of::<(&'static str, ())>(),
+        )?;
+        add_preparation_map(
+            &mut requirements,
+            edits.len(),
+            size_of::<(usize, PreparedEdit<'static>)>(),
+        )?;
+        add_preparation_map(
+            &mut requirements,
+            insertions.len(),
+            size_of::<(&'static str, ())>(),
+        )?;
+        add_preparation_vec(
+            &mut requirements,
+            insertions.len(),
+            size_of::<PreparedInsertion<'static>>(),
+        )?;
+        add_request_traversal(&mut requirements, insertions, edits, deleted_names)?;
+        Ok(requirements)
+    }
+
     /// Return whether the catalog's logical entries still describe the
     /// original ZIP envelope exactly.
     #[must_use]
@@ -2489,6 +2795,286 @@ impl Catalog {
         sink.write_all(&bytes)?;
         Ok(())
     }
+}
+
+fn identical_edits_are_noop_without_allocation(
+    entries: &[Entry],
+    edits: &[EntryEdit<'_>],
+    limits: Limits,
+) -> Result<bool> {
+    let mut identical = true;
+    for (index, edit) in edits.iter().copied().enumerate() {
+        if edits[..index]
+            .iter()
+            .any(|previous| previous.name() == edit.name())
+        {
+            return Err(Error::Reassembly(format!(
+                "member is edited more than once: {}",
+                edit.name()
+            )));
+        }
+        let entry = entries
+            .iter()
+            .find(|entry| entry.name() == edit.name())
+            .ok_or_else(|| {
+                Error::Reassembly(format!(
+                    "edited member does not exist in the flat catalog: {}",
+                    edit.name()
+                ))
+            })?;
+        if entry.is_opaque() {
+            return Err(Error::Reassembly(format!(
+                "edited member uses unsupported compression method {}: {}",
+                entry.metadata().central().compression_method(),
+                entry.name()
+            )));
+        }
+        let data_size = u64::try_from(edit.data().len()).map_err(|_error| {
+            Error::InvalidBundle("edited member length does not fit u64".to_owned())
+        })?;
+        if data_size > limits.max_entry_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::EntryBytes,
+                observed: data_size,
+                maximum: limits.max_entry_bytes(),
+            });
+        }
+        identical &= entry.data() == edit.data();
+    }
+    Ok(identical)
+}
+
+fn validate_reassembly_request_shape(
+    catalog: &Catalog,
+    insertions: &[EntryInsertion<'_>],
+    edits: &[EntryEdit<'_>],
+    deleted_names: &[&str],
+    limits: Limits,
+) -> Result<()> {
+    for (index, edit) in edits.iter().copied().enumerate() {
+        if edits[..index]
+            .iter()
+            .any(|previous| previous.name() == edit.name())
+        {
+            return Err(Error::Reassembly(format!(
+                "member is edited more than once: {}",
+                edit.name()
+            )));
+        }
+        if deleted_names.iter().any(|name| *name == edit.name()) {
+            return Err(Error::Reassembly(format!(
+                "member cannot be both edited and deleted: {}",
+                edit.name()
+            )));
+        }
+        let entry = catalog
+            .entries
+            .iter()
+            .find(|entry| entry.name() == edit.name())
+            .ok_or_else(|| {
+                Error::Reassembly(format!(
+                    "edited member does not exist in the flat catalog: {}",
+                    edit.name()
+                ))
+            })?;
+        if entry.is_opaque() {
+            return Err(Error::Reassembly(format!(
+                "edited member uses unsupported compression method {}: {}",
+                entry.metadata().central().compression_method(),
+                entry.name()
+            )));
+        }
+        let data_size = u64::try_from(edit.data().len()).map_err(|_error| {
+            Error::InvalidBundle("edited member length does not fit u64".to_owned())
+        })?;
+        if data_size > limits.max_entry_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::EntryBytes,
+                observed: data_size,
+                maximum: limits.max_entry_bytes(),
+            });
+        }
+    }
+
+    for (index, name) in deleted_names.iter().enumerate() {
+        if deleted_names[..index].contains(name) {
+            return Err(Error::Reassembly(format!(
+                "member is deleted more than once: {name}"
+            )));
+        }
+        if catalog.entries.iter().all(|entry| entry.name() != *name) {
+            return Err(Error::Reassembly(format!(
+                "deleted member does not exist in the flat catalog: {name}"
+            )));
+        }
+    }
+
+    let logical_count = catalog.entries.len();
+    for (index, insertion) in insertions.iter().copied().enumerate() {
+        if insertions[..index]
+            .iter()
+            .any(|previous| previous.name() == insertion.name())
+        {
+            return Err(Error::Reassembly(format!(
+                "inserted member is requested more than once: {}",
+                insertion.name()
+            )));
+        }
+        let position = insertion.position().unwrap_or(logical_count);
+        if position > logical_count {
+            return Err(Error::Reassembly(format!(
+                "inserted member position {position} exceeds the {logical_count} logical members"
+            )));
+        }
+        let name_bytes = insertion.name().as_bytes();
+        if !is_exact_portable_raw_name(name_bytes) {
+            return Err(Error::Reassembly(format!(
+                "inserted member name is not an exact portable ZIP path: {:?}",
+                insertion.name()
+            )));
+        }
+        let name_len = u64::try_from(name_bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("inserted member name length does not fit u64".to_owned())
+        })?;
+        if name_len > limits.zip_limits().max_member_name_bytes {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::MemberNameBytes,
+                observed: name_len,
+                maximum: limits.zip_limits().max_member_name_bytes,
+            });
+        }
+        if name_bytes.len() > usize::from(u16::MAX) {
+            return Err(Error::Reassembly(
+                "inserted member name requires ZIP64 filename fields".to_owned(),
+            ));
+        }
+        if catalog
+            .entries
+            .iter()
+            .any(|entry| entry.name() == insertion.name())
+        {
+            return Err(Error::Reassembly(format!(
+                "inserted member duplicates an existing ZIP member: {}",
+                insertion.name()
+            )));
+        }
+        let data_len = u64::try_from(insertion.data().len()).map_err(|_error| {
+            Error::InvalidBundle("inserted member length does not fit u64".to_owned())
+        })?;
+        if data_len > limits.max_entry_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::EntryBytes,
+                observed: data_len,
+                maximum: limits.max_entry_bytes(),
+            });
+        }
+        if data_len > limits.zip_limits().max_compressed_size {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::CompressedEntryBytes,
+                observed: data_len,
+                maximum: limits.zip_limits().max_compressed_size,
+            });
+        }
+        if insertion.data().len() > usize::try_from(u32::MAX).unwrap_or(usize::MAX) {
+            return Err(Error::Reassembly(
+                "inserted member requires ZIP64 size fields".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn add_preparation_map(
+    requirements: &mut ReassemblyPreparationRequirements,
+    capacity: usize,
+    element_size: usize,
+) -> Result<()> {
+    if capacity == 0 {
+        return Ok(());
+    }
+    let map_slot_overhead = size_of::<usize>().saturating_mul(2).max(16);
+    let bytes = capacity
+        .checked_mul(element_size.checked_add(map_slot_overhead).ok_or_else(|| {
+            Error::Reassembly("reassembly map storage overflows usize".to_owned())
+        })?)
+        .and_then(|value| value.checked_mul(2))
+        .ok_or_else(|| Error::Reassembly("reassembly map storage overflows usize".to_owned()))?;
+    requirements.retained_bytes =
+        requirements
+            .retained_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| {
+                Error::Reassembly("reassembly retained storage overflows usize".to_owned())
+            })?;
+    requirements.allocations = requirements.allocations.checked_add(1).ok_or_else(|| {
+        Error::Reassembly("reassembly allocation count overflows usize".to_owned())
+    })?;
+    Ok(())
+}
+
+fn add_preparation_vec(
+    requirements: &mut ReassemblyPreparationRequirements,
+    capacity: usize,
+    element_size: usize,
+) -> Result<()> {
+    if capacity == 0 {
+        return Ok(());
+    }
+    let bytes = capacity
+        .checked_mul(element_size)
+        .ok_or_else(|| Error::Reassembly("reassembly vector storage overflows usize".to_owned()))?;
+    requirements.retained_bytes =
+        requirements
+            .retained_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| {
+                Error::Reassembly("reassembly retained storage overflows usize".to_owned())
+            })?;
+    requirements.allocations = requirements.allocations.checked_add(1).ok_or_else(|| {
+        Error::Reassembly("reassembly allocation count overflows usize".to_owned())
+    })?;
+    Ok(())
+}
+
+fn add_request_traversal(
+    requirements: &mut ReassemblyPreparationRequirements,
+    insertions: &[EntryInsertion<'_>],
+    edits: &[EntryEdit<'_>],
+    deleted_names: &[&str],
+) -> Result<()> {
+    for edit in edits {
+        let bytes = edit
+            .name()
+            .len()
+            .checked_add(edit.data().len())
+            .ok_or_else(|| {
+                Error::Reassembly("reassembly request traversal overflows usize".to_owned())
+            })?;
+        requirements.traversal_bytes = requirements
+            .traversal_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| Error::Reassembly("reassembly traversal overflows usize".to_owned()))?;
+    }
+    for name in deleted_names {
+        requirements.traversal_bytes = requirements
+            .traversal_bytes
+            .checked_add(name.len())
+            .ok_or_else(|| Error::Reassembly("reassembly traversal overflows usize".to_owned()))?;
+    }
+    for insertion in insertions {
+        let bytes = insertion
+            .name()
+            .len()
+            .checked_add(insertion.data().len())
+            .ok_or_else(|| {
+                Error::Reassembly("reassembly request traversal overflows usize".to_owned())
+            })?;
+        requirements.traversal_bytes = requirements
+            .traversal_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| Error::Reassembly("reassembly traversal overflows usize".to_owned()))?;
+    }
+    Ok(())
 }
 
 impl crate::SourceCatalog {

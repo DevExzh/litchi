@@ -41,6 +41,13 @@ use litchi_iwa_protos::archive_codec;
 use crate::{Error, HeaderKind, HeaderOperation, LimitKind, Limits, Result};
 
 mod identity_clone;
+mod ingress;
+mod inventory;
+pub use ingress::ArchiveIngressRequirements;
+pub use inventory::{
+    ArchiveCloneInventory, ArchiveCloneInventoryChunk, ArchiveCloneInventoryError,
+    ArchiveCloneInventoryKind, ArchiveCloneInventoryResult, ArchiveCloneInventoryVisitor,
+};
 
 use identity_clone::{
     checked_replacement_lengths, clone_archive_info_with_identity_remap,

@@ -13,12 +13,14 @@ mod limits;
 mod snappy;
 
 pub use archive::{
-    Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
-    CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
-    CanonicalObjectReferenceField, CanonicalObjectReferenceFields, DataReferenceTransition,
-    FieldDataReferenceTransition, FieldInfo, FieldPath, FieldType, KnownFieldRule, MessageInfo,
-    RawMessage, UnknownFieldRule,
+    Archive, ArchiveCloneInventory, ArchiveCloneInventoryChunk, ArchiveCloneInventoryError,
+    ArchiveCloneInventoryKind, ArchiveCloneInventoryResult, ArchiveCloneInventoryVisitor,
+    ArchiveInfo, ArchiveIngressRequirements, ArchiveObject, ArchiveReferenceKind,
+    ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceScope,
+    ArchiveReferenceVisitor, CanonicalFieldDataReferenceOperation,
+    CanonicalFieldDataReferenceTransition, CanonicalObjectReferenceField,
+    CanonicalObjectReferenceFields, DataReferenceTransition, FieldDataReferenceTransition,
+    FieldInfo, FieldPath, FieldType, KnownFieldRule, MessageInfo, RawMessage, UnknownFieldRule,
 };
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;
