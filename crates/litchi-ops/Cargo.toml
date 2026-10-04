@@ -13,10 +13,11 @@ default = []
 
 # Format features mirror the `litchi` facade's per-format features. Each one
 # gains its `dep:` leaf edge, and the matching `tools/crate_boundaries.json`
-# entry, in the change that first needs that leaf (ADR 0033, record 0004). The
-# error module (record 0003, step S2) wires the leaf errors of the tier 1-2
-# formats and RTF. ODT, ODS and ODP report `litchi_core::Error`, so their
-# features stay empty until their handlers land.
+# entry, in the change that first uses it (ADR 0033, record 0004). The error
+# module (record 0003, step S2) wires the leaf errors of the tier 1-2 formats
+# and RTF; the `OpenOptions` sub-options (step S3, §2.5) name OOXML limits from
+# `litchi-opc`, DOC leniency from `litchi-doc`, PPT record limits from
+# `litchi-ppt`, and ODF package limits from `litchi-odf-common`.
 doc     = ["dep:litchi-doc", "dep:litchi-cfb"]
 docx    = ["dep:litchi-docx", "dep:litchi-opc"]
 ppt     = ["dep:litchi-ppt", "dep:litchi-cfb"]
@@ -25,25 +26,26 @@ xls     = ["dep:litchi-xls", "dep:litchi-cfb"]
 xlsx    = ["dep:litchi-xlsx", "dep:litchi-opc"]
 xlsb    = ["dep:litchi-xlsb", "dep:litchi-opc"]
 rtf     = ["dep:litchi-rtf"]
-odt     = []
-ods     = []
-odp     = []
+odt     = ["dep:litchi-odf-common"]
+ods     = ["dep:litchi-odf-common"]
+odp     = ["dep:litchi-odf-common"]
 pages   = []
 keynote = []
 numbers = []
 
 [dependencies]
-litchi-cfb  = { workspace = true, optional = true }
-litchi-core = { workspace = true }
-litchi-doc  = { workspace = true, optional = true }
-litchi-docx = { workspace = true, optional = true }
-litchi-opc  = { workspace = true, optional = true }
-litchi-ppt  = { workspace = true, optional = true }
-litchi-pptx = { workspace = true, optional = true }
-litchi-rtf  = { workspace = true, optional = true }
-litchi-xls  = { workspace = true, optional = true }
-litchi-xlsb = { workspace = true, optional = true }
-litchi-xlsx = { workspace = true, optional = true }
+litchi-cfb        = { workspace = true, optional = true }
+litchi-core       = { workspace = true }
+litchi-doc        = { workspace = true, optional = true }
+litchi-docx       = { workspace = true, optional = true }
+litchi-odf-common = { workspace = true, optional = true }
+litchi-opc        = { workspace = true, optional = true }
+litchi-ppt        = { workspace = true, optional = true }
+litchi-pptx       = { workspace = true, optional = true }
+litchi-rtf        = { workspace = true, optional = true }
+litchi-xls        = { workspace = true, optional = true }
+litchi-xlsb       = { workspace = true, optional = true }
+litchi-xlsx       = { workspace = true, optional = true }
 
 [lints]
 workspace = true

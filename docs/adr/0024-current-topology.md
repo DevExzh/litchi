@@ -4748,7 +4748,23 @@ features, and `litchi-cfb` behind the three legacy binary features. ODT, ODS
 and ODP report `litchi_core::Error` and add no edge. `litchi-ops` stays
 runtime-neutral and iWork-free, so the non-iWork release gate is unchanged.
 
-The current inventory is 66 workspace packages, 255 internal dependency
-declarations, 244 canonical edges, 12 development-only edges, 11 ordered
+## 2026-10-04 amendment: `litchi-ops` open-option edges
+
+Unified-ops M0a step S3 (record
+[0003](../unified-ops/0003-m0a-migration-plan.md) §2.5) gives `litchi-ops`
+its `OpenOptions` per-format sub-options, which name leaf limit types. It uses
+four optional normal edges, each owned by the format features that use it:
+`litchi-ops -> litchi-opc` (`docx`, `pptx`, `xlsx`, `xlsb`: OOXML read and
+source-cache limits), `litchi-ops -> litchi-doc` (`doc`: leniency, without
+credentials), `litchi-ops -> litchi-ppt` (`ppt`: record limits), and
+`litchi-ops -> litchi-odf-common` (`odt`, `ods`, `odp`: package limits). The
+first three already exist from the S2 amendment above; only
+`litchi-ops -> litchi-odf-common` is new, so the `odt`, `ods` and `odp`
+features now carry that one edge. None of the four reaches an iWork package, so the non-iWork release gate keeps
+`litchi-ops` among its bulk packages, and the package stays runtime-neutral.
+
+Together with the S2 amendment above, the current inventory is 66 workspace
+packages, 256 internal dependency declarations, 245 canonical edges, 12
+development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.

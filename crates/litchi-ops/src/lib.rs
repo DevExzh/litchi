@@ -12,13 +12,16 @@
 //!
 //! # Status
 //!
-//! The crate is a scaffold. Its only public API so far is the unified
-//! [`error`] module; the rest of the module layout below only fixes where each
-//! part of the design will live.
+//! The crate is being built step by step (record 0003 §4). Its public API so
+//! far is the unified [`error`] module and the open-time vocabulary:
+//! [`OpenOptions`], [`SourceMode`], [`Family`], and the [`Locked`] and
+//! [`Signed`] shells. The module layout below fixes where each remaining part
+//! of the design will live.
 //!
 //! # Layout
 //!
 //! - `file`: the flat `File` enum, including `Locked` and `Signed` states.
+//! - `options`: `OpenOptions` and `SourceMode`.
 //! - `error`: the unified typed error and its closed code list.
 //! - `path`: re-export point for the `litchi_core::selector` grammar.
 //! - `node`: the generic node view, projected on demand.
@@ -35,7 +38,12 @@ pub mod error;
 mod file;
 mod handler;
 mod node;
+mod options;
 mod path;
 mod registry;
 
 pub use error::{Code, Error, Result};
+pub use file::{EncryptionKind, Family, Locked, SignatureOrigin, Signed};
+#[cfg(feature = "doc")]
+pub use options::DocOptions;
+pub use options::{OpenOptions, SourceMode};

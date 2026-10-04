@@ -243,6 +243,7 @@
       "litchi-core",
       "litchi-doc",
       "litchi-docx",
+      "litchi-odf-common",
       "litchi-opc",
       "litchi-ppt",
       "litchi-pptx",
