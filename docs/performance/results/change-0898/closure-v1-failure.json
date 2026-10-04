@@ -1,0 +1,14 @@
+{
+  "status": "fail",
+  "scope": "Coordinator closure bookkeeping only; no workload or measurement rerun",
+  "failure": "AssertionError: methodology-review.json",
+  "reason": "Initial closing script incorrectly required pass rather than actual approved_for_measurement for methodology receipt. Shell continued to commit already-staged batch after that assertion; final closure is supplied in a follow-up commit.",
+  "main_batch_commit": "3214e4ab555e17a74a3bf161db561d79689c1628",
+  "methodology_review": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/methodology-review.json",
+    "bytes": 28029,
+    "sha256": "464e3a8fe8775f90ec7daad375d8635e39f9e5d0d09fc11d89b3e1fd4f99aa7b"
+  },
+  "final_review_created_by_failed_attempt": false,
+  "measurement_unchanged": true
+}

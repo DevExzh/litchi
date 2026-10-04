@@ -1,0 +1,129 @@
+{
+  "schema": "litchi.emitted-name-final-review-0898.v1",
+  "status": "pass",
+  "reviewer": "root coordinator",
+  "review_provenance": "Final document/result/cleanup closure by coordinator, relying on separately retained independent source, corpus, methodology and raw-sample reviews. Optional final documentation agent was interrupted after no blocking finding was reported; this receipt is not represented as its independent approval.",
+  "decision": "rejected",
+  "production_adopted": false,
+  "primary_gate": {
+    "ci95_high": 0.9877410001268981,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 0.9850658963459487,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "checks": [
+    "Exact documented native p50 medians and paired ratios match sealed reduction",
+    "All 10 quality gates pass and corpus equality independently reviewed",
+    "Independent 72-child / 3,320-sample raw replay passes after four preserved offline-helper failures",
+    "Production source restored exactly",
+    "Owned source/build roots absent; retained binary/fixture/report custody and post-cleanup replay pass",
+    "Only performance documentation/evidence committed; unrelated work preserved",
+    "Verbatim hash-bound patch/log whitespace retained with staging audit"
+  ],
+  "issues": [],
+  "evidence": {
+    "decision.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/decision.json",
+      "bytes": 2326,
+      "sha256": "3064a2c4bb1ef53b318e7612245a45642f772324ab0255e6d429ba2aad08258e"
+    },
+    "native-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/native-review.json",
+      "bytes": 307788,
+      "sha256": "af003c9482d7dd126ac746e6518f250b2f2d4c0c3e12926f31e8344648c2b49d"
+    },
+    "independent_review_v5.py": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/independent_review_v5.py",
+      "bytes": 52903,
+      "sha256": "8654f0a4f6817e766b16e123763839207a6a1509af0ac3cd2ac7b1a92d651b4c"
+    },
+    "source-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/source-review.json",
+      "bytes": 782,
+      "sha256": "43e841e5e1991f80e6429d4b09c1e096de376dc0d14208915a71da0553311fea"
+    },
+    "corpus-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/corpus-review.json",
+      "bytes": 18882,
+      "sha256": "7edddcdee528e7b8d38351165f849fe9d70f58c0d64f0c6f83d77f41fb165350"
+    },
+    "quality.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/quality.json",
+      "bytes": 3111,
+      "sha256": "f52c28784da2be17509c0d4b1f225582b8172fe50bb4cb393187a82b852338fb"
+    },
+    "methodology-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/methodology-review.json",
+      "bytes": 28029,
+      "sha256": "464e3a8fe8775f90ec7daad375d8635e39f9e5d0d09fc11d89b3e1fd4f99aa7b"
+    },
+    "plan.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/plan.json",
+      "bytes": 41575,
+      "sha256": "e2582ea93191498fcb6a9687dbd958f76008439dda81c24494e525f1bf256d6a"
+    },
+    "reduction.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/reduction.json",
+      "bytes": 45773,
+      "sha256": "8b5a4481e6cec9c1d095cc2a2ad7a1b286cc4250812305ad90d8fa897f6926c8"
+    },
+    "restoration.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/restoration.json",
+      "bytes": 730,
+      "sha256": "9efcb9a740571b6817ba048c07f7406306c6bc954faa64d623290a9388fbbc21"
+    },
+    "owned-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/owned-cleanup.json",
+      "bytes": 5950,
+      "sha256": "d341b6eb9f541f68e23c3f57a33e9305661385252dcb16a61b4a87d0c88ae00f"
+    },
+    "verification-after-cleanup.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/verification-after-cleanup.json",
+      "bytes": 846,
+      "sha256": "227df4e8d136ddbd64bb0c383251411c3b597dbaaffed273fe77f6b178426a48"
+    },
+    "post-cleanup-custody.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/post-cleanup-custody.json",
+      "bytes": 2187,
+      "sha256": "7b64c34cae95c7c0dda33af73e3d3f87a44f0040fda41b8eb5bcc581d43c7e71"
+    },
+    "staging-audit.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/staging-audit.json",
+      "bytes": 1964,
+      "sha256": "f8609d010286328b5a6a53411277b78a52518c4804d57872a1edcd6588dd058c"
+    },
+    "closure-v1-failure.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/closure-v1-failure.json",
+      "bytes": 798,
+      "sha256": "f684c0918a76bdb0326e16a58b371e3d3d1a18017f594a63c12017efb95e015e"
+    },
+    "README.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0898/README.md",
+      "bytes": 4384,
+      "sha256": "057745c853b5fa77a1f99bef6bf0e8b52524b784e12b227054364904b9443225"
+    }
+  },
+  "documents": {
+    "0898-emitted-name-output-span.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/0898-emitted-name-output-span.md",
+      "bytes": 13062,
+      "sha256": "3a11aefb425a0e8de5b42ae87dd991aaca00fef62fd92963371c1b567c2de413"
+    },
+    "BASELINE.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/BASELINE.md",
+      "bytes": 471246,
+      "sha256": "7aa9b3a063a9402257213c7b7b4954972acff372795a5fd97abf4d68841d5f51"
+    },
+    "HOTSPOTS.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/HOTSPOTS.md",
+      "bytes": 773513,
+      "sha256": "64f3708b2d503218a37850990392c5a7772798774361e757fb2598f53585dcf0"
+    },
+    "REPORT.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/REPORT.md",
+      "bytes": 786293,
+      "sha256": "2f554a5ab513afc605d2fd86f6622d956e72e52868c7c31e3e85b5969f639217"
+    }
+  }
+}
