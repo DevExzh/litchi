@@ -1,0 +1,57 @@
+{
+  "cases": [
+    "medium-one-percent",
+    "dense-sparse-one-percent",
+    "medium-one-edit"
+  ],
+  "checks": [
+    "Exact exported source and output ZIP hashes match retained0902 baseline reports",
+    "Rust quick-xml and Python Expat full XML counts agree",
+    "All sidecar XML bytes equal ZIP members",
+    "Selected parts match changed XML set for fixed generator; preserve proof kinds/spans",
+    "Byte-identical offline replay",
+    "Create-only exporter and helper refuse overwrite"
+  ],
+  "cleanup": "Remove only target/litchi-0904-build with owned marker and duplicate replay outputs; no worktrees created",
+  "head": "0283e96b73af76906c1a83ce90956e1c6afa1116",
+  "prior_identities": {
+    "bytes": 5006,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0904/prior-identities.json",
+    "sha256": "2774adb7cbb2c158333814ff38b4003a8b46a6f9e4ec4b5aa6054b6da4bc7a4a"
+  },
+  "schema": "litchi.xlsx-attribute-census-plan-0904.v1",
+  "scope": "Untimed actual harness fixture export and independent lexical attribute census; no optimization or native performance claim",
+  "source": [
+    {
+      "bytes": 3020953,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    {
+      "bytes": 14152,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/xlsx_attribute_fixtures.rs",
+      "sha256": "1c5d740011dd7ce39bd8ad139627b3e030c4360731ca5af5caa5a7e93a984581"
+    },
+    {
+      "bytes": 788,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/examples/xlsx_attribute_fixtures.rs",
+      "sha256": "9b705f3fc42a360653cdb8c3be2d9042f5df5febce69b2f692fdf8046e478da6"
+    },
+    {
+      "bytes": 56289,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    {
+      "bytes": 138465,
+      "path": "/home/zhuhe/code/litchi/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    {
+      "bytes": 124782,
+      "path": "/home/zhuhe/code/litchi/crates/xml-minifier/src/audit.rs",
+      "sha256": "91424b57dfcecaf6cb204429e6d779a0c81a8b55c6546d616c694f4ea2455ac0"
+    }
+  ],
+  "status": "frozen"
+}

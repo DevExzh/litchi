@@ -1,0 +1,487 @@
+{
+  "schema": "litchi.xlsx-attribute-fixtures.v1",
+  "generator": "litchi-xlsx-source-backed-cell-values-attribute-fixtures-v1",
+  "source_publication": "SourceBackedEditor::edit_sheets -> set -> commit -> publish_multi_commit_to_stream",
+  "census_definition": "Every quick-xml Start or Empty event; zero/one/multiple classify that event's attributes, including namespace declarations; xml:space counts matching attributes and containing elements.",
+  "audited_member_definition": "The source-backed topology plan's owner workbook plus each selected worksheet; one-percent cases have five parts and the one-edit control has the workbook plus its selected worksheet.",
+  "cases": [
+    {
+      "id": "medium-one-percent",
+      "shape": "medium",
+      "case": "one-percent",
+      "update_count": 93,
+      "source": {
+        "path": "medium/source.zip",
+        "bytes": 4226429,
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "output": {
+        "path": "medium/one-percent/output.zip",
+        "bytes": 4226788,
+        "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+      },
+      "parts": [
+        {
+          "member": "xl/workbook.xml",
+          "original": {
+            "path": "medium/one-percent/original/xl/workbook.xml",
+            "bytes": 424,
+            "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+          },
+          "replacement": {
+            "path": "medium/one-percent/replacement/xl/workbook.xml",
+            "bytes": 527,
+            "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+          },
+          "original_census": {
+            "start_or_empty_tags": 6,
+            "zero_attribute_tags": 1,
+            "one_attribute_tags": 0,
+            "multiple_attribute_tags": 5,
+            "attributes": 14,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 7,
+            "zero_attribute_tags": 1,
+            "one_attribute_tags": 0,
+            "multiple_attribute_tags": 6,
+            "attributes": 19,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "path": "medium/one-percent/original/xl/worksheets/sheet1.xml",
+            "bytes": 63294,
+            "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+          },
+          "replacement": {
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet1.xml",
+            "bytes": 63294,
+            "sha256": "e12f687e5e1a0456338694a505134d53ccd1417cb17e51b12dff85429d6f1220"
+          },
+          "original_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet2.xml",
+          "original": {
+            "path": "medium/one-percent/original/xl/worksheets/sheet2.xml",
+            "bytes": 68488,
+            "sha256": "fae0309386f910eda0caf18ea98f578ce5c719438e7de8b696cdd8089cf8c326"
+          },
+          "replacement": {
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet2.xml",
+            "bytes": 68488,
+            "sha256": "6e530b0c405315eb4fb29b87da91d29faf3ec346c1e1e3b4c9b29c7fa21fbafa"
+          },
+          "original_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet3.xml",
+          "original": {
+            "path": "medium/one-percent/original/xl/worksheets/sheet3.xml",
+            "bytes": 68488,
+            "sha256": "c105ecf49b0b3a0f35c71f8dfa2d049aac677c95d2c21150f93afe3f871c8edf"
+          },
+          "replacement": {
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet3.xml",
+            "bytes": 68488,
+            "sha256": "34a604ebbe87e62535b215bfd648061c0686c45ae6795f43e856088247938811"
+          },
+          "original_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet4.xml",
+          "original": {
+            "path": "medium/one-percent/original/xl/worksheets/sheet4.xml",
+            "bytes": 68488,
+            "sha256": "8c34fd06ab17b99f9260ee7719c60785dabab53faeec829d2576fbcc42ae1f9c"
+          },
+          "replacement": {
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet4.xml",
+            "bytes": 68488,
+            "sha256": "dc18d296070fce4d64434d03ac400df00e1df53a1d534a9104aaddc4123baf79"
+          },
+          "original_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        }
+      ]
+    },
+    {
+      "id": "medium-one-edit",
+      "shape": "medium",
+      "case": "one-edit",
+      "update_count": 1,
+      "source": {
+        "path": "medium/source.zip",
+        "bytes": 4226429,
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "output": {
+        "path": "medium/one-edit/output.zip",
+        "bytes": 4226480,
+        "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+      },
+      "parts": [
+        {
+          "member": "xl/workbook.xml",
+          "original": {
+            "path": "medium/one-edit/original/xl/workbook.xml",
+            "bytes": 424,
+            "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+          },
+          "replacement": {
+            "path": "medium/one-edit/replacement/xl/workbook.xml",
+            "bytes": 527,
+            "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+          },
+          "original_census": {
+            "start_or_empty_tags": 6,
+            "zero_attribute_tags": 1,
+            "one_attribute_tags": 0,
+            "multiple_attribute_tags": 5,
+            "attributes": 14,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 7,
+            "zero_attribute_tags": 1,
+            "one_attribute_tags": 0,
+            "multiple_attribute_tags": 6,
+            "attributes": 19,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "path": "medium/one-edit/original/xl/worksheets/sheet1.xml",
+            "bytes": 63294,
+            "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+          },
+          "replacement": {
+            "path": "medium/one-edit/replacement/xl/worksheets/sheet1.xml",
+            "bytes": 63294,
+            "sha256": "fa4f801f0361d957aafaf00bc645ee845477216f8dd572a927350eafdca383b2"
+          },
+          "original_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 4659,
+            "zero_attribute_tags": 2305,
+            "one_attribute_tags": 2354,
+            "multiple_attribute_tags": 0,
+            "attributes": 2354,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Window",
+            "original": [
+              190,
+              198
+            ],
+            "replacement": [
+              190,
+              198
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dense-sparse-one-percent",
+      "shape": "dense-sparse",
+      "case": "one-percent",
+      "update_count": 178,
+      "source": {
+        "path": "dense-sparse/source.zip",
+        "bytes": 4251863,
+        "sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+      },
+      "output": {
+        "path": "dense-sparse/one-percent/output.zip",
+        "bytes": 4252436,
+        "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+      },
+      "parts": [
+        {
+          "member": "xl/workbook.xml",
+          "original": {
+            "path": "dense-sparse/one-percent/original/xl/workbook.xml",
+            "bytes": 424,
+            "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+          },
+          "replacement": {
+            "path": "dense-sparse/one-percent/replacement/xl/workbook.xml",
+            "bytes": 527,
+            "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+          },
+          "original_census": {
+            "start_or_empty_tags": 6,
+            "zero_attribute_tags": 1,
+            "one_attribute_tags": 0,
+            "multiple_attribute_tags": 5,
+            "attributes": 14,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 7,
+            "zero_attribute_tags": 1,
+            "one_attribute_tags": 0,
+            "multiple_attribute_tags": 6,
+            "attributes": 19,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet1.xml",
+            "bytes": 462568,
+            "sha256": "2366585fd004d6516a7ea33c2943b38993ffd234fe2e3b3070aaa0a593ab66e7"
+          },
+          "replacement": {
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet1.xml",
+            "bytes": 462569,
+            "sha256": "d079bcce4b785b6de82528458bc8b2ccfd1e8844e25b95bc386dd93f42bf6972"
+          },
+          "original_census": {
+            "start_or_empty_tags": 32899,
+            "zero_attribute_tags": 16385,
+            "one_attribute_tags": 16514,
+            "multiple_attribute_tags": 0,
+            "attributes": 16514,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 32899,
+            "zero_attribute_tags": 16385,
+            "one_attribute_tags": 16514,
+            "multiple_attribute_tags": 0,
+            "attributes": 16514,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet2.xml",
+          "original": {
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet2.xml",
+            "bytes": 31398,
+            "sha256": "e02fa30324c5436458d8cffcfd71c29bd5c9b7537693eedbedd5cbb79406dc64"
+          },
+          "replacement": {
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet2.xml",
+            "bytes": 31398,
+            "sha256": "a7e008e774b9f9a97e396bc8879435a3cc6ef09a44ae0cdbd4a2605dce47ddf5"
+          },
+          "original_census": {
+            "start_or_empty_tags": 2083,
+            "zero_attribute_tags": 1025,
+            "one_attribute_tags": 1058,
+            "multiple_attribute_tags": 0,
+            "attributes": 1058,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 2083,
+            "zero_attribute_tags": 1025,
+            "one_attribute_tags": 1058,
+            "multiple_attribute_tags": 0,
+            "attributes": 1058,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet3.xml",
+          "original": {
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet3.xml",
+            "bytes": 8115,
+            "sha256": "c2ab626116c4b3f11e087c5ca685338ea1a756f1b59f97b715c913c62f802a9a"
+          },
+          "replacement": {
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet3.xml",
+            "bytes": 8115,
+            "sha256": "f47c01b58d76b06ccfe243349cfb39cdb1d880dbfd1bb3f5e57dbe9086b01166"
+          },
+          "original_census": {
+            "start_or_empty_tags": 531,
+            "zero_attribute_tags": 257,
+            "one_attribute_tags": 274,
+            "multiple_attribute_tags": 0,
+            "attributes": 274,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 531,
+            "zero_attribute_tags": 257,
+            "one_attribute_tags": 274,
+            "multiple_attribute_tags": 0,
+            "attributes": 274,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Complete"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet4.xml",
+          "original": {
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet4.xml",
+            "bytes": 6352,
+            "sha256": "89dbdef2f41a633923338a399ea1a82729bad5e2e28db3e8e9796a4ce03b0dd9"
+          },
+          "replacement": {
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet4.xml",
+            "bytes": 6352,
+            "sha256": "ccaa730a58e12521cb441b63e5abebf492bb41e279a346bc84301dea797b0198"
+          },
+          "original_census": {
+            "start_or_empty_tags": 387,
+            "zero_attribute_tags": 129,
+            "one_attribute_tags": 258,
+            "multiple_attribute_tags": 0,
+            "attributes": 258,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "replacement_census": {
+            "start_or_empty_tags": 387,
+            "zero_attribute_tags": 129,
+            "one_attribute_tags": 258,
+            "multiple_attribute_tags": 0,
+            "attributes": 258,
+            "xml_space_attributes": 0,
+            "xml_space_elements": 0
+          },
+          "proof": {
+            "kind": "Window",
+            "original": [
+              1494,
+              1508
+            ],
+            "replacement": [
+              1494,
+              1508
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

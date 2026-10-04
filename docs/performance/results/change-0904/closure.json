@@ -1,0 +1,429 @@
+{
+  "expected_command_exit_codes": {
+    "boundaries": 0,
+    "build": 0,
+    "build-v2": 0,
+    "census": 2,
+    "census-mutations": 0,
+    "census-v2-invocation": 0,
+    "clippy": 101,
+    "clippy-v2": 0,
+    "export": 0,
+    "export-v2": 0,
+    "format": 0,
+    "format-final": 0,
+    "replay": 0,
+    "replay-after-cleanup": 0,
+    "rustdoc": 0
+  },
+  "files": {
+    "docs/performance/0904-xlsx-attribute-census.md": {
+      "bytes": 5797,
+      "sha256": "898ec0793ae65af836ce002654e29d27b20cd04caa31ffc70baf00f4bc43ad5e"
+    },
+    "docs/performance/BASELINE.md": {
+      "bytes": 475759,
+      "sha256": "87582fae68484d1158e7e849d5576be248011984dd3bac306e2f4df787c2cd32"
+    },
+    "docs/performance/GOAL_AUDIT.md": {
+      "bytes": 463774,
+      "sha256": "d924be603c15aa438c4bc7d5ea6c662ad5ac27ced6b54592bc95545aeb7c9caf"
+    },
+    "docs/performance/HOTSPOTS.md": {
+      "bytes": 778026,
+      "sha256": "46369a3bbd3659f6a7673dc5add32cf65722456ebf83d73df0fcd9233d9cdfa5"
+    },
+    "docs/performance/REPORT.md": {
+      "bytes": 790806,
+      "sha256": "40763772cf413078a21c79c2ab3a790629189c486c2002484f40fb7f43dba0ba"
+    },
+    "docs/performance/results/change-0904/README.md": {
+      "bytes": 2106,
+      "sha256": "29963df5f4141e11750479ac5b82114dcdab23c3474f812a3ef8afc4b5c61333"
+    },
+    "docs/performance/results/change-0904/analysis.json": {
+      "bytes": 42700,
+      "sha256": "7fe91367bff11d62fee990a1e364e65ee0a75776597d6a290e410d0cb1065bb1"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/original/xl/workbook.xml": {
+      "bytes": 424,
+      "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/original/xl/worksheets/sheet1.xml": {
+      "bytes": 462568,
+      "sha256": "2366585fd004d6516a7ea33c2943b38993ffd234fe2e3b3070aaa0a593ab66e7"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/original/xl/worksheets/sheet2.xml": {
+      "bytes": 31398,
+      "sha256": "e02fa30324c5436458d8cffcfd71c29bd5c9b7537693eedbedd5cbb79406dc64"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/original/xl/worksheets/sheet3.xml": {
+      "bytes": 8115,
+      "sha256": "c2ab626116c4b3f11e087c5ca685338ea1a756f1b59f97b715c913c62f802a9a"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/original/xl/worksheets/sheet4.xml": {
+      "bytes": 6352,
+      "sha256": "89dbdef2f41a633923338a399ea1a82729bad5e2e28db3e8e9796a4ce03b0dd9"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/output.zip": {
+      "bytes": 4252436,
+      "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/replacement/xl/workbook.xml": {
+      "bytes": 527,
+      "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/replacement/xl/worksheets/sheet1.xml": {
+      "bytes": 462569,
+      "sha256": "d079bcce4b785b6de82528458bc8b2ccfd1e8844e25b95bc386dd93f42bf6972"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/replacement/xl/worksheets/sheet2.xml": {
+      "bytes": 31398,
+      "sha256": "a7e008e774b9f9a97e396bc8879435a3cc6ef09a44ae0cdbd4a2605dce47ddf5"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/replacement/xl/worksheets/sheet3.xml": {
+      "bytes": 8115,
+      "sha256": "f47c01b58d76b06ccfe243349cfb39cdb1d880dbfd1bb3f5e57dbe9086b01166"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/one-percent/replacement/xl/worksheets/sheet4.xml": {
+      "bytes": 6352,
+      "sha256": "ccaa730a58e12521cb441b63e5abebf492bb41e279a346bc84301dea797b0198"
+    },
+    "docs/performance/results/change-0904/artifacts/dense-sparse/source.zip": {
+      "bytes": 4251863,
+      "sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+    },
+    "docs/performance/results/change-0904/artifacts/manifest.json": {
+      "bytes": 17221,
+      "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-edit/original/xl/workbook.xml": {
+      "bytes": 424,
+      "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-edit/original/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-edit/output.zip": {
+      "bytes": 4226480,
+      "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-edit/replacement/xl/workbook.xml": {
+      "bytes": 527,
+      "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-edit/replacement/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "fa4f801f0361d957aafaf00bc645ee845477216f8dd572a927350eafdca383b2"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/workbook.xml": {
+      "bytes": 424,
+      "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet2.xml": {
+      "bytes": 68488,
+      "sha256": "fae0309386f910eda0caf18ea98f578ce5c719438e7de8b696cdd8089cf8c326"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet3.xml": {
+      "bytes": 68488,
+      "sha256": "c105ecf49b0b3a0f35c71f8dfa2d049aac677c95d2c21150f93afe3f871c8edf"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet4.xml": {
+      "bytes": 68488,
+      "sha256": "8c34fd06ab17b99f9260ee7719c60785dabab53faeec829d2576fbcc42ae1f9c"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/output.zip": {
+      "bytes": 4226788,
+      "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/replacement/xl/workbook.xml": {
+      "bytes": 527,
+      "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/replacement/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "e12f687e5e1a0456338694a505134d53ccd1417cb17e51b12dff85429d6f1220"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/replacement/xl/worksheets/sheet2.xml": {
+      "bytes": 68488,
+      "sha256": "6e530b0c405315eb4fb29b87da91d29faf3ec346c1e1e3b4c9b29c7fa21fbafa"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/replacement/xl/worksheets/sheet3.xml": {
+      "bytes": 68488,
+      "sha256": "34a604ebbe87e62535b215bfd648061c0686c45ae6795f43e856088247938811"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/one-percent/replacement/xl/worksheets/sheet4.xml": {
+      "bytes": 68488,
+      "sha256": "dc18d296070fce4d64434d03ac400df00e1df53a1d534a9104aaddc4123baf79"
+    },
+    "docs/performance/results/change-0904/artifacts/medium/source.zip": {
+      "bytes": 4226429,
+      "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+    },
+    "docs/performance/results/change-0904/binary.json": {
+      "bytes": 492,
+      "sha256": "a7d8a407efdb39158f19c0a59c3574ef63067e53a59ff6736e4821ea1cecf9fd"
+    },
+    "docs/performance/results/change-0904/boundaries-run.json": {
+      "bytes": 3287,
+      "sha256": "726a32f2cc31c84a9044fbd5bfe906a1cf14e5401ed3b8971eca2945ecb8a64e"
+    },
+    "docs/performance/results/change-0904/boundaries-start.json": {
+      "bytes": 1981,
+      "sha256": "269d58a258a3647d628a40f30de2a262db92e1cd82e78939c0cdc0a93fc9fe80"
+    },
+    "docs/performance/results/change-0904/boundaries.log": {
+      "bytes": 565,
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    "docs/performance/results/change-0904/build-run.json": {
+      "bytes": 3402,
+      "sha256": "cf584beebed6e14611344d27124acf72dd62286bc21d649a86c2498ece981dad"
+    },
+    "docs/performance/results/change-0904/build-start.json": {
+      "bytes": 2100,
+      "sha256": "b9739ae6f23a7aeb0f0e396fe58b6d070d8d3a6ea4331c7695a13d9fc0aa2889"
+    },
+    "docs/performance/results/change-0904/build-v2-run.json": {
+      "bytes": 3404,
+      "sha256": "bec0563e0d87e63e1748bcff53c97b9b28b96cb588c332de14bf635793836611"
+    },
+    "docs/performance/results/change-0904/build-v2-start.json": {
+      "bytes": 2100,
+      "sha256": "60acb6767c10c22d3404727bf702aa0f42072174715527358a6947aaa4e5022c"
+    },
+    "docs/performance/results/change-0904/build-v2.log": {
+      "bytes": 148,
+      "sha256": "c52ca02b961e9f10850ea76fba19543983ef2b8c8b527d4084aec4c6fd63dfa4"
+    },
+    "docs/performance/results/change-0904/build.log": {
+      "bytes": 7931,
+      "sha256": "c7f59d5e8d4f92bcdc797d2d3efa0c086fdf1d32d192956b8e49115bd2e73a7e"
+    },
+    "docs/performance/results/change-0904/census-mutations-run.json": {
+      "bytes": 3321,
+      "sha256": "b2f77adc96fce051e6837279437552400c99c24a9f0f2377541ac337e30f8964"
+    },
+    "docs/performance/results/change-0904/census-mutations-start.json": {
+      "bytes": 2010,
+      "sha256": "c8c9afae227fd36c24c3c9a301f96c3267f51061f07f0b92f874c736d4f071f9"
+    },
+    "docs/performance/results/change-0904/census-mutations.log": {
+      "bytes": 34,
+      "sha256": "33d511ec23b61ec44f69f674701cc3e76d38d5844dcd2fedd22ca485684e9ee3"
+    },
+    "docs/performance/results/change-0904/census-run.json": {
+      "bytes": 3445,
+      "sha256": "72d58bed643366c4a66ed6d2cb639579b46cfdc3189bad8178a09cd063d3f406"
+    },
+    "docs/performance/results/change-0904/census-start.json": {
+      "bytes": 2143,
+      "sha256": "85e9b3f97233ef3ce7c83b30e6c154aac01a962c930e80bffc66032d92edad0e"
+    },
+    "docs/performance/results/change-0904/census-v2-invocation-run.json": {
+      "bytes": 3438,
+      "sha256": "bae1d336da6ec14e81aaf9f92163253c264e512fef1c79f3e4404f9ada54954a"
+    },
+    "docs/performance/results/change-0904/census-v2-invocation-start.json": {
+      "bytes": 2124,
+      "sha256": "0bfe2d644220d2b4b9bd8cd500652f7e840f91ad8bb20cbba9547a52fa22cb80"
+    },
+    "docs/performance/results/change-0904/census-v2-invocation.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0904/census.log": {
+      "bytes": 124,
+      "sha256": "41026a0aebef5e9a89a96bdec75f55b40b74e0d6470a870981e87878705a843d"
+    },
+    "docs/performance/results/change-0904/census.py": {
+      "bytes": 24874,
+      "sha256": "00adae754aa67b72d939615e96b5126d9e2186ad994cbb600921189a87b916a6"
+    },
+    "docs/performance/results/change-0904/census_mutation_test.py": {
+      "bytes": 7570,
+      "sha256": "af00af82a13d231b17910d97d79f10280c90af6c3defe6840158b07c5c31cf6d"
+    },
+    "docs/performance/results/change-0904/cleanup.json": {
+      "bytes": 435,
+      "sha256": "012de5ad67e211df4427f4ce3ece7b36f6dec4e81a28e154fb73ae0cebf75d69"
+    },
+    "docs/performance/results/change-0904/clippy-run.json": {
+      "bytes": 3459,
+      "sha256": "09c46f086b60c70740288aa879da3ade74c4c332e758cb28d745a9120de63315"
+    },
+    "docs/performance/results/change-0904/clippy-start.json": {
+      "bytes": 2154,
+      "sha256": "7a55e94901c55fa8fe8509b6683aae79a3d6add5497b007394b4902c48b4e627"
+    },
+    "docs/performance/results/change-0904/clippy-v2-run.json": {
+      "bytes": 3459,
+      "sha256": "8902026d3f998da369fdb2c9ec8ef93077de16bd8c0567c1b81f6633b6c8d457"
+    },
+    "docs/performance/results/change-0904/clippy-v2-start.json": {
+      "bytes": 2154,
+      "sha256": "3426970b0bb3b7deab0771b9d294e9169ad5c6734671bfa41d051db99da93b32"
+    },
+    "docs/performance/results/change-0904/clippy-v2.log": {
+      "bytes": 148,
+      "sha256": "55adbd8a1ad228df7bbe723988e6d24288c1d8f11d9e1569cb6413f339466885"
+    },
+    "docs/performance/results/change-0904/clippy.log": {
+      "bytes": 8321,
+      "sha256": "e2b46923069e1f36f2bb6846e22dc45e098d5d7544a9c30dcd0b5493e7ce96dd"
+    },
+    "docs/performance/results/change-0904/command.py": {
+      "bytes": 2241,
+      "sha256": "a06810479d89156b09c38d1c4bba7e7b92325c45f77053a2963ce12f426b6eae"
+    },
+    "docs/performance/results/change-0904/export-run.json": {
+      "bytes": 3368,
+      "sha256": "dc5b1d5c0082614e641f2bb3eac64afdbfd118ed39dbf82b8effd89753448d00"
+    },
+    "docs/performance/results/change-0904/export-start.json": {
+      "bytes": 2068,
+      "sha256": "6e29afc66c94acbfc8ed1c6c085ecd7d173dfeb8b8f27aa76c27108785e05c42"
+    },
+    "docs/performance/results/change-0904/export-v2-run.json": {
+      "bytes": 3374,
+      "sha256": "529077a4c9a3f89ae451d5b0ae70262c06fce72d4d77785e4ab3d78fec4c3403"
+    },
+    "docs/performance/results/change-0904/export-v2-start.json": {
+      "bytes": 2071,
+      "sha256": "5baad9593f425aac6cb13930d578565d1591e700c65c9ee2da0e63c17ebd9219"
+    },
+    "docs/performance/results/change-0904/export-v2.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0904/export.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0904/exporter-v1.rs": {
+      "bytes": 14152,
+      "sha256": "1c5d740011dd7ce39bd8ad139627b3e030c4360731ca5af5caa5a7e93a984581"
+    },
+    "docs/performance/results/change-0904/final-export-verification.json": {
+      "bytes": 5653,
+      "sha256": "58a2d1df8ab142e050413e11342d7d132f0ca1b81d3c5c8656c120dc6c82622d"
+    },
+    "docs/performance/results/change-0904/format-final-run.json": {
+      "bytes": 3498,
+      "sha256": "bda21f516d419eda474a1e2dddef6ebfcdfbb098d0b5ab512765249439cc19e3"
+    },
+    "docs/performance/results/change-0904/format-final-start.json": {
+      "bytes": 2192,
+      "sha256": "88fc5704da78044b68796cea6807a63bf2efef77efcf9b28bf6739b32ce11131"
+    },
+    "docs/performance/results/change-0904/format-final.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0904/format-run.json": {
+      "bytes": 3492,
+      "sha256": "64078669b79583557ca76d55dea8b62c7be5d5a273d33893412f231028fd194f"
+    },
+    "docs/performance/results/change-0904/format-start.json": {
+      "bytes": 2192,
+      "sha256": "d5f19016493b996b943951023003ea968d8ee6125cbe6f790f8c0c64fba18c9f"
+    },
+    "docs/performance/results/change-0904/format.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/performance/results/change-0904/identity-check.json": {
+      "bytes": 904,
+      "sha256": "6921650bb2253d4c6148f732e4d5727421ee6f565db34d3bbb8f9bb97eaf4ef7"
+    },
+    "docs/performance/results/change-0904/plan.json": {
+      "bytes": 2306,
+      "sha256": "6547b313f2bd4fe48e33e176a83bb718799d258bde5c26221b48522cf26e1fdf"
+    },
+    "docs/performance/results/change-0904/prior-identities.json": {
+      "bytes": 5006,
+      "sha256": "2774adb7cbb2c158333814ff38b4003a8b46a6f9e4ec4b5aa6054b6da4bc7a4a"
+    },
+    "docs/performance/results/change-0904/replay-after-cleanup-run.json": {
+      "bytes": 3313,
+      "sha256": "4ed7d0695fcff2e3e2915eb4857b3900be14d7e1eb15c00d116ba503a25dff8d"
+    },
+    "docs/performance/results/change-0904/replay-after-cleanup-start.json": {
+      "bytes": 1996,
+      "sha256": "cc217390d7d839489eebc2c979f44c9013c726834d04b3563d6a9ea5c121f1ce"
+    },
+    "docs/performance/results/change-0904/replay-after-cleanup.log": {
+      "bytes": 1065,
+      "sha256": "1fc44b00461f3c144812186d647599804d96fbe6470c8e0d0ad0ab4fd0534ae6"
+    },
+    "docs/performance/results/change-0904/replay-run.json": {
+      "bytes": 3299,
+      "sha256": "c127ce7ac5e2335ea2e2a2ab6557e4d213f9f7871b2378982b536c10f73bcaf0"
+    },
+    "docs/performance/results/change-0904/replay-start.json": {
+      "bytes": 1996,
+      "sha256": "5c63c45b14c4b828fa425f7ec797969aed6e55147b870cf7d8aad860e7aa4da4"
+    },
+    "docs/performance/results/change-0904/replay.log": {
+      "bytes": 1065,
+      "sha256": "1fc44b00461f3c144812186d647599804d96fbe6470c8e0d0ad0ab4fd0534ae6"
+    },
+    "docs/performance/results/change-0904/review.md": {
+      "bytes": 2132,
+      "sha256": "bf1bf09f8ce62764d2d8f0ecdd24ab2d7c2560b4804385619967d9a39b4d4431"
+    },
+    "docs/performance/results/change-0904/rustdoc-run.json": {
+      "bytes": 3425,
+      "sha256": "90c49acb050de39a31bbae394e45d161f75dfd76bb0e72d1cb25fe47322e1530"
+    },
+    "docs/performance/results/change-0904/rustdoc-start.json": {
+      "bytes": 2122,
+      "sha256": "908b769465a6bd608ccc7ccfe7db4b6413cbaab9c02dc2864f471f7cc359ef35"
+    },
+    "docs/performance/results/change-0904/rustdoc.log": {
+      "bytes": 245,
+      "sha256": "c5f016e9e06cebe47841c32a110b15b9495f69e7e6f82cb60644b39735847d2d"
+    },
+    "docs/performance/results/change-0904/semantic-review.md": {
+      "bytes": 9641,
+      "sha256": "ad1eebed277996f9333430aeca67cfe63c4c94ac34ddd70917a8b7a804a342ce"
+    },
+    "docs/performance/results/change-0904/source-final.json": {
+      "bytes": 1089,
+      "sha256": "268441c0f9382f11d456d0834391489106660a573462be71bb61c90726a1d86f"
+    },
+    "docs/performance/results/change-0904/verify.py": {
+      "bytes": 2496,
+      "sha256": "b84fc8577a513c779de4dc1f39a7f1842fa323c9e0afe21f7ec59d53608ab8a3"
+    },
+    "tools/perf-baseline/README.md": {
+      "bytes": 320394,
+      "sha256": "899c48ec904f8c62714401d9b5d897fc0eeb990d62f0d69830b6e9a948a48c91"
+    },
+    "tools/perf-baseline/examples/xlsx_attribute_fixtures.rs": {
+      "bytes": 788,
+      "sha256": "9b705f3fc42a360653cdb8c3be2d9042f5df5febce69b2f692fdf8046e478da6"
+    },
+    "tools/perf-baseline/src/lib.rs": {
+      "bytes": 3020953,
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    "tools/perf-baseline/src/xlsx_attribute_fixtures.rs": {
+      "bytes": 14154,
+      "sha256": "b26fcc0257431a08a2ee4f0d5cc4e8fc11780ce0d15693b6cd198ea33594a841"
+    }
+  },
+  "goal_complete": false,
+  "new_worktrees": 0,
+  "owned_build_root_absent": true,
+  "parent": "0283e96b73af76906c1a83ce90956e1c6afa1116",
+  "performance_claim": "none",
+  "production_changed": false,
+  "schema": "litchi.xlsx-attribute-census-closure-0904.v1",
+  "status": "pass"
+}

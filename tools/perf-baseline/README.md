@@ -1,5 +1,23 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+## Untimed XLSX attribute fixtures
+
+Export the deterministic medium and dense-sparse one-percent cell-edit inputs
+and source-backed outputs for offline XML analysis:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml \
+  --example xlsx_attribute_fixtures -- /path/to/new-fixtures --include-one-edit
+```
+
+The optional flag adds the medium one-cell control. The directory must be new.
+The manifest records archive and selected XML hashes, full-artifact attribute
+counts, and source-replacement proof kinds/window ranges. Full replacement
+counts do not imply that a window proof scanned the entire replacement.
+This exporter performs no timing and adds nothing to benchmark timers. See
+[0904](../../docs/performance/0904-xlsx-attribute-census.md) for independent
+count verification and matching retained benchmark identities.
+
 ## Current default: semantic text export (0508)
 
 The checked default is 41 cases, 213 rows and 43 deterministic corpora.

@@ -1,0 +1,28 @@
+{
+  "baseline_files_changed": [
+    "tools/perf-baseline/README.md",
+    "tools/perf-baseline/src/lib.rs"
+  ],
+  "baseline_files_matching": 10769,
+  "baseline_inventory": "docs/performance/results/change-0894/source.json",
+  "final_harness_files": {
+    "tools/perf-baseline/README.md": {
+      "bytes": 320394,
+      "sha256": "899c48ec904f8c62714401d9b5d897fc0eeb990d62f0d69830b6e9a948a48c91"
+    },
+    "tools/perf-baseline/examples/xlsx_attribute_fixtures.rs": {
+      "bytes": 788,
+      "sha256": "9b705f3fc42a360653cdb8c3be2d9042f5df5febce69b2f692fdf8046e478da6"
+    },
+    "tools/perf-baseline/src/lib.rs": {
+      "bytes": 3020953,
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    "tools/perf-baseline/src/xlsx_attribute_fixtures.rs": {
+      "bytes": 14154,
+      "sha256": "b26fcc0257431a08a2ee4f0d5cc4e8fc11780ce0d15693b6cd198ea33594a841"
+    }
+  },
+  "initial_ad_hoc_check_correction": "Initial expectation omitted README.md documentation change; corrected to two expected existing harness files.",
+  "production_changes": false
+}

@@ -48,6 +48,7 @@ mod producer_shape;
 #[cfg(test)]
 mod security_corpus;
 mod xls_numeric;
+mod xlsx_attribute_fixtures;
 #[cfg(test)]
 mod xlsx_commit_metrics_tests;
 pub mod xlsx_planning_guard;
@@ -10210,6 +10211,15 @@ pub fn write_odp_source_tail_append_fixtures(
     directory: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     odp_source_tail_append::export_odp_source_tail_append_fixtures(directory)
+}
+
+/// Export exact source-backed XLSX XML inputs and outputs for offline
+/// attribute-cardinality analysis.
+pub fn write_xlsx_attribute_fixtures(
+    directory: &std::path::Path,
+    include_one_edit: bool,
+) -> Result<(), Box<dyn Error>> {
+    xlsx_attribute_fixtures::export(directory, include_one_edit)
 }
 
 pub fn run() -> Result<(), Box<dyn Error>> {

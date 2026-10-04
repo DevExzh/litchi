@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "case": "medium-one-percent",
+      "changed_members_exactly_selected_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ],
+      "prior_source_output_hash_match": true
+    },
+    {
+      "case": "medium-one-edit",
+      "changed_members_exactly_selected_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml"
+      ],
+      "prior_source_output_hash_match": true
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "changed_members_exactly_selected_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ],
+      "prior_source_output_hash_match": true
+    }
+  ],
+  "status": "pass"
+}

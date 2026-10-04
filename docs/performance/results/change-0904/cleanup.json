@@ -1,0 +1,15 @@
+{
+  "duplicate_export_absent": true,
+  "files_removed": 3123,
+  "logical_bytes_removed": 1767353950,
+  "ownership_marker": {
+    "owner": "change-0904",
+    "purpose": "untimed fixture exporter build only",
+    "root": "/home/zhuhe/code/litchi/target/litchi-0904-build"
+  },
+  "removed_root": "target/litchi-0904-build",
+  "status": "pass",
+  "unrelated_worktrees_preserved": true,
+  "worktrees_created": 0,
+  "worktrees_removed": 0
+}

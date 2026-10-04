@@ -1,0 +1,7 @@
+{
+  "bytes": 35839368,
+  "path": "/home/zhuhe/code/litchi/target/litchi-0904-build/debug/examples/xlsx_attribute_fixtures",
+  "role": "untimed diagnostic exporter; not a benchmark executable",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "sha256": "5159c4356d2427e73129c7559701f6c8354a2c25299714b35398aca3ac21eb33"
+}

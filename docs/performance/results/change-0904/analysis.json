@@ -1,0 +1,1208 @@
+{
+  "cases": [
+    {
+      "case": "one-percent",
+      "claims": {
+        "full_original_structural_census": true,
+        "full_replacement_structural_census": true,
+        "native_benefit": false,
+        "selected_parts_only": true
+      },
+      "id": "medium-one-percent",
+      "output_archive": {
+        "bytes": 4226788,
+        "path": "medium/one-percent/output.zip",
+        "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+      },
+      "parts": [
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/workbook.xml",
+          "original": {
+            "artifact": {
+              "bytes": 424,
+              "path": "medium/one-percent/original/xl/workbook.xml",
+              "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+            },
+            "exporter_census": {
+              "attributes": 14,
+              "multiple_attribute_tags": 5,
+              "one_attribute_tags": 0,
+              "start_or_empty_tags": 6,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1
+            },
+            "full_xml_census": {
+              "attributes": 14,
+              "eligible_one_without_xml_space": 0,
+              "eligible_zero_or_one_without_xml_space": 1,
+              "eligible_zero_without_xml_space": 1,
+              "raw_attribute_cardinality": {
+                "0": 1,
+                "1": 0,
+                "2..32": 5,
+                ">32": 0
+              },
+              "start_element_events": 6,
+              "xml_space_absent_events": 6,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 527,
+              "path": "medium/one-percent/replacement/xl/workbook.xml",
+              "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+            },
+            "exporter_census": {
+              "attributes": 19,
+              "multiple_attribute_tags": 6,
+              "one_attribute_tags": 0,
+              "start_or_empty_tags": 7,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1
+            },
+            "full_xml_census": {
+              "attributes": 19,
+              "eligible_one_without_xml_space": 0,
+              "eligible_zero_or_one_without_xml_space": 1,
+              "eligible_zero_without_xml_space": 1,
+              "raw_attribute_cardinality": {
+                "0": 1,
+                "1": 0,
+                "2..32": 6,
+                ">32": 0
+              },
+              "start_element_events": 7,
+              "xml_space_absent_events": 7,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "artifact": {
+              "bytes": 63294,
+              "path": "medium/one-percent/original/xl/worksheets/sheet1.xml",
+              "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 63294,
+              "path": "medium/one-percent/replacement/xl/worksheets/sheet1.xml",
+              "sha256": "e12f687e5e1a0456338694a505134d53ccd1417cb17e51b12dff85429d6f1220"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet2.xml",
+          "original": {
+            "artifact": {
+              "bytes": 68488,
+              "path": "medium/one-percent/original/xl/worksheets/sheet2.xml",
+              "sha256": "fae0309386f910eda0caf18ea98f578ce5c719438e7de8b696cdd8089cf8c326"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 68488,
+              "path": "medium/one-percent/replacement/xl/worksheets/sheet2.xml",
+              "sha256": "6e530b0c405315eb4fb29b87da91d29faf3ec346c1e1e3b4c9b29c7fa21fbafa"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet3.xml",
+          "original": {
+            "artifact": {
+              "bytes": 68488,
+              "path": "medium/one-percent/original/xl/worksheets/sheet3.xml",
+              "sha256": "c105ecf49b0b3a0f35c71f8dfa2d049aac677c95d2c21150f93afe3f871c8edf"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 68488,
+              "path": "medium/one-percent/replacement/xl/worksheets/sheet3.xml",
+              "sha256": "34a604ebbe87e62535b215bfd648061c0686c45ae6795f43e856088247938811"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet4.xml",
+          "original": {
+            "artifact": {
+              "bytes": 68488,
+              "path": "medium/one-percent/original/xl/worksheets/sheet4.xml",
+              "sha256": "8c34fd06ab17b99f9260ee7719c60785dabab53faeec829d2576fbcc42ae1f9c"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 68488,
+              "path": "medium/one-percent/replacement/xl/worksheets/sheet4.xml",
+              "sha256": "dc18d296070fce4d64434d03ac400df00e1df53a1d534a9104aaddc4123baf79"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        }
+      ],
+      "shape": "medium",
+      "source_archive": {
+        "bytes": 4226429,
+        "path": "medium/source.zip",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "totals": {
+        "original": {
+          "attributes": 9430,
+          "eligible_one_without_xml_space": 9416,
+          "eligible_zero_or_one_without_xml_space": 18637,
+          "eligible_zero_without_xml_space": 9221,
+          "raw_attribute_cardinality": {
+            "0": 9221,
+            "1": 9416,
+            "2..32": 5,
+            ">32": 0
+          },
+          "start_element_events": 18642,
+          "xml_space_absent_events": 18642,
+          "xml_space_attribute_occurrences": 0,
+          "xml_space_present_events": 0
+        },
+        "replacement": {
+          "attributes": 9435,
+          "eligible_one_without_xml_space": 9416,
+          "eligible_zero_or_one_without_xml_space": 18637,
+          "eligible_zero_without_xml_space": 9221,
+          "raw_attribute_cardinality": {
+            "0": 9221,
+            "1": 9416,
+            "2..32": 6,
+            ">32": 0
+          },
+          "start_element_events": 18643,
+          "xml_space_absent_events": 18643,
+          "xml_space_attribute_occurrences": 0,
+          "xml_space_present_events": 0
+        }
+      }
+    },
+    {
+      "case": "one-edit",
+      "claims": {
+        "full_original_structural_census": true,
+        "full_replacement_structural_census": true,
+        "native_benefit": false,
+        "selected_parts_only": true
+      },
+      "id": "medium-one-edit",
+      "output_archive": {
+        "bytes": 4226480,
+        "path": "medium/one-edit/output.zip",
+        "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+      },
+      "parts": [
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/workbook.xml",
+          "original": {
+            "artifact": {
+              "bytes": 424,
+              "path": "medium/one-edit/original/xl/workbook.xml",
+              "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+            },
+            "exporter_census": {
+              "attributes": 14,
+              "multiple_attribute_tags": 5,
+              "one_attribute_tags": 0,
+              "start_or_empty_tags": 6,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1
+            },
+            "full_xml_census": {
+              "attributes": 14,
+              "eligible_one_without_xml_space": 0,
+              "eligible_zero_or_one_without_xml_space": 1,
+              "eligible_zero_without_xml_space": 1,
+              "raw_attribute_cardinality": {
+                "0": 1,
+                "1": 0,
+                "2..32": 5,
+                ">32": 0
+              },
+              "start_element_events": 6,
+              "xml_space_absent_events": 6,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 527,
+              "path": "medium/one-edit/replacement/xl/workbook.xml",
+              "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+            },
+            "exporter_census": {
+              "attributes": 19,
+              "multiple_attribute_tags": 6,
+              "one_attribute_tags": 0,
+              "start_or_empty_tags": 7,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1
+            },
+            "full_xml_census": {
+              "attributes": 19,
+              "eligible_one_without_xml_space": 0,
+              "eligible_zero_or_one_without_xml_space": 1,
+              "eligible_zero_without_xml_space": 1,
+              "raw_attribute_cardinality": {
+                "0": 1,
+                "1": 0,
+                "2..32": 6,
+                ">32": 0
+              },
+              "start_element_events": 7,
+              "xml_space_absent_events": 7,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": false
+          },
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "artifact": {
+              "bytes": 63294,
+              "path": "medium/one-edit/original/xl/worksheets/sheet1.xml",
+              "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": false,
+            "kind": "Window",
+            "original_span": {
+              "bytes": 8,
+              "range": [
+                190,
+                198
+              ],
+              "sha256": "f475316741733954f98bbc90eee12ab32607760ab5a6d2c74f8d2616755d2dd9"
+            },
+            "replacement_span": {
+              "bytes": 8,
+              "range": [
+                190,
+                198
+              ],
+              "sha256": "46bf8ff70c6b2baa7b6cf7b22a61a7807a805bed120b8313439115cc315b1539"
+            },
+            "span_parsed_as_xml": false
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 63294,
+              "path": "medium/one-edit/replacement/xl/worksheets/sheet1.xml",
+              "sha256": "fa4f801f0361d957aafaf00bc645ee845477216f8dd572a927350eafdca383b2"
+            },
+            "exporter_census": {
+              "attributes": 2354,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 2354,
+              "start_or_empty_tags": 4659,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 2305
+            },
+            "full_xml_census": {
+              "attributes": 2354,
+              "eligible_one_without_xml_space": 2354,
+              "eligible_zero_or_one_without_xml_space": 4659,
+              "eligible_zero_without_xml_space": 2305,
+              "raw_attribute_cardinality": {
+                "0": 2305,
+                "1": 2354,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 4659,
+              "xml_space_absent_events": 4659,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        }
+      ],
+      "shape": "medium",
+      "source_archive": {
+        "bytes": 4226429,
+        "path": "medium/source.zip",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "totals": {
+        "original": {
+          "attributes": 2368,
+          "eligible_one_without_xml_space": 2354,
+          "eligible_zero_or_one_without_xml_space": 4660,
+          "eligible_zero_without_xml_space": 2306,
+          "raw_attribute_cardinality": {
+            "0": 2306,
+            "1": 2354,
+            "2..32": 5,
+            ">32": 0
+          },
+          "start_element_events": 4665,
+          "xml_space_absent_events": 4665,
+          "xml_space_attribute_occurrences": 0,
+          "xml_space_present_events": 0
+        },
+        "replacement": {
+          "attributes": 2373,
+          "eligible_one_without_xml_space": 2354,
+          "eligible_zero_or_one_without_xml_space": 4660,
+          "eligible_zero_without_xml_space": 2306,
+          "raw_attribute_cardinality": {
+            "0": 2306,
+            "1": 2354,
+            "2..32": 6,
+            ">32": 0
+          },
+          "start_element_events": 4666,
+          "xml_space_absent_events": 4666,
+          "xml_space_attribute_occurrences": 0,
+          "xml_space_present_events": 0
+        }
+      }
+    },
+    {
+      "case": "one-percent",
+      "claims": {
+        "full_original_structural_census": true,
+        "full_replacement_structural_census": true,
+        "native_benefit": false,
+        "selected_parts_only": true
+      },
+      "id": "dense-sparse-one-percent",
+      "output_archive": {
+        "bytes": 4252436,
+        "path": "dense-sparse/one-percent/output.zip",
+        "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+      },
+      "parts": [
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/workbook.xml",
+          "original": {
+            "artifact": {
+              "bytes": 424,
+              "path": "dense-sparse/one-percent/original/xl/workbook.xml",
+              "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+            },
+            "exporter_census": {
+              "attributes": 14,
+              "multiple_attribute_tags": 5,
+              "one_attribute_tags": 0,
+              "start_or_empty_tags": 6,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1
+            },
+            "full_xml_census": {
+              "attributes": 14,
+              "eligible_one_without_xml_space": 0,
+              "eligible_zero_or_one_without_xml_space": 1,
+              "eligible_zero_without_xml_space": 1,
+              "raw_attribute_cardinality": {
+                "0": 1,
+                "1": 0,
+                "2..32": 5,
+                ">32": 0
+              },
+              "start_element_events": 6,
+              "xml_space_absent_events": 6,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 527,
+              "path": "dense-sparse/one-percent/replacement/xl/workbook.xml",
+              "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+            },
+            "exporter_census": {
+              "attributes": 19,
+              "multiple_attribute_tags": 6,
+              "one_attribute_tags": 0,
+              "start_or_empty_tags": 7,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1
+            },
+            "full_xml_census": {
+              "attributes": 19,
+              "eligible_one_without_xml_space": 0,
+              "eligible_zero_or_one_without_xml_space": 1,
+              "eligible_zero_without_xml_space": 1,
+              "raw_attribute_cardinality": {
+                "0": 1,
+                "1": 0,
+                "2..32": 6,
+                ">32": 0
+              },
+              "start_element_events": 7,
+              "xml_space_absent_events": 7,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "artifact": {
+              "bytes": 462568,
+              "path": "dense-sparse/one-percent/original/xl/worksheets/sheet1.xml",
+              "sha256": "2366585fd004d6516a7ea33c2943b38993ffd234fe2e3b3070aaa0a593ab66e7"
+            },
+            "exporter_census": {
+              "attributes": 16514,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 16514,
+              "start_or_empty_tags": 32899,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 16385
+            },
+            "full_xml_census": {
+              "attributes": 16514,
+              "eligible_one_without_xml_space": 16514,
+              "eligible_zero_or_one_without_xml_space": 32899,
+              "eligible_zero_without_xml_space": 16385,
+              "raw_attribute_cardinality": {
+                "0": 16385,
+                "1": 16514,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 32899,
+              "xml_space_absent_events": 32899,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 462569,
+              "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet1.xml",
+              "sha256": "d079bcce4b785b6de82528458bc8b2ccfd1e8844e25b95bc386dd93f42bf6972"
+            },
+            "exporter_census": {
+              "attributes": 16514,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 16514,
+              "start_or_empty_tags": 32899,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 16385
+            },
+            "full_xml_census": {
+              "attributes": 16514,
+              "eligible_one_without_xml_space": 16514,
+              "eligible_zero_or_one_without_xml_space": 32899,
+              "eligible_zero_without_xml_space": 16385,
+              "raw_attribute_cardinality": {
+                "0": 16385,
+                "1": 16514,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 32899,
+              "xml_space_absent_events": 32899,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet2.xml",
+          "original": {
+            "artifact": {
+              "bytes": 31398,
+              "path": "dense-sparse/one-percent/original/xl/worksheets/sheet2.xml",
+              "sha256": "e02fa30324c5436458d8cffcfd71c29bd5c9b7537693eedbedd5cbb79406dc64"
+            },
+            "exporter_census": {
+              "attributes": 1058,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 1058,
+              "start_or_empty_tags": 2083,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1025
+            },
+            "full_xml_census": {
+              "attributes": 1058,
+              "eligible_one_without_xml_space": 1058,
+              "eligible_zero_or_one_without_xml_space": 2083,
+              "eligible_zero_without_xml_space": 1025,
+              "raw_attribute_cardinality": {
+                "0": 1025,
+                "1": 1058,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 2083,
+              "xml_space_absent_events": 2083,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 31398,
+              "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet2.xml",
+              "sha256": "a7e008e774b9f9a97e396bc8879435a3cc6ef09a44ae0cdbd4a2605dce47ddf5"
+            },
+            "exporter_census": {
+              "attributes": 1058,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 1058,
+              "start_or_empty_tags": 2083,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 1025
+            },
+            "full_xml_census": {
+              "attributes": 1058,
+              "eligible_one_without_xml_space": 1058,
+              "eligible_zero_or_one_without_xml_space": 2083,
+              "eligible_zero_without_xml_space": 1025,
+              "raw_attribute_cardinality": {
+                "0": 1025,
+                "1": 1058,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 2083,
+              "xml_space_absent_events": 2083,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": true
+          },
+          "member": "xl/worksheets/sheet3.xml",
+          "original": {
+            "artifact": {
+              "bytes": 8115,
+              "path": "dense-sparse/one-percent/original/xl/worksheets/sheet3.xml",
+              "sha256": "c2ab626116c4b3f11e087c5ca685338ea1a756f1b59f97b715c913c62f802a9a"
+            },
+            "exporter_census": {
+              "attributes": 274,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 274,
+              "start_or_empty_tags": 531,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 257
+            },
+            "full_xml_census": {
+              "attributes": 274,
+              "eligible_one_without_xml_space": 274,
+              "eligible_zero_or_one_without_xml_space": 531,
+              "eligible_zero_without_xml_space": 257,
+              "raw_attribute_cardinality": {
+                "0": 257,
+                "1": 274,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 531,
+              "xml_space_absent_events": 531,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": true,
+            "kind": "Complete"
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 8115,
+              "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet3.xml",
+              "sha256": "f47c01b58d76b06ccfe243349cfb39cdb1d880dbfd1bb3f5e57dbe9086b01166"
+            },
+            "exporter_census": {
+              "attributes": 274,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 274,
+              "start_or_empty_tags": 531,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 257
+            },
+            "full_xml_census": {
+              "attributes": 274,
+              "eligible_one_without_xml_space": 274,
+              "eligible_zero_or_one_without_xml_space": 531,
+              "eligible_zero_without_xml_space": 257,
+              "raw_attribute_cardinality": {
+                "0": 257,
+                "1": 274,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 531,
+              "xml_space_absent_events": 531,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        },
+        {
+          "claims": {
+            "full_original_structural_census": true,
+            "full_replacement_structural_census": true,
+            "native_benefit": false,
+            "replacement_full_audit_coverage": false
+          },
+          "member": "xl/worksheets/sheet4.xml",
+          "original": {
+            "artifact": {
+              "bytes": 6352,
+              "path": "dense-sparse/one-percent/original/xl/worksheets/sheet4.xml",
+              "sha256": "89dbdef2f41a633923338a399ea1a82729bad5e2e28db3e8e9796a4ce03b0dd9"
+            },
+            "exporter_census": {
+              "attributes": 258,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 258,
+              "start_or_empty_tags": 387,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 129
+            },
+            "full_xml_census": {
+              "attributes": 258,
+              "eligible_one_without_xml_space": 258,
+              "eligible_zero_or_one_without_xml_space": 387,
+              "eligible_zero_without_xml_space": 129,
+              "raw_attribute_cardinality": {
+                "0": 129,
+                "1": 258,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 387,
+              "xml_space_absent_events": 387,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          },
+          "proof": {
+            "bytes_equal": false,
+            "full_replacement_audit": false,
+            "kind": "Window",
+            "original_span": {
+              "bytes": 14,
+              "range": [
+                1494,
+                1508
+              ],
+              "sha256": "9934af60cdd80113aeef6b399e89fcaa466e6b4f6d5b527f0806b880a4c1f5e7"
+            },
+            "replacement_span": {
+              "bytes": 14,
+              "range": [
+                1494,
+                1508
+              ],
+              "sha256": "d3ef8998a390e50f0bc33b16dfd44901e85f25dad8107e8f39e9fc96b0af823d"
+            },
+            "span_parsed_as_xml": false
+          },
+          "replacement": {
+            "artifact": {
+              "bytes": 6352,
+              "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet4.xml",
+              "sha256": "ccaa730a58e12521cb441b63e5abebf492bb41e279a346bc84301dea797b0198"
+            },
+            "exporter_census": {
+              "attributes": 258,
+              "multiple_attribute_tags": 0,
+              "one_attribute_tags": 258,
+              "start_or_empty_tags": 387,
+              "xml_space_attributes": 0,
+              "xml_space_elements": 0,
+              "zero_attribute_tags": 129
+            },
+            "full_xml_census": {
+              "attributes": 258,
+              "eligible_one_without_xml_space": 258,
+              "eligible_zero_or_one_without_xml_space": 387,
+              "eligible_zero_without_xml_space": 129,
+              "raw_attribute_cardinality": {
+                "0": 129,
+                "1": 258,
+                "2..32": 0,
+                ">32": 0
+              },
+              "start_element_events": 387,
+              "xml_space_absent_events": 387,
+              "xml_space_attribute_occurrences": 0,
+              "xml_space_present_events": 0
+            }
+          }
+        }
+      ],
+      "shape": "dense-sparse",
+      "source_archive": {
+        "bytes": 4251863,
+        "path": "dense-sparse/source.zip",
+        "sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+      },
+      "totals": {
+        "original": {
+          "attributes": 18118,
+          "eligible_one_without_xml_space": 18104,
+          "eligible_zero_or_one_without_xml_space": 35901,
+          "eligible_zero_without_xml_space": 17797,
+          "raw_attribute_cardinality": {
+            "0": 17797,
+            "1": 18104,
+            "2..32": 5,
+            ">32": 0
+          },
+          "start_element_events": 35906,
+          "xml_space_absent_events": 35906,
+          "xml_space_attribute_occurrences": 0,
+          "xml_space_present_events": 0
+        },
+        "replacement": {
+          "attributes": 18123,
+          "eligible_one_without_xml_space": 18104,
+          "eligible_zero_or_one_without_xml_space": 35901,
+          "eligible_zero_without_xml_space": 17797,
+          "raw_attribute_cardinality": {
+            "0": 17797,
+            "1": 18104,
+            "2..32": 6,
+            ">32": 0
+          },
+          "start_element_events": 35907,
+          "xml_space_absent_events": 35907,
+          "xml_space_attribute_occurrences": 0,
+          "xml_space_present_events": 0
+        }
+      }
+    }
+  ],
+  "helper": {
+    "bytes": 24874,
+    "path": "census.py",
+    "sha256": "00adae754aa67b72d939615e96b5126d9e2186ad994cbb600921189a87b916a6"
+  },
+  "input_schema": "litchi.xlsx-attribute-fixtures.v1",
+  "manifest": {
+    "bytes": 17221,
+    "path": "manifest.json",
+    "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+  },
+  "schema": "litchi.xlsx-attribute-census.v1",
+  "scope": {
+    "full_xml_artifacts_parsed": true,
+    "namespace_processing": "disabled",
+    "native_benefit_claim": false,
+    "ordered_attributes": true,
+    "proof_windows_parsed_as_xml": false,
+    "raw_attribute_cardinality": [
+      "0",
+      "1",
+      "2..32",
+      ">32"
+    ],
+    "rust_auditor_replayed": false,
+    "selected_parts_only": true
+  },
+  "totals": {
+    "case_count": 3,
+    "original": {
+      "attributes": 29916,
+      "eligible_one_without_xml_space": 29874,
+      "eligible_zero_or_one_without_xml_space": 59198,
+      "eligible_zero_without_xml_space": 29324,
+      "raw_attribute_cardinality": {
+        "0": 29324,
+        "1": 29874,
+        "2..32": 15,
+        ">32": 0
+      },
+      "start_element_events": 59213,
+      "xml_space_absent_events": 59213,
+      "xml_space_attribute_occurrences": 0,
+      "xml_space_present_events": 0
+    },
+    "part_count": 12,
+    "replacement": {
+      "attributes": 29931,
+      "eligible_one_without_xml_space": 29874,
+      "eligible_zero_or_one_without_xml_space": 59198,
+      "eligible_zero_without_xml_space": 29324,
+      "raw_attribute_cardinality": {
+        "0": 29324,
+        "1": 29874,
+        "2..32": 18,
+        ">32": 0
+      },
+      "start_element_events": 59216,
+      "xml_space_absent_events": 59216,
+      "xml_space_attribute_occurrences": 0,
+      "xml_space_present_events": 0
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "argv": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--example",
+    "xlsx_attribute_fixtures"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target/litchi-0904-build",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 2241,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0904/command.py",
+    "sha256": "a06810479d89156b09c38d1c4bba7e7b92325c45f77053a2963ce12f426b6eae"
+  },
+  "inputs_before": [
+    {
+      "bytes": 3020953,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+      "sha256": "b62775d903ccb2490c28af61d6c5c95d8ed826afad4f0e7dc3c83bd41b877903"
+    },
+    {
+      "bytes": 56289,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    {
+      "bytes": 138465,
+      "path": "/home/zhuhe/code/litchi/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    {
+      "bytes": 14152,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/xlsx_attribute_fixtures.rs",
+      "sha256": "1c5d740011dd7ce39bd8ad139627b3e030c4360731ca5af5caa5a7e93a984581"
+    },
+    {
+      "bytes": 788,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/examples/xlsx_attribute_fixtures.rs",
+      "sha256": "9b705f3fc42a360653cdb8c3be2d9042f5df5febce69b2f692fdf8046e478da6"
+    }
+  ],
+  "started_utc": "2026-10-04T05:03:11.131374+00:00"
+}

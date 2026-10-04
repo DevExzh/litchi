@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0904 — exact XLSX attribute census
+
+[0904](0904-xlsx-attribute-census.md) adds an untimed exporter whose three
+source/output archive pairs exactly match retained benchmark identities.
+Independent Rust/Python counts agree: over 99.9% of primary full-artifact tags
+have zero/one attribute without xml:space. Two replacement window proofs keep
+full-artifact counts distinct from actual re-audit coverage. This qualifies
+coverage for a bounded validated-summary experiment; semantic differential and
+native benefit gates remain ahead. Production is unchanged and the goal stays open.
+
 ## 0903 — XML audit hot-loop attribution
 
 [0903](0903-xml-audit-hotloop-attribution.md) reduces four retained publication

@@ -1,0 +1,137 @@
+{
+  "binary": {
+    "bytes": 35838616,
+    "path": "/home/zhuhe/code/litchi/target/litchi-0904-build/debug/examples/xlsx_attribute_fixtures",
+    "sha256": "c6f4d074a22433b5720ec541b10b5b77789cdafc9ba21b59b59dab6c54f47c37"
+  },
+  "duplicate_export_removed": true,
+  "exporter_existing_directory_refusal": {
+    "all_artifacts_unchanged": true,
+    "exit_code": 1,
+    "stderr": "Error: \"XLSX attribute fixture directory already exists: docs/performance/results/change-0904/artifacts\"\n"
+  },
+  "files": {
+    "dense-sparse/one-percent/original/xl/workbook.xml": {
+      "bytes": 424,
+      "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+    },
+    "dense-sparse/one-percent/original/xl/worksheets/sheet1.xml": {
+      "bytes": 462568,
+      "sha256": "2366585fd004d6516a7ea33c2943b38993ffd234fe2e3b3070aaa0a593ab66e7"
+    },
+    "dense-sparse/one-percent/original/xl/worksheets/sheet2.xml": {
+      "bytes": 31398,
+      "sha256": "e02fa30324c5436458d8cffcfd71c29bd5c9b7537693eedbedd5cbb79406dc64"
+    },
+    "dense-sparse/one-percent/original/xl/worksheets/sheet3.xml": {
+      "bytes": 8115,
+      "sha256": "c2ab626116c4b3f11e087c5ca685338ea1a756f1b59f97b715c913c62f802a9a"
+    },
+    "dense-sparse/one-percent/original/xl/worksheets/sheet4.xml": {
+      "bytes": 6352,
+      "sha256": "89dbdef2f41a633923338a399ea1a82729bad5e2e28db3e8e9796a4ce03b0dd9"
+    },
+    "dense-sparse/one-percent/output.zip": {
+      "bytes": 4252436,
+      "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+    },
+    "dense-sparse/one-percent/replacement/xl/workbook.xml": {
+      "bytes": 527,
+      "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+    },
+    "dense-sparse/one-percent/replacement/xl/worksheets/sheet1.xml": {
+      "bytes": 462569,
+      "sha256": "d079bcce4b785b6de82528458bc8b2ccfd1e8844e25b95bc386dd93f42bf6972"
+    },
+    "dense-sparse/one-percent/replacement/xl/worksheets/sheet2.xml": {
+      "bytes": 31398,
+      "sha256": "a7e008e774b9f9a97e396bc8879435a3cc6ef09a44ae0cdbd4a2605dce47ddf5"
+    },
+    "dense-sparse/one-percent/replacement/xl/worksheets/sheet3.xml": {
+      "bytes": 8115,
+      "sha256": "f47c01b58d76b06ccfe243349cfb39cdb1d880dbfd1bb3f5e57dbe9086b01166"
+    },
+    "dense-sparse/one-percent/replacement/xl/worksheets/sheet4.xml": {
+      "bytes": 6352,
+      "sha256": "ccaa730a58e12521cb441b63e5abebf492bb41e279a346bc84301dea797b0198"
+    },
+    "dense-sparse/source.zip": {
+      "bytes": 4251863,
+      "sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+    },
+    "manifest.json": {
+      "bytes": 17221,
+      "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+    },
+    "medium/one-edit/original/xl/workbook.xml": {
+      "bytes": 424,
+      "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+    },
+    "medium/one-edit/original/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+    },
+    "medium/one-edit/output.zip": {
+      "bytes": 4226480,
+      "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+    },
+    "medium/one-edit/replacement/xl/workbook.xml": {
+      "bytes": 527,
+      "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+    },
+    "medium/one-edit/replacement/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "fa4f801f0361d957aafaf00bc645ee845477216f8dd572a927350eafdca383b2"
+    },
+    "medium/one-percent/original/xl/workbook.xml": {
+      "bytes": 424,
+      "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+    },
+    "medium/one-percent/original/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+    },
+    "medium/one-percent/original/xl/worksheets/sheet2.xml": {
+      "bytes": 68488,
+      "sha256": "fae0309386f910eda0caf18ea98f578ce5c719438e7de8b696cdd8089cf8c326"
+    },
+    "medium/one-percent/original/xl/worksheets/sheet3.xml": {
+      "bytes": 68488,
+      "sha256": "c105ecf49b0b3a0f35c71f8dfa2d049aac677c95d2c21150f93afe3f871c8edf"
+    },
+    "medium/one-percent/original/xl/worksheets/sheet4.xml": {
+      "bytes": 68488,
+      "sha256": "8c34fd06ab17b99f9260ee7719c60785dabab53faeec829d2576fbcc42ae1f9c"
+    },
+    "medium/one-percent/output.zip": {
+      "bytes": 4226788,
+      "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+    },
+    "medium/one-percent/replacement/xl/workbook.xml": {
+      "bytes": 527,
+      "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+    },
+    "medium/one-percent/replacement/xl/worksheets/sheet1.xml": {
+      "bytes": 63294,
+      "sha256": "e12f687e5e1a0456338694a505134d53ccd1417cb17e51b12dff85429d6f1220"
+    },
+    "medium/one-percent/replacement/xl/worksheets/sheet2.xml": {
+      "bytes": 68488,
+      "sha256": "6e530b0c405315eb4fb29b87da91d29faf3ec346c1e1e3b4c9b29c7fa21fbafa"
+    },
+    "medium/one-percent/replacement/xl/worksheets/sheet3.xml": {
+      "bytes": 68488,
+      "sha256": "34a604ebbe87e62535b215bfd648061c0686c45ae6795f43e856088247938811"
+    },
+    "medium/one-percent/replacement/xl/worksheets/sheet4.xml": {
+      "bytes": 68488,
+      "sha256": "dc18d296070fce4d64434d03ac400df00e1df53a1d534a9104aaddc4123baf79"
+    },
+    "medium/source.zip": {
+      "bytes": 4226429,
+      "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+    }
+  },
+  "first_and_final_export_identical": true,
+  "status": "pass"
+}

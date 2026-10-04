@@ -1,0 +1,39 @@
+{
+  "analysis_sha256": "7fe91367bff11d62fee990a1e364e65ee0a75776597d6a290e410d0cb1065bb1",
+  "canonical_replay_byte_identical": true,
+  "cases": [
+    {
+      "case": "medium-one-percent",
+      "prior_archive_identity": true,
+      "selected_changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ]
+    },
+    {
+      "case": "medium-one-edit",
+      "prior_archive_identity": true,
+      "selected_changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml"
+      ]
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "prior_archive_identity": true,
+      "selected_changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ]
+    }
+  ],
+  "census_existing_output_refused_without_mutation": true,
+  "status": "pass",
+  "temporary_replay_removed": true
+}
