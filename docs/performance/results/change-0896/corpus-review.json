@@ -1,0 +1,113 @@
+{
+  "schema": "litchi.mce-corpus-review-0896.v1",
+  "status": "pass",
+  "performance_claim": false,
+  "production_adoption": false,
+  "independent_checks": {
+    "comparison": {
+      "schema": "litchi.mce-corpus-comparison-0896.v1",
+      "status": "pass",
+      "descriptor": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus-comparison.json",
+        "bytes": 8677,
+        "sha256": "c1f17dcdd067cfafa5a890d0d35cf383433b3a4b1f6a4abe5a3eeee2ec90c2a1"
+      },
+      "byte_equal": true,
+      "sha256_equal": true,
+      "semantic_equal": true,
+      "counts": {
+        "controls": 10,
+        "packages": 3,
+        "members": 67,
+        "generated": 20000,
+        "aliasing": 20000,
+        "oracles": 200201,
+        "legacy_results": 200405,
+        "stream_records_checked": 100067,
+        "raw_transcripts_checked": 100067,
+        "semantic_transcripts_checked": 100067
+      },
+      "outcomes": {
+        "codec_refusal": 48804,
+        "codec_success": 51330,
+        "stream_refusal": 48133,
+        "stream_success": 51934
+      },
+      "oracle_keys_sha256": "e8975186cc826aa04a955dd6b93a5fa7575360aa8266a20a9e7488c9286ac7df",
+      "result_keys_sha256": "af7d8a1cfdb6a7c6dd3b923535a8f5459d4aeb894d36f7a83469156d6d60f2ea"
+    },
+    "compressed_reports": {
+      "codec": "gzip",
+      "deterministic_header": {"mtime": 0, "filename": ""},
+      "baseline": {
+        "raw": {"bytes": 226196057, "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77"},
+        "compressed": {"bytes": 12319923, "sha256": "66b112c9dbcf9c6651f20871494b524772545241e5db68918d5ae0079280e926"},
+        "roundtrip": true
+      },
+      "candidate": {
+        "raw": {"bytes": 226196057, "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77"},
+        "compressed": {"bytes": 12319923, "sha256": "66b112c9dbcf9c6651f20871494b524772545241e5db68918d5ae0079280e926"},
+        "roundtrip": true
+      }
+    },
+    "diagnostic_repeat": {
+      "formal_baseline": false,
+      "byte_equal_to_formal": true,
+      "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77",
+      "runner_status": "fail",
+      "runner_exit_code": 1,
+      "runner_receipt_sha256": "a2b686b2f2e494060f16ae99b55befa432d650e944a97ac6c0cdb9aded53710c"
+    },
+    "command_receipts": {
+      "baseline": {"status": "pass", "exit_code": 0, "sha256": "334d37bffe8e81fb80128fa1601467229675996f40cf26bed9828c58b30b9e59"},
+      "candidate": {"status": "pass", "exit_code": 0, "sha256": "ceb91b6504b2755a39393d56ff9055eeacf9a46d6e3080625619ce33e86dd5b0"}
+    },
+    "quality": {
+      "status": "pass",
+      "gate_count": 8,
+      "gates": [
+        {"name": "boundary", "status": "pass", "exit_code": 0, "sha256": "5208f7a787cbd53423a522ad2bc994accefe2e8b0635023793503e89b0ca5da6"},
+        {"name": "common-clippy", "status": "pass", "exit_code": 0, "sha256": "37f1dce8a790ab5dfa934806ae8daccb4eb937166bd3aad10523d6a40a261e34"},
+        {"name": "common-doc", "status": "pass", "exit_code": 0, "sha256": "9003c9a977afdfbb9202544369c6d939d109cc957372bbc2daf6ef48796d2bf2"},
+        {"name": "common-tests", "status": "pass", "exit_code": 0, "sha256": "56328fa3303b47acff453961c96d1ac559e67b6e471a77b22990d8cd619ad4e8"},
+        {"name": "diagnostic-tests", "status": "pass", "exit_code": 0, "sha256": "05987aa932af8d635642183fdf4402351a7e6a3d1e439617624743283417cb3a"},
+        {"name": "fmt", "status": "pass", "exit_code": 0, "sha256": "5009a812bcadb9048f6b54ec785d38666fae829c0bb419bca6207f4ae39e5017"},
+        {"name": "producer-tests", "status": "pass", "exit_code": 0, "sha256": "3fcf166f769f92d6daac3b30eab781e108a6f14b3be0416d59cf1d221f65feae"},
+        {"name": "xlsx-tests", "status": "pass", "exit_code": 0, "sha256": "e2f1b13a92d212693d8cb53c0596256005aa99d460cd964e72341489f7009427"}
+      ]
+    },
+    "source_build_receipts": {
+      "source": {"status": "pass", "sha256": "f5e02ff2e86e1cac87384867c10e5e1a45775072ee62a3d7bfe5172245c0b911"},
+      "candidate_source": {"status": "pass", "production_adopted": false, "guard_contract": "post-endpoint-per-worksheet-tolerance-v1", "sha256": "bbce5f45c94e6c62e4bdfe468ca716f51c08c558ffdc0a2e8fe2d4e60654c354"},
+      "baseline_build": {"status": "pass", "sha256": "8204f60e195450f267f44bb05e59ec2457b1008a52a1e3275b33758b80dd9444"},
+      "candidate_build": {"status": "pass", "sha256": "f32f2c938eba39eab0b6e6e0c5ba46ee461c6024cfc82b9690b36c800793ba9d"}
+    }
+  },
+  "allocation_capture": {
+    "receipt": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/capture.json",
+      "bytes": 7724,
+      "sha256": "74fbad7e3fd02001dc4afdc97dece74c4a343f00a2fd2a96e8541ea8790ddad6"
+    },
+    "status": "pass",
+    "children": 8,
+    "cases": {"mce_stream_count_document": 4, "mce_stream_count_worksheet": 4},
+    "roles": ["baseline", "candidate", "candidate", "baseline", "baseline", "candidate", "candidate", "baseline"],
+    "samples": 20,
+    "warmup": 0,
+    "performance_claim": null
+  },
+  "logical_artifacts": {
+    "formal_baseline": {"bytes": 226196057, "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77"},
+    "formal_candidate": {"bytes": 226196057, "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77"},
+    "diagnostic_repeat": {"bytes": 226196057, "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77"},
+    "comparison_receipt": {"bytes": 8677, "sha256": "c1f17dcdd067cfafa5a890d0d35cf383433b3a4b1f6a4abe5a3eeee2ec90c2a1"},
+    "source_review": {"bytes": 4696, "sha256": "6f7c988f433334ccd96b03dd844069cd16a59bd3d676f810dc0d2b57cd938ebc"}
+  },
+  "notes": [
+    "The formal baseline and candidate reports are byte-identical and semantically complete across 20,000 generated cases, 20,000 aliasing cases, and 67 package members.",
+    "The original baseline report is a byte-equal diagnostic repeat only; its runner lost the formal receipt and exited 1.",
+    "The direct stream heaptrack capture is whole-process allocation evidence with no latency or production-adoption claim.",
+    "Artifact hashes are logical custody evidence and remain usable after root cleanup removes raw reports, compressed copies, or debug build roots."
+  ]
+}

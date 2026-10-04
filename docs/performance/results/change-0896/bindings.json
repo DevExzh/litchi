@@ -1,0 +1,116 @@
+{
+  "schema": "litchi.qname-freeze-bindings-0896.v1",
+  "evaluation_head": "3ff493b638b7aa5860d97858dae8bd82bac0f2d5",
+  "bindings": {
+    "source_manifest": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_identity": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-before-build.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "candidate_freeze": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-source.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "candidate_build": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-build.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "candidate_quality": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/quality.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "guard_reference": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0893/qualification-after-cleanup/report.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-review.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "candidate_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-review.json",
+      "kind": "evidence",
+      "role": "candidate"
+    },
+    "corpus_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus-review.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "corpus_comparison": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus-comparison.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "direct_review": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-review.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "direct_plan": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-plan.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "direct_capture": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/capture.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_after_build": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-after-build.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_v1": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/qualify.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_v2": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/qualify-v2.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "qualification_runner_final": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/qualify-v3.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "source_census_helper": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source_audit.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "corpus_compare_helper": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus_compare.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "direct_profile_helper": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct_profile.py",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "reports_cleanup": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/reports-cleanup.json",
+      "kind": "evidence",
+      "role": "review"
+    },
+    "quality_build_cleanup": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/quality-build-cleanup.json",
+      "kind": "evidence",
+      "role": "review"
+    }
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "cases": {
+    "mce_stream_count_document": [
+      {
+        "case": "mce_stream_count_document",
+        "heaptrack_allocations": 2650247,
+        "input_bytes": 288070,
+        "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+        "ordinal": 4,
+        "outcomes": [
+          "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+        ],
+        "role": "baseline"
+      },
+      {
+        "case": "mce_stream_count_document",
+        "heaptrack_allocations": 1619687,
+        "input_bytes": 288070,
+        "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+        "ordinal": 5,
+        "outcomes": [
+          "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+        ],
+        "role": "candidate"
+      },
+      {
+        "case": "mce_stream_count_document",
+        "heaptrack_allocations": 1619687,
+        "input_bytes": 288070,
+        "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+        "ordinal": 6,
+        "outcomes": [
+          "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+        ],
+        "role": "candidate"
+      },
+      {
+        "case": "mce_stream_count_document",
+        "heaptrack_allocations": 2650247,
+        "input_bytes": 288070,
+        "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+        "ordinal": 7,
+        "outcomes": [
+          "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+        ],
+        "role": "baseline"
+      }
+    ],
+    "mce_stream_count_worksheet": [
+      {
+        "case": "mce_stream_count_worksheet",
+        "heaptrack_allocations": 20152391,
+        "input_bytes": 1558391,
+        "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+        "ordinal": 0,
+        "outcomes": [
+          "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+        ],
+        "role": "baseline"
+      },
+      {
+        "case": "mce_stream_count_worksheet",
+        "heaptrack_allocations": 15361491,
+        "input_bytes": 1558391,
+        "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+        "ordinal": 1,
+        "outcomes": [
+          "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+        ],
+        "role": "candidate"
+      },
+      {
+        "case": "mce_stream_count_worksheet",
+        "heaptrack_allocations": 15361491,
+        "input_bytes": 1558391,
+        "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+        "ordinal": 2,
+        "outcomes": [
+          "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+        ],
+        "role": "candidate"
+      },
+      {
+        "case": "mce_stream_count_worksheet",
+        "heaptrack_allocations": 20152391,
+        "input_bytes": 1558391,
+        "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+        "ordinal": 3,
+        "outcomes": [
+          "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+        ],
+        "role": "baseline"
+      }
+    ]
+  },
+  "children": 8,
+  "fail_fast": true,
+  "fresh_child": true,
+  "measurement_scope": "whole-process heaptrack allocation count including setup and teardown; diagnostic only",
+  "performance_claim": null,
+  "plan": {
+    "bytes": 7044,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-plan.json",
+    "sha256": "8d11552073dcd36bff62f62a813bbef9733afc8a1c862bbae72d79f517f21022"
+  },
+  "rows": [
+    {
+      "receipt": "runs/000-mce_stream_count_worksheet-baseline/receipt.json",
+      "row": {
+        "case": "mce_stream_count_worksheet",
+        "ordinal": 0,
+        "pair": "mce_stream_count_worksheet-abba",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/001-mce_stream_count_worksheet-candidate/receipt.json",
+      "row": {
+        "case": "mce_stream_count_worksheet",
+        "ordinal": 1,
+        "pair": "mce_stream_count_worksheet-abba",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/002-mce_stream_count_worksheet-candidate/receipt.json",
+      "row": {
+        "case": "mce_stream_count_worksheet",
+        "ordinal": 2,
+        "pair": "mce_stream_count_worksheet-abba",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/003-mce_stream_count_worksheet-baseline/receipt.json",
+      "row": {
+        "case": "mce_stream_count_worksheet",
+        "ordinal": 3,
+        "pair": "mce_stream_count_worksheet-abba",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/004-mce_stream_count_document-baseline/receipt.json",
+      "row": {
+        "case": "mce_stream_count_document",
+        "ordinal": 4,
+        "pair": "mce_stream_count_document-abba",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/005-mce_stream_count_document-candidate/receipt.json",
+      "row": {
+        "case": "mce_stream_count_document",
+        "ordinal": 5,
+        "pair": "mce_stream_count_document-abba",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/006-mce_stream_count_document-candidate/receipt.json",
+      "row": {
+        "case": "mce_stream_count_document",
+        "ordinal": 6,
+        "pair": "mce_stream_count_document-abba",
+        "role": "candidate",
+        "samples": 20,
+        "warmup": 0
+      }
+    },
+    {
+      "receipt": "runs/007-mce_stream_count_document-baseline/receipt.json",
+      "row": {
+        "case": "mce_stream_count_document",
+        "ordinal": 7,
+        "pair": "mce_stream_count_document-abba",
+        "role": "baseline",
+        "samples": 20,
+        "warmup": 0
+      }
+    }
+  ],
+  "schema": "litchi.xlsx-qname-direct-stream-heaptrack-capture-0896.v1",
+  "status": "pass",
+  "workload_launched": true
+}

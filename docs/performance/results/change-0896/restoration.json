@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T00:14:44.396274+00:00",
+  "reason": "Frozen native primary gate fails; restore only two owned live files. Candidate overlays retained.",
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/stream.rs": {
+      "bytes": 125424,
+      "sha256": "1e194cae9ec2f2b559543656011c198fb67c84f52dc47894dba44f18e4f9710f",
+      "baseline_revision": "3ff493b638b7aa5860d97858dae8bd82bac0f2d5"
+    },
+    "crates/litchi-ooxml-common/src/mce/tests.rs": {
+      "bytes": 129836,
+      "sha256": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76",
+      "baseline_revision": "3ff493b638b7aa5860d97858dae8bd82bac0f2d5"
+    }
+  }
+}

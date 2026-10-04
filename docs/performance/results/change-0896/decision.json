@@ -1,0 +1,58 @@
+{
+  "evidence": {
+    "corpus-review.json": {
+      "bytes": 6294,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus-review.json",
+      "sha256": "f9ed78189cd6bad2a9a9873c55e96ca5b9eaa9e61ea43aa4e74950933ba464f2"
+    },
+    "direct-review.json": {
+      "bytes": 33781,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-review.json",
+      "sha256": "fc506730a8c41575a3de8364160f8f2c73cee5530b00aa5eaedc42d0ff11d750"
+    },
+    "methodology-review.json": {
+      "bytes": 27522,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/methodology-review.json",
+      "sha256": "4217a93c0be4043645a44ad2a58ce5f76d7a0f9a8a2cbe8837b2000962927891"
+    },
+    "native-review.json": {
+      "bytes": 240000,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/native-review.json",
+      "sha256": "7a7c0b3536571ed85da9cb8b7046d0006bbd1fbb175cf6c0cd958bc6f936ed19"
+    },
+    "plan.json": {
+      "bytes": 40556,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/plan.json",
+      "sha256": "0fdd0ec898414e4bdf02b44eb34f37ec7a11ad173c3b799a3bcc02e89842c75d"
+    },
+    "reduction.json": {
+      "bytes": 52048,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/reduction.json",
+      "sha256": "29216f729e3c4cd49b1a77314eb2a4d81030ec60b86f6ca872cddac75d2160a6"
+    },
+    "restoration.json": {
+      "bytes": 673,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/restoration.json",
+      "sha256": "38ac6e7853cff01d0fd472f23d6f198cb31366a92169082377b234e81aa17bc4"
+    },
+    "verification.json": {
+      "bytes": 827,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/verification.json",
+      "sha256": "d2c950291d1cc133a45edc40f243024ef008fb53a80a6944264966fd28b90d1d"
+    }
+  },
+  "native_speedup_claim": null,
+  "next_step": "Profile dominant work in restored current end-to-end fallback route before choosing another bounded candidate.",
+  "primary_gate": {
+    "ci95_high": 1.0074447946570588,
+    "ci95_upper_below": 1.0,
+    "median_ratio": 0.9998938487250413,
+    "median_ratio_at_most": 0.98,
+    "pass": false
+  },
+  "production_adopted": false,
+  "reason": "Both frozen primary native p50 criteria fail. Direct debug whole-process allocation reductions do not override the end-to-end gate.",
+  "schema": "litchi.qname-decision-0896.v1",
+  "status": "rejected",
+  "utc": "2026-10-04T00:21:29.467448+00:00"
+}

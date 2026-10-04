@@ -1,0 +1,12 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-codepage)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-vba)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-crypto)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/target/litchi-0896-source/crates/litchi-ooxml-common)
+    Finished `dev` profile [unoptimized] target(s) in 4.36s
+   Generated /home/zhuhe/code/litchi/target/litchi-0896-build/doc/litchi_ooxml_common/index.html

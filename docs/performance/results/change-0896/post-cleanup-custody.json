@@ -1,0 +1,176 @@
+{
+  "audited_utc": "2026-10-04T00:23:40.937919+00:00",
+  "compressed_corpus": {
+    "cleanup_status": "pass",
+    "deterministic_gzip_roundtrips": true,
+    "diagnostic_repeat": {
+      "byte_equal_to_formal": true,
+      "formal_baseline": false,
+      "raw_absent": true,
+      "runner_exit_code": 1,
+      "runner_status": "fail"
+    },
+    "formal_roles": [
+      "baseline",
+      "candidate"
+    ],
+    "raw_reports_absent": true,
+    "reports": {
+      "baseline": {
+        "compressed": {
+          "bytes": 12319923,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/baseline-v2-differential.json.gz",
+          "sha256": "66b112c9dbcf9c6651f20871494b524772545241e5db68918d5ae0079280e926"
+        },
+        "gzip_header": {
+          "filename": "",
+          "mtime": 0
+        },
+        "raw_bytes": 226196057,
+        "raw_path_absent": true,
+        "raw_sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77",
+        "roundtrip": true
+      },
+      "candidate": {
+        "compressed": {
+          "bytes": 12319923,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-differential.json.gz",
+          "sha256": "66b112c9dbcf9c6651f20871494b524772545241e5db68918d5ae0079280e926"
+        },
+        "gzip_header": {
+          "filename": "",
+          "mtime": 0
+        },
+        "raw_bytes": 226196057,
+        "raw_path_absent": true,
+        "raw_sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77",
+        "roundtrip": true
+      }
+    },
+    "reports_byte_equal": true,
+    "reports_sha256_equal": true,
+    "semantic_summary": {
+      "aliasing": 20000,
+      "controls": 10,
+      "distinct_generated_inputs": {
+        "aliasing": 19418,
+        "generated": 13811
+      },
+      "generated": 20000,
+      "legacy_results": 200405,
+      "members": 67,
+      "oracle_records": 200201,
+      "outcomes": {
+        "codec_refusal": 48804,
+        "codec_success": 51330,
+        "stream_refusal": 48133,
+        "stream_success": 51934
+      },
+      "packages": 3
+    }
+  },
+  "direct_profile": {
+    "builds_run_by_reviewer": false,
+    "children_checked": 8,
+    "performance_claim": null,
+    "production_adoption": false,
+    "raw_reports_checked": 8,
+    "review_status": "pass",
+    "source_mutation": false,
+    "timing_claim": null,
+    "unique_retained_artifacts_checked": 48,
+    "workloads_run_by_reviewer": false
+  },
+  "fixture_relocation": {
+    "checked": 3,
+    "fixtures": {
+      "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx": {
+        "bytes": 55519,
+        "original_path_absent": true,
+        "repository_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+        "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+      },
+      "test-data/ooxml/docx/drawing.docx": {
+        "bytes": 95247,
+        "original_path_absent": true,
+        "repository_path": "/home/zhuhe/code/litchi/test-data/ooxml/docx/drawing.docx",
+        "sha256": "5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8"
+      },
+      "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx": {
+        "bytes": 325446,
+        "original_path_absent": true,
+        "repository_path": "/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+        "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be"
+      }
+    },
+    "repo_test_data_census": {
+      "all_bytes_sha256_equal": true,
+      "before_after_equal": true,
+      "non_iwork_entries": 1210
+    },
+    "source_paths_absent": true
+  },
+  "limitations": [
+    "The audit verifies retained bytes, hashes, gzip roundtrips, and fixture relocation after cleanup; it runs no workload or build.",
+    "The direct profile remains diagnostic whole-process allocation evidence and carries no timing or adoption claim.",
+    "The old failed baseline runner receipt remains a repeat diagnostic and is not a formal baseline run."
+  ],
+  "performance_claim": null,
+  "production_adoption": false,
+  "retained_receipts": {
+    "corpus_comparison_status": "pass",
+    "corpus_review_status": "pass",
+    "decision_evidence_checked": true,
+    "native_review_status": "pass",
+    "owned_cleanup_evidence": {
+      "decision.json": {
+        "bytes": 2529,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/decision.json",
+        "sha256": "b2ccdc547ad5da575d9c1b1204f46f6daeb12d2b1baf975f39382db48fed37f3"
+      },
+      "native-review.json": {
+        "bytes": 240000,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/native-review.json",
+        "sha256": "7a7c0b3536571ed85da9cb8b7046d0006bbd1fbb175cf6c0cd958bc6f936ed19"
+      },
+      "reports-cleanup.json": {
+        "bytes": 2221,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/reports-cleanup.json",
+        "sha256": "161e4f48deefef3f6f1ac6e2988f36d673e3a8eaf09c35f5a922373486d55645"
+      },
+      "source-after-build.json": {
+        "bytes": 1881541,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-after-build.json",
+        "sha256": "a742a1b8bc7571a1cfffa5eb499adf57b58e450974414ad483675d68eb0548bf"
+      },
+      "verification.json": {
+        "bytes": 827,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/verification.json",
+        "sha256": "d2c950291d1cc133a45edc40f243024ef008fb53a80a6944264966fd28b90d1d"
+      }
+    }
+  },
+  "retained_release_binaries": {
+    "allocator": {
+      "bytes": 267669696,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/binaries/candidate-allocator",
+      "sha256": "0c9db014968600615682fbd59db4c2519ce5841dd1c578993cf6738884d471c6"
+    },
+    "native": {
+      "bytes": 264615512,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/binaries/candidate-native",
+      "sha256": "c24a3442dc5f517b8933937f00e9c8940f0d1756fbe635b665ea9f4c4d7966b0"
+    }
+  },
+  "schema": "litchi.qname-post-cleanup-custody-0896.v1",
+  "source_trees": {
+    "build_path_absent": true,
+    "owned_cleanup_status": "pass",
+    "removed_bytes": 3302917127,
+    "source_path_absent": true,
+    "worktrees_created": []
+  },
+  "status": "pass",
+  "timing_claim": null
+}
+

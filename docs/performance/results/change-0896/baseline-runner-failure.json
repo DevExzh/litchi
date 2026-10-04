@@ -1,0 +1,21 @@
+{
+  "diagnostic_exit_code": null,
+  "error": "FileExistsError creating baseline-differential.json after diagnostic wrote report; full failed helper and report retained",
+  "formal_baseline": false,
+  "helper": {
+    "bytes": 8881,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/qualify.py",
+    "sha256": "08a3ade32488364ba37b16270b664a07f986da80a7a9be599a72be2d011551a8"
+  },
+  "report": {
+    "bytes": 226196057,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/baseline-differential.json",
+    "sha256": "5f0dd9b0e9f77150d40c7d4e0f9e81e7f57c421e37fbbd7ee6517786ffea7e77"
+  },
+  "runner_exit_code": 1,
+  "status": "fail"
+}

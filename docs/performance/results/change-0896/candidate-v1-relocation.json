@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "reason": "test-only Clippy correction; first freeze and failure retained, no performance capture had started",
+  "moves": [
+    {
+      "before": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-overlay/crates/litchi-ooxml-common/src/mce/stream.rs",
+      "after": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-overlay-v1/crates/litchi-ooxml-common/src/mce/stream.rs",
+      "sha256": "597a65d9070f65c48669a592dd2715fc50e3461936ce9a6e65d0779e2d79464e"
+    },
+    {
+      "before": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-overlay/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "after": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-overlay-v1/crates/litchi-ooxml-common/src/mce/tests.rs",
+      "sha256": "89605bb3e89d691bbe519564cf62a3e5bcc5acb9fa296864452e5ec7b31a1591"
+    },
+    {
+      "before": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate.patch",
+      "after": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-v1.patch",
+      "sha256": "d61931ab6cd59bca93e727e221e6d20b1da991a774a55e3c8bfced070e592eb3"
+    }
+  ]
+}

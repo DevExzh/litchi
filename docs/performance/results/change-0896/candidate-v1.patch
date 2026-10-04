@@ -1,0 +1,178 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/stream.rs b/crates/litchi-ooxml-common/src/mce/stream.rs
+index 0ceb386719..67c8bfe73c 100644
+--- a/crates/litchi-ooxml-common/src/mce/stream.rs
++++ b/crates/litchi-ooxml-common/src/mce/stream.rs
+@@ -40,7 +40,7 @@ use super::model::{
+ use super::patterns::{NamePattern, Patterns};
+ use super::scope::{NO_NAMESPACE, Scope, Uri, UriId, XMLNS_URI, has_duplicate_prefix};
+ use crate::xml::attributes::BytesStartExt as _;
+-use crate::xml_name::{self, QualifiedName};
++use crate::xml_name;
+ 
+ const DEFAULT_MAX_EVENTS: usize = 1_000_000;
+ const DEFAULT_MAX_EVENT_BYTES: usize = 8 * 1024 * 1024;
+@@ -3355,9 +3355,10 @@ fn expand(
+     element: bool,
+     limits: &StreamLimits,
+ ) -> Result<(ExpandedName, UriId), Error> {
+-    let qualified = QualifiedName::try_from(q).map_err(|_| bad("invalid QName"))?;
+-    let prefix = qualified.prefix().unwrap_or_default();
+-    let local = qualified.local();
++    if !xml_name::is_qualified_name(q) {
++        return Err(bad("invalid QName"));
++    }
++    let (prefix, local) = q.split_once(':').unwrap_or(("", q));
+     let uri = if prefix.is_empty() {
+         if element {
+             let uri = namespaces.resolve("").unwrap_or(Uri::NONE);
+diff --git a/crates/litchi-ooxml-common/src/mce/tests.rs b/crates/litchi-ooxml-common/src/mce/tests.rs
+index 1b239ccb96..d5a184dd96 100644
+--- a/crates/litchi-ooxml-common/src/mce/tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/tests.rs
+@@ -1677,6 +1677,146 @@ mod streaming_0360_tests {
+         assert_eq!(plain.1, "ok");
+     }
+ 
++    #[test]
++    fn streaming_0896_qname_expansion_matches_the_legacy_parser() {
++        let cases = [
++            ("plain", "urn:default", ""),
++            ("p:item", "urn:pref", "urn:pref"),
++            ("π:名·2", "urn:unicode", "urn:unicode"),
++        ];
++
++        for (qname, element_namespace, attribute_namespace) in cases {
++            let parsed = crate::xml_name::parse(qname).expect("the test QName is valid");
++            assert!(crate::xml_name::is_qualified_name(qname));
++
++            let xml = format!(
++                r#"<r xmlns="urn:default" xmlns:p="urn:pref" xmlns:π="urn:unicode" {qname}="value"><{qname}/></r>"#
++            );
++            let mut element_name = None;
++            let mut attribute_name = None;
++            let mut input = Cursor::new(xml.as_bytes());
++            process_markup_compatibility_stream(
++                &mut input,
++                &Capabilities::new(),
++                &StreamLimits::default(),
++                |event| {
++                    match event {
++                        SemanticEvent::Start(element) => {
++                            attribute_name = element
++                                .attrs()
++                                .iter()
++                                .find(|attribute| attribute.name() == qname.as_bytes())
++                                .map(|attribute| attribute.expanded_name.clone());
++                        },
++                        SemanticEvent::Empty(element) if element.name() == qname.as_bytes() => {
++                            element_name = Some(element.expanded_name.clone());
++                        },
++                        _ => {},
++                    }
++                    Ok::<(), &'static str>(())
++                },
++            )
++            .expect("the valid QName must stream");
++
++            let element_name = element_name.expect("the element QName must be observed");
++            assert_eq!(element_name.namespace, element_namespace);
++            assert_eq!(element_name.local_name, parsed.local());
++            let attribute_name = attribute_name.expect("the attribute QName must be observed");
++            assert_eq!(attribute_name.namespace, attribute_namespace);
++            assert_eq!(attribute_name.local_name, parsed.local());
++            assert_eq!(
++                parsed.prefix().unwrap_or_default(),
++                qname.split_once(':').map_or("", |(prefix, _)| prefix)
++            );
++        }
++    }
++
++    #[test]
++    fn streaming_0896_qname_validation_keeps_limit_and_refusal_order() {
++        for qname in ["", "p:", ":local", "p:x:y", "bad name", "1bad", "π:名:余"] {
++            assert!(!crate::xml_name::is_qualified_name(qname));
++            assert!(crate::xml_name::parse(qname).is_err());
++        }
++
++        // The complete raw name is bounded before expansion. This remains the
++        // first refusal when an otherwise valid QName is too large, including
++        // when its prefix would also be unbound.
++        let mut overlong = Cursor::new(&b"<r><missing:long/></r>"[..]);
++        let overlong_limits = StreamLimits {
++            max_name_bytes: 5,
++            ..StreamLimits::default()
++        };
++        assert!(matches!(
++            process_markup_compatibility_stream(
++                &mut overlong,
++                &Capabilities::new(),
++                &overlong_limits,
++                |_| Ok::<(), &'static str>(()),
++            ),
++            Err(StreamError::Mce {
++                error: Error::LimitExceeded(message),
++                ..
++            }) if message == "stream name bytes"
++        ));
++
++        // A valid, bounded QName reaches expansion and retains the previous
++        // unbound-prefix refusal after lexical validation.
++        let mut unbound = Cursor::new(&b"<r><missing:x/></r>"[..]);
++        let error = process_markup_compatibility_stream(
++            &mut unbound,
++            &Capabilities::new(),
++            &StreamLimits::default(),
++            |_| Ok::<(), &'static str>(()),
++        )
++        .expect_err("the prefix is not declared");
++        assert!(matches!(
++            error,
++            StreamError::Mce {
++                error: Error::NonConformant(message),
++                ..
++            } if message == "unbound prefix"
++        ));
++
++        // Invalid lexical structure wins over namespace resolution, matching
++        // the old QualifiedName parser's validation-before-accessor order.
++        let mut invalid = Cursor::new(&b"<r xmlns:p=\"u\"><p:x:y/></r>"[..]);
++        let error = process_markup_compatibility_stream(
++            &mut invalid,
++            &Capabilities::new(),
++            &StreamLimits::default(),
++            |_| Ok::<(), &'static str>(()),
++        )
++        .expect_err("the QName has two colons");
++        assert!(matches!(
++            error,
++            StreamError::Mce {
++                error: Error::NonConformant(message),
++                ..
++            } if message == "invalid QName"
++        ));
++
++        // Exercise the same borrowed path through an attribute, including a
++        // non-ASCII character that is not an XML NCName character. The XML
++        // event reader preserves the lexical key; MCE qualification owns the
++        // QName validity refusal.
++        let unicode_invalid = format!("<r xmlns:p=\"u\" p:bad\u{2000}=\"1\"/>");
++        let mut unicode_input = Cursor::new(unicode_invalid.as_bytes());
++        let error = process_markup_compatibility_stream(
++            &mut unicode_input,
++            &Capabilities::new(),
++            &StreamLimits::default(),
++            |_| Ok::<(), &'static str>(()),
++        )
++        .expect_err("the Unicode attribute key is not an NCName");
++        assert!(matches!(
++            error,
++            StreamError::Mce {
++                error: Error::NonConformant(message),
++                ..
++            } if message == "invalid QName"
++        ));
++    }
++
+     #[test]
+     fn streaming_0360_processes_preserves_and_keeps_opaque_content() {
+         let mut capabilities = Capabilities::new();

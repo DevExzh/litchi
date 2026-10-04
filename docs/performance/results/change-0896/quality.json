@@ -1,0 +1,69 @@
+{
+  "gate_count": 8,
+  "gates": {
+    "boundary": {
+      "bytes": 1522,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/boundary-v2-run.json",
+      "sha256": "5208f7a787cbd53423a522ad2bc994accefe2e8b0635023793503e89b0ca5da6"
+    },
+    "common-clippy": {
+      "bytes": 1737,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/common-clippy-v2-run.json",
+      "sha256": "37f1dce8a790ab5dfa934806ae8daccb4eb937166bd3aad10523d6a40a261e34"
+    },
+    "common-doc": {
+      "bytes": 1692,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/common-doc-v2-run.json",
+      "sha256": "9003c9a977afdfbb9202544369c6d939d109cc957372bbc2daf6ef48796d2bf2"
+    },
+    "common-tests": {
+      "bytes": 1679,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/common-tests-v2-run.json",
+      "sha256": "56328fa3303b47acff453961c96d1ac559e67b6e471a77b22990d8cd619ad4e8"
+    },
+    "diagnostic-tests": {
+      "bytes": 1694,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/diagnostic-tests-v2-run.json",
+      "sha256": "05987aa932af8d635642183fdf4402351a7e6a3d1e439617624743283417cb3a"
+    },
+    "fmt": {
+      "bytes": 1730,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/fmt-v2-run.json",
+      "sha256": "5009a812bcadb9048f6b54ec785d38666fae829c0bb419bca6207f4ae39e5017"
+    },
+    "producer-tests": {
+      "bytes": 1688,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/producer-tests-v2-run.json",
+      "sha256": "3fcf166f769f92d6daac3b30eab781e108a6f14b3be0416d59cf1d221f65feae"
+    },
+    "xlsx-tests": {
+      "bytes": 1661,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/xlsx-tests-v2-run.json",
+      "sha256": "e2f1b13a92d212693d8cb53c0596256005aa99d460cd964e72341489f7009427"
+    }
+  },
+  "source": {
+    "bytes": 1344,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-source.json",
+    "sha256": "bbce5f45c94e6c62e4bdfe468ca716f51c08c558ffdc0a2e8fe2d4e60654c354"
+  },
+  "status": "pass"
+}

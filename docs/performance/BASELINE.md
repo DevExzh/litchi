@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0896 — borrowed QName candidate rejected
+
+[0896](0896-borrowed-qname-expansion.md) rejects the bounded QName candidate
+on its frozen native primary gate: p50 ratio 0.999894, 95% paired interval
+0.989597–1.007445. All 72 children / 3,320 measured samples pass semantic
+checks; eight quality gates and the 40,000-case generated/aliasing differential
+also pass. Direct debug stream whole-process allocation calls fall 23.77%
+for the worksheet and 38.89% for the document, but the current primary route
+only reaches a stream prefix: timed allocation calls fall by 68 (0.2622%).
+Production is restored; retained overlays and evidence preserve the candidate.
+Next work should profile dominant work in the current end-to-end fallback
+route. No RSS or native speedup claim is made.
+
 ## 0895 — selected-stream allocation attribution
 
 [0895](0895-selected-stream-allocation-profile.md) profiles the exact retained

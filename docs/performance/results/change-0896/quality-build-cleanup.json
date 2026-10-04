@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "utc": "2026-10-03T23:46:27.436106+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0896-build/debug",
+      "bytes": 2372251854,
+      "absent": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/target/litchi-0896-build/doc",
+      "bytes": 15690084,
+      "absent": true
+    }
+  ],
+  "retained_diagnostic_binaries": true,
+  "quality_corpus_direct_capture": "all pass",
+  "scope": "owned debug/doc target outputs only; source and release target preserved"
+}

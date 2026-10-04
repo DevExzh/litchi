@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.qname-candidate-review-0896.v1",
+  "status": "approved_for_measurement",
+  "production_adoption": false,
+  "performance_claim": null,
+  "scope": "Quality gates, semantic differential, source census and build custody permit the frozen paired trial. Direct debug allocation observations cannot override the native primary gate.",
+  "evidence": {
+    "candidate-build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-build.json",
+      "bytes": 3792,
+      "sha256": "de3a65d32a2e6f9dd90aa2abc923378fae3a56e43ce3919375b70e4df6e1ae3f"
+    },
+    "quality.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/quality.json",
+      "bytes": 2554,
+      "sha256": "cf0b686d34374535666bfb4f3e7cafd4afbc5a6c149df92e040de710554124e7"
+    },
+    "source-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-review.json",
+      "bytes": 598,
+      "sha256": "9c83a79091b2105b64c9533d5cc910166d5e4dce1f7d64c707b2fbb970bba7f3"
+    },
+    "corpus-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus-review.json",
+      "bytes": 6294,
+      "sha256": "f9ed78189cd6bad2a9a9873c55e96ca5b9eaa9e61ea43aa4e74950933ba464f2"
+    },
+    "corpus-comparison.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/corpus-comparison.json",
+      "bytes": 8677,
+      "sha256": "c1f17dcdd067cfafa5a890d0d35cf383433b3a4b1f6a4abe5a3eeee2ec90c2a1"
+    },
+    "direct-review.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-review.json",
+      "bytes": 33781,
+      "sha256": "fc506730a8c41575a3de8364160f8f2c73cee5530b00aa5eaedc42d0ff11d750"
+    },
+    "source-before-build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-before-build.json",
+      "bytes": 1881318,
+      "sha256": "ffe9ed1e8e5f0edd9a6175fd2332be08721fe11c7af83e9af6de1d6f5e7467e6"
+    },
+    "source-after-build.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-after-build.json",
+      "bytes": 1881541,
+      "sha256": "a742a1b8bc7571a1cfffa5eb499adf57b58e450974414ad483675d68eb0548bf"
+    },
+    "candidate-source.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-source.json",
+      "bytes": 1344,
+      "sha256": "bbce5f45c94e6c62e4bdfe468ca716f51c08c558ffdc0a2e8fe2d4e60654c354"
+    }
+  }
+}

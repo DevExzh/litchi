@@ -1,0 +1,4 @@
+# Locally retained, hash-bound executables and raw reports; compressed reports are tracked.
+/*-diagnostic
+/binaries/
+/*-differential.json

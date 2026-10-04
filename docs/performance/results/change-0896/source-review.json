@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "scope": "source equivalence and focused test review only; no adoption",
+  "review": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/source-review.md",
+    "bytes": 4696,
+    "sha256": "6f7c988f433334ccd96b03dd844069cd16a59bd3d676f810dc0d2b57cd938ebc"
+  },
+  "candidate_source": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/candidate-source.json",
+    "bytes": 1344,
+    "sha256": "bbce5f45c94e6c62e4bdfe468ca716f51c08c558ffdc0a2e8fe2d4e60654c354"
+  },
+  "production_adoption": false,
+  "performance_claim": null
+}

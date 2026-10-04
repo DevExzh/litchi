@@ -1,0 +1,90 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/heaptrack",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0896/baseline-diagnostic",
+    "adversarial",
+    "--case",
+    "mce_stream_count_document",
+    "--samples",
+    "20",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/report.json"
+  ],
+  "artifacts": {
+    "command.json": {
+      "bytes": 1287,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/command.json",
+      "sha256": "48507cc638eebc32ddd4e953561b79a7cd2c6786080bff28513e5c330cde9ac6"
+    },
+    "heaptrack.zst": {
+      "bytes": 285075,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/heaptrack.zst",
+      "sha256": "d80ab09b386bdd6204fe1a9c8e383dca3e55282e0e2d8e59f4ee7f60066d1979"
+    },
+    "report.json": {
+      "bytes": 784,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/report.json",
+      "sha256": "f657bdeb9a255b53686d98a73052a28c7b3dd4de93fd610679135269ce37c6e8"
+    },
+    "stderr.txt": {
+      "bytes": 106,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/stderr.txt",
+      "sha256": "89dfb67eacb25cb516d0f35484d575b0b9bc89a904660c07c0929602b4834d95"
+    },
+    "stdout.txt": {
+      "bytes": 455,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/stdout.txt",
+      "sha256": "d3b65f3cc25afc74e9b58166dce3b13e2d62008f3a93297b1a740d271a11d730"
+    }
+  },
+  "command": {
+    "bytes": 1287,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0896/direct-capture-v1/runs/007-mce_stream_count_document-baseline/command.json",
+    "sha256": "48507cc638eebc32ddd4e953561b79a7cd2c6786080bff28513e5c330cde9ac6"
+  },
+  "cwd": "/home/zhuhe/code/litchi/target/litchi-0896-source",
+  "environment": {
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-03T23:45:15.538867+00:00",
+  "heaptrack_allocations": 2650247,
+  "performance_claim": null,
+  "plan_sha256": "8d11552073dcd36bff62f62a813bbef9733afc8a1c862bbae72d79f517f21022",
+  "row": {
+    "case": "mce_stream_count_document",
+    "ordinal": 7,
+    "pair": "mce_stream_count_document-abba",
+    "role": "baseline",
+    "samples": 20,
+    "warmup": 0
+  },
+  "schema": "litchi.xlsx-qname-direct-stream-heaptrack-capture-0896.v1",
+  "started_utc": "2026-10-03T23:45:13.543311+00:00",
+  "status": "pass",
+  "workload_launched": true
+}

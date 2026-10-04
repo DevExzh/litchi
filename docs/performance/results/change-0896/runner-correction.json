@@ -1,0 +1,7 @@
+{
+  "status": "identified_before_phase_completion",
+  "kind": "runner report/receipt path collision",
+  "original_helper_sha256": "08a3ade32488364ba37b16270b664a07f986da80a7a9be599a72be2d011551a8",
+  "corrected_helper_sha256": "5720f7abe2d56670bee9594597d49ebc144e306c68748883dc496787b2669ac9",
+  "detail": "Original baseline phase uses baseline-differential.json both as diagnostic output and create-only command receipt. Original execution is retained; corrected helper uses -run.json receipts. Repeat qualification, if required, uses a fresh labeled output without overwriting evidence. This is not a performance capture."
+}
