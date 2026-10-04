@@ -1,0 +1,6 @@
+
+Program stopped.
+0x00007ef72b3becc0 in _start () from /lib64/ld-linux-x86-64.so.2
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/usr/lib/x86_64-linux-gnu/libthread_db.so.1".
+[Inferior 1 (process 572793) exited normally]

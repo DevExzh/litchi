@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0912 — dispatch uncertainty resolved, native attribution still open
+
+[0912](0912-pptx-native-sha-dispatch.md) retains a rejected perf attempt and two
+passing owner-gated native debugger witnesses. Both reach the x86 SHA backend
+and preserve all semantic/output/sink guards. No native profile or speedup is
+admitted. A concrete redundant owned-source span-copy candidate is documented
+for implementation and matched native evaluation.
+
 ## 0911 — bounded snapshot attribution, no production adoption
 
 [0911](0911-pptx-owning-snapshot-instruction-profile.md) separates fixture setup

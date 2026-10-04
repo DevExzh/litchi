@@ -1,0 +1,51 @@
+{
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "ranges": [
+    {
+      "address": 4450176,
+      "end": 4450551,
+      "kind": "T",
+      "name": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+      "size": 375
+    },
+    {
+      "address": 3921824,
+      "end": 3929439,
+      "kind": "t",
+      "name": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+      "size": 7615
+    },
+    {
+      "address": 3812416,
+      "end": 3822501,
+      "kind": "t",
+      "name": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+      "size": 10085
+    },
+    {
+      "address": 6075088,
+      "end": 6075163,
+      "kind": "T",
+      "name": "sha2::sha256::compress256",
+      "size": 75
+    },
+    {
+      "address": 6075264,
+      "end": 6076220,
+      "kind": "t",
+      "name": "sha2::sha256::x86_sha::compress",
+      "size": 956
+    },
+    {
+      "address": 6076224,
+      "end": 6086253,
+      "kind": "t",
+      "name": "sha2::sha256::soft::unroll::compress",
+      "size": 10029
+    }
+  ]
+}

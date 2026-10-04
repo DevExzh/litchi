@@ -1,0 +1,242 @@
+{
+  "schema": "litchi.pptx-native-sha-dispatch-result-review-0912.v1",
+  "status": "pass",
+  "decision": "admit_bounded_gdb_native_hardware_sha_reachability",
+  "reviewer": "owning_profile_review_0911",
+  "review_scope": {
+    "read_only": true,
+    "build_run": false,
+    "workload_run": false,
+    "profiler_run": false,
+    "production_source_changed": false,
+    "final_report_bound": true
+  },
+  "final_report": {
+    "path": "docs/performance/0912-pptx-native-sha-dispatch.md",
+    "bytes": 7360,
+    "sha256": "aa7a72545a3e1d052a60435ec54e5173b67f8b5d3b1332370af6f7d63594b00e"
+  },
+  "perf_rejection": {
+    "status": "rejected",
+    "sample_records": 16920,
+    "empty_decoded_chains": 15912,
+    "lost_chunks": 6,
+    "lost_records": 304,
+    "exact_owner_frames": 0,
+    "scoped_hardware_backend_frames": 0,
+    "unscoped_hardware_backend_frames": 1,
+    "remaining_perf_children_run": false,
+    "raw_packet_retained": true,
+    "native_cost_or_latency_claim": false
+  },
+  "gdb_dispatch": {
+    "status": "pass",
+    "routes": ["materialized", "owned"],
+    "children": 2,
+    "children_exit_zero": true,
+    "binary": {
+      "path": "docs/performance/results/change-0910/binaries/native",
+      "bytes": 9301456,
+      "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+    },
+    "setup_owner_entries_per_child": 1,
+    "measured_owner_entries_per_child": 1,
+    "matched_owner_returns": true,
+    "return_rsp_is_entry_rsp_plus_8": true,
+    "backend_breakpoints_disabled_outside_measured_owner": true,
+    "hardware_backend": "sha2::sha256::x86_sha::compress",
+    "hardware_hits_per_measured_owner": 1,
+    "hardware_pc_elf_virtual_address": "0x5cb380",
+    "hardware_pc_file_byte_offset": "0x5ca380",
+    "hardware_pc_in_frozen_range": true,
+    "full_backtraces_include_owner_and_timed_iteration": true,
+    "software_backend_hit": false,
+    "semantic_guards": {
+      "source_bytes": 17017139,
+      "source_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+      "output_bytes": 17017145,
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+    },
+    "native_timing_claim": false,
+    "native_profile_claim": false,
+    "route_comparison": false
+  },
+  "negative_checks": {
+    "status": "pass",
+    "mutations_in_memory_only": true,
+    "caller_ra_outside_expected_range_rejected": true,
+    "backend_pc_outside_frozen_range_rejected": true,
+    "missing_return_guard_rejected": true,
+    "mismatched_return_guard_rejected": true,
+    "out_of_order_enable_disable_rejected": true,
+    "cases": 10,
+    "receipt": {
+      "path": "docs/performance/results/change-0912/dispatch-checks.json",
+      "bytes": 4332,
+      "sha256": "9a155c498c2c330301838e2be1a44939d8588bc29b9b321ab5799ed529d7e048"
+    }
+  },
+  "custody": {
+    "status": "pass",
+    "reused_native_source_files": 9355,
+    "reused_native_capture_artifacts": 72,
+    "reused_native_legs": 24,
+    "native_custody_build_or_workload_run": false,
+    "dispatch_analysis_status": "pass",
+    "dispatch_analysis": {
+      "path": "docs/performance/results/change-0912/dispatch-analysis.json",
+      "bytes": 17708,
+      "sha256": "d8a59424f81c65b46ab7a955e37f66e5c7e4159dee97117488477818af37c8df"
+    },
+    "reused_native_custody": {
+      "path": "docs/performance/results/change-0912/reused-native-custody.json",
+      "bytes": 281,
+      "sha256": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257"
+    }
+  },
+  "replay_and_cleanup": {
+    "replay_before_cleanup": {
+      "path": "docs/performance/results/change-0912/replay-before-cleanup.json",
+      "bytes": 2223,
+      "sha256": "7ca9f9724c94d0e8832558a46aa6b6dbc342e04b17461028cfb7e1c9107aa62c",
+      "status": "pass"
+    },
+    "replay_after_cleanup": {
+      "path": "docs/performance/results/change-0912/replay-after-cleanup.json",
+      "bytes": 2223,
+      "sha256": "7ca9f9724c94d0e8832558a46aa6b6dbc342e04b17461028cfb7e1c9107aa62c",
+      "status": "pass"
+    },
+    "perf_exports_byte_exact": true,
+    "gdb_witnesses_byte_exact": 2,
+    "cleanup": {
+      "path": "docs/performance/results/change-0912/cleanup.json",
+      "bytes": 606,
+      "sha256": "92c9a4b9fc60be9e14153129c99ee1c152ca27fb7931a2e335d6a6f69e5a6492",
+      "status": "pass",
+      "temporary_roots_removed": 2,
+      "removed_logical_bytes": 130,
+      "worktrees_created": 0,
+      "builds_created": 0,
+      "caches_left": false
+    }
+  },
+  "limitations": [
+    "The perf lane does not provide an admitted native stack profile or sampled cost attribution.",
+    "The GDB lane proves reachability only for two guarded children on the unchanged 0910 binary.",
+    "No native elapsed-time, hardware-counter, guest-to-native conversion, allocation/RSS, speedup, or production optimization claim is admitted.",
+    "Evidence is limited to the generated fixture and does not qualify all inputs, hosts, or execution environments."
+  ],
+  "reviewed_files": [
+    {
+      "path": "docs/performance/0912-pptx-native-sha-dispatch.md",
+      "bytes": 7360,
+      "sha256": "aa7a72545a3e1d052a60435ec54e5173b67f8b5d3b1332370af6f7d63594b00e"
+    },
+    {
+      "path": "docs/performance/results/change-0912/result-review.md",
+      "bytes": 3120,
+      "sha256": "60d9fbd95fe5f88f70b00f2785fc14bd96f0bb747d59ceab67f8fb2e7720feba"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch-analysis.json",
+      "bytes": 17708,
+      "sha256": "d8a59424f81c65b46ab7a955e37f66e5c7e4159dee97117488477818af37c8df"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch-checks.json",
+      "bytes": 4332,
+      "sha256": "9a155c498c2c330301838e2be1a44939d8588bc29b9b321ab5799ed529d7e048"
+    },
+    {
+      "path": "docs/performance/results/change-0912/first-child-failure.json",
+      "bytes": 15835,
+      "sha256": "d3023a1dbfe33fe67e8bac4a38538f44c5874e29bb6d7aa225686a7314408b87"
+    },
+    {
+      "path": "docs/performance/results/change-0912/first-child-failure.md",
+      "bytes": 2154,
+      "sha256": "053213bc3538ded782b9a1c33802280b190f7ee87aa32913ad96fcf967f10c51"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch/materialized/dispatch.json",
+      "bytes": 10088,
+      "sha256": "0722fb393020fe6a2a801a9718124cafd782537cdfbc71646248665da927ac60"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch/owned/dispatch.json",
+      "bytes": 10088,
+      "sha256": "51e797fbba18b30a29d0a7c1f7b782810bc0fa49c4edf15c2ecd77291c30f1ca"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch/materialized/semantics.json",
+      "bytes": 999,
+      "sha256": "7a32891f7afdc53a99aac2b099f5d060cb7d7a3bf604b97d5eae218aba77a696"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch/owned/semantics.json",
+      "bytes": 978,
+      "sha256": "3849360c7f39a60cd5647ba62fab7be34d7ec05b8642833f236b0ef742b3a452"
+    },
+    {
+      "path": "docs/performance/results/change-0912/plan-gdb.json",
+      "bytes": 3707,
+      "sha256": "7ee5aa9dcbe91dcf1102c0e19767fc507a9b7a61c89fb7a4e3d15707288b4255"
+    },
+    {
+      "path": "docs/performance/results/change-0912/protocol-review-gdb.md",
+      "bytes": 7693,
+      "sha256": "53f2ecda0bd30fc8760cb4678410d1e7175fb4a71a1fe0f99a8ef18f2b0e9434"
+    },
+    {
+      "path": "docs/performance/results/change-0912/symbol-ranges.json",
+      "bytes": 1206,
+      "sha256": "c96bd9b009ef818b920e3696f878feb5778497299875e25b552d640a463ae697"
+    },
+    {
+      "path": "docs/performance/results/change-0912/verify_dispatch.py",
+      "bytes": 25330,
+      "sha256": "67b7ee42a8fe6ea7fbd6a2e8eae6d4e2d19e528a6107d8efffea41bfa4e2893d"
+    },
+    {
+      "path": "docs/performance/results/change-0912/dispatch-checks.py",
+      "bytes": 10631,
+      "sha256": "ffab2ec7cd6f9f99e18aa1584032d75c95ff5c7b3327044d6e8332614d7ea6ed"
+    },
+    {
+      "path": "docs/performance/results/change-0912/replay-before-cleanup.json",
+      "bytes": 2223,
+      "sha256": "7ca9f9724c94d0e8832558a46aa6b6dbc342e04b17461028cfb7e1c9107aa62c"
+    },
+    {
+      "path": "docs/performance/results/change-0912/replay-after-cleanup.json",
+      "bytes": 2223,
+      "sha256": "7ca9f9724c94d0e8832558a46aa6b6dbc342e04b17461028cfb7e1c9107aa62c"
+    },
+    {
+      "path": "docs/performance/results/change-0912/cleanup.json",
+      "bytes": 606,
+      "sha256": "92c9a4b9fc60be9e14153129c99ee1c152ca27fb7931a2e335d6a6f69e5a6492"
+    },
+    {
+      "path": "docs/performance/results/change-0912/reused-native-custody.json",
+      "bytes": 281,
+      "sha256": "16ca4e64a891cd93defc80cc9dd55906b0a4a5636a40fd6c909358eb54e44257"
+    },
+    {
+      "path": "docs/performance/results/change-0912/hardware-backend-disassembly.json",
+      "bytes": 534,
+      "sha256": "c4b002cfaed0559bc90a7697826569990dd09905a18fe29ec5b3fa3445c69d90"
+    },
+    {
+      "path": "docs/performance/results/change-0912/hardware-backend-disassembly.txt",
+      "bytes": 12588,
+      "sha256": "dc03a17d033947822c0938ff401f863a29a1325f6de0e48d19e6e974150ac93d"
+    },
+    {
+      "path": "docs/performance/results/change-0912/payload-source-audit.md",
+      "bytes": 9713,
+      "sha256": "5c6bf26da032f387619ea02587cedb9f786205886f0e238a39924b2d4d539843"
+    }
+  ]
+}

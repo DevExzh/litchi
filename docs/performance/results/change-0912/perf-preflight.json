@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "stat",
+    "-e",
+    "cycles:u",
+    "--",
+    "/usr/bin/true"
+  ],
+  "utc": "2026-10-04T09:50:57.013396+00:00",
+  "exit_code": 0,
+  "perf_event_paranoid": "1",
+  "scope": "Permission probe with true; no benchmark workload or performance claim."
+}

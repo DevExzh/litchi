@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0912 — native backend witness and implementable payload candidate
+
+[0912](0912-pptx-native-sha-dispatch.md) resolves backend reachability for two
+guarded native processes. Lost events and missing owner chains reject the perf
+lane, so native snapshot cost attribution remains unproved. Source review
+identifies a bounded owned-source copy to test, with preservation, error,
+limit and concurrency requirements intact. No production adoption or broad
+goal completion is claimed; ODF deferred, iWork excluded.
+
 ## 0911 — cold snapshot scope qualified; native attribution remains open
 
 [0911](0911-pptx-owning-snapshot-instruction-profile.md) closes the profiling

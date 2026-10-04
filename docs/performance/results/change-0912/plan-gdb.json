@@ -1,0 +1,102 @@
+{
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cpu": 12,
+  "cwd": "/tmp/litchi-0912-gdb-run",
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "gdb_script": {
+    "bytes": 7658,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch_gdb.py",
+    "sha256": "d27216536e5a2290f350003d05cd608693fe2c21fb04f6c02424cf680ad4f29f"
+  },
+  "gdb_version": "GNU gdb (Ubuntu 17.1-2ubuntu1) 17.1",
+  "helper": {
+    "bytes": 4163,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch.py",
+    "sha256": "416345178bd004e6a7ef1284814d33b74c26f511bf31782a49174619ae490797"
+  },
+  "inputs": [
+    {
+      "bytes": 7238,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/plan.json",
+      "sha256": "2e71866565416fba7545c35137892a22dcdfe8689cb2473341b0ca1fd26d3627"
+    },
+    {
+      "bytes": 10508,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture.py",
+      "sha256": "b4d9e23f5eec740d8c7c7da3c2bc7a6bb39d1a3953aae1d902512ab9d7c71ad6"
+    },
+    {
+      "bytes": 1206,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/symbol-ranges.json",
+      "sha256": "c96bd9b009ef818b920e3696f878feb5778497299875e25b552d640a463ae697"
+    },
+    {
+      "bytes": 2042,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/elf-segments.txt",
+      "sha256": "bcc4069b5be9e1c4051ac36e4155b1d5e966c6320241002cd5cbb95ad458e681"
+    },
+    {
+      "bytes": 7693,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/protocol-review-gdb.md",
+      "sha256": "53f2ecda0bd30fc8760cb4678410d1e7175fb4a71a1fe0f99a8ef18f2b0e9434"
+    },
+    {
+      "bytes": 3453,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/command.json",
+      "sha256": "b15249987d3d527bdd271eb822e6e2288bffd8d582ee0f237e195f708397b7a6"
+    },
+    {
+      "bytes": 1002,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/semantics.json",
+      "sha256": "f7d273336f1b5a72a1938ea6656f9dd0e696d8cfaea2deabde41b68367defc6c"
+    },
+    {
+      "bytes": 1696,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/decode.json",
+      "sha256": "9b4c530b3a091f013f386007a7da8df80b5828209c2eafa72f7db75e1f0781db"
+    },
+    {
+      "bytes": 958,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/sample-debug.json",
+      "sha256": "3fe00170414033e5e4ccd5eb594872ae61295c98999402e46bc7ddb5963e6bb0"
+    }
+  ],
+  "parent": "9a108730aa5533678b376ae097cd526c26e92b93",
+  "samples": 1,
+  "schedule": [
+    {
+      "index": 0,
+      "kind": "materialized"
+    },
+    {
+      "index": 1,
+      "kind": "owned"
+    }
+  ],
+  "schema": "litchi.native-sha-dispatch-0912.v1",
+  "scope": "ABI-scoped native SHA backend reachability only. Every owner entry and return checked; backend PC/backtrace bound to active measured owner. No perf attribution or timing result.",
+  "tools": [
+    {
+      "bytes": 10902792,
+      "path": "/usr/bin/gdb",
+      "sha256": "46b4ed875d55a533048f156d652a5cac5702bacb3324d62927eec6fc56dcf146"
+    },
+    {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  ],
+  "utc": "2026-10-04T09:59:54.811907+00:00",
+  "warmup": 0
+}

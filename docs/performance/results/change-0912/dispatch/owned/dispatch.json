@@ -1,0 +1,265 @@
+{
+  "backend_hits": [
+    {
+      "backtrace": "#0  0x00005a12e09a0380 in sha2::sha256::x86_sha::compress ()\n#1  0x00005a12e08085d5 in litchi_pptx::opened::model::feed ()\n#2  0x00005a12e080682c in litchi_pptx::opened::model::feed_relationships ()\n#3  0x00005a12e0806db9 in litchi_pptx::opened::model::package_fingerprint_with_memo ()\n#4  0x00005a12e08048bc in litchi_pptx::opened::model::capture_internal ()\n#5  0x00005a12e0813a5b in litchi_pptx::package::model::Package::opened_presentation_with_limits ()\n#6  0x00005a12e08137a2 in litchi_pptx::package::model::Package::opened_presentation_transaction ()\n#7  0x00005a12e0792e23 in litchi_perf_baseline::pptx_owned_benchmark::timed_iteration ()\n#8  0x00005a12e0790b37 in litchi_perf_baseline::pptx_owned_benchmark::run_from_args ()\n#9  0x00005a12e077640a in pptx_owned_benchmark::main ()\n#10 0x00005a12e0776863 in std::sys::backtrace::__rust_begin_short_backtrace ()\n#11 0x00005a12e07767d9 in std::rt::lang_start::{{closure}} ()\n#12 0x00005a12e09cd614 in std::rt::lang_start_internal ()\n#13 0x00005a12e0776605 in main ()\n",
+      "frame_scope_available": true,
+      "frames": [
+        {
+          "name": "sha2::sha256::x86_sha::compress",
+          "pc": 99037124100992
+        },
+        {
+          "name": "litchi_pptx::opened::model::feed",
+          "pc": 99037122430421
+        },
+        {
+          "name": "litchi_pptx::opened::model::feed_relationships",
+          "pc": 99037122422828
+        },
+        {
+          "name": "litchi_pptx::opened::model::package_fingerprint_with_memo",
+          "pc": 99037122424249
+        },
+        {
+          "name": "litchi_pptx::opened::model::capture_internal",
+          "pc": 99037122414780
+        },
+        {
+          "name": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+          "pc": 99037122476635
+        },
+        {
+          "name": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+          "pc": 99037122475938
+        },
+        {
+          "name": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+          "pc": 99037121949219
+        },
+        {
+          "name": "litchi_perf_baseline::pptx_owned_benchmark::run_from_args",
+          "pc": 99037121940279
+        },
+        {
+          "name": "pptx_owned_benchmark::main",
+          "pc": 99037121831946
+        },
+        {
+          "name": "std::sys::backtrace::__rust_begin_short_backtrace",
+          "pc": 99037121833059
+        },
+        {
+          "name": "std::rt::lang_start::{{closure}}",
+          "pc": 99037121832921
+        },
+        {
+          "name": "std::rt::lang_start_internal",
+          "pc": 99037124285972
+        },
+        {
+          "name": "main",
+          "pc": 99037121832453
+        }
+      ],
+      "kind": "hardware",
+      "owner_entry": 1,
+      "pc": 99037124100992,
+      "scope_proof": "Exact owner-entry caller return address, same-thread gated breakpoint state, and exact matched owner return",
+      "symbol": "sha2::sha256::x86_sha::compress",
+      "unwind_error": null
+    }
+  ],
+  "errors": [],
+  "events": [
+    {
+      "backend_breakpoints_enabled": {
+        "hardware": false,
+        "software": false
+      },
+      "context": "setup",
+      "kind": "owner_entry",
+      "owner_entry": 0
+    },
+    {
+      "backend_breakpoints_disabled": true,
+      "context": "setup",
+      "kind": "owner_return",
+      "owner_entry": 0
+    },
+    {
+      "backend_breakpoints_enabled": {
+        "hardware": true,
+        "software": true
+      },
+      "context": "measured",
+      "kind": "owner_entry",
+      "owner_entry": 1
+    },
+    {
+      "backend": "hardware",
+      "breakpoint_disabled_after_hit": true,
+      "kind": "backend",
+      "owner_entry": 1
+    },
+    {
+      "backend_breakpoints_disabled": true,
+      "context": "measured",
+      "kind": "owner_return",
+      "owner_entry": 1
+    }
+  ],
+  "exit_code": 0,
+  "interpretation": "One exact backend reached under the measured owner; breakpoint sample is not timing and absence of another hit is not a general dispatch claim.",
+  "mapping_load_bias": 99037118025728,
+  "mappings": "process 578314\nMapped address spaces:\n\nStart Addr         End Addr           Size               Offset             Perms File \n0x00005a12e03d5000 0x00005a12e0775000 0x3a0000           0x0                r--p  /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native \n0x00005a12e0775000 0x00005a12e09ef000 0x27a000           0x39f000           r-xp  /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native \n0x00005a12e09ef000 0x00005a12e0a02000 0x13000            0x618000           rw-p  /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native \n0x00005a12e0a02000 0x00005a12e0a03000 0x1000             0x62a000           rw-p  /home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native \n0x00005a12e0a03000 0x00005a12e0a04000 0x1000             0x0                rw-p   \n0x0000731ef6d86000 0x0000731ef6d8a000 0x4000             0x0                r--p  [vvar] \n0x0000731ef6d8a000 0x0000731ef6d8c000 0x2000             0x0                r--p  [vvar_vclock] \n0x0000731ef6d8c000 0x0000731ef6d8e000 0x2000             0x0                r-xp  [vdso] \n0x0000731ef6d8e000 0x0000731ef6d8f000 0x1000             0x0                r--p  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \n0x0000731ef6d8f000 0x0000731ef6dbd000 0x2e000            0x1000             r-xp  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \n0x0000731ef6dbd000 0x0000731ef6dc8000 0xb000             0x2f000            r--p  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \n0x0000731ef6dc8000 0x0000731ef6dcb000 0x3000             0x3a000            rw-p  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \n0x0000731ef6dcb000 0x0000731ef6dcc000 0x1000             0x0                rw-p   \n0x00007ffe55046000 0x00007ffe55067000 0x21000            0x0                rw-p  [stack] \n0xffffffffff600000 0xffffffffff601000 0x1000             0x0                --xp  [vsyscall] \n",
+  "owner_entries": [
+    {
+      "context": "setup",
+      "entry_pc": 99037122475904,
+      "entry_rsp": 140730324888728,
+      "frames": [
+        {
+          "name": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+          "pc": 99037122475904
+        },
+        {
+          "name": "litchi_perf_baseline::build_pptx_source_edit_corpus",
+          "pc": 99037121841705
+        },
+        {
+          "name": "litchi_perf_baseline::pptx_owned_benchmark::run_from_args",
+          "pc": 99037121938708
+        },
+        {
+          "name": "pptx_owned_benchmark::main",
+          "pc": 99037121831946
+        },
+        {
+          "name": "std::sys::backtrace::__rust_begin_short_backtrace",
+          "pc": 99037121833059
+        },
+        {
+          "name": "std::rt::lang_start::{{closure}}",
+          "pc": 99037121832921
+        },
+        {
+          "name": "std::rt::lang_start_internal",
+          "pc": 99037124285972
+        },
+        {
+          "name": "main",
+          "pc": 99037121832453
+        }
+      ],
+      "index": 0,
+      "return_address": 99037121841705,
+      "thread": 1,
+      "unwind_error": null
+    },
+    {
+      "context": "measured",
+      "entry_pc": 99037122475904,
+      "entry_rsp": 140730324886408,
+      "frames": [
+        {
+          "name": "litchi_pptx::package::model::Package::opened_presentation_transaction",
+          "pc": 99037122475904
+        },
+        {
+          "name": "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration",
+          "pc": 99037121949219
+        },
+        {
+          "name": "litchi_perf_baseline::pptx_owned_benchmark::run_from_args",
+          "pc": 99037121940279
+        },
+        {
+          "name": "pptx_owned_benchmark::main",
+          "pc": 99037121831946
+        },
+        {
+          "name": "std::sys::backtrace::__rust_begin_short_backtrace",
+          "pc": 99037121833059
+        },
+        {
+          "name": "std::rt::lang_start::{{closure}}",
+          "pc": 99037121832921
+        },
+        {
+          "name": "std::rt::lang_start_internal",
+          "pc": 99037124285972
+        },
+        {
+          "name": "main",
+          "pc": 99037121832453
+        }
+      ],
+      "index": 1,
+      "return_address": 99037121949219,
+      "thread": 1,
+      "unwind_error": null
+    }
+  ],
+  "owner_returns": [
+    {
+      "backend_breakpoints_disabled": true,
+      "context": "setup",
+      "owner_entry": 0,
+      "pc": 99037121841705,
+      "rsp": 140730324888736
+    },
+    {
+      "backend_breakpoints_disabled": true,
+      "context": "measured",
+      "owner_entry": 1,
+      "pc": 99037121949219,
+      "rsp": 140730324886416
+    }
+  ],
+  "runtime_symbols": {
+    "litchi_perf_baseline::build_pptx_source_edit_corpus": {
+      "end": 99037121848229,
+      "file_address": 3812416,
+      "load_bias": 99037118025728,
+      "size": 10085,
+      "start": 99037121838144
+    },
+    "litchi_perf_baseline::pptx_owned_benchmark::timed_iteration": {
+      "end": 99037121955167,
+      "file_address": 3921824,
+      "load_bias": 99037118025728,
+      "size": 7615,
+      "start": 99037121947552
+    },
+    "litchi_pptx::package::model::Package::opened_presentation_transaction": {
+      "end": 99037122476279,
+      "file_address": 4450176,
+      "load_bias": 99037118025728,
+      "size": 375,
+      "start": 99037122475904
+    },
+    "sha2::sha256::compress256": {
+      "end": 99037124100891,
+      "file_address": 6075088,
+      "load_bias": 99037118025728,
+      "size": 75,
+      "start": 99037124100816
+    },
+    "sha2::sha256::soft::unroll::compress": {
+      "end": 99037124111981,
+      "file_address": 6076224,
+      "load_bias": 99037118025728,
+      "size": 10029,
+      "start": 99037124101952
+    },
+    "sha2::sha256::x86_sha::compress": {
+      "end": 99037124101948,
+      "file_address": 6075264,
+      "load_bias": 99037118025728,
+      "size": 956,
+      "start": 99037124100992
+    }
+  },
+  "startup": "",
+  "status": "pass"
+}

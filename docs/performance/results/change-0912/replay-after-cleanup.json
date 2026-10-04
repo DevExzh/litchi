@@ -1,0 +1,61 @@
+{
+  "build_or_workload_or_profiler_run": false,
+  "deleted_capture_cwd_used": false,
+  "descriptor_checks": {
+    "capture/materialized-a/buildids.json": 3,
+    "capture/materialized-a/command.json": 10,
+    "capture/materialized-a/decode.json": 5,
+    "capture/materialized-a/header.json": 3,
+    "capture/materialized-a/mappings.json": 3,
+    "capture/materialized-a/sample-debug.json": 3,
+    "capture/materialized-a/semantics.json": 2,
+    "capture/materialized-a/start.json": 3,
+    "dispatch-analysis.json": 27,
+    "dispatch-checks.json": 6,
+    "dispatch/materialized/command.json": 11,
+    "dispatch/materialized/semantics.json": 2,
+    "dispatch/owned/command.json": 11,
+    "dispatch/owned/semantics.json": 2,
+    "first-child-failure.json": 17,
+    "plan-gdb.json": 14,
+    "plan.json": 26,
+    "symbol-ranges.json": 1
+  },
+  "dispatch_analysis": {
+    "bytes": 17708,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/dispatch-analysis.json",
+    "sha256": "d8a59424f81c65b46ab7a955e37f66e5c7e4159dee97117488477818af37c8df"
+  },
+  "dispatch_verifier": {
+    "bytes": 25330,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/verify_dispatch.py",
+    "sha256": "67b7ee42a8fe6ea7fbd6a2e8eae6d4e2d19e528a6107d8efffea41bfa4e2893d"
+  },
+  "gdb_witnesses_byte_exact": 2,
+  "helper": {
+    "bytes": 4213,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/replay.py",
+    "sha256": "6f8a55732fe115b41b225a6702baef33d836efa9910c9cdd825d69e85c34cf02"
+  },
+  "native_source_files_reconstructed": 9355,
+  "offline_perf_decoder_run": true,
+  "perf_analyzer": {
+    "bytes": 37067,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/analyze.py",
+    "sha256": "7d98fd85a271f32f652362b6b74ba60133985d277e664c20356aea1cbd941e23"
+  },
+  "perf_exports_byte_exact": [
+    "decode",
+    "mappings",
+    "header",
+    "buildids",
+    "sample-debug"
+  ],
+  "perf_failure": {
+    "bytes": 15835,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/first-child-failure.json",
+    "sha256": "d3023a1dbfe33fe67e8bac4a38538f44c5874e29bb6d7aa225686a7314408b87"
+  },
+  "perf_failure_byte_exact": true,
+  "status": "pass"
+}

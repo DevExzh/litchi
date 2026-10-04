@@ -1,0 +1,61 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/perf",
+    "record",
+    "--no-buildid-cache",
+    "--compression-level=3",
+    "-e",
+    "cycles:u",
+    "-F",
+    "997",
+    "--strict-freq",
+    "--call-graph",
+    "dwarf,16384",
+    "--sample-cpu",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/perf.data",
+    "--",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "materialized",
+    "0",
+    "50",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/artifacts"
+  ],
+  "binary": {
+    "bytes": 9301456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0910/binaries/native",
+    "sha256": "f4ad7ee158061cc80354c3c8674c9fe6a8100ed76a0c8f743653efcb06bb2e8d"
+  },
+  "cwd": "/tmp/litchi-0912-run",
+  "environment": {
+    "DEBUGINFOD_URLS": "",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC"
+  },
+  "helper": {
+    "bytes": 10508,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/capture.py",
+    "sha256": "b4d9e23f5eec740d8c7c7da3c2bc7a6bb39d1a3953aae1d902512ab9d7c71ad6"
+  },
+  "load_before": [
+    33.35986328125,
+    27.27197265625,
+    24.283203125
+  ],
+  "plan": {
+    "bytes": 7238,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0912/plan.json",
+    "sha256": "2e71866565416fba7545c35137892a22dcdfe8689cb2473341b0ca1fd26d3627"
+  },
+  "row": {
+    "index": 0,
+    "kind": "materialized",
+    "label": "materialized-a"
+  },
+  "started_utc": "2026-10-04T09:54:43.529462+00:00"
+}

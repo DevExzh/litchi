@@ -1,0 +1,2 @@
+[ perf record: Woken up 1074 times to write data ]
+[ perf record: Captured and wrote 5.549 MB /home/zhuhe/code/litchi/docs/performance/results/change-0912/capture/materialized-a/perf.data, compressed (original 268.262 MB, ratio is 48.492) ]

@@ -1,0 +1,11 @@
+
+ Performance counter stats for '/usr/bin/true':
+
+            466102      cycles:u                                                              
+
+       0.040088523 seconds time elapsed
+
+       0.000000000 seconds user
+       0.036832000 seconds sys
+
+

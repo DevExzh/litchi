@@ -1,0 +1,6 @@
+000000000043e780 0000000000000177 T litchi_pptx::package::model::Package::opened_presentation_transaction
+00000000003bd7a0 0000000000001dbf t litchi_perf_baseline::pptx_owned_benchmark::timed_iteration
+00000000003a2c40 0000000000002765 t litchi_perf_baseline::build_pptx_source_edit_corpus
+00000000005cb2d0 000000000000004b T sha2::sha256::compress256
+00000000005cb380 00000000000003bc t sha2::sha256::x86_sha::compress
+00000000005cb740 000000000000272d t sha2::sha256::soft::unroll::compress

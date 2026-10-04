@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0912 — native PPTX SHA dispatch witness
+
+[0912](0912-pptx-native-sha-dispatch.md) observes the x86 SHA backend inside
+the measured cold snapshot for both existing routes on the unchanged 0910
+binary. The native perf attempt is rejected for lost records and missing owner
+chains. GDB witnesses establish reachability only; no new timing or cost share.
+
 ## 0911 — PPTX cold snapshot instruction control
 
 [0911](0911-pptx-owning-snapshot-instruction-profile.md) retains four admitted

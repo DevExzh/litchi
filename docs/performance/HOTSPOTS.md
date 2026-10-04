@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0912 — native SHA confirmed; owned-source copy candidate identified
+
+[0912](0912-pptx-native-sha-dispatch.md) confirms native x86 SHA reachability,
+so 0911 software-SHA guest counts cannot estimate native hashing cost. Native
+sampling failed admission. Source review identifies an intermediate allocated,
+zero-filled `MemberSpan` copy for retained owned ZIP bytes. Test a bounded
+direct owned-source read path with existing correctness and fresh native gates;
+no production change or benefit is claimed yet.
+
 ## 0911 — qualify native dispatch before optimizing the snapshot
 
 [0911](0911-pptx-owning-snapshot-instruction-profile.md) attributes cold snapshot
