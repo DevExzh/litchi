@@ -16,7 +16,24 @@ The design document docs/UNIFIED_OPS_API_DESIGN.md is the specification. Its
 sections are settled decisions; this goal adds the execution rules, the
 performance and ergonomics bar the implementation must meet, and the definition
 of done. Where this goal and the design appear to disagree, the design wins and
-the disagreement is recorded as a finding.
+the disagreement is recorded as a finding — with one explicit owner override,
+below.
+
+OWNER OVERRIDE (2026-10-04) — supersedes design §4, §9, §13 "write OOXML
+first", and §16.6 "legacy package retention":
+
+  For every file format the library claims to support, the unified API must
+  provide BOTH read and write. Whole-format `unsupported_capability` is not an
+  acceptable end state for any claimed format. The claimed formats are those
+  listed in docs/FEATURE_MATRIX.md: doc, docx, xls, xlsx, xlsb, ppt, pptx,
+  rtf, odt, ods, odp, odg, odc, odi, odb, oth, odm, odf (formula), pages,
+  keynote, numbers. `unsupported_capability` remains legitimate only at
+  element/property granularity, where a format genuinely lacks the concept or
+  the leaf owner has no typed model yet; every such gap is listed in
+  `capabilities()` and in a delta table, with a follow-up.
+
+  OOXML is still the first write wave (it is the OfficeCLI parity target), but
+  the remaining formats are in scope for v1, not later waves.
 
 The reference implementation is OfficeCLI. It is not tracked in git, so read
 it from the main checkout: /home/zhuhe/code/litchi/3rdparty/OfficeCLI/
@@ -74,8 +91,13 @@ with (0001, 0002/0024, 0003, 0004, 0005/0031, 0006, 0007, 0008, 0009/0010/0023/
    green (ADR 0008).
 7. iWork crates (`litchi-iwa*`, `litchi-numbers*`, `litchi-pages`,
    `litchi-keynote`) are owned by other concurrent agents: do not modify them.
-   `litchi::iwork::Document` stays put (§16.4); iWork reads join the unified
-   read surface only through the facade's existing public iwork API.
+   The unified layer consumes their public read and edit APIs. Where a write
+   verb needs an iWork API that does not exist yet, record the request in
+   docs/unified-ops/IWORK_API_REQUESTS.md for those owners and keep the gap
+   visible in `capabilities()`; do not patch the iWork crates yourself.
+   The same rule applies to any leaf crate whose missing write API would need
+   a new leaf engine: prefer adding the API in the leaf crate (allowed for
+   non-iWork crates) over working around it in `litchi-ops`.
 8. Do not make unsupported performance claims in code, docs, or commits.
 
 ========================================================================
@@ -196,6 +218,12 @@ M1  Unified read: node view, `get`/`query`, `view(outline|text|annotated|
 M2  Write kernel for docx/xlsx/pptx, property registry + coercions, typed
     errors with suggestions, atomic and best-effort batch with family
     coalescing, P0 structural surface. Batch scaling benchmark (1 → 10k ops).
+M2b Write handlers for every other claimed format, in parallel streams:
+    legacy binary (doc/xls/ppt) + xlsb; ODF (odt/ods/odp first, then
+    odg/odc/odi/odb/oth/odm/odf); RTF; iWork (pages/keynote/numbers, via their
+    public edit APIs). Each stream starts from the leaf write-capability
+    inventory (record 0002), closes leaf API gaps in the leaf crate where it
+    owns them, and reports remaining element-level gaps in `capabilities()`.
 M3  Python write bindings, CLI, schema export, capabilities introspection.
 M4  CSV import, formula write/eval, typed chart and SmartArt CRUD, then the
     three new engines (find/replace, template merge, field/TOC refresh) —
@@ -209,12 +237,15 @@ Adopt the recommended default below, record it in a numbered decision record,
 list it in the progress log under "awaiting owner confirmation", and continue.
 Revisit only if the owner overrides.
 
-- Legacy package retention: keep `Doc`/`Ppt` as read models until the legacy
-  write wave (no memory cost now; retention is additive later).
+- Legacy package retention: superseded by the owner override. Every `File`
+  variant, legacy binary included, retains the leaf's editable owner (source-
+  backed where the leaf has one, so retention stays lazy and cheap).
 - `OpenOptions` shape: one `OpenOptions` struct with the common knobs (limits,
   security consumption, execution context) plus optional per-format sub-
   options; plain `open()` covers the common case.
-- iWork facade timing: at the iWork wave.
+- iWork facade timing: iWork joins the unified `File` enum in v1 (owner
+  override); `litchi::iwork::Document` is replaced once the unified variants
+  cover its read surface.
 - Verb names: `apply` (not `send`); find/replace as OfficeCLI-style `find=`/
   `replace=` props on `set` first, a dedicated verb only if usage demands it;
   `merge` means template merge.
@@ -258,9 +289,11 @@ DEFINITION OF DONE
 
 - `litchi::open()` and the flat `File` enum are the single entry point; the
   old wrapper types are deleted; every in-tree consumer is migrated.
-- Every format Litchi reads is readable through `get`/`query`/`view`;
-  docx/xlsx/pptx are writable through `set/add/remove/move/swap`, `batch`,
-  and the P0 surface of §13; everything else returns `unsupported_capability`.
+- Every claimed format is readable through `get`/`query`/`view` AND writable
+  through `set/add/remove/move/swap`, `batch`, `save`, and `create`; docx/
+  xlsx/pptx additionally cover the P0 surface of §13. No claimed format
+  returns whole-format `unsupported_capability`; remaining element/property
+  gaps are enumerated in `capabilities()` with follow-ups.
 - The property registry is the single source of truth for coercion,
   validation, schemas, capabilities, Python introspection, and suggestions,
   guarded by golden snapshots.
