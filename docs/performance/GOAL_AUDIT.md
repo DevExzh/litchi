@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0908 — measured instruction owners, preservation control still missing
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) adds scoped guest
+instruction attribution without converting it to native time. It exposes a
+missing owning-input eager control and retains physical ZIP fidelity, phase
+separation, producer coverage and broad CRUD coverage as open work. Temporary
+capture storage is cleaned; unrelated shared cherry-pick integration remains
+pending. OLE2/OOXML work continues, ODF is deferred and iWork excluded.
+
 ## 0907 — current PPTX evidence, broad goal still open
 
 [0907](0907-pptx-multi-slide-current-baseline.md) replaces stale timing as the

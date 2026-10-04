@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T07:42:02.854512+00:00",
+  "removed_root": "/tmp/litchi-0908-run",
+  "removed_files": 1,
+  "removed_file_bytes": 65,
+  "owner_marker_sha256": "bc53564014b4cf6ad0f93426e0906d5372051d2054e559d0b058b3124244345f",
+  "active_cwd_processes": [],
+  "worktrees_created": 0,
+  "build_roots_created": 0,
+  "retained_binary": "docs/performance/results/change-0907/binaries/native",
+  "unrelated_worktrees_untouched": true
+}

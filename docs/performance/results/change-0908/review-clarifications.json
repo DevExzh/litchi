@@ -1,0 +1,7 @@
+{
+  "status": "clarified",
+  "original_review_sha256": "bb2b7e8e4127a1612d1e82de8799523b26c68dba692fbac09776452c46bae673",
+  "final_review_sha256": "50d7359e587db986244e554f9bc09b67ce097644fb00446ecd0ce8c9f29f3f70",
+  "change": "The direct opened edge identifies initial snapshot work; only merged downstream capture/fingerprint totals mix initial and replay contexts. Raw data unchanged.",
+  "review_descriptors_checked": 42
+}

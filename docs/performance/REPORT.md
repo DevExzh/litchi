@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0908 — PPTX profile identifies an ingress comparison gap
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) validates four serial
+same-binary Callgrind profiles, exact measured owner scope, instruction
+conservation and semantic parity with 0907. Serialization dominates the
+materialized ReadAt route because it lacks preservation provenance. The next
+step is an owning-input eager control using existing preservation APIs.
+No production change or native performance claim is adopted.
+
 ## 0907 — fresh PPTX guarded workflow comparison
 
 [0907](0907-pptx-multi-slide-current-baseline.md) measures four same-binary

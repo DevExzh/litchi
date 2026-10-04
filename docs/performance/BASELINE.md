@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0908 — same-binary PPTX instruction attribution
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) retains four exact-owner
+Callgrind captures on the 0907 binary. Eager totals are 4.578 billion Ir;
+source totals are 108.17 million Ir. All semantic and counter gates pass.
+These are guest instructions, not new native timing or a speedup result.
+
 ## 0907 — current PPTX multi-slide baseline
 
 [0907](0907-pptx-multi-slide-current-baseline.md) retains 800 samples from four

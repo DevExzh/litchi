@@ -1,0 +1,40 @@
+{
+  "status": "pass",
+  "utc": "2026-10-04T07:46:54.562014+00:00",
+  "python_ast_files": [
+    "docs/performance/results/change-0908/admit-first.py",
+    "docs/performance/results/change-0908/analyze.py",
+    "docs/performance/results/change-0908/capture-v2-validation-attempt.py",
+    "docs/performance/results/change-0908/capture.py",
+    "docs/performance/results/change-0908/capture_v2.py",
+    "docs/performance/results/change-0908/check-analyzer.py"
+  ],
+  "json_syntax": "pass",
+  "authored_whitespace": "pass",
+  "raw_whitespace_exemption": {
+    "reason": "Byte-exact Callgrind desc/calls and stderr PID separator records retain tool-emitted trailing spaces. Raw artifacts must not be reformatted.",
+    "files": [
+      "docs/performance/results/change-0908/capture/eager-a/callgrind.out",
+      "docs/performance/results/change-0908/capture/eager-a/callgrind.out.1",
+      "docs/performance/results/change-0908/capture/eager-a/stderr.txt",
+      "docs/performance/results/change-0908/capture/eager-a/stdout.txt",
+      "docs/performance/results/change-0908/capture/eager-b/callgrind.out",
+      "docs/performance/results/change-0908/capture/eager-b/callgrind.out.1",
+      "docs/performance/results/change-0908/capture/eager-b/stderr.txt",
+      "docs/performance/results/change-0908/capture/eager-b/stdout.txt",
+      "docs/performance/results/change-0908/capture/source-a/callgrind.out",
+      "docs/performance/results/change-0908/capture/source-a/callgrind.out.1",
+      "docs/performance/results/change-0908/capture/source-a/stderr.txt",
+      "docs/performance/results/change-0908/capture/source-a/stdout.txt",
+      "docs/performance/results/change-0908/capture/source-b/callgrind.out",
+      "docs/performance/results/change-0908/capture/source-b/callgrind.out.1",
+      "docs/performance/results/change-0908/capture/source-b/stderr.txt",
+      "docs/performance/results/change-0908/capture/source-b/stdout.txt"
+    ],
+    "initial_checks": "Unscoped diffcheck found raw dump whitespace; dump-only exemption also found stderr whitespace; final authored-file gate excludes both retained raw streams and dumps."
+  },
+  "post_cleanup_analyzer_checks": "analyzer-checks.json",
+  "temporary_capture_root_absent": true,
+  "worktrees_created": 0,
+  "shared_index_used": false
+}

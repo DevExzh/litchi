@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0908 — qualify the owning eager control next
+
+[0908](0908-pptx-multi-slide-instruction-profile.md) attributes about 69.67%
+of eager Ir to serialization and 21.73% to the initial opened snapshot.
+The measured materialization route loses physical archive provenance; owning
+`from_vec`/`from_reader` already retain it. Qualify that missing preservation
+control before proposing a production bridge. Native phase fractions remain
+unmeasured, and full snapshot validation cannot be skipped.
+
 ## 0907 — attribute current PPTX costs before optimizing
 
 [0907](0907-pptx-multi-slide-current-baseline.md) confirms the current eager
