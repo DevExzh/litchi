@@ -260,6 +260,9 @@ pub enum Source {
     /// A `WordprocessingML` error.
     #[cfg(feature = "docx")]
     Docx(litchi_docx::Error),
+    /// A `WordprocessingML` main-document transaction error.
+    #[cfg(feature = "docx")]
+    DocxTransaction(litchi_docx::document::TransactionError),
     /// A `PresentationML` error.
     #[cfg(feature = "pptx")]
     Pptx(litchi_pptx::Error),
@@ -303,6 +306,8 @@ impl Source {
             Self::Cfb(error) => Some(error),
             #[cfg(feature = "docx")]
             Self::Docx(error) => Some(error),
+            #[cfg(feature = "docx")]
+            Self::DocxTransaction(error) => Some(error),
             #[cfg(feature = "pptx")]
             Self::Pptx(error) => Some(error),
             #[cfg(feature = "xlsx")]
@@ -692,6 +697,26 @@ impl Classify for litchi_docx::Error {
     }
 }
 
+#[cfg(feature = "docx")]
+impl Classify for litchi_docx::document::TransactionError {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Document(error) => error.classify(),
+            Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
+            Self::Refused { .. } | Self::Transfer(_) => Class::of(Code::UnsupportedCapability),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            // The patch target no longer holds the bytes the edit captured:
+            // the source changed underneath the handle.
+            Self::StaleSource => Class::of(Code::IoError),
+            Self::SemanticPrecondition => Class::of(Code::InvalidArgument),
+            Self::Durable(_) | Self::Composition(_) | Self::InvalidDurable(_) => {
+                Class::of(Code::InvalidInput)
+            },
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
 #[cfg(feature = "pptx")]
 impl Classify for litchi_pptx::Error {
     fn classify(&self) -> Class {
@@ -919,6 +944,10 @@ from_leaf!(
     litchi_cfb::OleError => Cfb, None
 );
 from_leaf!(#[cfg(feature = "docx")] litchi_docx::Error => Docx, Some(FileFormat::Docx));
+from_leaf!(
+    #[cfg(feature = "docx")]
+    litchi_docx::document::TransactionError => DocxTransaction, Some(FileFormat::Docx)
+);
 from_leaf!(#[cfg(feature = "pptx")] litchi_pptx::Error => Pptx, Some(FileFormat::Pptx));
 from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat::Xlsx));
 from_leaf!(
