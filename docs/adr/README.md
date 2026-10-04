@@ -61,7 +61,14 @@ table above. Nothing in the workspace may cite them as authority, and no code
 change is permitted on their basis, until a human accepts one and moves it into
 the table.
 
-No proposed record is outstanding. ADR 0030 and ADR 0031, proposed on
+| ADR | Proposed | Decision |
+|---|---|---|
+| [0033](0033-unified-operations-api.md) | 2026-10-04 | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
+
+ADR 0033 was proposed by unified-ops change record 0004, which also registers
+the inert `litchi-ops` scaffold in the topology gates.
+
+Earlier proposals have all been accepted. ADR 0030 and ADR 0031, proposed on
 2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in
 [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md). ADR
 0032, proposed on 2026-09-23 by

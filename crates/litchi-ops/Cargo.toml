@@ -1,0 +1,37 @@
+[package]
+name        = "litchi-ops"
+description = "Unified operations layer for Litchi: one open/get/query/set/batch/save surface over the per-format owners."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+
+# Format features mirror the `litchi` facade's per-format features. They are
+# empty while the crate is a scaffold (ADR 0033, record 0004); each one gains
+# its `dep:` leaf edge, and the matching `tools/crate_boundaries.json` entry,
+# in the change that wires that format's handler.
+doc     = []
+docx    = []
+ppt     = []
+pptx    = []
+xls     = []
+xlsx    = []
+xlsb    = []
+rtf     = []
+odt     = []
+ods     = []
+odp     = []
+pages   = []
+keynote = []
+numbers = []
+
+[dependencies]
+litchi-core = { workspace = true }
+
+[lints]
+workspace = true

@@ -4710,3 +4710,27 @@ tree's inventory is 65 workspace packages, 244 internal dependency
 declarations, 233 canonical edges, 12 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.
+
+## 2026-10-04 amendment: `litchi-ops` unified-operations package
+
+Unified-ops change record 0004 adds
+[`litchi-ops`](../../crates/litchi-ops/Cargo.toml), the facade-tier package
+proposed by [ADR 0033](0033-unified-operations-api.md) (Proposed, not
+normative) to hold the unified operations layer: the flat `File` enum, unified
+error, generic node view, property registry, batch executor, capability
+reporting, and internal per-format handlers. The package is a scaffold with no
+public API. Its format features mirror the facade's per-format features and
+are inert.
+
+The topology policy records exactly one normal edge, `litchi-ops ->
+litchi-core`, and classifies the package as runtime-neutral. No package
+depends on `litchi-ops` yet. The planned edges (`litchi-ops` to the claimed
+formats' leaf and common crates, and `litchi -> litchi-ops`) are listed in ADR
+0033 and are added only by the changes that use them. The non-iWork release
+gate counts `litchi-ops` among its bulk packages (46 to 47) until its first
+iWork edge requires facade-style classification.
+
+The current inventory is 66 workspace packages, 245 internal dependency
+declarations, 234 canonical edges, 12 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.

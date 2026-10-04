@@ -8592,8 +8592,8 @@ class BoundaryPolicyTests(unittest.TestCase):
         archive_edge = boundaries.Edge("litchi-iwa-archive", "litchi-iwa-package")
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
-        self.assertEqual(len(self.policy.packages), 65)
-        self.assertEqual(len(all_policy_edges), 244)
+        self.assertEqual(len(self.policy.packages), 66)
+        self.assertEqual(len(all_policy_edges), 245)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],

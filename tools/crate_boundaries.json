@@ -238,6 +238,9 @@
       "soapberry-zip",
       "xml-minifier"
     ],
+    "litchi-ops": [
+      "litchi-core"
+    ],
     "litchi-oth": [
       "litchi-core",
       "litchi-odf-common",
@@ -520,6 +523,7 @@
     "litchi-ograph",
     "litchi-ole-common",
     "litchi-ooxml-common",
+    "litchi-ops",
     "litchi-pages",
     "litchi-pptx",
     "litchi-sheet",
