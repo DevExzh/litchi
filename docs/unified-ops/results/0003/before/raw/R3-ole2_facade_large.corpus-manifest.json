@@ -1,0 +1,330 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "522eed6c6d0aecdfe46e74d7aac76055eafdc2ae8277bd99adace3cb2cea8b75",
+  "content_set_sha256": "0d7a4c0da6176cbe9bda33f4511fbffafd8bac26c2619499d4778f24112d1543",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "da4c207478eb9192ce2f258ac41920ce55e01ab3",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "doc-cfb-ole2:sha256:41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "name": "doc-facade-real-file",
+      "legacy_v1": {
+        "name": "doc-facade-real-file",
+        "generator": "litchi-doc-facade-real-file-v1",
+        "package_format": "DOC/CFB/OLE2",
+        "shape": "real-file",
+        "payload_kind": "real-producer-ole2",
+        "compression": "none",
+        "entry_count": 210,
+        "archive_member_count": 13,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 38775,
+        "archive_bytes": 335360,
+        "archive_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 38775,
+        "target_payload_sha256": "13a766fe9befdc8280b3ff9610369f547a3e33cbe306de8b75a9340c8931296c",
+        "xlsx": null
+      },
+      "format": "DOC/CFB/OLE2",
+      "size_class": "unknown",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-doc-facade-real-file-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "real-producer-ole2",
+          "legacy_shape": "real-file"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 335360,
+        "archive_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+        "logical_payload_bytes": 38775,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 512,
+        "entry_count": 210
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 335360,
+          "members": 13,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "WordDocument",
+          "logical_bytes": 38775,
+          "sha256": "13a766fe9befdc8280b3ff9610369f547a3e33cbe306de8b75a9340c8931296c"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "doc_facade_file_full_text",
+          "doc_facade_file_one_paragraph",
+          "doc_facade_file_open"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ppt-cfb-ole2:sha256:64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "name": "ppt-facade-real-file",
+      "legacy_v1": {
+        "name": "ppt-facade-real-file",
+        "generator": "litchi-ppt-facade-real-file-v1",
+        "package_format": "PPT/CFB/OLE2",
+        "shape": "real-file",
+        "payload_kind": "real-producer-ole2",
+        "compression": "none",
+        "entry_count": 2,
+        "archive_member_count": 4,
+        "entry_bytes": 512,
+        "uncompressed_payload_bytes": 62399,
+        "archive_bytes": 125440,
+        "archive_sha256": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+        "target_entry": "PowerPoint Document",
+        "target_payload_bytes": 62399,
+        "target_payload_sha256": "3ac5b2043aeb7837555cd1efb3ce3863be043ebabdaffae8fecc0d29da55fde6",
+        "xlsx": null
+      },
+      "format": "PPT/CFB/OLE2",
+      "size_class": "unknown",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-ppt-facade-real-file-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "real-producer-ole2",
+          "legacy_shape": "real-file"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 125440,
+        "archive_sha256": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+        "logical_payload_bytes": 62399,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 512,
+        "entry_count": 2
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 125440,
+          "members": 4,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "PowerPoint Document",
+          "logical_bytes": 62399,
+          "sha256": "3ac5b2043aeb7837555cd1efb3ce3863be043ebabdaffae8fecc0d29da55fde6"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "ppt_facade_file_full_text",
+          "ppt_facade_file_one_slide_text",
+          "ppt_facade_file_open"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "doc_facade_file_full_text",
+      "corpus_id": "doc-cfb-ole2:sha256:41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "legacy_name": "doc-facade-real-file",
+      "legacy_archive_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "role": "timed"
+    },
+    {
+      "case": "doc_facade_file_one_paragraph",
+      "corpus_id": "doc-cfb-ole2:sha256:41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "legacy_name": "doc-facade-real-file",
+      "legacy_archive_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "role": "timed"
+    },
+    {
+      "case": "doc_facade_file_open",
+      "corpus_id": "doc-cfb-ole2:sha256:41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "legacy_name": "doc-facade-real-file",
+      "legacy_archive_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "role": "timed"
+    },
+    {
+      "case": "ppt_facade_file_full_text",
+      "corpus_id": "ppt-cfb-ole2:sha256:64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "legacy_name": "ppt-facade-real-file",
+      "legacy_archive_sha256": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "role": "timed"
+    },
+    {
+      "case": "ppt_facade_file_one_slide_text",
+      "corpus_id": "ppt-cfb-ole2:sha256:64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "legacy_name": "ppt-facade-real-file",
+      "legacy_archive_sha256": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "role": "timed"
+    },
+    {
+      "case": "ppt_facade_file_open",
+      "corpus_id": "ppt-cfb-ole2:sha256:64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "legacy_name": "ppt-facade-real-file",
+      "legacy_archive_sha256": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+      "role": "timed"
+    }
+  ]
+}

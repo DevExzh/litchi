@@ -1,0 +1,535 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "f597c4747fb84490cbb7fa2b5a193611edd519c371959f3e8ad5ad4dd3b973a8",
+  "content_set_sha256": "52908959a71526ac2103fe6d6ae69c074f7a3fd99127a7ced652432dcbe9e572",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "da4c207478eb9192ce2f258ac41920ce55e01ab3",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "name": "rtf-semantic-plain-medium",
+      "legacy_v1": {
+        "name": "rtf-semantic-plain-medium",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 200,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 9999,
+        "archive_bytes": 10851,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "format": "RTF",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-rtf-semantic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "entry_bytes": 49,
+          "entry_count": 200,
+          "family": "rtf",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium",
+          "package_format": "RTF",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "rtf_variant": "plain",
+          "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant"
+          ],
+          "text_template": "litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 10851,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "logical_payload_bytes": 9999,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 200
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 10851,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "rtf_file_open",
+          "rtf_file_open_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "name": "rtf-semantic-plain-large",
+      "legacy_v1": {
+        "name": "rtf-semantic-plain-large",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 10000,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 499999,
+        "archive_bytes": 540051,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "format": "RTF",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-rtf-semantic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "entry_bytes": 49,
+          "entry_count": 10000,
+          "family": "rtf",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "large",
+          "package_format": "RTF",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "rtf_variant": "plain",
+          "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant"
+          ],
+          "text_template": "litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 540051,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "logical_payload_bytes": 499999,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 10000
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 540051,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "rtf_file_open",
+          "rtf_file_open_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "name": "rtf-semantic-plain-tiny",
+      "legacy_v1": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "format": "RTF",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-rtf-semantic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "entry_bytes": 49,
+          "entry_count": 24,
+          "family": "rtf",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "tiny",
+          "package_format": "RTF",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "rtf_variant": "plain",
+          "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant"
+          ],
+          "text_template": "litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "logical_payload_bytes": 1199,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 24
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 1347,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "rtf_file_open",
+          "rtf_file_open_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "rtf_file_open",
+      "corpus_id": "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "legacy_name": "rtf-semantic-plain-medium",
+      "legacy_archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_file_open",
+      "corpus_id": "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "legacy_name": "rtf-semantic-plain-large",
+      "legacy_archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_file_open",
+      "corpus_id": "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "legacy_name": "rtf-semantic-plain-tiny",
+      "legacy_archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus_id": "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "legacy_name": "rtf-semantic-plain-medium",
+      "legacy_archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus_id": "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "legacy_name": "rtf-semantic-plain-large",
+      "legacy_archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus_id": "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "legacy_name": "rtf-semantic-plain-tiny",
+      "legacy_archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "role": "timed"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+	Command being timed: "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478 --case xlsx_file_open,xlsx_file_open_lifecycle,xlsx_file_selected_cell,xlsx_bytes_open,xlsx_bytes_open_lifecycle --warmup 10 --samples 100 --workers 1 --json docs/unified-ops/results/0003/before/raw/R5-xlsx.json --filesystem-cache warm --corpus-manifest docs/unified-ops/results/0003/before/raw/R5-xlsx.corpus-manifest.json"
+	User time (seconds): 62.97
+	System time (seconds): 6.95
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:10.30
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 199480
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 5946046
+	Voluntary context switches: 3835
+	Involuntary context switches: 3819
+	Swaps: 0
+	File system inputs: 496
+	File system outputs: 1496
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

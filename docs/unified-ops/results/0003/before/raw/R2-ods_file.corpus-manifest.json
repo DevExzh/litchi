@@ -1,0 +1,200 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "6e957f1abfb6d54c83b3c9ceeca31b83384aa3c73a5aaeaaf7437907ccf75187",
+  "content_set_sha256": "1a533c2d3ac1b181a859b79a0f229517f9be4a2100f03d4a5ec29cd6e4852145",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "da4c207478eb9192ce2f258ac41920ce55e01ab3",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "name": "ods-media-publication",
+      "legacy_v1": {
+        "name": "ods-media-publication",
+        "generator": "litchi-ods-media-publication-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "media-rich",
+        "payload_kind": "deterministic-incompressible-media",
+        "compression": "deflate",
+        "entry_count": 2056,
+        "archive_member_count": 11,
+        "entry_bytes": 2097152,
+        "uncompressed_payload_bytes": 16887808,
+        "archive_bytes": 16790589,
+        "archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+        "target_entry": "Sheet 1!R16C16",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "format": "ODS/ODF/ZIP",
+      "size_class": "unknown",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-ods-media-publication-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-incompressible-media",
+          "legacy_shape": "media-rich"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 16790589,
+        "archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+        "logical_payload_bytes": 16887808,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 2097152,
+        "entry_count": 2056
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 16790589,
+          "members": 11,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Sheet 1!R16C16",
+          "logical_bytes": 54,
+          "sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "ods_file_eager_open",
+          "ods_file_eager_selected_cell",
+          "ods_file_eager_selected_media",
+          "ods_file_source_open",
+          "ods_file_source_selected_cell",
+          "ods_file_source_selected_media"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "ods_file_eager_open",
+      "corpus_id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "legacy_name": "ods-media-publication",
+      "legacy_archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "role": "timed"
+    },
+    {
+      "case": "ods_file_eager_selected_cell",
+      "corpus_id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "legacy_name": "ods-media-publication",
+      "legacy_archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "role": "timed"
+    },
+    {
+      "case": "ods_file_eager_selected_media",
+      "corpus_id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "legacy_name": "ods-media-publication",
+      "legacy_archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "role": "timed"
+    },
+    {
+      "case": "ods_file_source_open",
+      "corpus_id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "legacy_name": "ods-media-publication",
+      "legacy_archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "role": "timed"
+    },
+    {
+      "case": "ods_file_source_selected_cell",
+      "corpus_id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "legacy_name": "ods-media-publication",
+      "legacy_archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "role": "timed"
+    },
+    {
+      "case": "ods_file_source_selected_media",
+      "corpus_id": "ods-odf-zip:sha256:1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "legacy_name": "ods-media-publication",
+      "legacy_archive_sha256": "1e00a631c1eeb93e14056a7b57f90f612338458f124a218eb513db79dc519749",
+      "role": "timed"
+    }
+  ]
+}
