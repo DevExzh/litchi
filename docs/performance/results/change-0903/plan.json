@@ -1,0 +1,62 @@
+{
+  "conservation": "each selected function self plus direct-child edge costs; all XML-minifier self costs plus non-XML self remainder equal whole publication. Nested inclusive totals never added. Shared callee self is not assigned to a callpath.",
+  "head": "8d5debea6b9fe17c579bab7a665f6e39af32e5c0",
+  "limitations": "Inherited 0901 brk warnings, demangled specialization aggregation and source-debug attribution limits apply. Relative cost positions remain raw tokens unless independently resolved. Call counts are recorded edges, not inferred source branch coverage.",
+  "prior_analysis": {
+    "bytes": 375245,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/analysis.json",
+    "sha256": "299c218418daa1562e730f63715f78e9262dd918e0e47aa7de0192d87945ea89"
+  },
+  "prior_plan": {
+    "bytes": 56171,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/plan.json",
+    "sha256": "3b4f8a67a248aeb509d34c91a13e94d80d2af911b64a79505526b141ec70d92d"
+  },
+  "prior_review": {
+    "bytes": 41166,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/review.json",
+    "sha256": "82e8fcb8cab8d8a790de666f67f344acb416900fc689aca68abf973a13e180ed"
+  },
+  "profiles": [
+    {
+      "bytes": 226473,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium/callgrind.out.6",
+      "sha256": "289ddb99a1d05da7dd43f59dc74a31ff9b0a8f81253f3a5d5a53a9a7daf8928f"
+    },
+    {
+      "bytes": 230878,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/01-dense-sparse/callgrind.out.6",
+      "sha256": "9fb5601eddf87886d90f68aac28061b0ffa74dda66c6891f4cdb9eafdb3d2997"
+    },
+    {
+      "bytes": 231341,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/02-dense-sparse/callgrind.out.6",
+      "sha256": "c0513865ee7aa8bde4e2b21a0dd5a3c1f6efba7ac4f338038e4e755912346602"
+    },
+    {
+      "bytes": 226479,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/03-medium/callgrind.out.6",
+      "sha256": "c897954240e9df916f4fec894e19380cec6ca84678afda5d8c4ef0c8cb9252a2"
+    }
+  ],
+  "reader": {
+    "bytes": 63017,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_v2.py",
+    "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+  },
+  "rejected_candidate_decision": {
+    "bytes": 7208,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0902/decision.json",
+    "sha256": "8d79ae722b8576b1567ca6720007484d09031b0f9a432eaefae31e6ed17bc037"
+  },
+  "schema": "litchi.xml-audit-hotloops-0903.v1",
+  "scope": "offline reanalysis of four exact current-source publication-owner Callgrind dumps; no new workload, native-time, allocation, RSS or adoption claim",
+  "source_files_verified": 10771,
+  "source_manifest": {
+    "bytes": 3325536,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0894/source.json",
+    "sha256": "3d6e1fcc5bef3221d5b9131b80ad26292a07d0dcdc0c973093e823b75b168453"
+  },
+  "status": "frozen",
+  "worktrees_created": 0
+}

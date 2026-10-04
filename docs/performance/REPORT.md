@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0903 — XML audit hot-loop attribution
+
+[0903](0903-xml-audit-hotloop-attribution.md) reduces four retained publication
+profiles with exact function-edge and disjoint exclusive-self conservation.
+Repeated attribute scanning suggests a bounded zero/one-attribute summary,
+but cardinality coverage and exact semantic parity remain unqualified. Raw call
+count differences are unexplained and cannot serve as a tag census. Canonical
+replay is byte-identical and 10,771 current source hashes match. No production
+change, fresh workload or speedup claim; the non-iWork goal remains open.
+
 ## 0902 — rejected upfront-stopped XML audit candidate
 
 [0902](0902-xlsx-upfront-stopped-audit-candidate.md) tested a bounded observer

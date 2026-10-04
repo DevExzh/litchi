@@ -1,0 +1,62 @@
+{
+  "files": {
+    "docs/performance/0903-xml-audit-hotloop-attribution.md": {
+      "bytes": 4615,
+      "sha256": "e9ad1c0a9d8a6638bbd173d63f1c2f405749ec07b8540841916a02f74480b6ce"
+    },
+    "docs/performance/BASELINE.md": {
+      "bytes": 475173,
+      "sha256": "1dd6d7e1f2032d80b46444f0bd033be0a2c37fac19b512d0f475b80d16248fc8"
+    },
+    "docs/performance/GOAL_AUDIT.md": {
+      "bytes": 463188,
+      "sha256": "cebbe956db1c6e00ad47d09039ff27e9b905a9efadc6f1027b20e1f7d793b1c4"
+    },
+    "docs/performance/HOTSPOTS.md": {
+      "bytes": 777440,
+      "sha256": "6b28ad50241248f09279dd9bf2b8f3118b7790ac9a1e0ea173b2362105181fbf"
+    },
+    "docs/performance/REPORT.md": {
+      "bytes": 790220,
+      "sha256": "70e7bf3e53cb416772dbfd4c6d09d7a0b4545e331feac66dbb518ab2c8f2a9f3"
+    },
+    "docs/performance/results/change-0903/README.md": {
+      "bytes": 2409,
+      "sha256": "a7c4010445141f9f512b95bb91bb9df7a11a45f500cd492f3167de5e42038461"
+    },
+    "docs/performance/results/change-0903/analysis.json": {
+      "bytes": 243293,
+      "sha256": "c1ff36ad4dc77c1d8db0cd36810a64772d1ff38b9b4531a9719ac85f24c7d5c3"
+    },
+    "docs/performance/results/change-0903/plan.json": {
+      "bytes": 3124,
+      "sha256": "96b0111ae06249f2fe5508c3a16d9d4874524d6ab4c8f465e5447983649c5a81"
+    },
+    "docs/performance/results/change-0903/reduce.py": {
+      "bytes": 24612,
+      "sha256": "76b736792d073bc9e25231a74daa9c486652f9b10371d03e01b1b5b4f6e76ca6"
+    },
+    "docs/performance/results/change-0903/review.md": {
+      "bytes": 2376,
+      "sha256": "859e97450d719a9e16ef745bf6b5ef5ac3ffc8c45a0f5ee7dbd3dfb7ed1fea89"
+    },
+    "docs/performance/results/change-0903/source-audit.md": {
+      "bytes": 17833,
+      "sha256": "6259dc50f907118ff68019bee24c41d2e69e93c367fa082afe53ba723df8cede"
+    },
+    "docs/performance/results/change-0903/verification.json": {
+      "bytes": 922,
+      "sha256": "fb76be0cd6cec5ef54f8c30ba9ce49de8df15901ce732c8413c5b333f2909156"
+    }
+  },
+  "goal_complete": false,
+  "owned_temporary_artifacts_remaining": 0,
+  "parent_commit": "8d5debea6b9fe17c579bab7a665f6e39af32e5c0",
+  "performance_claim": "none",
+  "production_changed": false,
+  "schema": "litchi.xml-audit-hotloops-closure-0903.v1",
+  "source_files_verified": 10771,
+  "status": "pass",
+  "worktrees_created": 0,
+  "worktrees_removed": 0
+}

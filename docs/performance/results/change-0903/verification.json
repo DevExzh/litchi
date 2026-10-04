@@ -1,0 +1,29 @@
+{
+  "analysis": {
+    "bytes": 243293,
+    "path": "docs/performance/results/change-0903/analysis.json",
+    "sha256": "c1ff36ad4dc77c1d8db0cd36810a64772d1ff38b9b4531a9719ac85f24c7d5c3"
+  },
+  "canonical_command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0903/reduce.py",
+    "--output",
+    "docs/performance/results/change-0903/analysis.json"
+  ],
+  "canonical_exit_code": 0,
+  "duplicate_output_removed": true,
+  "production_changes": false,
+  "reducer": {
+    "bytes": 24612,
+    "path": "docs/performance/results/change-0903/reduce.py",
+    "sha256": "76b736792d073bc9e25231a74daa9c486652f9b10371d03e01b1b5b4f6e76ca6"
+  },
+  "replay_byte_identical": true,
+  "replay_exit_code": 0,
+  "replay_stdout": "0903 XML-audit reduction passed: docs/performance/results/change-0903/replay.json\n",
+  "source_files_verified": 10771,
+  "status": "pass",
+  "worktrees_created": 0,
+  "worktrees_removed": 0
+}
