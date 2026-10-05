@@ -6,6 +6,10 @@
 //! rather than main-story syntax.  This module reads that part through its
 //! exact source-preserving OPC view and never runs markup-compatibility
 //! projection on it.
+//!
+//! The owning package publishes the same transactions, so it applies the same
+//! policy through [`validate_changed_owned_document`]: one settings
+//! inspection and one typed refusal, whichever owner holds the document.
 
 use litchi_core::{ExecutionContext, ExecutionError, Resource};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -102,14 +106,88 @@ fn validate_changed_document_inner(package: &Package) -> Result<()> {
     let source = settings_part.source_xml()?;
     let settings = inspect_settings_source(source.bytes(), settings_strict, context.as_ref())?;
     if settings.protected || settings.track_revisions {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "changed document publication",
-            reason: "document or write protection, or tracked revisions, is enabled",
-        });
+        return Err(protection_refusal());
     }
 
     finish_source_fence(package, source_version)
+}
+
+/// The refusal of a changed publication under enforced protection or
+/// tracked revisions, identical for both owners.
+fn protection_refusal() -> Error {
+    Error::UnsafeEdit {
+        format: "DOCX",
+        operation: "changed document publication",
+        reason: "document or write protection, or tracked revisions, is enabled",
+    }
+}
+
+/// Validate the policy for a real changed main-document publication from an
+/// owning package.
+///
+/// This is the source-backed check over the owning OPC graph: the same
+/// relationship, conformance-family and content-type rules for the optional
+/// settings part, the same bounded inspection of its exact bytes, and the
+/// same refusal when document or write protection is enforced or revisions
+/// are tracked. Exact no-ops do not call it.
+pub(crate) fn validate_changed_owned_document(opc: &litchi_opc::OpcPackage) -> Result<()> {
+    let main = opc.main_document_part()?;
+    let mut package_dialect = None;
+    for relationship in opc.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+        )
+    }) {
+        if package_dialect
+            .replace(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
+            .is_some()
+        {
+            return Err(Error::InvalidRelationship(
+                "package has multiple main-document relationships".into(),
+            ));
+        }
+    }
+    let mut settings_relationship = None;
+    for relationship in main.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::SETTINGS | STRICT_SETTINGS_RELATIONSHIP
+        )
+    }) {
+        if settings_relationship.replace(relationship).is_some() {
+            return Err(Error::InvalidRelationship(
+                "document has multiple settings relationships".into(),
+            ));
+        }
+    }
+    let Some(relationship) = settings_relationship else {
+        return Ok(());
+    };
+    if relationship.is_external() {
+        return Err(Error::InvalidRelationship(
+            "settings relationship cannot be external".into(),
+        ));
+    }
+    let settings_strict = relationship.reltype() == STRICT_SETTINGS_RELATIONSHIP;
+    if package_dialect != Some(settings_strict) {
+        return Err(Error::InvalidRelationship(
+            "main document and settings relationship use mixed OOXML conformance families".into(),
+        ));
+    }
+    let target = relationship.target_partname()?;
+    let settings_part = opc.get_part(&target)?;
+    if settings_part.content_type() != ct::WML_SETTINGS {
+        return Err(Error::InvalidContentType {
+            expected: ct::WML_SETTINGS.into(),
+            got: settings_part.content_type().into(),
+        });
+    }
+    let settings = inspect_settings_source(settings_part.blob(), settings_strict, None)?;
+    if settings.protected || settings.track_revisions {
+        return Err(protection_refusal());
+    }
+    Ok(())
 }
 
 fn package_dialect(package: &Package) -> Result<Option<bool>> {

@@ -465,6 +465,14 @@ fn build_inventory(
 }
 
 fn validate_main_document_closure(closure: &sanitize::Snapshot) -> Result<()> {
+    // The scan resolves names on namespace values as written; a binding that
+    // spells the markup-compatibility namespace with references is invisible
+    // to it, while readers apply it.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(closure.xml_bytes()) {
+        return unsafe_closure(
+            "markup-compatibility owner syntax is outside the redaction closure",
+        );
+    }
     let mut reader = NsReader::from_reader(closure.xml_bytes());
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;

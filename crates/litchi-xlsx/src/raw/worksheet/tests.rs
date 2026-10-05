@@ -4698,3 +4698,24 @@ mod change_0658_ineligibility_gate_tests {
         }
     }
 }
+
+/// Record 0011: the shared traversal follows the preprocessor's own decision.
+/// A declaration that spells the namespace with references is rewritten by
+/// preprocessing, so the source is never parsed as if it were borrowed.
+#[test]
+fn escaped_markup_compatibility_takes_the_rewritten_admission() {
+    use super::{SourceAdmission, source_stream_admission};
+    let main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    let escaped = format!(
+        r#"<worksheet xmlns="{main}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;" xmlns:x="urn:x" mc:Ignorable="x"><sheetData/></worksheet>"#
+    );
+    assert_eq!(
+        source_stream_admission(escaped.as_bytes()),
+        Some(SourceAdmission::Rewritten)
+    );
+    let plain = format!(r#"<worksheet xmlns="{main}"><sheetData/></worksheet>"#);
+    assert_eq!(
+        source_stream_admission(plain.as_bytes()),
+        Some(SourceAdmission::Borrowed)
+    );
+}

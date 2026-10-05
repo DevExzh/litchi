@@ -125,6 +125,14 @@ pub(crate) fn scan(
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("story XML bytes", xml.len(), MAX_XML_BYTES));
     }
+    // Frames are classified on namespace values as written, while active
+    // anchors come from the markup-compatibility processor: a binding spelled
+    // with references would make the two disagree.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
+        return Err(invalid(
+            "DOCX story XML spells the markup-compatibility namespace with references",
+        ));
+    }
 
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);

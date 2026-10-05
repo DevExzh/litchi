@@ -7,9 +7,12 @@ use quick_xml::{
 };
 use std::{borrow::Cow, collections::HashSet, rc::Rc, str, sync::Arc};
 
+use super::admission::mentions_namespace;
+#[cfg(test)]
+use super::model::NAMESPACE;
 use super::model::{
-    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits,
-    Output, Report, XML_NS,
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, Name, OffsetLimits, Output,
+    Report, XML_NS,
 };
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
@@ -57,7 +60,7 @@ pub fn active_offsets(
     if offsets.is_empty() {
         return Ok(Vec::new());
     }
-    if find_bytes(xml, NAMESPACE.as_bytes()).is_none() {
+    if !mentions_namespace(xml) {
         return copy_offsets(offsets);
     }
 
@@ -719,23 +722,6 @@ struct Attr<'a> {
     keep: bool,
 }
 
-#[inline(never)]
-fn contains_mce_namespace(mut remaining: &[u8]) -> bool {
-    let needle = NAMESPACE.as_bytes();
-    let first = needle[0];
-    while remaining.len() >= needle.len() {
-        let valid_starts = remaining.len() - needle.len() + 1;
-        let Some(offset) = memchr::memchr(first, &remaining[..valid_starts]) else {
-            return false;
-        };
-        if remaining[offset..].starts_with(needle) {
-            return true;
-        }
-        remaining = &remaining[offset + 1..];
-    }
-    false
-}
-
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -748,7 +734,9 @@ pub fn process_markup_compatibility<'a>(
     if xml.len() > lim.max_input_bytes {
         return Err(limit("input bytes"));
     }
-    if !contains_mce_namespace(xml) {
+    // A declaration that spells the namespace with references binds it as a
+    // literal one does, so the fast path decides on decoded declarations too.
+    if !mentions_namespace(xml) {
         if xml.len() > lim.max_output_bytes {
             return Err(limit("output bytes"));
         }

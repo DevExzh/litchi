@@ -470,7 +470,13 @@ fn audit_xml(content: &[u8], owner: XmlOwner) -> Result<XmlAudit> {
         return Err(invalid("tab-state XML exceeds the 32 MiB edit bound"));
     }
     let mut reader = NsReader::from_reader(content);
-    let mut audit = XmlAudit::default();
+    // Names are recognized on namespace values as written; a declaration that
+    // spells the markup-compatibility namespace with references binds it for
+    // preprocessing all the same (record 0011).
+    let mut audit = XmlAudit {
+        alternate_content: litchi_ooxml_common::mce::binds_namespace_by_reference(content),
+        ..XmlAudit::default()
+    };
     let mut depth = 0usize;
     let mut events = 0usize;
     loop {

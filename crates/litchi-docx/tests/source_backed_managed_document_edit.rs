@@ -1784,6 +1784,49 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
     }
 }
 
+/// Record 0011: Word's markup compatibility that cannot change content (a
+/// declared namespace, a root `mc:Ignorable` of an understood namespace) is
+/// admitted under an execution context. The managed transaction edits and
+/// publishes the source bytes exactly as the unmanaged one does, and every
+/// reservation is released.
+#[test]
+fn managed_source_document_admits_word_markup_compatibility() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{MCE}" xmlns:w14="{W14}" mc:Ignorable="w14"><w:body><w:p w14:paraId="1A2B3C4D"><w:r><w:t>before</w:t></w:r></w:p><w:p><w:r><w:t>second</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let source = fixture_with_document(document.clone(), 37, 13);
+
+    let unmanaged =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    let mut edit = unmanaged.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut expected = Vec::new();
+    unmanaged
+        .publish_document_commit_to_stream(&mut expected, &commit)
+        .unwrap();
+
+    let (budget, _cancellation_source, package) = managed(source, 1 << 20);
+    let snapshot = package.document_snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    drop(snapshot);
+    let mut output = Vec::new();
+    package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(part_bytes(&output, MAIN), part_bytes(&expected, MAIN));
+    let published = String::from_utf8(part_bytes(&output, MAIN)).unwrap();
+    assert!(published.contains(r#"mc:Ignorable="w14""#));
+    assert!(published.contains(r#"w14:paraId="1A2B3C4D""#));
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
 #[test]
 fn managed_source_document_rejects_mce_and_dtd_before_edit() {
     let cases: [(&str, Vec<u8>, fn(&TransactionError) -> bool); 2] = [

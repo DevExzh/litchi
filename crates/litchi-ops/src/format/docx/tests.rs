@@ -385,24 +385,49 @@ fn editor_is_built_from_either_owner_without_reindexing() {
     assert_eq!(cold_loads(&source), 1);
 }
 
-/// Leaf gap recorded for M2: the source-backed `edit_document` refuses a
-/// main document whose markup-compatibility preprocessing changes its bytes,
-/// which every Word-authored fixture does (`mc:Ignorable`). The eager owner
-/// edits the same file. The refusal is typed, not flattened.
+/// Record 0011 closed the leaf gap M0a recorded: both owners admit Word
+/// documents whose markup compatibility cannot change content (a declared
+/// namespace, a root `mc:Ignorable`) and build editors over the same bytes.
 #[test]
-fn source_editor_refusal_on_markup_compatibility_is_typed() {
+fn editor_admits_word_markup_compatibility_on_both_owners() {
     for name in FIXTURES {
         let bytes = std::fs::read(fixture(name)).unwrap();
         let eager = open_eager(bytes.clone(), &OpenOptions::new()).unwrap();
-        assert!(eager.edit_document().unwrap().source().paragraph_count() > 0);
-
         let source = open_bytes(bytes, &OpenOptions::new()).unwrap();
-        let error = source.edit_document().unwrap_err();
+        let eager_edit = eager.edit_document().unwrap();
+        let source_edit = source
+            .edit_document()
+            .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        assert!(source_edit.source().paragraph_count() > 0, "{name}");
         assert_eq!(
-            error.code(),
-            Code::UnsupportedCapability,
-            "{name}: {error:?}"
+            source_edit.source().paragraph_count(),
+            eager_edit.source().paragraph_count(),
+            "{name}"
         );
+        assert_eq!(
+            source_edit.source().xml_bytes(),
+            eager_edit.source().xml_bytes(),
+            "{name}"
+        );
+    }
+}
+
+/// Markup compatibility that selects content stays refused, as a typed leaf
+/// error, whichever owner holds the document: here a body-level
+/// `AlternateContent` whose branches hold different paragraphs.
+#[test]
+fn editor_refuses_alternate_content_on_both_owners() {
+    let document = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:body><w:p><w:r><w:t>P0</w:t></w:r></w:p><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>CHOICE</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>FALLBACK</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent><w:p><w:r><w:t>P2</w:t></w:r></w:p></w:body></w:document>"#;
+    let bytes = minimal_docx(document);
+    let source = open_bytes(bytes.clone(), &OpenOptions::new()).unwrap();
+    let eager = open_eager(bytes, &OpenOptions::new()).unwrap();
+    // Reads apply the projection: the selected branch only.
+    assert_eq!(source.text().unwrap(), eager.text().unwrap());
+    assert!(!source.text().unwrap().contains("FALLBACK"));
+    for docx in [&source, &eager] {
+        let error = docx.edit_document().unwrap_err();
+        assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
+        assert_eq!(error.format(), Some(FileFormat::Docx));
         assert!(
             matches!(
                 error.leaf(),
@@ -410,7 +435,7 @@ fn source_editor_refusal_on_markup_compatibility_is_typed() {
                     litchi_docx::Error::UnsafeEdit { .. }
                 ))
             ),
-            "{name}: {error:?}"
+            "{error:?}"
         );
     }
 }

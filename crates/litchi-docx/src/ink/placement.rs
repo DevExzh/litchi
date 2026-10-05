@@ -92,6 +92,14 @@ pub(crate) fn paragraph_records(
     limits: Limits,
 ) -> Result<Vec<Paragraph>> {
     let limits = limits.validate()?;
+    // Candidates are classified on namespace values as written, while active
+    // paragraphs come from the markup-compatibility processor: a binding
+    // spelled with references would make the two disagree.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(source) {
+        return Err(invalid(
+            "DOCX story XML spells the markup-compatibility namespace with references",
+        ));
+    }
     let candidates = scan_paragraph_candidates(source, dialect, limits)?;
     if candidates.is_empty() {
         return Ok(Vec::new());

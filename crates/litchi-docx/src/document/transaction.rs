@@ -420,6 +420,11 @@ pub enum TransferRefusal {
     },
     /// The selected donor paragraph could not be represented as compact XML.
     InvalidParagraphXml,
+    /// The donor's markup-compatibility directive drops markup that its
+    /// paragraphs may carry; that markup is ignorable only under the donor's
+    /// own `mc:Ignorable`, so moving it to another document would change
+    /// whether readers see it.
+    MarkupCompatibilityScope,
 }
 
 impl std::fmt::Display for TransferRefusal {
@@ -445,6 +450,9 @@ impl std::fmt::Display for TransferRefusal {
             Self::InvalidParagraphXml => {
                 formatter.write_str("donor paragraph XML is not transferable")
             },
+            Self::MarkupCompatibilityScope => formatter.write_str(
+                "donor markup-compatibility directive drops markup a transferred paragraph may carry",
+            ),
         }
     }
 }

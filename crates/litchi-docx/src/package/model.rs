@@ -136,6 +136,11 @@ pub struct Package {
     /// Package-scoped clean paragraph memo; entries are invalidated by source
     /// allocation identity when the main relationship or payload changes.
     pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
+    /// The main-document payload the markup-compatibility admission last
+    /// proved for a transaction. Payloads are replaced, never mutated in
+    /// place, so a live allocation that is still this one holds the same
+    /// bytes; the weak reference keeps nothing alive.
+    pub(super) main_admission: std::sync::Mutex<std::sync::Weak<Vec<u8>>>,
     /// Mutable document for writing (cached)
     pub(super) mutable_doc: Option<MutableDocument>,
     /// Whether a committed raw edit has disabled the legacy document writer.

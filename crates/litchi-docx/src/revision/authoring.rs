@@ -1019,6 +1019,15 @@ struct OpenRange {
 }
 
 fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
+    // Names are resolved on namespace values as written: a binding that
+    // spells the markup-compatibility namespace with references would hide
+    // alternatives and scope directives from this scan while readers apply
+    // them.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(source) {
+        return Err(invalid(
+            "tracked revision XML spells the markup-compatibility namespace with references",
+        ));
+    }
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);

@@ -491,28 +491,87 @@ pub struct DocumentPart<'a> {
     paragraph_memo: OnceLock<Option<Arc<ParagraphIndexMemo>>>,
 }
 
+/// The markup-compatibility profile a main document is read with: the OOXML
+/// baseline, plus the Word 2010 (`w14`) and Word 2023 UTC-date (`w16du`)
+/// namespaces.
+///
+/// Word 2010 paragraph and drawing extensions are declared ignorable by
+/// producers. Keeping those namespaces understood at the package boundary
+/// lets `w14:paraId`, `w14:textId`, `w14:noSpellErr` and unrelated `w14`
+/// markup survive the visibility pass for typed and opaque readers.
+pub(crate) fn visible_document_capabilities() -> litchi_ooxml_common::mce::Capabilities {
+    let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+    capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
+    capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+    capabilities
+}
+
 /// Select markup-compatibility branches for a main-document payload.
 ///
 /// Both materialized OPC parts and source-backed pinned documents use this
 /// path so their paragraph semantics remain identical.
 pub(crate) fn visible_document_xml(raw: Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
-    // Word 2010 paragraph/drawing extensions are declared ignorable by
-    // producers. Keep that namespace understood at the package boundary so
-    // `w14:paraId`, `w14:textId`, `w14:noSpellErr`, and unrelated w14 markup
-    // survive the MCE visibility pass for typed or opaque source-backed
-    // readers.
-    let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
-    capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
-    capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
     match litchi_ooxml_common::mce::process_markup_compatibility(
         raw.as_slice(),
-        &capabilities,
+        &visible_document_capabilities(),
         &litchi_ooxml_common::mce::Limits::default(),
     )?
     .xml
     {
         std::borrow::Cow::Borrowed(_) => Ok(raw),
         std::borrow::Cow::Owned(value) => Ok(Arc::new(value)),
+    }
+}
+
+/// Admit a main-document part to a transaction that reads and publishes its
+/// source bytes while readers see the visible projection.
+///
+/// The transaction may edit the source only where the two agree on
+/// everything either of them reads. The shared admission proof
+/// ([`litchi_ooxml_common::mce::admission`]) establishes that in one pass
+/// without building the projection: a part that never mentions the
+/// markup-compatibility namespace, one that binds it and uses nothing in it,
+/// and one whose only constructs are valid `Ignorable` directives: one on
+/// `w:document`, whose dropped markup holds no element or attribute of an
+/// understood namespace, and any below it listing only understood namespaces
+/// (as litchi's revision writer emits). The transaction scanners treat that
+/// foreign markup as opaque, as the projection drops it, so positions, text
+/// and every WordprocessingML element and attribute agree.
+///
+/// A part the proof cannot admit keeps the historical answer: the projection
+/// runs, its error is returned as is (for example an unsatisfiable
+/// `MustUnderstand`), and a projection that differs from the source is
+/// refused as an unsafe edit with `reason`. Decisions are made on decoded
+/// names, so a namespace declaration that spells the namespace with
+/// character references is a binding like any other.
+///
+/// # Errors
+///
+/// Returns the projection's markup-compatibility error, or
+/// [`crate::Error::UnsafeEdit`] for a part whose projection selects, unwraps
+/// or hides content.
+pub(crate) fn admit_document_source(
+    raw: &[u8],
+    operation: &'static str,
+    reason: &'static str,
+) -> Result<litchi_ooxml_common::mce::admission::Admission> {
+    use litchi_ooxml_common::mce;
+
+    if !mce::mentions_namespace(raw) {
+        return Ok(mce::admission::Admission::Unbound);
+    }
+    let capabilities = visible_document_capabilities();
+    let limits = mce::Limits::default();
+    match mce::admission::admit(raw, &capabilities, &limits) {
+        Ok(admission) => Ok(admission),
+        Err(_) => match mce::process_markup_compatibility(raw, &capabilities, &limits)?.xml {
+            std::borrow::Cow::Borrowed(_) => Ok(mce::admission::Admission::Unbound),
+            std::borrow::Cow::Owned(_) => Err(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason,
+            }),
+        },
     }
 }
 

@@ -226,6 +226,7 @@ impl Package {
         Ok(Self {
             opc,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
+            main_admission: std::sync::Mutex::new(std::sync::Weak::new()),
             mutable_doc,
             raw_edit_committed: false,
             properties,
@@ -384,6 +385,7 @@ impl Package {
         Ok(Self {
             opc,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
+            main_admission: std::sync::Mutex::new(std::sync::Weak::new()),
             mutable_doc: None,
             raw_edit_committed: false,
             properties,

@@ -469,10 +469,23 @@ fn managed_document_refuses_only_actual_mce_and_retains_part_data() {
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 
-    let encoded_mce = format!(
-        r#"<w:document xmlns:w="{W}" xmlns:mc="http:&#x2f;&#x2f;schemas.openxmlformats.org&#x2f;markup-compatibility&#x2f;2006"><w:body><w:p/></w:body></w:document>"#
+    // Record 0011: the binding is decided on its decoded value. Spelled with
+    // references and never used, the namespace changes nothing a reader
+    // sees, so the managed route reads the part over its source bytes.
+    let encoded = "http:&#x2f;&#x2f;schemas.openxmlformats.org&#x2f;markup-compatibility&#x2f;2006";
+    let encoded_declaration = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{encoded}"><w:body><w:p><w:r><w:t>kept</w:t></w:r></w:p></w:body></w:document>"#
     );
-    let (_budget, package) = managed_document_fixture(encoded_mce.as_bytes());
+    let (budget, package) = managed_document_fixture(encoded_declaration.as_bytes());
+    assert_eq!(package.document().unwrap().extract_text().unwrap(), "kept");
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    // Used through that spelling, it selects a branch: refused as before.
+    let encoded_use = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{encoded}"><w:body><mc:AlternateContent><mc:Choice Requires="w"><w:p/></mc:Choice></mc:AlternateContent></w:body></w:document>"#
+    );
+    let (_budget, package) = managed_document_fixture(encoded_use.as_bytes());
     assert!(matches!(
         package.document(),
         Err(Error::UnsafeEdit {

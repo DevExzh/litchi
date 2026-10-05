@@ -101,6 +101,11 @@ pub(crate) fn rewrite(
     if renames.is_empty() {
         return Ok(None);
     }
+    // Branches are recognized on namespace values as written; a binding
+    // spelled with references could hide a reference inside one (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(content) {
+        return Err(block(context, RenameBlock::MarkupCompatibility));
+    }
     let formula_renames = renames
         .iter()
         .map(|rename| formula::Rename {

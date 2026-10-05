@@ -1510,10 +1510,9 @@ fn inspect_settings(
 }
 
 fn inspect_settings_xml(xml: &[u8], diagnostics: &mut Vec<Diagnostic>) -> Result<()> {
-    if xml
-        .windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
-    {
+    // Literally or through a declaration spelled with references, which the
+    // namespace-resolving scan below cannot see.
+    if litchi_ooxml_common::mce::mentions_namespace(xml) {
         add_diagnostic(diagnostics, UnsupportedClass::MarkupCompatibility, 1)?;
     }
     let mut reader = NsReader::from_reader(xml);
@@ -1556,10 +1555,9 @@ fn inspect_story_xml(
     relationships: &[RelationshipState],
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<()> {
-    if xml
-        .windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
-    {
+    // Literally or through a declaration spelled with references, which the
+    // namespace-resolving scan below cannot see.
+    if litchi_ooxml_common::mce::mentions_namespace(xml) {
         add_diagnostic(diagnostics, UnsupportedClass::MarkupCompatibility, 1)?;
     }
     let mut reader = NsReader::from_reader(xml);

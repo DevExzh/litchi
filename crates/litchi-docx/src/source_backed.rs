@@ -8,7 +8,7 @@
 //! transactions retain the raw XML and may be published to a sequential sink
 //! while raw-copying every unselected ZIP member.
 
-mod document_policy;
+pub(crate) mod document_policy;
 mod ink;
 mod svg_lifecycle;
 
@@ -93,7 +93,7 @@ use crate::parts::document_part::{
     ParagraphIndexMemo, ParagraphIndexRoute, body_block_ranges, document_blocks, document_elements,
     document_paragraph, document_paragraph_count, document_paragraph_from_index,
     document_paragraphs, document_paragraphs_from_index, document_tables, is_xml_outer_whitespace,
-    visible_document_xml,
+    visible_document_capabilities, visible_document_xml,
 };
 use crate::redact;
 use crate::sanitize::{self, RelationshipState};
@@ -133,6 +133,11 @@ pub struct Package {
     /// into `tolerance`. The source is pinned to one revision, so every read
     /// repairs the same defects; they are recorded once, not per call.
     properties_recorded: std::sync::atomic::AtomicBool,
+    /// The source revision whose main document the markup-compatibility
+    /// admission last proved for an unmanaged transaction. One revision has
+    /// one main-document payload, so publishing an edit started from it does
+    /// not prove the same bytes again.
+    main_admission: Mutex<Option<SourceVersion>>,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -625,6 +630,7 @@ impl Package {
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             tolerance: Mutex::new(tolerance),
             properties_recorded: std::sync::atomic::AtomicBool::new(false),
+            main_admission: Mutex::new(None),
         })
     }
 
@@ -1122,14 +1128,29 @@ impl Package {
     /// Load the exact raw main-document bytes as a semantic transaction
     /// snapshot.
     ///
-    /// Source-backed edits currently refuse documents whose markup-
-    /// compatibility preprocessing selects or rewrites branches. Keeping the
-    /// raw bytes prevents semantic selectors from being applied to a different
-    /// XML representation than the one eventually published.
+    /// The snapshot edits and publishes the source bytes while readers see
+    /// the markup-compatibility projection, so a document is admitted only
+    /// when the two agree on everything either reads (one bounded proof, no
+    /// projection built): it never mentions the markup-compatibility
+    /// namespace, binds it and uses nothing in it, or carries one valid
+    /// `mc:Ignorable` on `w:document` whose dropped markup holds no element
+    /// or attribute of an understood namespace (and, below it, only
+    /// `Ignorable` directives listing understood namespaces). Names are
+    /// decided on their decoded values. A document whose projection selects,
+    /// unwraps or hides content (`AlternateContent`, `ProcessContent`,
+    /// `MustUnderstand`, ignorable markup holding content, or an `Ignorable`
+    /// below `w:document` listing a namespace that is not understood) is
+    /// refused, and a projection error is returned as is. Under an
+    /// execution context the projection is never built, so only documents
+    /// whose projection differs from the source in spelling alone are
+    /// admitted. Keeping the raw bytes prevents semantic selectors from being
+    /// applied to a different XML representation than the one eventually
+    /// published.
     ///
     /// # Errors
     ///
-    /// Returns a typed package, document, resource-limit, or unsafe-edit error.
+    /// Returns a typed package, document, resource-limit, markup-
+    /// compatibility, or unsafe-edit error.
     pub fn document_snapshot(&self) -> TransactionResult<Snapshot> {
         let (_, snapshot) = self.main_document_snapshot("document_snapshot", true)?;
         Ok(snapshot)
@@ -1149,8 +1170,12 @@ impl Package {
     ///
     /// This source-backed capability never creates a settings relationship or
     /// Part. It accepts exactly one Strict or Transitional internal settings
-    /// relationship with the Word settings content type. Markup-compatibility
-    /// branch selection is refused so the semantic snapshot and publish bytes
+    /// relationship with the Word settings content type. The settings part is
+    /// admitted by the main document's markup-compatibility rule, with the
+    /// baseline profile settings readers use: a valid `mc:Ignorable` on
+    /// `w:settings` may drop Word's foreign leaves (such as `w14:docId`),
+    /// which hold no WordprocessingML. Branch selection and every other
+    /// directive are refused, so the semantic snapshot and publish bytes
     /// cannot diverge.
     ///
     /// # Errors
@@ -1510,7 +1535,11 @@ impl Package {
     /// Cross-package paragraph transfers are refused because their dependency
     /// graph requires package-level publication. A no-op commit reproduces the
     /// complete source artifact byte for byte. A changed signed package is
-    /// refused by the underlying OPC publisher.
+    /// refused by the underlying OPC publisher, and a changed publication is
+    /// refused while document or write protection is enforced or revisions
+    /// are tracked; the owning [`crate::Package`] applies the same policy. The
+    /// current main document passes the markup-compatibility admission of
+    /// [`Self::document_snapshot`], proved once per source revision.
     ///
     /// All semantic, source-version, topology, signature, and replacement-XML
     /// checks happen before output. A sink failure after output begins is
@@ -2088,15 +2117,7 @@ impl Package {
                 let data = self.main_data(main)?;
                 let raw = data.into_arc().map_err(Error::from)?;
                 let snapshot: TransactionResult<Snapshot> = (|| {
-                    let visible = visible_document_xml(Arc::clone(&raw))?;
-                    if !Arc::ptr_eq(&raw, &visible) {
-                        return Err(Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation,
-                        reason: "source-backed document transactions do not support markup-compatibility branch selection",
-                    }
-                    .into());
-                    }
+                    self.admit_main_document(raw.as_slice(), source_version, operation)?;
                     Snapshot::from_shared_xml_with_source_identity(
                         raw,
                         source_lineage.clone(),
@@ -2111,6 +2132,36 @@ impl Package {
         self.package.source_version().map_err(Error::from)?;
         self.package.check_execution().map_err(Error::from)?;
         result
+    }
+
+    /// Prove the unmanaged main document admissible to a transaction over its
+    /// source bytes (see [`crate::parts::document_part::admit_document_source`]),
+    /// once per source revision.
+    fn admit_main_document(
+        &self,
+        raw: &[u8],
+        version: SourceVersion,
+        operation: &'static str,
+    ) -> Result<()> {
+        let admitted = || {
+            *self
+                .main_admission
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        };
+        if admitted() == Some(version) {
+            return Ok(());
+        }
+        crate::parts::document_part::admit_document_source(
+            raw,
+            operation,
+            "source-backed document transactions do not support markup-compatibility branch selection",
+        )?;
+        *self
+            .main_admission
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(version);
+        Ok(())
     }
 
     fn main_section_layout_snapshot(
@@ -2238,19 +2289,7 @@ impl Package {
                 variables::MAX_DOCUMENT_VARIABLE_XML_BYTES
             )));
         }
-        let staged = BlobPart::new_shared(
-            target.clone(),
-            ct::WML_SETTINGS.to_owned(),
-            Arc::clone(&raw),
-        );
-        let visible = litchi_ooxml_common::mce::process_part_arc(&staged)?;
-        if !Arc::ptr_eq(&raw, &visible) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "source-backed document-variable transactions do not support markup-compatibility branch selection",
-            });
-        }
+        admit_settings_source(raw.as_slice(), operation)?;
         let policy = variables::inspect_source_policy(raw.as_slice())?;
         let settings_strict = relationship.reltype() == STRICT_SETTINGS;
         let root_strict = policy.dialect == variables::SettingsDialect::Strict;
@@ -2650,7 +2689,80 @@ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) ->
             },
         }
     }
-    Ok(())
+    admit_managed_document_markup_compatibility(xml, context)
+}
+
+/// The markup-compatibility admission of a managed source-backed document.
+///
+/// A managed document is read and edited over its source bytes: there is no
+/// projection, because building one would need an unbudgeted owned payload.
+/// The shared proof admits it only when the projection would differ from
+/// the source in spelling alone (no markup-compatibility use at all, or
+/// valid `Ignorable` directives that drop nothing), so a managed
+/// reader sees what an unmanaged reader sees in the projection. The proof
+/// runs inside the caller's workspace reservation and charges its work per
+/// XML event; cancellation and budget failures keep their typed identity.
+///
+/// Everything else, including ignorable markup the projection would drop,
+/// keeps the historical refusal.
+fn admit_managed_document_markup_compatibility(
+    xml: &[u8],
+    context: Option<&ExecutionContext>,
+) -> Result<()> {
+    use litchi_ooxml_common::mce;
+
+    if !mce::mentions_namespace(xml) {
+        return Ok(());
+    }
+    let capabilities = visible_document_capabilities();
+    let verdict =
+        mce::admission::admit_with(xml, &capabilities, &mce::Limits::default(), |bytes| {
+            if let Some(context) = context {
+                let work = u64::try_from(bytes).unwrap_or(u64::MAX).saturating_add(1);
+                context
+                    .consume(Resource::Work, work)
+                    .map_err(source_document_execution_error)?;
+            }
+            Ok::<(), Error>(())
+        })?;
+    match verdict {
+        Ok(admission) if admission.is_lexical() => Ok(()),
+        Ok(_) | Err(_) => Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "source-backed document read",
+            reason: "markup-compatibility preprocessing would require an unbudgeted owned payload",
+        }),
+    }
+}
+
+/// Admit a settings part to a document-variable transaction over its source
+/// bytes: the main-document rule with the OOXML baseline profile that the
+/// settings readers use. Word's `w14`/`w15` settings leaves are ignorable
+/// and not understood by that profile, so the projection drops them; they
+/// hold no WordprocessingML, and the transaction reads only `w:docVars`.
+///
+/// A part the proof cannot admit keeps the historical answer: the
+/// projection's own error, or the refusal of a projection that differs from
+/// the source.
+fn admit_settings_source(raw: &[u8], operation: &'static str) -> Result<()> {
+    use litchi_ooxml_common::mce;
+
+    if !mce::mentions_namespace(raw) {
+        return Ok(());
+    }
+    let capabilities = mce::Capabilities::default();
+    let limits = mce::Limits::default();
+    if mce::admission::admit(raw, &capabilities, &limits).is_ok() {
+        return Ok(());
+    }
+    match mce::process_markup_compatibility(raw, &capabilities, &limits)?.xml {
+        Cow::Borrowed(_) => Ok(()),
+        Cow::Owned(_) => Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation,
+            reason: "source-backed document-variable transactions do not support markup-compatibility branch selection",
+        }),
+    }
 }
 
 fn retain_source_document_name(
@@ -2917,6 +3029,12 @@ fn ensure_source_mce_element(
                 "source-backed section inventory"
             },
         )?;
+        if operation == "document" {
+            // A document's declarations and directives are decided on
+            // decoded names by the shared admission proof once this scan
+            // has finished (`admit_managed_document_markup_compatibility`).
+            continue;
+        }
         let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&attribute_namespace)
             || is_namespace_declaration(attribute.key)

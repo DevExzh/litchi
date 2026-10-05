@@ -41,6 +41,15 @@ impl Package {
 
     /// Capture an immutable, source-preserving main-document snapshot.
     ///
+    /// The payload is admitted by the markup-compatibility rule of
+    /// [`crate::source_backed::Package::document_snapshot`]: the snapshot
+    /// edits the payload's own bytes while readers see the projection, so a
+    /// payload whose projection selects, unwraps or hides content is refused
+    /// with a typed unsafe-edit error, and a projection error is returned as
+    /// is. Payloads that never mention the namespace, bind it without using
+    /// it, or carry valid `mc:Ignorable` directives that hide nothing a
+    /// reader sees are admitted.
+    ///
     /// The snapshot shares the main part's payload allocation instead of
     /// copying it. `Part::set_blob` and `set_blob_shared` replace the part's
     /// `Arc` rather than mutating through it, and no route in the workspace
@@ -59,7 +68,44 @@ impl Package {
     ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
-        crate::document::Snapshot::from_shared_xml(main.blob_arc())
+        let xml = main.blob_arc();
+        self.admit_main_document(&xml, "document_snapshot")?;
+        crate::document::Snapshot::from_shared_xml(xml)
+    }
+
+    /// Prove the main-document payload admissible to a transaction over its
+    /// own bytes, as the source-backed owner does
+    /// ([`crate::parts::document_part::admit_document_source`]): one rule for
+    /// both owners. A payload whose projection selects, unwraps or hides
+    /// content is refused, and a projection error is returned as is. The
+    /// verdict is remembered for the allocation it was proved on.
+    fn admit_main_document(
+        &self,
+        xml: &std::sync::Arc<Vec<u8>>,
+        operation: &'static str,
+    ) -> std::result::Result<(), crate::document::TransactionError> {
+        let proved = |memo: &std::sync::Weak<Vec<u8>>| {
+            memo.upgrade()
+                .is_some_and(|admitted| std::sync::Arc::ptr_eq(&admitted, xml))
+        };
+        if proved(
+            &self
+                .main_admission
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        ) {
+            return Ok(());
+        }
+        crate::parts::document_part::admit_document_source(
+            xml.as_slice(),
+            operation,
+            "document transactions do not support markup-compatibility branch selection",
+        )?;
+        *self
+            .main_admission
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = std::sync::Arc::downgrade(xml);
+        Ok(())
     }
 
     /// Answer `Patch::apply`'s exact-source proof from the retained main part
@@ -81,6 +127,12 @@ impl Package {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
         if let Some(candidate) = patch.target_for_exact_unmanaged_source(main.blob()) {
+            // The rescanned route proves the payload in `document_snapshot`;
+            // a reused candidate is held to the same admission before it is
+            // published, however its source snapshot was built.
+            if patch.changed() {
+                self.admit_main_document(&main.blob_arc(), "apply_document_patch")?;
+            }
             return Ok(DocumentPatchSource::Reused(candidate));
         }
         Ok(DocumentPatchSource::Rescanned(self.document_snapshot()?))
@@ -90,7 +142,11 @@ impl Package {
     ///
     /// A stale patch leaves the package untouched. An exact no-op preserves
     /// signatures and the main-part payload allocation; a real edit validates
-    /// the complete candidate facade state before publication.
+    /// the complete candidate facade state before publication. A real edit is
+    /// refused, as on the source-backed publisher, while document or write
+    /// protection is enforced or revisions are tracked, and when the current
+    /// payload fails the markup-compatibility admission of
+    /// [`Self::document_snapshot`].
     ///
     /// # Errors
     ///
@@ -110,6 +166,9 @@ impl Package {
         if !patch.changed() {
             return Ok(candidate);
         }
+        // Protection and tracked revisions refuse a changed publication here
+        // exactly as they do on the source-backed publisher.
+        crate::source_backed::document_policy::validate_changed_owned_document(&self.opc)?;
         // A commit that proved its candidate's exact allocation to the
         // writer's source audit publishes that allocation with the proof
         // (change 0754): the writer then does not audit those bytes again,
@@ -275,6 +334,7 @@ impl Package {
         if candidate.xml_bytes() == current.xml_bytes() {
             return Ok(candidate);
         }
+        crate::source_backed::document_policy::validate_changed_owned_document(&self.opc)?;
         let replacement = candidate.xml_bytes().to_vec();
         self.edit_semantic_opc("apply_durable_document_patch", move |opc| {
             if let Some((graph, insert, expected_digest)) = graph_transition {

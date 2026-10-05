@@ -1,5 +1,6 @@
 //! Shared markup-compatibility preprocessing for OOXML parts.
 
+pub mod admission;
 pub mod alternative;
 pub mod stream;
 
@@ -18,6 +19,7 @@ mod shared_names_tests;
 #[cfg(test)]
 mod tests;
 
+pub use admission::{binds_namespace_by_reference, mentions_namespace};
 pub use codec::{
     active_offsets, process_markup_compatibility, process_ooxml, process_part, process_part_arc,
     process_str,

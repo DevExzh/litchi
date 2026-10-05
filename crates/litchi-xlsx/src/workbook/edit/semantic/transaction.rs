@@ -124,7 +124,7 @@ fn reduced_readback_admitted(
         && compacted.bytes() == after
         && (after.len() > MAX_VALIDATED_STORE_HANDOFF_BYTES
             || source_cells.saturating_sub(changed_cells) > MAX_VALIDATED_STORE_HANDOFF_CELLS)
-        && memchr::memmem::find(after, litchi_ooxml_common::mce::NAMESPACE.as_bytes()).is_none()
+        && !litchi_ooxml_common::mce::mentions_namespace(after)
 }
 
 /// Verify a changed worksheet through the reduced readback, or `None` when

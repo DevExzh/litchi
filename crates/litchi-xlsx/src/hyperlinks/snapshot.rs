@@ -593,10 +593,9 @@ fn validate_surface(workbook_xml: &[u8], worksheet_xml: &[u8]) -> Result<bool> {
 }
 
 fn reject_mce(xml: &[u8], owner: &str) -> Result<()> {
-    if xml
-        .windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
-    {
+    // Literally or through a declaration spelled with references, which the
+    // namespace comparisons of the scan cannot see (record 0011).
+    if litchi_ooxml_common::mce::mentions_namespace(xml) {
         return Err(invalid(format!(
             "XLSX {owner} hyperlink editing refuses markup-compatibility content"
         )));

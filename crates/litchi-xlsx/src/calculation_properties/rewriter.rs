@@ -237,15 +237,19 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("unterminated workbook XML"));
     }
+    // Projection is recognized on namespace values as written; a binding
+    // spelled with references may project either owner all the same
+    // (record 0011).
+    let escaped = litchi_ooxml_common::mce::binds_namespace_by_reference(xml);
     Ok(Layout {
         calc,
         calc_insert: calc_insert.unwrap_or(root_close),
-        calc_projected,
+        calc_projected: calc_projected || escaped,
         ext_list,
         target_ext,
         feature_list,
         feature_qname,
-        features_projected,
+        features_projected: features_projected || escaped,
         mixed_target,
         root_qname,
         root_close,

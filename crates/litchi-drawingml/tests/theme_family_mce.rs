@@ -267,6 +267,42 @@ fn mce_owners_are_opaque_and_all_shared_mutations_refuse_without_source_change()
     }
 }
 
+/// Record 0011: a declaration that spells the namespace with references
+/// binds it for preprocessing exactly as a literal one does. The scan cannot
+/// see such a binding, so it must never treat the wrapper as a foreign
+/// payload beside which a new direct owner may be added: every shared
+/// mutation still refuses, and no hidden family is projected.
+#[test]
+fn escaped_mce_owners_refuse_every_shared_mutation() {
+    let incoming = family::Family::new("Fresh MCE Family", OFFICE_ID, OFFICE_VID)
+        .expect("valid incoming family");
+    let literal = format!(r#"xmlns:mc="{MC_NAMESPACE}""#);
+    let escaped = r#"xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;""#;
+    for (label, source) in hidden_mce_cases() {
+        let source = replace_bytes(&source, literal.as_bytes(), escaped.as_bytes());
+        if let Ok(snapshot) = part::read(&source) {
+            assert!(
+                snapshot.family().is_none(),
+                "{label}: hidden family projected"
+            );
+            assert!(
+                snapshot
+                    .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI)
+                    .is_err(),
+                "{label}: snapshot add must refuse"
+            );
+            assert!(snapshot.replace_family(&incoming).is_err(), "{label}");
+            assert!(snapshot.remove_family().is_err(), "{label}");
+        }
+        assert!(
+            part::add_family_with_uri(&source, &incoming, part::NATIVE_EXTENSION_URI).is_err(),
+            "{label}: borrowed add must refuse"
+        );
+        assert!(part::replace_family(&source, &incoming).is_err(), "{label}");
+        assert!(part::remove_family(&source).is_err(), "{label}");
+    }
+}
+
 fn foreign_wrapper_mce_theme() -> Vec<u8> {
     let family = std::str::from_utf8(native_family_fragment()).expect("family UTF-8");
     let hidden = format!(

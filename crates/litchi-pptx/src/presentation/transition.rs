@@ -58,6 +58,12 @@ pub(super) fn validate_source(xml: &[u8], operation: &'static str) -> Result<()>
 // normalize XML. It cannot select a branch or alter scene semantics. Keep the
 // source scene byte-exact while still refusing actual MCE owners/directives.
 fn has_mce_markup(xml: &[u8]) -> Result<bool> {
+    // The scan below resolves names on namespace values as written. A
+    // declaration that spells the namespace with references binds it for
+    // preprocessing, so its markup counts as present (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
+        return Ok(true);
+    }
     let mut reader = NsReader::from_reader(xml);
     loop {
         let event = reader
@@ -1991,4 +1997,23 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
 
 fn invalid(message: &str) -> Error {
     Error::Invalid(format!("source-backed slide transition: {message}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::has_mce_markup;
+
+    const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+
+    /// Record 0011: preprocessing applies a binding spelled with references,
+    /// so the transition guard counts it as markup compatibility.
+    #[test]
+    fn escaped_markup_compatibility_counts_as_markup() {
+        let escaped = format!(
+            r#"<p:sld xmlns:p="{P}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;"><p:cSld/></p:sld>"#
+        );
+        assert!(has_mce_markup(escaped.as_bytes()).unwrap());
+        let plain = format!(r#"<p:sld xmlns:p="{P}"><p:cSld/></p:sld>"#);
+        assert!(!has_mce_markup(plain.as_bytes()).unwrap());
+    }
 }

@@ -66,11 +66,13 @@ pub(crate) enum SourceParseAttempt {
 /// bytes, so it is admissible only where the two event streams agree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SourceAdmission {
-    /// The MCE namespace does not occur, so the preprocessor borrows its input
-    /// and the parser sees exactly these bytes on both paths.
+    /// The MCE namespace does not occur, even spelled with references, so the
+    /// preprocessor borrows its input and the parser sees exactly these bytes
+    /// on both paths.
     Borrowed,
-    /// The MCE namespace occurs, so the preprocessor rewrites. Equivalence is
-    /// not lexical, and [`MceRewriteEquivalence`] must prove it event by event.
+    /// The MCE namespace occurs, literally or spelled with references, so the
+    /// preprocessor rewrites. Equivalence is not lexical, and
+    /// [`MceRewriteEquivalence`] must prove it event by event.
     Rewritten,
 }
 
@@ -93,7 +95,9 @@ pub(crate) fn source_stream_admission(content: &[u8]) -> Option<SourceAdmission>
     {
         return None;
     }
-    Some(if contains(content, mce::NAMESPACE.as_bytes()) {
+    // Exactly the preprocessor's own fast-path test (record 0011): a
+    // declaration that spells the namespace with references is rewritten.
+    Some(if mce::mentions_namespace(content) {
         SourceAdmission::Rewritten
     } else {
         SourceAdmission::Borrowed

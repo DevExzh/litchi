@@ -326,6 +326,15 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
     if xml.len() > MAX_SLIDE_XML {
         return invalid_relationship("slide XML exceeds animation relationship scan limit");
     }
+    // Branches are chosen below on namespace values as written; a declaration
+    // that spells the markup-compatibility namespace with references would
+    // hide them from that choice while preprocessing applies them
+    // (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
+        return invalid_relationship(
+            "slide XML spells the markup-compatibility namespace with references",
+        );
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -844,6 +853,17 @@ mod tests {
         let parsed = parse_package_slide(&package, &slide_name).unwrap();
         assert_eq!(parsed.graphic_builds.len(), 1);
         assert_eq!(parsed.animations.len(), 1);
+    }
+
+    /// Record 0011: host branches bound through a declaration that spells
+    /// the namespace with references are never chosen by this scan.
+    #[test]
+    fn host_scan_refuses_escaped_markup_compatibility() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{P}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;"><p:cSld><p:spTree/></p:cSld></p:sld>"#,
+            P = std::str::from_utf8(P_NS).unwrap(),
+        );
+        assert!(scan_hosts(xml.as_bytes()).is_err());
     }
 
     #[test]

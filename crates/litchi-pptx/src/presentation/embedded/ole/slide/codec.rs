@@ -62,6 +62,15 @@ pub(crate) fn locate(source: &[u8]) -> Result<Document> {
     if source.len() > MAX_XML_BYTES {
         return Err(limit("OLE slide XML bytes", MAX_XML_BYTES));
     }
+    // Branches are chosen below on namespace values as written; a declaration
+    // that spells the markup-compatibility namespace with references would
+    // hide them from that choice while preprocessing applies them
+    // (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(source) {
+        return Err(invalid(
+            "OLE slide spells the markup-compatibility namespace with references",
+        ));
+    }
     let root = parse(source)?;
     let insertion = find_shape_tree(&root)
         .and_then(|node| node.close_start)
@@ -551,6 +560,14 @@ mod tests {
         (0..count)
             .map(|index| format!(" x{index}=\"{index}\""))
             .collect()
+    }
+
+    /// Record 0011: branches bound through a declaration that spells the
+    /// namespace with references are never chosen by this scan.
+    #[test]
+    fn escaped_markup_compatibility_is_refused() {
+        let xml = r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;"><p:cSld><p:spTree><mc:AlternateContent><mc:Choice Requires="p"/></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#;
+        assert!(locate(xml.as_bytes()).is_err());
     }
 
     fn is_attribute_limit(result: &Result<Node>) -> bool {

@@ -419,9 +419,7 @@ pub(super) fn preflight_xml_with_limits(
 }
 
 pub(super) fn contains_mce_markup(xml: &[u8]) -> bool {
-    const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-    xml.windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
+    litchi_ooxml_common::mce::mentions_namespace(xml)
 }
 
 fn preflight_payload(bytes: &[u8], maximum: usize) -> XlsxResult<()> {

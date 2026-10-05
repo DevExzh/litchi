@@ -590,6 +590,15 @@ fn inspect_metadata_xml(
     owner: MetadataOwner,
     context: Option<&ExecutionContext>,
 ) -> Result<()> {
+    // Names are resolved below on namespace values as written; a declaration
+    // that spells the markup-compatibility namespace with references binds it
+    // all the same (record 0011).
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
+        return Err(metadata_refusal(
+            owner,
+            "positional metadata contains markup-compatibility content",
+        ));
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut nodes = 0usize;
@@ -1000,6 +1009,24 @@ mod tests {
     use super::*;
 
     const FOREIGN_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
+
+    /// Record 0011: a declaration that spells the namespace with references
+    /// binds it for preprocessing, so positional metadata refuses it as it
+    /// refuses a literal one.
+    #[test]
+    fn escaped_markup_compatibility_is_refused_in_positional_metadata() {
+        let xml = format!(
+            r#"<p:viewPr xmlns:p="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;" mc:Ignorable="p"/>"#,
+            std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
+        );
+        assert!(matches!(
+            inspect_metadata_xml(xml.as_bytes(), MetadataOwner::ViewProperties, None),
+            Err(Error::SlideOrderPlan {
+                kind: SlideOrderRefusal::ViewProperties,
+                ..
+            })
+        ));
+    }
 
     #[test]
     fn only_canonical_mce_attributes_are_classified_as_markup_compatibility() {

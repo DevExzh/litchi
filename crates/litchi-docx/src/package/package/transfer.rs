@@ -46,6 +46,19 @@ impl Package {
     ) -> Result<ParagraphTransfer, TransactionError> {
         let receiver = self.document_snapshot()?;
         let donor_snapshot = donor.document_snapshot()?;
+        // The donor's admission may rest on its root `mc:Ignorable` dropping
+        // opaque markup. That markup is ignorable only in the donor, so a
+        // transfer requires a donor whose projection drops nothing.
+        let donor_admission = crate::parts::document_part::admit_document_source(
+            donor_snapshot.xml_bytes(),
+            "plan_paragraph_transfer_from",
+            "document transactions do not support markup-compatibility branch selection",
+        )?;
+        if !donor_admission.is_lexical() {
+            return Err(TransactionError::Transfer(
+                TransferRefusal::MarkupCompatibilityScope,
+            ));
+        }
         let donor_paragraph =
             donor_snapshot
                 .paragraph(paragraph)
