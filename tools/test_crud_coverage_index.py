@@ -25,9 +25,12 @@ HISTORICAL_INDEX_PATH = ROOT / "docs/performance/crud-coverage-index-v1.json"
 CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
-EXPECTED_SELECTOR_COUNT = 533
+# 533 trailed the 534-name registry after change 0884 added
+# `xlsx_producer_medium_source_full_cell_scan` (record 0010 finding F-11);
+# M0a step S8b then registered 118 paired unified/leaf routes.
+EXPECTED_SELECTOR_COUNT = 652
 EXPECTED_SELECTOR_NAMES_SHA256 = (
-    "fcbd9d80c9c32e6e98c80b44d5a3253e0252efff4bad16304e9517c0e108c1ec"
+    "61ce017357dca944e478cfa22bc3605beb18770def66269d377d0cf709fbab9d"
 )
 EXPECTED_HISTORICAL_INDEX_SHA256 = (
     "5002b254d1f2111dcbf86bf2401fe56891c4c257ab1b064c273bba0984ad82ce"

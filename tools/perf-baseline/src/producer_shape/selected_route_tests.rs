@@ -212,6 +212,10 @@ fn controlled_xml(xml: &[u8], control: Control) -> String {
     result
 }
 
+#[allow(
+    clippy::result_large_err,
+    reason = "the test helper returns the leaf scanner's own result type unchanged"
+)]
 fn scan_xml(xml: &str) -> litchi_xlsx::raw::selected_worksheet::StreamResult<RangeScanOutcome> {
     let mut limits = StreamLimits::default();
     limits.processing.max_input_bytes = xml.len();

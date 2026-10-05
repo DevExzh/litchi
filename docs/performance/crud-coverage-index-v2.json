@@ -31,9 +31,9 @@
   "selector_registry": {
     "source": "tools/perf-baseline/src/lib.rs",
     "registry_format": "case-name-utf8-newline-v1",
-    "minimum_selectable_cases": 533,
-    "selector_count": 533,
-    "selector_names_sha256": "fcbd9d80c9c32e6e98c80b44d5a3253e0252efff4bad16304e9517c0e108c1ec",
+    "minimum_selectable_cases": 652,
+    "selector_count": 652,
+    "selector_names_sha256": "61ce017357dca944e478cfa22bc3605beb18770def66269d377d0cf709fbab9d",
     "selector_names": [
       "zip_index",
       "zip_read_one",
@@ -338,6 +338,7 @@
       "xlsx_bytes_open_lifecycle",
       "xlsx_producer_medium_source_open",
       "xlsx_producer_medium_source_selected_cell",
+      "xlsx_producer_medium_source_full_cell_scan",
       "xlsx_producer_medium_source_planning",
       "xlsx_producer_medium_source_one_edit_save",
       "xlsx_producer_dense_source_open",
@@ -567,7 +568,125 @@
       "ods_file_eager_cell_sweep",
       "ods_file_source_cell_sweep",
       "ods_file_eager_cell_batch_sweep",
-      "ods_file_source_cell_batch_sweep"
+      "ods_file_source_cell_batch_sweep",
+      "docx_file_unified_eager_open",
+      "docx_file_unified_source_open",
+      "docx_file_unified_eager_paragraph_count",
+      "docx_file_unified_source_paragraph_count",
+      "docx_file_unified_eager_list_paragraphs",
+      "docx_file_unified_source_list_paragraphs",
+      "docx_file_unified_eager_full_text",
+      "docx_file_unified_source_full_text",
+      "docx_file_unified_eager_open_paragraph_count_lifecycle",
+      "docx_file_unified_source_open_paragraph_count_lifecycle",
+      "docx_file_unified_eager_open_full_text_lifecycle",
+      "docx_file_unified_source_open_full_text_lifecycle",
+      "docx_file_leaf_eager_open",
+      "docx_file_leaf_source_open",
+      "docx_file_leaf_eager_paragraph_count",
+      "docx_file_leaf_source_paragraph_count",
+      "docx_file_leaf_eager_list_paragraphs",
+      "docx_file_leaf_source_list_paragraphs",
+      "docx_file_leaf_eager_full_text",
+      "docx_file_leaf_source_full_text",
+      "docx_file_leaf_eager_open_paragraph_count_lifecycle",
+      "docx_file_leaf_source_open_paragraph_count_lifecycle",
+      "docx_file_leaf_eager_open_full_text_lifecycle",
+      "docx_file_leaf_source_open_full_text_lifecycle",
+      "pptx_file_unified_eager_open",
+      "pptx_file_unified_source_open",
+      "pptx_file_unified_eager_list_slides",
+      "pptx_file_unified_source_list_slides",
+      "pptx_file_unified_eager_slide_count",
+      "pptx_file_unified_source_slide_count",
+      "pptx_file_unified_eager_selected_slide",
+      "pptx_file_unified_source_selected_slide",
+      "pptx_file_unified_eager_open_slide_count_lifecycle",
+      "pptx_file_unified_source_open_slide_count_lifecycle",
+      "pptx_file_unified_eager_open_selected_slide_lifecycle",
+      "pptx_file_unified_source_open_selected_slide_lifecycle",
+      "pptx_file_leaf_eager_open",
+      "pptx_file_leaf_source_open",
+      "pptx_file_leaf_eager_list_slides",
+      "pptx_file_leaf_source_list_slides",
+      "pptx_file_leaf_eager_slide_count",
+      "pptx_file_leaf_source_slide_count",
+      "pptx_file_leaf_eager_selected_slide",
+      "pptx_file_leaf_source_selected_slide",
+      "pptx_file_leaf_eager_open_slide_count_lifecycle",
+      "pptx_file_leaf_source_open_slide_count_lifecycle",
+      "pptx_file_leaf_eager_open_selected_slide_lifecycle",
+      "pptx_file_leaf_source_open_selected_slide_lifecycle",
+      "xlsx_file_unified_open",
+      "xlsx_file_unified_open_lifecycle",
+      "xlsx_file_unified_selected_cell",
+      "xlsx_file_leaf_open",
+      "xlsx_file_leaf_open_lifecycle",
+      "xlsx_file_leaf_selected_cell",
+      "xlsx_bytes_unified_open",
+      "xlsx_bytes_unified_open_lifecycle",
+      "xlsx_bytes_leaf_open",
+      "xlsx_bytes_leaf_open_lifecycle",
+      "docx_semantic_unified_one_paragraph",
+      "docx_semantic_unified_one_paragraph_text",
+      "docx_semantic_leaf_one_paragraph",
+      "docx_semantic_leaf_one_paragraph_text",
+      "docx_producer_unified_source_selected_paragraph",
+      "docx_producer_leaf_source_selected_paragraph",
+      "doc_file_unified_open",
+      "doc_file_unified_full_text",
+      "doc_file_unified_one_paragraph",
+      "doc_file_leaf_open",
+      "doc_file_leaf_full_text",
+      "doc_file_leaf_one_paragraph",
+      "ppt_file_unified_open",
+      "ppt_file_unified_full_text",
+      "ppt_file_unified_one_slide_text",
+      "ppt_file_leaf_open",
+      "ppt_file_leaf_full_text",
+      "ppt_file_leaf_one_slide_text",
+      "rtf_file_unified_open",
+      "rtf_file_unified_open_lifecycle",
+      "rtf_file_leaf_open",
+      "rtf_file_leaf_open_lifecycle",
+      "odt_file_unified_eager_open",
+      "odt_file_unified_source_open",
+      "odt_file_unified_eager_open_full_text_lifecycle",
+      "odt_file_unified_source_open_full_text_lifecycle",
+      "odt_file_leaf_eager_open",
+      "odt_file_leaf_source_open",
+      "odt_file_leaf_eager_open_full_text_lifecycle",
+      "odt_file_leaf_source_open_full_text_lifecycle",
+      "odp_file_unified_eager_open",
+      "odp_file_unified_source_open",
+      "odp_file_unified_eager_selected_slide",
+      "odp_file_unified_source_selected_slide",
+      "odp_file_leaf_eager_open",
+      "odp_file_leaf_source_open",
+      "odp_file_leaf_eager_selected_slide",
+      "odp_file_leaf_source_selected_slide",
+      "ods_file_unified_eager_open",
+      "ods_file_unified_source_open",
+      "ods_file_leaf_eager_open",
+      "ods_file_leaf_source_open",
+      "detect_odt_unified_bytes",
+      "detect_odt_unified_reader",
+      "detect_odt_unified_polyglot",
+      "detect_odt_unified_catalog_alias",
+      "detect_odt_leaf_bytes",
+      "detect_odt_leaf_reader",
+      "detect_ods_unified_bytes",
+      "detect_ods_unified_reader",
+      "detect_ods_unified_polyglot",
+      "detect_ods_unified_catalog_alias",
+      "detect_ods_leaf_bytes",
+      "detect_ods_leaf_reader",
+      "detect_odp_unified_bytes",
+      "detect_odp_unified_reader",
+      "detect_odp_unified_polyglot",
+      "detect_odp_unified_catalog_alias",
+      "detect_odp_leaf_bytes",
+      "detect_odp_leaf_reader"
     ],
     "coverage": {
       "mapped": [
@@ -903,11 +1022,35 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "detect_odp_leaf_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_leaf_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "detect_odp_polyglot",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "detect_odp_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_unified_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_unified_catalog_alias",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_unified_polyglot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_unified_reader",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -919,11 +1062,35 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "detect_ods_leaf_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_leaf_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "detect_ods_polyglot",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "detect_ods_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_unified_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_unified_catalog_alias",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_unified_polyglot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_unified_reader",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -935,11 +1102,35 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "detect_odt_leaf_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_leaf_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "detect_odt_polyglot",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "detect_odt_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_unified_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_unified_catalog_alias",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_unified_polyglot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_unified_reader",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -956,6 +1147,30 @@
         },
         {
           "selector": "doc_facade_file_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_file_leaf_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_file_leaf_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_file_leaf_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_file_unified_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_file_unified_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_file_unified_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1019,6 +1234,54 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "docx_file_leaf_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_eager_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_eager_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_eager_open_paragraph_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_eager_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_source_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_source_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_source_open_paragraph_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_leaf_source_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "docx_file_source_full_text",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1040,6 +1303,54 @@
         },
         {
           "selector": "docx_file_source_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_eager_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_eager_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_eager_open_paragraph_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_eager_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_source_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_source_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_source_open_paragraph_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_unified_source_paragraph_count",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1107,7 +1418,15 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "docx_producer_leaf_source_selected_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "docx_producer_source_selected_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_producer_unified_source_selected_paragraph",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1136,6 +1455,14 @@
         },
         {
           "selector": "docx_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_leaf_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_leaf_one_paragraph_text",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1168,6 +1495,14 @@
         },
         {
           "selector": "docx_semantic_text_to_sink",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_unified_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_unified_one_paragraph_text",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1219,11 +1554,43 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "odp_file_leaf_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_leaf_eager_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_leaf_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_leaf_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "odp_file_source_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "odp_file_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_unified_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_unified_eager_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_unified_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_unified_source_selected_slide",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1343,6 +1710,14 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "ods_file_leaf_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_leaf_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "ods_file_source_cell_batch_sweep",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1360,6 +1735,14 @@
         },
         {
           "selector": "ods_file_source_selected_media",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_unified_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_unified_source_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1455,11 +1838,43 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "odt_file_leaf_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_leaf_eager_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_leaf_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_leaf_source_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "odt_file_source_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "odt_file_source_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_unified_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_unified_eager_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_unified_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_unified_source_open_full_text_lifecycle",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1727,6 +2142,30 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "ppt_file_leaf_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_file_leaf_one_slide_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_file_leaf_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_file_unified_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_file_unified_one_slide_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_file_unified_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "ppt_owned_source_control_open",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1879,6 +2318,54 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "pptx_file_leaf_eager_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_eager_open_selected_slide_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_eager_open_slide_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_eager_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_eager_slide_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_source_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_source_open_selected_slide_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_source_open_slide_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_leaf_source_slide_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "pptx_file_source_list_slides",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1900,6 +2387,54 @@
         },
         {
           "selector": "pptx_file_source_slide_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_eager_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_eager_open_selected_slide_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_eager_open_slide_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_eager_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_eager_slide_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_source_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_source_open_selected_slide_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_source_open_slide_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_unified_source_slide_count",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2091,11 +2626,27 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "rtf_file_leaf_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_file_leaf_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "rtf_file_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "rtf_file_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_file_unified_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_file_unified_open_lifecycle",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2359,11 +2910,27 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "xlsx_bytes_leaf_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_bytes_leaf_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "xlsx_bytes_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
           "selector": "xlsx_bytes_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_bytes_unified_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_bytes_unified_open_lifecycle",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2435,6 +3002,18 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
+          "selector": "xlsx_file_leaf_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_leaf_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_leaf_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
           "selector": "xlsx_file_open",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -2444,6 +3023,18 @@
         },
         {
           "selector": "xlsx_file_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_unified_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_unified_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_unified_selected_cell",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2532,6 +3123,10 @@
         },
         {
           "selector": "xlsx_producer_medium_control_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_source_full_cell_scan",
           "reason": "not-selected-in-representative-matrix"
         },
         {

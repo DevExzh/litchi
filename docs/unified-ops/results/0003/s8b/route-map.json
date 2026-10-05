@@ -1,0 +1,712 @@
+{
+  "schema": "litchi-unified-ops-route-map-v1",
+  "source": "tools/perf-baseline/src/unified_ops.rs CATALOG and src/filesystem/ops.rs ROUTES",
+  "plan": "docs/unified-ops/0003-m0a-migration-plan.md section 5.3",
+  "naming": "<prefix>_unified_<rest> and <prefix>_leaf_<rest>: the predecessor's name with the leg after the format family prefix; doc_facade_file_* and ppt_facade_file_* drop 'facade'",
+  "routes": [
+    {
+      "scenario": "open",
+      "predecessor": "docx_file_eager_open",
+      "unified": "docx_file_unified_eager_open",
+      "leaf": "docx_file_leaf_eager_open",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "the predecessor recreated the historical eager facade on the leaf, converting core properties at open; the unified eager owner defers them"
+    },
+    {
+      "scenario": "open",
+      "predecessor": "docx_file_source_open",
+      "unified": "docx_file_unified_source_open",
+      "leaf": "docx_file_leaf_source_open",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "docx_file_eager_paragraph_count",
+      "unified": "docx_file_unified_eager_paragraph_count",
+      "leaf": "docx_file_leaf_eager_paragraph_count",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "docx_file_source_paragraph_count",
+      "unified": "docx_file_unified_source_paragraph_count",
+      "leaf": "docx_file_leaf_source_paragraph_count",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "docx_file_eager_list_paragraphs",
+      "unified": "docx_file_unified_eager_list_paragraphs",
+      "leaf": "docx_file_leaf_eager_list_paragraphs",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "docx_file_source_list_paragraphs",
+      "unified": "docx_file_unified_source_list_paragraphs",
+      "leaf": "docx_file_leaf_source_list_paragraphs",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "docx_file_eager_full_text",
+      "unified": "docx_file_unified_eager_full_text",
+      "leaf": "docx_file_leaf_eager_full_text",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "docx_file_source_full_text",
+      "unified": "docx_file_unified_source_full_text",
+      "leaf": "docx_file_leaf_source_full_text",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "docx_file_eager_open_paragraph_count_lifecycle",
+      "unified": "docx_file_unified_eager_open_paragraph_count_lifecycle",
+      "leaf": "docx_file_leaf_eager_open_paragraph_count_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "the predecessor recreated the historical eager facade on the leaf, converting core properties at open; the unified eager owner defers them"
+    },
+    {
+      "scenario": "list",
+      "predecessor": "docx_file_source_open_paragraph_count_lifecycle",
+      "unified": "docx_file_unified_source_open_paragraph_count_lifecycle",
+      "leaf": "docx_file_leaf_source_open_paragraph_count_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "docx_file_eager_open_full_text_lifecycle",
+      "unified": "docx_file_unified_eager_open_full_text_lifecycle",
+      "leaf": "docx_file_leaf_eager_open_full_text_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "the predecessor recreated the historical eager facade on the leaf, converting core properties at open; the unified eager owner defers them"
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "docx_file_source_open_full_text_lifecycle",
+      "unified": "docx_file_unified_source_open_full_text_lifecycle",
+      "leaf": "docx_file_leaf_source_open_full_text_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "docx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "pptx_file_eager_open",
+      "unified": "pptx_file_unified_eager_open",
+      "leaf": "pptx_file_leaf_eager_open",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "pptx_file_source_open",
+      "unified": "pptx_file_unified_source_open",
+      "leaf": "pptx_file_leaf_source_open",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "pptx_file_eager_list_slides",
+      "unified": "pptx_file_unified_eager_list_slides",
+      "leaf": "pptx_file_leaf_eager_list_slides",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "pptx_file_source_list_slides",
+      "unified": "pptx_file_unified_source_list_slides",
+      "leaf": "pptx_file_leaf_source_list_slides",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "pptx_file_eager_slide_count",
+      "unified": "pptx_file_unified_eager_slide_count",
+      "leaf": "pptx_file_leaf_eager_slide_count",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "pptx_file_source_slide_count",
+      "unified": "pptx_file_unified_source_slide_count",
+      "leaf": "pptx_file_leaf_source_slide_count",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "pptx_file_eager_selected_slide",
+      "unified": "pptx_file_unified_eager_selected_slide",
+      "leaf": "pptx_file_leaf_eager_selected_slide",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "pptx_file_source_selected_slide",
+      "unified": "pptx_file_unified_source_selected_slide",
+      "leaf": "pptx_file_leaf_source_selected_slide",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "pptx_file_eager_open_slide_count_lifecycle",
+      "unified": "pptx_file_unified_eager_open_slide_count_lifecycle",
+      "leaf": "pptx_file_leaf_eager_open_slide_count_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "list",
+      "predecessor": "pptx_file_source_open_slide_count_lifecycle",
+      "unified": "pptx_file_unified_source_open_slide_count_lifecycle",
+      "leaf": "pptx_file_leaf_source_open_slide_count_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "pptx_file_eager_open_selected_slide_lifecycle",
+      "unified": "pptx_file_unified_eager_open_selected_slide_lifecycle",
+      "leaf": "pptx_file_leaf_eager_open_selected_slide_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "pptx_file_source_open_selected_slide_lifecycle",
+      "unified": "pptx_file_unified_source_open_selected_slide_lifecycle",
+      "leaf": "pptx_file_leaf_source_open_selected_slide_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "pptx_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "xlsx_file_open",
+      "unified": "xlsx_file_unified_open",
+      "leaf": "xlsx_file_leaf_open",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "xlsx",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "xlsx_file_open_lifecycle",
+      "unified": "xlsx_file_unified_open_lifecycle",
+      "leaf": "xlsx_file_leaf_open_lifecycle",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "xlsx",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "xlsx_file_selected_cell",
+      "unified": "xlsx_file_unified_selected_cell",
+      "leaf": "xlsx_file_leaf_selected_cell",
+      "runner": "filesystem, fresh child per sample",
+      "s1_capture_group": "xlsx",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "xlsx_bytes_open",
+      "unified": "xlsx_bytes_unified_open",
+      "leaf": "xlsx_bytes_leaf_open",
+      "runner": "in process",
+      "s1_capture_group": "xlsx",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "xlsx_bytes_open_lifecycle",
+      "unified": "xlsx_bytes_unified_open_lifecycle",
+      "leaf": "xlsx_bytes_leaf_open_lifecycle",
+      "runner": "in process",
+      "s1_capture_group": "xlsx",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "docx_semantic_one_paragraph",
+      "unified": "docx_semantic_unified_one_paragraph",
+      "leaf": "docx_semantic_leaf_one_paragraph",
+      "runner": "in process",
+      "s1_capture_group": "docx_read_one",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": false,
+      "note": "the predecessor timed Document::paragraph on a prepared litchi_docx document; both legs time Package::document() + paragraph, because the unified view holds no document across calls"
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "docx_semantic_one_paragraph_text",
+      "unified": "docx_semantic_unified_one_paragraph_text",
+      "leaf": "docx_semantic_leaf_one_paragraph_text",
+      "runner": "in process",
+      "s1_capture_group": "docx_read_one",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "docx_producer_source_selected_paragraph",
+      "unified": "docx_producer_unified_source_selected_paragraph",
+      "leaf": "docx_producer_leaf_source_selected_paragraph",
+      "runner": "in process",
+      "s1_capture_group": "docx_read_one",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": false,
+      "note": "the predecessor timed paragraph(index).text() on a prepared source-backed document; both legs time document() + paragraph_text(index) after deriving the main story once outside the timer"
+    },
+    {
+      "scenario": "open",
+      "predecessor": "doc_facade_file_open",
+      "unified": "doc_file_unified_open",
+      "leaf": "doc_file_leaf_open",
+      "runner": "in process",
+      "s1_capture_group": "ole2_facade_{small,large,refusal}",
+      "needs_ole2_file": true,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "doc_facade_file_full_text",
+      "unified": "doc_file_unified_full_text",
+      "leaf": "doc_file_leaf_full_text",
+      "runner": "in process",
+      "s1_capture_group": "ole2_facade_{small,large,refusal}",
+      "needs_ole2_file": true,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "doc_facade_file_one_paragraph",
+      "unified": "doc_file_unified_one_paragraph",
+      "leaf": "doc_file_leaf_one_paragraph",
+      "runner": "in process",
+      "s1_capture_group": "ole2_facade_{small,large,refusal}",
+      "needs_ole2_file": true,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "ppt_facade_file_open",
+      "unified": "ppt_file_unified_open",
+      "leaf": "ppt_file_leaf_open",
+      "runner": "in process",
+      "s1_capture_group": "ole2_facade_{small,large}",
+      "needs_ole2_file": true,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "ppt_facade_file_full_text",
+      "unified": "ppt_file_unified_full_text",
+      "leaf": "ppt_file_leaf_full_text",
+      "runner": "in process",
+      "s1_capture_group": "ole2_facade_{small,large}",
+      "needs_ole2_file": true,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "ppt_facade_file_one_slide_text",
+      "unified": "ppt_file_unified_one_slide_text",
+      "leaf": "ppt_file_leaf_one_slide_text",
+      "runner": "in process",
+      "s1_capture_group": "ole2_facade_{small,large}",
+      "needs_ole2_file": true,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "rtf_file_open",
+      "unified": "rtf_file_unified_open",
+      "leaf": "rtf_file_leaf_open",
+      "runner": "in process",
+      "s1_capture_group": "rtf",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "rtf_file_open_lifecycle",
+      "unified": "rtf_file_unified_open_lifecycle",
+      "leaf": "rtf_file_leaf_open_lifecycle",
+      "runner": "in process",
+      "s1_capture_group": "rtf",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "odt_file_eager_open",
+      "unified": "odt_file_unified_eager_open",
+      "leaf": "odt_file_leaf_eager_open",
+      "runner": "in process",
+      "s1_capture_group": "odt_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "odt_file_source_open",
+      "unified": "odt_file_unified_source_open",
+      "leaf": "odt_file_leaf_source_open",
+      "runner": "in process",
+      "s1_capture_group": "odt_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "odt_file_eager_open_full_text_lifecycle",
+      "unified": "odt_file_unified_eager_open_full_text_lifecycle",
+      "leaf": "odt_file_leaf_eager_open_full_text_lifecycle",
+      "runner": "in process",
+      "s1_capture_group": "odt_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "full-text",
+      "predecessor": "odt_file_source_open_full_text_lifecycle",
+      "unified": "odt_file_unified_source_open_full_text_lifecycle",
+      "leaf": "odt_file_leaf_source_open_full_text_lifecycle",
+      "runner": "in process",
+      "s1_capture_group": "odt_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "odp_file_eager_open",
+      "unified": "odp_file_unified_eager_open",
+      "leaf": "odp_file_leaf_eager_open",
+      "runner": "in process",
+      "s1_capture_group": "odp_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "odp_file_source_open",
+      "unified": "odp_file_unified_source_open",
+      "leaf": "odp_file_leaf_source_open",
+      "runner": "in process",
+      "s1_capture_group": "odp_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "odp_file_eager_selected_slide",
+      "unified": "odp_file_unified_eager_selected_slide",
+      "leaf": "odp_file_leaf_eager_selected_slide",
+      "runner": "in process",
+      "s1_capture_group": "odp_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "read-one",
+      "predecessor": "odp_file_source_selected_slide",
+      "unified": "odp_file_unified_source_selected_slide",
+      "leaf": "odp_file_leaf_source_selected_slide",
+      "runner": "in process",
+      "s1_capture_group": "odp_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "ods_file_eager_open",
+      "unified": "ods_file_unified_eager_open",
+      "leaf": "ods_file_leaf_eager_open",
+      "runner": "in process",
+      "s1_capture_group": "ods_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "open",
+      "predecessor": "ods_file_source_open",
+      "unified": "ods_file_unified_source_open",
+      "leaf": "ods_file_leaf_source_open",
+      "runner": "in process",
+      "s1_capture_group": "ods_file",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odt_bytes",
+      "unified": "detect_odt_unified_bytes",
+      "leaf": "detect_odt_leaf_bytes",
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odt_reader",
+      "unified": "detect_odt_unified_reader",
+      "leaf": "detect_odt_leaf_reader",
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odt_polyglot",
+      "unified": "detect_odt_unified_polyglot",
+      "leaf": null,
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "no leaf twin: two leaf owners (ODF, OPC) decide this input by the coordinator's precedence; the predecessor times the facade's public detector"
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odt_catalog_alias",
+      "unified": "detect_odt_unified_catalog_alias",
+      "leaf": null,
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "no leaf twin: two leaf owners (ODF, OPC) decide this input by the coordinator's precedence; the predecessor times the facade's public detector"
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_ods_bytes",
+      "unified": "detect_ods_unified_bytes",
+      "leaf": "detect_ods_leaf_bytes",
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_ods_reader",
+      "unified": "detect_ods_unified_reader",
+      "leaf": "detect_ods_leaf_reader",
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_ods_polyglot",
+      "unified": "detect_ods_unified_polyglot",
+      "leaf": null,
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "no leaf twin: two leaf owners (ODF, OPC) decide this input by the coordinator's precedence; the predecessor times the facade's public detector"
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_ods_catalog_alias",
+      "unified": "detect_ods_unified_catalog_alias",
+      "leaf": null,
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "no leaf twin: two leaf owners (ODF, OPC) decide this input by the coordinator's precedence; the predecessor times the facade's public detector"
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odp_bytes",
+      "unified": "detect_odp_unified_bytes",
+      "leaf": "detect_odp_leaf_bytes",
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odp_reader",
+      "unified": "detect_odp_unified_reader",
+      "leaf": "detect_odp_leaf_reader",
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": null
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odp_polyglot",
+      "unified": "detect_odp_unified_polyglot",
+      "leaf": null,
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "no leaf twin: two leaf owners (ODF, OPC) decide this input by the coordinator's precedence; the predecessor times the facade's public detector"
+    },
+    {
+      "scenario": "detection",
+      "predecessor": "detect_odp_catalog_alias",
+      "unified": "detect_odp_unified_catalog_alias",
+      "leaf": null,
+      "runner": "in process",
+      "s1_capture_group": "detection",
+      "needs_ole2_file": false,
+      "timed_scope_matches_predecessor": true,
+      "note": "no leaf twin: two leaf owners (ODF, OPC) decide this input by the coordinator's precedence; the predecessor times the facade's public detector"
+    }
+  ],
+  "unpaired_predecessors": [
+    {
+      "predecessor": "ods_file_eager_selected_cell",
+      "reason": "the M0a File has no ODS cell or media read (WorkbookView refuses ODS worksheet access); the route already times the ODS leaf owner; M1's get adds the unified leg"
+    },
+    {
+      "predecessor": "ods_file_source_selected_cell",
+      "reason": "the M0a File has no ODS cell or media read (WorkbookView refuses ODS worksheet access); the route already times the ODS leaf owner; M1's get adds the unified leg"
+    },
+    {
+      "predecessor": "ods_file_eager_selected_media",
+      "reason": "the M0a File has no ODS cell or media read (WorkbookView refuses ODS worksheet access); the route already times the ODS leaf owner; M1's get adds the unified leg"
+    },
+    {
+      "predecessor": "ods_file_source_selected_media",
+      "reason": "the M0a File has no ODS cell or media read (WorkbookView refuses ODS worksheet access); the route already times the ODS leaf owner; M1's get adds the unified leg"
+    },
+    {
+      "predecessor": "docx_source_selected_paragraph",
+      "reason": "an untimed range-evidence binary, not a timing route (S1); the timed DOCX read-one pairs are docx_semantic_* and docx_producer_*"
+    }
+  ]
+}

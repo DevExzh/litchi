@@ -135,7 +135,9 @@ The checked default is 41 cases, 213 rows and 43 deterministic corpora.
 appends the existing plain RTF, ODT, ODS and ODP `semantic_text_to_sink`
 selectors across three sizes, preserving every old 201-row identity. Two full
 serial runs retain 6,390 samples and pass report/catalog and CRUD timing gates.
-The registry has 534 selectors; the coverage index's minimum remains 439.
+The registry has 652 selectors, including the 118 paired unified/leaf routes
+of M0a step S8b ([below](#paired-unified-api-and-leaf-api-routes-m0a-step-s8b));
+the CRUD coverage index binds every name.
 The source-bound [0906 census](../../docs/performance/results/change-0906/registry-final.json)
 checks all enum/name/CLI mappings and the 41 default selectors. Selector counts
 do not establish measured CRUD coverage; older change notes below retain their
@@ -3295,6 +3297,138 @@ digest. The report's `ordinary_save.save_durability` names the level and
 `atomic_publication_steps` lists that level's steps. Without the flag the
 documented `save` runs and the report is unchanged. The flag is refused for the
 `edit` and `counting_publish` phases and without an ordinary-save selector.
+
+## Paired unified-API and leaf-API routes (M0a step S8b)
+
+M0a moves every open and read behind `litchi::open*` and the flat
+`litchi::File` (ADR 0033; plan
+[0003](../../docs/unified-ops/0003-m0a-migration-plan.md) §5.3). The
+performance bar of [`UNIFIED_OPS_GOAL.md`](../../docs/UNIFIED_OPS_GOAL.md)
+judges that layer against the leaf APIs it wraps, one scenario at a time, so
+step S8b registers 118 opt-in selectors in pairs. None is in `Case::DEFAULT`;
+the default 41 cases / 213 rows do not move.
+
+- **Unified leg**, `<prefix>_unified_<rest>`: opens with `litchi::open`,
+  `litchi::open_bytes` or `litchi::open_bytes_with`, and reads through
+  `litchi::File`, its family views (`File::document`, `File::presentation`,
+  `File::workbook`) and its format handles (`Xlsx::sheet`,
+  `Pptx::slide_size`).
+- **Leaf leg**, `<prefix>_leaf_<rest>`: makes the same leaf calls directly on
+  the format's leaf crate. The format is known, so the leaf leg runs no format
+  detection, no signature or encryption classification and none of the
+  unified layer's own source-freshness re-checks, and builds no handle. Leaf
+  work the unified route does is included, for example the eager DOCX owner's
+  validation text pass and the XLSX, DOC and PPT property reads at open, so a
+  pair's difference is the unified layer's own work.
+
+A selector's name is its predecessor's with the leg inserted after the format
+family prefix: `docx_file_source_full_text` becomes
+`docx_file_unified_source_full_text` and `docx_file_leaf_source_full_text`.
+The OLE2 facade family drops `facade`: `doc_facade_file_open` becomes
+`doc_file_unified_open` and `doc_file_leaf_open`. Each pair mirrors its
+predecessor:
+
+- the same corpus builder and manifest;
+- the same ingress, `fs::read` plus a byte open or a path open;
+- the same untimed preparation of query roots;
+- the same timer placement: DOCX and PPTX roots drop inside the timer, XLSX
+  roots after every operation-only snapshot, and the DOC and PPT routes open
+  afresh in every sample.
+
+The predecessors stay registered until step S9 deletes the facade types they
+call. Their recorded results are frozen and are never rewritten.
+
+| Family | Selectors | Runner | Corpus |
+|---|---|---|---|
+| DOCX file | `docx_file_{unified,leaf}_{eager,source}_{open,paragraph_count,list_paragraphs,full_text,open_paragraph_count_lifecycle,open_full_text_lifecycle}` (24) | fresh child per sample | `docx-source-backed-media` |
+| PPTX file | `pptx_file_{unified,leaf}_{eager,source}_{open,list_slides,slide_count,selected_slide,open_slide_count_lifecycle,open_selected_slide_lifecycle}` (24) | fresh child per sample | `pptx-source-backed-media` |
+| XLSX file | `xlsx_file_{unified,leaf}_{open,open_lifecycle,selected_cell}` (6) | fresh child per sample | `xlsx-cell-values-medium` |
+| XLSX bytes | `xlsx_bytes_{unified,leaf}_{open,open_lifecycle}` (4) | in process | `xlsx-cell-values-medium` |
+| DOCX read one | `docx_semantic_{unified,leaf}_{one_paragraph,one_paragraph_text}`, `docx_producer_{unified,leaf}_source_selected_paragraph` (6) | in process | `docx-semantic-*`, `docx-producer-medium` |
+| DOC, PPT | `doc_file_{unified,leaf}_{open,full_text,one_paragraph}`, `ppt_file_{unified,leaf}_{open,full_text,one_slide_text}` (12) | in process, `--ole2-file` | the caller-named fixture |
+| RTF | `rtf_file_{unified,leaf}_{open,open_lifecycle}` (4) | in process | `rtf-semantic-*` (not `watermark`) |
+| ODT | `odt_file_{unified,leaf}_{eager,source}_{open,open_full_text_lifecycle}` (8) | in process | `odt-source-backed-repeated-text-media` |
+| ODP | `odp_file_{unified,leaf}_{eager,source}_{open,selected_slide}` (8) | in process | `odp-media-textbox-publication` |
+| ODS | `ods_file_{unified,leaf}_{eager,source}_open` (4) | in process | `ods-media-publication` |
+| Detection | `detect_{odt,ods,odp}_unified_{bytes,reader,polyglot,catalog_alias}`, `detect_{odt,ods,odp}_leaf_{bytes,reader}` (18) | in process | `*-{bytes,reader,polyglot,catalog-alias}-*` |
+
+Notes on the pairs:
+
+- **"Eager" means what it meant for the predecessor.** For DOCX it is the
+  owning `litchi_docx::Package` (`SourceMode::Eager` on the unified leg). For
+  PPTX it is the byte route, a source-backed presentation over the owned bytes
+  (`litchi::open_bytes`).
+- **Detection.** The unified detection leg calls `litchi_ops::detect`, the
+  coordinator `litchi::open` runs, without the facade's iWork tail, which
+  only runs when every other candidate has declined. The leaf leg calls
+  `litchi_odf_common::detect::{bytes, reader}`. The polyglot and
+  catalog-alias inputs are decided by the coordinator's precedence between two
+  leaf owners (ODF and OPC), so they have no leaf leg; compare them with the
+  predecessor `detect_*` selectors, which time the facade's public detector.
+- **Not paired.** `ods_file_*_selected_{cell,media}` already time the ODS leaf
+  owners, and the M0a `File` has no ODS cell or media read (`WorkbookView`
+  refuses ODS worksheet access), so their unified leg waits for M1's `get`.
+  `docx_source_selected_paragraph` is an untimed binary; the timed DOCX
+  read-one pairs are `docx_semantic_*` and `docx_producer_*`.
+- **Scopes that differ from the predecessor.** The unified views take no
+  borrowed document handle across calls, so a route whose predecessor timed a
+  query on a prepared `litchi_docx` document times the document derivation
+  too, on both legs. These routes are `docx_semantic_*_one_paragraph` and
+  `docx_producer_*`. S10 compares such a successor with its leaf twin, not with
+  the predecessor's record. The list and read-one unified legs return the
+  `litchi::compat` wrappers that M1 replaces with the node view. A route whose
+  measured work changes then gets a new name; the names here are frozen with
+  their records.
+
+Every result carries `source.unified_ops`: the leg, the predecessor, the twin,
+the calls inside the timer and an explicit no-claim statement. The in-process
+pairs also report the digest of the oracle projection every retained sample
+reproduced. The OLE2 pairs report each leg's frozen outcome, including a
+refusal, and whether the two legs reached the same outcome; two successful
+outcomes that differ fail the run. The filesystem pairs keep their
+predecessors' per-sample evidence:
+
+- the source and semantic SHA-256 and the selected-cell evidence for XLSX;
+- the timed full-text digest for the DOCX full-text lifecycles;
+- for source-backed DOCX and PPTX routes on both legs, the untimed replay of
+  the leaf owner over the same file. That replay has the predecessor's shape
+  and does not include the unified route's detection reads.
+
+Correctness is checked outside the timer against the leaf crates and the
+corpus generators: the unified projections of both owners and the leaf
+projection must agree, and the code under measurement never builds its own
+oracle.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 5 --samples 30 --filesystem-cache warm \
+  --case docx_file_unified_source_full_text,docx_file_leaf_source_full_text \
+  --json target/perf/docx-pair.json
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 10 --samples 100 \
+  --case doc_file_unified_open,doc_file_leaf_open,ppt_file_unified_open,ppt_file_leaf_open \
+  --ole2-file test-data/ole/doc/documentProperties.doc \
+  --ole2-file test-data/ole/ppt/SampleShow.ppt --json target/perf/ole2-pair.json
+```
+
+**How M0a step S10 uses them.** S10 answers two questions with the same
+protocol as the S1 baseline
+([`results/0003/before`](../../docs/unified-ops/results/0003/before/README.md)):
+the same CPU pin, warm cache, corpus and group sizes, with ABBA ordering.
+
+1. *Did the migration regress a scenario?* The A legs run the pre-M0a binary
+   on the predecessor selectors. The B legs run the post-S9 binary on their
+   unified successors. Predecessor and successor are matched through the route
+   table in [`s8b-perf-routes.md`](../../docs/unified-ops/s8b-perf-routes.md),
+   not by name, and only where the timed scopes match. The trigger is S1's
+   per-route rule: `max(5%, spread_all)`, with separation required above 10%
+   spread.
+2. *Is the unified layer within the goal's budgets?* The unified and leaf legs
+   of each pair run in the same post-S9 binary, alternated ABBA. Their
+   difference is the unified layer's own work. The open budget is 5% or 20 µs,
+   whichever is larger.
+
+These selectors make no performance claim.
 
 ## Opt-in marker-bearing corpora and their controls (change 0664)
 

@@ -914,6 +914,7 @@ dependencies = [
  "litchi-ole-common",
  "litchi-ooxml-common",
  "litchi-opc",
+ "litchi-ops",
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
@@ -1214,6 +1215,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-ops"
+version = "0.0.1"
+dependencies = [
+ "chrono",
+ "litchi-cfb",
+ "litchi-core",
+ "litchi-doc",
+ "litchi-docx",
+ "litchi-odf-common",
+ "litchi-odp",
+ "litchi-ods",
+ "litchi-odt",
+ "litchi-ole-common",
+ "litchi-ooxml-common",
+ "litchi-opc",
+ "litchi-ppt",
+ "litchi-pptx",
+ "litchi-rtf",
+ "litchi-sign",
+ "litchi-xls",
+ "litchi-xlsb",
+ "litchi-xlsx",
+]
+
+[[package]]
 name = "litchi-perf-baseline"
 version = "0.1.0"
 dependencies = [
@@ -1231,6 +1257,7 @@ dependencies = [
  "litchi-ole-common",
  "litchi-ooxml-common",
  "litchi-opc",
+ "litchi-ops",
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",

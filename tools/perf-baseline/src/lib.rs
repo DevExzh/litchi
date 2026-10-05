@@ -51,6 +51,7 @@ mod process_metrics;
 mod producer_shape;
 #[cfg(test)]
 mod security_corpus;
+mod unified_ops;
 mod xls_numeric;
 mod xlsx_attribute_fixtures;
 #[cfg(test)]
@@ -1646,6 +1647,124 @@ enum Case {
     OdsFileSourceCellSweep,
     OdsFileEagerCellBatchSweep,
     OdsFileSourceCellBatchSweep,
+    DocxFileUnifiedEagerOpen,
+    DocxFileUnifiedSourceOpen,
+    DocxFileUnifiedEagerParagraphCount,
+    DocxFileUnifiedSourceParagraphCount,
+    DocxFileUnifiedEagerListParagraphs,
+    DocxFileUnifiedSourceListParagraphs,
+    DocxFileUnifiedEagerFullText,
+    DocxFileUnifiedSourceFullText,
+    DocxFileUnifiedEagerOpenParagraphCountLifecycle,
+    DocxFileUnifiedSourceOpenParagraphCountLifecycle,
+    DocxFileUnifiedEagerOpenFullTextLifecycle,
+    DocxFileUnifiedSourceOpenFullTextLifecycle,
+    DocxFileLeafEagerOpen,
+    DocxFileLeafSourceOpen,
+    DocxFileLeafEagerParagraphCount,
+    DocxFileLeafSourceParagraphCount,
+    DocxFileLeafEagerListParagraphs,
+    DocxFileLeafSourceListParagraphs,
+    DocxFileLeafEagerFullText,
+    DocxFileLeafSourceFullText,
+    DocxFileLeafEagerOpenParagraphCountLifecycle,
+    DocxFileLeafSourceOpenParagraphCountLifecycle,
+    DocxFileLeafEagerOpenFullTextLifecycle,
+    DocxFileLeafSourceOpenFullTextLifecycle,
+    PptxFileUnifiedEagerOpen,
+    PptxFileUnifiedSourceOpen,
+    PptxFileUnifiedEagerListSlides,
+    PptxFileUnifiedSourceListSlides,
+    PptxFileUnifiedEagerSlideCount,
+    PptxFileUnifiedSourceSlideCount,
+    PptxFileUnifiedEagerSelectedSlide,
+    PptxFileUnifiedSourceSelectedSlide,
+    PptxFileUnifiedEagerOpenSlideCountLifecycle,
+    PptxFileUnifiedSourceOpenSlideCountLifecycle,
+    PptxFileUnifiedEagerOpenSelectedSlideLifecycle,
+    PptxFileUnifiedSourceOpenSelectedSlideLifecycle,
+    PptxFileLeafEagerOpen,
+    PptxFileLeafSourceOpen,
+    PptxFileLeafEagerListSlides,
+    PptxFileLeafSourceListSlides,
+    PptxFileLeafEagerSlideCount,
+    PptxFileLeafSourceSlideCount,
+    PptxFileLeafEagerSelectedSlide,
+    PptxFileLeafSourceSelectedSlide,
+    PptxFileLeafEagerOpenSlideCountLifecycle,
+    PptxFileLeafSourceOpenSlideCountLifecycle,
+    PptxFileLeafEagerOpenSelectedSlideLifecycle,
+    PptxFileLeafSourceOpenSelectedSlideLifecycle,
+    XlsxFileUnifiedOpen,
+    XlsxFileUnifiedOpenLifecycle,
+    XlsxFileUnifiedSelectedCell,
+    XlsxFileLeafOpen,
+    XlsxFileLeafOpenLifecycle,
+    XlsxFileLeafSelectedCell,
+    XlsxBytesUnifiedOpen,
+    XlsxBytesUnifiedOpenLifecycle,
+    XlsxBytesLeafOpen,
+    XlsxBytesLeafOpenLifecycle,
+    DocxSemanticUnifiedOneParagraph,
+    DocxSemanticUnifiedOneParagraphText,
+    DocxSemanticLeafOneParagraph,
+    DocxSemanticLeafOneParagraphText,
+    DocxProducerUnifiedSourceSelectedParagraph,
+    DocxProducerLeafSourceSelectedParagraph,
+    DocFileUnifiedOpen,
+    DocFileUnifiedFullText,
+    DocFileUnifiedOneParagraph,
+    DocFileLeafOpen,
+    DocFileLeafFullText,
+    DocFileLeafOneParagraph,
+    PptFileUnifiedOpen,
+    PptFileUnifiedFullText,
+    PptFileUnifiedOneSlideText,
+    PptFileLeafOpen,
+    PptFileLeafFullText,
+    PptFileLeafOneSlideText,
+    RtfFileUnifiedOpen,
+    RtfFileUnifiedOpenLifecycle,
+    RtfFileLeafOpen,
+    RtfFileLeafOpenLifecycle,
+    OdtFileUnifiedEagerOpen,
+    OdtFileUnifiedSourceOpen,
+    OdtFileUnifiedEagerOpenFullTextLifecycle,
+    OdtFileUnifiedSourceOpenFullTextLifecycle,
+    OdtFileLeafEagerOpen,
+    OdtFileLeafSourceOpen,
+    OdtFileLeafEagerOpenFullTextLifecycle,
+    OdtFileLeafSourceOpenFullTextLifecycle,
+    OdpFileUnifiedEagerOpen,
+    OdpFileUnifiedSourceOpen,
+    OdpFileUnifiedEagerSelectedSlide,
+    OdpFileUnifiedSourceSelectedSlide,
+    OdpFileLeafEagerOpen,
+    OdpFileLeafSourceOpen,
+    OdpFileLeafEagerSelectedSlide,
+    OdpFileLeafSourceSelectedSlide,
+    OdsFileUnifiedEagerOpen,
+    OdsFileUnifiedSourceOpen,
+    OdsFileLeafEagerOpen,
+    OdsFileLeafSourceOpen,
+    DetectOdtUnifiedBytes,
+    DetectOdtUnifiedReader,
+    DetectOdtUnifiedPolyglot,
+    DetectOdtUnifiedCatalogAlias,
+    DetectOdtLeafBytes,
+    DetectOdtLeafReader,
+    DetectOdsUnifiedBytes,
+    DetectOdsUnifiedReader,
+    DetectOdsUnifiedPolyglot,
+    DetectOdsUnifiedCatalogAlias,
+    DetectOdsLeafBytes,
+    DetectOdsLeafReader,
+    DetectOdpUnifiedBytes,
+    DetectOdpUnifiedReader,
+    DetectOdpUnifiedPolyglot,
+    DetectOdpUnifiedCatalogAlias,
+    DetectOdpLeafBytes,
+    DetectOdpLeafReader,
 }
 
 impl Case {
@@ -2379,6 +2498,168 @@ impl Case {
             Self::OdsFileSourceCellSweep => "ods_file_source_cell_sweep",
             Self::OdsFileEagerCellBatchSweep => "ods_file_eager_cell_batch_sweep",
             Self::OdsFileSourceCellBatchSweep => "ods_file_source_cell_batch_sweep",
+            Self::DocxFileUnifiedEagerOpen => "docx_file_unified_eager_open",
+            Self::DocxFileUnifiedSourceOpen => "docx_file_unified_source_open",
+            Self::DocxFileUnifiedEagerParagraphCount => "docx_file_unified_eager_paragraph_count",
+            Self::DocxFileUnifiedSourceParagraphCount => "docx_file_unified_source_paragraph_count",
+            Self::DocxFileUnifiedEagerListParagraphs => "docx_file_unified_eager_list_paragraphs",
+            Self::DocxFileUnifiedSourceListParagraphs => "docx_file_unified_source_list_paragraphs",
+            Self::DocxFileUnifiedEagerFullText => "docx_file_unified_eager_full_text",
+            Self::DocxFileUnifiedSourceFullText => "docx_file_unified_source_full_text",
+            Self::DocxFileUnifiedEagerOpenParagraphCountLifecycle => {
+                "docx_file_unified_eager_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileUnifiedSourceOpenParagraphCountLifecycle => {
+                "docx_file_unified_source_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileUnifiedEagerOpenFullTextLifecycle => {
+                "docx_file_unified_eager_open_full_text_lifecycle"
+            },
+            Self::DocxFileUnifiedSourceOpenFullTextLifecycle => {
+                "docx_file_unified_source_open_full_text_lifecycle"
+            },
+            Self::DocxFileLeafEagerOpen => "docx_file_leaf_eager_open",
+            Self::DocxFileLeafSourceOpen => "docx_file_leaf_source_open",
+            Self::DocxFileLeafEagerParagraphCount => "docx_file_leaf_eager_paragraph_count",
+            Self::DocxFileLeafSourceParagraphCount => "docx_file_leaf_source_paragraph_count",
+            Self::DocxFileLeafEagerListParagraphs => "docx_file_leaf_eager_list_paragraphs",
+            Self::DocxFileLeafSourceListParagraphs => "docx_file_leaf_source_list_paragraphs",
+            Self::DocxFileLeafEagerFullText => "docx_file_leaf_eager_full_text",
+            Self::DocxFileLeafSourceFullText => "docx_file_leaf_source_full_text",
+            Self::DocxFileLeafEagerOpenParagraphCountLifecycle => {
+                "docx_file_leaf_eager_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileLeafSourceOpenParagraphCountLifecycle => {
+                "docx_file_leaf_source_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileLeafEagerOpenFullTextLifecycle => {
+                "docx_file_leaf_eager_open_full_text_lifecycle"
+            },
+            Self::DocxFileLeafSourceOpenFullTextLifecycle => {
+                "docx_file_leaf_source_open_full_text_lifecycle"
+            },
+            Self::PptxFileUnifiedEagerOpen => "pptx_file_unified_eager_open",
+            Self::PptxFileUnifiedSourceOpen => "pptx_file_unified_source_open",
+            Self::PptxFileUnifiedEagerListSlides => "pptx_file_unified_eager_list_slides",
+            Self::PptxFileUnifiedSourceListSlides => "pptx_file_unified_source_list_slides",
+            Self::PptxFileUnifiedEagerSlideCount => "pptx_file_unified_eager_slide_count",
+            Self::PptxFileUnifiedSourceSlideCount => "pptx_file_unified_source_slide_count",
+            Self::PptxFileUnifiedEagerSelectedSlide => "pptx_file_unified_eager_selected_slide",
+            Self::PptxFileUnifiedSourceSelectedSlide => "pptx_file_unified_source_selected_slide",
+            Self::PptxFileUnifiedEagerOpenSlideCountLifecycle => {
+                "pptx_file_unified_eager_open_slide_count_lifecycle"
+            },
+            Self::PptxFileUnifiedSourceOpenSlideCountLifecycle => {
+                "pptx_file_unified_source_open_slide_count_lifecycle"
+            },
+            Self::PptxFileUnifiedEagerOpenSelectedSlideLifecycle => {
+                "pptx_file_unified_eager_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileUnifiedSourceOpenSelectedSlideLifecycle => {
+                "pptx_file_unified_source_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileLeafEagerOpen => "pptx_file_leaf_eager_open",
+            Self::PptxFileLeafSourceOpen => "pptx_file_leaf_source_open",
+            Self::PptxFileLeafEagerListSlides => "pptx_file_leaf_eager_list_slides",
+            Self::PptxFileLeafSourceListSlides => "pptx_file_leaf_source_list_slides",
+            Self::PptxFileLeafEagerSlideCount => "pptx_file_leaf_eager_slide_count",
+            Self::PptxFileLeafSourceSlideCount => "pptx_file_leaf_source_slide_count",
+            Self::PptxFileLeafEagerSelectedSlide => "pptx_file_leaf_eager_selected_slide",
+            Self::PptxFileLeafSourceSelectedSlide => "pptx_file_leaf_source_selected_slide",
+            Self::PptxFileLeafEagerOpenSlideCountLifecycle => {
+                "pptx_file_leaf_eager_open_slide_count_lifecycle"
+            },
+            Self::PptxFileLeafSourceOpenSlideCountLifecycle => {
+                "pptx_file_leaf_source_open_slide_count_lifecycle"
+            },
+            Self::PptxFileLeafEagerOpenSelectedSlideLifecycle => {
+                "pptx_file_leaf_eager_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileLeafSourceOpenSelectedSlideLifecycle => {
+                "pptx_file_leaf_source_open_selected_slide_lifecycle"
+            },
+            Self::XlsxFileUnifiedOpen => "xlsx_file_unified_open",
+            Self::XlsxFileUnifiedOpenLifecycle => "xlsx_file_unified_open_lifecycle",
+            Self::XlsxFileUnifiedSelectedCell => "xlsx_file_unified_selected_cell",
+            Self::XlsxFileLeafOpen => "xlsx_file_leaf_open",
+            Self::XlsxFileLeafOpenLifecycle => "xlsx_file_leaf_open_lifecycle",
+            Self::XlsxFileLeafSelectedCell => "xlsx_file_leaf_selected_cell",
+            Self::XlsxBytesUnifiedOpen => "xlsx_bytes_unified_open",
+            Self::XlsxBytesUnifiedOpenLifecycle => "xlsx_bytes_unified_open_lifecycle",
+            Self::XlsxBytesLeafOpen => "xlsx_bytes_leaf_open",
+            Self::XlsxBytesLeafOpenLifecycle => "xlsx_bytes_leaf_open_lifecycle",
+            Self::DocxSemanticUnifiedOneParagraph => "docx_semantic_unified_one_paragraph",
+            Self::DocxSemanticUnifiedOneParagraphText => "docx_semantic_unified_one_paragraph_text",
+            Self::DocxSemanticLeafOneParagraph => "docx_semantic_leaf_one_paragraph",
+            Self::DocxSemanticLeafOneParagraphText => "docx_semantic_leaf_one_paragraph_text",
+            Self::DocxProducerUnifiedSourceSelectedParagraph => {
+                "docx_producer_unified_source_selected_paragraph"
+            },
+            Self::DocxProducerLeafSourceSelectedParagraph => {
+                "docx_producer_leaf_source_selected_paragraph"
+            },
+            Self::DocFileUnifiedOpen => "doc_file_unified_open",
+            Self::DocFileUnifiedFullText => "doc_file_unified_full_text",
+            Self::DocFileUnifiedOneParagraph => "doc_file_unified_one_paragraph",
+            Self::DocFileLeafOpen => "doc_file_leaf_open",
+            Self::DocFileLeafFullText => "doc_file_leaf_full_text",
+            Self::DocFileLeafOneParagraph => "doc_file_leaf_one_paragraph",
+            Self::PptFileUnifiedOpen => "ppt_file_unified_open",
+            Self::PptFileUnifiedFullText => "ppt_file_unified_full_text",
+            Self::PptFileUnifiedOneSlideText => "ppt_file_unified_one_slide_text",
+            Self::PptFileLeafOpen => "ppt_file_leaf_open",
+            Self::PptFileLeafFullText => "ppt_file_leaf_full_text",
+            Self::PptFileLeafOneSlideText => "ppt_file_leaf_one_slide_text",
+            Self::RtfFileUnifiedOpen => "rtf_file_unified_open",
+            Self::RtfFileUnifiedOpenLifecycle => "rtf_file_unified_open_lifecycle",
+            Self::RtfFileLeafOpen => "rtf_file_leaf_open",
+            Self::RtfFileLeafOpenLifecycle => "rtf_file_leaf_open_lifecycle",
+            Self::OdtFileUnifiedEagerOpen => "odt_file_unified_eager_open",
+            Self::OdtFileUnifiedSourceOpen => "odt_file_unified_source_open",
+            Self::OdtFileUnifiedEagerOpenFullTextLifecycle => {
+                "odt_file_unified_eager_open_full_text_lifecycle"
+            },
+            Self::OdtFileUnifiedSourceOpenFullTextLifecycle => {
+                "odt_file_unified_source_open_full_text_lifecycle"
+            },
+            Self::OdtFileLeafEagerOpen => "odt_file_leaf_eager_open",
+            Self::OdtFileLeafSourceOpen => "odt_file_leaf_source_open",
+            Self::OdtFileLeafEagerOpenFullTextLifecycle => {
+                "odt_file_leaf_eager_open_full_text_lifecycle"
+            },
+            Self::OdtFileLeafSourceOpenFullTextLifecycle => {
+                "odt_file_leaf_source_open_full_text_lifecycle"
+            },
+            Self::OdpFileUnifiedEagerOpen => "odp_file_unified_eager_open",
+            Self::OdpFileUnifiedSourceOpen => "odp_file_unified_source_open",
+            Self::OdpFileUnifiedEagerSelectedSlide => "odp_file_unified_eager_selected_slide",
+            Self::OdpFileUnifiedSourceSelectedSlide => "odp_file_unified_source_selected_slide",
+            Self::OdpFileLeafEagerOpen => "odp_file_leaf_eager_open",
+            Self::OdpFileLeafSourceOpen => "odp_file_leaf_source_open",
+            Self::OdpFileLeafEagerSelectedSlide => "odp_file_leaf_eager_selected_slide",
+            Self::OdpFileLeafSourceSelectedSlide => "odp_file_leaf_source_selected_slide",
+            Self::OdsFileUnifiedEagerOpen => "ods_file_unified_eager_open",
+            Self::OdsFileUnifiedSourceOpen => "ods_file_unified_source_open",
+            Self::OdsFileLeafEagerOpen => "ods_file_leaf_eager_open",
+            Self::OdsFileLeafSourceOpen => "ods_file_leaf_source_open",
+            Self::DetectOdtUnifiedBytes => "detect_odt_unified_bytes",
+            Self::DetectOdtUnifiedReader => "detect_odt_unified_reader",
+            Self::DetectOdtUnifiedPolyglot => "detect_odt_unified_polyglot",
+            Self::DetectOdtUnifiedCatalogAlias => "detect_odt_unified_catalog_alias",
+            Self::DetectOdtLeafBytes => "detect_odt_leaf_bytes",
+            Self::DetectOdtLeafReader => "detect_odt_leaf_reader",
+            Self::DetectOdsUnifiedBytes => "detect_ods_unified_bytes",
+            Self::DetectOdsUnifiedReader => "detect_ods_unified_reader",
+            Self::DetectOdsUnifiedPolyglot => "detect_ods_unified_polyglot",
+            Self::DetectOdsUnifiedCatalogAlias => "detect_ods_unified_catalog_alias",
+            Self::DetectOdsLeafBytes => "detect_ods_leaf_bytes",
+            Self::DetectOdsLeafReader => "detect_ods_leaf_reader",
+            Self::DetectOdpUnifiedBytes => "detect_odp_unified_bytes",
+            Self::DetectOdpUnifiedReader => "detect_odp_unified_reader",
+            Self::DetectOdpUnifiedPolyglot => "detect_odp_unified_polyglot",
+            Self::DetectOdpUnifiedCatalogAlias => "detect_odp_unified_catalog_alias",
+            Self::DetectOdpLeafBytes => "detect_odp_leaf_bytes",
+            Self::DetectOdpLeafReader => "detect_odp_leaf_reader",
         }
     }
 
@@ -3349,6 +3630,141 @@ impl Case {
                 | Self::OdtFileSourceOpen
                 | Self::OdtFileEagerOpenFullTextLifecycle
                 | Self::OdtFileSourceOpenFullTextLifecycle
+        ) || self.is_unified_ops_filesystem()
+    }
+
+    /// The paired unified-API/leaf-API DOCX, PPTX and XLSX routes of M0a step
+    /// S8b (plan 0003 §5.3). `filesystem::run_selected` runs them in fresh
+    /// child processes, as it runs their predecessors.
+    const fn is_unified_ops_filesystem(self) -> bool {
+        matches!(
+            self,
+            Self::DocxFileUnifiedEagerOpen
+                | Self::DocxFileUnifiedSourceOpen
+                | Self::DocxFileUnifiedEagerParagraphCount
+                | Self::DocxFileUnifiedSourceParagraphCount
+                | Self::DocxFileUnifiedEagerListParagraphs
+                | Self::DocxFileUnifiedSourceListParagraphs
+                | Self::DocxFileUnifiedEagerFullText
+                | Self::DocxFileUnifiedSourceFullText
+                | Self::DocxFileUnifiedEagerOpenParagraphCountLifecycle
+                | Self::DocxFileUnifiedSourceOpenParagraphCountLifecycle
+                | Self::DocxFileUnifiedEagerOpenFullTextLifecycle
+                | Self::DocxFileUnifiedSourceOpenFullTextLifecycle
+                | Self::DocxFileLeafEagerOpen
+                | Self::DocxFileLeafSourceOpen
+                | Self::DocxFileLeafEagerParagraphCount
+                | Self::DocxFileLeafSourceParagraphCount
+                | Self::DocxFileLeafEagerListParagraphs
+                | Self::DocxFileLeafSourceListParagraphs
+                | Self::DocxFileLeafEagerFullText
+                | Self::DocxFileLeafSourceFullText
+                | Self::DocxFileLeafEagerOpenParagraphCountLifecycle
+                | Self::DocxFileLeafSourceOpenParagraphCountLifecycle
+                | Self::DocxFileLeafEagerOpenFullTextLifecycle
+                | Self::DocxFileLeafSourceOpenFullTextLifecycle
+                | Self::PptxFileUnifiedEagerOpen
+                | Self::PptxFileUnifiedSourceOpen
+                | Self::PptxFileUnifiedEagerListSlides
+                | Self::PptxFileUnifiedSourceListSlides
+                | Self::PptxFileUnifiedEagerSlideCount
+                | Self::PptxFileUnifiedSourceSlideCount
+                | Self::PptxFileUnifiedEagerSelectedSlide
+                | Self::PptxFileUnifiedSourceSelectedSlide
+                | Self::PptxFileUnifiedEagerOpenSlideCountLifecycle
+                | Self::PptxFileUnifiedSourceOpenSlideCountLifecycle
+                | Self::PptxFileUnifiedEagerOpenSelectedSlideLifecycle
+                | Self::PptxFileUnifiedSourceOpenSelectedSlideLifecycle
+                | Self::PptxFileLeafEagerOpen
+                | Self::PptxFileLeafSourceOpen
+                | Self::PptxFileLeafEagerListSlides
+                | Self::PptxFileLeafSourceListSlides
+                | Self::PptxFileLeafEagerSlideCount
+                | Self::PptxFileLeafSourceSlideCount
+                | Self::PptxFileLeafEagerSelectedSlide
+                | Self::PptxFileLeafSourceSelectedSlide
+                | Self::PptxFileLeafEagerOpenSlideCountLifecycle
+                | Self::PptxFileLeafSourceOpenSlideCountLifecycle
+                | Self::PptxFileLeafEagerOpenSelectedSlideLifecycle
+                | Self::PptxFileLeafSourceOpenSelectedSlideLifecycle
+                | Self::XlsxFileUnifiedOpen
+                | Self::XlsxFileUnifiedOpenLifecycle
+                | Self::XlsxFileUnifiedSelectedCell
+                | Self::XlsxFileLeafOpen
+                | Self::XlsxFileLeafOpenLifecycle
+                | Self::XlsxFileLeafSelectedCell
+        )
+    }
+
+    /// The paired unified-API/leaf-API routes of M0a step S8b that run in
+    /// process (`unified_ops::run_selected`).
+    const fn is_unified_ops_in_process(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxBytesUnifiedOpen
+                | Self::XlsxBytesUnifiedOpenLifecycle
+                | Self::XlsxBytesLeafOpen
+                | Self::XlsxBytesLeafOpenLifecycle
+                | Self::DocxSemanticUnifiedOneParagraph
+                | Self::DocxSemanticUnifiedOneParagraphText
+                | Self::DocxSemanticLeafOneParagraph
+                | Self::DocxSemanticLeafOneParagraphText
+                | Self::DocxProducerUnifiedSourceSelectedParagraph
+                | Self::DocxProducerLeafSourceSelectedParagraph
+                | Self::DocFileUnifiedOpen
+                | Self::DocFileUnifiedFullText
+                | Self::DocFileUnifiedOneParagraph
+                | Self::DocFileLeafOpen
+                | Self::DocFileLeafFullText
+                | Self::DocFileLeafOneParagraph
+                | Self::PptFileUnifiedOpen
+                | Self::PptFileUnifiedFullText
+                | Self::PptFileUnifiedOneSlideText
+                | Self::PptFileLeafOpen
+                | Self::PptFileLeafFullText
+                | Self::PptFileLeafOneSlideText
+                | Self::RtfFileUnifiedOpen
+                | Self::RtfFileUnifiedOpenLifecycle
+                | Self::RtfFileLeafOpen
+                | Self::RtfFileLeafOpenLifecycle
+                | Self::OdtFileUnifiedEagerOpen
+                | Self::OdtFileUnifiedSourceOpen
+                | Self::OdtFileUnifiedEagerOpenFullTextLifecycle
+                | Self::OdtFileUnifiedSourceOpenFullTextLifecycle
+                | Self::OdtFileLeafEagerOpen
+                | Self::OdtFileLeafSourceOpen
+                | Self::OdtFileLeafEagerOpenFullTextLifecycle
+                | Self::OdtFileLeafSourceOpenFullTextLifecycle
+                | Self::OdpFileUnifiedEagerOpen
+                | Self::OdpFileUnifiedSourceOpen
+                | Self::OdpFileUnifiedEagerSelectedSlide
+                | Self::OdpFileUnifiedSourceSelectedSlide
+                | Self::OdpFileLeafEagerOpen
+                | Self::OdpFileLeafSourceOpen
+                | Self::OdpFileLeafEagerSelectedSlide
+                | Self::OdpFileLeafSourceSelectedSlide
+                | Self::OdsFileUnifiedEagerOpen
+                | Self::OdsFileUnifiedSourceOpen
+                | Self::OdsFileLeafEagerOpen
+                | Self::OdsFileLeafSourceOpen
+                | Self::DetectOdtUnifiedBytes
+                | Self::DetectOdtUnifiedReader
+                | Self::DetectOdtUnifiedPolyglot
+                | Self::DetectOdtUnifiedCatalogAlias
+                | Self::DetectOdtLeafBytes
+                | Self::DetectOdtLeafReader
+                | Self::DetectOdsUnifiedBytes
+                | Self::DetectOdsUnifiedReader
+                | Self::DetectOdsUnifiedPolyglot
+                | Self::DetectOdsUnifiedCatalogAlias
+                | Self::DetectOdsLeafBytes
+                | Self::DetectOdsLeafReader
+                | Self::DetectOdpUnifiedBytes
+                | Self::DetectOdpUnifiedReader
+                | Self::DetectOdpUnifiedPolyglot
+                | Self::DetectOdpUnifiedCatalogAlias
+                | Self::DetectOdpLeafBytes
+                | Self::DetectOdpLeafReader
         )
     }
 
@@ -5633,6 +6049,9 @@ struct SourceSummary {
         Option<docx_story_hyperlink_publication::DocxStoryHyperlinkPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_section_layout: Option<DocxSectionLayoutSummary>,
+    /// Pairing and timing metadata of the M0a S8b unified/leaf routes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unified_ops: Option<Box<unified_ops::RouteSummary>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -10591,6 +11010,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_opc_source_cache_evidence()
                     && !case.is_opc_casefold_lookup()
                     && !case.is_filesystem()
+                    && !case.is_unified_ops_in_process()
                     && !case.is_docx_source_edit_save()
                     && !case.is_docx_section_layout_edit_save()
                     && !case.is_docx_story_hyperlink_plan()
@@ -12898,6 +13318,24 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // Paired unified-API (`litchi::open`, `litchi::File`) and leaf-API routes
+    // of M0a step S8b (plan 0003 §5.3). Their DOCX, PPTX and XLSX filesystem
+    // pairs already ran above, through `filesystem::run_selected`.
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_unified_ops_in_process())
+    {
+        results.extend(unified_ops::run_selected(&unified_ops::Selection {
+            cases: &options.cases,
+            semantic_shapes: &options.semantic_shapes,
+            rtf_variants: &options.rtf_variants,
+            ole2_files: &options.ole2_files,
+            warmup_iterations: options.warmup_iterations,
+            samples: options.samples,
+        })?);
+    }
+
     promote_sink_operation_metrics(&mut results)?;
     let allocation_coverage = validate_full_default_allocator_coverage(&options, &results)?;
 
@@ -14055,6 +14493,174 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_file_source_cell_sweep" => Some(Case::OdsFileSourceCellSweep),
         "ods_file_eager_cell_batch_sweep" => Some(Case::OdsFileEagerCellBatchSweep),
         "ods_file_source_cell_batch_sweep" => Some(Case::OdsFileSourceCellBatchSweep),
+        "docx_file_unified_eager_open" => Some(Case::DocxFileUnifiedEagerOpen),
+        "docx_file_unified_source_open" => Some(Case::DocxFileUnifiedSourceOpen),
+        "docx_file_unified_eager_paragraph_count" => Some(Case::DocxFileUnifiedEagerParagraphCount),
+        "docx_file_unified_source_paragraph_count" => {
+            Some(Case::DocxFileUnifiedSourceParagraphCount)
+        },
+        "docx_file_unified_eager_list_paragraphs" => Some(Case::DocxFileUnifiedEagerListParagraphs),
+        "docx_file_unified_source_list_paragraphs" => {
+            Some(Case::DocxFileUnifiedSourceListParagraphs)
+        },
+        "docx_file_unified_eager_full_text" => Some(Case::DocxFileUnifiedEagerFullText),
+        "docx_file_unified_source_full_text" => Some(Case::DocxFileUnifiedSourceFullText),
+        "docx_file_unified_eager_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileUnifiedEagerOpenParagraphCountLifecycle)
+        },
+        "docx_file_unified_source_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileUnifiedSourceOpenParagraphCountLifecycle)
+        },
+        "docx_file_unified_eager_open_full_text_lifecycle" => {
+            Some(Case::DocxFileUnifiedEagerOpenFullTextLifecycle)
+        },
+        "docx_file_unified_source_open_full_text_lifecycle" => {
+            Some(Case::DocxFileUnifiedSourceOpenFullTextLifecycle)
+        },
+        "docx_file_leaf_eager_open" => Some(Case::DocxFileLeafEagerOpen),
+        "docx_file_leaf_source_open" => Some(Case::DocxFileLeafSourceOpen),
+        "docx_file_leaf_eager_paragraph_count" => Some(Case::DocxFileLeafEagerParagraphCount),
+        "docx_file_leaf_source_paragraph_count" => Some(Case::DocxFileLeafSourceParagraphCount),
+        "docx_file_leaf_eager_list_paragraphs" => Some(Case::DocxFileLeafEagerListParagraphs),
+        "docx_file_leaf_source_list_paragraphs" => Some(Case::DocxFileLeafSourceListParagraphs),
+        "docx_file_leaf_eager_full_text" => Some(Case::DocxFileLeafEagerFullText),
+        "docx_file_leaf_source_full_text" => Some(Case::DocxFileLeafSourceFullText),
+        "docx_file_leaf_eager_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileLeafEagerOpenParagraphCountLifecycle)
+        },
+        "docx_file_leaf_source_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileLeafSourceOpenParagraphCountLifecycle)
+        },
+        "docx_file_leaf_eager_open_full_text_lifecycle" => {
+            Some(Case::DocxFileLeafEagerOpenFullTextLifecycle)
+        },
+        "docx_file_leaf_source_open_full_text_lifecycle" => {
+            Some(Case::DocxFileLeafSourceOpenFullTextLifecycle)
+        },
+        "pptx_file_unified_eager_open" => Some(Case::PptxFileUnifiedEagerOpen),
+        "pptx_file_unified_source_open" => Some(Case::PptxFileUnifiedSourceOpen),
+        "pptx_file_unified_eager_list_slides" => Some(Case::PptxFileUnifiedEagerListSlides),
+        "pptx_file_unified_source_list_slides" => Some(Case::PptxFileUnifiedSourceListSlides),
+        "pptx_file_unified_eager_slide_count" => Some(Case::PptxFileUnifiedEagerSlideCount),
+        "pptx_file_unified_source_slide_count" => Some(Case::PptxFileUnifiedSourceSlideCount),
+        "pptx_file_unified_eager_selected_slide" => Some(Case::PptxFileUnifiedEagerSelectedSlide),
+        "pptx_file_unified_source_selected_slide" => Some(Case::PptxFileUnifiedSourceSelectedSlide),
+        "pptx_file_unified_eager_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileUnifiedEagerOpenSlideCountLifecycle)
+        },
+        "pptx_file_unified_source_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileUnifiedSourceOpenSlideCountLifecycle)
+        },
+        "pptx_file_unified_eager_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileUnifiedEagerOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_unified_source_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileUnifiedSourceOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_leaf_eager_open" => Some(Case::PptxFileLeafEagerOpen),
+        "pptx_file_leaf_source_open" => Some(Case::PptxFileLeafSourceOpen),
+        "pptx_file_leaf_eager_list_slides" => Some(Case::PptxFileLeafEagerListSlides),
+        "pptx_file_leaf_source_list_slides" => Some(Case::PptxFileLeafSourceListSlides),
+        "pptx_file_leaf_eager_slide_count" => Some(Case::PptxFileLeafEagerSlideCount),
+        "pptx_file_leaf_source_slide_count" => Some(Case::PptxFileLeafSourceSlideCount),
+        "pptx_file_leaf_eager_selected_slide" => Some(Case::PptxFileLeafEagerSelectedSlide),
+        "pptx_file_leaf_source_selected_slide" => Some(Case::PptxFileLeafSourceSelectedSlide),
+        "pptx_file_leaf_eager_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileLeafEagerOpenSlideCountLifecycle)
+        },
+        "pptx_file_leaf_source_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileLeafSourceOpenSlideCountLifecycle)
+        },
+        "pptx_file_leaf_eager_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileLeafEagerOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_leaf_source_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileLeafSourceOpenSelectedSlideLifecycle)
+        },
+        "xlsx_file_unified_open" => Some(Case::XlsxFileUnifiedOpen),
+        "xlsx_file_unified_open_lifecycle" => Some(Case::XlsxFileUnifiedOpenLifecycle),
+        "xlsx_file_unified_selected_cell" => Some(Case::XlsxFileUnifiedSelectedCell),
+        "xlsx_file_leaf_open" => Some(Case::XlsxFileLeafOpen),
+        "xlsx_file_leaf_open_lifecycle" => Some(Case::XlsxFileLeafOpenLifecycle),
+        "xlsx_file_leaf_selected_cell" => Some(Case::XlsxFileLeafSelectedCell),
+        "xlsx_bytes_unified_open" => Some(Case::XlsxBytesUnifiedOpen),
+        "xlsx_bytes_unified_open_lifecycle" => Some(Case::XlsxBytesUnifiedOpenLifecycle),
+        "xlsx_bytes_leaf_open" => Some(Case::XlsxBytesLeafOpen),
+        "xlsx_bytes_leaf_open_lifecycle" => Some(Case::XlsxBytesLeafOpenLifecycle),
+        "docx_semantic_unified_one_paragraph" => Some(Case::DocxSemanticUnifiedOneParagraph),
+        "docx_semantic_unified_one_paragraph_text" => {
+            Some(Case::DocxSemanticUnifiedOneParagraphText)
+        },
+        "docx_semantic_leaf_one_paragraph" => Some(Case::DocxSemanticLeafOneParagraph),
+        "docx_semantic_leaf_one_paragraph_text" => Some(Case::DocxSemanticLeafOneParagraphText),
+        "docx_producer_unified_source_selected_paragraph" => {
+            Some(Case::DocxProducerUnifiedSourceSelectedParagraph)
+        },
+        "docx_producer_leaf_source_selected_paragraph" => {
+            Some(Case::DocxProducerLeafSourceSelectedParagraph)
+        },
+        "doc_file_unified_open" => Some(Case::DocFileUnifiedOpen),
+        "doc_file_unified_full_text" => Some(Case::DocFileUnifiedFullText),
+        "doc_file_unified_one_paragraph" => Some(Case::DocFileUnifiedOneParagraph),
+        "doc_file_leaf_open" => Some(Case::DocFileLeafOpen),
+        "doc_file_leaf_full_text" => Some(Case::DocFileLeafFullText),
+        "doc_file_leaf_one_paragraph" => Some(Case::DocFileLeafOneParagraph),
+        "ppt_file_unified_open" => Some(Case::PptFileUnifiedOpen),
+        "ppt_file_unified_full_text" => Some(Case::PptFileUnifiedFullText),
+        "ppt_file_unified_one_slide_text" => Some(Case::PptFileUnifiedOneSlideText),
+        "ppt_file_leaf_open" => Some(Case::PptFileLeafOpen),
+        "ppt_file_leaf_full_text" => Some(Case::PptFileLeafFullText),
+        "ppt_file_leaf_one_slide_text" => Some(Case::PptFileLeafOneSlideText),
+        "rtf_file_unified_open" => Some(Case::RtfFileUnifiedOpen),
+        "rtf_file_unified_open_lifecycle" => Some(Case::RtfFileUnifiedOpenLifecycle),
+        "rtf_file_leaf_open" => Some(Case::RtfFileLeafOpen),
+        "rtf_file_leaf_open_lifecycle" => Some(Case::RtfFileLeafOpenLifecycle),
+        "odt_file_unified_eager_open" => Some(Case::OdtFileUnifiedEagerOpen),
+        "odt_file_unified_source_open" => Some(Case::OdtFileUnifiedSourceOpen),
+        "odt_file_unified_eager_open_full_text_lifecycle" => {
+            Some(Case::OdtFileUnifiedEagerOpenFullTextLifecycle)
+        },
+        "odt_file_unified_source_open_full_text_lifecycle" => {
+            Some(Case::OdtFileUnifiedSourceOpenFullTextLifecycle)
+        },
+        "odt_file_leaf_eager_open" => Some(Case::OdtFileLeafEagerOpen),
+        "odt_file_leaf_source_open" => Some(Case::OdtFileLeafSourceOpen),
+        "odt_file_leaf_eager_open_full_text_lifecycle" => {
+            Some(Case::OdtFileLeafEagerOpenFullTextLifecycle)
+        },
+        "odt_file_leaf_source_open_full_text_lifecycle" => {
+            Some(Case::OdtFileLeafSourceOpenFullTextLifecycle)
+        },
+        "odp_file_unified_eager_open" => Some(Case::OdpFileUnifiedEagerOpen),
+        "odp_file_unified_source_open" => Some(Case::OdpFileUnifiedSourceOpen),
+        "odp_file_unified_eager_selected_slide" => Some(Case::OdpFileUnifiedEagerSelectedSlide),
+        "odp_file_unified_source_selected_slide" => Some(Case::OdpFileUnifiedSourceSelectedSlide),
+        "odp_file_leaf_eager_open" => Some(Case::OdpFileLeafEagerOpen),
+        "odp_file_leaf_source_open" => Some(Case::OdpFileLeafSourceOpen),
+        "odp_file_leaf_eager_selected_slide" => Some(Case::OdpFileLeafEagerSelectedSlide),
+        "odp_file_leaf_source_selected_slide" => Some(Case::OdpFileLeafSourceSelectedSlide),
+        "ods_file_unified_eager_open" => Some(Case::OdsFileUnifiedEagerOpen),
+        "ods_file_unified_source_open" => Some(Case::OdsFileUnifiedSourceOpen),
+        "ods_file_leaf_eager_open" => Some(Case::OdsFileLeafEagerOpen),
+        "ods_file_leaf_source_open" => Some(Case::OdsFileLeafSourceOpen),
+        "detect_odt_unified_bytes" => Some(Case::DetectOdtUnifiedBytes),
+        "detect_odt_unified_reader" => Some(Case::DetectOdtUnifiedReader),
+        "detect_odt_unified_polyglot" => Some(Case::DetectOdtUnifiedPolyglot),
+        "detect_odt_unified_catalog_alias" => Some(Case::DetectOdtUnifiedCatalogAlias),
+        "detect_odt_leaf_bytes" => Some(Case::DetectOdtLeafBytes),
+        "detect_odt_leaf_reader" => Some(Case::DetectOdtLeafReader),
+        "detect_ods_unified_bytes" => Some(Case::DetectOdsUnifiedBytes),
+        "detect_ods_unified_reader" => Some(Case::DetectOdsUnifiedReader),
+        "detect_ods_unified_polyglot" => Some(Case::DetectOdsUnifiedPolyglot),
+        "detect_ods_unified_catalog_alias" => Some(Case::DetectOdsUnifiedCatalogAlias),
+        "detect_ods_leaf_bytes" => Some(Case::DetectOdsLeafBytes),
+        "detect_ods_leaf_reader" => Some(Case::DetectOdsLeafReader),
+        "detect_odp_unified_bytes" => Some(Case::DetectOdpUnifiedBytes),
+        "detect_odp_unified_reader" => Some(Case::DetectOdpUnifiedReader),
+        "detect_odp_unified_polyglot" => Some(Case::DetectOdpUnifiedPolyglot),
+        "detect_odp_unified_catalog_alias" => Some(Case::DetectOdpUnifiedCatalogAlias),
+        "detect_odp_leaf_bytes" => Some(Case::DetectOdpLeafBytes),
+        "detect_odp_leaf_reader" => Some(Case::DetectOdpLeafReader),
         _ => None,
     }
 }
@@ -14195,6 +14801,93 @@ fn usage_text() -> String {
                                        odt_file_eager_open,odt_file_source_open,\n\
                                        odt_file_eager_open_full_text_lifecycle,\n\
                                        odt_file_source_open_full_text_lifecycle,\n\
+                                       docx_file_unified_eager_open,docx_file_unified_source_open,\n\
+                                       docx_file_unified_eager_paragraph_count,\n\
+                                       docx_file_unified_source_paragraph_count,\n\
+                                       docx_file_unified_eager_list_paragraphs,\n\
+                                       docx_file_unified_source_list_paragraphs,\n\
+                                       docx_file_unified_eager_full_text,\n\
+                                       docx_file_unified_source_full_text,\n\
+                                       docx_file_unified_eager_open_paragraph_count_lifecycle,\n\
+                                       docx_file_unified_source_open_paragraph_count_lifecycle,\n\
+                                       docx_file_unified_eager_open_full_text_lifecycle,\n\
+                                       docx_file_unified_source_open_full_text_lifecycle,\n\
+                                       docx_file_leaf_eager_open,docx_file_leaf_source_open,\n\
+                                       docx_file_leaf_eager_paragraph_count,\n\
+                                       docx_file_leaf_source_paragraph_count,\n\
+                                       docx_file_leaf_eager_list_paragraphs,\n\
+                                       docx_file_leaf_source_list_paragraphs,\n\
+                                       docx_file_leaf_eager_full_text,\n\
+                                       docx_file_leaf_source_full_text,\n\
+                                       docx_file_leaf_eager_open_paragraph_count_lifecycle,\n\
+                                       docx_file_leaf_source_open_paragraph_count_lifecycle,\n\
+                                       docx_file_leaf_eager_open_full_text_lifecycle,\n\
+                                       docx_file_leaf_source_open_full_text_lifecycle,\n\
+                                       pptx_file_unified_eager_open,pptx_file_unified_source_open,\n\
+                                       pptx_file_unified_eager_list_slides,\n\
+                                       pptx_file_unified_source_list_slides,\n\
+                                       pptx_file_unified_eager_slide_count,\n\
+                                       pptx_file_unified_source_slide_count,\n\
+                                       pptx_file_unified_eager_selected_slide,\n\
+                                       pptx_file_unified_source_selected_slide,\n\
+                                       pptx_file_unified_eager_open_slide_count_lifecycle,\n\
+                                       pptx_file_unified_source_open_slide_count_lifecycle,\n\
+                                       pptx_file_unified_eager_open_selected_slide_lifecycle,\n\
+                                       pptx_file_unified_source_open_selected_slide_lifecycle,\n\
+                                       pptx_file_leaf_eager_open,pptx_file_leaf_source_open,\n\
+                                       pptx_file_leaf_eager_list_slides,\n\
+                                       pptx_file_leaf_source_list_slides,\n\
+                                       pptx_file_leaf_eager_slide_count,\n\
+                                       pptx_file_leaf_source_slide_count,\n\
+                                       pptx_file_leaf_eager_selected_slide,\n\
+                                       pptx_file_leaf_source_selected_slide,\n\
+                                       pptx_file_leaf_eager_open_slide_count_lifecycle,\n\
+                                       pptx_file_leaf_source_open_slide_count_lifecycle,\n\
+                                       pptx_file_leaf_eager_open_selected_slide_lifecycle,\n\
+                                       pptx_file_leaf_source_open_selected_slide_lifecycle,\n\
+                                       xlsx_file_unified_open,xlsx_file_unified_open_lifecycle,\n\
+                                       xlsx_file_unified_selected_cell,xlsx_file_leaf_open,\n\
+                                       xlsx_file_leaf_open_lifecycle,xlsx_file_leaf_selected_cell,\n\
+                                       xlsx_bytes_unified_open,xlsx_bytes_unified_open_lifecycle,\n\
+                                       xlsx_bytes_leaf_open,xlsx_bytes_leaf_open_lifecycle,\n\
+                                       docx_semantic_unified_one_paragraph,\n\
+                                       docx_semantic_unified_one_paragraph_text,\n\
+                                       docx_semantic_leaf_one_paragraph,\n\
+                                       docx_semantic_leaf_one_paragraph_text,\n\
+                                       docx_producer_unified_source_selected_paragraph,\n\
+                                       docx_producer_leaf_source_selected_paragraph,\n\
+                                       doc_file_unified_open,doc_file_unified_full_text,\n\
+                                       doc_file_unified_one_paragraph,doc_file_leaf_open,\n\
+                                       doc_file_leaf_full_text,doc_file_leaf_one_paragraph,\n\
+                                       ppt_file_unified_open,ppt_file_unified_full_text,\n\
+                                       ppt_file_unified_one_slide_text,ppt_file_leaf_open,\n\
+                                       ppt_file_leaf_full_text,ppt_file_leaf_one_slide_text,\n\
+                                       rtf_file_unified_open,rtf_file_unified_open_lifecycle,\n\
+                                       rtf_file_leaf_open,rtf_file_leaf_open_lifecycle,\n\
+                                       odt_file_unified_eager_open,odt_file_unified_source_open,\n\
+                                       odt_file_unified_eager_open_full_text_lifecycle,\n\
+                                       odt_file_unified_source_open_full_text_lifecycle,\n\
+                                       odt_file_leaf_eager_open,odt_file_leaf_source_open,\n\
+                                       odt_file_leaf_eager_open_full_text_lifecycle,\n\
+                                       odt_file_leaf_source_open_full_text_lifecycle,\n\
+                                       odp_file_unified_eager_open,odp_file_unified_source_open,\n\
+                                       odp_file_unified_eager_selected_slide,\n\
+                                       odp_file_unified_source_selected_slide,\n\
+                                       odp_file_leaf_eager_open,odp_file_leaf_source_open,\n\
+                                       odp_file_leaf_eager_selected_slide,\n\
+                                       odp_file_leaf_source_selected_slide,\n\
+                                       ods_file_unified_eager_open,ods_file_unified_source_open,\n\
+                                       ods_file_leaf_eager_open,ods_file_leaf_source_open,\n\
+                                       detect_odt_unified_bytes,detect_odt_unified_reader,\n\
+                                       detect_odt_unified_polyglot,\n\
+                                       detect_odt_unified_catalog_alias,detect_odt_leaf_bytes,\n\
+                                       detect_odt_leaf_reader,detect_ods_unified_bytes,\n\
+                                       detect_ods_unified_reader,detect_ods_unified_polyglot,\n\
+                                       detect_ods_unified_catalog_alias,detect_ods_leaf_bytes,\n\
+                                       detect_ods_leaf_reader,detect_odp_unified_bytes,\n\
+                                       detect_odp_unified_reader,detect_odp_unified_polyglot,\n\
+                                       detect_odp_unified_catalog_alias,detect_odp_leaf_bytes,\n\
+                                       detect_odp_leaf_reader,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        docx_source_backed_existing_section_layout_edit_save,\n\
                                        docx_story_hyperlink_plan,\n\
@@ -25895,6 +26588,127 @@ fn run_case_with_config(
         Case::OpcOpenSessionScaling | Case::CfbBulkReadScaling => {
             Err("scaling case requires an explicit worker count".into())
         },
+        Case::DocxFileUnifiedEagerOpen
+        | Case::DocxFileUnifiedSourceOpen
+        | Case::DocxFileUnifiedEagerParagraphCount
+        | Case::DocxFileUnifiedSourceParagraphCount
+        | Case::DocxFileUnifiedEagerListParagraphs
+        | Case::DocxFileUnifiedSourceListParagraphs
+        | Case::DocxFileUnifiedEagerFullText
+        | Case::DocxFileUnifiedSourceFullText
+        | Case::DocxFileUnifiedEagerOpenParagraphCountLifecycle
+        | Case::DocxFileUnifiedSourceOpenParagraphCountLifecycle
+        | Case::DocxFileUnifiedEagerOpenFullTextLifecycle
+        | Case::DocxFileUnifiedSourceOpenFullTextLifecycle
+        | Case::DocxFileLeafEagerOpen
+        | Case::DocxFileLeafSourceOpen
+        | Case::DocxFileLeafEagerParagraphCount
+        | Case::DocxFileLeafSourceParagraphCount
+        | Case::DocxFileLeafEagerListParagraphs
+        | Case::DocxFileLeafSourceListParagraphs
+        | Case::DocxFileLeafEagerFullText
+        | Case::DocxFileLeafSourceFullText
+        | Case::DocxFileLeafEagerOpenParagraphCountLifecycle
+        | Case::DocxFileLeafSourceOpenParagraphCountLifecycle
+        | Case::DocxFileLeafEagerOpenFullTextLifecycle
+        | Case::DocxFileLeafSourceOpenFullTextLifecycle
+        | Case::PptxFileUnifiedEagerOpen
+        | Case::PptxFileUnifiedSourceOpen
+        | Case::PptxFileUnifiedEagerListSlides
+        | Case::PptxFileUnifiedSourceListSlides
+        | Case::PptxFileUnifiedEagerSlideCount
+        | Case::PptxFileUnifiedSourceSlideCount
+        | Case::PptxFileUnifiedEagerSelectedSlide
+        | Case::PptxFileUnifiedSourceSelectedSlide
+        | Case::PptxFileUnifiedEagerOpenSlideCountLifecycle
+        | Case::PptxFileUnifiedSourceOpenSlideCountLifecycle
+        | Case::PptxFileUnifiedEagerOpenSelectedSlideLifecycle
+        | Case::PptxFileUnifiedSourceOpenSelectedSlideLifecycle
+        | Case::PptxFileLeafEagerOpen
+        | Case::PptxFileLeafSourceOpen
+        | Case::PptxFileLeafEagerListSlides
+        | Case::PptxFileLeafSourceListSlides
+        | Case::PptxFileLeafEagerSlideCount
+        | Case::PptxFileLeafSourceSlideCount
+        | Case::PptxFileLeafEagerSelectedSlide
+        | Case::PptxFileLeafSourceSelectedSlide
+        | Case::PptxFileLeafEagerOpenSlideCountLifecycle
+        | Case::PptxFileLeafSourceOpenSlideCountLifecycle
+        | Case::PptxFileLeafEagerOpenSelectedSlideLifecycle
+        | Case::PptxFileLeafSourceOpenSelectedSlideLifecycle
+        | Case::XlsxFileUnifiedOpen
+        | Case::XlsxFileUnifiedOpenLifecycle
+        | Case::XlsxFileUnifiedSelectedCell
+        | Case::XlsxFileLeafOpen
+        | Case::XlsxFileLeafOpenLifecycle
+        | Case::XlsxFileLeafSelectedCell
+        | Case::XlsxBytesUnifiedOpen
+        | Case::XlsxBytesUnifiedOpenLifecycle
+        | Case::XlsxBytesLeafOpen
+        | Case::XlsxBytesLeafOpenLifecycle
+        | Case::DocxSemanticUnifiedOneParagraph
+        | Case::DocxSemanticUnifiedOneParagraphText
+        | Case::DocxSemanticLeafOneParagraph
+        | Case::DocxSemanticLeafOneParagraphText
+        | Case::DocxProducerUnifiedSourceSelectedParagraph
+        | Case::DocxProducerLeafSourceSelectedParagraph
+        | Case::DocFileUnifiedOpen
+        | Case::DocFileUnifiedFullText
+        | Case::DocFileUnifiedOneParagraph
+        | Case::DocFileLeafOpen
+        | Case::DocFileLeafFullText
+        | Case::DocFileLeafOneParagraph
+        | Case::PptFileUnifiedOpen
+        | Case::PptFileUnifiedFullText
+        | Case::PptFileUnifiedOneSlideText
+        | Case::PptFileLeafOpen
+        | Case::PptFileLeafFullText
+        | Case::PptFileLeafOneSlideText
+        | Case::RtfFileUnifiedOpen
+        | Case::RtfFileUnifiedOpenLifecycle
+        | Case::RtfFileLeafOpen
+        | Case::RtfFileLeafOpenLifecycle
+        | Case::OdtFileUnifiedEagerOpen
+        | Case::OdtFileUnifiedSourceOpen
+        | Case::OdtFileUnifiedEagerOpenFullTextLifecycle
+        | Case::OdtFileUnifiedSourceOpenFullTextLifecycle
+        | Case::OdtFileLeafEagerOpen
+        | Case::OdtFileLeafSourceOpen
+        | Case::OdtFileLeafEagerOpenFullTextLifecycle
+        | Case::OdtFileLeafSourceOpenFullTextLifecycle
+        | Case::OdpFileUnifiedEagerOpen
+        | Case::OdpFileUnifiedSourceOpen
+        | Case::OdpFileUnifiedEagerSelectedSlide
+        | Case::OdpFileUnifiedSourceSelectedSlide
+        | Case::OdpFileLeafEagerOpen
+        | Case::OdpFileLeafSourceOpen
+        | Case::OdpFileLeafEagerSelectedSlide
+        | Case::OdpFileLeafSourceSelectedSlide
+        | Case::OdsFileUnifiedEagerOpen
+        | Case::OdsFileUnifiedSourceOpen
+        | Case::OdsFileLeafEagerOpen
+        | Case::OdsFileLeafSourceOpen
+        | Case::DetectOdtUnifiedBytes
+        | Case::DetectOdtUnifiedReader
+        | Case::DetectOdtUnifiedPolyglot
+        | Case::DetectOdtUnifiedCatalogAlias
+        | Case::DetectOdtLeafBytes
+        | Case::DetectOdtLeafReader
+        | Case::DetectOdsUnifiedBytes
+        | Case::DetectOdsUnifiedReader
+        | Case::DetectOdsUnifiedPolyglot
+        | Case::DetectOdsUnifiedCatalogAlias
+        | Case::DetectOdsLeafBytes
+        | Case::DetectOdsLeafReader
+        | Case::DetectOdpUnifiedBytes
+        | Case::DetectOdpUnifiedReader
+        | Case::DetectOdpUnifiedPolyglot
+        | Case::DetectOdpUnifiedCatalogAlias
+        | Case::DetectOdpLeafBytes
+        | Case::DetectOdpLeafReader => Err(
+            "paired unified/leaf routes run through filesystem::run_selected or unified_ops::run_selected"
+                .into(),
+        ),
     }
 }
 
@@ -63424,7 +64238,7 @@ mod tests {
         // four provider-axis controls below are deliberately opt-in: they
         // increase the selectable registry without changing the default
         // cases or the separate default allocator contract.
-        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 534;
+        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 652;
         let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")

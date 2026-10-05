@@ -37,6 +37,7 @@ use soapberry_zip::ZipArchive;
 use crate::{cold_verified, process_metrics};
 
 mod aligned_zip;
+mod ops;
 
 const OPC_FILE_SHAPE: super::CorpusShape = super::CorpusShape::FewLarge;
 const OPC_FILE_PAYLOAD: super::PayloadKind = super::PayloadKind::Incompressible;
@@ -920,6 +921,9 @@ enum Operation {
     XlsxSourceRepeatedStoreMediumReacquisitionControl,
     XlsxSourceRepeatedStoreOversized,
     XlsxSourceRepeatedStoreOversizedReacquisitionControl,
+    /// A paired unified-API or leaf-API DOCX, PPTX or XLSX route of M0a step
+    /// S8b (`ops`). The predecessor operations above keep their own variants.
+    Ops(ops::Route),
 }
 
 impl Operation {
@@ -984,7 +988,7 @@ impl Operation {
             "xlsx_source_repeated_store_oversized_reacquisition_control" => {
                 Some(Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl)
             },
-            _ => None,
+            _ => ops::Route::parse(name).map(Self::Ops),
         }
     }
 
@@ -1047,6 +1051,15 @@ impl Operation {
             Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
                 super::Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl
             },
+            Self::Ops(route) => route.case(),
+        }
+    }
+
+    /// The paired route this operation runs, if it is one of S8b's.
+    const fn ops(self) -> Option<ops::Route> {
+        match self {
+            Self::Ops(route) => Some(route),
+            _ => None,
         }
     }
 
@@ -1088,7 +1101,7 @@ impl Operation {
                 | Self::PptxSourceOpenSlideCountLifecycle
                 | Self::PptxEagerOpenSelectedSlideLifecycle
                 | Self::PptxSourceOpenSelectedSlideLifecycle
-        )
+        ) || matches!(self, Self::Ops(route) if route.is_pptx())
     }
 
     const fn is_docx(self) -> bool {
@@ -1106,7 +1119,7 @@ impl Operation {
                 | Self::DocxSourceOpenParagraphCountLifecycle
                 | Self::DocxEagerOpenFullTextLifecycle
                 | Self::DocxSourceOpenFullTextLifecycle
-        )
+        ) || matches!(self, Self::Ops(route) if route.is_docx())
     }
 
     const fn is_xlsx(self) -> bool {
@@ -1119,7 +1132,7 @@ impl Operation {
                 | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
                 | Self::XlsxSourceRepeatedStoreOversized
                 | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
-        )
+        ) || matches!(self, Self::Ops(route) if route.is_xlsx())
     }
 
     const fn is_xlsx_repeated_store(self) -> bool {
@@ -1134,6 +1147,21 @@ impl Operation {
 
     const fn is_xlsx_selected_cell(self) -> bool {
         matches!(self, Self::XlsxFileSelectedCell)
+    }
+
+    /// Whether a sample of this operation must carry selected-cell evidence:
+    /// the predecessor selected-cell operation and both paired legs.
+    const fn reports_xlsx_selected_cell(self) -> bool {
+        self.is_xlsx_selected_cell()
+            || matches!(self, Self::Ops(route) if route.is_xlsx_selected_cell())
+    }
+
+    /// Whether a sample carries the timed DOCX full-text evidence.
+    const fn is_docx_full_text_lifecycle(self) -> bool {
+        matches!(
+            self,
+            Self::DocxEagerOpenFullTextLifecycle | Self::DocxSourceOpenFullTextLifecycle
+        ) || matches!(self, Self::Ops(route) if route.is_docx_full_text_lifecycle())
     }
 
     const fn xlsx_repeated_store_scenario(self) -> Option<XlsxRepeatStoreScenario> {
@@ -1243,6 +1271,7 @@ impl Operation {
             && !self.is_docx_query()
             && !self.is_xlsx_repeated_store()
             && !matches!(self, Self::XlsxFileSelectedCell)
+            && !matches!(self, Self::Ops(route) if route.is_prepared_query())
     }
 
     const fn pptx_query_name(self) -> Option<&'static str> {
@@ -2213,7 +2242,7 @@ fn record_sample(
             )
             .into());
         }
-        if operation.is_xlsx_selected_cell() {
+        if operation.reports_xlsx_selected_cell() {
             let evidence = invocation
                 .child
                 .xlsx_selected_cell
@@ -2223,7 +2252,7 @@ fn record_sample(
         }
     }
     validate_cfb_owned_evidence(operation, &invocation.child)?;
-    if !operation.is_xlsx_selected_cell() && invocation.child.xlsx_selected_cell.is_some() {
+    if !operation.reports_xlsx_selected_cell() && invocation.child.xlsx_selected_cell.is_some() {
         return Err(
             format!("{stem} {cache_state} unexpectedly emitted selected-cell evidence").into(),
         );
@@ -2293,10 +2322,7 @@ fn validate_docx_timed_full_text_evidence(
     operation: Operation,
     child: &ChildResult,
 ) -> Result<(), Box<dyn Error>> {
-    let is_full_text_lifecycle = matches!(
-        operation,
-        Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle
-    );
+    let is_full_text_lifecycle = operation.is_docx_full_text_lifecycle();
     let has_evidence = child.docx_timed_full_text_sha256.is_some()
         || child.docx_timed_full_text_bytes.is_some()
         || child.docx_timed_full_text_timing_scope.is_some();
@@ -2468,6 +2494,12 @@ fn filesystem_result(
             ..super::SourceSummary::default()
         }));
     }
+    if let Some(route) = operation_for_case(case).and_then(Operation::ops) {
+        result.source = Some(Box::new(super::SourceSummary {
+            unified_ops: Some(Box::new(route.summary()?)),
+            ..super::SourceSummary::default()
+        }));
+    }
     result.operation_metrics = Some(crate::operation_metrics::aggregate(
         samples,
         cache_state,
@@ -2629,9 +2661,8 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         | Operation::XlsxSourceRepeatedStoreMedium
         | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Operation::XlsxSourceRepeatedStoreOversized
-        | Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
-            Err("open operation has no output digest".into())
-        },
+        | Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl
+        | Operation::Ops(_) => Err("open operation has no output digest".into()),
     }
 }
 
@@ -2867,6 +2898,15 @@ where
     } else {
         None
     };
+    // The paired S8b query routes prepare their root outside the timer, as
+    // their predecessors do. Except for the XLSX selected-cell root, which
+    // moves into the retained timed values, it lives until the child exits.
+    let mut prepared_ops = operation
+        .ops()
+        .filter(|route| route.is_prepared_query())
+        .map(|route| ops::prepare(route, &source))
+        .transpose()?;
+    let mut timed_ops = None;
     let before = verified_before.or_else(|| process_metrics::Snapshot::read().ok());
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
@@ -2951,6 +2991,12 @@ where
                 run_xlsx_repeat_store_queries(deferred)?;
                 None
             },
+            Operation::Ops(route) => {
+                let mut timed = ops::run_timed(route, &source, &mut prepared_ops)?;
+                timed_docx_full_text = timed.docx_full_text.take();
+                timed_ops = Some(timed);
+                None
+            },
         })
     })();
     let elapsed_ns = if operation.is_xlsx_repeated_store() {
@@ -2991,7 +3037,9 @@ where
         details.opc_materialized_parts = Some(package.try_cache_diagnostics()?.successful_loads);
         std::hint::black_box(package);
     }
-    let logical_read_counter_scope = if operation == Operation::ProviderFileReadAt {
+    let logical_read_counter_scope = if let Some(route) = operation.ops() {
+        route.logical_read_counter_scope()
+    } else if operation == Operation::ProviderFileReadAt {
         "timed_filesystem_positional_read_at_provider_axis"
     } else if operation == Operation::ProviderAtomicSave {
         "timed_filesystem_positional_read_at_atomic_save_provider_axis"
@@ -3018,12 +3066,22 @@ where
     }
     .to_owned();
     let corpus = filesystem_corpus(operation)?;
-    let pptx_source_replay = operation
-        .is_source_pptx()
-        .then(|| {
+    // A paired source-backed route carries the untimed leaf replay of its
+    // predecessor's query (`ops::Route::source_replay`).
+    let (pptx_replay_operation, docx_replay_operation) = match operation.ops() {
+        Some(route) if route.is_pptx() => (route.source_replay(), None),
+        Some(route) if route.is_docx() => (None, route.source_replay()),
+        Some(_) => (None, None),
+        None => (
+            operation.is_source_pptx().then_some(operation),
+            operation.is_source_docx().then_some(operation),
+        ),
+    };
+    let pptx_source_replay = pptx_replay_operation
+        .map(|replay_operation| {
             replay_pptx_source(
                 &source,
-                operation,
+                replay_operation,
                 mode,
                 &corpus,
                 matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
@@ -3031,12 +3089,11 @@ where
             )
         })
         .transpose()?;
-    let docx_source_replay = operation
-        .is_source_docx()
-        .then(|| {
+    let docx_source_replay = docx_replay_operation
+        .map(|replay_operation| {
             replay_docx_source(
                 &source,
-                operation,
+                replay_operation,
                 &corpus,
                 matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
                 cold_verified.as_ref(),
@@ -3049,7 +3106,22 @@ where
     if let Some(deferred) = deferred_xlsx_repeat_store_operation.as_mut() {
         finalize_xlsx_repeat_store_evidence(deferred)?;
     }
-    let xlsx_evidence = if operation.is_xlsx() && !operation.is_xlsx_repeated_store() {
+    let xlsx_evidence = if let Some(route) = operation.ops() {
+        if route.is_xlsx() {
+            let timed = timed_ops
+                .as_ref()
+                .ok_or("paired XLSX child operation did not retain its timed root")?;
+            Some(ops::verify_xlsx(
+                route,
+                &source,
+                &corpus,
+                matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+                timed,
+            )?)
+        } else {
+            None
+        }
+    } else if operation.is_xlsx() && !operation.is_xlsx_repeated_store() {
         let deferred = deferred_xlsx_operation
             .as_ref()
             .ok_or("XLSX child operation did not retain its timed workbook")?;
@@ -3098,6 +3170,10 @@ where
         std::hint::black_box(deferred.workbook);
         std::hint::black_box(deferred.worksheet);
         std::hint::black_box(deferred.control_package);
+    }
+    if let Some(timed) = timed_ops.take() {
+        // The paired routes release their timed values at the same point.
+        std::hint::black_box(timed);
     }
     let output = operation
         .is_save()
@@ -6609,6 +6685,13 @@ fn verify_child_output(
             // workbook before this output-only dispatch reaches this arm.
             Ok(())
         },
+        Operation::Ops(route) => ops::verify_output(
+            route,
+            source,
+            corpus,
+            allow_page_aligned_source,
+            timed_docx_full_text,
+        ),
     }
 }
 

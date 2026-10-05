@@ -52,6 +52,12 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.marker_shape = (PERF_BASELINE / "src" / "marker_shape.rs").read_text(
             encoding="utf-8"
         )
+        cls.unified_ops = (PERF_BASELINE / "src" / "unified_ops.rs").read_text(
+            encoding="utf-8"
+        )
+        cls.filesystem_ops = (
+            PERF_BASELINE / "src" / "filesystem" / "ops.rs"
+        ).read_text(encoding="utf-8")
         cls.workflow = (ROOT / ".github" / "workflows" / "perf-baseline.yml").read_text(
             encoding="utf-8"
         )
@@ -509,6 +515,87 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         ):
             self.assertIn(f"Self::{case}", self.library)
             self.assertNotIn(case, default_matrix)
+
+    def test_unified_ops_modules_own_no_unsafe_or_ambient_surface(self):
+        # M0a step S8b's paired routes. Their temporary sources live under
+        # `filesystem::scratch_root`, the harness's one ambient directory, and
+        # the only caller-named input they read is the bounded `--ole2-file`
+        # fixture, through change 0627's bounded reader.
+        self.assertIn("mod unified_ops;", self.library)
+        self.assertIn("mod ops;", self.filesystem)
+        for module in (self.unified_ops, self.filesystem_ops):
+            self.assertNotIn("unsafe", module)
+            self.assertNotIn("#[global_allocator]", module)
+            self.assertNotIn("std::env", module)
+            self.assertNotIn("Command", module)
+        self.assertIn(
+            'crate::filesystem::scratch_root(None, "unified-ops")', self.unified_ops
+        )
+        self.assertIn(
+            "use crate::ole2_range_source::{cfb_inventory, provenance_of, read_bounded};",
+            self.unified_ops,
+        )
+        self.assertIn(
+            "let bytes = crate::ole2_range_source::read_bounded(path)?;",
+            self.unified_ops,
+        )
+
+    def test_unified_ops_routes_are_opt_in_named_and_paired(self):
+        # Plan 0003 section 5.3: every re-measured scenario gets a `unified_`
+        # route through `litchi::open*` and `litchi::File`, and a `leaf_` twin
+        # that makes the same leaf calls directly. Both names are the
+        # predecessor's with the leg infix inserted, and the predecessor stays
+        # registered: its frozen records are never rewritten.
+        from tools.validate_crud_coverage_index import _selector_registry_names
+
+        names = _selector_registry_names(self.library)
+        registry = set(names)
+        unified = [name for name in names if "_unified_" in name]
+        leaf = [name for name in names if "_leaf_" in name]
+        self.assertEqual(len(unified), 62)
+        self.assertEqual(len(leaf), 56)
+        for name in unified + leaf:
+            infix = "_unified_" if "_unified_" in name else "_leaf_"
+            predecessor = name.replace(infix, "_", 1)
+            if predecessor not in registry:
+                predecessor = predecessor.replace("_file_", "_facade_file_", 1)
+            self.assertIn(predecessor, registry, name)
+            self.assertNotIn("_unified_", predecessor)
+            self.assertNotIn("_leaf_", predecessor)
+        for name in leaf:
+            self.assertIn(name.replace("_leaf_", "_unified_", 1), registry)
+        # Only the detection inputs that two leaf owners decide by the
+        # coordinator's precedence lack a leaf twin.
+        self.assertEqual(
+            sorted(
+                name
+                for name in unified
+                if name.replace("_unified_", "_leaf_", 1) not in registry
+            ),
+            sorted(
+                f"detect_{family}_unified_{mode}"
+                for family in ("odt", "ods", "odp")
+                for mode in ("polyglot", "catalog_alias")
+            ),
+        )
+        # The predecessors keep their names, among them the six facade
+        # selectors change 0638 registered.
+        for name in (
+            "docx_file_source_open",
+            "pptx_file_eager_open",
+            "xlsx_file_selected_cell",
+            "doc_facade_file_open",
+            "ppt_facade_file_one_slide_text",
+            "detect_odt_bytes",
+        ):
+            self.assertIn(name, registry)
+        start = self.library.index("const DEFAULT: ")
+        end = self.library.index("];", start)
+        default_matrix = self.library[start:end]
+        self.assertNotIn("Unified", default_matrix)
+        self.assertNotIn("Leaf", default_matrix)
+        for marker in ("const fn is_unified_ops_filesystem", "const fn is_unified_ops_in_process"):
+            self.assertIn(marker, self.library)
 
     def test_region_scope_is_static_and_heap_free(self):
         self.assertIn("pub scope: Scope", self.metrics)
