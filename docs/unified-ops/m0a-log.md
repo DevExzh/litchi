@@ -105,3 +105,27 @@
 
 ## Coordinator check — S5c's fixture-dependent xlsx tests
 - On `uo/m0a` (S5c merged), with the evidence directory `docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/` added to the sparse checkout and `3rdparty` temporarily symlinked from the main checkout, `cargo test -p litchi-xlsx --all-features` passes the four targets S5c could not compile: `form_control_properties` (15), `form_control_scalar_lifecycle` (39), `form_control_owner_read` (18) and `drawing_svg_read` (32). This closes S5c's open item.
+
+## S8a-pre — Python read-API oracle (`70f8465a72`)
+- 121 `unittest` tests in `crates/pyo3-litchi/tests/` (14 expected failures) pin today's `litchi_py` read API:
+  - docx/doc/rtf/odt/pages through `Document`; pptx/odp/key through `Presentation`; xlsx/xlsb/ods/numbers through `Workbook`;
+  - detection, errors, and `.pyi`/README sync.
+- Green on dev and release builds, and under pytest 9.1.1 (in a temporary venv, since deleted). Runner: `crates/pyo3-litchi/tests/run_tests.sh` (cargo build, no maturin). Record: `docs/unified-ops/s8a-python-oracle.md`.
+- Drift pinned as today/intended test pairs:
+  - D1: `.odb` is detected as `Doc`.
+  - D2: the stub lists 14 of 21 formats.
+  - D3: the stub calls `FileFormat` an `Enum`; it is not.
+  - D4: exception classes contradict the stub's `Raises:` notes.
+  - D5: the README documents a `Worksheet` API that does not exist.
+  - F10: PPTX raises `ValueError` on a source change; the other formats raise a bare `Exception`.
+- Bugs found, to fix in S8a:
+  - B1: `.ppt`/`.xls` are unrecognised; the pyo3 crate enables neither the `ppt` nor the `xls` feature, although its docs claim both.
+  - B2: `repr()` panics when its byte-sliced preview cuts a multibyte character. That is an interpreter abort in release builds (`drawing.docx`).
+  - B3: DOCX `Document.text()` joins paragraphs with no separator.
+  - B4: `Run.underline()` is a placeholder that always returns `None`.
+  - B5: using a handle from another thread panics. The unified `File` is `Send + Sync`, so S8a can make the classes thread-safe.
+- S8a contract:
+  - `Document`/`Presentation` I/O errors stay `OSError`.
+  - Flat ODF, password-protected `.doc` and Word 6 stay `ValueError`, including once a protected `.doc` becomes `File::Locked`.
+  - Wrong-opener messages keep naming the detected format.
+  - Exact messages and `repr` snapshots may change on purpose, and the S8a record lists each change.
