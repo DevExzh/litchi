@@ -209,3 +209,32 @@
   - litchi-ops: 442 tests;
   - facade targets: `markdown_file_parity` (9), `unified_open_facade` (14), `tolerance_report_facade` (12), `unexpected_format` (16), `read_limits_facade` (8), the three Markdown suites, and `--lib` (352);
   - the boundary checker, the non-iWork gate and the gate unit tests.
+
+## S6b — signature policy (`f30c521c90`, record 0013)
+- New API:
+  - `Signed::unsign(self) -> File` (O(1), `#[must_use]`) and `File::is_signed()`.
+  - Tier 1–2 handles carry a signature state (`Arc<Opened<State>>`, still one pointer; `File` is still 16 bytes).
+- Editor builders:
+  - While a file is signed, all seven refuse with `document_protected`, naming `Signed::unsign()`.
+  - After `unsign` they build over a copy whose signature the leaf removed explicitly. For OOXML that is the leaf's `unsign` on a package opened over the exact input bytes; for DOC, XLS and PPT it is `litchi_sign::cfb::Editor::clear`.
+  - An unlocked encrypted DOCX or PPTX refuses rather than publish in the clear.
+- `resign` is deferred to P1: the unified layer publishes nothing until M2, and signer input must meet ADR 0006's credential rules.
+- New edge `litchi-ops -> litchi-sign`.
+- Leaf fixes (breaking):
+  - pptx `opened::Transaction::commit` and about ten xlsb families stripped signatures silently; they now refuse.
+  - Added: `pptx::Package::unsign`, `xlsx::Workbook::unsigned`, and read-only accessors (`source_backed_package()`, `shared_ole_file()`).
+  - Exact no-ops on signed input stay byte-identical.
+  - Five tests that pinned the old stripping now assert the refusal.
+- Audit test: 11 signed inputs × 4 routes (3 DOCX, 2 PPTX and 2 XLSX from the corpus; XLSB, DOC, XLS and PPT signed in-test), plus the encrypted-and-signed refusal.
+- Follow-ups:
+  - About 115 package-level implicit `unsign()` calls in pptx (~60), xlsx (~45) and docx (~10) still strip outside the builders' reach.
+  - Tier 3: the ODF rebuild drops signature members (`litchi-odf-common/src/core/writer.rs:1621`), reached from the ODF formula, ODP and ODS mutators.
+  - The opener does not detect ODF signatures.
+  - xlsb task panes and ribbon refuse only at save.
+- Merge into `uo/m0a` (after S7): I combined the appended classifiers and tests in `error.rs`, the `Docx` state fields (the S7 Markdown cache and the S6b `ooxml_limits`), and the ADR 0024 amendments. Inventory: 267 declarations, 255 canonical edges.
+- Verified on the merged tree:
+  - litchi-ops/litchi clippy with all features, and litchi-ops clippy across 10 feature sets;
+  - litchi-ops: 449 tests, including the 26 signature tests;
+  - facade targets: parity, open, tolerance, unexpected-format, read-limits and encryption;
+  - leaf suites: xlsb 1,039, pptx 1,314, ppt 1,349;
+  - the boundary checker (267), the non-iWork gate and the gate unit tests.
