@@ -248,3 +248,22 @@
   - XLSX coordinate and range errors (`cell("A0")`) classify as `corrupt_file` through the wildcard arm. They are caller errors and should be `invalid_argument` or `out_of_range`.
   - `Docx::section_inventory` refuses Word-authored files (MCE bindings, F-15 in record 0010); L-DOCX-R5 is asked to cover it.
 - Verified on the merged `uo/m0a`: facade examples clippy, 52 doctests, and the example-targets gate.
+
+## S8c — facade tests on `litchi::open` and `File` (`940f8fb440`)
+- All facade integration tests and the in-source `prepared_index_tests` now use `open*`, `File` and the views: 192 tests over 31 targets, plus `--lib` 352 and `--doc` 49. Only `markdown_file_parity` still names the old types, by design.
+- Eval: `FormulaEvaluator` reads `WorkbookView` directly, which closes S6's item. A new test evaluates through the path, bytes and eager routes.
+- S7's parity checks moved to 47 KB of goldens in `crates/litchi/tests/golden/`, recorded from the old types:
+  - Markdown digests for the 438-file corpus;
+  - 25 tolerance reports;
+  - 55 PPTX slide catalogs.
+
+  `markdown_file_parity` pins the goldens to the old types until S9 deletes that file. `LITCHI_BLESS_GOLDEN=1` regenerates them.
+- Six assertions changed form or could not be ported (record `docs/unified-ops/s8c-facade-tests.md` §3). For example, the "XLSB has no sheet selector" refusal is now enforced at compile time, and the content-types limit now names `ContentTypesBytes` instead of the flattened `InputBytes`.
+- Fuzz: no target uses the old types. 57 of 58 bins check; `keynote_chart_title` has an E0283 that predates this work (iWork, not edited).
+- For S9:
+  - Delete `markdown_file_parity.rs` whole.
+  - Keep the detection, `sheet` and `markdown` re-exports the tests use.
+  - Give the OPC probe counter a public test path when `__migration` is removed.
+  - The full list is in §5 of the record.
+- **Merge note for `uo/m1`:** L-PPT-R1 (already on `uo/m1`) changes PPT slide text, so the Markdown golden's PPT rows will differ there. Re-bless them on `uo/m1` after this merges, and record the reason (the F-10 fix).
+- Verified on the merged `uo/m0a`: facade clippy with all features, plus `markdown_corpus_golden`, `markdown_file_parity` (12), `unified_open_facade`, `unexpected_format`, `read_limits_facade`, `xlsb_facade` (23), `eval_xlsx_integration`, `unified_sheet_selectors`, `tolerance_report_facade` and `pages_facade`.
