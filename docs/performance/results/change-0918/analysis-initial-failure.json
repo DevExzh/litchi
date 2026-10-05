@@ -1,0 +1,17 @@
+{
+  "command": "python3 -B docs/performance/results/change-0918/comparison-analysis.py",
+  "exit_code": 1,
+  "reason": "Initial helper default output attempted to replace its already retained report after replay; CLI corrected before final helper acceptance. Frozen experiment unchanged.",
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0918/execution-logs/analysis-initial.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0918/execution-logs/analysis-initial.stderr",
+      "bytes": 165,
+      "sha256": "7783381b608ad468970b929d45087282596c276ec56986de75cf31c9e5e92ebc"
+    }
+  ]
+}

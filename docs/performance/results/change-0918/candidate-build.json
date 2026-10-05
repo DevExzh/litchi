@@ -1,0 +1,50 @@
+{
+  "schema": "litchi.performance.0918.candidate-build.v1",
+  "revision": "f5485b3ca8582051247d31946b1c5f45c8a561ad",
+  "candidate_scope": "RevisionEditor::commit Arc<[u8]> handoff only; three slice conversions, no other production change",
+  "source_archive": {
+    "path": "/home/zhuhe/litchi-performance-0918/candidate/source-base-v2-f5485b3ca8582051247d31946b1c5f45c8a561ad.tar",
+    "bytes": 281774080,
+    "sha256": "eaaaaf9b939f2cd8fc1093a75de5a0152438ba84bcf27a09dde4a8be7f23be6b",
+    "regeneration_argv": [
+      "git", "archive", "--format=tar", "--prefix=tree-v2/",
+      "f5485b3ca8582051247d31946b1c5f45c8a561ad", "--",
+      "AGENTS.md", "README.md", "SECURITY.md", "LICENSE", ".cargo",
+      "Cargo.toml", "clippy.toml", "deny.toml", "rust-toolchain.toml",
+      "rustfmt.toml", "crates", "test-data", "media", "tools",
+      "docs/GOAL.md", "docs/CRUD_Scenario_Checklist.md", "docs/adr",
+      "docs/performance/results/change-0917/probe"
+    ],
+    "extracted_root": "/home/zhuhe/litchi-performance-0918/candidate/tree-v2",
+    "regular_files": 10898,
+    "scope": "All crates and test-data, build configuration, tools, ADRs, goal/checklist, and exactly the eight committed 0917 probe files; no historic performance/report evidence or user-untracked files"
+  },
+  "source_hashes": {
+    "baseline_package_rs": "a04da643b093ec9724c9ac57ed8fbfdf2c2fedfc16eade105c91c32df7c9a446",
+    "candidate_package_rs": "3febb53e4b5d13521f40d50d6851823b4a9320696a58a3c4887fb34ac8d91779",
+    "candidate_patch": "7439f82ff725106b1782c7ce6e3d28b1978ec7d8831b24f3745f3813b466bc18",
+    "probe_cargo_toml": "0e6f34cc57d56b2725034d4ed067e06a9a28d571f59348d0412c3c6966ea157d",
+    "probe_cargo_lock": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c",
+    "workspace_cargo_lock_original_copy": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "workspace_cargo_lock_generated_offline": "00ef62deed9b94a8b4ed0b3e2497923ae6e1a092975c2311b654407738881684"
+  },
+  "build": {
+    "command": "taskset -c 16,17 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0918/candidate/target cargo build --release --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0918/candidate/tree-v2/docs/performance/results/change-0917/probe/Cargo.toml --bins",
+    "start_utc": "2026-10-05T18:16:27,686259069+00:00",
+    "finish_utc": "2026-10-05T18:17:41,182148644+00:00",
+    "exit": 0,
+    "toolchain": "rustc/cargo 1.95.0 (rustc 59807616e, cargo f2d3ce0bd)",
+    "rustflags": "absent",
+    "rustc_wrapper": "absent",
+    "probe_manifest_and_lock_match_0917": true,
+    "binaries": [
+      {"name": "doc_retention_probe", "path": "/home/zhuhe/litchi-performance-0918/candidate/target/release/doc_retention_probe", "bytes": 50630928, "sha256": "76dbda76cd6bdbb3e9a219b4ef0c06160c4607a2bc58ad2e4bd21103008f6d2b"},
+      {"name": "doc_retention_probe_alloc", "path": "/home/zhuhe/litchi-performance-0918/candidate/target/release/doc_retention_probe_alloc", "bytes": 50634624, "sha256": "b151763ad9613ac2ac6f8349b3ff80383b45f96d27298f1fbb3b3d1ab2fe5fb9"}
+    ],
+    "baseline_binaries": [
+      {"name": "doc_retention_probe", "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe", "bytes": 55146832, "sha256": "2ae48b4f7548c1468c8e7691d56d89b231c4a63f52ed48383f07fe3609c59a13"},
+      {"name": "doc_retention_probe_alloc", "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe_alloc", "bytes": 55150520, "sha256": "927606880090f9169e222254944df92366dd1cb0e1aa37fc0861234c466ccf1b"}
+    ]
+  },
+  "large_artifacts": "Source archive, target directory, and executables remain outside the repository. This receipt records paths, sizes, hashes, and regeneration command."
+}

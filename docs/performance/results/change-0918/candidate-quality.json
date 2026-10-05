@@ -1,0 +1,41 @@
+{
+  "schema": "litchi.performance.0918.candidate-quality.v1",
+  "candidate_build": "candidate-build.json",
+  "production_source_unchanged_in_root": true,
+  "checks": {
+    "changed_file_rustfmt_check": {"exit": 0, "command": "rustfmt --edition 2024 --check crates/litchi-doc/src/tracked_revision/package.rs"},
+    "litchi_doc_fmt_check": {"exit": 0, "command": "cargo fmt -p litchi-doc -- --check"},
+    "workspace_fmt_check": {
+      "exit": 1,
+      "command": "cargo fmt --all -- --check",
+      "result": "pre-existing baseline drift in soapberry-zip/src/office.rs and litchi-iwa-archive/src/{package.rs,zip.rs}; no candidate file is listed"
+    },
+    "litchi_doc_clippy": {"exit": 0, "command": "cargo clippy -p litchi-doc --all-targets --all-features --locked --offline -- -D warnings"},
+    "litchi_doc_tests": {"exit": 0, "command": "cargo test -p litchi-doc --all-targets --all-features --locked --offline", "result_groups": 48, "passed": 1365, "failed": 0, "ignored": 2},
+    "litchi_doc_doctests": {"exit": 0, "command": "cargo test -p litchi-doc --doc --all-features --locked --offline", "passed": 14, "failed": 0, "ignored": 12},
+    "public_rustdoc_warnings_denied": {
+      "candidate_exit": 101,
+      "baseline_exit": 101,
+      "command": "RUSTDOCFLAGS=-D warnings cargo doc -p litchi-doc --all-features --no-deps --locked --offline",
+      "diagnostic_diff_bytes": 0,
+      "result": "baseline-matched pre-existing private parse_recording links in bookmarks, comments, rsids, and sections/codec"
+    },
+    "private_rustdoc_warnings_denied": {
+      "exit": 101,
+      "command": "RUSTDOCFLAGS=-D warnings cargo doc -p litchi-doc --all-features --no-deps --document-private-items --locked --offline",
+      "result": "additional pre-existing unresolved documentation links; retained as a failure"
+    },
+    "data_changed_picture_transaction": {"exit": 0, "command": "cargo test -p litchi-doc --test doc_body_transaction --all-features genuine_receivers_accept_pictures_beside_main_and_header_drawings --locked --offline", "result": "existing Data-stream replacement path passed"},
+    "probe_smoke_native_noheadfoot": {"exit": 0, "correctness_gates": "all checked true", "samples": 1},
+    "probe_smoke_native_floatingpictures": {"exit": 0, "correctness_gates": "all checked true", "samples": 1},
+    "probe_smoke_allocator_floatingpictures": {"exit": 0, "correctness_gates": "all checked true", "samples": 1}
+  },
+  "lock_note": {
+    "original_workspace_lock": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "locked_offline_quality_attempt": "The first --locked --offline workspace metadata/clippy attempt exited because Cargo reported that it could not update the lock file while --locked was active; the original stderr was overwritten by the successful rerun",
+    "generated_quality_lock": "00ef62deed9b94a8b4ed0b3e2497923ae6e1a092975c2311b654407738881684",
+    "standalone_probe_lock_unchanged": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c",
+    "initial_clippy_attempt_log": "not retained separately; exit and observed Cargo error are recorded above, and the successful rerun log remains in the log directory"
+  },
+  "logs": "/home/zhuhe/litchi-performance-0918/candidate/quality-logs"
+}

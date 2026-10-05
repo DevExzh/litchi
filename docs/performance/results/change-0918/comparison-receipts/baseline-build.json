@@ -1,0 +1,58 @@
+{
+  "schema": "litchi.performance.0917.doc-retention.build.v1",
+  "created_utc": "2026-10-05T17:45:00Z",
+  "status": "passed",
+  "source_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "argv": [
+    "taskset", "-c", "14,15", "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0917/target",
+    "CARGO_TERM_COLOR=never", "cargo", "build", "--locked", "--offline", "-j2", "--release",
+    "--manifest-path", "/home/zhuhe/litchi-performance-0917/source/tree/docs/performance/results/change-0917/probe/Cargo.toml", "--bins"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0917/source/tree",
+  "start_utc": "2026-10-05T17:41:36.806203018Z",
+  "end_utc": "2026-10-05T17:42:50.227950066Z",
+  "elapsed_ns": 73416856166,
+  "exit_code": 0,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0917/target",
+    "CARGO_TERM_COLOR": "never",
+    "cargo_jobs": 2,
+    "cpu_affinity": [14, 15],
+    "cargo_locked": true,
+    "cargo_offline": true,
+    "RUSTFLAGS": null,
+    "RUSTC_WRAPPER": null,
+    "CARGO_HOME": null,
+    "RUSTUP_TOOLCHAIN": null
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "source": {
+    "archive_path": "/home/zhuhe/litchi-performance-0917/source-base.tar",
+    "archive_bytes": 164352000,
+    "archive_sha256": "61df35b45519c95b43fb4194b0f679c69ce17aa8b39e5c112c0aea9b02f95863",
+    "manifest_before_sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49",
+    "manifest_after_build_path": "/home/zhuhe/litchi-performance-0917/source/source-tree-after-build.sha256",
+    "manifest_after_build_sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49",
+    "manifest_after_quality_sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49",
+    "manifest_unchanged": true
+  },
+  "binaries": [
+    {"name": "doc_retention_probe", "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe", "bytes": 55146832, "sha256": "2ae48b4f7548c1468c8e7691d56d89b231c4a63f52ed48383f07fe3609c59a13"},
+    {"name": "doc_retention_probe_alloc", "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe_alloc", "bytes": 55150520, "sha256": "927606880090f9169e222254944df92366dd1cb0e1aa37fc0861234c466ccf1b"}
+  ],
+  "logs": [
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.command", "bytes": 274, "sha256": "3ea32f07e8dd4dabc0c30cd224cbaf95b20c3a3bc82e5fb7e952fdd53f3d9796"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.environment", "bytes": 394, "sha256": "7df5209768af1502e8146c2cf167b76e16ec9bd72f980c9c96871801bc1dbf67"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.exit", "bytes": 2, "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.finish.epoch-ns", "bytes": 20, "sha256": "255acbe15b9c8ce976a12776fe4af6ad9b8e3152a43942c71efc10d0c498ef5b"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.finish.utc", "bytes": 31, "sha256": "cb5ba857fcdad49cef8ecab4b7c10ce53257c7fe96373451ceac00df777fcbde"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.start.epoch-ns", "bytes": 20, "sha256": "1fdb406567a178957799b13f04861732b13b97a90841460daea1010e844524fd"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.start.utc", "bytes": 31, "sha256": "d5752f8fb311c6d5126d51b52e313eb9141659c3daca618fa09b00216323276c"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.stderr", "bytes": 4300, "sha256": "122412d583675374800527316e843f028776a1aada13a9534591b1e1c5fa9581"},
+    {"path": "docs/performance/results/change-0917/build-logs/release-build.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+  ]
+}

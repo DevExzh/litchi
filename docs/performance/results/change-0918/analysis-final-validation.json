@@ -1,0 +1,22 @@
+{
+  "command": "python3 -B docs/performance/results/change-0918/comparison-analysis.py",
+  "exit_code": 0,
+  "adapter_sha256": "1c72d1d84ba7a789fced7ec24d4d7e275ef9a6a8a1b9fbd92ef24f7f9bd60d87",
+  "result": {
+    "reports": 288,
+    "adoption": false,
+    "status": "verified"
+  },
+  "logs": [
+    {
+      "path": "docs/performance/results/change-0918/execution-logs/analysis-final.stdout",
+      "bytes": 97,
+      "sha256": "0528431a287679a5c1dc674192f0548456c949c74a1c1fb7ad6d78ec30fa8c5f"
+    },
+    {
+      "path": "docs/performance/results/change-0918/execution-logs/analysis-final.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

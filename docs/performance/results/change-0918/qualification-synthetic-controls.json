@@ -1,0 +1,85 @@
+{
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0918/qualification-synthetic-controls.py",
+  "controls": {
+    "allocation_gate_failure": {
+      "allocator_cells": 48,
+      "allocator_children": 96,
+      "expected_adoption": false,
+      "gates": {
+        "adoption": false,
+        "allocation": false,
+        "latency": true,
+        "peak_live": true
+      },
+      "native_children": 192,
+      "native_paired_cells": 96,
+      "native_scenario_cells": 8
+    },
+    "latency_gate_failure": {
+      "allocator_cells": 48,
+      "allocator_children": 96,
+      "expected_adoption": false,
+      "gates": {
+        "adoption": false,
+        "allocation": true,
+        "latency": false,
+        "peak_live": true
+      },
+      "native_children": 192,
+      "native_paired_cells": 96,
+      "native_scenario_cells": 8
+    },
+    "missing_pair_failure": {
+      "expected_failure": "EvidenceError: synthetic receipt missing: native-r01-docnohf-e01-baseline-default"
+    },
+    "passing_full_schedule": {
+      "allocator_cells": 48,
+      "allocator_children": 96,
+      "gates": {
+        "adoption": true,
+        "allocation": true,
+        "latency": true,
+        "peak_live": true
+      },
+      "native_children": 192,
+      "native_paired_cells": 96,
+      "native_scenario_cells": 8
+    },
+    "peak_live_gate_failure": {
+      "allocator_cells": 48,
+      "allocator_children": 96,
+      "expected_adoption": false,
+      "gates": {
+        "adoption": false,
+        "allocation": true,
+        "latency": true,
+        "peak_live": false
+      },
+      "native_children": 192,
+      "native_paired_cells": 96,
+      "native_scenario_cells": 8
+    },
+    "semantic_corruption_failure": {
+      "expected_failure": "EvidenceError: native semantic identity differs: docnohf/e1/r1"
+    }
+  },
+  "coverage": {
+    "allocator_cells": 48,
+    "allocator_children": 96,
+    "native_children": 192,
+    "native_paired_cells": 96,
+    "native_scenario_cells": 8
+  },
+  "execution": "in-memory synthetic receipts; no binaries, probes, builds, or real raw captures",
+  "protocol": {
+    "bytes": 7319,
+    "path": "docs/performance/results/change-0918/comparison-protocol.json",
+    "sha256": "0bfd3669f72b0a491f40c489f9d2cd153275e99add8fd65fba3554e5e50b72de"
+  },
+  "runner": {
+    "bytes": 63000,
+    "path": "docs/performance/results/change-0918/comparison.py",
+    "sha256": "4ac944350e38239e8148c2884d6c2a4f21082f7a2293159dd0e0636575532f88"
+  },
+  "schema": "litchi.performance.0918.qualification-synthetic-controls.v1"
+}

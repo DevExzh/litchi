@@ -1,0 +1,49 @@
+{
+  "commands": {
+    "relocated": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0918/comparison-analysis.py --packet <copied-packet> --controls-root <control-root>",
+    "replay": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0918/comparison-analysis.py"
+  },
+  "fixture_corruption_controls": [
+    {
+      "error": "AnalysisError: missing copied fixture: /home/zhuhe/litchi-performance-0918/reviewer-final/fixture-controls/path-corrupt/test-data/ole/doc/NoHeadFoot.doc",
+      "name": "fixture-path",
+      "packet": "/home/zhuhe/litchi-performance-0918/reviewer-final/fixture-controls/path-corrupt/docs/performance/results/change-0918",
+      "status": "rejected"
+    },
+    {
+      "error": "AnalysisError: copied fixture hash changed: docnohf",
+      "name": "fixture-bytes",
+      "packet": "/home/zhuhe/litchi-performance-0918/reviewer-final/fixture-controls/bytes-corrupt/docs/performance/results/change-0918",
+      "status": "rejected"
+    }
+  ],
+  "positive_replay": {
+    "adoption": false,
+    "allocator_children": 96,
+    "canonical_reports": {
+      "authorized_input_rows": 288,
+      "canonical_sha256": "6247bd652bf353250de1d960309dfaa31d4caf0095e8ce6bb4f73e9a693f00d0",
+      "reports": 288
+    },
+    "fixture_hashes_verified": [
+      "docfloat",
+      "docnohf"
+    ],
+    "frozen_hashes": {
+      "comparison-manifest.json": "3831f99ea1df275970118bbd6452d9f7a44694b77d971d867e33134862b369b0",
+      "comparison-protocol.json": "0bfd3669f72b0a491f40c489f9d2cd153275e99add8fd65fba3554e5e50b72de",
+      "comparison-reduced.json": "237fa7b7e9d3a4773e2b973f8a2baf7b01d323dd8f1f059af484221ca175824f",
+      "comparison-replay-validator.py": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894",
+      "comparison-replay.py": "4c55800b59d3663889c402dd396276434196583ed5c7c88e1cccd7c0d0d1049b",
+      "comparison.py": "4ac944350e38239e8148c2884d6c2a4f21082f7a2293159dd0e0636575532f88"
+    },
+    "native_children": 192,
+    "original_fixture_aliases_validation_only": true,
+    "packet": "/home/zhuhe/litchi-performance-0918/reviewer-final/reconstructed-final/docs/performance/results/change-0918",
+    "repository_root": "/home/zhuhe/litchi-performance-0918/reviewer-final/reconstructed-final",
+    "status": "verified"
+  },
+  "raw_report_policy": "raw reports and metrics are read-only; canonical hashes are recomputed",
+  "schema": "litchi.performance.0918.comparison-analysis.v1",
+  "status": "verified"
+}

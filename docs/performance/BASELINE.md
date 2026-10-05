@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0918 — DOC stream-copy candidate rejected
+
+[0918](0918-doc-stream-arc-handoff.md) retains 192 matched native children
+(9,600 samples), 96 allocator children and 96 correctness qualifications.
+Direct slice-to-Arc construction saves 5.7073%/4.6685% allocated bytes at
+32 default-policy edits for NoHeadFoot/FloatingPictures, with unchanged peak
+live bytes. FloatingPictures two/eight-edit bootstrap lower ratios
+0.871292/0.933940 fail the frozen 0.952381 latency threshold. The candidate is
+rejected and production stays unchanged. All adverse latency/RSS rows remain;
+scoped Callgrind diagnosis is separate from native performance claims.
+
 ## 0917 — current real-DOC repeated-edit retention matrix
 
 [0917](0917-doc-repeated-edit-retention.md) retains 144 native children/4,320

@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0918 — measured DOC candidate rejected by latency gate
+
+[0918](0918-doc-stream-arc-handoff.md) adds scoped current-source diagnosis
+and a frozen baseline/candidate experiment: 288 measured children and 96
+correctness qualifications pass, but two native confidence bounds fail the
+prospective admission threshold. Allocation savings do not waive that gate;
+production remains unchanged. DOC tests and Clippy pass; baseline-matched
+rustdoc failures and unrelated workspace formatting drift remain documented.
+No broad CRUD, producer, distinct-object, cold/range, or concurrency gap is
+closed by this experiment. The non-iWork program remains open.
+
 ## 0917 — real-DOC repeated-object scaling evidence
 
 [0917](0917-doc-repeated-edit-retention.md) closes the narrow current-source

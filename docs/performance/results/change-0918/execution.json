@@ -1,0 +1,91 @@
+{
+  "schema": "litchi.performance.0918.execution.v1",
+  "recorded_utc": "2026-10-05T18:56:51.017951+00:00",
+  "steps": [
+    {
+      "command": "python3 -B docs/performance/results/change-0918/comparison.py run --lane native",
+      "exit_code": 0,
+      "logs": [
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/native-driver.stdout",
+          "external_path": "/home/zhuhe/litchi-performance-0918/native-driver.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/native-driver.stderr",
+          "external_path": "/home/zhuhe/litchi-performance-0918/native-driver.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "python3 -B docs/performance/results/change-0918/comparison.py run --lane allocator",
+      "exit_code": 0,
+      "logs": [
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/allocator-driver.stdout",
+          "external_path": "/home/zhuhe/litchi-performance-0918/allocator-driver.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/allocator-driver.stderr",
+          "external_path": "/home/zhuhe/litchi-performance-0918/allocator-driver.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "python3 -B docs/performance/results/change-0918/comparison.py reduce",
+      "exit_code": 0,
+      "logs": [
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/reduce.stdout",
+          "external_path": "/home/zhuhe/litchi-performance-0918/reduce.stdout",
+          "bytes": 220,
+          "sha256": "54af6f8441a9cdda956d161ba077ec0df752f51d88ecb396af927ae3a28250e6"
+        },
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/reduce.stderr",
+          "external_path": "/home/zhuhe/litchi-performance-0918/reduce.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "python3 -B docs/performance/results/change-0918/comparison-replay.py",
+      "exit_code": 0,
+      "logs": [
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/replay.stdout",
+          "external_path": "/home/zhuhe/litchi-performance-0918/replay.stdout",
+          "bytes": 166,
+          "sha256": "202841005ab1b1c3bc6ee94ad174006b35e7e018d5922315a1edc94a2d6e062c"
+        },
+        {
+          "path": "docs/performance/results/change-0918/execution-logs/replay.stderr",
+          "external_path": "/home/zhuhe/litchi-performance-0918/replay.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ],
+  "capture_children": {
+    "native": 192,
+    "allocator": 96
+  },
+  "native_samples": 9600,
+  "native_warmups": 960,
+  "adoption": false,
+  "post_capture_loadavg": [
+    9.2724609375,
+    7.72021484375,
+    6.171875
+  ],
+  "failed_or_replaced_children": 0
+}

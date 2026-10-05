@@ -1,0 +1,23 @@
+--- a/crates/litchi-doc/src/tracked_revision/package.rs
++++ b/crates/litchi-doc/src/tracked_revision/package.rs
+@@ -3027,17 +3027,17 @@
+         let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
+         replacements.push((
+             self.word_path.as_slice(),
+-            Arc::<[u8]>::from(self.word.clone()),
++            Arc::<[u8]>::from(self.word.as_slice()),
+         ));
+         replacements.push((
+             self.table_path.as_slice(),
+-            Arc::<[u8]>::from(self.table.clone()),
++            Arc::<[u8]>::from(self.table.as_slice()),
+         ));
+         if self.data_changed {
+             if self.package.stream(&self.data_path).is_some() {
+                 replacements.push((
+                     self.data_path.as_slice(),
+-                    Arc::<[u8]>::from(self.data.clone()),
++                    Arc::<[u8]>::from(self.data.as_slice()),
+                 ));
+             } else {
+                 self.package

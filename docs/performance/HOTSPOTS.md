@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0918 — temporary DOC stream ownership copy measured, not adopted
+
+[0918](0918-doc-stream-arc-handoff.md) profiles the repeated-edit lifecycle
+with collection limited to one `measure_one` invocation. Stream publication
+and copies merit inspection, but overlapping guest-instruction shares do not
+predict native time. The isolated three-line slice-to-Arc candidate removes
+two temporary allocations per measured edit and saves bytes without lowering
+peak live; it fails the prospective FloatingPictures two/eight-edit latency
+gate and remains unadopted. Do not repeat it as an untested recommendation.
+Further work should diagnose native variability and the remaining clone-first
+staging/whole-stream growth while preserving full-tail and publication checks.
+
 ## 0917 — DOC handoff already exists; repeated-edit costs remain
 
 [0917](0917-doc-repeated-edit-retention.md) corrects 0906's stale recommendation:

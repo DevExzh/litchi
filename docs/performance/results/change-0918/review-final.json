@@ -1,0 +1,57 @@
+{
+  "schema": "litchi.performance.0918.final-review.v1",
+  "status": "verified_with_committed_replay_adapter",
+  "manifest": {
+    "bytes": 7161,
+    "sha256": "3831f99ea1df275970118bbd6452d9f7a44694b77d971d867e33134862b369b0"
+  },
+  "reduced": {
+    "bytes": 397754,
+    "sha256": "237fa7b7e9d3a4773e2b973f8a2baf7b01d323dd8f1f059af484221ca175824f"
+  },
+  "independent_recompute": {
+    "proof_path": "/home/zhuhe/litchi-performance-0918/reviewer-final/recompute-proof.json",
+    "proof_bytes": 3869,
+    "proof_sha256": "4336b22ef5ad5768609d5a07ae9259a72335315d1ee974028b94b16f43513816",
+    "receipts": 288,
+    "custody_artifacts": 864,
+    "native_bootstrap_failed_cells": ["docfloat/e02", "docfloat/e08"],
+    "native_adverse_flags_p50_p95_p99": [17, 19, 19],
+    "allocator_adverse_flags_allocated_peak_live": [0, 0],
+    "allocator_rss_adverse_pairs": 1,
+    "adoption": false
+  },
+  "relocation": {
+    "proof_path": "/home/zhuhe/litchi-performance-0918/reviewer-final/relocation-proof.json",
+    "proof_bytes": 2923,
+    "proof_sha256": "45a8294ac51d95897838c0b859f6c4ef24ada35af1b10f249c0a44958e7b9966",
+    "adapter_sha256": "a303ac6ec606b645f4b3b5046ee7609f9d1b19a6df2fd2e20a8dc9e223bf2907",
+    "literal_frozen_replay": "rejected copied fixture path embedded in retained report",
+    "adapter_replay": "verified 192 native and 96 allocator children",
+    "corruption_tests": ["packet gzip rejected", "reduced result rejected"]
+  },
+  "committed_adapter_review": {
+    "adapter_bytes": 13553,
+    "adapter_sha256": "1c72d1d84ba7a789fced7ec24d4d7e275ef9a6a8a1b9fbd92ef24f7f9bd60d87",
+    "copied_packet_replay": "verified twice, 288 canonical reports, adoption false",
+    "canonical_reports_sha256": "6247bd652bf353250de1d960309dfaa31d4caf0095e8ce6bb4f73e9a693f00d0",
+    "fixture_controls": {
+      "path_alias_manifest_tamper": "rejected",
+      "copied_fixture_byte_tamper": "rejected"
+    },
+    "artifact_controls": {
+      "gzip_stdout_byte_tamper": "rejected: content changed",
+      "reduced_result_tamper": "rejected: frozen comparison-reduced.json byte count changed"
+    },
+    "proof_path": "/home/zhuhe/litchi-performance-0918/reviewer-final/committed-analysis-proof.json",
+    "proof_bytes": 7017,
+    "proof_sha256": "98435feb868534df914516e46d7ca7e07beaa9c87c2f98f78033def94d008fe2"
+  },
+  "cleanup": {
+    "reviewer_owned_reconstructed_and_corruption_trees": "cleaned after checks",
+    "retained_external_proofs": ["committed-analysis-proof.json", "recompute-proof.json", "relocation-proof.json"],
+    "receipt_path": "/home/zhuhe/litchi-performance-0918/reviewer-final/cleanup-receipt.json",
+    "receipt_bytes": 1565,
+    "receipt_sha256": "9f435e7a94e0c6e2d9d87c64e371e4414bdb3cb9130f4a6f7e9e04ad6f88490c"
+  }
+}

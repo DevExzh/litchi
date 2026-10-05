@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 0918 — DOC repeated-object ownership experiment
+
+[0918](0918-doc-stream-arc-handoff.md) compares an isolated ownership-copy
+candidate over the existing two-fixture 1/2/8/32-edit paragraph-zero workload.
+All preservation, no-op, refusal, inverse-patch and retention controls pass;
+native latency admission fails and production remains unchanged. The result
+adds measured evidence to the existing scenario, with no selector or scenario
+count increase and no distinct-object bulk-edit or producer promotion.
+
 ## 0917 — real-DOC repeated-object retention scaling
 
 [0917](0917-doc-repeated-edit-retention.md) adds a two-fixture 1/2/8/32-edit

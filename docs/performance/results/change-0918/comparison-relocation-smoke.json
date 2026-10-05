@@ -1,0 +1,100 @@
+{
+  "external_root": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke",
+  "fixtures": [
+    {
+      "bytes": 26112,
+      "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/test-data/ole/doc/NoHeadFoot.doc",
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "bytes": 335360,
+      "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/test-data/ole/doc/FloatingPictures.doc",
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "mode": "copied reconstructed hierarchy with original checkout paths unavailable",
+  "packet": {
+    "bytes": 63000,
+    "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/docs/performance/results/change-0918/comparison.py",
+    "sha256": "4ac944350e38239e8148c2884d6c2a4f21082f7a2293159dd0e0636575532f88"
+  },
+  "probe": {
+    "files": [
+      {
+        "bytes": 33633,
+        "path": "Cargo.lock",
+        "sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"
+      },
+      {
+        "bytes": 541,
+        "path": "Cargo.toml",
+        "sha256": "0e6f34cc57d56b2725034d4ed067e06a9a28d571f59348d0412c3c6966ea157d"
+      },
+      {
+        "bytes": 2932,
+        "path": "README.md",
+        "sha256": "fe5630cb4f41da2b79f1ed83c336ca908171d20fb00277df121891b80b72d2b4"
+      },
+      {
+        "bytes": 4912,
+        "path": "src/alloc_metrics.rs",
+        "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+      },
+      {
+        "bytes": 1797,
+        "path": "src/bin/alloc.rs",
+        "sha256": "11a1b9d765399ad0917c657108f4a5ea81011a20d7b6ebd5385f95bbc702e320"
+      },
+      {
+        "bytes": 34827,
+        "path": "src/lib.rs",
+        "sha256": "b932992f10ecee244eaa3bd14833a07dcd2456f0bfc2de0dce3bf64403737dc3"
+      },
+      {
+        "bytes": 105,
+        "path": "src/main.rs",
+        "sha256": "496530a1954a6e014c59e5e82e9a7ba2a6b4e3e5077758f1c6a12b85d5cc439c"
+      },
+      {
+        "bytes": 58805,
+        "path": "src/oracle_0730.rs",
+        "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+      }
+    ],
+    "path": "docs/performance/results/change-0917/probe"
+  },
+  "protocol": {
+    "bytes": 7319,
+    "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/docs/performance/results/change-0918/comparison-protocol.json",
+    "sha256": "0bfd3669f72b0a491f40c489f9d2cd153275e99add8fd65fba3554e5e50b72de"
+  },
+  "replay": {
+    "bytes": 2871,
+    "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/docs/performance/results/change-0918/comparison-replay.py",
+    "sha256": "4c55800b59d3663889c402dd396276434196583ed5c7c88e1cccd7c0d0d1049b"
+  },
+  "schema": "litchi.performance.0918.comparison-relocation-smoke.v1",
+  "setup_command": "smoke=/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke; mkdir -p \"$smoke/docs/performance/results\" \"$smoke/test-data/ole/doc\"; cp -a docs/performance/results/change-0918 \"$smoke/docs/performance/results/\"; mkdir -p \"$smoke/docs/performance/results/change-0917\"; cp docs/performance/results/change-0917/capture.py docs/performance/results/change-0917/native-protocol.json \"$smoke/docs/performance/results/change-0917/\"; cp -a docs/performance/results/change-0917/probe \"$smoke/docs/performance/results/change-0917/\"; cp test-data/ole/doc/NoHeadFoot.doc test-data/ole/doc/FloatingPictures.doc \"$smoke/test-data/ole/doc/\"",
+  "status": "verified",
+  "validator": {
+    "bytes": 69575,
+    "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/docs/performance/results/change-0917/capture.py",
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  },
+  "verification_script": {
+    "bytes": 1326,
+    "path": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/verify-smoke.py",
+    "sha256": "4b2b99aa44e3ed1b8f9b37111c591f321ad12ceb85d3009598e7da6ea92d28d0"
+  },
+  "verification_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0918/comparison-relocation-smoke/verify-smoke.py",
+  "verified_invariants": {
+    "fixture_cases": [
+      "docfloat",
+      "docnohf"
+    ],
+    "original_checkout_used": false,
+    "probe_file_count": 8,
+    "replay_hierarchy_check": "require_reconstructed_hierarchy passed",
+    "runner_repo_root": "/home/zhuhe/litchi-performance-0918/comparison-relocation-smoke"
+  }
+}

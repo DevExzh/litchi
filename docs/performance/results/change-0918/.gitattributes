@@ -1,0 +1,4 @@
+# Preserve captured bytes and the reviewed, unapplied patch exactly.
+comparison-raw/** -text -whitespace
+execution-logs/** -text -whitespace
+candidate.patch -text -whitespace

@@ -1,0 +1,102 @@
+{
+  "schema": "litchi.performance.0918.doc-comparison.protocol.v1",
+  "frozen_utc": "2026-10-05T18:12:19.992456039Z",
+  "current_source_head": "f5485b3ca8582051247d31946b1c5f45c8a561ad",
+  "baseline_source_head": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "purpose": "Compare the current public DOC repeated-edit lifecycle with the isolated Arc<[u8]> ownership candidate under one frozen probe, with correctness and resource gates required before any adoption decision.",
+  "candidate_scope": "DOCRevisionEditor::commit changes only the changed-stream ownership conversion from Arc::from(Vec<u8>) to Arc::from(&[u8]); no public API, retention policy, fixture, or probe behavior may change.",
+  "fixtures": [
+    {
+      "case": "docnohf",
+      "path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "case": "docfloat",
+      "path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "edits": [1, 2, 8, 32],
+  "operation": "Use the unchanged 0917 public probe. Each child opens a fresh source, replaces paragraph zero with the two alternating retained-0917 texts, commits, copies the output, and validates all 0917 semantic, patch, preservation, and retention controls. Native comparison selects the default 8 MiB route; allocator comparison covers zero, default, and release routes.",
+  "retention_routes": ["zero", "default", "release"],
+  "native": {
+    "cpu": 14,
+    "rounds": 12,
+    "versions": ["baseline", "candidate"],
+    "version_order": "odd rounds baseline then candidate; even rounds candidate then baseline",
+    "case_and_edit_order": "odd rounds use fixture order docnohf, docfloat and edit order 1, 2, 8, 32; even rounds reverse both",
+    "retention": "default",
+    "warmups_per_child": 5,
+    "samples_per_child": 50,
+    "children": 192,
+    "paired_cells": 96,
+    "timer": "The probe's complete public in-memory lifecycle: source clone/open, edit construction, repeated replacements, optional release as selected by the probe, commit, output copy, and local owner destruction. File I/O, preparation, correctness checks, and JSON serialization are outside the probe clock."
+  },
+  "allocator": {
+    "cpu": 14,
+    "repetitions": 2,
+    "versions": ["baseline", "candidate"],
+    "version_order": "repetition one uses baseline then candidate in listed cell order; repetition two reverses case, edit, route, and version order",
+    "warmups_per_child": 0,
+    "samples_per_child": 1,
+    "children": 96,
+    "cells": 48,
+    "routes": ["zero", "default", "release"],
+    "scope": "Separate System allocator lane. Compare requested allocated bytes, successful allocation calls, relative peak live bytes, and retained output bytes. It makes no latency claim."
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "seed": 918,
+    "unit": "matched round within fixed fixture/edit cell",
+    "statistic": "median of twelve baseline-p50/candidate-p50 ratios for native default retention",
+    "interval": "nearest-rank 2.5th and 97.5th percentiles",
+    "minimum_lower_ratio": 0.9523809523809523
+  },
+  "review_flags": {
+    "latency_increase_fraction": 0.05,
+    "peak_live_increase_fraction": 0.05,
+    "rss_increase_fraction": 0.05,
+    "allocation_increase_fraction": 0.01,
+    "meaning": "Flags are retained review triggers and never remove adverse rows from the reduction or substitute for a mandatory gate."
+  },
+  "mandatory_gates": [
+    "Fixture byte lengths and SHA-256 values match this protocol for every child.",
+    "Each baseline and candidate report passes the unchanged 0917 report validator with the frozen lane warmup/sample counts and all twenty correctness flags true.",
+    "The input document source hash and byte length, output hashes and byte lengths, output capacities, reference output identities, retention ceilings, route capacities, stage transitions, and control results match exactly within every paired child; the production source lineage is bound separately by the version receipts.",
+    "No source, output, fixture, probe, or retention identity is changed between versions.",
+    "At least one 32-edit real fixture's default-route median allocated_bytes is at least 5 percent lower for the candidate.",
+    "Candidate allocated_bytes does not increase by more than 1 percent in any allocator cell or paired repetition.",
+    "Candidate peak_live_bytes does not increase by more than 5 percent in any allocator cell or paired repetition.",
+    "Every native default fixture/edit cell has a paired baseline-p50/candidate-p50 bootstrap 95 percent confidence interval lower bound at least 1/1.05.",
+    "All native, allocator, latency, peak-live, RSS, allocation, and correctness adverse rows remain visible in the reduction.",
+    "A failed gate rejects adoption; the candidate's small source diff does not waive any gate."
+  ],
+  "capture_rules": [
+    "Freeze this protocol before any candidate performance child is executed.",
+    "Freeze the baseline and candidate source/build receipts, both binaries, the exact unchanged 0917 probe source, the 0917 validator, this runner, replay, and fixture identities in a manifest before capture.",
+    "Use exclusive child and receipt writes. A failed attempt is retained and blocks reduction; no overwrite, selective rerun, dropped sample, or adverse-row replacement is permitted.",
+    "All raw artifacts at or above 1 MiB and all compiled executables stay outside Git. Small packet artifacts are copied only after hash verification. Large JSON is retained externally and may have a deterministic gzip companion whose compressed and decompressed descriptors are replayed.",
+    "Record command, environment, binary, protocol, validator, start/end timestamps, exit status, host process metrics, and source/fixture hashes for every child.",
+    "The root coordinator starts captures only after profiling, build, quality, and review work is idle; unrelated shared-host load remains an uncontrolled observation."
+  ],
+  "interfaces": {
+    "probe": "--case docnohf|docfloat --input PATH --edits 1|2|8|32 --retention zero|default|release --warmup N --samples N",
+    "qualification": "comparison.py qualify --version baseline|candidate --lane native|allocator --binary PATH --case CASE --edits N --retention zero|default|release --warmup 0 --samples 1",
+    "capture": "comparison.py freeze ...; comparison.py run --lane native|allocator; comparison.py reduce",
+    "replay": "comparison-replay.py --packet PATH"
+  },
+  "identity_binding": {
+    "baseline_receipts": [
+      "docs/performance/results/change-0917/receipts/source-receipt.json",
+      "docs/performance/results/change-0917/receipts/build-receipt.json"
+    ],
+    "baseline_revision_must_be": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_revision_must_be": "f5485b3ca8582051247d31946b1c5f45c8a561ad plus the isolated three-line candidate patch recorded by its source receipt",
+    "probe_source": "docs/performance/results/change-0917/probe",
+    "validator": "docs/performance/results/change-0917/capture.py",
+    "binary_hashes": "Bound in comparison-manifest.json at freeze time and repeated in every child receipt."
+  }
+}

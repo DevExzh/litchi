@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0918 — isolated stream-ownership candidate remains unadopted
+
+[0918](0918-doc-stream-arc-handoff.md) changes no production code. Its
+three-line experimental patch preserves immutable owned stream bytes, atomic
+publication, source-bound inverse patches and exact no-op/refusal behavior
+(ADR 0003), explicit bounded retention and separate measurement lanes
+(ADR 0005), and full semantic/stream/directory preservation checks (ADR 0006).
+All 96 qualification children and 288 comparison children pass these gates.
+The independent native latency admission gate fails, so no candidate source
+is applied. Crate boundaries, dependencies, safety policy and ordinary public
+API remain unchanged; no ADR exception or support promotion is claimed.
+
 ## 0917 — evidence for existing bounded DOC retention
 
 [0917](0917-doc-repeated-edit-retention.md) changes only the standalone harness

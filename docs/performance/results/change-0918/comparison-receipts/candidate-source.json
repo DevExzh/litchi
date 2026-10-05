@@ -1,0 +1,67 @@
+{
+  "schema": "litchi.performance.0918.candidate-source.v1",
+  "source_revision": "f5485b3ca8582051247d31946b1c5f45c8a561ad",
+  "candidate_patch": {
+    "path": "/home/zhuhe/litchi-performance-0918/candidate/candidate-v2.patch",
+    "repository_copy": "docs/performance/results/change-0918/candidate.patch",
+    "bytes": 977,
+    "sha256": "7439f82ff725106b1782c7ce6e3d28b1978ec7d8831b24f3745f3813b466bc18"
+  },
+  "base_archive": {
+    "path": "/home/zhuhe/litchi-performance-0918/candidate/source-base-v2-f5485b3ca8582051247d31946b1c5f45c8a561ad.tar",
+    "bytes": 281774080,
+    "sha256": "eaaaaf9b939f2cd8fc1093a75de5a0152438ba84bcf27a09dde4a8be7f23be6b",
+    "archive_file_count": 10897,
+    "regeneration_argv": [
+      "git", "archive", "--format=tar", "--prefix=tree-v2/",
+      "f5485b3ca8582051247d31946b1c5f45c8a561ad", "--",
+      "AGENTS.md", "README.md", "SECURITY.md", "LICENSE", ".cargo",
+      "Cargo.toml", "clippy.toml", "deny.toml", "rust-toolchain.toml",
+      "rustfmt.toml", "crates", "test-data", "media", "tools",
+      "docs/GOAL.md", "docs/CRUD_Scenario_Checklist.md", "docs/adr",
+      "docs/performance/results/change-0917/probe"
+    ]
+  },
+  "source_before_final": {
+    "root": "/home/zhuhe/litchi-performance-0918/candidate/tree-v2",
+    "manifest": "/home/zhuhe/litchi-performance-0918/candidate/source-before-final.manifest.tsv",
+    "manifest_bytes": 1355153,
+    "manifest_sha256": "41a5d78bd26493575ca2f6a9b129532d1d46971fe9cfce7f9c612bc4a2d5cb9e",
+    "regular_file_count": 10898,
+    "supplementary_files": ["Cargo.lock"],
+    "production_changed_file": {
+      "path": "crates/litchi-doc/src/tracked_revision/package.rs",
+      "baseline_sha256": "a04da643b093ec9724c9ac57ed8fbfdf2c2fedfc16eade105c91c32df7c9a446",
+      "candidate_sha256": "3febb53e4b5d13521f40d50d6851823b4a9320696a58a3c4887fb34ac8d91779",
+      "change": "three Arc<[u8]> conversions use as_slice()"
+    }
+  },
+  "archive_comparison": {
+    "candidate_extra_files": ["Cargo.lock"],
+    "archive_missing_files": [],
+    "common_file_hash_mismatches_excluding_production_changed_file": 0,
+    "verification": "all common files match the base archive; package.rs is the only source mismatch; Cargo.lock is the only supplementary file"
+  },
+  "workspace_quality_locks": {
+    "original_copy": {
+      "path": "/home/zhuhe/litchi-performance-0918/candidate/Cargo.lock.workspace-root-copy",
+      "bytes": 138465,
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "generated_offline": {
+      "path": "/home/zhuhe/litchi-performance-0918/candidate/tree-v2/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "00ef62deed9b94a8b4ed0b3e2497923ae6e1a092975c2311b654407738881684"
+    }
+  },
+  "probe_files": [
+    {"path": "docs/performance/results/change-0917/probe/Cargo.lock", "bytes": 33633, "sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"},
+    {"path": "docs/performance/results/change-0917/probe/Cargo.toml", "bytes": 541, "sha256": "0e6f34cc57d56b2725034d4ed067e06a9a28d571f59348d0412c3c6966ea157d"},
+    {"path": "docs/performance/results/change-0917/probe/README.md", "bytes": 2932, "sha256": "fe5630cb4f41da2b79f1ed83c336ca908171d20fb00277df121891b80b72d2b4"},
+    {"path": "docs/performance/results/change-0917/probe/src/alloc_metrics.rs", "bytes": 4912, "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"},
+    {"path": "docs/performance/results/change-0917/probe/src/bin/alloc.rs", "bytes": 1797, "sha256": "11a1b9d765399ad0917c657108f4a5ea81011a20d7b6ebd5385f95bbc702e320"},
+    {"path": "docs/performance/results/change-0917/probe/src/lib.rs", "bytes": 34827, "sha256": "b932992f10ecee244eaa3bd14833a07dcd2456f0bfc2de0dce3bf64403737dc3"},
+    {"path": "docs/performance/results/change-0917/probe/src/main.rs", "bytes": 105, "sha256": "496530a1954a6e014c59e5e82e9a7ba2a6b4e3e5077758f1c6a12b85d5cc439c"},
+    {"path": "docs/performance/results/change-0917/probe/src/oracle_0730.rs", "bytes": 58805, "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"}
+  ]
+}
