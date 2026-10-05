@@ -1,0 +1,236 @@
+pair,scenario,category,before_case,after_case,corpus,before_children,after_children,before_p50_ns,after_p50_ns,ratio,delta_ns,noise_pct,trigger_pct,s10_before_spread_pct,s10_after_spread_pct,separated,over_trigger,verdict
+facade,open,open,docx_file_eager_open,docx_file_unified_eager_open,docx-source-backed-media,2,2,10382999.5,10511994.2,1.0124,128994.8,0.09,5.00,3.01,2.44,False,False,pass
+overhead,open,open,docx_file_leaf_eager_open,docx_file_unified_eager_open,docx-source-backed-media,2,2,10387233.5,10511994.2,1.0120,124760.8,0.09,5.00,1.56,2.44,False,False,within budget
+facade,open,open,docx_file_source_open,docx_file_unified_source_open,docx-source-backed-media,2,2,344226.5,358454.5,1.0413,14228.0,0.58,5.00,1.29,2.56,True,False,pass
+overhead,open,open,docx_file_leaf_source_open,docx_file_unified_source_open,docx-source-backed-media,2,2,323541.5,358454.5,1.1079,34913.0,0.58,5.00,3.23,2.56,True,True,"over budget, explained"
+facade,list,list,docx_file_eager_paragraph_count,docx_file_unified_eager_paragraph_count,docx-source-backed-media,2,2,99333.0,107428.2,1.0815,8095.2,0.95,5.00,0.57,0.75,True,True,explained
+overhead,list,list,docx_file_leaf_eager_paragraph_count,docx_file_unified_eager_paragraph_count,docx-source-backed-media,2,2,104153.0,107428.2,1.0314,3275.2,0.95,5.00,0.10,0.75,True,False,within trigger
+facade,list,list,docx_file_source_paragraph_count,docx_file_unified_source_paragraph_count,docx-source-backed-media,2,2,178316.0,179623.0,1.0073,1307.0,1.39,5.00,1.59,0.93,False,False,pass
+overhead,list,list,docx_file_leaf_source_paragraph_count,docx_file_unified_source_paragraph_count,docx-source-backed-media,2,2,179466.0,179623.0,1.0009,157.0,1.39,5.00,0.38,0.93,False,False,within trigger
+facade,list,list,docx_file_eager_list_paragraphs,docx_file_unified_eager_list_paragraphs,docx-source-backed-media,2,2,143375.5,142941.0,0.9970,-434.5,2.90,5.00,0.01,1.36,False,False,pass
+overhead,list,list,docx_file_leaf_eager_list_paragraphs,docx_file_unified_eager_list_paragraphs,docx-source-backed-media,2,2,108725.8,142941.0,1.3147,34215.2,2.90,5.00,0.87,1.36,True,True,"review, explained"
+facade,list,list,docx_file_source_list_paragraphs,docx_file_unified_source_list_paragraphs,docx-source-backed-media,2,2,240278.5,240566.2,1.0012,287.8,3.44,5.00,0.17,0.15,False,False,pass
+overhead,list,list,docx_file_leaf_source_list_paragraphs,docx_file_unified_source_list_paragraphs,docx-source-backed-media,2,2,184331.0,240566.2,1.3051,56235.2,3.44,5.00,1.73,0.15,True,True,"review, explained"
+facade,full-text,full-text,docx_file_eager_full_text,docx_file_unified_eager_full_text,docx-source-backed-media,2,2,58725.8,68872.8,1.1728,10147.0,1.27,5.00,0.25,0.91,True,True,explained
+overhead,full-text,full-text,docx_file_leaf_eager_full_text,docx_file_unified_eager_full_text,docx-source-backed-media,2,2,67550.2,68872.8,1.0196,1322.5,1.27,5.00,0.09,0.91,True,False,within trigger
+facade,full-text,full-text,docx_file_source_full_text,docx_file_unified_source_full_text,docx-source-backed-media,2,2,152237.8,149375.5,0.9812,-2862.2,0.72,5.00,6.35,0.70,False,False,pass
+overhead,full-text,full-text,docx_file_leaf_source_full_text,docx_file_unified_source_full_text,docx-source-backed-media,2,2,149728.0,149375.5,0.9976,-352.5,0.72,5.00,0.44,0.70,False,False,within trigger
+facade,list,list,docx_file_eager_open_paragraph_count_lifecycle,docx_file_unified_eager_open_paragraph_count_lifecycle,docx-source-backed-media,2,2,10455622.5,10389110.5,0.9936,-66512.0,1.82,5.00,2.51,1.64,False,False,pass
+overhead,list,list,docx_file_leaf_eager_open_paragraph_count_lifecycle,docx_file_unified_eager_open_paragraph_count_lifecycle,docx-source-backed-media,2,2,10461229.0,10389110.5,0.9931,-72118.5,1.82,5.00,0.55,1.64,False,False,within trigger
+facade,list,list,docx_file_source_open_paragraph_count_lifecycle,docx_file_unified_source_open_paragraph_count_lifecycle,docx-source-backed-media,2,2,539940.2,529732.5,0.9811,-10207.8,1.52,5.00,3.47,0.72,False,False,pass
+overhead,list,list,docx_file_leaf_source_open_paragraph_count_lifecycle,docx_file_unified_source_open_paragraph_count_lifecycle,docx-source-backed-media,2,2,504882.2,529732.5,1.0492,24850.2,1.52,5.00,0.76,0.72,True,False,within trigger
+facade,full-text,full-text,docx_file_eager_open_full_text_lifecycle,docx_file_unified_eager_open_full_text_lifecycle,docx-source-backed-media,2,2,10300521.8,10414243.2,1.0110,113721.5,3.02,5.00,1.21,1.33,False,False,pass
+overhead,full-text,full-text,docx_file_leaf_eager_open_full_text_lifecycle,docx_file_unified_eager_open_full_text_lifecycle,docx-source-backed-media,2,2,10424901.0,10414243.2,0.9990,-10657.8,3.02,5.00,1.85,1.33,False,False,within trigger
+facade,full-text,full-text,docx_file_source_open_full_text_lifecycle,docx_file_unified_source_open_full_text_lifecycle,docx-source-backed-media,2,2,505497.2,508092.5,1.0051,2595.2,1.63,5.00,2.05,3.21,False,False,pass
+overhead,full-text,full-text,docx_file_leaf_source_open_full_text_lifecycle,docx_file_unified_source_open_full_text_lifecycle,docx-source-backed-media,2,2,477902.5,508092.5,1.0632,30190.0,1.63,5.00,0.18,3.21,True,True,"review, explained"
+facade,open,open,pptx_file_eager_open,pptx_file_unified_eager_open,pptx-source-backed-media,4,4,6994673.0,7054149.5,1.0085,59476.5,7.34,7.34,3.35,3.92,False,False,pass
+overhead,open,open,pptx_file_leaf_eager_open,pptx_file_unified_eager_open,pptx-source-backed-media,4,4,6928071.8,7054149.5,1.0182,126077.8,7.34,7.34,5.45,3.92,False,False,within budget
+facade,open,open,pptx_file_source_open,pptx_file_unified_source_open,pptx-source-backed-media,4,4,2780962.2,2870033.8,1.0320,89071.5,1.47,5.00,5.83,1.60,False,False,pass
+overhead,open,open,pptx_file_leaf_source_open,pptx_file_unified_source_open,pptx-source-backed-media,4,4,2825014.2,2870033.8,1.0159,45019.5,1.47,5.00,2.67,1.60,False,False,within budget
+facade,list,list,pptx_file_eager_list_slides,pptx_file_unified_eager_list_slides,pptx-source-backed-media,4,4,5869711.0,5993422.8,1.0211,123711.8,1.26,5.00,0.40,0.59,True,False,pass
+overhead,list,list,pptx_file_leaf_eager_list_slides,pptx_file_unified_eager_list_slides,pptx-source-backed-media,4,4,6021140.5,5993422.8,0.9954,-27717.8,1.26,5.00,1.13,0.59,False,False,within trigger
+facade,list,list,pptx_file_source_list_slides,pptx_file_unified_source_list_slides,pptx-source-backed-media,4,4,6099211.5,6210381.5,1.0182,111170.0,0.71,5.00,0.36,0.55,True,False,pass
+overhead,list,list,pptx_file_leaf_source_list_slides,pptx_file_unified_source_list_slides,pptx-source-backed-media,4,4,6261294.2,6210381.5,0.9919,-50912.8,0.71,5.00,1.74,0.55,False,False,within trigger
+facade,list,list,pptx_file_eager_slide_count,pptx_file_unified_eager_slide_count,pptx-source-backed-media,4,4,1712.5,4390.0,2.5635,2677.5,21.98,21.98,31.53,7.52,True,True,explained
+overhead,list,list,pptx_file_leaf_eager_slide_count,pptx_file_unified_eager_slide_count,pptx-source-backed-media,4,4,3860.0,4390.0,1.1373,530.0,21.98,21.98,10.88,7.52,True,False,within trigger
+facade,list,list,pptx_file_source_slide_count,pptx_file_unified_source_slide_count,pptx-source-backed-media,4,4,1607.5,4445.0,2.7652,2837.5,55.44,55.44,12.44,2.70,True,True,explained
+overhead,list,list,pptx_file_leaf_source_slide_count,pptx_file_unified_source_slide_count,pptx-source-backed-media,4,4,4010.0,4445.0,1.1085,435.0,55.44,55.44,5.11,2.70,True,False,within trigger
+facade,read-one,read-one,pptx_file_eager_selected_slide,pptx_file_unified_eager_selected_slide,pptx-source-backed-media,4,4,77045.0,76395.2,0.9916,-649.8,7.01,7.01,7.32,4.23,False,False,pass
+overhead,read-one,read-one,pptx_file_leaf_eager_selected_slide,pptx_file_unified_eager_selected_slide,pptx-source-backed-media,4,4,73415.5,76395.2,1.0406,2979.8,7.01,7.01,7.72,4.23,False,False,within trigger
+facade,read-one,read-one,pptx_file_source_selected_slide,pptx_file_unified_source_selected_slide,pptx-source-backed-media,4,4,71115.2,77580.8,1.0909,6465.5,5.94,5.94,8.58,5.20,True,True,explained
+overhead,read-one,read-one,pptx_file_leaf_source_selected_slide,pptx_file_unified_source_selected_slide,pptx-source-backed-media,4,4,75902.8,77580.8,1.0221,1678.0,5.94,5.94,5.59,5.20,False,False,within trigger
+facade,list,list,pptx_file_eager_open_slide_count_lifecycle,pptx_file_unified_eager_open_slide_count_lifecycle,pptx-source-backed-media,4,4,7129192.2,7087265.8,0.9941,-41926.5,5.40,5.40,1.48,4.45,False,False,pass
+overhead,list,list,pptx_file_leaf_eager_open_slide_count_lifecycle,pptx_file_unified_eager_open_slide_count_lifecycle,pptx-source-backed-media,4,4,6965203.2,7087265.8,1.0175,122062.5,5.40,5.40,1.89,4.45,False,False,within trigger
+facade,list,list,pptx_file_source_open_slide_count_lifecycle,pptx_file_unified_source_open_slide_count_lifecycle,pptx-source-backed-media,4,4,2818917.0,2896364.0,1.0275,77447.0,3.53,5.00,3.75,3.19,False,False,pass
+overhead,list,list,pptx_file_leaf_source_open_slide_count_lifecycle,pptx_file_unified_source_open_slide_count_lifecycle,pptx-source-backed-media,4,4,2845855.0,2896364.0,1.0177,50509.0,3.53,5.00,4.35,3.19,False,False,within trigger
+facade,read-one,read-one,pptx_file_eager_open_selected_slide_lifecycle,pptx_file_unified_eager_open_selected_slide_lifecycle,pptx-source-backed-media,4,4,7113260.0,7100401.8,0.9982,-12858.2,6.23,6.23,0.77,4.22,False,False,pass
+overhead,read-one,read-one,pptx_file_leaf_eager_open_selected_slide_lifecycle,pptx_file_unified_eager_open_selected_slide_lifecycle,pptx-source-backed-media,4,4,6990490.2,7100401.8,1.0157,109911.5,6.23,6.23,8.16,4.22,False,False,within trigger
+facade,read-one,read-one,pptx_file_source_open_selected_slide_lifecycle,pptx_file_unified_source_open_selected_slide_lifecycle,pptx-source-backed-media,4,4,2862014.8,2948747.8,1.0303,86733.0,8.51,8.51,1.29,1.50,True,False,pass
+overhead,read-one,read-one,pptx_file_leaf_source_open_selected_slide_lifecycle,pptx_file_unified_source_open_selected_slide_lifecycle,pptx-source-backed-media,4,4,2894825.2,2948747.8,1.0186,53922.5,8.51,8.51,3.30,1.50,False,False,within trigger
+facade,open,open,xlsx_file_open,xlsx_file_unified_open,xlsx-cell-values-medium,6,6,253198.5,376766.8,1.4880,123568.2,19.70,19.70,17.36,15.36,True,True,explained
+overhead,open,open,xlsx_file_leaf_open,xlsx_file_unified_open,xlsx-cell-values-medium,6,6,352128.8,376766.8,1.0700,24638.0,19.70,19.70,9.74,15.36,True,True,"over budget, explained"
+facade,open,open,xlsx_file_open_lifecycle,xlsx_file_unified_open_lifecycle,xlsx-cell-values-medium,6,6,2648452.0,2801075.5,1.0576,152623.5,4.06,5.00,2.48,3.74,True,True,explained
+overhead,open,open,xlsx_file_leaf_open_lifecycle,xlsx_file_unified_open_lifecycle,xlsx-cell-values-medium,6,6,2687857.0,2801075.5,1.0421,113218.5,4.06,5.00,2.49,3.74,True,False,within budget
+facade,read-one,read-one,xlsx_file_selected_cell,xlsx_file_unified_selected_cell,xlsx-cell-values-medium,6,6,2981156.2,3049546.0,1.0229,68389.8,0.87,5.00,0.53,0.66,True,False,pass
+overhead,read-one,read-one,xlsx_file_leaf_selected_cell,xlsx_file_unified_selected_cell,xlsx-cell-values-medium,6,6,3045396.8,3049546.0,1.0014,4149.2,0.87,5.00,0.35,0.66,False,False,within trigger
+facade,open,open,xlsx_bytes_open,xlsx_bytes_unified_open,xlsx-cell-values-medium,6,6,60390.5,62297.5,1.0316,1907.0,34.09,34.09,49.46,1.99,False,False,pass
+overhead,open,open,xlsx_bytes_leaf_open,xlsx_bytes_unified_open,xlsx-cell-values-medium,6,6,61463.0,62297.5,1.0136,834.5,34.09,34.09,1.87,1.99,False,False,within budget
+facade,open,open,xlsx_bytes_open_lifecycle,xlsx_bytes_unified_open_lifecycle,xlsx-cell-values-medium,6,6,1790360.8,1797520.8,1.0040,7160.0,0.95,5.00,4.22,0.55,False,False,pass
+overhead,open,open,xlsx_bytes_leaf_open_lifecycle,xlsx_bytes_unified_open_lifecycle,xlsx-cell-values-medium,6,6,1783195.2,1797520.8,1.0080,14325.5,0.95,5.00,6.22,0.55,False,False,within budget
+budget-only,read-one,read-one,docx_semantic_one_paragraph,docx_semantic_unified_one_paragraph,docx-semantic-large,16,16,3186256.5,3187109.0,1.0003,852.5,1.07,5.00,7.16,1.73,False,False,budget-only
+overhead,read-one,read-one,docx_semantic_leaf_one_paragraph,docx_semantic_unified_one_paragraph,docx-semantic-large,16,16,3204429.8,3187109.0,0.9946,-17320.8,1.07,5.00,4.28,1.73,False,False,within trigger
+budget-only,read-one,read-one,docx_semantic_one_paragraph,docx_semantic_unified_one_paragraph,docx-semantic-medium,16,16,65250.5,66260.8,1.0155,1010.2,2.00,5.00,8.37,1.64,False,False,budget-only
+overhead,read-one,read-one,docx_semantic_leaf_one_paragraph,docx_semantic_unified_one_paragraph,docx-semantic-medium,16,16,66278.0,66260.8,0.9997,-17.2,2.00,5.00,3.55,1.64,False,False,within trigger
+budget-only,read-one,read-one,docx_semantic_one_paragraph,docx_semantic_unified_one_paragraph,docx-semantic-tiny,16,16,9577.5,10575.2,1.1042,997.8,1.75,5.00,5.64,1.42,True,True,budget-only
+overhead,read-one,read-one,docx_semantic_leaf_one_paragraph,docx_semantic_unified_one_paragraph,docx-semantic-tiny,16,16,10667.5,10575.2,0.9914,-92.2,1.75,5.00,8.76,1.42,False,False,within trigger
+facade,read-one,read-one,docx_semantic_one_paragraph_text,docx_semantic_unified_one_paragraph_text,docx-semantic-large,16,16,957.5,800.0,0.8355,-157.5,65.15,65.15,7.31,6.25,False,False,pass
+overhead,read-one,read-one,docx_semantic_leaf_one_paragraph_text,docx_semantic_unified_one_paragraph_text,docx-semantic-large,16,16,770.0,800.0,1.0390,30.0,65.15,65.15,24.68,6.25,False,False,within trigger
+facade,read-one,read-one,docx_semantic_one_paragraph_text,docx_semantic_unified_one_paragraph_text,docx-semantic-medium,16,16,610.0,530.0,0.8689,-80.0,5.83,5.83,7.38,11.32,False,False,pass
+overhead,read-one,read-one,docx_semantic_leaf_one_paragraph_text,docx_semantic_unified_one_paragraph_text,docx-semantic-medium,16,16,520.0,530.0,1.0192,10.0,5.83,5.83,7.69,11.32,False,False,within trigger
+facade,read-one,read-one,docx_semantic_one_paragraph_text,docx_semantic_unified_one_paragraph_text,docx-semantic-tiny,16,16,580.0,520.0,0.8966,-60.0,3.57,5.00,8.62,7.69,False,False,pass
+overhead,read-one,read-one,docx_semantic_leaf_one_paragraph_text,docx_semantic_unified_one_paragraph_text,docx-semantic-tiny,16,16,510.0,520.0,1.0196,10.0,3.57,5.00,3.92,7.69,False,False,within trigger
+budget-only,read-one,read-one,docx_producer_source_selected_paragraph,docx_producer_unified_source_selected_paragraph,docx-producer-medium,16,16,106043.0,260746.0,2.4589,154703.0,4.62,5.00,6.48,2.39,True,True,budget-only
+overhead,read-one,read-one,docx_producer_leaf_source_selected_paragraph,docx_producer_unified_source_selected_paragraph,docx-producer-medium,16,16,262591.5,260746.0,0.9930,-1845.5,4.62,5.00,2.89,2.39,False,False,within trigger
+facade,open,open,doc_facade_file_open,doc_file_unified_open,doc-facade-real-file:FloatingPictures.doc,16,16,179740.8,178183.2,0.9913,-1557.5,37.58,37.58,41.43,4.67,False,False,pass
+overhead,open,open,doc_file_leaf_open,doc_file_unified_open,doc-facade-real-file:FloatingPictures.doc,16,16,174876.0,178183.2,1.0189,3307.2,37.58,37.58,3.07,4.67,False,False,within budget
+facade,open,open,doc_facade_file_open,doc_file_unified_open,doc-facade-real-file:documentProperties.doc,16,16,15657.5,14437.5,0.9221,-1220.0,1.79,5.00,2.84,2.29,False,False,pass
+overhead,open,open,doc_file_leaf_open,doc_file_unified_open,doc-facade-real-file:documentProperties.doc,16,16,13297.8,14437.5,1.0857,1139.8,1.79,5.00,2.37,2.29,True,False,within budget
+facade,open,open,doc_facade_file_open,doc_file_unified_open,doc-facade-real-file:duplicate-style-names.doc,16,16,11462.8,10825.0,0.9444,-637.8,0.95,5.00,1.83,1.71,False,False,pass
+overhead,open,open,doc_file_leaf_open,doc_file_unified_open,doc-facade-real-file:duplicate-style-names.doc,16,16,9255.0,10825.0,1.1696,1570.0,0.95,5.00,2.92,1.71,True,False,within budget
+facade,full-text,full-text,doc_facade_file_full_text,doc_file_unified_full_text,doc-facade-real-file:FloatingPictures.doc,16,16,271386.0,190446.0,0.7018,-80940.0,31.11,31.11,33.84,4.04,False,False,pass
+overhead,full-text,full-text,doc_file_leaf_full_text,doc_file_unified_full_text,doc-facade-real-file:FloatingPictures.doc,16,16,187151.0,190446.0,1.0176,3295.0,31.11,31.11,2.34,4.04,False,False,within trigger
+facade,full-text,full-text,doc_facade_file_full_text,doc_file_unified_full_text,doc-facade-real-file:documentProperties.doc,16,16,16378.0,15350.0,0.9372,-1028.0,2.63,5.00,2.38,3.65,False,False,pass
+overhead,full-text,full-text,doc_file_leaf_full_text,doc_file_unified_full_text,doc-facade-real-file:documentProperties.doc,16,16,14165.0,15350.0,1.0837,1185.0,2.63,5.00,2.79,3.65,True,True,"review, explained"
+facade,full-text,full-text,doc_facade_file_full_text,doc_file_unified_full_text,doc-facade-real-file:duplicate-style-names.doc,16,16,11272.5,10950.0,0.9714,-322.5,2.04,5.00,2.92,1.97,False,False,pass
+overhead,full-text,full-text,doc_file_leaf_full_text,doc_file_unified_full_text,doc-facade-real-file:duplicate-style-names.doc,16,16,9370.0,10950.0,1.1686,1580.0,2.04,5.00,2.45,1.97,True,True,"review, explained"
+facade,read-one,read-one,doc_facade_file_one_paragraph,doc_file_unified_one_paragraph,doc-facade-real-file:FloatingPictures.doc,16,16,498564.5,422156.8,0.8467,-76407.8,7.43,7.43,13.69,13.32,False,False,pass
+overhead,read-one,read-one,doc_file_leaf_one_paragraph,doc_file_unified_one_paragraph,doc-facade-real-file:FloatingPictures.doc,16,16,415429.5,422156.8,1.0162,6727.2,7.43,7.43,2.20,13.32,False,False,within trigger
+facade,read-one,read-one,doc_facade_file_one_paragraph,doc_file_unified_one_paragraph,doc-facade-real-file:documentProperties.doc,16,16,17210.0,16350.5,0.9501,-859.5,2.10,5.00,2.15,3.12,False,False,pass
+overhead,read-one,read-one,doc_file_leaf_one_paragraph,doc_file_unified_one_paragraph,doc-facade-real-file:documentProperties.doc,16,16,15087.5,16350.5,1.0837,1263.0,2.10,5.00,1.46,3.12,True,True,"review, explained"
+facade,read-one,read-one,doc_facade_file_one_paragraph,doc_file_unified_one_paragraph,doc-facade-real-file:duplicate-style-names.doc,16,16,11377.5,10895.2,0.9576,-482.2,3.02,5.00,2.42,1.97,False,False,pass
+overhead,read-one,read-one,doc_file_leaf_one_paragraph,doc_file_unified_one_paragraph,doc-facade-real-file:duplicate-style-names.doc,16,16,9350.2,10895.2,1.1652,1545.0,3.02,5.00,2.78,1.97,True,True,"review, explained"
+facade,open,open,ppt_facade_file_open,ppt_file_unified_open,ppt-facade-real-file:SampleShow.ppt,16,16,29980.2,28997.8,0.9672,-982.5,2.41,5.00,4.84,3.19,False,False,pass
+overhead,open,open,ppt_file_leaf_open,ppt_file_unified_open,ppt-facade-real-file:SampleShow.ppt,16,16,28660.0,28997.8,1.0118,337.8,2.41,5.00,2.55,3.19,False,False,within budget
+facade,open,open,ppt_facade_file_open,ppt_file_unified_open,ppt-facade-real-file:ppt_with_png.ppt,16,16,28112.8,28110.0,0.9999,-2.8,0.45,5.00,2.71,1.83,False,False,pass
+overhead,open,open,ppt_file_leaf_open,ppt_file_unified_open,ppt-facade-real-file:ppt_with_png.ppt,16,16,27425.0,28110.0,1.0250,685.0,0.45,5.00,1.79,1.83,True,False,within budget
+facade,full-text,full-text,ppt_facade_file_full_text,ppt_file_unified_full_text,ppt-facade-real-file:SampleShow.ppt,16,16,35190.2,34880.0,0.9912,-310.2,1.62,5.00,4.49,2.88,False,False,pass
+overhead,full-text,full-text,ppt_file_leaf_full_text,ppt_file_unified_full_text,ppt-facade-real-file:SampleShow.ppt,16,16,34322.5,34880.0,1.0162,557.5,1.62,5.00,2.33,2.88,False,False,within trigger
+facade,full-text,full-text,ppt_facade_file_full_text,ppt_file_unified_full_text,ppt-facade-real-file:ppt_with_png.ppt,16,16,32002.5,32517.5,1.0161,515.0,1.89,5.00,1.97,1.81,False,False,pass
+overhead,full-text,full-text,ppt_file_leaf_full_text,ppt_file_unified_full_text,ppt-facade-real-file:ppt_with_png.ppt,16,16,31737.8,32517.5,1.0246,779.8,1.89,5.00,1.84,1.81,True,False,within trigger
+facade,read-one,read-one,ppt_facade_file_one_slide_text,ppt_file_unified_one_slide_text,ppt-facade-real-file:SampleShow.ppt,16,16,35502.8,35162.8,0.9904,-340.0,2.97,5.00,3.56,2.30,False,False,pass
+overhead,read-one,read-one,ppt_file_leaf_one_slide_text,ppt_file_unified_one_slide_text,ppt-facade-real-file:SampleShow.ppt,16,16,34508.0,35162.8,1.0190,654.8,2.97,5.00,2.30,2.30,False,False,within trigger
+facade,read-one,read-one,ppt_facade_file_one_slide_text,ppt_file_unified_one_slide_text,ppt-facade-real-file:ppt_with_png.ppt,16,16,34510.0,34863.0,1.0102,353.0,1.21,5.00,2.23,2.20,False,False,pass
+overhead,read-one,read-one,ppt_file_leaf_one_slide_text,ppt_file_unified_one_slide_text,ppt-facade-real-file:ppt_with_png.ppt,16,16,33930.2,34863.0,1.0275,932.8,1.21,5.00,2.62,2.20,True,False,within trigger
+facade,open,open,rtf_file_open,rtf_file_unified_open,rtf-semantic-plain-large,16,16,1891923.8,3179296.5,1.6805,1287372.8,7.96,7.96,7.08,5.30,True,True,explained
+overhead,open,open,rtf_file_leaf_open,rtf_file_unified_open,rtf-semantic-plain-large,16,16,1824623.2,3179296.5,1.7424,1354673.2,7.96,7.96,3.41,5.30,True,True,"over budget, explained"
+facade,open,open,rtf_file_open,rtf_file_unified_open,rtf-semantic-plain-medium,16,16,51445.2,52102.5,1.0128,657.2,3.23,5.00,2.38,2.72,False,False,pass
+overhead,open,open,rtf_file_leaf_open,rtf_file_unified_open,rtf-semantic-plain-medium,16,16,47772.5,52102.5,1.0906,4330.0,3.23,5.00,4.65,2.72,True,False,within budget
+facade,open,open,rtf_file_open,rtf_file_unified_open,rtf-semantic-plain-tiny,16,16,7327.8,7435.0,1.0146,107.2,3.39,5.00,2.25,3.09,False,False,pass
+overhead,open,open,rtf_file_leaf_open,rtf_file_unified_open,rtf-semantic-plain-tiny,16,16,7257.5,7435.0,1.0245,177.5,3.39,5.00,2.89,3.09,False,False,within budget
+facade,open,open,rtf_file_open_lifecycle,rtf_file_unified_open_lifecycle,rtf-semantic-plain-large,16,16,1936741.0,1964213.5,1.0142,27472.5,5.24,5.24,5.37,32.17,False,False,pass
+overhead,open,open,rtf_file_leaf_open_lifecycle,rtf_file_unified_open_lifecycle,rtf-semantic-plain-large,16,16,1861910.8,1964213.5,1.0549,102302.8,5.24,5.24,3.91,32.17,False,True,"over budget, explained"
+facade,open,open,rtf_file_open_lifecycle,rtf_file_unified_open_lifecycle,rtf-semantic-plain-medium,16,16,52302.8,42150.0,0.8059,-10152.8,3.36,5.00,2.92,2.72,False,False,pass
+overhead,open,open,rtf_file_leaf_open_lifecycle,rtf_file_unified_open_lifecycle,rtf-semantic-plain-medium,16,16,51057.5,42150.0,0.8255,-8907.5,3.36,5.00,2.25,2.72,False,False,within budget
+facade,open,open,rtf_file_open_lifecycle,rtf_file_unified_open_lifecycle,rtf-semantic-plain-tiny,16,16,7575.0,7710.0,1.0178,135.0,1.97,5.00,2.90,2.21,False,False,pass
+overhead,open,open,rtf_file_leaf_open_lifecycle,rtf_file_unified_open_lifecycle,rtf-semantic-plain-tiny,16,16,7335.0,7710.0,1.0511,375.0,1.97,5.00,2.52,2.21,True,False,within budget
+facade,open,open,odt_file_eager_open,odt_file_unified_eager_open,odt-source-backed-repeated-text-media,16,16,1905986.0,2032271.8,1.0663,126285.8,6.98,6.98,10.16,17.87,False,False,pass
+overhead,open,open,odt_file_leaf_eager_open,odt_file_unified_eager_open,odt-source-backed-repeated-text-media,16,16,2024079.0,2032271.8,1.0040,8192.8,6.98,6.98,8.01,17.87,False,False,within budget
+facade,open,open,odt_file_source_open,odt_file_unified_source_open,odt-source-backed-repeated-text-media,16,16,651305.5,644905.5,0.9902,-6400.0,3.42,5.00,4.17,6.92,False,False,pass
+overhead,open,open,odt_file_leaf_source_open,odt_file_unified_source_open,odt-source-backed-repeated-text-media,16,16,649823.0,644905.5,0.9924,-4917.5,3.42,5.00,4.66,6.92,False,False,within budget
+facade,full-text,full-text,odt_file_eager_open_full_text_lifecycle,odt_file_unified_eager_open_full_text_lifecycle,odt-source-backed-repeated-text-media,16,16,3248984.8,3156004.0,0.9714,-92980.8,7.17,7.17,26.63,15.19,False,False,pass
+overhead,full-text,full-text,odt_file_leaf_eager_open_full_text_lifecycle,odt_file_unified_eager_open_full_text_lifecycle,odt-source-backed-repeated-text-media,16,16,3126511.2,3156004.0,1.0094,29492.8,7.17,7.17,6.82,15.19,False,False,within trigger
+facade,full-text,full-text,odt_file_source_open_full_text_lifecycle,odt_file_unified_source_open_full_text_lifecycle,odt-source-backed-repeated-text-media,16,16,1783925.8,1716862.8,0.9624,-67063.0,1.98,5.00,3.92,4.47,False,False,pass
+overhead,full-text,full-text,odt_file_leaf_source_open_full_text_lifecycle,odt_file_unified_source_open_full_text_lifecycle,odt-source-backed-repeated-text-media,16,16,1718870.0,1716862.8,0.9988,-2007.2,1.98,5.00,5.67,4.47,False,False,within trigger
+facade,open,open,odp_file_eager_open,odp_file_unified_eager_open,odp-media-textbox-publication,8,8,163380.8,133163.2,0.8150,-30217.5,3.60,5.00,25.54,14.21,False,False,pass
+overhead,open,open,odp_file_leaf_eager_open,odp_file_unified_eager_open,odp-media-textbox-publication,8,8,131101.0,133163.2,1.0157,2062.2,3.60,5.00,15.03,14.21,False,False,within budget
+facade,open,open,odp_file_source_open,odp_file_unified_source_open,odp-media-textbox-publication,8,8,102340.5,43347.5,0.4236,-58993.0,12.12,12.12,35.83,1.51,False,False,pass
+overhead,open,open,odp_file_leaf_source_open,odp_file_unified_source_open,odp-media-textbox-publication,8,8,38485.0,43347.5,1.1263,4862.5,12.12,12.12,1.91,1.51,True,False,within budget
+facade,read-one,read-one,odp_file_eager_selected_slide,odp_file_unified_eager_selected_slide,odp-media-textbox-publication,8,8,79235.8,56525.0,0.7134,-22710.8,5.89,5.89,18.62,10.40,False,False,pass
+overhead,read-one,read-one,odp_file_leaf_eager_selected_slide,odp_file_unified_eager_selected_slide,odp-media-textbox-publication,8,8,56833.0,56525.0,0.9946,-308.0,5.89,5.89,11.08,10.40,False,False,within trigger
+facade,read-one,read-one,odp_file_source_selected_slide,odp_file_unified_source_selected_slide,odp-media-textbox-publication,8,8,73702.8,49218.5,0.6678,-24484.2,9.02,9.02,16.13,2.12,False,False,pass
+overhead,read-one,read-one,odp_file_leaf_source_selected_slide,odp_file_unified_source_selected_slide,odp-media-textbox-publication,8,8,49323.0,49218.5,0.9979,-104.5,9.02,9.02,1.72,2.12,False,False,within trigger
+facade,open,open,ods_file_eager_open,ods_file_unified_eager_open,ods-media-publication,8,8,2577682.0,2442448.0,0.9475,-135234.0,5.24,5.24,118.49,126.47,False,False,pass
+overhead,open,open,ods_file_leaf_eager_open,ods_file_unified_eager_open,ods-media-publication,8,8,3936779.5,2442448.0,0.6204,-1494331.5,5.24,5.24,78.02,126.47,False,False,within budget
+facade,open,open,ods_file_source_open,ods_file_unified_source_open,ods-media-publication,8,8,2011659.0,1871156.0,0.9302,-140503.0,7.88,7.88,152.74,163.09,False,False,pass
+overhead,open,open,ods_file_leaf_source_open,ods_file_unified_source_open,ods-media-publication,8,8,3371227.0,1871156.0,0.5550,-1500071.0,7.88,7.88,89.64,163.09,False,False,within budget
+facade,detection,detection,detect_odt_bytes,detect_odt_unified_bytes,odt-bytes-large,16,16,1475.0,1467.5,0.9949,-7.5,2.68,5.00,5.42,6.81,False,False,pass
+overhead,detection,detection,detect_odt_leaf_bytes,detect_odt_unified_bytes,odt-bytes-large,16,16,850.0,1467.5,1.7265,617.5,2.68,5.00,4.71,6.81,True,True,"review, explained"
+facade,detection,detection,detect_odt_bytes,detect_odt_unified_bytes,odt-bytes-medium,16,16,1455.0,1450.0,0.9966,-5.0,2.71,5.00,5.50,6.21,False,False,pass
+overhead,detection,detection,detect_odt_leaf_bytes,detect_odt_unified_bytes,odt-bytes-medium,16,16,850.0,1450.0,1.7059,600.0,2.71,5.00,2.41,6.21,True,True,"review, explained"
+facade,detection,detection,detect_odt_bytes,detect_odt_unified_bytes,odt-bytes-tiny,16,16,1452.5,1475.0,1.0155,22.5,0.35,5.00,4.13,4.75,False,False,pass
+overhead,detection,detection,detect_odt_leaf_bytes,detect_odt_unified_bytes,odt-bytes-tiny,16,16,830.2,1475.0,1.7766,644.8,0.35,5.00,2.41,4.75,True,True,"review, explained"
+facade,detection,detection,detect_odt_reader,detect_odt_unified_reader,odt-reader-large,16,16,7072.5,7190.0,1.0166,117.5,0.35,5.00,2.55,2.36,False,False,pass
+overhead,detection,detection,detect_odt_leaf_reader,detect_odt_unified_reader,odt-reader-large,16,16,1820.0,7190.0,3.9505,5370.0,0.35,5.00,7.69,2.36,True,True,"review, explained"
+facade,detection,detection,detect_odt_reader,detect_odt_unified_reader,odt-reader-medium,16,16,6405.0,6565.0,1.0250,160.0,1.91,5.00,3.75,5.18,False,False,pass
+overhead,detection,detection,detect_odt_leaf_reader,detect_odt_unified_reader,odt-reader-medium,16,16,1250.0,6565.0,5.2520,5315.0,1.91,5.00,8.00,5.18,True,True,"review, explained"
+facade,detection,detection,detect_odt_reader,detect_odt_unified_reader,odt-reader-tiny,16,16,6380.0,6510.0,1.0204,130.0,2.17,5.00,3.45,5.45,False,False,pass
+overhead,detection,detection,detect_odt_leaf_reader,detect_odt_unified_reader,odt-reader-tiny,16,16,1225.0,6510.0,5.3143,5285.0,2.17,5.00,8.16,5.45,True,True,"review, explained"
+facade,detection,detection,detect_odt_polyglot,detect_odt_unified_polyglot,odt-polyglot-large,16,16,14165.0,14545.0,1.0268,380.0,2.28,5.00,4.97,1.54,False,False,pass
+facade,detection,detection,detect_odt_polyglot,detect_odt_unified_polyglot,odt-polyglot-medium,16,16,14117.5,14482.5,1.0259,365.0,1.39,5.00,3.83,1.97,False,False,pass
+facade,detection,detection,detect_odt_polyglot,detect_odt_unified_polyglot,odt-polyglot-tiny,16,16,14307.5,14552.5,1.0171,245.0,2.12,5.00,2.21,3.64,False,False,pass
+facade,detection,detection,detect_odt_catalog_alias,detect_odt_unified_catalog_alias,odt-catalog-alias-large,16,16,12047.5,12400.0,1.0293,352.5,3.00,5.00,5.27,2.05,False,False,pass
+facade,detection,detection,detect_odt_catalog_alias,detect_odt_unified_catalog_alias,odt-catalog-alias-medium,16,16,12017.5,12335.0,1.0264,317.5,2.69,5.00,4.41,3.32,False,False,pass
+facade,detection,detection,detect_odt_catalog_alias,detect_odt_unified_catalog_alias,odt-catalog-alias-tiny,16,16,12030.2,12352.5,1.0268,322.2,1.70,5.00,5.49,3.03,False,False,pass
+facade,detection,detection,detect_ods_bytes,detect_ods_unified_bytes,ods-bytes-large,16,16,1110.0,1120.0,1.0090,10.0,1.82,5.00,4.50,5.36,False,False,pass
+overhead,detection,detection,detect_ods_leaf_bytes,detect_ods_unified_bytes,ods-bytes-large,16,16,610.0,1120.0,1.8361,510.0,1.82,5.00,4.92,5.36,True,True,"review, explained"
+facade,detection,detection,detect_ods_bytes,detect_ods_unified_bytes,ods-bytes-medium,16,16,1080.0,1080.0,1.0000,0.0,1.85,5.00,2.78,4.63,False,False,pass
+overhead,detection,detection,detect_ods_leaf_bytes,detect_ods_unified_bytes,ods-bytes-medium,16,16,600.0,1080.0,1.8000,480.0,1.85,5.00,1.67,4.63,True,False,within trigger
+facade,detection,detection,detect_ods_bytes,detect_ods_unified_bytes,ods-bytes-tiny,16,16,1075.0,1070.0,0.9953,-5.0,0.93,5.00,2.79,3.74,False,False,pass
+overhead,detection,detection,detect_ods_leaf_bytes,detect_ods_unified_bytes,ods-bytes-tiny,16,16,600.0,1070.0,1.7833,470.0,0.93,5.00,5.00,3.74,True,False,within trigger
+facade,detection,detection,detect_ods_reader,detect_ods_unified_reader,ods-reader-large,16,16,7772.5,7715.0,0.9926,-57.5,0.51,5.00,10.36,15.81,False,False,pass
+overhead,detection,detection,detect_ods_leaf_reader,detect_ods_unified_reader,ods-reader-large,16,16,3650.0,7715.0,2.1137,4065.0,0.51,5.00,19.45,15.81,True,True,"review, explained"
+facade,detection,detection,detect_ods_reader,detect_ods_unified_reader,ods-reader-medium,16,16,5190.0,5197.5,1.0014,7.5,1.15,5.00,3.47,4.81,False,False,pass
+overhead,detection,detection,detect_ods_leaf_reader,detect_ods_unified_reader,ods-reader-medium,16,16,1080.0,5197.5,4.8125,4117.5,1.15,5.00,8.33,4.81,True,True,"review, explained"
+facade,detection,detection,detect_ods_reader,detect_ods_unified_reader,ods-reader-tiny,16,16,4975.0,5070.0,1.0191,95.0,2.16,5.00,4.53,5.03,False,False,pass
+overhead,detection,detection,detect_ods_leaf_reader,detect_ods_unified_reader,ods-reader-tiny,16,16,950.0,5070.0,5.3368,4120.0,2.16,5.00,7.37,5.03,True,True,"review, explained"
+facade,detection,detection,detect_ods_polyglot,detect_ods_unified_polyglot,ods-polyglot-large,16,16,12612.5,12867.5,1.0202,255.0,1.01,5.00,3.09,2.14,True,False,pass
+facade,detection,detection,detect_ods_polyglot,detect_ods_unified_polyglot,ods-polyglot-medium,16,16,12397.8,12777.8,1.0307,380.0,1.91,5.00,2.14,3.29,True,False,pass
+facade,detection,detection,detect_ods_polyglot,detect_ods_unified_polyglot,ods-polyglot-tiny,16,16,12315.0,12815.0,1.0406,500.0,2.30,5.00,2.23,1.79,True,False,pass
+facade,detection,detection,detect_ods_catalog_alias,detect_ods_unified_catalog_alias,ods-catalog-alias-large,16,16,10600.0,10870.0,1.0255,270.0,2.64,5.00,3.25,3.22,False,False,pass
+facade,detection,detection,detect_ods_catalog_alias,detect_ods_unified_catalog_alias,ods-catalog-alias-medium,16,16,10487.8,10822.5,1.0319,334.8,3.39,5.00,2.53,3.28,True,False,pass
+facade,detection,detection,detect_ods_catalog_alias,detect_ods_unified_catalog_alias,ods-catalog-alias-tiny,16,16,10370.2,10785.0,1.0400,414.8,2.36,5.00,2.70,3.06,True,False,pass
+facade,detection,detection,detect_odp_bytes,detect_odp_unified_bytes,odp-bytes-large,16,16,1517.5,1520.0,1.0016,2.5,1.31,5.00,6.59,2.63,False,False,pass
+overhead,detection,detection,detect_odp_leaf_bytes,detect_odp_unified_bytes,odp-bytes-large,16,16,895.0,1520.0,1.6983,625.0,1.31,5.00,5.59,2.63,True,True,"review, explained"
+facade,detection,detection,detect_odp_bytes,detect_odp_unified_bytes,odp-bytes-medium,16,16,1520.0,1527.5,1.0049,7.5,3.27,5.00,5.59,5.89,False,False,pass
+overhead,detection,detection,detect_odp_leaf_bytes,detect_odp_unified_bytes,odp-bytes-medium,16,16,890.0,1527.5,1.7163,637.5,3.27,5.00,6.74,5.89,True,True,"review, explained"
+facade,detection,detection,detect_odp_bytes,detect_odp_unified_bytes,odp-bytes-tiny,16,16,1500.0,1490.0,0.9933,-10.0,2.68,5.00,3.33,4.70,False,False,pass
+overhead,detection,detection,detect_odp_leaf_bytes,detect_odp_unified_bytes,odp-bytes-tiny,16,16,870.0,1490.0,1.7126,620.0,2.68,5.00,5.75,4.70,True,True,"review, explained"
+facade,detection,detection,detect_odp_reader,detect_odp_unified_reader,odp-reader-large,16,16,6635.0,6660.0,1.0038,25.0,1.35,5.00,4.07,3.15,False,False,pass
+overhead,detection,detection,detect_odp_leaf_reader,detect_odp_unified_reader,odp-reader-large,16,16,1340.0,6660.0,4.9701,5320.0,1.35,5.00,8.96,3.15,True,True,"review, explained"
+facade,detection,detection,detect_odp_reader,detect_odp_unified_reader,odp-reader-medium,16,16,6567.5,6685.0,1.0179,117.5,0.60,5.00,5.25,4.19,False,False,pass
+overhead,detection,detection,detect_odp_leaf_reader,detect_odp_unified_reader,odp-reader-medium,16,16,1330.0,6685.0,5.0263,5355.0,0.60,5.00,5.26,4.19,True,True,"review, explained"
+facade,detection,detection,detect_odp_reader,detect_odp_unified_reader,odp-reader-tiny,16,16,6465.0,6640.0,1.0271,175.0,2.59,5.00,4.18,4.52,False,False,pass
+overhead,detection,detection,detect_odp_leaf_reader,detect_odp_unified_reader,odp-reader-tiny,16,16,1285.0,6640.0,5.1673,5355.0,2.59,5.00,7.00,4.52,True,True,"review, explained"
+facade,detection,detection,detect_odp_polyglot,detect_odp_unified_polyglot,odp-polyglot-large,16,16,14482.5,14607.5,1.0086,125.0,1.49,5.00,3.63,2.37,False,False,pass
+facade,detection,detection,detect_odp_polyglot,detect_odp_unified_polyglot,odp-polyglot-medium,16,16,14232.5,14607.5,1.0263,375.0,2.95,5.00,2.98,2.46,False,False,pass
+facade,detection,detection,detect_odp_polyglot,detect_odp_unified_polyglot,odp-polyglot-tiny,16,16,14417.5,14677.5,1.0180,260.0,3.36,5.00,3.06,3.00,False,False,pass
+facade,detection,detection,detect_odp_catalog_alias,detect_odp_unified_catalog_alias,odp-catalog-alias-large,16,16,12307.8,12477.5,1.0138,169.8,3.25,5.00,4.22,2.48,False,False,pass
+facade,detection,detection,detect_odp_catalog_alias,detect_odp_unified_catalog_alias,odp-catalog-alias-medium,16,16,12230.0,12492.5,1.0215,262.5,2.00,5.00,4.58,1.60,False,False,pass
+facade,detection,detection,detect_odp_catalog_alias,detect_odp_unified_catalog_alias,odp-catalog-alias-tiny,16,16,12290.0,12495.0,1.0167,205.0,4.54,5.00,3.86,2.80,False,False,pass
+kept,detection,detection,detect_odp_bytes,detect_odp_bytes,odp-bytes-large,16,16,1517.5,1520.0,1.0016,2.5,1.31,5.00,6.59,3.95,False,False,pass
+kept,detection,detection,detect_odp_bytes,detect_odp_bytes,odp-bytes-medium,16,16,1520.0,1505.0,0.9901,-15.0,3.27,5.00,5.59,5.98,False,False,pass
+kept,detection,detection,detect_odp_bytes,detect_odp_bytes,odp-bytes-tiny,16,16,1500.0,1487.5,0.9917,-12.5,2.68,5.00,3.33,3.70,False,False,pass
+kept,detection,detection,detect_odp_catalog_alias,detect_odp_catalog_alias,odp-catalog-alias-large,16,16,12307.8,12527.5,1.0179,219.8,3.25,5.00,4.22,4.23,False,False,pass
+kept,detection,detection,detect_odp_catalog_alias,detect_odp_catalog_alias,odp-catalog-alias-medium,16,16,12230.0,12445.2,1.0176,215.2,2.00,5.00,4.58,3.58,False,False,pass
+kept,detection,detection,detect_odp_catalog_alias,detect_odp_catalog_alias,odp-catalog-alias-tiny,16,16,12290.0,12470.2,1.0147,180.2,4.54,5.00,3.86,2.65,False,False,pass
+kept,detection,detection,detect_odp_polyglot,detect_odp_polyglot,odp-polyglot-large,16,16,14482.5,14620.0,1.0095,137.5,1.49,5.00,3.63,2.71,False,False,pass
+kept,detection,detection,detect_odp_polyglot,detect_odp_polyglot,odp-polyglot-medium,16,16,14232.5,14540.0,1.0216,307.5,2.95,5.00,2.98,2.34,False,False,pass
+kept,detection,detection,detect_odp_polyglot,detect_odp_polyglot,odp-polyglot-tiny,16,16,14417.5,14620.0,1.0140,202.5,3.36,5.00,3.06,2.33,False,False,pass
+kept,detection,detection,detect_odp_reader,detect_odp_reader,odp-reader-large,16,16,6635.0,6625.0,0.9985,-10.0,1.35,5.00,4.07,5.06,False,False,pass
+kept,detection,detection,detect_odp_reader,detect_odp_reader,odp-reader-medium,16,16,6567.5,6590.0,1.0034,22.5,0.60,5.00,5.25,3.64,False,False,pass
+kept,detection,detection,detect_odp_reader,detect_odp_reader,odp-reader-tiny,16,16,6465.0,6495.0,1.0046,30.0,2.59,5.00,4.18,4.16,False,False,pass
+kept,detection,detection,detect_ods_bytes,detect_ods_bytes,ods-bytes-large,16,16,1110.0,1120.0,1.0090,10.0,1.82,5.00,4.50,4.91,False,False,pass
+kept,detection,detection,detect_ods_bytes,detect_ods_bytes,ods-bytes-medium,16,16,1080.0,1070.0,0.9907,-10.0,1.85,5.00,2.78,3.27,False,False,pass
+kept,detection,detection,detect_ods_bytes,detect_ods_bytes,ods-bytes-tiny,16,16,1075.0,1077.5,1.0023,2.5,0.93,5.00,2.79,4.18,False,False,pass
+kept,detection,detection,detect_ods_catalog_alias,detect_ods_catalog_alias,ods-catalog-alias-large,16,16,10600.0,10782.5,1.0172,182.5,2.64,5.00,3.25,2.97,False,False,pass
+kept,detection,detection,detect_ods_catalog_alias,detect_ods_catalog_alias,ods-catalog-alias-medium,16,16,10487.8,10720.2,1.0222,232.5,3.39,5.00,2.53,2.80,False,False,pass
+kept,detection,detection,detect_ods_catalog_alias,detect_ods_catalog_alias,ods-catalog-alias-tiny,16,16,10370.2,10595.0,1.0217,224.8,2.36,5.00,2.70,2.40,False,False,pass
+kept,detection,detection,detect_ods_polyglot,detect_ods_polyglot,ods-polyglot-large,16,16,12612.5,12815.0,1.0161,202.5,1.01,5.00,3.09,2.73,False,False,pass
+kept,detection,detection,detect_ods_polyglot,detect_ods_polyglot,ods-polyglot-medium,16,16,12397.8,12732.5,1.0270,334.8,1.91,5.00,2.14,2.67,True,False,pass
+kept,detection,detection,detect_ods_polyglot,detect_ods_polyglot,ods-polyglot-tiny,16,16,12315.0,12540.0,1.0183,225.0,2.30,5.00,2.23,3.19,False,False,pass
+kept,detection,detection,detect_ods_reader,detect_ods_reader,ods-reader-large,16,16,7772.5,7745.0,0.9965,-27.5,0.51,5.00,10.36,9.62,False,False,pass
+kept,detection,detection,detect_ods_reader,detect_ods_reader,ods-reader-medium,16,16,5190.0,5150.0,0.9923,-40.0,1.15,5.00,3.47,4.37,False,False,pass
+kept,detection,detection,detect_ods_reader,detect_ods_reader,ods-reader-tiny,16,16,4975.0,5015.0,1.0080,40.0,2.16,5.00,4.53,2.99,False,False,pass
+kept,detection,detection,detect_odt_bytes,detect_odt_bytes,odt-bytes-large,16,16,1475.0,1470.0,0.9966,-5.0,2.68,5.00,5.42,8.16,False,False,pass
+kept,detection,detection,detect_odt_bytes,detect_odt_bytes,odt-bytes-medium,16,16,1455.0,1450.0,0.9966,-5.0,2.71,5.00,5.50,3.45,False,False,pass
+kept,detection,detection,detect_odt_bytes,detect_odt_bytes,odt-bytes-tiny,16,16,1452.5,1450.0,0.9983,-2.5,0.35,5.00,4.13,3.45,False,False,pass
+kept,detection,detection,detect_odt_catalog_alias,detect_odt_catalog_alias,odt-catalog-alias-large,16,16,12047.5,12352.5,1.0253,305.0,3.00,5.00,5.27,3.40,False,False,pass
+kept,detection,detection,detect_odt_catalog_alias,detect_odt_catalog_alias,odt-catalog-alias-medium,16,16,12017.5,12282.8,1.0221,265.2,2.69,5.00,4.41,3.37,False,False,pass
+kept,detection,detection,detect_odt_catalog_alias,detect_odt_catalog_alias,odt-catalog-alias-tiny,16,16,12030.2,12222.5,1.0160,192.2,1.70,5.00,5.49,3.52,False,False,pass
+kept,detection,detection,detect_odt_polyglot,detect_odt_polyglot,odt-polyglot-large,16,16,14165.0,14500.0,1.0236,335.0,2.28,5.00,4.97,3.10,False,False,pass
+kept,detection,detection,detect_odt_polyglot,detect_odt_polyglot,odt-polyglot-medium,16,16,14117.5,14430.0,1.0221,312.5,1.39,5.00,3.83,2.01,False,False,pass
+kept,detection,detection,detect_odt_polyglot,detect_odt_polyglot,odt-polyglot-tiny,16,16,14307.5,14440.2,1.0093,132.8,2.12,5.00,2.21,2.60,False,False,pass
+kept,detection,detection,detect_odt_reader,detect_odt_reader,odt-reader-large,16,16,7072.5,7070.0,0.9996,-2.5,0.35,5.00,2.55,2.83,False,False,pass
+kept,detection,detection,detect_odt_reader,detect_odt_reader,odt-reader-medium,16,16,6405.0,6435.0,1.0047,30.0,1.91,5.00,3.75,3.65,False,False,pass
+kept,detection,detection,detect_odt_reader,detect_odt_reader,odt-reader-tiny,16,16,6380.0,6350.0,0.9953,-30.0,2.17,5.00,3.45,4.40,False,False,pass
+kept,read-one,read-one,docx_producer_source_selected_paragraph,docx_producer_source_selected_paragraph,docx-producer-medium,16,16,106043.0,105735.5,0.9971,-307.5,4.62,5.00,6.48,4.95,False,False,pass
+kept,read-one,read-one,docx_semantic_one_paragraph,docx_semantic_one_paragraph,docx-semantic-large,16,16,3186256.5,3174231.8,0.9962,-12024.8,1.07,5.00,7.16,3.02,False,False,pass
+kept,read-one,read-one,docx_semantic_one_paragraph,docx_semantic_one_paragraph,docx-semantic-medium,16,16,65250.5,64925.2,0.9950,-325.2,2.00,5.00,8.37,3.15,False,False,pass
+kept,read-one,read-one,docx_semantic_one_paragraph,docx_semantic_one_paragraph,docx-semantic-tiny,16,16,9577.5,9515.0,0.9935,-62.5,1.75,5.00,5.64,2.63,False,False,pass
+kept,read-one,read-one,docx_semantic_one_paragraph_text,docx_semantic_one_paragraph_text,docx-semantic-large,16,16,957.5,917.5,0.9582,-40.0,65.15,65.15,7.31,9.81,False,False,pass
+kept,read-one,read-one,docx_semantic_one_paragraph_text,docx_semantic_one_paragraph_text,docx-semantic-medium,16,16,610.0,600.0,0.9836,-10.0,5.83,5.83,7.38,3.33,False,False,pass
+kept,read-one,read-one,docx_semantic_one_paragraph_text,docx_semantic_one_paragraph_text,docx-semantic-tiny,16,16,580.0,570.0,0.9828,-10.0,3.57,5.00,8.62,3.51,False,False,pass
+kept,read-one,read-one,ods_file_eager_selected_cell,ods_file_eager_selected_cell,ods-media-publication,8,8,600.0,520.0,0.8667,-80.0,25.47,25.47,65.00,42.31,False,False,pass
+kept,read-one,read-one,ods_file_eager_selected_media,ods_file_eager_selected_media,ods-media-publication,8,8,266941.2,270126.0,1.0119,3184.8,6.88,6.88,2.07,3.16,False,False,pass
+kept,read-one,read-one,ods_file_source_selected_cell,ods_file_source_selected_cell,ods-media-publication,8,8,1365.0,1377.5,1.0092,12.5,15.75,15.75,27.47,10.16,False,False,pass
+kept,read-one,read-one,ods_file_source_selected_media,ods_file_source_selected_media,ods-media-publication,8,8,412039.5,420074.5,1.0195,8035.0,5.50,5.50,5.09,8.65,False,False,pass

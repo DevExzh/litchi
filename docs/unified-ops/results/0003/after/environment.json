@@ -1,0 +1,95 @@
+{
+ "schema": "litchi.unified-ops.0003.s10-environment.v1",
+ "before": {
+  "binary": "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+  "sha256": "9c887ee55436adc1d98431449fa8c123e9616e73166e6f604e4bd81d12979c04",
+  "bytes": 264629168,
+  "source_revision": "a8f45144c26aee97c17214a48dd7434e43f90bcb (da4c207478 before the 2026-10-05 rewrite)",
+  "build": "S1 recipe, ../before/environment.json",
+  "tools/perf-baseline/Cargo.lock": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+ },
+ "after": {
+  "binary": "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+  "sha256": "dbe581e730b159872165f871067f23e27ae4baedf7cdd6974f5a5939d6985761",
+  "bytes": 265331992,
+  "source_revision": "d10dd4c747066a087ab4f29209bf29504b9bd048 (uo/m0a b906691f3b + the S10 harness fix)",
+  "build": {
+   "cwd": "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure",
+   "argv": "cargo build --manifest-path tools/perf-baseline/Cargo.toml --locked --offline --release --bin litchi-perf-baseline",
+   "env": {
+    "CARGO_BUILD_JOBS": "6",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target",
+    "LC_ALL": "C",
+    "TZ": "UTC"
+   },
+   "log": [
+    "start 2026-10-05T18:36:36Z load 3.41 4.82 4.26 rev d10dd4c747066a087ab4f29209bf29504b9bd048",
+    "Finished `release` profile [optimized + debuginfo] target(s) in 6m 31s",
+    "exit 0 end 2026-10-05T18:43:07Z"
+   ]
+  },
+  "tools/perf-baseline/Cargo.lock": "a9979b6e64e20071b0ef2d503c62eeeae7b2eec0fa15d7282e9905120e6efe3f",
+  "location_note": "children before 2026-10-05T19:49:43Z ran a byte-identical copy on the /tmp tmpfs; later children ran it from target/release (ext4)"
+ },
+ "unfixed_after_binary": {
+  "source_revision": "b906691f3bf55099bf80bc7ff9aa1f605a2f5c33",
+  "sha256": "2c5c356f0bff46cac4f4c9b0b6f482a841b3b74c79df70944d7544c383688ce7",
+  "use": "one-sample smoke run that reproduced the DOCX verification failure; deleted afterwards"
+ },
+ "probes": {
+  "memory_before": {
+   "sha256": "be69f91c809d5b0cd2bc9c64c74cece1d0cef5fd94ec3a36a2078c84e2349dfa",
+   "profile": "default release",
+   "revision": "a8f45144c2"
+  },
+  "memory_after": {
+   "sha256": "6bd32cb246fc085ec54fb9334b6e09d37f280c0ab71fecf69af5f03efe4f157d",
+   "profile": "default release",
+   "revision": "b906691f3b crates"
+  },
+  "cold_open_before": {
+   "sha256": "d3b70a9aa9323cf8062b665a821a7140254c2722cd103183166f9d55eee157ff",
+   "profile": "S1 recipe",
+   "revision": "a8f45144c2"
+  },
+  "cold_open_after": {
+   "sha256": "4ef796df340bc9f1e56119621e9e89a183332d298982774c4991a412f1e39ef6",
+   "profile": "S1 recipe",
+   "revision": "b906691f3b crates"
+  },
+  "rtf_open_after": {
+   "sha256": "883012301a2cb4650a06ee1137009ad0a50ca024f6a26fa6ce28a83fd5ec4b87",
+   "profile": "S1 recipe",
+   "revision": "b906691f3b crates"
+  },
+  "build": "mem_probe_build.sh; before builds ran in a detached sparse worktree of a8f45144c2 with its own target directory, removed afterwards"
+ },
+ "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+ "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+ "host": {
+  "nproc": 32,
+  "cpu_model": "AMD EPYC 9R45",
+  "threads_per_core": "1",
+  "kernel": "7.0.0-1013-aws",
+  "mem_total": "MemTotal:       129447072 kB",
+  "pinned_cpu": 20,
+  "shared_host": "yes: other agents worked on the host and filled the shared per-user tmpfs quota (49.38 GiB) during the capture; per-child load averages are in children.jsonl"
+ },
+ "filesystem_samples": {
+  "default": "the harness temporary directory, /tmp (tmpfs), as in S1: every group except PPTX and DOCX",
+  "pptx_file, docx_file": "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/s10-fsroot (ext4), via --filesystem-root, after the tmpfs quota failures (README, Problems)"
+ },
+ "ole2_fixtures": {
+  "test-data/ole/doc/documentProperties.doc": "3958e5c16a9089f07c1d7602e2e15b6032b586f1d1eeed6fe048af73535e36cb",
+  "test-data/ole/doc/FloatingPictures.doc": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+  "test-data/ole/doc/duplicate-style-names.doc": "660e6f947d7af78764cd0bb1dfc90e6e37a634e1ab0642a406b470b73e6770ed",
+  "test-data/ole/ppt/ppt_with_png.ppt": "92865c21e43aa3a69a61371fed9ea50873a66e4a5ee5a24ede2af58db66aeeb3",
+  "test-data/ole/ppt/SampleShow.ppt": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6"
+ }
+}
