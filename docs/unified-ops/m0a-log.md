@@ -302,3 +302,21 @@
   - litchi-ops: 452 tests;
   - facade targets: `unified_open_facade`, the Markdown goldens and parity, tolerance, unexpected-format, semantic, and the Pages/Keynote/Numbers suites;
   - Python oracle: 132 OK.
+
+## 0014b — xlsx/docx implicit `unsign()` (0013 F1) and XLSB task panes/Ribbon (F2) (`fe2c26f068`, merged here)
+- Classified every site:
+  - xlsx: 49 sites. 36 stripped silently on a changed edit, and 6 rewrote identical content (the slicer, timeline and query-table reorders and the smart-tag store); no site followed a refusal. The other 7 are the explicit authorization (`Workbook::unsigned`).
+  - docx: 13 sites. 11 stripped silently; 2 are the explicit authorization (`Package::unsign`).
+- Changed edits on signed packages now refuse with the crate's typed signed error before mutating. Exact no-ops keep the signature byte for byte. New `xlsx::Package::unsign()` is the explicit path for the slicer, timeline and smart-tag editors.
+- Breaking changes:
+  - xlsx changes on signed packages return `Error::Signed`; connections, XML Maps and volatile dependencies return it boxed.
+  - Four xlsx paths now refuse before touching the package instead of failing at save.
+  - docx mail merge, glossary, web settings, the font table and font settings refuse with `Opc(SignedSourceRequiresExplicitPolicy)` (reported as `document_protected`).
+  - docx `put_ribbon`/`remove_ribbon` refuse up front.
+  - Reorders that produce identical content now leave the bytes untouched on unsigned packages too.
+- F2 (XLSB): task panes now return a typed `PackageError::Signed` (they used to return an untyped error that ops reported as `corrupt_file`), and the Ribbon refuses instead of stripping. The record corrects record 0013 §2.1 accordingly.
+- Follow-ups:
+  - F1b: litchi-ooxml-common's shared custom/core-properties, Custom XML, VBA and Ribbon code still strips when called directly from xlsx, docx, pptx and xlsb. One record together with 0014a.
+  - F1c: semantic no-ops through a different serializer are still refused.
+  - An unrelated bug: adding a second timeline cache fails once a timeline view exists.
+- Verified on the merged `uo/m0a`: lib clippy on xlsx, docx, xlsb and ops; the new signature-policy targets (xlsx 16, docx 7, xlsb 10); the ops signature audit (26).
