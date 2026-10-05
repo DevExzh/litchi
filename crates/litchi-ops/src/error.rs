@@ -723,6 +723,10 @@ impl Classify for litchi_pptx::Error {
         match self {
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
+            // The core-properties reader reports its OPC failures, among them
+            // a source change or cancellation during the read, through the
+            // shared OOXML error.
+            Self::CustomProperties(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::IndexOutOfBounds { .. }
             | Self::SlideIndexOutOfBounds { .. }

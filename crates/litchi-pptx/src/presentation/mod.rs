@@ -24,11 +24,11 @@ pub use order::{
     SourceBackedSlideOrderSnapshot,
 };
 pub use source::{
-    MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
-    SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
-    SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
-    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceBackedSvgAttachmentCommit,
-    SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
+    MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedIntoEditorError, SourceBackedPresentation,
+    SourceBackedPresentationEditor, SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit,
+    SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
+    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot,
+    SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
     SourceBackedSvgAttachmentSnapshot, SourceBackedSvgCommit, SourceBackedSvgEdit,
     SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage, SourceImageDescriptor,
     SourceImageTarget, SourceSlide, SourceSvgAttachment, SourceSvgAttachmentReplacement,

@@ -121,6 +121,11 @@ pub(super) struct SourceInner {
     /// deferred slide read performs surface at that read's own entry point.
     /// See [`crate::leniency`].
     pub(super) tolerance: crate::leniency::ToleranceReport,
+    /// Whether the slide list met the strict, pre-leniency contract at open:
+    /// the tolerant scan repaired nothing, so the retained slide graph is the
+    /// one [`SourceBackedPresentationEditor`] would build. Read by
+    /// [`SourceBackedPresentation::try_into_editor`].
+    strict_slide_list: bool,
 }
 
 struct SourceCatalog {
@@ -408,6 +413,16 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 pub struct SourceBackedPresentation {
     pub(super) inner: Arc<SourceInner>,
 }
+
+// Risk R3 of unified-ops record 0003: the unified `Pptx` handle shares these
+// owners across threads, so they must stay `Send + Sync`.
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedPresentation>();
+    assert_send_sync::<SourceSlide>();
+    assert_send_sync::<SourceBackedPresentationEditor>();
+    assert_send_sync::<SourceBackedIntoEditorError>();
+};
 
 /// A lifetime-free read-only slide handle from [`SourceBackedPresentation`].
 ///
@@ -1156,8 +1171,10 @@ impl SourceBackedPresentation {
         // OPC manifest repairs (audit findings 8.5-8.9) were applied while
         // the deferred package was opened; they come first.
         tolerance.append_package(package.tolerance_report());
+        let repairs_before_catalog = tolerance.total();
         let catalog = source_catalog(&package, Some(&mut tolerance))?;
         package.check_execution()?;
+        let strict_slide_list = tolerance.total() == repairs_before_catalog;
 
         Ok(Self {
             inner: Arc::new(SourceInner {
@@ -1166,7 +1183,108 @@ impl SourceBackedPresentation {
                 slides: catalog.slides,
                 limits,
                 tolerance,
+                strict_slide_list,
             }),
+        })
+    }
+
+    /// Convert this read-only presentation into a
+    /// [`SourceBackedPresentationEditor`] over the same, already indexed
+    /// source-backed package.
+    ///
+    /// The ZIP central directory, OPC catalog, presentation root, and slide
+    /// graph validated at open are reused: no source byte is re-read for
+    /// indexing and no part payload is loaded. Only the package and
+    /// presentation relationship bindings the editor's publication planner
+    /// needs are copied from the retained in-memory catalog. When the slide
+    /// list needed a lenient repair at open, the editor's strict slide-list
+    /// contract is applied again over the retained root, exactly as
+    /// [`SourceBackedPresentationEditor::from_read_at`] would apply it, and
+    /// its refusal is reported.
+    ///
+    /// The editor takes ownership of the package because publication consumes
+    /// it, so the conversion succeeds only while this value is the sole owner
+    /// of the opened source: no clone of it and no [`SourceSlide`] from it is
+    /// alive.
+    ///
+    /// # Errors
+    ///
+    /// Returns the presentation unchanged inside [`SourceBackedIntoEditorError`]:
+    /// - without an error when it is shared ([`SourceBackedIntoEditorError::is_shared`]);
+    /// - with the typed cancellation, source-change, allocation, or strict
+    ///   slide-list error that prevented the conversion.
+    pub fn try_into_editor(
+        self,
+    ) -> std::result::Result<SourceBackedPresentationEditor, SourceBackedIntoEditorError> {
+        let seed = match self.editor_seed() {
+            Ok(seed) => seed,
+            Err(error) => {
+                return Err(SourceBackedIntoEditorError {
+                    presentation: self,
+                    error: Some(error),
+                });
+            },
+        };
+        let inner = match Arc::try_unwrap(self.inner) {
+            Ok(inner) => inner,
+            Err(inner) => {
+                return Err(SourceBackedIntoEditorError {
+                    presentation: Self { inner },
+                    error: None,
+                });
+            },
+        };
+        let SourceInner {
+            package,
+            _presentation,
+            slides,
+            limits,
+            tolerance: _,
+            strict_slide_list: _,
+        } = inner;
+        let (presentation, slides) = match seed.strict_catalog {
+            Some((presentation, slides)) => (presentation, slides),
+            None => (_presentation, slides),
+        };
+        Ok(SourceBackedPresentationEditor {
+            package,
+            _presentation: presentation,
+            slides,
+            package_relationships: seed.package_relationships,
+            presentation_binding: seed.presentation_binding,
+            limits,
+        })
+    }
+
+    /// Everything fallible [`Self::try_into_editor`] needs, computed while
+    /// the presentation is still borrowed so a failure can return it intact.
+    fn editor_seed(&self) -> Result<EditorSeed> {
+        let package = &self.inner.package;
+        package.check_execution()?;
+        package.source_version()?;
+        if !self.inner.strict_slide_list {
+            // The lenient open repaired the slide list; the editor refuses
+            // such a list. Rebuild the strict catalog over the same indexed
+            // package so the refusal (or, defensively, the strict graph) is
+            // exactly the editor's own.
+            let catalog = source_catalog(package, None)?;
+            package.check_execution()?;
+            package.source_version()?;
+            return Ok(EditorSeed {
+                package_relationships: Arc::from(catalog.package_relationships),
+                presentation_binding: Arc::new(catalog.presentation_binding),
+                strict_catalog: Some((catalog.presentation, catalog.slides)),
+            });
+        }
+        let package_relationships = Arc::from(relationship_bindings(package, package.rels())?);
+        let view = package.main_document_part()?;
+        let presentation_binding = Arc::new(part_binding(package, &view)?);
+        package.check_execution()?;
+        package.source_version()?;
+        Ok(EditorSeed {
+            package_relationships,
+            presentation_binding,
+            strict_catalog: None,
         })
     }
 
@@ -1362,6 +1480,81 @@ impl SourceBackedPresentation {
         litchi_opc::SourceCacheDiagnosticsError,
     > {
         self.inner.package.try_cache_diagnostics()
+    }
+}
+
+/// The editor-only catalog state [`SourceBackedPresentation::try_into_editor`]
+/// derives from the retained catalog before taking ownership of the package.
+struct EditorSeed {
+    package_relationships: Arc<[RelationshipBinding]>,
+    presentation_binding: Arc<PartBinding>,
+    /// The strict presentation root and slide graph, present only when the
+    /// open-time slide list needed a lenient repair.
+    strict_catalog: Option<(SourcePart, Box<[Arc<SourceSlideData>]>)>,
+}
+
+/// Why [`SourceBackedPresentation::try_into_editor`] could not convert a
+/// presentation. The presentation is returned unchanged and stays readable.
+pub struct SourceBackedIntoEditorError {
+    presentation: SourceBackedPresentation,
+    error: Option<Error>,
+}
+
+impl SourceBackedIntoEditorError {
+    /// Whether the conversion was refused only because another clone of the
+    /// presentation, or a [`SourceSlide`] from it, still shares the source.
+    #[must_use]
+    pub fn is_shared(&self) -> bool {
+        self.error.is_none()
+    }
+
+    /// The typed error that prevented the conversion, or `None` when the
+    /// presentation was merely shared.
+    #[must_use]
+    pub fn error(&self) -> Option<&Error> {
+        self.error.as_ref()
+    }
+
+    /// The unchanged presentation.
+    #[must_use]
+    pub fn presentation(&self) -> &SourceBackedPresentation {
+        &self.presentation
+    }
+
+    /// Split into the unchanged presentation and the optional typed error.
+    #[must_use]
+    pub fn into_parts(self) -> (SourceBackedPresentation, Option<Error>) {
+        (self.presentation, self.error)
+    }
+}
+
+impl std::fmt::Debug for SourceBackedIntoEditorError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SourceBackedIntoEditorError")
+            .field("slide_count", &self.presentation.slide_count())
+            .field("error", &self.error)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for SourceBackedIntoEditorError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.error {
+            Some(error) => write!(
+                formatter,
+                "cannot convert the source-backed presentation into an editor: {error}"
+            ),
+            None => formatter
+                .write_str("cannot convert a shared source-backed presentation into an editor"),
+        }
+    }
+}
+
+impl std::error::Error for SourceBackedIntoEditorError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        let error: &(dyn std::error::Error + 'static) = self.error.as_ref()?;
+        Some(error)
     }
 }
 
@@ -5209,6 +5402,15 @@ mod tests {
     }
 
     fn source_backed_pptx() -> Vec<u8> {
+        source_backed_pptx_with_slide_list(
+            r#"<p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/>"#,
+        )
+    }
+
+    fn source_backed_pptx_with_slide_list(slide_list: &str) -> Vec<u8> {
+        let presentation = format!(
+            r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>{slide_list}</p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#
+        );
         let mut writer = StreamingArchiveWriter::new();
         writer
             .write_stored(
@@ -5223,10 +5425,7 @@ mod tests {
             )
             .unwrap();
         writer
-            .write_stored(
-                "ppt/presentation.xml",
-                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#,
-            )
+            .write_stored("ppt/presentation.xml", presentation.as_bytes())
             .unwrap();
         writer
             .write_stored(
@@ -5701,6 +5900,136 @@ mod tests {
         assert_eq!(output, archive);
         drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    fn publish_first_slide_update(editor: SourceBackedPresentationEditor) -> Vec<u8> {
+        let commit = changed_slide_commit(&editor, 0, "First slide", "Updated slide");
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        output
+    }
+
+    #[test]
+    fn presentation_converts_into_editor_without_reindexing() {
+        reset_source_catalog_builds();
+        let archive = source_backed_pptx();
+        let source = Arc::new(CountingSource::new(archive.clone()));
+        let shared: Arc<dyn ReadAt> = source.clone();
+        let presentation = SourceBackedPresentation::from_read_at(shared).unwrap();
+        assert!(presentation.tolerance_report().is_clean());
+        assert_eq!(source_catalog_builds(), 1);
+        let reads = source.read_calls.load(Ordering::SeqCst);
+
+        let editor = presentation.try_into_editor().unwrap();
+        assert_eq!(
+            source_catalog_builds(),
+            1,
+            "the open-time catalog is reused"
+        );
+        assert_eq!(
+            source.read_calls.load(Ordering::SeqCst),
+            reads,
+            "conversion reads no source byte"
+        );
+        assert_eq!(editor.slide_count(), 2);
+
+        let converted = publish_first_slide_update(editor);
+        let direct = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        assert_eq!(converted, publish_first_slide_update(direct));
+        assert_ne!(converted, archive);
+    }
+
+    #[test]
+    fn converted_editor_reproduces_the_source_on_a_no_op() {
+        let archive = source_backed_pptx();
+        let presentation =
+            SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(archive.clone())))
+                .unwrap();
+        let editor = presentation.try_into_editor().unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(!edit.clear_transition().unwrap());
+        let commit = edit.commit();
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(output, archive);
+    }
+
+    #[test]
+    fn shared_presentation_is_returned_unchanged() {
+        let presentation = SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+
+        let clone = presentation.clone();
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(refused.is_shared());
+        assert!(refused.error().is_none());
+        let (presentation, error) = refused.into_parts();
+        assert!(error.is_none());
+        assert_eq!(
+            presentation.slide(1).unwrap().text().unwrap(),
+            "Second slide"
+        );
+        drop(clone);
+
+        let slide = presentation.slide(0).unwrap();
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(refused.is_shared(), "a live slide handle shares the source");
+        let presentation = refused.into_parts().0;
+        drop(slide);
+
+        assert!(presentation.try_into_editor().is_ok());
+    }
+
+    #[test]
+    fn changed_source_refuses_conversion_and_keeps_the_presentation() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let shared: Arc<dyn ReadAt> = source.clone();
+        let presentation = SourceBackedPresentation::from_read_at(shared).unwrap();
+        source.changed();
+
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(!refused.is_shared());
+        assert!(
+            matches!(
+                refused.error(),
+                Some(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+            ),
+            "{refused:?}"
+        );
+        assert!(std::error::Error::source(&refused).is_some());
+        let (presentation, _) = refused.into_parts();
+        assert_eq!(presentation.slide_count(), 2);
+    }
+
+    #[test]
+    fn repaired_slide_list_gets_the_editor_strict_refusal() {
+        let archive = source_backed_pptx_with_slide_list(
+            r#"<p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/><p:sldId id="258" r:id="rId1"/>"#,
+        );
+        let presentation =
+            SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(archive.clone())))
+                .unwrap();
+        assert!(!presentation.tolerance_report().is_clean());
+        assert_eq!(presentation.slide_count(), 2);
+
+        let Err(direct) =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(archive)))
+        else {
+            panic!("the editor's strict slide-list contract refuses the repaired list");
+        };
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(!refused.is_shared());
+        assert_eq!(refused.error().unwrap().to_string(), direct.to_string());
+        assert_eq!(refused.into_parts().0.slide_count(), 2);
     }
 
     #[test]
