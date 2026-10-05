@@ -7,7 +7,7 @@
 //! - concrete DOC and PPT packages map their storage topology onto those views.
 //!
 //! ```no_run
-//! # fn main() -> Result<(), litchi::Error> {
+//! # fn main() -> Result<(), litchi::common::Error> {
 //! #[cfg(feature = "doc")]
 //! {
 //!     use litchi::images::{Convert, Options, doc};

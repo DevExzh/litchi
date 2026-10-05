@@ -28,6 +28,8 @@ struct MyDoc {
 }
 
 impl ToMarkdown for MyDoc {
+    type Error = litchi_core::Error;
+
     fn to_markdown_with_options(&self, _options: &MarkdownOptions) -> Result<String> {
         // Pre-allocate a reasonable upper bound to avoid reallocations.
         let mut out = String::with_capacity(256);

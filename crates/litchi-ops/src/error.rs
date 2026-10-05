@@ -347,6 +347,10 @@ pub enum Source {
     /// An OOXML package-encryption error.
     #[cfg(feature = "encryption")]
     Crypto(litchi_crypto::ooxml::Error),
+    /// A formula conversion error: Markdown output renders OMML formulas as
+    /// LaTeX.
+    #[cfg(feature = "formula")]
+    Formula(litchi_formula::FormulaError),
 }
 
 impl Source {
@@ -390,6 +394,8 @@ impl Source {
             Self::Rtf(error) => Some(error),
             #[cfg(feature = "encryption")]
             Self::Crypto(error) => Some(error),
+            #[cfg(feature = "formula")]
+            Self::Formula(error) => Some(error),
         }
     }
 }
@@ -1053,6 +1059,20 @@ impl Classify for litchi_crypto::ooxml::Error {
     }
 }
 
+#[cfg(feature = "formula")]
+impl Classify for litchi_formula::FormulaError {
+    fn classify(&self) -> Class {
+        use litchi_formula::OmmlError;
+
+        match self {
+            Self::Omml(OmmlError::UnsupportedFeature(_)) => Class::of(Code::UnsupportedElement),
+            Self::Omml(OmmlError::DepthLimitExceeded(_)) => Class::of(Code::LimitExceeded),
+            Self::Omml(OmmlError::ArenaAllocationError(_)) => Class::of(Code::InternalError),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
 /// Implements `From<leaf>` for [`Error`]: classify, keep the leaf's message,
 /// record the leaf's format, and keep the leaf as the typed source.
 macro_rules! from_leaf {
@@ -1111,6 +1131,7 @@ from_leaf!(
     #[cfg(feature = "encryption")]
     litchi_crypto::ooxml::Error => Crypto, None
 );
+from_leaf!(#[cfg(feature = "formula")] litchi_formula::FormulaError => Formula, None);
 
 #[cfg(test)]
 mod tests;

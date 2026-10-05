@@ -32,10 +32,16 @@
 //!
 //! # Markdown
 //!
-//! The facade also keeps a lazily materialized owning package for its
-//! Markdown adapter (`DocxSourceCache`). `litchi-ops` has no `markdown`
-//! feature, so that cache is not ported here; S7 adds it next to
-//! `impl ToMarkdown for File`, bound to the same freshness guard.
+//! With the `markdown` feature the handle also keeps the owning package the
+//! Markdown adapter reads relationships, notes, images and numbering from.
+//! An eager owner is that package already; a source-backed owner
+//! materializes it once, on the first conversion, and every later conversion
+//! of the handle or its clones reuses it. The cache never outlives the
+//! source revision it was built from: each use checks the source first and
+//! last, and the adapter checks it again after the whole conversion, so a
+//! changed file is reported as [`Code::IoError`] instead of being answered
+//! from the stale package. This is the facade's former `DocxSourceCache`,
+//! moved onto the handle.
 
 use std::fmt;
 use std::sync::{Arc, OnceLock};
@@ -70,6 +76,10 @@ pub(crate) struct DocxState {
     /// ([`OpenOptions::retain_source`]). Both owner states already hold
     /// everything an edit needs, so this releases nothing; it only refuses.
     retain_source: bool,
+    /// The owning package a source-backed owner materializes for the
+    /// Markdown adapter, built on the first conversion.
+    #[cfg(feature = "markdown")]
+    markdown: OnceLock<Box<litchi_docx::Package>>,
 }
 
 /// The two owner states of a DOCX handle (record 0003 §2.3).
@@ -104,11 +114,11 @@ impl DocxOwner {
     }
 
     /// Check that a source-backed owner's file is unchanged: the facade's
-    /// `check_source_freshness_after_markdown`, for the Markdown adapter S7
-    /// moves onto `File`.
+    /// `check_source_freshness_after_markdown`, which the Markdown adapter
+    /// runs after a whole conversion.
     #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by the Markdown adapter from S7")
+        not(any(test, feature = "markdown")),
+        expect(dead_code, reason = "used by the Markdown adapter")
     )]
     pub(crate) fn check_source(&self) -> Result<()> {
         self.finish(Ok(()))
@@ -175,6 +185,8 @@ impl Docx {
             metadata: OnceLock::new(),
             tolerance: tolerance.map_or_else(OnceLock::new, OnceLock::from),
             retain_source: options.retain_source,
+            #[cfg(feature = "markdown")]
+            markdown: OnceLock::new(),
         };
         Self(Arc::new(state))
     }
@@ -375,6 +387,44 @@ impl Docx {
                 self.0.owner.finish(result)
             },
         }
+    }
+}
+
+#[cfg(feature = "markdown")]
+impl Docx {
+    /// The owning package the Markdown adapter reads relationships, notes,
+    /// images and numbering from: the eager owner itself, or the package a
+    /// source-backed owner materializes once and caches on the handle.
+    ///
+    /// The source is checked before the cache is consulted, so a package
+    /// materialized by an earlier conversion never answers for a file that
+    /// changed since, and again before the package is returned. Failures are
+    /// not cached: two first callers may both materialize, and the loser
+    /// drops its equal package.
+    pub(crate) fn markdown_package(&self) -> Result<&litchi_docx::Package> {
+        let source = match &self.0.owner {
+            DocxOwner::Eager(package) => return Ok(package),
+            DocxOwner::Source(source) => source,
+        };
+        self.0.owner.check_source()?;
+        if let Some(package) = self.0.markdown.get() {
+            return self.0.owner.finish(Ok(package.as_ref()));
+        }
+        // `to_owned_package` reads the pinned source revision and fails when
+        // the file changed underneath it.
+        let package = self
+            .0
+            .owner
+            .finish(source.to_owned_package().map_err(Error::from))?;
+        let _ = self.0.markdown.set(Box::new(package));
+        let package = self.0.markdown.get().map(Box::as_ref).ok_or_else(|| {
+            Error::new(
+                Code::InternalError,
+                "the DOCX Markdown package cache is empty after it was filled",
+            )
+            .with_format(FileFormat::Docx)
+        });
+        self.0.owner.finish(package)
     }
 }
 

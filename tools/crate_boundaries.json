@@ -245,6 +245,8 @@
       "litchi-crypto",
       "litchi-doc",
       "litchi-docx",
+      "litchi-formula",
+      "litchi-markdown",
       "litchi-odf-common",
       "litchi-odp",
       "litchi-ods",

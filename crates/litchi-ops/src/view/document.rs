@@ -42,8 +42,10 @@ use crate::format::rtf::Rtf;
 #[derive(Clone, Copy)]
 pub struct DocumentView<'a>(Inner<'a>);
 
+/// The handle a [`DocumentView`] reads, for the crate's adapters built on
+/// the view.
 #[derive(Clone, Copy)]
-enum Inner<'a> {
+pub(crate) enum Inner<'a> {
     #[cfg(feature = "docx")]
     Docx(&'a Docx),
     #[cfg(feature = "doc")]
@@ -74,7 +76,7 @@ fn reserve<T>(capacity: usize, resource: &'static str, format: FileFormat) -> Re
 /// appear as an opaque body child in DOCX's ordered-block view and must not
 /// make an otherwise textual document unreadable.
 #[cfg(feature = "docx")]
-fn docx_unknown_is_section_properties(block: &litchi_docx::OpaqueBlock) -> bool {
+pub(crate) fn docx_unknown_is_section_properties(block: &litchi_docx::OpaqueBlock) -> bool {
     let bytes = block.xml_bytes();
     let Some(open) = bytes.iter().position(|byte| *byte == b'<') else {
         return false;
@@ -163,6 +165,15 @@ impl<'a> DocumentView<'a> {
     #[cfg(feature = "odt")]
     pub(crate) fn odt(handle: &'a Odt) -> Self {
         Self(Inner::Odt(handle))
+    }
+
+    /// The handle this view reads.
+    #[cfg_attr(
+        not(feature = "markdown"),
+        expect(dead_code, reason = "the Markdown adapter is the only reader")
+    )]
+    pub(crate) fn inner(&self) -> Inner<'a> {
+        self.0
     }
 
     /// The format of the document.

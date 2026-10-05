@@ -127,6 +127,7 @@ encryption = [
     "dep:litchi-crypto",
     "litchi-docx?/encryption",
     "litchi-ooxml-common?/encryption",
+    "litchi-ops?/encryption",
     "litchi-ppt?/encryption",
     "litchi-pptx?/encryption",
     "litchi-xlsx?/encryption",
@@ -139,7 +140,12 @@ vba-inspection = [
     "litchi-xlsb?/vba-inspection",
     "litchi-xlsx?/vba-inspection",
 ]
-formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
+formula = [
+    "dep:litchi-formula",
+    "litchi-doc?/formula",
+    "litchi-ops?/formula",
+    "litchi-ppt?/formula",
+]
 fonts = [
     "dep:litchi-fonts",
     "litchi-docx?/fonts",
@@ -171,8 +177,8 @@ automatic-fonts = [
 images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
 eval = ["dep:litchi-eval"]
 web-functions = ["eval", "litchi-eval/web_functions"]
-markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr"]
-yaml = ["dep:serde-saphyr"]
+markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr", "litchi-ops?/markdown"]
+yaml = ["dep:serde-saphyr", "litchi-ops?/yaml"]
 
 # Format and convenience aggregates
 legacy = ["doc", "ppt", "xls", "cfb", "ole"]

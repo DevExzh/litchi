@@ -126,6 +126,15 @@ pub(crate) fn resolve_doc_lists(
 }
 
 impl ToMarkdown for Document {
+    type Error = Error;
+
+    #[cfg_attr(
+        not(feature = "docx"),
+        allow(
+            clippy::unused_enumerate_index,
+            reason = "the element index aligns the DOCX projections only"
+        )
+    )]
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         use crate::document::DocumentElement;
 
@@ -227,6 +236,8 @@ impl ToMarkdown for Document {
 }
 
 impl ToMarkdown for Paragraph {
+    type Error = Error;
+
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut writer = MarkdownWriter::new(*options);
         writer.write_paragraph(self)?;
@@ -235,6 +246,8 @@ impl ToMarkdown for Paragraph {
 }
 
 impl ToMarkdown for Run {
+    type Error = Error;
+
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut writer = MarkdownWriter::new(*options);
         writer.write_run(self)?;
@@ -244,6 +257,8 @@ impl ToMarkdown for Run {
 
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 impl ToMarkdown for Table {
+    type Error = Error;
+
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut writer = MarkdownWriter::new(*options);
         writer.write_table(self)?;

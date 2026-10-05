@@ -40,6 +40,8 @@ struct MathSnippet {
 }
 
 impl ToMarkdown for MathSnippet {
+    type Error = litchi_core::Error;
+
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut out = String::with_capacity(256);
 

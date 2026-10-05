@@ -1,167 +1,129 @@
-//! Litchi - High-performance Rust library for Microsoft Office file formats
+//! Litchi: one Rust API for Microsoft Office, OpenDocument and Apple iWork
+//! documents.
 //!
-//! Litchi provides a unified, user-friendly API for parsing Microsoft Office documents
-//! in both legacy (OLE2) and modern (OOXML) formats. The library automatically detects
-//! file formats and provides consistent interfaces for working with documents and presentations.
+//! # Opening a file
 //!
-//! # Features
+//! [`open`] is the entry point. It detects the format from the content in
+//! one pass and returns a [`File`]: a flat enum with one variant per format,
+//! plus [`File::Locked`] for an encrypted input and [`File::Signed`] for a
+//! signed one. [`open_bytes`] does the same for an in-memory input, and
+//! [`open_with`] and [`open_bytes_with`] take [`OpenOptions`] for limits and
+//! policy. The common case needs no options and no format knowledge.
 //!
-//! - **Unified API**: Work with .doc and .docx files using the same interface
-//! - **Format Auto-detection**: No need to specify file format - it's detected automatically
-//! - **High Performance**: Zero-copy parsing with SIMD optimizations where possible
-//! - **Production Ready**: Clean API inspired by python-docx and python-pptx
-//! - **Type Safe**: Leverages Rust's type system for safety and correctness
+//! ```
+//! # #[cfg(feature = "docx")]
+//! # {
+//! let path = concat!(
+//!     env!("CARGO_MANIFEST_DIR"),
+//!     "/../../test-data/ooxml/docx/documentProperties.docx"
+//! );
+//! let file = litchi::open(path)?;
+//! assert_eq!(file.format(), Some(litchi::FileFormat::Docx));
+//! assert_eq!(file.family(), Some(litchi::Family::Document));
 //!
-//! # Quick Start - Word Documents (Read)
+//! // Reads every format shares are methods on `File`.
+//! assert_eq!(file.text()?.trim(), "Hello World!");
+//! assert!(file.tolerance_report()?.is_clean());
 //!
-//! ```ignore
-//! use litchi::Document;
+//! // Family reads go through the view of the file's family.
+//! let document = file.document()?;
+//! assert_eq!(document.paragraph_count()?, 1);
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
 //!
-//! # fn main() -> Result<(), litchi::Error> {
-//! // Open any Word document (.doc or .docx) - format auto-detected
-//! let doc = Document::open("document.doc")?;
+//! A view refuses a file of another family, and names the format it found:
 //!
-//! // Extract all text
-//! let text = doc.text()?;
-//! println!("Document text: {}", text);
+//! ```
+//! # #[cfg(all(feature = "docx", feature = "xlsx"))]
+//! # {
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/ooxml/docx/documentProperties.docx"
+//! # );
+//! let file = litchi::open(path)?;
+//! let error = file.workbook().unwrap_err();
+//! assert_eq!(error.code(), litchi::Code::UnsupportedFormat);
+//! assert_eq!(error.detected(), Some(litchi::FileFormat::Docx));
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
 //!
-//! // Access paragraphs
-//! for para in doc.paragraphs()? {
-//!     println!("Paragraph: {}", para.text()?);
-//!     
-//!     // Access runs with formatting
-//!     for run in para.runs()? {
-//!         println!("  Text: {}", run.text()?);
-//!         if run.bold()? == Some(true) {
-//!             println!("    (bold)");
-//!         }
-//!     }
+//! Format-specific reads live on the handle a variant carries;
+//! [`format`](mod@format) documents each handle:
+//!
+//! ```no_run
+//! # #[cfg(feature = "pptx")]
+//! # {
+//! use litchi::File;
+//!
+//! let file = litchi::open("deck.pptx")?;
+//! if let File::Pptx(pptx) = &file {
+//!     let (width, height) = pptx.slide_size()?;
+//!     println!("{} slides of {width} x {height} EMU", pptx.slide_catalog()?.len());
 //! }
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
 //!
-//! // Access tables
-//! for table in doc.tables()? {
-//!     println!("Table with {} rows", table.row_count()?);
-//!     for row in table.rows()? {
-//!         for cell in row.cells()? {
-//!             println!("  Cell: {}", cell.text()?);
-//!         }
-//!     }
-//! }
-//! # Ok(())
+//! With the `markdown` feature a document or presentation converts to
+//! Markdown through [`markdown::ToMarkdown`]:
+//!
+//! ```
+//! # #[cfg(all(feature = "docx", feature = "markdown"))]
+//! # {
+//! use litchi::markdown::ToMarkdown;
+//!
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/ooxml/docx/documentProperties.docx"
+//! # );
+//! let file = litchi::open(path)?;
+//! assert_eq!(file.to_markdown()?, "Hello World\\!\n\n");
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
+//!
+//! # Errors
+//!
+//! Every failure of the unified API is one [`Error`] with a stable [`Code`]
+//! (OfficeCLI's code list plus Litchi's `unsupported_capability`,
+//! `limit_exceeded` and `cancelled`), a message, an optional suggestion, the
+//! format involved and the typed error of the format crate that failed
+//! ([`Error::leaf`]).
+//!
+//! ```
+//! # #[cfg(feature = "docx")]
+//! # {
+//! let error = litchi::open_bytes(b"plain text".to_vec()).unwrap_err();
+//! assert_eq!(error.code(), litchi::Code::UnsupportedFormat);
+//! assert_eq!(error.code().as_str(), "unsupported_format");
+//! assert_eq!(error.detected(), None);
 //! # }
 //! ```
 //!
-//! # Quick Start - Word Documents (Write)
+//! # Apple iWork
 //!
-//! ```ignore
-//! use litchi::docx::Package;
+//! Pages, Keynote and Numbers documents are read through the `iwork` module
+//! (the `iwork` feature). [`open`] recognizes them and refuses them with
+//! [`Code::UnsupportedFormat`] and a suggestion to use
+//! `litchi::iwork::Document::open`.
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a new empty document
-//! let mut pkg = Package::new()?;
+//! # Older entry points
 //!
-//! // Save the document
-//! pkg.save("new_document.docx")?;
+//! `Document`, `Presentation` and `sheet::Workbook` predate [`File`] and are
+//! removed in a later step of the migration to it. They report
+//! [`common::Error`], the error of the format crates' shared vocabulary.
 //!
-//! // Open and verify
-//! let reopened = Package::open("new_document.docx")?;
-//! let doc = reopened.document()?;
-//! println!("Created document with {} paragraphs", doc.paragraph_count()?);
-//! # Ok(())
-//! # }
-//! ```
+//! # Low-level modules
 //!
-//! # Quick Start - PowerPoint Presentations (Read)
-//!
-//! ```ignore
-//! use litchi::Presentation;
-//!
-//! # fn main() -> Result<(), litchi::Error> {
-//! // Open any PowerPoint presentation (.ppt or .pptx) - format auto-detected
-//! let pres = Presentation::open("presentation.ppt")?;
-//!
-//! // Extract all text
-//! let text = pres.text()?;
-//! println!("Presentation text: {}", text);
-//!
-//! // Get slide count
-//! println!("Total slides: {}", pres.slide_count()?);
-//!
-//! // Access individual slides
-//! for (i, slide) in pres.slides()?.iter().enumerate() {
-//!     println!("Slide {}: {}", i + 1, slide.text()?);
-//! }
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Quick Start - PowerPoint Presentations (Write)
-//!
-//! ```ignore
-//! use litchi::pptx::Package;
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//! // Create a new empty presentation
-//! let mut pkg = Package::new()?;
-//!
-//! // Save the presentation
-//! pkg.save("new_presentation.pptx")?;
-//!
-//! // Open and verify
-//! let reopened = Package::open("new_presentation.pptx")?;
-//! let pres = reopened.presentation()?;
-//! println!("Created presentation with {} slides", pres.slide_count()?);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Quick Start - Excel Workbooks (Write)
-//!
-//! ```ignore
-//! use litchi::xlsx::Workbook;
-//! use litchi::sheet::WorkbookTrait;
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//! // Create a new empty workbook
-//! let mut workbook = Workbook::create()?;
-//!
-//! // Save the workbook
-//! workbook.save("new_workbook.xlsx")?;
-//!
-//! // Open and verify
-//! let reopened = Workbook::open("new_workbook.xlsx")?;
-//! println!("Created workbook with {} worksheets", reopened.worksheet_count());
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Architecture
-//!
-//! The library is organized into several layers:
-//!
-//! ## High-Level API (Recommended)
-//!
-//! - `Document` - Unified Word document interface (.doc and .docx)
-//! - `Presentation` - Unified PowerPoint interface (.ppt and .pptx)
-//!
-//! These automatically detect file formats and provide a consistent API.
-//!
-//! ## Common Types
-//!
-//! - [`common::Error`] - Unified error type
-//! - [`common::Result`] - Result type alias
-//! - [`common::ShapeType`] - Common shape types
-//! - [`common::RGBColor`] - Color representation
-//! - [`common::Length`] - Measurement with units
-//!
-//! ## Low-Level Modules (Advanced Use)
-//!
-//! - `ppt` - Direct access to the legacy PowerPoint parser and writer
-//! - `xls` - Direct access to legacy Excel BIFF parsers and writers
-//! - `docx`, `pptx`, `xlsx`, and `xlsb` - Direct access to standalone OOXML owners
-//!
-//! Most users should use the high-level API and only access low-level modules
-//! when format-specific features are needed.
+//! Each format crate is re-exported under its own module for format-specific
+//! reading and writing: `doc`, `ppt` and `xls` for the legacy binary formats,
+//! `docx`, `pptx`, `xlsx` and `xlsb` for the OOXML owners, `odt`, `ods` and
+//! `odp` for OpenDocument, and `rtf`. [`common`] holds the shared vocabulary
+//! ([`common::ShapeType`], [`common::RGBColor`], [`common::Length`], ...).
+//! Most users need only [`open`], and reach for these modules when they
+//! write a document or need a format-specific feature.
 
 #![forbid(unsafe_code)]
 
@@ -268,9 +230,9 @@ pub use metadata_ext::MetadataYaml;
 ))]
 pub mod document;
 
-/// Format-neutral repair reports of the unified facades
+/// Format-neutral repair reports
 ///
-/// See [`ToleranceReport`] and the facades' `tolerance_report()` methods.
+/// See [`ToleranceReport`] and [`File::tolerance_report`].
 #[cfg(any(
     feature = "doc",
     feature = "docx",
@@ -323,10 +285,10 @@ pub mod presentation;
 #[cfg(feature = "sheet")]
 pub mod sheet;
 
-/// Markdown conversion module
+/// Markdown conversion
 ///
-/// Provides functionality to convert Office documents and presentations to Markdown.
-/// Use the [`markdown::ToMarkdown`] trait on Document or Presentation types.
+/// [`markdown::ToMarkdown`] converts a [`File`] holding a document or a
+/// presentation, and its family views, to Markdown.
 #[cfg(feature = "markdown")]
 pub mod markdown;
 
@@ -724,9 +686,100 @@ pub mod eval {
     pub use litchi_eval::*;
 }
 
-// Re-export high-level APIs
-pub use common::{Error, Result};
+// The unified operations API (ADR 0033, `litchi-ops`): `open` and `File`
+// are the entry point. The openers wrap the `litchi-ops` ones with the
+// facade's iWork classifier.
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "rtf",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "pages",
+    feature = "keynote",
+    feature = "numbers"
+))]
+mod unified;
 
+#[cfg(feature = "doc")]
+pub use litchi_ops::DocOptions;
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
+pub use litchi_ops::DocumentView;
+#[cfg(all(
+    feature = "encryption",
+    any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "rtf",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "pages",
+        feature = "keynote",
+        feature = "numbers"
+    )
+))]
+pub use litchi_ops::Password;
+#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
+pub use litchi_ops::PresentationView;
+#[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+pub use litchi_ops::WorkbookView;
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "rtf",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "pages",
+    feature = "keynote",
+    feature = "numbers"
+))]
+pub use litchi_ops::{
+    Code, EncryptionKind, Error, Family, File, Locked, OpenOptions, Result, SignatureOrigin,
+    Signed, SourceMode, compat, error, format,
+};
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub use litchi_ops::{open_prepared, open_prepared_with};
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "rtf",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "pages",
+    feature = "keynote",
+    feature = "numbers"
+))]
+pub use unified::{open, open_bytes, open_bytes_with, open_with};
+
+// The format-family types that predate `File`. They report
+// `common::Error`, and are removed in M0a step S9.
 #[cfg(any(
     feature = "doc",
     feature = "docx",

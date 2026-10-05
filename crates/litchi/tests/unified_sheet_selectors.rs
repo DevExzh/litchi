@@ -175,8 +175,8 @@ fn non_xlsx_workbook_returns_explicit_unsupported_error() {
     let workbook = Workbook::from_bytes(bytes).expect("open unified XLSB workbook");
     let error = workbook.sheet(0usize).unwrap_err();
     assert!(matches!(
-        error.downcast_ref::<litchi::Error>(),
-        Some(litchi::Error::Unsupported(message)) if message.contains("only for XLSX")
+        error.downcast_ref::<litchi::common::Error>(),
+        Some(litchi::common::Error::Unsupported(message)) if message.contains("only for XLSX")
     ));
 }
 
@@ -197,12 +197,12 @@ fn selected_handle_preserves_source_change_error() {
 
     let error = selected.cell("A1").unwrap_err();
     assert!(matches!(
-        error.downcast_ref::<litchi::Error>(),
-        Some(litchi::Error::SourceChanged { .. })
+        error.downcast_ref::<litchi::common::Error>(),
+        Some(litchi::common::Error::SourceChanged { .. })
     ));
     let selection_error = workbook.sheet("Data").unwrap_err();
     assert!(matches!(
-        selection_error.downcast_ref::<litchi::Error>(),
-        Some(litchi::Error::SourceChanged { .. })
+        selection_error.downcast_ref::<litchi::common::Error>(),
+        Some(litchi::common::Error::SourceChanged { .. })
     ));
 }

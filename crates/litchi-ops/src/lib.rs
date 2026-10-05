@@ -33,14 +33,55 @@
 //!
 //! Every failure is one typed [`Error`] with a stable [`Code`].
 //!
+//! # Markdown
+//!
+//! With the `markdown` feature, [`File`], its document and presentation
+//! views and the [`compat`] element wrappers implement
+//! `litchi_markdown::ToMarkdown`, reporting this crate's typed [`Error`].
+//!
+//! ```no_run
+//! # #[cfg(all(feature = "markdown", feature = "docx"))]
+//! # {
+//! use litchi_markdown::{MarkdownOptions, ToMarkdown};
+//!
+//! let file = litchi_ops::open("report.docx")?;
+//! println!("{}", file.to_markdown()?);
+//! let plain = MarkdownOptions::new().with_styles(false);
+//! println!("{}", file.to_markdown_with_options(&plain)?);
+//! # }
+//! # Ok::<(), litchi_ops::Error>(())
+//! ```
+//!
+//! - Documents (DOC, DOCX, RTF, ODT) convert paragraph by paragraph and
+//!   table by table, in document order; DOCX adds hyperlinks, embedded
+//!   images, footnotes and endnotes from its package.
+//! - Presentations (PPT, PPTX, ODP) convert to one `# Slide N` section per
+//!   slide, separated by thematic breaks.
+//! - Workbooks are refused with [`Code::UnsupportedCapability`].
+//! - A [`File::Locked`] is refused with [`Code::DocumentProtected`]; a
+//!   [`File::Signed`] converts the file it wraps.
+//!
+//! The conversion refuses what Markdown cannot carry instead of dropping it:
+//!
+//! | Condition | Code |
+//! |---|---|
+//! | Content Markdown cannot represent faithfully: unresolved list numbering, active `altChunk` blocks, inline images in DOC, hyperlinks or notes it cannot place, formulas without a LaTeX form | [`Code::UnsupportedElement`] |
+//! | Output that needs a cargo feature this build lacks (`formula` for formulas, `yaml` for front matter) | [`Code::UnsupportedCapability`], with a suggestion |
+//! | Malformed content met while converting, such as a note the body references but the package lacks | [`Code::CorruptFile`] |
+//! | A failed internal invariant of the conversion | [`Code::InternalError`] |
+//! | A source-backed file that changed during or after the conversion | [`Code::IoError`] |
+//!
+//! Read failures keep the leaf's typed error as [`Error::leaf`], and every
+//! error a document or presentation conversion reports names the format.
+//!
 //! # Status
 //!
 //! M0a delivers the open and read surface: [`File`], the family views
 //! ([`DocumentView`], [`PresentationView`], [`WorkbookView`]), the
-//! [`ToleranceReport`], and [`detect`]. The element wrappers in [`compat`]
-//! are scheduled for deletion in M1, when the node view replaces them. Edit
-//! verbs, the property registry, batches and saving arrive in later
-//! milestones.
+//! [`ToleranceReport`], Markdown output, and [`detect`]. The element
+//! wrappers in [`compat`] are scheduled for deletion in M1, when the node
+//! view replaces them. Edit verbs, the property registry, batches and saving
+//! arrive in later milestones.
 
 #![forbid(unsafe_code)]
 
@@ -52,6 +93,8 @@ mod file;
 pub mod format;
 mod handler;
 mod locked;
+#[cfg(feature = "markdown")]
+mod markdown;
 mod node;
 #[cfg(any(
     feature = "doc",

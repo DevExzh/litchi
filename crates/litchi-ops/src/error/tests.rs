@@ -824,3 +824,32 @@ fn wildcard_rtf_errors_are_corrupt_file() {
     let error = assert_code(litchi_rtf::Error::UnexpectedEof, Code::CorruptFile);
     assert_eq!(error.format(), Some(FileFormat::Rtf));
 }
+
+#[cfg(feature = "formula")]
+#[test]
+fn formula_conversion_errors_keep_their_typed_source() {
+    use litchi_formula::{FormulaError, LatexError, OmmlError};
+
+    let unsupported = assert_code(
+        FormulaError::Omml(OmmlError::UnsupportedFeature("m:groupChr".into())),
+        Code::UnsupportedElement,
+    );
+    assert!(matches!(unsupported.leaf(), Source::Formula(_)));
+    assert_code(
+        FormulaError::Omml(OmmlError::DepthLimitExceeded(64)),
+        Code::LimitExceeded,
+    );
+    assert_code(
+        FormulaError::Omml(OmmlError::ArenaAllocationError("full".into())),
+        Code::InternalError,
+    );
+    // The wildcard arm: every other conversion failure is malformed markup.
+    assert_code(
+        FormulaError::Omml(OmmlError::MalformedElement("m:f".into())),
+        Code::CorruptFile,
+    );
+    assert_code(
+        FormulaError::Latex(LatexError::InvalidNode("bad".into())),
+        Code::CorruptFile,
+    );
+}

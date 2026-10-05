@@ -37,8 +37,10 @@ use crate::format::pptx::{Pptx, PptxSlide};
 #[derive(Clone, Copy)]
 pub struct PresentationView<'a>(Inner<'a>);
 
+/// The handle a [`PresentationView`] reads, for the crate's adapters built
+/// on the view.
 #[derive(Clone, Copy)]
-enum Inner<'a> {
+pub(crate) enum Inner<'a> {
     #[cfg(feature = "pptx")]
     Pptx(&'a Pptx),
     #[cfg(feature = "ppt")]
@@ -84,6 +86,15 @@ impl<'a> PresentationView<'a> {
     #[cfg(feature = "odp")]
     pub(crate) fn odp(handle: &'a Odp) -> Self {
         Self(Inner::Odp(handle))
+    }
+
+    /// The handle this view reads.
+    #[cfg_attr(
+        not(all(feature = "markdown", feature = "yaml")),
+        expect(dead_code, reason = "the Markdown front matter is the only reader")
+    )]
+    pub(crate) fn inner(&self) -> Inner<'a> {
+        self.0
     }
 
     /// The format of the presentation.

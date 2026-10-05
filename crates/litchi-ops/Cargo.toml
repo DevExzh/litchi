@@ -55,18 +55,31 @@ encryption = [
 # (an XLS-only build with OPC enabled bounds its workbook path probe).
 opc = ["dep:litchi-opc"]
 
+# `markdown` (step S7) implements `litchi_markdown::ToMarkdown` for `File`,
+# its family views and the `compat` element wrappers: the facade's Markdown
+# adapter moved here, because the trait and `File` are both foreign to the
+# facade. `formula` renders OMML and MTEF formulas as LaTeX in that output,
+# and `yaml` writes document properties as YAML front matter; each mirrors
+# the facade feature of the same name, which turns it on.
+markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr"]
+formula = ["dep:litchi-formula", "litchi-doc?/formula"]
+yaml = ["dep:serde-saphyr"]
+
 # Compiles the detection probe counter and the test-only source detectors the
 # `litchi` facade's unit tests exercise. Enabled only by `litchi`'s
 # dev-dependency; never part of a release build.
 test-support = []
 
 [dependencies]
+base64              = { workspace = true, optional = true } # Markdown image data URIs
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps
 litchi-cfb          = { workspace = true, optional = true }
 litchi-core         = { workspace = true }
 litchi-crypto       = { workspace = true, optional = true, features = ["ooxml"] }
 litchi-doc          = { workspace = true, optional = true }
 litchi-docx         = { workspace = true, optional = true }
+litchi-formula      = { workspace = true, optional = true }
+litchi-markdown     = { workspace = true, optional = true }
 litchi-odf-common   = { workspace = true, optional = true }
 litchi-odp          = { workspace = true, optional = true }
 litchi-ods          = { workspace = true, optional = true }
@@ -80,6 +93,8 @@ litchi-rtf          = { workspace = true, optional = true }
 litchi-xls          = { workspace = true, optional = true }
 litchi-xlsb         = { workspace = true, optional = true }
 litchi-xlsx         = { workspace = true, optional = true }
+memchr              = { workspace = true, optional = true } # Markdown HTML escaping
+serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
 
 [dev-dependencies]
 tempfile = { workspace = true }

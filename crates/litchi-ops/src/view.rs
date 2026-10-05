@@ -11,9 +11,9 @@
 //! M1 node view replaces.
 
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
-mod document;
+pub(crate) mod document;
 #[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
-mod presentation;
+pub(crate) mod presentation;
 #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
 mod workbook;
 

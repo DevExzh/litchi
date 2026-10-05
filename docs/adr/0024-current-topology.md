@@ -4834,3 +4834,27 @@ Together with the S2 through S5d amendments above, the current inventory is
 66 workspace packages, 264 internal dependency declarations, 252 canonical
 edges, 12 development-only edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-10-05 amendment: `litchi-ops` Markdown edges (M0a step S7)
+
+Unified-ops M0a step S7 makes `litchi::open` and the `File` enum the facade's
+entry point (record [0003](../unified-ops/0003-m0a-migration-plan.md) §4).
+`File` gains Markdown output: `litchi_markdown::ToMarkdown` and `File` are
+both foreign to the facade, so the implementation can only live next to
+`File`, and the facade's Markdown adapter moves into `litchi-ops` behind a
+new `markdown` feature. That adds two optional normal edges:
+`litchi-ops -> litchi-markdown`, owned by `markdown`, and
+`litchi-ops -> litchi-formula`, owned by a new `formula` feature that renders
+OMML formulas as LaTeX and turns on `litchi-doc`'s own `formula` feature for
+MTEF formulas. A third new feature, `yaml`, adds only an external YAML
+serializer for front matter. The facade's `markdown`, `formula` and `yaml`
+features turn the matching `litchi-ops` features on, and its `encryption`
+feature now also turns on `litchi-ops/encryption`, an existing edge.
+`litchi-markdown` and `litchi-formula` are bulk packages, so `litchi-ops`
+stays runtime-neutral and iWork-free and the non-iWork release gate is
+unchanged.
+
+Together with the S2 through S6 amendments above, the current inventory is
+66 workspace packages, 266 internal dependency declarations, 254 canonical
+edges, 12 development-only edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

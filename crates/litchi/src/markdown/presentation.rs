@@ -13,6 +13,8 @@ use litchi_core::Result;
 use litchi_markdown::{MarkdownOptions, ToMarkdown, escape};
 
 impl ToMarkdown for Presentation {
+    type Error = litchi_core::Error;
+
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         // Write metadata as YAML front matter if available and enabled
         let metadata_md = if options.include_metadata {
@@ -69,6 +71,8 @@ impl ToMarkdown for Presentation {
 }
 
 impl ToMarkdown for Slide {
+    type Error = litchi_core::Error;
+
     fn to_markdown_with_options(&self, _options: &MarkdownOptions) -> Result<String> {
         // For individual slides, just return the text
         // Formatting is minimal for presentations

@@ -257,12 +257,15 @@ pub mod functions {
 pub use litchi_ops::detect::ooxml;
 
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
-mod iwork_tail;
+pub(crate) mod iwork_tail;
 
+/// The lowest-precedence ZIP classifier of this build: the iWork arms when an
+/// iWork format is enabled, nothing otherwise. The detection functions here
+/// and the unified openers ([`crate::open`]) share it.
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
-use iwork_tail::IworkTail as FacadeTail;
+pub(crate) use iwork_tail::IworkTail as FacadeTail;
 #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
-use litchi_ops::__migration::detect::NoZipTail as FacadeTail;
+pub(crate) use litchi_ops::__migration::detect::NoZipTail as FacadeTail;
 
 #[cfg(test)]
 pub(crate) use litchi_ops::__migration::detect::{opc_probe_count, reset_opc_probe_count};

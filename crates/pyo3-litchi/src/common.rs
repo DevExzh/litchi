@@ -15,12 +15,13 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Converts a Rust litchi::Error to a Python exception
-pub fn to_py_err(err: litchi::Error) -> PyErr {
+/// Converts the error of the facade's format-family types
+/// (`litchi::common::Error`) to a Python exception
+pub fn to_py_err(err: litchi::common::Error) -> PyErr {
     match err {
-        litchi::Error::Io(e) => PyIOError::new_err(e.to_string()),
-        litchi::Error::InvalidFormat(msg) => PyValueError::new_err(msg),
-        litchi::Error::Unsupported(msg) => PyValueError::new_err(msg),
+        litchi::common::Error::Io(e) => PyIOError::new_err(e.to_string()),
+        litchi::common::Error::InvalidFormat(msg) => PyValueError::new_err(msg),
+        litchi::common::Error::Unsupported(msg) => PyValueError::new_err(msg),
         _ => PyException::new_err(err.to_string()),
     }
 }
