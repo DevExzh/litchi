@@ -1,16 +1,43 @@
-//! A wrong-format open reports which format was detected.
+//! A wrong-family read reports which format was detected.
 //!
-//! Detection classifies the input before an opener refuses it, so refusing
-//! with a bare "not an Office file" throws away something the caller needs.
-//! These tests pin the typed classification onto each opener's refusal, and
-//! keep the genuinely unrecognized case reporting `NotOfficeFile`.
+//! Detection classifies the input before a family view refuses it, so
+//! refusing with a bare "not an Office file" throws away something the caller
+//! needs. These tests pin the detected format onto each family view's
+//! refusal ([`litchi::File::document`], [`litchi::File::presentation`] and
+//! [`litchi::File::workbook`] return [`Code::UnsupportedFormat`] with
+//! [`litchi::Error::detected`] naming the format), and keep the genuinely
+//! unrecognized case reporting no detected format.
+//!
+//! M0a step S8c ported these tests from the facade's format-family openers
+//! (document, presentation and workbook), which refused the same inputs with
+//! `UnexpectedFormat { detected }` and `NotOfficeFile`.
 
-#![cfg(any(unix, windows))]
+#![cfg(all(
+    any(unix, windows),
+    any(feature = "docx", feature = "pptx", feature = "xlsx")
+))]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    reason = "test assertions panic on failure by design"
+)]
+#![cfg_attr(
+    not(all(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "odp",
+        feature = "xlsx"
+    )),
+    allow(dead_code, reason = "helpers are shared by feature-gated tests")
+)]
 
 use std::path::{Path, PathBuf};
 
-use litchi::common::Error;
-use litchi::common::detection::FileFormat;
+use litchi::{Code, Error, FileFormat};
 
 fn fixture(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -18,23 +45,26 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-#[track_caller]
-fn assert_unexpected(error: &Error, expected: FileFormat) {
-    match error {
-        Error::UnexpectedFormat { detected } => assert_eq!(*detected, expected),
-        other => panic!("expected UnexpectedFormat {{ {expected:?} }}, got {other:?}"),
-    }
+/// Open `relative`, which must open, for a family view to refuse.
+fn open(relative: &str) -> litchi::File {
+    litchi::open(fixture(relative)).unwrap_or_else(|error| panic!("{relative}: {error:?}"))
 }
 
 #[track_caller]
-fn assert_boxed_unexpected(
-    error: &(dyn std::error::Error + Send + Sync + 'static),
-    expected: FileFormat,
-) {
-    let Some(error) = error.downcast_ref::<Error>() else {
-        panic!("expected a litchi error, got {error:?}");
-    };
-    assert_unexpected(error, expected);
+fn assert_unexpected(error: &Error, expected: FileFormat) {
+    assert_eq!(error.code(), Code::UnsupportedFormat, "{error:?}");
+    assert_eq!(error.detected(), Some(expected), "{error:?}");
+}
+
+/// The unified opener's refusal of an input no format claims: the old
+/// openers' `NotOfficeFile`.
+#[track_caller]
+fn assert_not_an_office_file(relative: &str) {
+    let error = litchi::open(fixture(relative))
+        .err()
+        .unwrap_or_else(|| panic!("{relative} is not an Office file"));
+    assert_eq!(error.code(), Code::UnsupportedFormat, "{error:?}");
+    assert_eq!(error.detected(), None, "{error:?}");
 }
 
 // ---------------------------------------------------------------- documents --
@@ -42,46 +72,43 @@ fn assert_boxed_unexpected(
 #[cfg(all(feature = "docx", feature = "xlsx"))]
 #[test]
 fn an_xlsx_given_to_the_document_opener_reports_xlsx() {
-    let error = litchi::Document::open(fixture("ooxml/xlsx/styles.xlsx"))
-        .err()
-        .expect("an XLSX is not a document");
+    let error = open("ooxml/xlsx/styles.xlsx")
+        .document()
+        .expect_err("an XLSX is not a document");
     assert_unexpected(&error, FileFormat::Xlsx);
 }
 
 #[cfg(all(feature = "docx", feature = "pptx"))]
 #[test]
 fn a_pptx_given_to_the_document_opener_reports_pptx() {
-    let error = litchi::Document::open(fixture("ooxml/pptx/shapes.pptx"))
-        .err()
-        .expect("a PPTX is not a document");
+    let error = open("ooxml/pptx/shapes.pptx")
+        .document()
+        .expect_err("a PPTX is not a document");
     assert_unexpected(&error, FileFormat::Pptx);
 }
 
 #[cfg(all(feature = "docx", feature = "ppt"))]
 #[test]
 fn a_legacy_ole2_presentation_given_to_the_document_opener_reports_ppt() {
-    let error = litchi::Document::open(fixture("ole/ppt/text_shapes.ppt"))
-        .err()
-        .expect("a legacy PowerPoint file is not a document");
+    let error = open("ole/ppt/text_shapes.ppt")
+        .document()
+        .expect_err("a legacy PowerPoint file is not a document");
     assert_unexpected(&error, FileFormat::Ppt);
 }
 
 #[cfg(all(feature = "docx", feature = "odp"))]
 #[test]
 fn an_odf_presentation_given_to_the_document_opener_reports_odp() {
-    let error = litchi::Document::open(fixture("odf/corpus/impress-basic.odp"))
-        .err()
-        .expect("an ODP is not a document");
+    let error = open("odf/corpus/impress-basic.odp")
+        .document()
+        .expect_err("an ODP is not a document");
     assert_unexpected(&error, FileFormat::Odp);
 }
 
 #[cfg(feature = "docx")]
 #[test]
 fn a_non_office_file_given_to_the_document_opener_still_reports_not_an_office_file() {
-    let error = litchi::Document::open(fixture("images/png/lena.png"))
-        .err()
-        .expect("a PNG is not a document");
-    assert!(matches!(error, Error::NotOfficeFile), "{error:?}");
+    assert_not_an_office_file("images/png/lena.png");
 }
 
 // ------------------------------------------------------------ presentations --
@@ -89,37 +116,34 @@ fn a_non_office_file_given_to_the_document_opener_still_reports_not_an_office_fi
 #[cfg(all(feature = "pptx", feature = "docx"))]
 #[test]
 fn a_docx_given_to_the_presentation_opener_reports_docx() {
-    let error = litchi::Presentation::open(fixture("ooxml/docx/comment.docx"))
-        .err()
-        .expect("a DOCX is not a presentation");
+    let error = open("ooxml/docx/comment.docx")
+        .presentation()
+        .expect_err("a DOCX is not a presentation");
     assert_unexpected(&error, FileFormat::Docx);
 }
 
 #[cfg(all(feature = "pptx", feature = "doc"))]
 #[test]
 fn a_legacy_ole2_document_given_to_the_presentation_opener_reports_doc() {
-    let error = litchi::Presentation::open(fixture("ole/doc/NoHeadFoot.doc"))
-        .err()
-        .expect("a legacy Word file is not a presentation");
+    let error = open("ole/doc/NoHeadFoot.doc")
+        .presentation()
+        .expect_err("a legacy Word file is not a presentation");
     assert_unexpected(&error, FileFormat::Doc);
 }
 
 #[cfg(all(feature = "pptx", feature = "odt"))]
 #[test]
 fn an_odf_document_given_to_the_presentation_opener_reports_odt() {
-    let error = litchi::Presentation::open(fixture("odf/corpus/writer-paragraph-styles.odt"))
-        .err()
-        .expect("an ODT is not a presentation");
+    let error = open("odf/corpus/writer-paragraph-styles.odt")
+        .presentation()
+        .expect_err("an ODT is not a presentation");
     assert_unexpected(&error, FileFormat::Odt);
 }
 
 #[cfg(feature = "pptx")]
 #[test]
 fn a_non_office_file_given_to_the_presentation_opener_still_reports_not_an_office_file() {
-    let error = litchi::Presentation::open(fixture("images/png/lena.png"))
-        .err()
-        .expect("a PNG is not a presentation");
-    assert!(matches!(error, Error::NotOfficeFile), "{error:?}");
+    assert_not_an_office_file("images/png/lena.png");
 }
 
 // --------------------------------------------------------------- workbooks --
@@ -127,58 +151,52 @@ fn a_non_office_file_given_to_the_presentation_opener_still_reports_not_an_offic
 #[cfg(all(feature = "xlsx", feature = "docx"))]
 #[test]
 fn a_docx_given_to_the_workbook_opener_reports_docx() {
-    let error = litchi::sheet::Workbook::open(fixture("ooxml/docx/comment.docx"))
-        .err()
-        .expect("a DOCX is not a workbook");
-    assert_boxed_unexpected(error.as_ref(), FileFormat::Docx);
+    let error = open("ooxml/docx/comment.docx")
+        .workbook()
+        .expect_err("a DOCX is not a workbook");
+    assert_unexpected(&error, FileFormat::Docx);
 }
 
 #[cfg(all(feature = "xlsx", feature = "pptx"))]
 #[test]
 fn a_pptx_given_to_the_workbook_opener_reports_pptx() {
-    let error = litchi::sheet::Workbook::open(fixture("ooxml/pptx/shapes.pptx"))
-        .err()
-        .expect("a PPTX is not a workbook");
-    assert_boxed_unexpected(error.as_ref(), FileFormat::Pptx);
+    let error = open("ooxml/pptx/shapes.pptx")
+        .workbook()
+        .expect_err("a PPTX is not a workbook");
+    assert_unexpected(&error, FileFormat::Pptx);
 }
 
 #[cfg(all(feature = "xlsx", feature = "doc"))]
 #[test]
 fn a_legacy_ole2_document_given_to_the_workbook_opener_reports_doc() {
-    let error = litchi::sheet::Workbook::open(fixture("ole/doc/NoHeadFoot.doc"))
-        .err()
-        .expect("a legacy Word file is not a workbook");
-    assert_boxed_unexpected(error.as_ref(), FileFormat::Doc);
+    let error = open("ole/doc/NoHeadFoot.doc")
+        .workbook()
+        .expect_err("a legacy Word file is not a workbook");
+    assert_unexpected(&error, FileFormat::Doc);
 }
 
 #[cfg(all(feature = "xlsx", feature = "odt"))]
 #[test]
 fn an_odf_document_given_to_the_workbook_opener_reports_odt() {
-    let error = litchi::sheet::Workbook::open(fixture("odf/corpus/writer-paragraph-styles.odt"))
-        .err()
-        .expect("an ODT is not a workbook");
-    assert_boxed_unexpected(error.as_ref(), FileFormat::Odt);
+    let error = open("odf/corpus/writer-paragraph-styles.odt")
+        .workbook()
+        .expect_err("an ODT is not a workbook");
+    assert_unexpected(&error, FileFormat::Odt);
 }
 
 #[cfg(all(feature = "xlsx", feature = "odp"))]
 #[test]
 fn an_odf_presentation_given_to_the_workbook_opener_reports_odp() {
-    let error = litchi::sheet::Workbook::open(fixture("odf/corpus/impress-basic.odp"))
-        .err()
-        .expect("an ODP is not a workbook");
-    assert_boxed_unexpected(error.as_ref(), FileFormat::Odp);
+    let error = open("odf/corpus/impress-basic.odp")
+        .workbook()
+        .expect_err("an ODP is not a workbook");
+    assert_unexpected(&error, FileFormat::Odp);
 }
 
 #[cfg(feature = "xlsx")]
 #[test]
 fn a_non_office_file_given_to_the_workbook_opener_still_reports_not_an_office_file() {
-    let error = litchi::sheet::Workbook::open(fixture("images/png/lena.png"))
-        .err()
-        .expect("a PNG is not a workbook");
-    let Some(error) = error.downcast_ref::<Error>() else {
-        panic!("expected a litchi error, got {error:?}");
-    };
-    assert!(matches!(error, Error::NotOfficeFile), "{error:?}");
+    assert_not_an_office_file("images/png/lena.png");
 }
 
 /// The defect this pins: before the change every one of these returned the
@@ -204,18 +222,17 @@ fn the_workbook_opener_separates_every_wrong_format_it_can_name() {
 
     let mut reported = Vec::new();
     for (relative, expected) in cases {
-        let error = litchi::sheet::Workbook::open(fixture(relative))
+        let error = open(relative)
+            .workbook()
             .err()
             .unwrap_or_else(|| panic!("{relative} is not a workbook"));
-        assert_boxed_unexpected(error.as_ref(), expected);
-        reported.push(expected);
+        assert_unexpected(&error, expected);
+        let detected = error.detected().expect("the refusal names the format");
+        assert!(
+            !reported.contains(&detected),
+            "each wrong format must be distinguishable: {detected:?} reported twice"
+        );
+        reported.push(detected);
     }
-
-    let mut unique = reported.clone();
-    unique.dedup();
-    assert_eq!(
-        unique.len(),
-        reported.len(),
-        "each wrong format must be distinguishable"
-    );
+    assert_eq!(reported.len(), cases.len());
 }

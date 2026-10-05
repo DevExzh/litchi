@@ -443,3 +443,249 @@ fn file_markdown_matches_the_facade_types_over_the_corpus() {
         differences.join("\n")
     );
 }
+
+// ---------------------------------------------- goldens for M0a step S9 --
+//
+// S9 deletes the facade types this file compares `File` against, and this
+// file with them. Before that, these tests pin the golden files under
+// `tests/golden/` to the facade types' output, so the `File`-only tests that
+// read the goldens keep this file's semantics, and those of the parity tests
+// in `unified_open_facade.rs`, once the facade types are gone:
+//
+// - `markdown_corpus.tsv` <- the corpus test above; read by
+//   `markdown_corpus_golden.rs`.
+// - `tolerance_reports.tsv` <- `unified_open_facade.rs`'s S7 parity of
+//   tolerance reports; read there.
+// - `pptx_slide_catalog.tsv` <- `unified_open_facade.rs`'s S7 parity of the
+//   PPTX slide catalog and slide size; read there.
+//
+// `LITCHI_BLESS_GOLDEN=1` rewrites the goldens from the facade types instead
+// of comparing (record `docs/unified-ops/s8c-facade-tests.md`).
+
+/// The path of a golden file.
+fn golden(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(name)
+}
+
+/// Compare `actual` with the golden file `name`, or rewrite the golden when
+/// `LITCHI_BLESS_GOLDEN=1`.
+#[track_caller]
+fn assert_golden_file(name: &str, actual: &str) {
+    let path = golden(name);
+    if std::env::var_os("LITCHI_BLESS_GOLDEN").is_some_and(|value| value == "1") {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, actual).unwrap();
+        return;
+    }
+    let expected = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    if expected != actual {
+        let first = expected
+            .lines()
+            .zip(actual.lines())
+            .position(|(expected, actual)| expected != actual)
+            .map_or_else(
+                || "a missing or extra line".to_owned(),
+                |line| format!("line {}", line + 1),
+            );
+        panic!(
+            "{} differs from the facade types' output at {first}",
+            path.display()
+        );
+    }
+}
+
+/// The fixture's path below `test-data`, with `/` separators.
+fn relative(path: &Path) -> String {
+    path.strip_prefix(fixture(""))
+        .unwrap_or(path)
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// FNV-1a over 64 bits: a stable digest of a Markdown output, so the
+/// corpus golden stays small. No hashing crate is a facade dependency.
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
+/// One corpus outcome as the golden records it: `<length>:<digest>` for
+/// Markdown, `!<variant>` for a refusal.
+fn golden_outcome(result: &Result<String, String>) -> String {
+    match result {
+        Ok(markdown) => format!("{}:{:016x}", markdown.len(), fnv1a64(markdown.as_bytes())),
+        Err(debug) => format!("!{}", variant(debug)),
+    }
+}
+
+#[test]
+fn the_markdown_corpus_golden_is_the_facade_types_output() {
+    let mut files = Vec::new();
+    corpus(&fixture(""), &mut files);
+    let option_sets = [
+        MarkdownOptions::new(),
+        MarkdownOptions::new().with_styles(false),
+        MarkdownOptions::new()
+            .with_metadata(true)
+            .with_table_style(TableStyle::StyledHtml),
+    ];
+    let mut golden = String::from(
+        "# Markdown of every DOCX, DOC, RTF, ODT, PPTX, PPT and ODP fixture under test-data, as\n\
+         # the facade's Document and Presentation types produced it (M0a step S8c). Columns:\n\
+         # fixture, then default/path, default/bytes, plain/path, plain/bytes,\n\
+         # metadata+html/path, metadata+html/bytes, where `plain` is `with_styles(false)` and\n\
+         # `metadata+html` is `with_metadata(true)` plus `TableStyle::StyledHtml`.\n\
+         # An outcome is `<bytes>:<FNV-1a 64 hex>` for Markdown or `!<facade error variant>`\n\
+         # for a refusal; `=` repeats the outcome to its left.\n",
+    );
+    for (path, family) in &files {
+        golden.push_str(&relative(path));
+        let mut previous = String::new();
+        for options in &option_sets {
+            for bytes in [false, true] {
+                let outcome = golden_outcome(&facade_markdown(path, *family, bytes, options));
+                golden.push('\t');
+                golden.push_str(if outcome == previous { "=" } else { &outcome });
+                previous = outcome;
+            }
+        }
+        golden.push('\n');
+    }
+    assert_golden_file("markdown_corpus.tsv", &golden);
+}
+
+/// One golden row per tolerance report: `family`, `route`, the fixture and
+/// the report's debug form.
+#[cfg(all(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+fn tolerance_row(
+    family: &str,
+    route: &str,
+    fixture: &str,
+    report: &litchi::ToleranceReport,
+) -> String {
+    format!("{family}\t{route}\t{fixture}\t{report:?}\n")
+}
+
+/// The tolerance reports of the facade types over the fixtures of
+/// `unified_open_facade.rs`'s S7 parity tests, read as those tests read
+/// them: documents by path and by bytes after their metadata, presentations
+/// by path after their metadata, workbooks by path after their text and
+/// metadata.
+#[cfg(all(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+#[test]
+fn the_tolerance_report_golden_is_the_facade_types_output() {
+    let mut golden = String::from(
+        "# Tolerance reports of the facade's Document, Presentation and Workbook types (M0a\n\
+         # step S8c), as unified_open_facade.rs's S7 parity tests read them. Columns: family,\n\
+         # route, fixture, the report's debug form.\n",
+    );
+    for relative in [
+        "ole/doc/watermark.doc",
+        "libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc",
+        "poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
+        "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
+        "libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf",
+        "libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf",
+        "odfpy/tests/examples/simpletable.odt",
+    ] {
+        let path = fixture(relative);
+        let document = Document::open(&path).unwrap();
+        let _ = document.metadata().unwrap();
+        golden.push_str(&tolerance_row(
+            "document",
+            "path",
+            relative,
+            &document.tolerance_report().unwrap(),
+        ));
+        let document = Document::from_bytes(std::fs::read(&path).unwrap()).unwrap();
+        let _ = document.metadata().unwrap();
+        golden.push_str(&tolerance_row(
+            "document",
+            "bytes",
+            relative,
+            &document.tolerance_report().unwrap(),
+        ));
+    }
+    for relative in [
+        "poi/test-data/slideshow/45543.ppt",
+        "ole/ppt/empty.ppt",
+        "libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx",
+        "libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp",
+    ] {
+        let presentation = litchi::Presentation::open(fixture(relative)).unwrap();
+        let _ = presentation.metadata().unwrap();
+        golden.push_str(&tolerance_row(
+            "presentation",
+            "path",
+            relative,
+            &presentation.tolerance_report().unwrap(),
+        ));
+    }
+    for relative in [
+        "ole/xls/WithCustomViews.xls",
+        "libreoffice-core/chart2/qa/extras/data/xls/chart.xls",
+        "ooxml/xlsx/universal-content.xlsx",
+        "libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx",
+        "ooxml/xlsb/universal-content.xlsb",
+        "libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
+        "libreoffice-core/sc/qa/extras/testdocuments/ScDatabaseRangeObj.ods",
+    ] {
+        let workbook = litchi::Workbook::open(fixture(relative)).unwrap();
+        let _ = workbook.text().unwrap();
+        let _ = workbook.metadata().unwrap();
+        golden.push_str(&tolerance_row(
+            "workbook",
+            "path",
+            relative,
+            &workbook.tolerance_report().unwrap(),
+        ));
+    }
+    assert_golden_file("tolerance_reports.tsv", &golden);
+}
+
+/// The slide catalog and slide size the facade's `Presentation` reports for
+/// every `test-data/ooxml/pptx` fixture it opens.
+#[test]
+fn the_pptx_slide_catalog_golden_is_the_facade_types_output() {
+    let mut golden = String::from(
+        "# Slide catalog and slide size of every test-data/ooxml/pptx fixture the facade's\n\
+         # Presentation opens (M0a step S8c). Columns: file name, slide width and height in\n\
+         # EMU (`-` when absent), then `position:slide id` per slide.\n",
+    );
+    let mut paths: Vec<_> = std::fs::read_dir(fixture("ooxml/pptx"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("pptx"))
+        .collect();
+    paths.sort();
+    for path in paths {
+        let Ok(presentation) = litchi::Presentation::open(&path) else {
+            continue;
+        };
+        let size =
+            |value: Option<i64>| value.map_or_else(|| "-".to_owned(), |value| value.to_string());
+        let catalog = presentation
+            .slide_catalog()
+            .unwrap()
+            .iter()
+            .map(|slide| format!("{}:{}", slide.position(), slide.slide_id()))
+            .collect::<Vec<_>>()
+            .join(",");
+        golden.push_str(&format!(
+            "{}\t{}\t{}\t{catalog}\n",
+            path.file_name().unwrap().to_string_lossy(),
+            size(presentation.slide_width().unwrap()),
+            size(presentation.slide_height().unwrap()),
+        ));
+    }
+    assert_golden_file("pptx_slide_catalog.tsv", &golden);
+}

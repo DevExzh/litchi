@@ -1,4 +1,4 @@
-use litchi::sheet::{CellValue, FormulaEvaluator, functions::open_workbook};
+use litchi::sheet::{CellValue, FormulaEvaluator};
 use litchi::xlsx::{Formula, Workbook};
 use tempfile::tempdir;
 
@@ -10,8 +10,9 @@ async fn eval_lookup_and_text_functions() {
 
     build_workbook(path_str);
 
-    let wb = open_workbook(path_str).expect("open workbook");
-    let evaluator = FormulaEvaluator::new(wb.as_ref());
+    let file = litchi::open(path_str).expect("open workbook");
+    let workbook = file.workbook().expect("workbook view");
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     assert_int(
         evaluator

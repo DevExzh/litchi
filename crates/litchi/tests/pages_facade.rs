@@ -3,7 +3,6 @@
 use std::io;
 use std::path::PathBuf;
 
-use litchi::Document;
 use litchi::pages::document_settings::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Settings,
 };
@@ -28,6 +27,13 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error
     Ok(bytes)
 }
 
+/// Pages body text that the native reader projects into a rich-text storage
+/// reaches the facade reader as one paragraph.
+///
+/// M0a step S8c: Pages has no `litchi::File` variant, so the facade reader is
+/// `litchi::iwork::Document` (the facade's `Document` read the same
+/// storage); `litchi::open` refuses the file with its format and a
+/// suggestion to use that reader.
 #[test]
 fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
@@ -49,29 +55,45 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
         .text();
     assert!(!expected.is_empty());
 
-    let document = Document::open(path)?;
-    assert_eq!(document.text()?, expected);
-    assert_eq!(document.paragraph_count()?, 1);
+    #[cfg(feature = "iwork")]
+    {
+        use litchi::iwork::{SectionKind, TextRole};
 
-    let paragraphs = document.paragraphs()?;
-    assert_eq!(paragraphs.len(), 1);
-    assert_eq!(
-        paragraphs
+        let snapshot = litchi::iwork::Document::open(&path)?.snapshot();
+        // The document's text is exactly the storage's text, as one
+        // paragraph-level item (the facade's `text()`, `paragraph_count()`,
+        // `paragraphs()` and `elements()` all reported that one paragraph).
+        let text = snapshot.iter_text().collect::<Vec<_>>();
+        assert_eq!(text.len(), 1);
+        let paragraph = text
             .first()
-            .ok_or_else(|| io::Error::other("facade returned no Pages paragraph"))?
-            .text()?,
-        expected
+            .ok_or_else(|| io::Error::other("iWork reader returned no Pages text"))?;
+        assert_eq!(paragraph.value(), expected);
+        assert_eq!(paragraph.role(), TextRole::SectionAdditional);
+        assert_eq!(snapshot.all_text(), [expected.to_owned()]);
+
+        assert_eq!(snapshot.section_count(), 1);
+        let body = snapshot
+            .section(0)
+            .ok_or_else(|| io::Error::other("iWork reader returned no Pages section"))?;
+        assert_eq!(body.kind(), SectionKind::Body);
+        assert_eq!(body.paragraphs().len(), 0);
+        assert_eq!(body.additional_text().collect::<Vec<_>>(), [expected]);
+    }
+
+    let error = litchi::open(&path).expect_err("litchi::open refuses Pages");
+    assert_eq!(error.code(), litchi::Code::UnsupportedFormat, "{error:?}");
+    assert_eq!(
+        error.detected(),
+        Some(litchi::FileFormat::Pages),
+        "{error:?}"
     );
-
-    let elements = document.elements()?;
-    assert_eq!(elements.len(), 1);
-    assert_eq!(
-        elements
-            .first()
-            .and_then(litchi::DocumentElement::as_paragraph)
-            .ok_or_else(|| io::Error::other("facade returned no Pages paragraph element"))?
-            .text()?,
-        expected
+    let suggestion = error
+        .suggestion()
+        .ok_or_else(|| io::Error::other("the Pages refusal carries no suggestion"))?;
+    assert!(
+        suggestion.contains("litchi::iwork::Document::open"),
+        "{suggestion}"
     );
 
     Ok(())

@@ -1,4 +1,16 @@
 //! Integration regressions for package-catalog format arbitration.
+//!
+//! Detection is asserted through the facade's detection functions; opens go
+//! through `litchi::open*`, with OPC read limits passed as
+//! `OpenOptions::ooxml_limits` (M0a step S8c ported the opens from the
+//! facade's `Document`, `Presentation` and `Workbook` types).
+
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    reason = "test assertions panic on failure by design"
+)]
 
 #[cfg(any(feature = "pptx", feature = "xlsx"))]
 const PPTX_PRESENTATION_MAIN_CONTENT_TYPE: &str =
@@ -9,6 +21,12 @@ const PPTX_PACKAGE_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schem
 
 #[cfg(any(feature = "pptx", feature = "xlsx"))]
 const PPTX_PRESENTATION_XML: &[u8] = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#;
+
+#[cfg(any(feature = "xlsx", all(feature = "pptx", feature = "odp")))]
+const PPTX_PRESENTATION_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#;
+
+#[cfg(any(feature = "xlsx", all(feature = "pptx", feature = "odp")))]
+const PPTX_SLIDE: &[u8] = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#;
 
 #[cfg(any(feature = "pptx", feature = "xlsx"))]
 fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
@@ -40,6 +58,25 @@ fn pptx_catalog(content_type: &str) -> Vec<u8> {
     ])
 }
 
+/// A readable one-slide PPTX: the catalog of [`pptx_catalog`] plus the
+/// slide its presentation part references.
+#[cfg(feature = "xlsx")]
+fn pptx_package() -> Vec<u8> {
+    let content_types = format!(
+        r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="{PPTX_PRESENTATION_MAIN_CONTENT_TYPE}"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>"#
+    );
+    zip_bytes(&[
+        ("[Content_Types].xml", content_types.as_bytes()),
+        ("_rels/.rels", PPTX_PACKAGE_RELATIONSHIPS),
+        ("ppt/presentation.xml", PPTX_PRESENTATION_XML),
+        (
+            "ppt/_rels/presentation.xml.rels",
+            PPTX_PRESENTATION_RELATIONSHIPS,
+        ),
+        ("ppt/slides/slide1.xml", PPTX_SLIDE),
+    ])
+}
+
 #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
 fn odf_package(mimetype: &str, content: &[u8]) -> Vec<u8> {
     let mut writer = litchi::odf_common::core::PackageWriter::new();
@@ -53,8 +90,9 @@ fn odf_package(mimetype: &str, content: &[u8]) -> Vec<u8> {
 #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
 mod document_limit_arbitration {
     use super::odf_package;
-    use litchi::Document;
-    use litchi::common::{Error, Resource};
+    use litchi::error::Source;
+    use litchi::opc::{OpcError, ReadResource};
+    use litchi::{Code, Error, File, OpenOptions};
 
     const ODT_MIME: &str = "application/vnd.oasis.opendocument.text";
     const ODT_CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text><text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">bounded</text:p></office:text></office:body></office:document-content>"#;
@@ -80,13 +118,25 @@ mod document_limit_arbitration {
             .expect("polyglot package is writable")
     }
 
-    fn assert_input_limit(error: Error, observed: u64, maximum: u64) {
-        let Error::ResourceLimit(limit) = error else {
-            panic!("expected an input resource limit, got {error}");
+    #[track_caller]
+    fn assert_input_limit(error: &Error, observed: u64, maximum: u64) {
+        assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+        let Source::Opc(OpcError::ReadLimit {
+            resource,
+            actual,
+            maximum: limit,
+        }) = error.leaf()
+        else {
+            panic!("expected an input resource limit, got {error:?}");
         };
-        assert_eq!(limit.resource, Resource::InputBytes);
-        assert_eq!(limit.observed, observed);
-        assert_eq!(limit.limit, maximum);
+        assert_eq!(*resource, ReadResource::InputBytes);
+        assert_eq!(*actual, observed);
+        assert_eq!(*limit, maximum);
+    }
+
+    #[track_caller]
+    fn assert_odt(file: &File) {
+        assert!(matches!(file, File::Odt(_)), "{file:?}");
     }
 
     #[test]
@@ -97,30 +147,38 @@ mod document_limit_arbitration {
             .expect("positive input limit")
             .build()
             .expect("limits are consistent");
-        assert!(Document::from_bytes_with_limits(ordinary.clone(), native_limits).is_ok());
+        let native = OpenOptions::new().ooxml_limits(native_limits);
+        assert_odt(
+            &litchi::open_bytes_with(ordinary.clone(), &native)
+                .expect("ordinary ODT bytes use the ODT policy"),
+        );
         let ordinary_path = tempfile::Builder::new()
             .suffix(".odt")
             .tempfile()
             .expect("temporary ordinary ODT path");
         std::fs::write(ordinary_path.path(), &ordinary).expect("write ordinary ODT fixture");
-        assert!(Document::open_with_limits(ordinary_path.path(), native_limits).is_ok());
+        assert_odt(
+            &litchi::open_with(ordinary_path.path(), &native)
+                .expect("an ordinary ODT path uses the ODT policy"),
+        );
 
         let renamed_path = tempfile::Builder::new()
             .suffix(".DOCX")
             .tempfile()
             .expect("temporary DOCX-suffixed ODT path");
         std::fs::write(renamed_path.path(), &ordinary).expect("write renamed ODT fixture");
-        let renamed_error = match Document::open_with_limits(renamed_path.path(), native_limits) {
+        let renamed_error = match litchi::open_with(renamed_path.path(), &native) {
             Ok(_) => panic!("DOCX-suffixed ODT bypassed the caller's input limit"),
             Err(error) => error,
         };
         assert_input_limit(
-            renamed_error,
+            &renamed_error,
             u64::try_from(ordinary.len()).expect("fixture length fits in u64"),
             1,
         );
-        let renamed = Document::open(renamed_path.path())
+        let renamed = litchi::open(renamed_path.path())
             .expect("ordinary ODT content must retain its owner after the suffix limit");
+        assert_odt(&renamed);
         assert_eq!(renamed.text().expect("renamed ODT text"), "bounded");
 
         for catalog_name in ["[Content_Types].xml", "[content_types].xml"] {
@@ -133,22 +191,23 @@ mod document_limit_arbitration {
                 .build()
                 .expect("limits are consistent");
 
-            let bytes_error = match Document::from_bytes_with_limits(bytes.clone(), limits) {
+            let limits = OpenOptions::new().ooxml_limits(limits);
+            let bytes_error = match litchi::open_bytes_with(bytes.clone(), &limits) {
                 Ok(_) => panic!("ODT/DOCX bytes bypassed the caller's DOCX input limit"),
                 Err(error) => error,
             };
-            assert_input_limit(bytes_error, observed, maximum);
+            assert_input_limit(&bytes_error, observed, maximum);
 
             let temporary = tempfile::Builder::new()
                 .suffix(".odt")
                 .tempfile()
                 .expect("temporary ODT/DOCX path");
             std::fs::write(temporary.path(), bytes).expect("write ODT/DOCX fixture");
-            let path_error = match Document::open_with_limits(temporary.path(), limits) {
+            let path_error = match litchi::open_with(temporary.path(), &limits) {
                 Ok(_) => panic!("ODT/DOCX path bypassed the caller's DOCX input limit"),
                 Err(error) => error,
             };
-            assert_input_limit(path_error, observed, maximum);
+            assert_input_limit(&path_error, observed, maximum);
         }
     }
 }
@@ -187,8 +246,10 @@ mod content_type_matching {
 mod ordinary_ods_detection {
     use super::odf_package;
     use litchi::common::FileFormat;
-    use litchi::common::detection::{detect_file_format_from_bytes, detect_format_from_reader};
-    use litchi::detection_smart::{DetectedFormat, detect_format_smart};
+    use litchi::common::detection::{
+        DetectedFormat, detect_file_format_from_bytes, detect_format_from_reader,
+        detect_format_smart,
+    };
     use std::io::Cursor;
 
     const MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -219,8 +280,10 @@ mod ordinary_ods_detection {
 mod ordinary_odp_detection {
     use super::odf_package;
     use litchi::common::FileFormat;
-    use litchi::common::detection::{detect_file_format_from_bytes, detect_format_from_reader};
-    use litchi::detection_smart::{DetectedFormat, detect_format_smart};
+    use litchi::common::detection::{
+        DetectedFormat, detect_file_format_from_bytes, detect_format_from_reader,
+        detect_format_smart,
+    };
     use std::io::Cursor;
 
     const MIME: &str = "application/vnd.oasis.opendocument.presentation";
@@ -250,22 +313,22 @@ mod ordinary_odp_detection {
 #[cfg(all(feature = "pptx", feature = "odp"))]
 mod ooxml_odf_arbitration {
     use super::{
-        PPTX_PACKAGE_RELATIONSHIPS, PPTX_PRESENTATION_MAIN_CONTENT_TYPE, PPTX_PRESENTATION_XML,
-        odf_package, zip_bytes,
+        PPTX_PACKAGE_RELATIONSHIPS, PPTX_PRESENTATION_MAIN_CONTENT_TYPE,
+        PPTX_PRESENTATION_RELATIONSHIPS, PPTX_PRESENTATION_XML, PPTX_SLIDE, odf_package, zip_bytes,
     };
-    use litchi::Presentation;
-    use litchi::common::detection::detect_file_format_from_bytes;
-    use litchi::common::{Error, FileFormat};
-    use litchi::detection_smart::{
-        DetectedFormat, detect_format_smart, detect_format_smart_with_limits,
+    use litchi::common::FileFormat;
+    use litchi::common::detection::{
+        DetectedFormat, detect_file_format_from_bytes, detect_format_smart,
+        detect_format_smart_with_limits,
     };
+    use litchi::error::Source;
+    use litchi::opc::{OpcError, ReadResource};
+    use litchi::{Code, OpenOptions};
 
     const ODP_MIME: &str = "application/vnd.oasis.opendocument.presentation";
     const ODP_CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="one"/></office:presentation></office:body></office:document-content>"#;
     const POLYGLOT_ODP_CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="one"/><draw:page draw:name="two"/></office:presentation></office:body></office:document-content>"#;
     const ODP_MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#;
-    const PPTX_PRESENTATION_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#;
-    const PPTX_SLIDE: &[u8] = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#;
 
     fn pptx_odf_polyglot() -> Vec<u8> {
         let content_types = format!(
@@ -298,9 +361,13 @@ mod ooxml_odf_arbitration {
             Some(DetectedFormat::Pptx(_))
         ));
 
-        let presentation = Presentation::from_bytes(bytes).expect("valid PPTX owner wins");
+        let file = litchi::open_bytes(bytes).expect("valid PPTX owner wins");
+        assert_eq!(file.format(), Some(FileFormat::Pptx));
         assert_eq!(
-            presentation.slide_count().expect("slide count is readable"),
+            file.presentation()
+                .unwrap()
+                .slide_count()
+                .expect("slide count is readable"),
             1
         );
     }
@@ -314,10 +381,14 @@ mod ooxml_odf_arbitration {
             .build()
             .expect("limits are consistent");
 
-        let presentation = Presentation::from_bytes_with_limits(bytes, limits)
+        let file = litchi::open_bytes_with(bytes, &OpenOptions::new().ooxml_limits(limits))
             .expect("ordinary ODP bytes use the ODP policy");
+        assert_eq!(file.format(), Some(FileFormat::Odp));
         assert_eq!(
-            presentation.slide_count().expect("slide count is readable"),
+            file.presentation()
+                .unwrap()
+                .slide_count()
+                .expect("slide count is readable"),
             1
         );
     }
@@ -338,15 +409,28 @@ mod ooxml_odf_arbitration {
 
         assert!(detect_format_smart_with_limits(bytes.clone(), input_limits).is_none());
         assert!(detect_format_smart_with_limits(bytes.clone(), catalog_limits).is_none());
-        let error = match Presentation::from_bytes_with_limits(bytes, catalog_limits) {
+        let error = match litchi::open_bytes_with(
+            bytes,
+            &OpenOptions::new().ooxml_limits(catalog_limits),
+        ) {
             Ok(_) => panic!("tight limits were replaced by an ODP fallback"),
             Err(error) => error,
         };
-        assert!(matches!(
-            error,
-            Error::ResourceLimit(ref limit)
-                if limit.resource == litchi::common::Resource::InputBytes && limit.limit == 1
-        ));
+        // The facade flattened every OPC read limit into a core
+        // `ResourceLimit { resource: InputBytes }`; the typed OPC source
+        // names the content-types limit that refused the package.
+        assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+        assert!(
+            matches!(
+                error.leaf(),
+                Source::Opc(OpcError::ReadLimit {
+                    resource: ReadResource::ContentTypesBytes,
+                    maximum: 1,
+                    ..
+                })
+            ),
+            "{error:?}"
+        );
     }
 
     #[test]
@@ -358,9 +442,13 @@ mod ooxml_odf_arbitration {
             .expect("temporary renamed ODP path");
         std::fs::write(temporary.path(), &bytes).expect("write renamed ODP");
 
-        let presentation = Presentation::open(temporary.path()).expect("renamed ODP opens");
+        let file = litchi::open(temporary.path()).expect("renamed ODP opens");
+        assert_eq!(file.format(), Some(FileFormat::Odp));
         assert_eq!(
-            presentation.slide_count().expect("slide count is readable"),
+            file.presentation()
+                .unwrap()
+                .slide_count()
+                .expect("slide count is readable"),
             1
         );
 
@@ -369,44 +457,70 @@ mod ooxml_odf_arbitration {
             .expect("positive input limit")
             .build()
             .expect("limits are consistent");
-        let limited = Presentation::open_with_limits(temporary.path(), limits)
+        let limited = litchi::open_with(temporary.path(), &OpenOptions::new().ooxml_limits(limits))
             .expect("renamed ordinary ODP uses the neutral ODP budget");
-        assert_eq!(limited.slide_count().expect("slide count is readable"), 1);
+        assert_eq!(
+            limited
+                .presentation()
+                .unwrap()
+                .slide_count()
+                .expect("slide count is readable"),
+            1
+        );
     }
 }
 
 #[cfg(feature = "xlsx")]
 mod wrong_family_workbook {
-    use super::{PPTX_PRESENTATION_MAIN_CONTENT_TYPE, pptx_catalog};
-    use litchi::Workbook;
-    use litchi::common::Error;
+    use super::{PPTX_PRESENTATION_MAIN_CONTENT_TYPE, pptx_catalog, pptx_package};
+    use litchi::{Code, FileFormat};
 
-    #[test]
-    fn wrong_family_ooxml_path_reports_the_detected_family() {
+    fn xlsx_path(bytes: &[u8]) -> tempfile::NamedTempFile {
         let temporary = tempfile::Builder::new()
             .suffix(".xlsx")
             .tempfile()
             .expect("temporary wrong-family workbook path");
-        std::fs::write(
-            temporary.path(),
-            pptx_catalog(PPTX_PRESENTATION_MAIN_CONTENT_TYPE),
-        )
-        .expect("write wrong-family OOXML fixture");
+        std::fs::write(temporary.path(), bytes).expect("write wrong-family OOXML fixture");
+        temporary
+    }
 
-        let error = match Workbook::open(temporary.path()) {
-            Ok(_) => panic!("PPTX content was accepted by the XLSX facade"),
+    #[test]
+    fn wrong_family_ooxml_path_reports_the_detected_family() {
+        let temporary = xlsx_path(&pptx_package());
+        // The file opens as a presentation in a build with PPTX, and is
+        // refused at open, with its format, in a build without; either way
+        // the workbook view is never handed PPTX content.
+        let error = match litchi::open(temporary.path()) {
+            Ok(file) => match file.workbook() {
+                Ok(_) => panic!("PPTX content was accepted by the XLSX facade"),
+                Err(error) => error,
+            },
             Err(error) => error,
         };
-        // The workbook facade knows this is a PowerPoint package; saying only
+        // The workbook view knows this is a PowerPoint package; saying only
         // "not an Office file" would throw that away.
-        assert!(
-            error.downcast_ref::<Error>().is_some_and(|error| matches!(
-                error,
-                Error::UnexpectedFormat {
-                    detected: litchi::common::detection::FileFormat::Pptx
-                }
-            )),
-            "{error:?}"
-        );
+        assert_eq!(error.code(), Code::UnsupportedFormat, "{error:?}");
+        assert_eq!(error.detected(), Some(FileFormat::Pptx), "{error:?}");
+
+        // The catalog-only package of the facade test references a slide it
+        // does not carry. The facade's workbook opener refused it from the
+        // catalog alone; the unified opener builds the PPTX owner the catalog
+        // selects, which refuses the dangling slide reference. Its error still
+        // names PowerPoint rather than "not an Office file".
+        let catalog_only = xlsx_path(&pptx_catalog(PPTX_PRESENTATION_MAIN_CONTENT_TYPE));
+        let error = match litchi::open(catalog_only.path()) {
+            Ok(file) => panic!("a dangling slide reference opened: {file:?}"),
+            Err(error) => error,
+        };
+        #[cfg(feature = "pptx")]
+        {
+            assert_eq!(error.code(), Code::CorruptFile, "{error:?}");
+            assert_eq!(error.format(), Some(FileFormat::Pptx), "{error:?}");
+        }
+        #[cfg(not(feature = "pptx"))]
+        {
+            assert_eq!(error.code(), Code::UnsupportedFormat, "{error:?}");
+            assert_eq!(error.detected(), Some(FileFormat::Pptx), "{error:?}");
+        }
     }
 }

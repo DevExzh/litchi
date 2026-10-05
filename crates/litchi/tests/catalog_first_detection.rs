@@ -5,9 +5,10 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use litchi::common::detection::{detect_file_format_from_bytes, detect_format_from_reader};
+use litchi::common::detection::{
+    DetectedFormat, detect_file_format_from_bytes, detect_format_from_reader, detect_format_smart,
+};
 use litchi::common::{FileFormat, ReadAt, SourceVersion};
-use litchi::detection_smart::{DetectedFormat, detect_format_smart};
 
 const DOCX_MAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";

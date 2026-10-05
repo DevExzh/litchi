@@ -6,6 +6,11 @@
 //! reporting them as unrecognized; and the reads the facade's format-family
 //! types offered (tolerance reports, PPTX slide catalogs and sizes) come
 //! from the format handles with the same values.
+//!
+//! S7 compared those reads with the format-family types directly. M0a step
+//! S8c recorded the format-family types' values in `tests/golden/` (pinned
+//! to those types by `markdown_file_parity.rs` until S9 removes them), and
+//! these tests compare the handles with the recorded values.
 
 #![cfg(any(
     feature = "doc",
@@ -119,11 +124,19 @@ fn the_root_names_the_unified_api() {
 fn the_root_error_is_the_unified_error_and_the_core_error_stays_nameable() {
     let error: litchi::Error = litchi::open(fixture("does/not/exist.docx")).unwrap_err();
     assert_eq!(error.code(), Code::FileNotFound);
-    // The format-family types report the format crates' shared error.
-    let core: litchi::common::Error = litchi::Document::open(fixture("does/not/exist.docx"))
-        .err()
-        .expect("a missing file does not open");
+    // The format crates' shared error stays nameable as `common::Error`, and
+    // converts into the unified error with its code and typed source.
+    let core = litchi::common::Error::Io(std::io::Error::from(std::io::ErrorKind::NotFound));
     assert!(matches!(core, litchi::common::Error::Io(_)), "{core:?}");
+    let unified = litchi::Error::from(core);
+    assert_eq!(unified.code(), Code::FileNotFound);
+    assert!(
+        matches!(
+            unified.leaf(),
+            litchi::error::Source::Core(litchi::common::Error::Io(_))
+        ),
+        "{unified:?}"
+    );
 }
 
 // ------------------------------------------------------------------- iWork --
@@ -289,16 +302,54 @@ fn a_prepared_detection_opens_without_indexing_again() {
 
 // ------------------------------------------------------- tolerance reports --
 
-/// The facade types' report and the `File` report of one input.
-fn assert_same_report(
-    old: litchi::common::Result<litchi::ToleranceReport>,
-    new: litchi::Result<litchi::ToleranceReport>,
-    what: &str,
-) -> litchi::ToleranceReport {
-    let old = old.unwrap_or_else(|error| panic!("{what}: facade report: {error:?}"));
-    let new = new.unwrap_or_else(|error| panic!("{what}: File report: {error:?}"));
-    assert_eq!(old, new, "{what}");
-    new
+/// The golden file of `name`.
+fn golden(name: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(name);
+    std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+}
+
+/// The rows of a tab-separated golden file, comments skipped.
+fn golden_rows(name: &str) -> Vec<Vec<String>> {
+    golden(name)
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .map(|line| line.split('\t').map(str::to_owned).collect())
+        .collect()
+}
+
+/// Compare the `File` tolerance report of every `family` row of
+/// `tolerance_reports.tsv` with the facade type's recorded report, after
+/// `prepare` performed the reads the facade test performed.
+fn assert_recorded_reports(family: &str, prepare: impl Fn(&litchi::File)) -> usize {
+    let mut compared = 0;
+    for row in golden_rows("tolerance_reports.tsv") {
+        let [row_family, route, relative, expected] = row.as_slice() else {
+            panic!("malformed tolerance golden row: {row:?}");
+        };
+        if row_family != family {
+            continue;
+        }
+        let path = fixture(relative);
+        let file = match route.as_str() {
+            "path" => litchi::open(&path),
+            "bytes" => litchi::open_bytes(std::fs::read(&path).unwrap()),
+            other => panic!("unknown route {other:?}"),
+        }
+        .unwrap_or_else(|error| panic!("{relative} ({route}): {error:?}"));
+        prepare(&file);
+        let report = file
+            .tolerance_report()
+            .unwrap_or_else(|error| panic!("{relative} ({route}): File report: {error:?}"));
+        assert_eq!(
+            &format!("{report:?}"),
+            expected,
+            "{relative} ({route}): File report differs from the facade type's"
+        );
+        compared += 1;
+    }
+    compared
 }
 
 /// Every fixture `tolerance_report_facade.rs` reads, through `File`: the
@@ -306,35 +357,13 @@ fn assert_same_report(
 #[cfg(all(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 #[test]
 fn document_tolerance_reports_come_from_the_handles() {
-    for relative in [
-        "ole/doc/watermark.doc",
-        "libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc",
-        "poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
-        "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
-        "libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf",
-        "libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf",
-        "odfpy/tests/examples/simpletable.odt",
-    ] {
-        let path = fixture(relative);
-        let old = litchi::Document::open(&path).unwrap();
-        let new = litchi::open(&path).unwrap();
-        // Read the metadata first, as the facade test does, so deferred
-        // core-properties repairs are part of both reports.
-        let _ = old.metadata().unwrap();
-        let _ = new.metadata().unwrap();
-        assert_same_report(old.tolerance_report(), new.tolerance_report(), relative);
-
-        let bytes = std::fs::read(&path).unwrap();
-        let old = litchi::Document::from_bytes(bytes.clone()).unwrap();
-        let new = litchi::open_bytes(bytes).unwrap();
-        let _ = old.metadata().unwrap();
-        let _ = new.metadata().unwrap();
-        assert_same_report(
-            old.tolerance_report(),
-            new.tolerance_report(),
-            &format!("{relative} (bytes)"),
-        );
-    }
+    // Read the metadata first, as the facade test does, so deferred
+    // core-properties repairs are part of the report.
+    let compared = assert_recorded_reports("document", |file| {
+        let _ = file.metadata().unwrap();
+    });
+    // Seven fixtures, by path and by bytes.
+    assert_eq!(compared, 14);
 
     let report = litchi::open(fixture("ole/doc/watermark.doc"))
         .unwrap()
@@ -354,19 +383,10 @@ fn document_tolerance_reports_come_from_the_handles() {
 #[cfg(all(feature = "ppt", feature = "pptx", feature = "odp"))]
 #[test]
 fn presentation_tolerance_reports_come_from_the_handles() {
-    for relative in [
-        "poi/test-data/slideshow/45543.ppt",
-        "ole/ppt/empty.ppt",
-        "libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx",
-        "libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp",
-    ] {
-        let path = fixture(relative);
-        let old = litchi::Presentation::open(&path).unwrap();
-        let new = litchi::open(&path).unwrap();
-        let _ = old.metadata().unwrap();
-        let _ = new.metadata().unwrap();
-        assert_same_report(old.tolerance_report(), new.tolerance_report(), relative);
-    }
+    let compared = assert_recorded_reports("presentation", |file| {
+        let _ = file.metadata().unwrap();
+    });
+    assert_eq!(compared, 4);
     let report = litchi::open(fixture("poi/test-data/slideshow/45543.ppt"))
         .unwrap()
         .tolerance_report()
@@ -383,29 +403,11 @@ fn presentation_tolerance_reports_come_from_the_handles() {
 #[cfg(all(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
 #[test]
 fn workbook_tolerance_reports_come_from_the_handles() {
-    for relative in [
-        "ole/xls/WithCustomViews.xls",
-        "libreoffice-core/chart2/qa/extras/data/xls/chart.xls",
-        "ooxml/xlsx/universal-content.xlsx",
-        "libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx",
-        "ooxml/xlsb/universal-content.xlsb",
-        "libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb",
-        "libreoffice-core/sc/qa/extras/testdocuments/ScDatabaseRangeObj.ods",
-    ] {
-        let path = fixture(relative);
-        let old = litchi::Workbook::open(&path).unwrap();
-        let new = litchi::open(&path).unwrap();
-        let _ = old.text().unwrap();
-        let _ = new.text().unwrap();
-        let _ = old.metadata().unwrap();
-        let _ = new.metadata().unwrap();
-        assert_same_report(
-            old.tolerance_report()
-                .map_err(|error| litchi::common::Error::Other(error.to_string())),
-            new.tolerance_report(),
-            relative,
-        );
-    }
+    let compared = assert_recorded_reports("workbook", |file| {
+        let _ = file.text().unwrap();
+        let _ = file.metadata().unwrap();
+    });
+    assert_eq!(compared, 7);
 }
 
 /// Pages, which `open` refuses, keeps no repair report: the untracked report
@@ -422,52 +424,38 @@ fn pages_reports_stay_untracked() {
 
 // ------------------------------------------------ PPTX catalog and size --
 
-/// The slide catalog and size the facade's `Presentation` reported, read
-/// from the `Pptx` handle.
+/// The slide catalog and size the facade's `Presentation` reported for
+/// every `test-data/ooxml/pptx` fixture it opened, read from the `Pptx`
+/// handle (a signed package through the file it wraps).
 #[cfg(feature = "pptx")]
 #[test]
 fn pptx_slide_catalog_and_size_come_from_the_handle() {
     let directory = fixture("ooxml/pptx");
     let mut compared = 0;
-    for entry in std::fs::read_dir(&directory).unwrap() {
-        let path = entry.unwrap().path();
-        if path.extension().and_then(|extension| extension.to_str()) != Some("pptx") {
-            continue;
-        }
-        let Ok(old) = litchi::Presentation::open(&path) else {
-            continue;
+    for row in golden_rows("pptx_slide_catalog.tsv") {
+        let [name, width, height, catalog] = row.as_slice() else {
+            panic!("malformed slide catalog golden row: {row:?}");
         };
-        let file = litchi::open(&path).unwrap();
+        let path = directory.join(name);
+        let file = litchi::open(&path).unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        let file = match &file {
+            litchi::File::Signed(signed) => signed.file().clone(),
+            other => other.clone(),
+        };
         let litchi::File::Pptx(pptx) = &file else {
-            // A signed package reads through the file it wraps.
-            continue;
+            panic!("{name}: expected a PPTX, got {file:?}");
         };
-        let catalog: Vec<(usize, u32)> = old
+        let handle = pptx
             .slide_catalog()
             .unwrap()
             .iter()
-            .map(|slide| (slide.position(), slide.slide_id()))
-            .collect();
-        let handle: Vec<(usize, u32)> = pptx
-            .slide_catalog()
-            .unwrap()
-            .iter()
-            .map(|slide| (slide.position(), slide.slide_id()))
-            .collect();
-        assert_eq!(catalog, handle, "{}", path.display());
-        let (width, height) = pptx.slide_size().unwrap();
-        assert_eq!(
-            old.slide_width().unwrap(),
-            Some(width),
-            "{}",
-            path.display()
-        );
-        assert_eq!(
-            old.slide_height().unwrap(),
-            Some(height),
-            "{}",
-            path.display()
-        );
+            .map(|slide| format!("{}:{}", slide.position(), slide.slide_id()))
+            .collect::<Vec<_>>()
+            .join(",");
+        assert_eq!(&handle, catalog, "{name}");
+        let (handle_width, handle_height) = pptx.slide_size().unwrap();
+        assert_eq!(&handle_width.to_string(), width, "{name}");
+        assert_eq!(&handle_height.to_string(), height, "{name}");
         compared += 1;
     }
     assert!(compared > 0, "no PPTX fixture compared");

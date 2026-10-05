@@ -1,8 +1,10 @@
 //! Evidence that one detect-and-prepare plus one adopt builds the container
 //! index exactly once, where detect-then-open builds it twice.
 //!
-//! These tests open through the facade types, so they stay in the facade
-//! when detection moves to `litchi_ops::detect`.
+//! These tests detect through the facade's detection functions, which add the
+//! iWork tail, so they stay in the facade. They open through `crate::open`
+//! and adopt through `crate::open_prepared` (M0a step S8c ported them from
+//! the format-family types' `open` and `from_prepared`).
 
 use litchi_core::detection::FileFormat;
 
@@ -29,14 +31,16 @@ fn docx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
             crate::detection_smart::detect_file_format(&path),
             Some(FileFormat::Docx)
         );
-        crate::Document::open(&path).expect("open");
+        let file = crate::open(&path).expect("open");
+        assert_eq!(file.format(), Some(FileFormat::Docx));
     });
 
     let single_call = archive_constructions(|| {
         let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
         assert_eq!(detected.format(), FileFormat::Docx);
-        let prepared = detected.into_prepared().expect("prepared handle");
-        crate::Document::from_prepared(prepared).expect("adopt");
+        assert!(detected.is_prepared(), "prepared handle");
+        let file = crate::open_prepared(detected).expect("adopt");
+        assert_eq!(file.format(), Some(FileFormat::Docx));
     });
 
     assert_eq!(
@@ -59,14 +63,16 @@ fn pptx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
             crate::detection_smart::detect_file_format(&path),
             Some(FileFormat::Pptx)
         );
-        crate::Presentation::open(&path).expect("open");
+        let file = crate::open(&path).expect("open");
+        assert_eq!(file.format(), Some(FileFormat::Pptx));
     });
 
     let single_call = archive_constructions(|| {
         let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
         assert_eq!(detected.format(), FileFormat::Pptx);
-        let prepared = detected.into_prepared().expect("prepared handle");
-        crate::Presentation::from_prepared(prepared).expect("adopt");
+        assert!(detected.is_prepared(), "prepared handle");
+        let file = crate::open_prepared(detected).expect("adopt");
+        assert_eq!(file.format(), Some(FileFormat::Pptx));
     });
 
     assert_eq!(
@@ -89,14 +95,16 @@ fn xlsx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
             crate::detection_smart::detect_file_format(&path),
             Some(FileFormat::Xlsx)
         );
-        crate::sheet::Workbook::open(&path).expect("open");
+        let file = crate::open(&path).expect("open");
+        assert_eq!(file.format(), Some(FileFormat::Xlsx));
     });
 
     let single_call = archive_constructions(|| {
         let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
         assert_eq!(detected.format(), FileFormat::Xlsx);
-        let prepared = detected.into_prepared().expect("prepared handle");
-        crate::sheet::Workbook::from_prepared(prepared).expect("adopt");
+        assert!(detected.is_prepared(), "prepared handle");
+        let file = crate::open_prepared(detected).expect("adopt");
+        assert_eq!(file.format(), Some(FileFormat::Xlsx));
     });
 
     assert_eq!(
@@ -164,7 +172,7 @@ fn a_prepared_handle_refuses_a_source_rewritten_before_adoption() {
 
     let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
     assert_eq!(detected.format(), FileFormat::Docx);
-    let prepared = detected.into_prepared().expect("prepared handle");
+    assert!(detected.is_prepared(), "prepared handle");
 
     // Rewrite the file under the handle. `FileSource` derives its revision
     // from length and modification time, so a different payload is a
@@ -173,35 +181,32 @@ fn a_prepared_handle_refuses_a_source_rewritten_before_adoption() {
     rewritten.extend_from_slice(b"trailing bytes that change the length");
     std::fs::write(&path, &rewritten).expect("rewrite fixture");
 
-    let Err(error) = crate::Document::from_prepared(prepared) else {
+    let Err(error) = crate::open_prepared(detected) else {
         panic!("adoption must refuse a source rewritten after preparation");
     };
+    assert_eq!(error.code(), crate::Code::IoError, "{error:?}");
     assert!(
-        matches!(error, litchi_core::Error::SourceChanged { .. }),
+        matches!(
+            error.leaf(),
+            crate::error::Source::Core(litchi_core::Error::SourceChanged { .. })
+                | crate::error::Source::Opc(crate::opc::OpcError::SourceChanged { .. })
+        ),
         "{error:?}"
     );
 }
 
-/// A prepared handle is refused by the wrong facade, and names the format
-/// it actually carries.
+/// A prepared handle is refused by the wrong family view, which names the
+/// format it actually carries.
 #[test]
 #[cfg(all(feature = "docx", feature = "pptx"))]
 fn a_prepared_docx_handle_is_refused_by_the_presentation_opener() {
     let path = fixture("ooxml/docx/comment.docx");
-    let prepared = crate::detection_smart::detect_and_prepare(&path)
-        .expect("detect")
-        .into_prepared()
-        .expect("prepared handle");
-    let Err(error) = crate::Presentation::from_prepared(prepared) else {
-        panic!("a DOCX handle must be refused by the presentation opener");
+    let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+    assert!(detected.is_prepared(), "prepared handle");
+    let file = crate::open_prepared(detected).expect("adopt");
+    let Err(error) = file.presentation() else {
+        panic!("a DOCX handle must be refused by the presentation view");
     };
-    assert!(
-        matches!(
-            error,
-            litchi_core::Error::UnexpectedFormat {
-                detected: FileFormat::Docx
-            }
-        ),
-        "{error:?}"
-    );
+    assert_eq!(error.code(), crate::Code::UnsupportedFormat, "{error:?}");
+    assert_eq!(error.detected(), Some(FileFormat::Docx), "{error:?}");
 }
