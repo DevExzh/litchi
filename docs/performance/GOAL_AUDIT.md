@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0915 — scoped resolver hypothesis tested without production adoption
+
+[0915](0915-docx-section-resolver-borrow.md) supplies replayable snapshot
+instruction/caller evidence, a three-line isolated candidate, DOCX correctness
+checks, and an eight-pair native comparison. The candidate fails the frozen
+material-benefit threshold; early boundary-check overlap is explicitly retained
+as a capture limitation. No production optimization is adopted. Broad CRUD,
+producer, input, memory, hardware-counter, and scaling coverage remain open;
+iWork is excluded.
+
 ## 0914 — one previously unmeasured DOCX edit/save baseline
 
 [0914](0914-docx-section-layout-baseline.md) adds 800 current-source samples

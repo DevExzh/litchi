@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree/tools/check_crate_boundaries.py", line 76900, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree/tools/check_crate_boundaries.py", line 76623, in main
+    + audit_keynote_chart_axis_title_legacy_calls()
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree/tools/check_crate_boundaries.py", line 54079, in audit_keynote_chart_axis_title_legacy_calls
+    _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree/tools/check_crate_boundaries.py", line 20510, in _mask_rust_cfg_test_items
+    for attribute_start, attribute_end in _rust_cfg_test_only_attribute_spans(
+                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        source
+        ^^^^^^
+    ):
+    ^
+  File "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree/tools/check_crate_boundaries.py", line 20399, in _rust_cfg_test_only_attribute_spans
+    code = _mask_rust_non_code(source)
+  File "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree/tools/check_crate_boundaries.py", line 20170, in _mask_rust_non_code
+    if source.startswith("//", cursor):
+       ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+KeyboardInterrupt

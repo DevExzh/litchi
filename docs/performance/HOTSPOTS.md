@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0915 — section guard allocations identified, narrow candidate not admitted
+
+[0915](0915-docx-section-resolver-borrow.md) attributes 3,676 allocation calls
+to per-event namespace resolver cloning in each selected snapshot guard.
+Callgrind covers the query snapshot and publication's current-snapshot subcall,
+not whole publication or native SHA cost. Borrowing only the guard resolver
+misses the 5% paired admission gate; early capture overlap further limits
+isolation. Production stays unchanged. Other inventory/layout resolver clones
+are separate, untested candidates; source fingerprinting remains mandatory.
+
 ## 0914 — DOCX section query and publication need attribution
 
 [0914](0914-docx-section-layout-baseline.md) measures publication at 62.29%

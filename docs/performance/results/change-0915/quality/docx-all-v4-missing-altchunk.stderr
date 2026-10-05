@@ -1,0 +1,30 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-docx)
+error: couldn't read `crates/litchi-docx/tests/../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/tests/alt_chunk_authoring.rs:10:29
+   |
+10 |   const HTML_FIXTURE: &[u8] = include_bytes!(
+   |  _____________________________^
+11 | |     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx"
+12 | | );
+   | |_^
+
+error: couldn't read `crates/litchi-docx/tests/../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/tests/alt_chunk_authoring.rs:13:29
+   |
+13 |   const DOCX_FIXTURE: &[u8] = include_bytes!(
+   |  _____________________________^
+14 | |     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx"
+15 | | );
+   | |_^
+
+error: couldn't read `crates/litchi-docx/tests/../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx`: No such file or directory (os error 2)
+  --> crates/litchi-docx/tests/alt_chunk_authoring.rs:16:31
+   |
+16 |   const HEADER_FIXTURE: &[u8] = include_bytes!(
+   |  _______________________________^
+17 | |     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx"
+18 | | );
+   | |_^
+
+error: could not compile `litchi-docx` (test "alt_chunk_authoring") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

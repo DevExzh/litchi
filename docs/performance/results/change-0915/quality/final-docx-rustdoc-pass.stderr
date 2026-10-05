@@ -1,0 +1,11 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/soapberry-zip)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-drawingml)
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-docx)
+error: Unrecognized option: 'no-deps'
+
+error: could not document `litchi-docx`

@@ -1,0 +1,53 @@
+{
+  "adoption": "Timing eligibility alone does not adopt the candidate; source/ADR review and applicable correctness/quality gates must pass.",
+  "baseline_binary_bytes": 69940744,
+  "baseline_binary_sha256": "fe56e5192c1198e831583e870beb5e1ba4731fb2077faaffdfc46044bb0ed2db",
+  "baseline_source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "bootstrap": {
+    "draws": 10000,
+    "interval": "nearest-rank 2.5th/97.5th percentiles",
+    "seed": 915,
+    "statistic": "median of per-pair baseline_p50/candidate_p50 ratios",
+    "unit": "matched process pair"
+  },
+  "candidate_scope": "Only resolver borrowing and corresponding reference arguments in ensure_source_section_inventory_xml; any test-only changes must be identified separately.",
+  "capture_rules": [
+    "Use fresh baseline controls, not historical timings.",
+    "Do not modify frozen protocol or binary/source receipts after the first child.",
+    "Preserve failures and all captured samples; do not rerun adverse rows.",
+    "Finish profiler and candidate builds before native captures.",
+    "Native clocks and setup-inclusive process RSS are distinct; no allocation-count benefit inferred from RSS."
+  ],
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "correctness": "All 0914 corpus, source/output identity, phase-sum, cache/source/sink and preservation/refusal gates must pass for every child; one-part materializations and logical reads must remain identical.",
+  "cpu": 12,
+  "frozen_utc": "2026-10-05T15:05:40.157580+00:00",
+  "hypothesis": "Borrow the namespace resolver during each source-backed section XML event instead of cloning it; remove temporary allocations without changing validation, source checks, or publication.",
+  "pair_orders": [
+    "baseline,candidate",
+    "candidate,baseline",
+    "baseline,candidate",
+    "candidate,baseline",
+    "baseline,candidate",
+    "candidate,baseline",
+    "baseline,candidate",
+    "candidate,baseline"
+  ],
+  "pairs": 8,
+  "review_flags": {
+    "latency_statistics": [
+      "p50",
+      "p95",
+      "p99"
+    ],
+    "pooled_latency_increase_fraction": 0.05,
+    "whole_process_max_rss_median_increase_fraction": 0.05
+  },
+  "samples_per_child": 200,
+  "schema": "litchi.performance.0915.native-protocol.v1",
+  "timing_gate": {
+    "lower_95_percent_bound_must_exceed": 1.0,
+    "minimum_median_ratio": 1.05
+  },
+  "warmups": 30
+}

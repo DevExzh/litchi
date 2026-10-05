@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0915 — source-local borrowing experiment, no adopted implementation
+
+[0915](0915-docx-section-resolver-borrow.md) tests a borrowed namespace resolver
+without changing validation order, source/version fingerprints, limits,
+publication, or retention (ADRs 0003, 0005, 0006, 0032). The candidate misses its
+predeclared native threshold and is retained only as an experiment patch.
+Production/API/package ownership is unchanged (ADRs 0010, 0011, 0024).
+The quality and timing scopes, failed setup attempts, and early capture overlap
+are recorded rather than generalized into workspace certification (ADR 0008).
+
 ## 0914 — existing DOCX section-layout measurement
 
 [0914](0914-docx-section-layout-baseline.md) changes only external measurement

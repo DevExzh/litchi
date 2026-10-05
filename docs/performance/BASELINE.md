@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0915 — DOCX section resolver candidate rejected
+
+[0915](0915-docx-section-resolver-borrow.md) retains eight fresh matched pairs
+(3,200 samples). The paired ratio is 1.013825 with interval
+[1.013223, 1.014817], below the frozen 1.05 threshold. Seven early children
+overlap a boundary check on other CPUs, so this is not clean isolation proof.
+All report gates pass; all samples remain included; no production change is
+adopted. Pooled p50 is 4.813090 ms baseline and 4.747636 ms candidate.
+
 ## 0914 — DOCX existing-section layout baseline
 
 [0914](0914-docx-section-layout-baseline.md) records four fresh processes and

@@ -1,0 +1,51 @@
+{
+  "schema": "litchi.performance.0915.candidate.build.v1",
+  "status": "passed",
+  "command": [
+    "cargo", "build", "--release", "--locked", "-j2", "--bin",
+    "litchi-perf-baseline", "--manifest-path",
+    "/home/zhuhe/litchi-performance-0915-candidate/source/tree/tools/perf-baseline/Cargo.toml"
+  ],
+  "wrapper": ["taskset", "--cpu-list", "14,15"],
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0915-candidate/target",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "RUSTFLAGS": null,
+    "RUSTC_WRAPPER": null,
+    "profile_release_codegen_units": null,
+    "profile_release_debug": null,
+    "profile_release_lto": null,
+    "profile_release_opt_level": null,
+    "profile_release_strip": null
+  },
+  "source": {
+    "archive_path": "/home/zhuhe/litchi-performance-0915-candidate/frozen/source-HEAD-code.tar",
+    "archive_bytes": 171120640,
+    "archive_sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571",
+    "revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+    "candidate_patch_sha256": "1bebd5ee09bfbce6f7d79ea33caf5ad35ef24ef033365a2e5fe74b611033ea4a"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0915-candidate/target/release/litchi-perf-baseline",
+    "bytes": 69938512,
+    "sha256": "b3b3279d839b5dd92fed0533a528934b3c901a356f79ee694db3826079f0c053"
+  },
+  "logs": {
+    "stdout": {"path": "/home/zhuhe/litchi-performance-0915-candidate/logs/build-final.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    "stderr": {"path": "/home/zhuhe/litchi-performance-0915-candidate/logs/build-final.stderr", "bytes": 396, "sha256": "f73e5d88dae39b871ae84f1d4f58a1c83e7753584cb634f6c10d5948d5df9b93"},
+    "exit": {"path": "/home/zhuhe/litchi-performance-0915-candidate/logs/build-final.exit", "bytes": 2, "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa", "value": 0}
+  },
+  "first_build_attempt": {
+    "status": "passed_but_superseded",
+    "command_omitted_bin_flag": true,
+    "binary_observed_bytes": 69937928,
+    "binary_observed_sha256": "20099b070d6f505dc42647c1d732a3602b4e8ac779c19c67adb52f95481d26e8",
+    "logs_prefix": "/home/zhuhe/litchi-performance-0915-candidate/logs/build"
+  },
+  "timing": {
+    "final_build_finished_from_log_mtime_utc": "2026-10-05T15:18:15.517Z",
+    "duration_reported_by_cargo": "2m 24s",
+    "start_time": "not recorded by wrapper; no invented timestamp"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "recorded_utc": "2026-10-05T15:53:49.114084+00:00",
+  "removed": [
+    "/home/zhuhe/litchi-performance-0915-candidate/source",
+    "/home/zhuhe/litchi-performance-0915-candidate/baseline",
+    "/home/zhuhe/litchi-performance-0915-candidate/quality/boundary-tree"
+  ],
+  "target_cleanup": "All candidate target entries except target/release/litchi-perf-baseline removed; approximately16GiB build/test/doc intermediates removed.",
+  "retained": "Frozen source and fixture archives, exact patch, quality lock/SVG inputs, final executable, original build/test logs and receipts, complete native raw reports, selected profile artifacts.",
+  "retained_binary_sha256": "b3b3279d839b5dd92fed0533a528934b3c901a356f79ee694db3826079f0c053",
+  "production_candidate_applied": false
+}

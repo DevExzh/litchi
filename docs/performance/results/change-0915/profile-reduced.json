@@ -1,0 +1,155 @@
+{
+  "schema": "litchi.performance.0915.callgrind-profile.v1",
+  "claim": "descriptive operation-local guest-instruction attribution; no native-cycle, allocation-byte, or end-to-end speedup claim",
+  "scenario": "docx_source_backed_existing_section_layout_edit_save",
+  "source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "frozen_inputs": {
+    "binary": {
+      "path": "/home/zhuhe/litchi-performance-0915/frozen/litchi-perf-baseline",
+      "bytes": 69940744,
+      "sha256": "fe56e5192c1198e831583e870beb5e1ba4731fb2077faaffdfc46044bb0ed2db"
+    },
+    "protocol": {
+      "path": "/home/zhuhe/litchi-performance-0915/frozen/0914-protocol-v1.json",
+      "bytes": 53363,
+      "sha256": "88bca0028d1b658053a31bd9a395f6c282e53ed0bd219cbeda01c21ee4acdfd7"
+    },
+    "source_archive": {
+      "path": "/home/zhuhe/litchi-performance-0915/frozen/source-HEAD-code.tar",
+      "member": "litchi/crates/litchi-docx/src/source_backed.rs",
+      "bytes": 171120640,
+      "sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+    },
+    "source_file_used_for_line_proof": {
+      "path": "/home/zhuhe/litchi-performance-0915/frozen/litchi/crates/litchi-docx/src/source_backed.rs",
+      "bytes": 145276,
+      "sha256": "f12638008f7742a9e0af7295414d0acd54b79823bebdd459d9e1f2a5cf6e127e"
+    }
+  },
+  "capture": {
+    "tool": "valgrind 3.26.0 callgrind",
+    "cpu_affinity": 12,
+    "warmup_iterations": 0,
+    "samples": 1,
+    "events": "Ir",
+    "trigger": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+    "command": "taskset -c 12 setarch x86_64 -R valgrind --tool=callgrind --quiet --callgrind-out-file=/home/zhuhe/litchi-performance-0915/callgrind/query-dump2.out --separate-callers=2 --collect-jumps=yes --zero-before='litchi_docx::source_backed::Package::main_section_layout_snapshot' --dump-after='litchi_docx::source_backed::Package::main_section_layout_snapshot' /home/zhuhe/litchi-performance-0915/frozen/litchi-perf-baseline --warmup 0 --samples 1 --case docx_source_backed_existing_section_layout_edit_save --json /home/zhuhe/litchi-performance-0915/raw/query-dump2.json",
+    "scope": "Each .16/.17 dump is the selected main_section_layout_snapshot invocation only. .16 is reached through public section_layout_snapshot; .17 is the current-snapshot subcall reached through publish_section_layout_commit_to_stream. .17 excludes patch application, output writing, and output hashing from the whole publication phase.",
+    "selected_dump_artifacts": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump2.out.16",
+        "part": 16,
+        "bytes": 266692,
+        "sha256": "66e785427db99ae5aa62531c7cb51f27ef9ae319bd3cd2ee6ee6957e144aab70"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump2.out.17",
+        "part": 17,
+        "bytes": 227098,
+        "sha256": "995b5f6572016dbf8379ebbfc01b0c45440276cc4660b6261dc7b235da6f426b"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump3.out.16",
+        "part": 16,
+        "bytes": 266164,
+        "sha256": "b7f232328954a3fe3f448a0a66cc01d64bf330e72fc9d7f2e80c9e9fba736d94"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump3.out.17",
+        "part": 17,
+        "bytes": 227370,
+        "sha256": "da01049404bfff81a83408554abcd260d644a53c068944cb1739af7a69379ead"
+      }
+    ]
+  },
+  "owner_proof": [
+    {
+      "owner": "query_snapshot",
+      "dump": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump2.out.16",
+      "caller_chain": "main_section_layout_snapshot -> section_layout_snapshot -> run_docx_source_backed_existing_section_layout_edit_save",
+      "selected_call_count": 1,
+      "selected_total_ir": 118144825,
+      "snapshot_from_shared_xml_calls": 1,
+      "ensure_source_section_inventory_xml_calls": 1,
+      "ensure_ir": 2140918,
+      "parse_inventory_calls": 1,
+      "parse_inventory_ir": 4226369,
+      "fingerprint_ir": 111584396,
+      "sha256_compress256_ir": 109404406
+    },
+    {
+      "owner": "publication_current_snapshot_subcall",
+      "dump": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump2.out.17",
+      "caller_chain": "main_section_layout_snapshot -> publish_section_layout_commit_to_stream -> run_docx_source_backed_existing_section_layout_edit_save",
+      "selected_call_count": 1,
+      "selected_total_ir": 117957908,
+      "snapshot_from_shared_xml_calls": 1,
+      "ensure_source_section_inventory_xml_calls": 1,
+      "ensure_ir": 2141278,
+      "parse_inventory_calls": 1,
+      "parse_inventory_ir": 4226437,
+      "fingerprint_ir": 111584412,
+      "sha256_compress256_ir": 109404406
+    }
+  ],
+  "repeat_owner_values": {
+    "query_snapshot": {
+      "dump": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump3.out.16",
+      "selected_total_ir": 118166114,
+      "ensure_ir": 2141129
+    },
+    "publication_current_snapshot_subcall": {
+      "dump": "/home/zhuhe/litchi-performance-0915/callgrind/query-dump3.out.17",
+      "selected_total_ir": 117959533,
+      "ensure_ir": 2141130
+    }
+  },
+  "resolver_clone_site": {
+    "source_file": "/home/zhuhe/litchi-performance-0915/frozen/litchi/crates/litchi-docx/src/source_backed.rs",
+    "line": 2701,
+    "line_text": "let resolver = reader.resolver().clone();",
+    "function": "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+    "called_via": "litchi_docx::section::layout::Snapshot::from_shared_xml",
+    "observed_call_counts_in_publication_dump": {
+      "quick_xml::reader::ns_reader::NsReader<R>::process_event": 1838,
+      "clone_associated_alloc": 3676,
+      "clone_associated_dealloc": 3674,
+      "clone_associated_memcpy": 1838
+    },
+    "observed_guest_ir": {
+      "clone_associated_alloc": 143364,
+      "clone_associated_dealloc": 124916,
+      "clone_associated_memcpy": 55132,
+      "sum_of_observed_allocator_copy_ir": 323412
+    },
+    "interpretation": "The counts are profiler call records under the inlined clone site, not XML byte counts, allocation-byte counts, or native cycles. quick-xml 0.42.0 NamespaceResolver derives Clone over a String buffer and Vec bindings; resolve_event borrows self, making resolver borrowing an implementable source-local hypothesis subject to correctness and native gates."
+  },
+  "artifact_reports": {
+    "raw_query_dump2_json": {
+      "path": "/home/zhuhe/litchi-performance-0915/raw/query-dump2.json",
+      "bytes": 18475,
+      "sha256": "0262aa9ac5452c4747d20e77e4b21c5c1ee0590257600748b87b005f7c4e2dc3"
+    },
+    "raw_query_dump3_json": {
+      "path": "/home/zhuhe/litchi-performance-0915/raw/query-dump3.json",
+      "bytes": 18474,
+      "sha256": "880ede2ca96872aab99d49c640f70aa990863e31f4c2cb9a5b3825c7fb07fe84"
+    },
+    "external_reduced_record": {
+      "path": "/home/zhuhe/litchi-performance-0915/logs/profile-0915-operation-local.txt",
+      "bytes": 4372,
+      "sha256": "1a95363030e649693c84eb87eefd84802710de5217dfe766e484bc4bdb79d2be"
+    }
+  },
+  "limitations": [
+    "perf hardware sampling/statistics was unavailable because perf_event_paranoid=4; no native timing or native SHA cost is inferred",
+    "Callgrind Ir is Valgrind guest instruction simulation and the SHA owner is software guest execution",
+    "selected owner percentages are not whole publication-phase percentages",
+    "no end-to-end optimization adoption follows from this diagnostic profile"
+  ],
+  "regeneration": {
+    "command": "Use the command in capture.command with a new --callgrind-out-file and --json path under /home/zhuhe/litchi-performance-0915; never overwrite frozen/* or retained query-dump2/query-dump3 artifacts.",
+    "verification": "python3 docs/performance/results/change-0915/profile-replay.py",
+    "frozen_receipts": "The binary, protocol, source archive, and custody receipt files under /home/zhuhe/litchi-performance-0915/frozen were not overwritten."
+  }
+}

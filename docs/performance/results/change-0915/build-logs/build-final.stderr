@@ -1,0 +1,4 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-docx)
+   Compiling litchi v0.0.1 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/litchi-performance-0915-candidate/source/tree/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 2m 24s

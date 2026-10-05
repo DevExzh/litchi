@@ -1,0 +1,45 @@
+{
+  "schema": "litchi.performance.0915.capture-limitation.v1",
+  "limitation": "Quality boundary checker ran on CPUs14,15 during early native children pinned to CPU12. Planned isolation was not achieved; all rows retained; no replacement capture, exclusion, or production adoption.",
+  "checker_activity_window_basis": "Approximate start from stdout mtime and SIGINT completion from stderr mtime, plus agent-reported observed process exit130. No contemporaneous wrapper timestamp receipt.",
+  "checker_start_utc": "2026-10-05T15:41:01.976978+00:00",
+  "checker_stop_utc": "2026-10-05T15:41:41.871148+00:00",
+  "potentially_overlapping_children": [
+    {
+      "label": "pair-01-leg-1-baseline",
+      "started_utc": "2026-10-05T15:41:18.605436+00:00",
+      "finished_utc": "2026-10-05T15:41:22.330523+00:00"
+    },
+    {
+      "label": "pair-01-leg-2-candidate",
+      "started_utc": "2026-10-05T15:41:22.347356+00:00",
+      "finished_utc": "2026-10-05T15:41:26.035350+00:00"
+    },
+    {
+      "label": "pair-02-leg-1-candidate",
+      "started_utc": "2026-10-05T15:41:26.050184+00:00",
+      "finished_utc": "2026-10-05T15:41:29.742815+00:00"
+    },
+    {
+      "label": "pair-02-leg-2-baseline",
+      "started_utc": "2026-10-05T15:41:29.757534+00:00",
+      "finished_utc": "2026-10-05T15:41:33.484787+00:00"
+    },
+    {
+      "label": "pair-03-leg-1-baseline",
+      "started_utc": "2026-10-05T15:41:33.499647+00:00",
+      "finished_utc": "2026-10-05T15:41:37.228121+00:00"
+    },
+    {
+      "label": "pair-03-leg-2-candidate",
+      "started_utc": "2026-10-05T15:41:37.242338+00:00",
+      "finished_utc": "2026-10-05T15:41:40.946386+00:00"
+    },
+    {
+      "label": "pair-04-leg-1-candidate",
+      "started_utc": "2026-10-05T15:41:40.962777+00:00",
+      "finished_utc": "2026-10-05T15:41:44.654156+00:00"
+    }
+  ],
+  "decision": "Frozen gate fails for retained whole cohort. Do not treat observed small difference as an isolated optimization proof."
+}

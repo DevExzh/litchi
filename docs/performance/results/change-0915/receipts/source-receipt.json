@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.performance.0915.candidate.source.v1",
+  "source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "candidate_base_commit": "58e181d2bbc566ad6ded9132bf65a6aa4f166e29",
+  "archive": {
+    "path": "/home/zhuhe/litchi-performance-0915-candidate/frozen/source-HEAD-code.tar",
+    "bytes": 171120640,
+    "sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+  },
+  "archive_source_file_count": 9357,
+  "archive_source_listing_sha256": "c3f5e27628502a103a833a6b55e57ea64da21f9a74986f15a07c692f5480f058",
+  "patch": {
+    "path": "/home/zhuhe/litchi-performance-0915-candidate/candidate.patch",
+    "bytes": 1403,
+    "sha256": "1bebd5ee09bfbce6f7d79ea33caf5ad35ef24ef033365a2e5fe74b611033ea4a",
+    "files_changed": ["crates/litchi-docx/src/source_backed.rs"],
+    "diff_hunks": 3,
+    "changed_lines": 3,
+    "scope": "ensure_source_section_inventory_xml resolver clone removal only"
+  },
+  "changed_file": {
+    "path": "crates/litchi-docx/src/source_backed.rs",
+    "base_bytes": 145276,
+    "base_sha256": "f12638008f7742a9e0af7295414d0acd54b79823bebdd459d9e1f2a5cf6e127e",
+    "candidate_bytes": 145266,
+    "candidate_sha256": "07e0b9dad77d39fff9db05567b2c3f968d0c33ef0738643b44d2dfc59f7131ed"
+  },
+  "comparison": {
+    "path": "/home/zhuhe/litchi-performance-0915-candidate/patch-file-diff.txt",
+    "bytes": 220,
+    "sha256": "e788e01d4c87ba523eb05583028f0ffcffcc43c1dab77acc26ff80765b0115ef",
+    "result": "one changed source file; no other archive source file differs"
+  }
+}

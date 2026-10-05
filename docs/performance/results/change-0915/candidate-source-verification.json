@@ -1,0 +1,15 @@
+{
+  "verified_utc": "2026-10-05T15:34:13.381812+00:00",
+  "archive_files_checked": 9357,
+  "changed": [
+    {
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "base_bytes": 145276,
+      "candidate_bytes": 145266,
+      "base_sha256": "f12638008f7742a9e0af7295414d0acd54b79823bebdd459d9e1f2a5cf6e127e",
+      "candidate_sha256": "07e0b9dad77d39fff9db05567b2c3f968d0c33ef0738643b44d2dfc59f7131ed"
+    }
+  ],
+  "mode_mismatches": [],
+  "scope": "Every regular archive member compared byte-for-byte and mode-for-mode with final candidate source. Quality-only extra files excluded."
+}

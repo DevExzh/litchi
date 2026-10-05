@@ -1,0 +1,5 @@
+# Preserve exact captured log bytes, including whitespace emitted by tools.
+quality/*.stdout -text -whitespace
+quality/*.stderr -text -whitespace
+quality/*.exit -text -whitespace
+build-logs/* -text -whitespace

@@ -1,0 +1,7 @@
+error: unexpected argument '--no-deps' found
+
+  tip: to pass '--no-deps' as a value, use '-- --no-deps'
+
+Usage: cargo rustdoc --package [<SPEC>] [ARGS]...
+
+For more information, try '--help'.

@@ -1,0 +1,29 @@
+--- /home/zhuhe/litchi-performance-0915-candidate/baseline/tree/base/crates/litchi-docx/src/source_backed.rs	2026-10-05 06:49:58.000000000 +0000
++++ /home/zhuhe/litchi-performance-0915-candidate/source/tree/crates/litchi-docx/src/source_backed.rs	2026-10-05 15:15:33.992561734 +0000
+@@ -2698,7 +2698,7 @@
+         let event = reader
+             .read_event()
+             .map_err(|error| Error::Xml(error.to_string()))?;
+-        let resolver = reader.resolver().clone();
++        let resolver = reader.resolver();
+         let (namespace, event) = resolver.resolve_event(event);
+         match event {
+             Event::Start(element) => {
+@@ -2720,7 +2720,7 @@
+                         actual: depth,
+                     });
+                 }
+-                validate_source_section_element(&resolver, decoder, &namespace, &element)?;
++                validate_source_section_element(resolver, decoder, &namespace, &element)?;
+             },
+             Event::Empty(element) => {
+                 if depth == 0 {
+@@ -2742,7 +2742,7 @@
+                         actual: element_depth,
+                     });
+                 }
+-                validate_source_section_element(&resolver, decoder, &namespace, &element)?;
++                validate_source_section_element(resolver, decoder, &namespace, &element)?;
+             },
+             Event::End(_) => {
+                 depth = depth
