@@ -189,3 +189,23 @@
   - fmt and clippy `-D warnings` on ops, docx, ooxml-common and DrawingML;
   - litchi-ops: 361 unit tests and 52 doctests;
   - full suites (with `3rdparty` symlinked temporarily): docx 2,022, ooxml-common 451, DrawingML 369, pptx 1,309, xlsx 2,137, all passing.
+
+## S7 — facade switch (`28962cfe88`)
+- The facade root re-exports the ops API: `open*`, `File`, `OpenOptions`, `SourceMode`, `Error`, `Result`, `Code`, `Locked`, `Signed`, `Family`, `ToleranceReport`, the views, `EncryptionKind`, `SignatureOrigin`, `DocOptions`, `open_prepared*`, `Password` (encryption), and the modules `error`, `format` and `compat`.
+- `litchi::open*` (`crates/litchi/src/unified.rs`) plug in the iWork tail. Pages, Keynote and Numbers packages and package directories return `iwork_unsupported` with the detected format and a `litchi::iwork::Document::open` suggestion, tested on path, eager and bytes routes.
+- `litchi::Error`/`Result` are now the ops types. The old `Document`/`Presentation`/`Workbook` keep `litchi_core::Error` as `litchi::common::Error` until S9. Moving them would touch about 10k lines that S9 deletes anyway.
+- Markdown:
+  - `impl ToMarkdown for File` lives in litchi-ops because of Rust's orphan rule, behind new ops features `markdown`, `formula` and `yaml`. New edges `litchi-ops -> litchi-markdown` and `litchi-ops -> litchi-formula` bring the inventory to 266 declarations and 254 canonical edges.
+  - `ToMarkdown` gained `type Error`, a breaking trait change that avoids string flattening, plus a new `Source::Formula`.
+  - The DOCX Markdown cache moved onto the `Docx` handle, keeping its freshness checks.
+- Parity: `File` Markdown against the old types over 438 fixtures × 3 option sets × 2 routes: 2,076 identical, 552 refused by both, 0 differing. Tolerance reports are equal on every `tolerance_report_facade` fixture.
+- Known: some smaller feature sets fail the facade's `--all-targets` clippy run, but with identical error lists on the base commit (checked on 10 feature sets). The iWork feature sets fail on a lint inside `litchi-iwa-archive`, which this program does not edit.
+- For S9:
+  - delete the facade's old Markdown adapter with the old types;
+  - keep a public `ZipTail` path when `__migration` is removed;
+  - point `litchi::SlideDescriptor` at the ops type.
+- Verified on the merged `uo/m0a`:
+  - fmt, plus clippy `-D warnings` on litchi and litchi-ops with all features;
+  - litchi-ops: 442 tests;
+  - facade targets: `markdown_file_parity` (9), `unified_open_facade` (14), `tolerance_report_facade` (12), `unexpected_format` (16), `read_limits_facade` (8), the three Markdown suites, and `--lib` (352);
+  - the boundary checker, the non-iWork gate and the gate unit tests.
