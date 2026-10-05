@@ -1811,14 +1811,8 @@ mod tests {
     #[test]
     fn docx_full_text_legs_time_the_separated_text_of_the_oracle() {
         let corpus = crate::build_docx_source_edit_corpus().unwrap();
-        let path = std::env::temp_dir().join(format!(
-            "litchi-perf-docx-full-text-legs-{}-{}.docx",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let scratch = crate::filesystem::scratch_root(None, "docx-full-text-legs").unwrap();
+        let path = scratch.join("source.docx");
         fs::write(&path, &corpus.archive).unwrap();
         let expected = super::super::expected_docx_full_text();
         assert_eq!(
@@ -1840,7 +1834,7 @@ mod tests {
             assert_eq!(docx_text(&root).unwrap(), expected, "{}", case.name());
             legs += 1;
         }
-        fs::remove_file(&path).unwrap();
+        fs::remove_dir_all(&scratch).unwrap();
         assert_eq!(legs, 4);
     }
 
