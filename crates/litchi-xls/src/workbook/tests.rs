@@ -111,6 +111,25 @@ mod defined_name_tests {
             Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
         assert!(workbook.defined_names().len() <= usize::from(u16::MAX));
     }
+
+    #[test]
+    fn a_password_required_open_hands_the_parsed_container_back() {
+        let ole =
+            litchi_cfb::OleFile::open(File::open(poi_fixture("xor-encryption-abc.xls")).unwrap())
+                .unwrap();
+        let ole = match Workbook::from_ole_file_or_password_required(ole, OpenOptions::new()) {
+            Ok(Err(ole)) => ole,
+            Ok(Ok(_)) => panic!("an encrypted workbook opened without a password"),
+            Err(error) => panic!("expected the container back, got {error}"),
+        };
+        let workbook = Workbook::from_ole_file_or_password_required(
+            ole,
+            OpenOptions::new().with_password("abc"),
+        )
+        .unwrap()
+        .unwrap_or_else(|_| panic!("the returned container opens with its password"));
+        assert!(litchi_core::sheet::WorkbookTrait::worksheet_count(&workbook) > 0);
+    }
 }
 
 fn push_record(stream: &mut Vec<u8>, record_type: u16, data: &[u8]) {

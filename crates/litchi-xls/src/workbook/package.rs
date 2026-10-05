@@ -119,6 +119,33 @@ impl<R: Read + Seek> Workbook<R> {
         Ok(workbook)
     }
 
+    /// Create a workbook from a parsed OLE file, or hand the file back when
+    /// the workbook needs a password to open.
+    ///
+    /// This is [`Self::from_ole_file_with_options`] for callers that classify
+    /// encrypted input without discarding it: when the `FILEPASS` record asks
+    /// for a password that `options` does not supply, the result is
+    /// `Ok(Err(ole_file))`, and the container can be opened again with a
+    /// password without parsing it a second time.
+    ///
+    /// # Errors
+    ///
+    /// Returns every error of [`Self::from_ole_file_with_options`] other than
+    /// [`Error::PasswordRequired`].
+    pub fn from_ole_file_or_password_required(
+        ole_file: OleFile<R>,
+        options: OpenOptions<'_>,
+    ) -> Result<std::result::Result<Self, OleFile<R>>> {
+        let mut workbook = Self::empty(ole_file);
+
+        workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
+        match workbook.parse_workbook(&options, CellDecoding::Every) {
+            Ok(()) => Ok(Ok(workbook)),
+            Err(Error::PasswordRequired) => Ok(Err(workbook.ole_file)),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Parse the workbook stream.
     ///
     /// `cells` selects which worksheet cells are decoded. It changes nothing

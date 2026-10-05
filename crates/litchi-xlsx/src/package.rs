@@ -201,6 +201,55 @@ impl Package {
         ))
     }
 
+    /// Open a package that was already decrypted, keeping its encryption
+    /// provenance.
+    ///
+    /// `opened` comes from [`crate::encryption::open`] or one of its limit
+    /// and policy variants. The package and the workbooks it materializes
+    /// keep the source profile exactly as
+    /// [`Self::from_bytes_with_password_and_limits`] does, so plain output
+    /// stays refused until the caller chooses re-encryption or plaintext.
+    /// This lets one decryption serve both a caller's own classification of
+    /// the clear package and the open.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clear package violates `opc_limits` or is not a
+    /// valid XLSX package.
+    #[cfg(feature = "encryption")]
+    pub fn from_decrypted(
+        opened: crate::encryption::Opened,
+        opc_limits: ReadLimits,
+    ) -> Result<Self> {
+        Self::from_opened_with_limits(opened, opc_limits)
+    }
+
+    /// Whether the package carries OPC digital-signature parts or
+    /// relationships. Nothing is verified.
+    #[must_use]
+    pub fn is_signed(&self) -> bool {
+        self.0.is_signed()
+    }
+
+    /// Read the package's core properties, recording the repairs the reader
+    /// applies in `report`.
+    ///
+    /// This reads the clear OPC graph's core-properties part only; it does
+    /// not expose the graph or change any retained encryption policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the core-properties part is present but cannot be
+    /// read.
+    pub fn core_properties_with_report(
+        &self,
+        report: &mut litchi_ooxml_common::leniency::ToleranceReport,
+    ) -> Result<Option<litchi_ooxml_common::Props>> {
+        Ok(litchi_ooxml_common::properties::read_with_report(
+            &self.0, report,
+        )?)
+    }
+
     #[cfg(feature = "encryption")]
     fn from_opened_with_limits(
         opened: crate::encryption::Opened,

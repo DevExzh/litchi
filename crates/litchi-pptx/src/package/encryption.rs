@@ -322,6 +322,24 @@ impl Package {
         Ok(())
     }
 
+    /// Open a package that was already decrypted, keeping its encryption
+    /// mode.
+    ///
+    /// `opened` comes from [`litchi_crypto::ooxml::open`] or one of its limit
+    /// and policy variants. The package keeps the source mode exactly as
+    /// [`Self::from_vec_with_password_and_limits`] does, so plain output
+    /// stays refused until the caller chooses re-encryption or plaintext.
+    /// This lets one decryption serve both a caller's own classification of
+    /// the clear package and the open.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clear package violates `limits` or is not a
+    /// valid PPTX package.
+    pub fn from_decrypted(opened: ooxml::Opened, limits: ReadLimits) -> Result<Self> {
+        Self::from_opened_encryption(opened, limits)
+    }
+
     fn from_opened_encryption(opened: ooxml::Opened, limits: ReadLimits) -> Result<Self> {
         let mode = opened.mode();
         let mut package = Self::from_vec_with_limits(opened.into_bytes(), limits)?;

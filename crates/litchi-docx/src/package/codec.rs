@@ -483,6 +483,28 @@ impl Package {
         Self::from_opened_with_limits(opened, opc_limits)
     }
 
+    /// Open a package that was already decrypted, keeping its encryption
+    /// profile.
+    ///
+    /// `opened` comes from [`crate::encryption::open`] or one of its limit
+    /// and policy variants. The package keeps the source profile exactly as
+    /// [`Self::from_reader_with_password_and_limits`] does, so plain output
+    /// stays refused until the caller chooses re-encryption or plaintext.
+    /// This lets one decryption serve both a caller's own classification of
+    /// the clear package and the open.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clear package violates `limits` or is not a
+    /// valid DOCX package.
+    #[cfg(feature = "encryption")]
+    pub fn from_decrypted(
+        opened: crate::encryption::Opened,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_opened_with_limits(opened, limits)
+    }
+
     #[cfg(feature = "encryption")]
     fn from_opened_with_limits(
         opened: crate::encryption::Opened,
