@@ -370,3 +370,4 @@
   - facade targets: unified open, Markdown golden, tolerance, unexpected format, read limits, xlsb, eval, sheet selectors, encryption, pages; lib 56;
   - Python 132;
   - the boundary and non-iWork gates and their tests, and the perf policy and CRUD index tests.
+- Note: `tools.test_perf_baseline_source_policy` and `tools.test_crud_coverage_index` read top-level files under `docs/performance/results/`, which the sparse worktrees exclude. With `/docs/performance/results/*.json` and `*.md` added to the sparse checkout, both pass on the merged `uo/m0a`.
