@@ -1,0 +1,1009 @@
+{
+  "allocation_metrics": "unavailable in normal release binary; no allocator-instrumented timing claim",
+  "binary": {
+    "bytes": 69940744,
+    "path": "/home/zhuhe/litchi-performance-0914/target/release/litchi-perf-baseline",
+    "sha256": "fe56e5192c1198e831583e870beb5e1ba4731fb2077faaffdfc46044bb0ed2db"
+  },
+  "build": {
+    "bytes": 58012,
+    "path": "/home/zhuhe/litchi-performance-0914/build-v1.json",
+    "sha256": "72f7cf09cafa9c0900176a389909a3fa1734b5fa20e63fd90beec386eb55c2ff"
+  },
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "child_elapsed_p50_ns": [
+    4811064,
+    4807344,
+    4816565,
+    4804199
+  ],
+  "child_elapsed_p50_range_ns": {
+    "max": 4816565,
+    "min": 4804199
+  },
+  "children": 4,
+  "children_detail": [
+    {
+      "cache_before_publication_after_commit": {
+        "cold_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "hits": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "samples": 200
+        },
+        "retained_bytes": {
+          "max": 18855,
+          "mean": 18855.0,
+          "min": 18855,
+          "p50": 18855,
+          "p95": 18855,
+          "p99": 18855,
+          "samples": 200
+        },
+        "retained_entries": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "successful_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        }
+      },
+      "elapsed_ns": {
+        "max": 4903190,
+        "mean": 4814789.62,
+        "min": 4770569,
+        "p50": 4811064,
+        "p95": 4853390,
+        "p99": 4874940,
+        "samples": 200
+      },
+      "gates": {
+        "cache_counters_verified": true,
+        "header_footer_relationships_verified": true,
+        "patch_forward_inverse_verified": true,
+        "phase_sum_verified": true,
+        "publication_inverse_exact_source_verified": true,
+        "raw_member_order_and_comment_verified": true,
+        "raw_untouched_members_verified": true,
+        "semantic_reopen_all_sections_verified": true,
+        "sink_counters_verified": true,
+        "source_immutability_verified": true,
+        "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+        "table_cell_sectpr_excluded_verified": true
+      },
+      "label": "child-a",
+      "max_in_flight_reads": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      },
+      "ordinary_payload_materializations": 1,
+      "ordinary_payload_read_bytes": {
+        "max": 8397632,
+        "mean": 8397632.0,
+        "min": 8397632,
+        "p50": 8397632,
+        "p95": 8397632,
+        "p99": 8397632,
+        "samples": 200
+      },
+      "ordinary_payload_read_calls": {
+        "max": 138,
+        "mean": 138.0,
+        "min": 138,
+        "p50": 138,
+        "p95": 138,
+        "p99": 138,
+        "samples": 200
+      },
+      "output_bytes": 2101446,
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "phase_ns": {
+        "commit_ns": {
+          "max": 388471,
+          "mean": 348238.91,
+          "min": 337901,
+          "p50": 345611,
+          "p95": 360611,
+          "p99": 371481,
+          "samples": 200
+        },
+        "edit_ns": {
+          "max": 64370,
+          "mean": 54235.1,
+          "min": 51220,
+          "p50": 53625,
+          "p95": 60590,
+          "p99": 63550,
+          "samples": 200
+        },
+        "open_ns": {
+          "max": 52881,
+          "mean": 44785.965,
+          "min": 42010,
+          "p50": 44460,
+          "p95": 47590,
+          "p99": 51980,
+          "samples": 200
+        },
+        "preparation_ns": {
+          "max": 48711,
+          "mean": 35689.45,
+          "min": 32960,
+          "p50": 34205,
+          "p95": 41441,
+          "p99": 43970,
+          "samples": 200
+        },
+        "publication_ns": {
+          "max": 3076373,
+          "mean": 2998190.275,
+          "min": 2973482,
+          "p50": 2993387,
+          "p95": 3027872,
+          "p99": 3044453,
+          "samples": 200
+        },
+        "query_ns": {
+          "max": 1367965,
+          "mean": 1333649.92,
+          "min": 1319615,
+          "p50": 1332275,
+          "p95": 1348806,
+          "p99": 1357695,
+          "samples": 200
+        }
+      },
+      "process": {
+        "bytes": 946,
+        "file_system_inputs": "0",
+        "file_system_outputs": "296",
+        "involuntary_context_switches": "46",
+        "major_page_faults": "0",
+        "max_rss_kib": "38056",
+        "minor_page_faults": "881827",
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-a/process.txt",
+        "raw_sha256": "f548d4b4323fa4694790572e28a884b97b2e0e9eb888fe0cdfb5243db67512c6",
+        "system_seconds": 0.43,
+        "user_seconds": 3.27,
+        "voluntary_context_switches": "24"
+      },
+      "receipt": {
+        "bytes": 2883,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-a/receipt.json",
+        "sha256": "10dba2467e05c5e3b1f1521dfef3c0812e3a77a7e5481c468478544074dc21bb"
+      },
+      "report": {
+        "bytes": 151272,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-a/report.json",
+        "sha256": "79f54a76f3a45be72c4c773a1246067602510330f35f92d7015ff47c415e4cf9"
+      },
+      "sink": {
+        "accepted_bytes": 2101446,
+        "largest_write": 65536,
+        "write_calls": 75,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 32,
+          "bytes_1_to_512": 42,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "sink_largest_write": 65536,
+      "source_read_bytes": {
+        "max": 8409488,
+        "mean": 8409488.0,
+        "min": 8409488,
+        "p50": 8409488,
+        "p95": 8409488,
+        "p99": 8409488,
+        "samples": 200
+      },
+      "source_read_calls": {
+        "max": 202,
+        "mean": 202.0,
+        "min": 202,
+        "p50": 202,
+        "p95": 202,
+        "p99": 202,
+        "samples": 200
+      }
+    },
+    {
+      "cache_before_publication_after_commit": {
+        "cold_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "hits": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "samples": 200
+        },
+        "retained_bytes": {
+          "max": 18855,
+          "mean": 18855.0,
+          "min": 18855,
+          "p50": 18855,
+          "p95": 18855,
+          "p99": 18855,
+          "samples": 200
+        },
+        "retained_entries": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "successful_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        }
+      },
+      "elapsed_ns": {
+        "max": 4953160,
+        "mean": 4810963.785,
+        "min": 4771560,
+        "p50": 4807344,
+        "p95": 4850460,
+        "p99": 4870290,
+        "samples": 200
+      },
+      "gates": {
+        "cache_counters_verified": true,
+        "header_footer_relationships_verified": true,
+        "patch_forward_inverse_verified": true,
+        "phase_sum_verified": true,
+        "publication_inverse_exact_source_verified": true,
+        "raw_member_order_and_comment_verified": true,
+        "raw_untouched_members_verified": true,
+        "semantic_reopen_all_sections_verified": true,
+        "sink_counters_verified": true,
+        "source_immutability_verified": true,
+        "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+        "table_cell_sectpr_excluded_verified": true
+      },
+      "label": "child-b",
+      "max_in_flight_reads": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      },
+      "ordinary_payload_materializations": 1,
+      "ordinary_payload_read_bytes": {
+        "max": 8397632,
+        "mean": 8397632.0,
+        "min": 8397632,
+        "p50": 8397632,
+        "p95": 8397632,
+        "p99": 8397632,
+        "samples": 200
+      },
+      "ordinary_payload_read_calls": {
+        "max": 138,
+        "mean": 138.0,
+        "min": 138,
+        "p50": 138,
+        "p95": 138,
+        "p99": 138,
+        "samples": 200
+      },
+      "output_bytes": 2101446,
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "phase_ns": {
+        "commit_ns": {
+          "max": 371661,
+          "mean": 348708.505,
+          "min": 338142,
+          "p50": 346756,
+          "p95": 361292,
+          "p99": 367431,
+          "samples": 200
+        },
+        "edit_ns": {
+          "max": 67420,
+          "mean": 54919.015,
+          "min": 51100,
+          "p50": 54265,
+          "p95": 60670,
+          "p99": 64600,
+          "samples": 200
+        },
+        "open_ns": {
+          "max": 63900,
+          "mean": 45757.71,
+          "min": 42480,
+          "p50": 44920,
+          "p95": 52520,
+          "p99": 56640,
+          "samples": 200
+        },
+        "preparation_ns": {
+          "max": 46140,
+          "mean": 34385.715,
+          "min": 33010,
+          "p50": 33830,
+          "p95": 37340,
+          "p99": 40771,
+          "samples": 200
+        },
+        "publication_ns": {
+          "max": 3073603,
+          "mean": 2998508.85,
+          "min": 2977922,
+          "p50": 2995257,
+          "p95": 3017902,
+          "p99": 3049162,
+          "samples": 200
+        },
+        "query_ns": {
+          "max": 1373695,
+          "mean": 1328683.99,
+          "min": 1317076,
+          "p50": 1327660,
+          "p95": 1341216,
+          "p99": 1352876,
+          "samples": 200
+        }
+      },
+      "process": {
+        "bytes": 946,
+        "file_system_inputs": "0",
+        "file_system_outputs": "296",
+        "involuntary_context_switches": "49",
+        "major_page_faults": "0",
+        "max_rss_kib": "36672",
+        "minor_page_faults": "881835",
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-b/process.txt",
+        "raw_sha256": "6908890d15f252bb861d8edcb364a6138be8760e6420f7987b092ea193a43128",
+        "system_seconds": 0.4,
+        "user_seconds": 3.31,
+        "voluntary_context_switches": "24"
+      },
+      "receipt": {
+        "bytes": 2880,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-b/receipt.json",
+        "sha256": "2f5bc62b1c87046710f2166470d76b09e7c8e6570f9c6feeb881d43a591aeb37"
+      },
+      "report": {
+        "bytes": 151272,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-b/report.json",
+        "sha256": "bf1bc749044d1fcdba9e05538f7d03ac837d1759e4078085c45dd85aff64ca98"
+      },
+      "sink": {
+        "accepted_bytes": 2101446,
+        "largest_write": 65536,
+        "write_calls": 75,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 32,
+          "bytes_1_to_512": 42,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "sink_largest_write": 65536,
+      "source_read_bytes": {
+        "max": 8409488,
+        "mean": 8409488.0,
+        "min": 8409488,
+        "p50": 8409488,
+        "p95": 8409488,
+        "p99": 8409488,
+        "samples": 200
+      },
+      "source_read_calls": {
+        "max": 202,
+        "mean": 202.0,
+        "min": 202,
+        "p50": 202,
+        "p95": 202,
+        "p99": 202,
+        "samples": 200
+      }
+    },
+    {
+      "cache_before_publication_after_commit": {
+        "cold_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "hits": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "samples": 200
+        },
+        "retained_bytes": {
+          "max": 18855,
+          "mean": 18855.0,
+          "min": 18855,
+          "p50": 18855,
+          "p95": 18855,
+          "p99": 18855,
+          "samples": 200
+        },
+        "retained_entries": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "successful_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        }
+      },
+      "elapsed_ns": {
+        "max": 4891970,
+        "mean": 4819963.965,
+        "min": 4782360,
+        "p50": 4816565,
+        "p95": 4856730,
+        "p99": 4879540,
+        "samples": 200
+      },
+      "gates": {
+        "cache_counters_verified": true,
+        "header_footer_relationships_verified": true,
+        "patch_forward_inverse_verified": true,
+        "phase_sum_verified": true,
+        "publication_inverse_exact_source_verified": true,
+        "raw_member_order_and_comment_verified": true,
+        "raw_untouched_members_verified": true,
+        "semantic_reopen_all_sections_verified": true,
+        "sink_counters_verified": true,
+        "source_immutability_verified": true,
+        "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+        "table_cell_sectpr_excluded_verified": true
+      },
+      "label": "child-c",
+      "max_in_flight_reads": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      },
+      "ordinary_payload_materializations": 1,
+      "ordinary_payload_read_bytes": {
+        "max": 8397632,
+        "mean": 8397632.0,
+        "min": 8397632,
+        "p50": 8397632,
+        "p95": 8397632,
+        "p99": 8397632,
+        "samples": 200
+      },
+      "ordinary_payload_read_calls": {
+        "max": 138,
+        "mean": 138.0,
+        "min": 138,
+        "p50": 138,
+        "p95": 138,
+        "p99": 138,
+        "samples": 200
+      },
+      "output_bytes": 2101446,
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "phase_ns": {
+        "commit_ns": {
+          "max": 369702,
+          "mean": 344623.495,
+          "min": 335341,
+          "p50": 341982,
+          "p95": 358531,
+          "p99": 367181,
+          "samples": 200
+        },
+        "edit_ns": {
+          "max": 66540,
+          "mean": 53515.745,
+          "min": 50280,
+          "p50": 52800,
+          "p95": 60571,
+          "p99": 65770,
+          "samples": 200
+        },
+        "open_ns": {
+          "max": 59231,
+          "mean": 45209.55,
+          "min": 42470,
+          "p50": 44655,
+          "p95": 50200,
+          "p99": 54950,
+          "samples": 200
+        },
+        "preparation_ns": {
+          "max": 48730,
+          "mean": 40084.405,
+          "min": 33590,
+          "p50": 40215,
+          "p95": 44140,
+          "p99": 47260,
+          "samples": 200
+        },
+        "publication_ns": {
+          "max": 3066343,
+          "mean": 3000380.185,
+          "min": 2978682,
+          "p50": 2997503,
+          "p95": 3024573,
+          "p99": 3039703,
+          "samples": 200
+        },
+        "query_ns": {
+          "max": 1362195,
+          "mean": 1336150.585,
+          "min": 1320835,
+          "p50": 1334850,
+          "p95": 1350866,
+          "p99": 1357546,
+          "samples": 200
+        }
+      },
+      "process": {
+        "bytes": 947,
+        "file_system_inputs": "0",
+        "file_system_outputs": "296",
+        "involuntary_context_switches": "51",
+        "major_page_faults": "0",
+        "max_rss_kib": "36728",
+        "minor_page_faults": "881839",
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-c/process.txt",
+        "raw_sha256": "a2addbf064cff25e5531412d3fd7b0aaf7949cf43e0d8f3296dbadedf8b4ea5b",
+        "system_seconds": 0.41,
+        "user_seconds": 3.3,
+        "voluntary_context_switches": "24"
+      },
+      "receipt": {
+        "bytes": 2876,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-c/receipt.json",
+        "sha256": "c040e96dae6a056d5d1fc273b79a4e159f1f5b064a1177344b927eb1ae20b8d0"
+      },
+      "report": {
+        "bytes": 151266,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-c/report.json",
+        "sha256": "2e1a14ce46f378f3453a893168bb65c7658164c4a57d1f4d4174b4e1b487c7f0"
+      },
+      "sink": {
+        "accepted_bytes": 2101446,
+        "largest_write": 65536,
+        "write_calls": 75,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 32,
+          "bytes_1_to_512": 42,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "sink_largest_write": 65536,
+      "source_read_bytes": {
+        "max": 8409488,
+        "mean": 8409488.0,
+        "min": 8409488,
+        "p50": 8409488,
+        "p95": 8409488,
+        "p99": 8409488,
+        "samples": 200
+      },
+      "source_read_calls": {
+        "max": 202,
+        "mean": 202.0,
+        "min": 202,
+        "p50": 202,
+        "p95": 202,
+        "p99": 202,
+        "samples": 200
+      }
+    },
+    {
+      "cache_before_publication_after_commit": {
+        "cold_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "hits": {
+          "max": 0,
+          "mean": 0.0,
+          "min": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "samples": 200
+        },
+        "retained_bytes": {
+          "max": 18855,
+          "mean": 18855.0,
+          "min": 18855,
+          "p50": 18855,
+          "p95": 18855,
+          "p99": 18855,
+          "samples": 200
+        },
+        "retained_entries": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        },
+        "successful_loads": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "samples": 200
+        }
+      },
+      "elapsed_ns": {
+        "max": 4891260,
+        "mean": 4809381.165,
+        "min": 4782039,
+        "p50": 4804199,
+        "p95": 4841789,
+        "p99": 4866340,
+        "samples": 200
+      },
+      "gates": {
+        "cache_counters_verified": true,
+        "header_footer_relationships_verified": true,
+        "patch_forward_inverse_verified": true,
+        "phase_sum_verified": true,
+        "publication_inverse_exact_source_verified": true,
+        "raw_member_order_and_comment_verified": true,
+        "raw_untouched_members_verified": true,
+        "semantic_reopen_all_sections_verified": true,
+        "sink_counters_verified": true,
+        "source_immutability_verified": true,
+        "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+        "table_cell_sectpr_excluded_verified": true
+      },
+      "label": "child-d",
+      "max_in_flight_reads": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      },
+      "ordinary_payload_materializations": 1,
+      "ordinary_payload_read_bytes": {
+        "max": 8397632,
+        "mean": 8397632.0,
+        "min": 8397632,
+        "p50": 8397632,
+        "p95": 8397632,
+        "p99": 8397632,
+        "samples": 200
+      },
+      "ordinary_payload_read_calls": {
+        "max": 138,
+        "mean": 138.0,
+        "min": 138,
+        "p50": 138,
+        "p95": 138,
+        "p99": 138,
+        "samples": 200
+      },
+      "output_bytes": 2101446,
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "phase_ns": {
+        "commit_ns": {
+          "max": 371692,
+          "mean": 347958.99,
+          "min": 337421,
+          "p50": 345716,
+          "p95": 359062,
+          "p99": 368042,
+          "samples": 200
+        },
+        "edit_ns": {
+          "max": 67540,
+          "mean": 53625.035,
+          "min": 50860,
+          "p50": 52890,
+          "p95": 58950,
+          "p99": 64890,
+          "samples": 200
+        },
+        "open_ns": {
+          "max": 57790,
+          "mean": 44786.115,
+          "min": 42411,
+          "p50": 44365,
+          "p95": 47990,
+          "p99": 52160,
+          "samples": 200
+        },
+        "preparation_ns": {
+          "max": 44360,
+          "mean": 33743.475,
+          "min": 32860,
+          "p50": 33340,
+          "p95": 36080,
+          "p99": 40380,
+          "samples": 200
+        },
+        "publication_ns": {
+          "max": 3066132,
+          "mean": 2997719.095,
+          "min": 2976242,
+          "p50": 2994863,
+          "p95": 3021763,
+          "p99": 3036693,
+          "samples": 200
+        },
+        "query_ns": {
+          "max": 1362785,
+          "mean": 1331548.455,
+          "min": 1318145,
+          "p50": 1329940,
+          "p95": 1349286,
+          "p99": 1353775,
+          "samples": 200
+        }
+      },
+      "process": {
+        "bytes": 946,
+        "file_system_inputs": "0",
+        "file_system_outputs": "296",
+        "involuntary_context_switches": "56",
+        "major_page_faults": "0",
+        "max_rss_kib": "37612",
+        "minor_page_faults": "882046",
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-d/process.txt",
+        "raw_sha256": "9f2bcbdfff35b83b91c564fcce1e3e0fcb657c0d79a8225853fdaf5b10eb29f2",
+        "system_seconds": 0.41,
+        "user_seconds": 3.28,
+        "voluntary_context_switches": "24"
+      },
+      "receipt": {
+        "bytes": 2889,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-d/receipt.json",
+        "sha256": "2cadf14b88ef0ca1c87828a7ec083cc9c07b4c2f87671569ac29f09e00f64c3e"
+      },
+      "report": {
+        "bytes": 151272,
+        "path": "/home/zhuhe/litchi-performance-0914/runs/child-d/report.json",
+        "sha256": "70929f7334234be4d84be56575c3912aef545c85de94aee27d332c83a3954652"
+      },
+      "sink": {
+        "accepted_bytes": 2101446,
+        "largest_write": 65536,
+        "write_calls": 75,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 32,
+          "bytes_1_to_512": 42,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 1,
+          "bytes_over_65536": 0
+        }
+      },
+      "sink_largest_write": 65536,
+      "source_read_bytes": {
+        "max": 8409488,
+        "mean": 8409488.0,
+        "min": 8409488,
+        "p50": 8409488,
+        "p95": 8409488,
+        "p99": 8409488,
+        "samples": 200
+      },
+      "source_read_calls": {
+        "max": 202,
+        "mean": 202.0,
+        "min": 202,
+        "p50": 202,
+        "p95": 202,
+        "p99": 202,
+        "samples": 200
+      }
+    }
+  ],
+  "corpus": {
+    "archive_bytes": 2101427,
+    "archive_member_count": 10,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "compression": "deflate",
+    "entry_bytes": 524288,
+    "entry_count": 7,
+    "generator": "litchi-docx-section-layout-source-v1",
+    "name": "docx-source-backed-existing-section-layout",
+    "output_bytes": 2101446,
+    "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "package_format": "DOCX/OPC/ZIP",
+    "payload_kind": "deterministic-incompressible-media",
+    "shape": "existing-section-layout",
+    "target_entry": "word/document.xml",
+    "target_payload_bytes": 18855,
+    "target_payload_sha256": "67cb9066f112bfee6905a23f3eabdc76b65c86cd0c6613dd60a5a18895ceac81",
+    "uncompressed_payload_bytes": 2116441
+  },
+  "cpu": 12,
+  "guards": {
+    "all_children_exit_zero": true,
+    "all_output_hashes_stable": true,
+    "all_reports_match_binary": true,
+    "all_reports_match_source_corpus": true,
+    "all_reports_match_warmup_and_samples": true,
+    "all_semantic_and_preservation_gates": true,
+    "all_source_and_sink_gates": true,
+    "no_speedup_claim": true
+  },
+  "performance_claim": "none",
+  "physical_io_metrics": "unavailable; source is in-memory InstrumentedSource and counters are logical harness observations",
+  "pooled_elapsed_descriptive_only": {
+    "max": 4953160,
+    "mean": 4813774.63375,
+    "min": 4770569,
+    "p50": 4810184,
+    "p95": 4850650,
+    "p99": 4876280,
+    "samples": 800
+  },
+  "pooled_phase_descriptive_only": {
+    "commit_ns": {
+      "max": 388471,
+      "mean": 347382.475,
+      "min": 335341,
+      "p50": 345301,
+      "p95": 360611,
+      "p99": 369871,
+      "samples": 800
+    },
+    "edit_ns": {
+      "max": 67540,
+      "mean": 54073.72375,
+      "min": 50280,
+      "p50": 53420,
+      "p95": 60670,
+      "p99": 64600,
+      "samples": 800
+    },
+    "open_ns": {
+      "max": 63900,
+      "mean": 45134.835,
+      "min": 42010,
+      "p50": 44590,
+      "p95": 50180,
+      "p99": 54950,
+      "samples": 800
+    },
+    "preparation_ns": {
+      "max": 48730,
+      "mean": 35975.76125,
+      "min": 32860,
+      "p50": 34090,
+      "p95": 41730,
+      "p99": 46380,
+      "samples": 800
+    },
+    "publication_ns": {
+      "max": 3076373,
+      "mean": 2998699.60125,
+      "min": 2973482,
+      "p50": 2995682,
+      "p95": 3024112,
+      "p99": 3046322,
+      "samples": 800
+    },
+    "query_ns": {
+      "max": 1373695,
+      "mean": 1332508.2375,
+      "min": 1317076,
+      "p50": 1331181,
+      "p95": 1348305,
+      "p99": 1357695,
+      "samples": 800
+    }
+  },
+  "pooled_phase_fraction_of_elapsed": {
+    "commit_ns": 0.0721642580781527,
+    "edit_ns": 0.011233123248205698,
+    "open_ns": 0.00937618364672783,
+    "preparation_ns": 0.007473503432788328,
+    "publication_ns": 0.6229414190323176,
+    "query_ns": 0.2768115125618078
+  },
+  "process_scope": "GNU time -v: setup-inclusive child process including corpus generation, benchmark, verification, JSON serialization, and process teardown",
+  "protocol": {
+    "bytes": 53363,
+    "path": "/home/zhuhe/litchi-performance-0914/protocol-v1.json",
+    "sha256": "88bca0028d1b658053a31bd9a395f6c282e53ed0bd219cbeda01c21ee4acdfd7"
+  },
+  "regeneration_command": "LITCHI_PERF_0914_ROOT=/home/zhuhe/litchi-performance-0914 LITCHI_PERF_0914_REVISION=a4ca85e28cdea151176534b7f8dc912253a1ca1e python3 docs/performance/results/change-0914/capture.py reduce --output /home/zhuhe/litchi-performance-0914/reduced-replay.json",
+  "samples_per_child": 200,
+  "schema": "litchi.performance.0914.docx-section-layout-reduction.v1",
+  "source_receipt": {
+    "bytes": 55644,
+    "path": "/home/zhuhe/litchi-performance-0914/source-v1.json",
+    "sha256": "935f669d2a38255eaf5ce462fd93df00b55b34e2676a079d313f525572bda4b8"
+  },
+  "source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "timing_scope": "harness elapsed_ns: preparation, source-backed open, section query, edit, commit, sequential publication; exact six-phase sum",
+  "warmup_iterations": 30
+}

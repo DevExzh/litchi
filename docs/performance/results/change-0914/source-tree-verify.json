@@ -1,0 +1,14 @@
+{
+  "revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "tree_entries": 9357,
+  "extracted_entries": 9357,
+  "tar_files": 9357,
+  "missing": 0,
+  "extra": 0,
+  "content_or_mode_mismatches": 0,
+  "archive_content_or_mode_mismatches": 0,
+  "tar_missing": 0,
+  "tar_extra": 0,
+  "archive_bytes": 171120640,
+  "archive_sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+}

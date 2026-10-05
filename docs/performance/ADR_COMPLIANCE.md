@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0914 — existing DOCX section-layout measurement
+
+[0914](0914-docx-section-layout-baseline.md) changes only external measurement
+tooling and evidence. The existing source-bound edit, semantic readback, exact
+inverse, raw-member preservation, and typed refusal checks remain exercised
+(ADRs 0003/0006). Explicit benchmark process/I/O and scoped metric reporting
+stay outside the library (ADR 0005). Public APIs, dependencies, and physical
+ownership are unchanged (ADRs 0010/0011/0024). The record's matrix and source
+audit define this generated-fixture verification scope; no broader support or
+performance claim is inferred (ADR 0008).
+
 ## 0742–0757 — the OLE2/OOXML wave of 2026-09-22/23
 
 [0756](0756-ole2-ooxml-wave-integration.md) integrates fifteen records; each

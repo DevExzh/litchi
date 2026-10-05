@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0914 — DOCX section query and publication need attribution
+
+[0914](0914-docx-section-layout-baseline.md) measures publication at 62.29%
+and section query at 27.68% of summed six-phase time. Every measured iteration
+returns 8,409,488 logical source bytes in 202 reads for a 2,101,427-byte archive.
+Source review finds repeated full-artifact fingerprints; the phase result does
+not establish their native cost share. Profile those two phases before proposing
+digest reuse, parser reuse, or source-read changes, preserving exact-source,
+freshness, budget, and conflict checks. No production optimization is adopted.
+
 ## 0913 — large media already bypass the member-span buffer
 
 [0913](0913-pptx-owned-direct-read.md) rejects the direct-owned-read candidate.

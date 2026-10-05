@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0914 — one previously unmeasured DOCX edit/save baseline
+
+[0914](0914-docx-section-layout-baseline.md) adds 800 current-source samples
+for existing-section layout editing, with six phase clocks, logical source/sink
+counters, process RSS, and executed preservation/inverse/refusal controls.
+It closes that narrow baseline gap from 0906. It does not establish an
+optimization, real-producer coverage, physical cold/range behavior, allocation
+or hardware-counter attribution, or scaling. Query/publication profiling is the
+next scoped action. The full non-iWork goal remains open; iWork is excluded.
+
 ## 0913 — rejected input-span hypothesis and completed requested integration
 
 [0913](0913-pptx-owned-direct-read.md) closes the proposed copy-bypass experiment

@@ -1,0 +1,43 @@
+{
+  "schema": "litchi.performance.0914.rust-files.v1",
+  "source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "archive": "/home/zhuhe/litchi-performance-0914/source-HEAD-code.tar",
+  "files": {
+    ".cargo/config.toml": {
+      "bytes": 470,
+      "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+    },
+    "clippy.toml": {
+      "bytes": 2165,
+      "sha256": "f11517bc5872d96aab42ba6519db4e78f2fdcd44512ac70a1b45adbd9929b50c"
+    },
+    "deny.toml": {
+      "bytes": 463,
+      "sha256": "586e3099fcdf53ddc383388fd85ad173505abfda6518f2d7e7dd116868b85bcc"
+    },
+    "rust-toolchain.toml": {
+      "bytes": 86,
+      "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+    },
+    "rustfmt.toml": {
+      "bytes": 79,
+      "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+    },
+    "tools/perf-baseline/Cargo.lock": {
+      "bytes": 56289,
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "tools/perf-baseline/Cargo.toml": {
+      "bytes": 3286,
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    },
+    "tools/perf-baseline/src/lib.rs": {
+      "bytes": 3022923,
+      "sha256": "8542f4e8e580bef2b12b3782b03bcfabc8e0d60cefc80f27c55042c57baff860"
+    },
+    "tools/perf-baseline/src/main.rs": {
+      "bytes": 2079,
+      "sha256": "2327bc6430ec6ed125396823a0ce1a9315358cf861ad6458513ac7772ed0f54b"
+    }
+  }
+}

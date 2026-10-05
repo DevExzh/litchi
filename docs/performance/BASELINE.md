@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0914 — DOCX existing-section layout baseline
+
+[0914](0914-docx-section-layout-baseline.md) records four fresh processes and
+800 measured iterations on pinned CPU 12. The existing source-backed section
+edit/save has pooled p50/p95/p99 of 4.810184/4.850650/4.876280 ms, with child
+medians spanning 4.804199–4.816565 ms. Preservation and inverse controls pass.
+The timer sums six phases and excludes verification and teardown. This is one
+warm generated-fixture baseline, with no candidate or speedup comparison.
+
 ## 0913 — direct owned-source read candidate rejected
 
 The fresh matched comparison in [0913](0913-pptx-owned-direct-read.md) fails
