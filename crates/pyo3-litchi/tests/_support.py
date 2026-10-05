@@ -55,41 +55,23 @@ CORE_FORMAT_NAMES = frozenset(
     }
 )
 
-#: Variants the runtime ``litchi_py.FileFormat`` exposes today: every core
-#: variant except ``Odb``, which the bindings map to ``Doc`` (drift D1).
-RUNTIME_FORMAT_NAMES_TODAY = CORE_FORMAT_NAMES - {"Odb"}
+#: Variants the runtime ``litchi_py.FileFormat`` exposes: every core variant
+#: (S8a added ``Odb``, which the bindings used to map to ``Doc``; drift D1).
+RUNTIME_FORMAT_NAMES = CORE_FORMAT_NAMES
 
-#: Variants ``__init__.pyi`` declares today: 14 of 21 (drift D2).
-STUB_FORMAT_NAMES_TODAY = frozenset(
-    {
-        "Doc", "Docx", "Ppt", "Pptx", "Xls", "Xlsx", "Xlsb",
-        "Odt", "Ods", "Odp", "Pages", "Keynote", "Numbers", "Rtf",
-    }
-)
+#: Public runtime members the stub does not declare, by class. Empty since
+#: S8a declared the six missing ODF formats (drift D2); ``test_stub_sync``
+#: tolerates exactly these, so anything new fails.
+KNOWN_RUNTIME_ONLY_MEMBERS: dict = {}
 
-#: Public runtime members the stub does not declare, by class (drift D2).
-#: ``test_stub_sync`` tolerates exactly these; anything new fails.
-KNOWN_RUNTIME_ONLY_MEMBERS = {
-    "FileFormat": RUNTIME_FORMAT_NAMES_TODAY - STUB_FORMAT_NAMES_TODAY,
-}
+#: Base classes the stub declares that the runtime class does not have.
+#: Empty since S8a dropped the false ``Enum`` base of ``FileFormat`` (drift D3).
+KNOWN_STUB_BASE_DRIFT: frozenset = frozenset()
 
-#: Base classes the stub declares that the runtime class does not have
-#: (drift D3: ``class FileFormat(Enum)``, but the runtime is a pyo3 class).
-KNOWN_STUB_BASE_DRIFT = frozenset({("FileFormat", "Enum")})
-
-#: API the README's "API Reference" lists that the module does not have
-#: (drift D5): the Workbook/Worksheet section documents an unimplemented API.
-KNOWN_README_ONLY_API = frozenset(
-    {
-        ("Workbook", "worksheets"),
-        ("Workbook", "worksheet_by_name"),
-        ("Worksheet", "name"),
-        ("Worksheet", "row_count"),
-        ("Worksheet", "column_count"),
-        ("Worksheet", "cell_value"),
-        ("Worksheet", "rows"),
-    }
-)
+#: API the README's "API Reference" lists that the module does not have.
+#: Empty since S8a removed the unimplemented Worksheet API from the README
+#: (drift D5).
+KNOWN_README_ONLY_API: frozenset = frozenset()
 
 # ---------------------------------------------------------------------------
 # Fixtures and processes
@@ -280,14 +262,28 @@ def parse_stub(path: Path = STUB_PATH) -> Stub:
 
 
 def public_members(cls) -> set:
-    return {name for name in dir(cls) if not name.startswith("_")}
+    """Public names ``cls`` defines itself.
+
+    Members a class inherits are checked on the class that defines them: the
+    stub declares ``code``, ``message`` and ``suggestion`` once, on
+    ``LitchiError``, and never redeclares what the exception classes inherit
+    from the built-in exceptions (``args``, ``errno``, ``with_traceback``, ...).
+    For the pyo3 classes, which inherit only from ``object``, this is the same
+    set as ``dir()``.
+    """
+    return {name for name in vars(cls) if not name.startswith("_")}
 
 
 def resolve_stub_base(name: str):
-    """Runtime class for a base the stub names (only what the stub imports)."""
+    """Runtime class for a base the stub names: a litchi_py class or a built-in."""
+    import builtins
     import enum
 
-    return {"Enum": enum.Enum, "enum.Enum": enum.Enum, "object": object}[name]
+    if name in ("Enum", "enum.Enum"):
+        return enum.Enum
+    if hasattr(L, name):
+        return getattr(L, name)
+    return getattr(builtins, name)
 
 
 def readme_api_references(path: Path = README_PATH) -> set:

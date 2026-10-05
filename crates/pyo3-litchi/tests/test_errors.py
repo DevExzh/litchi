@@ -8,12 +8,14 @@ Contract tier (keep green through S8a):
   * messages are checked only for semantic fragments: the detected format of
     a wrong-family input (record 0003 D7), "password", "source changed".
 
-Snapshot tier: ``MessageSnapshotTests`` pins today's exact messages. S8a may
-change wording deliberately (design §8 adds code/message/suggestion); update
-the table in the same change and list the diff in the S8a record.
+Snapshot tier: ``MessageSnapshotTests`` pins the exact messages. S8a changed
+them deliberately (design §8: errors carry code/message/suggestion, and
+``str()`` is the message followed by the suggestion); the S8a record
+(docs/unified-ops/s8a-python-on-file.md) lists the differences. Change the
+table only on purpose, and list the difference in a record.
 
-Where today's classes contradict the stub's ``Raises:`` sections, the drift is
-pinned in test_known_drift.py (D4, F10).
+The exception classes, codes and suggestions are pinned in test_exceptions.py;
+the fixed class drift (D4, F10) in test_known_drift.py.
 """
 
 from __future__ import annotations
@@ -46,8 +48,7 @@ ACCEPTED = (
 
 FLAT_ODF = ("odf/odt/form-controls.fodt", "odf/ods/grid-padding.fods", "odf/drawing/multicolor-gradient.fodp")
 
-#: ODF variants that detection names but no Python opener reads; Odb is
-#: detected as Doc (drift D1) and refused like the others.
+#: ODF variants that detection names but no Python opener reads.
 DETECTED_NOT_OPENED = (
     "libreoffice-core/desktop/qa/data/BlankDrawDocument.odg",
     "odf/odc-producer-evidence/odfdom-created.odc",
@@ -88,7 +89,8 @@ class PathErrorTests(unittest.TestCase):
                 with self.subTest(opener=opener.__name__):
                     with self.assertRaises(OSError):
                         opener.open(missing)
-            # Workbook raises a bare Exception today (drift D4a).
+            # Workbook raised a bare Exception before S8a (drift D4a, now an
+            # OSError; see test_known_drift).
             with self.assertRaises(Exception):
                 L.Workbook.open(missing)
 
@@ -145,7 +147,8 @@ class UnsupportedInputTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         opener.open(path)
             with self.subTest(fixture=relative, opener="Workbook"):
-                # Bare Exception today (drift D4c).
+                # A bare Exception before S8a (drift D4c, now a ValueError;
+                # see test_known_drift).
                 with self.assertRaises(Exception):
                     L.Workbook.open(path)
 
@@ -217,11 +220,13 @@ class SourceChangeTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "I/O messages are platform text")
 class MessageSnapshotTests(unittest.TestCase):
-    """Exact messages today (snapshot tier)."""
+    """Exact messages (snapshot tier), as S8a left them."""
 
-    NOT_OFFICE = "Not a valid Office file"
+    NOT_OFFICE = "not a recognized Office file"
     NO_ZIP_MAGIC = "ZIP error: OOXML-suffixed input does not have ZIP magic"
-    FLAT = "flat OpenDocument {} is detected but the dedicated family facade exposes packaged parsing only"
+    FLAT = "flat OpenDocument {} is detected, but only packaged OpenDocument opens"
+    DETECTED = "detected {}, which this operation does not handle"
+    OPENER = {L.Document: "Document.open", L.Presentation: "Presentation.open", L.Workbook: "Workbook.open"}
 
     def _message(self, opener, path) -> str:
         with self.assertRaises(Exception) as caught:
@@ -249,32 +254,40 @@ class MessageSnapshotTests(unittest.TestCase):
                     (opener, inputs["plain.docx"], self.NO_ZIP_MAGIC),
                     (opener, inputs["truncated.docx"], "ZIP error: Missing end of central directory"),
                 ]
-                rows += [(opener, fixture(r), self.NOT_OFFICE) for r in DETECTED_NOT_OPENED]
+                rows += [
+                    (opener, fixture(r), self.DETECTED.format(name))
+                    for r, name in zip(DETECTED_NOT_OPENED, ("Odg", "Odc", "Odf", "Odm", "Odb"))
+                ]
             for relative, detected, accepting in ACCEPTED:
                 rows += [
-                    (opener, fixture(relative), f"Detected {detected}, which this opener does not handle")
+                    (
+                        opener,
+                        fixture(relative),
+                        self.DETECTED.format(detected)
+                        + f" (suggestion: open it with {self.OPENER[accepting]})",
+                    )
                     for opener in OPENERS
                     if opener is not accepting
                 ]
             rows += [
-                (L.Document, fixture("ole/doc/PasswordProtected.doc"), "DOC password required"),
+                (L.Document, fixture("ole/doc/PasswordProtected.doc"),
+                 "the Doc document is encrypted (suggestion: remove the password in the"
+                 " application that created the file; litchi_py cannot unlock encrypted"
+                 " documents yet)"),
                 (L.Document, fixture("ole/doc/word6-no-table-stream.doc"),
-                 "Word 6.0 documents (nFib 0x0065) are not supported"),
+                 "Word 6.0 documents (nFib 0x0065) predate the Word 97 binary format and"
+                 " are not supported"),
             ]
             for relative, name in zip(FLAT_ODF, ("Odt", "Ods", "Odp")):
-                rows += [
-                    (L.Document, fixture(relative), self.FLAT.format(name)),
-                    (L.Presentation, fixture(relative), self.FLAT.format(name)),
-                    (L.Workbook, fixture(relative), "Unsupported feature: " + self.FLAT.format(name)),
-                ]
+                rows += [(opener, fixture(relative), self.FLAT.format(name)) for opener in OPENERS]
             for opener, path, expected in rows:
                 with self.subTest(opener=opener.__name__, input=os.path.basename(path)):
                     self.assertEqual(self._message(opener, path), expected)
 
     def test_source_change_messages(self):
         cases = (
-            (L.Document, "ooxml/docx/Hyperlink.docx", "positional source changed (expected SourceVersion {"),
-            (L.Workbook, "ooxml/xlsx/SimpleNormal.xlsx", "positional source changed (expected SourceVersion {"),
+            (L.Document, "ooxml/docx/Hyperlink.docx", "OPC error: OPC source changed from SourceVersion {"),
+            (L.Workbook, "ooxml/xlsx/SimpleNormal.xlsx", "OPC package error: OPC source changed from SourceVersion {"),
             (L.Presentation, "ooxml/pptx/sample.pptx", "PPTX OPC error: OPC source changed from SourceVersion {"),
         )
         for opener, relative, prefix in cases:

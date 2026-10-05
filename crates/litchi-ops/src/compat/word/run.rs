@@ -90,6 +90,31 @@ impl Run {
         }
     }
 
+    /// Whether the run is underlined, when the run states it.
+    ///
+    /// DOCX reports a direct `w:u` (`Some(false)` for `w:val="none"`); DOC
+    /// reports `Some(true)` for any underline style and `None` otherwise; RTF
+    /// always states it, as it does bold and italic; ODT spans report `None`,
+    /// since ODT formatting lives in styles.
+    ///
+    /// Scheduled for deletion in M1.
+    ///
+    /// # Errors
+    ///
+    /// Returns the DOCX typed error when the run properties cannot be read.
+    pub fn underline(&self) -> Result<Option<bool>> {
+        match self {
+            #[cfg(feature = "doc")]
+            Self::Doc(run) => Ok(run.underline()),
+            #[cfg(feature = "docx")]
+            Self::Docx(run) => Ok(run.underline()?),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(run) => Ok(Some(run.underline())),
+            #[cfg(feature = "odt")]
+            Self::Odt(_) => Ok(None),
+        }
+    }
+
     /// Whether the run is struck through, when the run states it.
     ///
     /// Scheduled for deletion in M1.

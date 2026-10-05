@@ -130,6 +130,48 @@ fn separators_and_empty_paragraph_policy_are_explicit() {
     assert_eq!(excluded_report.objects_written(), 2);
 }
 
+/// The in-memory paragraph-separated text agrees with the semantic sink on
+/// both owners, and keeps a nested paragraph inside its anchor where the sink
+/// refuses it.
+#[test]
+fn paragraph_separated_text_matches_the_sink_on_both_owners() {
+    let bytes = package_bytes(
+        &document_xml(
+            r#"<w:p><w:r><w:t>one &amp; 世界</w:t><w:tab/><w:t>two</w:t></w:r></w:p><w:p/><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>last</w:t></w:r></w:p>"#,
+        ),
+        false,
+    );
+    let (sink, _) = eager_text(&bytes, parity_options(true));
+    let eager = eager_package(&bytes)
+        .document()
+        .expect("eager document")
+        .text_with_paragraph_separator("\n")
+        .expect("eager paragraph text");
+    let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source-backed package")
+        .document()
+        .expect("source document")
+        .extract_text_with_paragraph_separator("\n")
+        .expect("source paragraph text");
+    assert_eq!(eager, "one & 世界\ttwo\n\ncell\nlast");
+    assert_eq!(eager.as_bytes(), sink.as_slice());
+    assert_eq!(source, eager);
+
+    let nested = package_bytes(
+        &document_xml(
+            r#"<w:p><w:r><w:t>anchor </w:t></w:r><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>box</w:t></w:r></w:p></w:txbxContent></w:pict></w:r></w:p><w:p><w:r><w:t>after</w:t></w:r></w:p>"#,
+        ),
+        false,
+    );
+    let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(nested)))
+        .expect("source-backed package")
+        .document()
+        .expect("source document")
+        .extract_text_with_paragraph_separator("\n")
+        .expect("nested paragraphs stay in their anchor");
+    assert_eq!(source, "anchor box\nafter");
+}
+
 #[test]
 fn nested_empty_paragraph_is_rejected_without_output() {
     let bytes = package_bytes(

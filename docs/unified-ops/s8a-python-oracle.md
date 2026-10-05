@@ -1,6 +1,8 @@
 # S8a Python read-API oracle
 
-- Status: test suite only; no binding code changed.
+- Status: test suite only; no binding code changed. S8a has since fixed every
+  drift and bug item below; see "Status after S8a" and
+  `docs/unified-ops/s8a-python-on-file.md`.
 - Date: 2026-10-05
 - Branch: `uo/m0a-s8a-pre-pytests`, based on `uo/m0a` at `2d8971feac`. That is
   before S8a, so `litchi::Document`, `Presentation` and `Workbook` still back
@@ -198,7 +200,10 @@ The following are not tied to one format:
 
 ## Known drift and bugs
 
-| ID | Today | Intended | Root cause | Fix expected in |
+All fourteen pairs were fixed in S8a: each `_today` test is deleted and each
+`_intended` test is an ordinary test. The table keeps the state before S8a.
+
+| ID | Today (before S8a) | Intended | Root cause | Fix expected in |
 |---|---|---|---|---|
 | D1 | `FileFormat` has 20 variants and no `Odb`. `.odb` is detected as `FileFormat.Doc` (path and bytes), yet `Document.open` refuses it. | `FileFormat.Odb` exists and detection returns it; all 21 core variants. | `From<litchi::FileFormat>` ends with `_ => FileFormat::Doc` (`src/common.rs`). | S8a (record 0003 §5.1, F14) |
 | D2 | The stub's `FileFormat` declares 14 of 21 formats. `Odg`, `Odc`, `Odf`, `Odi`, `Odm` and `Oth` exist at runtime but are missing from the stub. | The stub declares every runtime variant. | `python/litchi_py/__init__.pyi` | S8a (record 0003 §5.1) |
@@ -312,6 +317,14 @@ tracing. B2 and B5 were exercised in both profiles:
 |---|---|---|---|
 | dev | 1 (`PanicException`) | 3 | the panic text on stderr |
 | release | −6 (SIGABRT) | −6 (SIGABRT) | the panic text on stderr |
+
+## Status after S8a
+
+S8a (`docs/unified-ops/s8a-python-on-file.md`) moved the bindings onto
+`litchi::File` and fixed D1–D5, F10 and B1–B5. The suite now has 132 tests,
+all ordinary (no expected failures): 13 `_today` tests were deleted and 24
+tests were added. The snapshot tier changed on purpose (messages, the
+source-change prefixes); the S8a record lists every difference.
 
 ## Not covered, not claimed
 

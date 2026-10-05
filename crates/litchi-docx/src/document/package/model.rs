@@ -48,6 +48,36 @@ impl<'a> Document<'a> {
         self.part.extract_text()
     }
 
+    /// Get all text from the document, with `separator` between paragraphs.
+    ///
+    /// The text is [`Self::text`]'s, with `separator` before every paragraph
+    /// after the first. The paragraphs are the ones [`Self::paragraphs`]
+    /// returns: a paragraph nested in another one, such as a text box's,
+    /// stays part of the paragraph that anchors it, and an empty paragraph
+    /// adds an empty segment. For well-formed XML the result is the paragraph
+    /// texts joined by `separator`; malformed XML fails as [`Self::text`]
+    /// fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_docx::Package;
+    ///
+    /// let pkg = Package::open("document.docx")?;
+    /// let text = pkg.document()?.text_with_paragraph_separator("\n")?;
+    /// for line in text.lines() {
+    ///     println!("{line}");
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::text`].
+    pub fn text_with_paragraph_separator(&self, separator: &str) -> Result<String> {
+        self.part.extract_text_with_paragraph_separator(separator)
+    }
+
     /// Stream visible main-document paragraphs to a caller-owned sink.
     ///
     /// The parser walks the document once in XML order, including paragraphs

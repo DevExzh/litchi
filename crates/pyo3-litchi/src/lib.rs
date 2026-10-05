@@ -7,19 +7,26 @@ use pyo3::types::PyModule;
 
 mod common;
 mod document;
+mod errors;
+mod iwork;
 mod presentation;
 mod sheet;
 
 /// Litchi - High-performance Office file format parser
 ///
-/// This module provides Python bindings for parsing and manipulating various
-/// Office file formats including:
+/// This module provides Python bindings for reading various Office file
+/// formats including:
 /// - Word documents (.doc, .docx)
 /// - PowerPoint presentations (.ppt, .pptx)
 /// - Excel workbooks (.xls, .xlsx, .xlsb)
 /// - OpenDocument formats (.odt, .ods, .odp)
 /// - Apple iWork formats (.pages, .key, .numbers)
 /// - RTF documents (.rtf)
+///
+/// Errors are raised as `LitchiError` subclasses that carry the error's
+/// `code`, `message` and `suggestion`; each family also derives from the
+/// matching built-in exception (`OSError`, `ValueError` or `LookupError`).
+/// Handles are immutable and can be used from any thread.
 ///
 /// # Examples
 ///
@@ -67,6 +74,9 @@ mod sheet;
 /// ```
 #[pymodule]
 fn litchi_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Register the exception classes
+    errors::register(m)?;
+
     // Register common types
     common::register(m)?;
 

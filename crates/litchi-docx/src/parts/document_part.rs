@@ -1066,6 +1066,20 @@ impl<'a> DocumentPart<'a> {
         extract_word_text(self.xml_bytes())
     }
 
+    /// Extract all paragraph text, with `separator` between paragraphs.
+    ///
+    /// The text is [`Self::extract_text`]'s, with `separator` before every
+    /// paragraph after the first; for well-formed XML it is the paragraph
+    /// texts joined by `separator`. Malformed XML fails as
+    /// [`Self::extract_text`] fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::extract_text`].
+    pub fn extract_text_with_paragraph_separator(&self, separator: &str) -> Result<String> {
+        crate::paragraph::extract_word_paragraph_text(self.xml_bytes(), separator)
+    }
+
     /// Read recognized tracked revisions throughout the visible main document.
     /// Includes body-final section properties and table-grid/row metadata that
     /// paragraph-only traversal cannot visit. Unknown markup remains in source.

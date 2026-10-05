@@ -241,7 +241,14 @@ impl Docx {
         matches!(self.0.owner, DocxOwner::Source(_))
     }
 
-    /// The visible text of the main document.
+    /// The visible text of the main document: the text of each paragraph,
+    /// table-cell paragraphs included, in document order, separated by
+    /// `\n`. An empty paragraph is an empty line, so the paragraph breaks of
+    /// the document stay visible, as in the other word-processing formats.
+    /// The paragraphs are the ones
+    /// [`DocumentView::paragraphs`](crate::DocumentView::paragraphs)
+    /// returns, and each one's text is that paragraph's own text (which a
+    /// line break inside the paragraph can split across lines).
     ///
     /// # Errors
     ///
@@ -251,18 +258,27 @@ impl Docx {
     ///
     /// ```no_run
     /// # fn demo(docx: &litchi_ops::format::docx::Docx) -> litchi_ops::Result<()> {
-    /// let text = docx.text()?;
-    /// println!("{text}");
+    /// for line in docx.text()?.lines() {
+    ///     println!("{line}");
+    /// }
     /// # Ok(())
     /// # }
     /// ```
     pub fn text(&self) -> Result<String> {
+        // One validating pass over the main story, which writes the
+        // separator before every paragraph after the first; the leaf's
+        // `extract_text` joins the runs with no separator at all (oracle drift
+        // B3 in `docs/unified-ops/s8a-python-oracle.md`).
         match &self.0.owner {
-            DocxOwner::Eager(package) => Ok(package.document()?.text()?),
+            DocxOwner::Eager(package) => Ok(package
+                .document()?
+                .text_with_paragraph_separator(PARAGRAPH_SEPARATOR)?),
             DocxOwner::Source(package) => {
                 let result = package
                     .document()
-                    .and_then(|document| document.extract_text())
+                    .and_then(|document| {
+                        document.extract_text_with_paragraph_separator(PARAGRAPH_SEPARATOR)
+                    })
                     .map_err(Error::from);
                 self.0.owner.finish(result)
             },
@@ -523,6 +539,9 @@ impl fmt::Debug for Docx {
             .finish_non_exhaustive()
     }
 }
+
+/// The paragraph separator of [`Docx::text`].
+const PARAGRAPH_SEPARATOR: &str = "\n";
 
 #[cfg(test)]
 mod tests;

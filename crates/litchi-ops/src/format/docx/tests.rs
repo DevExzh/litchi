@@ -129,15 +129,25 @@ struct Oracle {
     tolerance: litchi_docx::ToleranceReport,
 }
 
-/// The eager facade output: `docx::Package` text, props, and the report
-/// of the open-time text pass.
+/// What `Docx::text` reads: each paragraph's text, separated by `\n`.
+fn paragraph_lines(paragraphs: &[litchi_docx::Paragraph]) -> String {
+    paragraphs
+        .iter()
+        .map(|paragraph| paragraph.text().unwrap())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The eager facade output: `docx::Package` paragraphs, props, and the
+/// report of the open-time text pass.
 fn eager_oracle(bytes: &[u8]) -> Oracle {
     let package = litchi_docx::Package::from_opc_package(
         OpcPackage::from_bytes_with_limits(bytes, ReadLimits::default()).unwrap(),
     )
     .unwrap();
     let document = package.document().unwrap();
-    let text = document.text().unwrap();
+    document.text().unwrap();
+    let text = paragraph_lines(&document.paragraphs().unwrap());
     let metadata = package
         .props()
         .cloned()
@@ -154,7 +164,7 @@ fn eager_oracle(bytes: &[u8]) -> Oracle {
 fn source_oracle(bytes: &[u8]) -> Oracle {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.to_vec()));
     let package = litchi_docx::source_backed::Package::from_read_at(source).unwrap();
-    let text = package.document().unwrap().extract_text().unwrap();
+    let text = paragraph_lines(&package.document().unwrap().paragraphs().unwrap());
     let metadata = package.metadata().unwrap();
     Oracle {
         text,
@@ -190,6 +200,24 @@ fn handle_is_one_pointer_and_clones_share_state() {
     assert!(Arc::ptr_eq(&docx.0, &clone.0));
     assert_eq!(docx.text().unwrap(), clone.text().unwrap());
     assert!(format!("{docx:?}").contains("source_backed: true"));
+}
+
+/// Oracle drift B3: the text keeps one line per paragraph, empty paragraphs
+/// and table-cell paragraphs included, on both owners.
+#[test]
+fn text_separates_paragraphs_with_newlines() {
+    const XML: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>first</w:t></w:r></w:p><w:p/><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>last</w:t></w:r></w:p></w:body></w:document>"#;
+    let source = open_bytes(minimal_docx(XML), &OpenOptions::new()).unwrap();
+    let eager = open_eager(minimal_docx(XML), &OpenOptions::new()).unwrap();
+    for docx in [source, eager] {
+        assert_eq!(docx.text().unwrap(), "first\n\ncell\nlast");
+    }
+    let fixture = std::fs::read(fixture("ooxml/docx/Hyperlink.docx")).unwrap();
+    let docx = open_bytes(fixture, &OpenOptions::new()).unwrap();
+    assert_eq!(
+        docx.text().unwrap(),
+        "Following is a hyperlink.\nEricWhite.com"
+    );
 }
 
 #[cfg(any(unix, windows))]

@@ -3413,6 +3413,29 @@ impl Document {
         result
     }
 
+    /// Extract all visible paragraph text from the pinned document, with
+    /// `separator` between paragraphs.
+    ///
+    /// The text is [`Self::extract_text`]'s, with `separator` before every
+    /// paragraph after the first. The paragraphs are the ones
+    /// [`Self::paragraphs`] returns: a paragraph nested in another one, such
+    /// as a text box's, stays part of the paragraph that anchors it, and an
+    /// empty paragraph adds an empty segment. For well-formed XML the result
+    /// is the paragraph texts joined by `separator`; malformed XML fails as
+    /// [`Self::extract_text`] fails, where [`Self::paragraphs`] may return
+    /// the paragraphs it found.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::extract_text`].
+    pub fn extract_text_with_paragraph_separator(&self, separator: &str) -> Result<String> {
+        self.check_execution()?;
+        let _parser = self.admit_query_parser(self.xml.as_bytes().len())?;
+        let result = crate::paragraph::extract_word_paragraph_text(self.xml.as_bytes(), separator);
+        self.check_execution()?;
+        result
+    }
+
     /// Read recognized tracked revisions throughout the visible main document.
     /// Includes body-final section properties and table-grid/row metadata that
     /// paragraph-only traversal cannot visit. Unknown markup remains in source.

@@ -1,9 +1,11 @@
 //! Common types and utilities
 
-use pyo3::exceptions::{PyException, PyIOError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
+use std::borrow::Cow;
 use std::path::PathBuf;
+
+use crate::errors::Failure;
 
 /// Registers common types with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -15,26 +17,11 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Converts the error of the facade's format-family types
-/// (`litchi::common::Error`) to a Python exception
-pub fn to_py_err(err: litchi::common::Error) -> PyErr {
-    match err {
-        litchi::common::Error::Io(e) => PyIOError::new_err(e.to_string()),
-        litchi::common::Error::InvalidFormat(msg) => PyValueError::new_err(msg),
-        litchi::common::Error::Unsupported(msg) => PyValueError::new_err(msg),
-        _ => PyException::new_err(err.to_string()),
-    }
-}
-
-/// Converts a boxed error to a Python exception
-pub fn boxed_err_to_py_err(err: Box<dyn std::error::Error + Send + Sync>) -> PyErr {
-    PyException::new_err(err.to_string())
-}
-
 /// File format enumeration
 ///
-/// Represents the different Office file formats supported by Litchi.
-#[pyclass(skip_from_py_object)]
+/// Represents the different Office file formats supported by Litchi: one
+/// value per format detection can report.
+#[pyclass(skip_from_py_object, module = "litchi_py")]
 #[derive(Clone, Copy, Debug)]
 pub enum FileFormat {
     /// Microsoft Word 97-2003 (.doc)
@@ -77,11 +64,19 @@ pub enum FileFormat {
     Numbers,
     /// Rich Text Format (.rtf)
     Rtf,
+    /// OpenDocument Database Front End (.odb). Last, so the integer values
+    /// of the formats before it stay as they were.
+    Odb,
 }
 
-impl From<litchi::FileFormat> for FileFormat {
-    fn from(fmt: litchi::FileFormat) -> Self {
-        match fmt {
+impl FileFormat {
+    /// The Python value of a detected format.
+    ///
+    /// Every format of this Litchi build has a Python value; a format a
+    /// newer Litchi adds before these bindings learn it is reported as an
+    /// internal error instead of being given another format's name.
+    pub(crate) fn from_core(fmt: litchi::FileFormat) -> Result<Self, Failure> {
+        Ok(match fmt {
             litchi::FileFormat::Doc => FileFormat::Doc,
             litchi::FileFormat::Docx => FileFormat::Docx,
             litchi::FileFormat::Ppt => FileFormat::Ppt,
@@ -98,17 +93,13 @@ impl From<litchi::FileFormat> for FileFormat {
             litchi::FileFormat::Odi => FileFormat::Odi,
             litchi::FileFormat::Odm => FileFormat::Odm,
             litchi::FileFormat::Oth => FileFormat::Oth,
+            litchi::FileFormat::Odb => FileFormat::Odb,
             litchi::FileFormat::Pages => FileFormat::Pages,
             litchi::FileFormat::Keynote => FileFormat::Keynote,
             litchi::FileFormat::Numbers => FileFormat::Numbers,
             litchi::FileFormat::Rtf => FileFormat::Rtf,
-            // `litchi::FileFormat` is `#[non_exhaustive]`; map any future
-            // variants we don't yet expose in Python bindings to the closest
-            // match. Until a binding is added, fall back to `Doc` rather than
-            // panicking — callers can disambiguate via the format-specific
-            // detection APIs.
-            _ => FileFormat::Doc,
-        }
+            other => return Err(Failure::unknown_format(other)),
+        })
     }
 }
 
@@ -133,6 +124,7 @@ impl FileFormat {
             FileFormat::Odi => "Odi",
             FileFormat::Odm => "Odm",
             FileFormat::Oth => "Oth",
+            FileFormat::Odb => "Odb",
             FileFormat::Pages => "Pages",
             FileFormat::Keynote => "Keynote",
             FileFormat::Numbers => "Numbers",
@@ -148,7 +140,7 @@ impl FileFormat {
 /// RGB color representation
 ///
 /// Represents a color in RGB format with values from 0-255.
-#[pyclass(skip_from_py_object)]
+#[pyclass(frozen, skip_from_py_object, module = "litchi_py")]
 #[derive(Clone, Debug)]
 pub struct RGBColor {
     inner: litchi::RGBColor,
@@ -199,7 +191,7 @@ impl RGBColor {
 /// Length with units
 ///
 /// Represents a measurement with associated units (EMUs, points, inches, etc.).
-#[pyclass(skip_from_py_object)]
+#[pyclass(frozen, skip_from_py_object, module = "litchi_py")]
 #[derive(Clone, Debug)]
 pub struct Length {
     inner: litchi::Length,
@@ -266,20 +258,25 @@ impl Length {
 
 /// Detect file format from file path
 ///
+/// Detection reads the file's content; the file name is not consulted.
+/// The GIL is released while the file is read.
+///
 /// Args:
 ///     path: Path to the file
 ///
 /// Returns:
 ///     The detected FileFormat, or None if format cannot be determined
 #[pyfunction]
-fn detect_file_format(path: PathBuf) -> PyResult<Option<FileFormat>> {
-    match litchi::detect_file_format(&path) {
-        Some(fmt) => Ok(Some(FileFormat::from(fmt))),
-        None => Ok(None),
-    }
+fn detect_file_format(py: Python<'_>, path: PathBuf) -> PyResult<Option<FileFormat>> {
+    py.detach(|| litchi::detect_file_format(&path))
+        .map(FileFormat::from_core)
+        .transpose()
+        .map_err(PyErr::from)
 }
 
 /// Detect file format from bytes
+///
+/// The GIL is released while the bytes are inspected.
 ///
 /// Args:
 ///     data: File content as bytes
@@ -287,6 +284,43 @@ fn detect_file_format(path: PathBuf) -> PyResult<Option<FileFormat>> {
 /// Returns:
 ///     The detected FileFormat, or None if format cannot be determined
 #[pyfunction]
-fn detect_file_format_from_bytes(data: &[u8]) -> Option<FileFormat> {
-    litchi::detect_file_format_from_bytes(data).map(FileFormat::from)
+fn detect_file_format_from_bytes(py: Python<'_>, data: &[u8]) -> PyResult<Option<FileFormat>> {
+    py.detach(|| litchi::detect_file_format_from_bytes(data))
+        .map(FileFormat::from_core)
+        .transpose()
+        .map_err(PyErr::from)
+}
+
+/// A `repr()` preview of `text`: the text itself when it has at most
+/// `limit` characters, otherwise its first `limit` characters and `...`.
+///
+/// The cut is counted in characters, as Python slices a `str`, so it never
+/// falls inside a multi-byte character.
+pub(crate) fn preview(text: &str, limit: usize) -> Cow<'_, str> {
+    match text.char_indices().nth(limit) {
+        Some((end, _)) => Cow::Owned(format!("{}...", &text[..end])),
+        None => Cow::Borrowed(text),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preview;
+
+    #[test]
+    fn preview_cuts_at_a_character_boundary() {
+        assert_eq!(preview("short", 30), "short");
+        assert_eq!(preview(&"a".repeat(30), 30), "a".repeat(30));
+        assert_eq!(
+            preview(&"a".repeat(31), 30),
+            format!("{}...", "a".repeat(30))
+        );
+        // Two-byte letters: a byte cut at 30 would split the 16th letter.
+        let russian = "Привет мир, это длинный абзац текста";
+        assert_eq!(
+            preview(russian, 30),
+            format!("{}...", russian.chars().take(30).collect::<String>())
+        );
+        assert_eq!(preview("😀😀😀", 2), "😀😀...");
+    }
 }

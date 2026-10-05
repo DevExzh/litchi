@@ -998,10 +998,27 @@ mod docx {
                 run.text().unwrap();
                 run.bold().unwrap();
                 run.italic().unwrap();
+                run.underline().unwrap();
                 run.strikethrough().unwrap();
                 run.vertical_position().unwrap();
             }
         }
+    }
+
+    /// A direct `w:u` is reported, `w:val="none"` as an explicit `false`,
+    /// and a run without one inherits (`None`).
+    #[test]
+    fn docx_runs_report_direct_underline() {
+        const XML: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>a</w:t></w:r><w:r><w:rPr><w:u w:val="none"/></w:rPr><w:t>b</w:t></w:r><w:r><w:t>c</w:t></w:r></w:p></w:body></w:document>"#;
+        let file = crate::open_bytes(minimal_docx(XML)).unwrap();
+        let paragraphs = file.document().unwrap().paragraphs().unwrap();
+        let underline: Vec<_> = paragraphs[0]
+            .runs()
+            .unwrap()
+            .iter()
+            .map(|run| run.underline().unwrap())
+            .collect();
+        assert_eq!(underline, [Some(true), Some(false), None]);
     }
 }
 
@@ -1332,6 +1349,7 @@ mod rtf {
                 run.text().unwrap();
                 run.bold().unwrap();
                 run.italic().unwrap();
+                run.underline().unwrap();
                 run.strikethrough().unwrap();
             }
         }
@@ -1352,6 +1370,23 @@ mod rtf {
         if let Ok(file) = crate::open(test_data("rtf/hyperlink.rtf")) {
             file.text().unwrap();
         }
+    }
+
+    /// The `\ul` group of `tdf108947.rtf` is an underlined run; RTF states
+    /// the property on every run, as it states bold and italic.
+    #[test]
+    fn rtf_runs_report_underline() {
+        let file = open("libreoffice-core/sw/qa/extras/rtfimport/data/tdf108947.rtf");
+        let paragraphs = file.document().unwrap().paragraphs().unwrap();
+        let runs = paragraphs[0].runs().unwrap();
+        assert_eq!(runs[0].text().unwrap(), "Sublet Agreement");
+        assert_eq!(runs[0].underline().unwrap(), Some(true));
+        let file = open("rtf/testStyles.rtf");
+        let paragraphs = file.document().unwrap().paragraphs().unwrap();
+        assert_eq!(
+            paragraphs[0].runs().unwrap()[0].underline().unwrap(),
+            Some(false)
+        );
     }
 
     /// A row of two cells joined by `\clmgf` (range owner) and `\clmrg`

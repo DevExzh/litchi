@@ -1,7 +1,8 @@
 """FileFormat values, detection functions, RGBColor and Length.
 
-Contract tier: S8a must keep these green. Drift in the FileFormat vocabulary
-(Odb mapped to Doc, the 14-of-21 stub) is pinned in test_known_drift.py.
+Contract tier: keep these green. S8a fixed the FileFormat vocabulary drift
+(Odb mapped to Doc, the 14-of-21 stub); test_known_drift.py keeps the fixed
+pairs' intended halves (D1, D2, D3).
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _support import L, RUNTIME_FORMAT_NAMES_TODAY, fixture, read_fixture
+from _support import L, RUNTIME_FORMAT_NAMES, fixture, read_fixture
 
 FF = L.FileFormat
 
@@ -30,11 +31,15 @@ DETECTION_CASES = (
     ("ooxml/xlsb/sample.xlsb", "Xlsb"),
     ("odf/corpus/calc-two-sheets.ods", "Ods"),
     ("iwork/numbers/basic.numbers", "Numbers"),
+    # Legacy PowerPoint and Excel, accepted since S8a enabled them (B1).
+    ("ole/ppt/SampleShow.ppt", "Ppt"),
+    ("ole/xls/Simple.xls", "Xls"),
     # Detected, but no Python opener reads them (test_errors.py).
     ("libreoffice-core/desktop/qa/data/BlankDrawDocument.odg", "Odg"),
     ("odf/odc-producer-evidence/odfdom-created.odc", "Odc"),
     ("odf/native-resave/source/font-styles.odf", "Odf"),
     ("libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm", "Odm"),
+    ("libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb", "Odb"),
     # Flat (single-XML) ODF is classified as its packaged sibling.
     ("odf/odt/form-controls.fodt", "Odt"),
     ("odf/ods/grid-padding.fods", "Ods"),
@@ -45,12 +50,12 @@ DETECTION_CASES = (
 
 class FileFormatTests(unittest.TestCase):
     def test_runtime_variant_names(self):
-        # 20 of the 21 core variants; Odb is the missing one (drift D1).
+        # All 21 core variants (S8a added Odb; drift D1).
         names = {name for name in dir(FF) if not name.startswith("_")}
-        self.assertEqual(names, set(RUNTIME_FORMAT_NAMES_TODAY))
+        self.assertEqual(names, set(RUNTIME_FORMAT_NAMES))
 
     def test_str_and_repr(self):
-        for name in RUNTIME_FORMAT_NAMES_TODAY:
+        for name in RUNTIME_FORMAT_NAMES:
             value = getattr(FF, name)
             self.assertIsInstance(value, FF)
             self.assertEqual(str(value), name)
@@ -59,16 +64,16 @@ class FileFormatTests(unittest.TestCase):
     def test_equality_and_hashing(self):
         self.assertEqual(FF.Docx, FF.Docx)
         self.assertNotEqual(FF.Docx, FF.Doc)
-        values = [getattr(FF, name) for name in RUNTIME_FORMAT_NAMES_TODAY]
-        self.assertEqual(len(set(values)), len(RUNTIME_FORMAT_NAMES_TODAY))
+        values = [getattr(FF, name) for name in RUNTIME_FORMAT_NAMES]
+        self.assertEqual(len(set(values)), len(RUNTIME_FORMAT_NAMES))
         detected = L.detect_file_format(fixture("ooxml/docx/Hyperlink.docx"))
         self.assertEqual(detected, FF.Docx)
         self.assertEqual({FF.Docx: "word"}[detected], "word")
         self.assertIn(detected, {FF.Docx, FF.Xlsx})
 
     def test_values_convert_to_distinct_ints(self):
-        ints = {int(getattr(FF, name)) for name in RUNTIME_FORMAT_NAMES_TODAY}
-        self.assertEqual(len(ints), len(RUNTIME_FORMAT_NAMES_TODAY))
+        ints = {int(getattr(FF, name)) for name in RUNTIME_FORMAT_NAMES}
+        self.assertEqual(len(ints), len(RUNTIME_FORMAT_NAMES))
 
 
 class DetectionTests(unittest.TestCase):

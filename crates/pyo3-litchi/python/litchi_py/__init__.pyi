@@ -2,31 +2,102 @@
 Litchi - High-performance Office file format parser
 
 Type stubs for the litchi_py Python extension module.
+
+Errors are raised as ``LitchiError`` subclasses, which carry the error's
+``code``, ``message`` and ``suggestion``. Every family class also derives from
+the built-in exception that fits it (``OSError``, ``ValueError`` or
+``LookupError``). Handles are immutable and can be used from any thread; opening
+and the document-wide reads release the GIL while they run.
 """
 
 from pathlib import Path
-from typing import Optional, List
-from enum import Enum
+from typing import ClassVar, Optional, List
 
-class FileFormat(Enum):
-    """File format enumeration
-    
-    Represents the different Office file formats supported by Litchi.
+# Exceptions
+
+class LitchiError(Exception):
+    """Base class of the errors litchi_py raises for a file it cannot open or read.
+
+    ``str()`` gives the message, followed by the suggestion when there is one.
+    Each family subclass also derives from the built-in exception that fits it,
+    so ``except OSError`` and ``except ValueError`` keep working.
     """
-    Doc: int  # Microsoft Word 97-2003 (.doc)
-    Docx: int  # Microsoft Word 2007+ (.docx)
-    Ppt: int  # Microsoft PowerPoint 97-2003 (.ppt)
-    Pptx: int  # Microsoft PowerPoint 2007+ (.pptx)
-    Xls: int  # Microsoft Excel 97-2003 (.xls)
-    Xlsx: int  # Microsoft Excel 2007+ (.xlsx)
-    Xlsb: int  # Microsoft Excel Binary 2007+ (.xlsb)
-    Odt: int  # OpenDocument Text (.odt)
-    Ods: int  # OpenDocument Spreadsheet (.ods)
-    Odp: int  # OpenDocument Presentation (.odp)
-    Pages: int  # Apple Pages (.pages)
-    Keynote: int  # Apple Keynote (.key)
-    Numbers: int  # Apple Numbers (.numbers)
-    Rtf: int  # Rich Text Format (.rtf)
+
+    def __init__(
+        self, message: str, code: Optional[str] = None, suggestion: Optional[str] = None
+    ) -> None:
+        """Create an error. ``code`` defaults to the class's own code."""
+        ...
+
+    @property
+    def code(self) -> str:
+        """The stable error code, for example "unsupported_format"."""
+        ...
+
+    @property
+    def message(self) -> str:
+        """The human-readable message."""
+        ...
+
+    @property
+    def suggestion(self) -> Optional[str]:
+        """How to recover, or None when there is no known way."""
+        ...
+
+class PathError(LitchiError, LookupError):
+    """A path or selector is malformed or resolves to nothing (codes such as
+    "path_not_found", "invalid_path" and "out_of_range")."""
+
+class PropertyError(LitchiError, ValueError):
+    """A property, argument or payload value is invalid, missing or not
+    supported (codes such as "invalid_value" and "unsupported_property")."""
+
+class UnsupportedError(LitchiError, ValueError):
+    """The input's format, or the requested operation, is not supported (codes
+    "unsupported_format", "unsupported_capability", "unsupported_element",
+    "unsupported_type" and "unsupported_command")."""
+
+class IoError(LitchiError, OSError):
+    """Reading or writing the file failed, or the file changed after it was
+    opened (codes "file_not_found", "file_locked", "file_exists",
+    "file_required" and "io_error")."""
+
+class CorruptFileError(LitchiError, ValueError):
+    """The file is malformed (codes "corrupt_file" and "invalid_input")."""
+
+class ProtectedError(LitchiError, ValueError):
+    """The document is encrypted, signed or edit-protected (code
+    "document_protected")."""
+
+# Formats and values
+
+class FileFormat:
+    """File format enumeration
+
+    One value per format detection can report. The values are the class
+    attributes below; ``str()`` gives the name and ``int()`` a distinct number.
+    """
+    Doc: ClassVar[FileFormat]  # Microsoft Word 97-2003 (.doc)
+    Docx: ClassVar[FileFormat]  # Microsoft Word 2007+ (.docx)
+    Ppt: ClassVar[FileFormat]  # Microsoft PowerPoint 97-2003 (.ppt)
+    Pptx: ClassVar[FileFormat]  # Microsoft PowerPoint 2007+ (.pptx)
+    Xls: ClassVar[FileFormat]  # Microsoft Excel 97-2003 (.xls)
+    Xlsx: ClassVar[FileFormat]  # Microsoft Excel 2007+ (.xlsx)
+    Xlsb: ClassVar[FileFormat]  # Microsoft Excel Binary 2007+ (.xlsb)
+    Odt: ClassVar[FileFormat]  # OpenDocument Text (.odt)
+    Ods: ClassVar[FileFormat]  # OpenDocument Spreadsheet (.ods)
+    Odp: ClassVar[FileFormat]  # OpenDocument Presentation (.odp)
+    Odg: ClassVar[FileFormat]  # OpenDocument Drawing (.odg, .otg)
+    Odc: ClassVar[FileFormat]  # OpenDocument Chart (.odc, .otc)
+    Odf: ClassVar[FileFormat]  # OpenDocument Formula (.odf, .otf)
+    Odi: ClassVar[FileFormat]  # OpenDocument Image (.odi, .oti)
+    Odm: ClassVar[FileFormat]  # OpenDocument Master Document (.odm)
+    Oth: ClassVar[FileFormat]  # OpenDocument Web Document (.oth)
+    Odb: ClassVar[FileFormat]  # OpenDocument Database Front End (.odb)
+    Pages: ClassVar[FileFormat]  # Apple Pages (.pages)
+    Keynote: ClassVar[FileFormat]  # Apple Keynote (.key)
+    Numbers: ClassVar[FileFormat]  # Apple Numbers (.numbers)
+    Rtf: ClassVar[FileFormat]  # Rich Text Format (.rtf)
 
 class RGBColor:
     """RGB color representation
@@ -106,10 +177,13 @@ class Length:
 
 def detect_file_format(path: Path | str) -> Optional[FileFormat]:
     """Detect file format from file path
-    
+
+    Detection reads the file's content; the file name is not consulted. The
+    GIL is released while the file is read.
+
     Args:
         path: Path to the file
-    
+
     Returns:
         The detected FileFormat, or None if format cannot be determined
     """
@@ -117,10 +191,12 @@ def detect_file_format(path: Path | str) -> Optional[FileFormat]:
 
 def detect_file_format_from_bytes(data: bytes) -> Optional[FileFormat]:
     """Detect file format from bytes
-    
+
+    The GIL is released while the bytes are inspected.
+
     Args:
         data: File content as bytes
-    
+
     Returns:
         The detected FileFormat, or None if format cannot be determined
     """
@@ -156,7 +232,11 @@ class Run:
     
     def underline(self) -> Optional[bool]:
         """Check if the run is underlined
-        
+
+        .docx reports the run's own underline (False for an explicit "none");
+        .doc reports True for any underline and None otherwise; .rtf always
+        answers True or False. .odt and .pages runs report None.
+
         Returns:
             True if underlined, False if not underlined, None if unspecified
         """
@@ -174,9 +254,10 @@ class Paragraph:
     
     def runs(self) -> List[Run]:
         """Get all runs in the paragraph
-        
-        A run is a contiguous section of text with the same formatting.
-        
+
+        A run is a contiguous section of text with the same formatting. A
+        Pages paragraph is one run without formatting.
+
         Returns:
             List of Run objects
         """
@@ -218,10 +299,14 @@ class Table:
 
 class Document:
     """Unified Word document interface
-    
-    Provides format-agnostic interface for both .doc and .docx files.
-    The format is automatically detected when opening a file.
-    
+
+    Provides a format-agnostic interface for word-processing documents:
+    .doc, .docx, .rtf, .odt and .pages. The format is detected from the
+    file's content when it is opened.
+
+    A Document is immutable and can be shared between threads. Opening and
+    the document-wide reads release the GIL while they run.
+
     Example:
         >>> from litchi_py import Document
         >>> doc = Document.open("document.docx")
@@ -233,26 +318,37 @@ class Document:
     @staticmethod
     def open(path: Path | str) -> Document:
         """Open a Word document from a file path
-        
-        The file format (.doc or .docx) is automatically detected.
-        
+
+        The format (.doc, .docx, .rtf, .odt or .pages) is detected from the
+        file's content, not from its name.
+
         Args:
             path: Path to the document file
-        
+
         Returns:
             Document instance
-        
+
         Raises:
-            IOError: If the file cannot be read
-            ValueError: If the file format is invalid or unsupported
+            IoError: (an OSError) If the file cannot be read
+            UnsupportedError: (a ValueError) If the file is not a
+                word-processing document, is not a recognized format, or
+                uses a variant that cannot be read (flat OpenDocument, Word 6)
+            CorruptFileError: (a ValueError) If the file is malformed
+            ProtectedError: (a ValueError) If the document is encrypted
         """
         ...
-    
+
     def text(self) -> str:
         """Extract all text from the document
-        
+
+        .docx, .rtf, .odt and .pages separate paragraphs with a line break;
+        .doc keeps Word's paragraph marks (carriage returns).
+
         Returns:
             All text content as a single string
+
+        Raises:
+            IoError: (an OSError) If the file changed after it was opened
         """
         ...
     
@@ -266,7 +362,9 @@ class Document:
     
     def tables(self) -> List[Table]:
         """Get all tables in the document
-        
+
+        Pages tables are not exposed; the list is empty for .pages files.
+
         Returns:
             List of Table objects
         """
@@ -286,10 +384,14 @@ class Slide:
 
 class Presentation:
     """Unified PowerPoint presentation interface
-    
-    Provides format-agnostic interface for both .ppt and .pptx files.
-    The format is automatically detected when opening a file.
-    
+
+    Provides a format-agnostic interface for presentations: .ppt, .pptx,
+    .odp and .key. The format is detected from the file's content when it is
+    opened.
+
+    A Presentation is immutable and can be shared between threads. Opening
+    and the presentation-wide reads release the GIL while they run.
+
     Example:
         >>> from litchi_py import Presentation
         >>> pres = Presentation.open("presentation.pptx")
@@ -301,26 +403,34 @@ class Presentation:
     @staticmethod
     def open(path: Path | str) -> Presentation:
         """Open a PowerPoint presentation from a file path
-        
-        The file format (.ppt or .pptx) is automatically detected.
-        
+
+        The format (.ppt, .pptx, .odp or .key) is detected from the file's
+        content, not from its name.
+
         Args:
             path: Path to the presentation file
-        
+
         Returns:
             Presentation instance
-        
+
         Raises:
-            IOError: If the file cannot be read
-            ValueError: If the file format is invalid or unsupported
+            IoError: (an OSError) If the file cannot be read
+            UnsupportedError: (a ValueError) If the file is not a
+                presentation, is not a recognized format, or uses a variant
+                that cannot be read (flat OpenDocument)
+            CorruptFileError: (a ValueError) If the file is malformed
+            ProtectedError: (a ValueError) If the presentation is encrypted
         """
         ...
-    
+
     def text(self) -> str:
         """Extract all text from the presentation
-        
+
         Returns:
             All text content from all slides as a single string
+
+        Raises:
+            IoError: (an OSError) If the file changed after it was opened
         """
         ...
     
@@ -340,19 +450,23 @@ class Presentation:
 
 class Worksheet:
     """A worksheet in a workbook
-    
-    Note: This is a placeholder for future worksheet-level API.
-    Currently, use Workbook.worksheet_names() and Workbook.text() for data access.
+
+    Note: This is a placeholder for future worksheet-level API. No method
+    returns one yet; use Workbook.worksheet_names() and Workbook.text() for
+    data access.
     """
     pass
 
 class Workbook:
     """Excel workbook interface
-    
-    Provides support for Excel workbooks in various formats 
+
+    Provides support for workbooks in various formats
     (.xls, .xlsx, .xlsb, .ods, .numbers).
-    The format is automatically detected when opening a file.
-    
+    The format is detected from the file's content when it is opened.
+
+    A Workbook is immutable and can be shared between threads. Opening and
+    the reads release the GIL while they run.
+
     Example:
         >>> from litchi_py import Workbook
         >>> wb = Workbook.open("workbook.xlsx")
@@ -366,18 +480,23 @@ class Workbook:
     @staticmethod
     def open(path: Path | str) -> Workbook:
         """Open an Excel workbook from a file path
-        
-        The file format (.xls, .xlsx, .xlsb, .ods, .numbers) is automatically detected.
-        
+
+        The format (.xls, .xlsx, .xlsb, .ods, .numbers) is detected from the
+        file's content, not from its name.
+
         Args:
             path: Path to the workbook file
-        
+
         Returns:
             Workbook instance
-        
+
         Raises:
-            IOError: If the file cannot be read
-            ValueError: If the file format is invalid or unsupported
+            IoError: (an OSError) If the file cannot be read
+            UnsupportedError: (a ValueError) If the file is not a workbook,
+                is not a recognized format, or uses a variant that cannot be
+                read (flat OpenDocument)
+            CorruptFileError: (a ValueError) If the file is malformed
+            ProtectedError: (a ValueError) If the workbook is encrypted
         """
         ...
     
@@ -395,13 +514,23 @@ class Workbook:
     
     def text(self) -> str:
         """Extract all text from all worksheets
-        
+
         Returns:
             All text content as a single string
+
+        Raises:
+            IoError: (an OSError) If the file changed after it was opened
         """
         ...
 
 __all__ = [
+    "LitchiError",
+    "PathError",
+    "PropertyError",
+    "UnsupportedError",
+    "IoError",
+    "CorruptFileError",
+    "ProtectedError",
     "FileFormat",
     "RGBColor",
     "Length",

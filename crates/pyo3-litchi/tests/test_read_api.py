@@ -6,11 +6,11 @@ green: the Python read API stays source-compatible (design §7) while the
 bindings move onto ``litchi::File``. ``ReprSnapshotTests`` is the one snapshot
 class: its strings may change, but only deliberately and on the record.
 
-Formats the bindings accept today:
+Formats the bindings accept:
   Document     docx, doc, rtf, odt, pages
-  Presentation pptx, odp, key
-  Workbook     xlsx, xlsb, ods, numbers
-``.ppt`` and ``.xls`` are not accepted (bug B1, see test_known_drift.py).
+  Presentation pptx, ppt, odp, key
+  Workbook     xlsx, xlsb, xls, ods, numbers
+``.ppt`` and ``.xls`` are accepted since S8a (bug B1, see test_known_drift.py).
 Opening from bytes is not offered by the bindings; only detection takes bytes
 (test_formats_and_values.py).
 """
@@ -24,6 +24,7 @@ import unittest
 from pathlib import Path
 
 from _support import (
+    TEST_DATA,
     L,
     copy_fixture,
     fixture,
@@ -72,10 +73,22 @@ class DocxReadTests(unittest.TestCase):
             )
 
     def test_text_holds_every_paragraph_in_order(self):
-        # The separator between paragraphs is pinned by bug B3 (test_known_drift).
+        # The separator between paragraphs is pinned by bug B3 (test_known_drift)
+        # and test_text_is_one_line_per_paragraph.
         for relative in (self.HYPERLINK, self.TABLES):
             document = L.Document.open(fixture(relative))
             assert_in_order(self, document.text(), paragraph_texts(document))
+
+    def test_text_is_one_line_per_paragraph(self):
+        # S8a (bug B3): File::text() joins the paragraph texts with "\n", empty
+        # and table-cell paragraphs included.
+        self.assertEqual(
+            L.Document.open(fixture(self.HYPERLINK)).text(),
+            "Following is a hyperlink.\nEricWhite.com",
+        )
+        for relative in (self.HYPERLINK, self.TABLES):
+            document = L.Document.open(fixture(relative))
+            self.assertEqual(document.text().split("\n"), paragraph_texts(document))
 
     def test_paragraphs_and_runs(self):
         paragraphs = L.Document.open(fixture(self.HYPERLINK)).paragraphs()
@@ -343,6 +356,28 @@ class PptxReadTests(unittest.TestCase):
         self.assertEqual(presentation.text(), "\n\n".join(t for t in texts if t))
 
 
+class PptReadTests(unittest.TestCase):
+    """Legacy PowerPoint, accepted since S8a enabled the ``ppt`` feature (B1)."""
+
+    SHAPES = "ole/ppt/text_shapes.ppt"
+    SAMPLE = "ole/ppt/SampleShow.ppt"
+
+    def test_slides_and_text(self):
+        presentation = L.Presentation.open(fixture(self.SHAPES))
+        self.assertEqual(presentation.slide_count(), 1)
+        self.assertEqual(slide_texts(presentation), ["Text in a TextBox\nRectangle\nEllipse\nOctagon"])
+        self.assertEqual(presentation.text(), "Text in a TextBox\nRectangle\nEllipse\nOctagon")
+
+    def test_text_joins_slides_with_a_blank_line(self):
+        presentation = L.Presentation.open(fixture(self.SAMPLE))
+        texts = slide_texts(presentation)
+        self.assertEqual(presentation.slide_count(), 2)
+        self.assertEqual(len(texts), 2)
+        self.assertTrue(texts[0].startswith("FirstSlide\nTitle of the first slide\n"), texts[0])
+        self.assertTrue(texts[1].startswith("This is the second slide\n"), texts[1])
+        self.assertEqual(presentation.text(), "\n\n".join(texts))
+
+
 class OdpReadTests(unittest.TestCase):
     LINKS = "odf/odp/tdf169979.odp"
     LAYOUTS = "odf/corpus/impress-master-layouts.odp"
@@ -471,6 +506,24 @@ class XlsbReadTests(unittest.TestCase):
         )
 
 
+class XlsReadTests(unittest.TestCase):
+    """Legacy Excel, accepted since S8a enabled the ``xls`` feature (B1)."""
+
+    SIMPLE = "ole/xls/Simple.xls"
+    MULTI = "ole/xls/SimpleMultiCell.xls"
+
+    def test_worksheet_names_and_count(self):
+        workbook = L.Workbook.open(fixture(self.SIMPLE))
+        self.assertEqual(workbook.worksheet_count(), 3)
+        self.assertEqual(workbook.worksheet_names(), ["Sheet1", "Sheet2", "Sheet3"])
+        self.assertEqual(text_lines(workbook)[0], "replaceMe")
+
+    def test_text_rows_are_tab_separated_cell_values(self):
+        lines = text_lines(L.Workbook.open(fixture(self.MULTI)))
+        for row in ("1\t\t\t\t", "2\t3\t\t\t", "7\t8\t9\t10\t", "11\t12\t13\t14\t15"):
+            self.assertIn(row, lines)
+
+
 class OdsReadTests(unittest.TestCase):
     TWO_SHEETS = "odf/corpus/calc-two-sheets.ods"
     CHINESE = "odf/corpus/calc-unicode-chinese.ods"
@@ -537,6 +590,39 @@ class NumbersReadTests(unittest.TestCase):
                 "Empty", "Blank value",
             ],
         )
+
+
+class IworkPackageDirectoryTests(unittest.TestCase):
+    """Apple's package-directory form of the three iWork formats.
+
+    Since S8a, ``litchi::open`` names the iWork format of a package directory
+    and the semantic readers accept one, so the openers read it like the
+    packaged file. Before S8a every opener refused a directory as an I/O
+    error. Path detection still reports None for a directory
+    (test_formats_and_values).
+    """
+
+    ROOT = TEST_DATA / "iwork" / "directory"
+
+    def test_package_directories_open(self):
+        for path in (
+            self.ROOT / "pages" / "basic.pages",
+            self.ROOT / "keynote" / "basic.key",
+            self.ROOT / "numbers" / "basic.numbers",
+        ):
+            self.assertTrue(path.is_dir(), f"fixture directory missing: {path}")
+        document = L.Document.open(self.ROOT / "pages" / "basic.pages")
+        self.assertEqual(document.text(), PagesReadTests.BASIC_TEXT)
+        presentation = L.Presentation.open(self.ROOT / "keynote" / "basic.key")
+        self.assertEqual(slide_texts(presentation), [KeynoteReadTests.TEXT])
+        workbook = L.Workbook.open(self.ROOT / "numbers" / "basic.numbers")
+        self.assertEqual(workbook.worksheet_names(), ["Sheet 1"])
+        self.assertEqual(workbook.text(), "Sheet 1\nTable 1\nLitchi native Numbers fixture\n42")
+
+    def test_wrong_opener_names_the_directory_format(self):
+        with self.assertRaises(L.UnsupportedError) as caught:
+            L.Workbook.open(self.ROOT / "pages" / "basic.pages")
+        self.assertIn("pages", str(caught.exception).lower())
 
 
 # ---------------------------------------------------------------------------
@@ -683,10 +769,10 @@ class HandleSemanticsTests(unittest.TestCase):
 
 
 class ReprSnapshotTests(unittest.TestCase):
-    """``repr``/``str`` of handles today (snapshot tier: may change only deliberately).
+    """``repr``/``str`` of handles (snapshot tier: may change only deliberately).
 
-    Only ASCII texts are used here: a preview cut inside a multibyte character
-    panics (bug B2), which aborts the interpreter in release builds.
+    Previews are cut by character (bug B2 fixed in S8a); multibyte text is
+    covered by test_multibyte_previews_are_cut_by_character.
     """
 
     def test_handle_reprs(self):
@@ -712,13 +798,25 @@ class ReprSnapshotTests(unittest.TestCase):
         )
 
     def test_previews_truncate_long_text(self):
-        # Paragraph and Slide previews keep 50 bytes, Run and TableCell 30.
+        # Paragraph and Slide previews keep 50 characters, Run and TableCell 30.
         paragraph = L.Document.open(fixture(DocReadTests.NO_HEAD_FOOT)).paragraphs()[0]
         text = paragraph.text()
         self.assertEqual(repr(paragraph), f"<Paragraph: '{text[:50]}...'>")
         self.assertEqual(repr(paragraph.runs()[0]), f"<Run: '{text[:30]}...'>")
         slide = L.Presentation.open(fixture(PptxReadTests.SAMPLE)).slides()[0]
         self.assertEqual(repr(slide), f"<Slide: '{slide.text()[:50]}...'>")
+
+    def test_multibyte_previews_are_cut_by_character(self):
+        # drawing.docx holds Russian text, where a cut at byte 50 or 30 used to
+        # fall inside a letter and panic (bug B2).
+        document = L.Document.open(fixture("ooxml/docx/drawing.docx"))
+        paragraph = document.paragraphs()[3]
+        run = document.paragraphs()[7].runs()[2]
+        cell = document.tables()[1].rows()[2].cells()[0]
+        for handle, owner, limit in ((paragraph, "Paragraph", 50), (run, "Run", 30), (cell, "TableCell", 30)):
+            text = handle.text()
+            preview = text if len(text) <= limit else text[:limit] + "..."
+            self.assertEqual(repr(handle), f"<{owner}: '{preview}'>")
 
 
 if __name__ == "__main__":
