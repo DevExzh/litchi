@@ -320,3 +320,22 @@
   - F1c: semantic no-ops through a different serializer are still refused.
   - An unrelated bug: adding a second timeline cache fails once a timeline view exists.
 - Verified on the merged `uo/m0a`: lib clippy on xlsx, docx, xlsb and ops; the new signature-policy targets (xlsx 16, docx 7, xlsb 10); the ops signature audit (26).
+
+## 0014a — pptx implicit `unsign()` (0013 F1) and the shared litchi-ooxml-common owners (F1b) (`88729fa29f`, `02123283f1`, merged here)
+- litchi-pptx, 63 sites:
+  - 2 kept: they follow the caller's explicit `PlaceholderSignaturePolicy::Invalidate`;
+  - 53 silent strips (one test-only) now refuse with `Error::Opc(SignedSourceRequiresExplicitPolicy)` until `Package::unsign()`;
+  - 8 that also stripped on a no-op now write nothing when the result is unchanged (comment, author and modern-comment commits, theme `put_*`).
+- Also in pptx:
+  - Shape classification, design elements and Designer properties now detect a no-op before taking a mutable borrow.
+  - `Package::edit_opc` refuses a changing closure on a signed package.
+  - Opened-transaction staging verbs refuse at staging instead of at commit.
+  - `store_placeholder_shape` refuses instead of always stripping.
+  - The unsigned output of 94 operations is byte-identical before and after.
+- F1b, litchi-ooxml-common: the 13 silent strips (custom/core properties, Custom XML, VBA, Ribbon) now refuse. Each caller keeps its own signed error: pptx and docx map it to `Error::Opc`, xlsx to `Error::Signed`. A docx managed save with edited core or custom properties rolls back and keeps the edit pending.
+- Tests: 10 new in pptx (a 27-family table on both signed fixtures) plus 1 unit test; 3 in ooxml-common; 2 in docx; 3 in xlsx. 19 tests that asserted the old stripping were rewritten.
+- Follow-ups:
+  - F1-late: some pptx stores (`store_presentation_comments`, `store_modern_comment`, `media_parts::store`, `slide_sync::store`) only fail at save instead of refusing up front. Nothing is stripped.
+  - F1-semantic: no-ops through a different serializer are refused rather than treated as no-ops.
+  - Unrelated: shape classification and design elements read one shape on its own, so they fail on producer slides that declare `p:` on the root.
+- Verified on the merged `uo/m0a`: lib clippy on pptx, ooxml-common, docx, xlsx and ops; pptx `package_signature_policy` (10); ooxml-common (454); litchi-ops (452).
