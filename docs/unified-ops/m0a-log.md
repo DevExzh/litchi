@@ -238,3 +238,13 @@
   - facade targets: parity, open, tolerance, unexpected-format, read-limits and encryption;
   - leaf suites: xlsb 1,039, pptx 1,314, ppt 1,349;
   - the boundary checker (267), the non-iWork gate and the gate unit tests.
+
+## S8d — examples and docs on `litchi::open` (`7e6746e2a3`)
+- 16 examples ported to `litchi::open`/`File`: the `sheet_eval_*` examples use `FormulaEvaluator::new(&file.workbook()?)`, statically dispatched. `text_formats_api_demo`, missed by plan §5.2, moved to the concrete `TextWorkbook`. The CLI examples print the error's cause chain.
+- Rewritten: the README Quick Start (with a "not done yet" list), the guide's Unified API section, the crate rustdoc, and the `ToMarkdown` doctests.
+- All 16 doc snippets were compiled and run. Example output before and after is identical except `NOW()`, iWork rows (now plain text) and the unified error text.
+- Stale README snippets fixed: the XLSX writer, the formula snippet, and the iWork-directory note.
+- Findings, for the M0a close-out (S9):
+  - XLSX coordinate and range errors (`cell("A0")`) classify as `corrupt_file` through the wildcard arm. They are caller errors and should be `invalid_argument` or `out_of_range`.
+  - `Docx::section_inventory` refuses Word-authored files (MCE bindings, F-15 in record 0010); L-DOCX-R5 is asked to cover it.
+- Verified on the merged `uo/m0a`: facade examples clippy, 52 doctests, and the example-targets gate.
