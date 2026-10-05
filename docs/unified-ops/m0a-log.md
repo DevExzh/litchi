@@ -267,3 +267,16 @@
   - The full list is in §5 of the record.
 - **Merge note for `uo/m1`:** L-PPT-R1 (already on `uo/m1`) changes PPT slide text, so the Markdown golden's PPT rows will differ there. Re-bless them on `uo/m1` after this merges, and record the reason (the F-10 fix).
 - Verified on the merged `uo/m0a`: facade clippy with all features, plus `markdown_corpus_golden`, `markdown_file_parity` (12), `unified_open_facade`, `unexpected_format`, `read_limits_facade`, `xlsb_facade` (23), `eval_xlsx_integration`, `unified_sheet_selectors`, `tolerance_report_facade` and `pages_facade`.
+
+## S8b — perf-baseline unified and leaf routes (`d5469842fd`)
+- 118 opt-in selectors: `<prefix>_unified_<rest>` (through `litchi::open*`, `File`, views and handles) and `<prefix>_leaf_<rest>` (the same leaf calls without detection), for every plan §5.3 scenario. Old routes stay until S9.
+- Unpaired:
+  - ODS selected cell and media: `File` has no ODS cell or media read in M0a.
+  - The untimed docx binary.
+  - ODF polyglot and catalog-alias detection have no leaf leg.
+  - Two DOCX read-one successors time a wider scope; S10 compares them only against their leaf twins.
+- Registry 534 → 652, and the CRUD index and its test are bound to 652, which fixes F-11. Also fixed: the harness's stale `Cargo.lock` (broken since S4) and a clippy failure that predates this work.
+- Route map and smoke summary are in `docs/unified-ops/results/0003/s8b/`.
+- Gates: fmt, clippy `-D warnings`, `cargo test` (643 passed, 1 ignored), the Python policy suites (28 + 50) and the CI Python list (517 tests). One release build ran all 118 routes once, with no measurement kept.
+- Observation: unified errors print only the code summary; the specific cause is reachable only through `Error::leaf()`. So legs refusing the same file record differently worded messages (`duplicate-style-names.doc`).
+- The coordinator merged this into `uo/m0a` without a separate harness re-run: the harness is a standalone workspace, and S8b's own gates ran on this base.
