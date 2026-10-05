@@ -58,24 +58,15 @@ const SECTION_XML: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformat
 
 // ---- routes -------------------------------------------------------------
 
-/// The facade's `Document::open` route: the per-family path detector.
+/// The path route: [`crate::open_with`], which `litchi::open` wraps.
 #[cfg(any(unix, windows))]
 fn open_path(path: &std::path::Path, options: &OpenOptions) -> Docx {
-    use crate::detect::detected::{
-        DocumentSourcePathDetection, DocxSourcePathDetection,
-        detect_document_source_path_with_limits,
-    };
-    let detection = detect_document_source_path_with_limits(path, ReadLimits::default())
-        .unwrap_or_else(|_| panic!("detect {}", path.display()));
-    match detection {
-        DocumentSourcePathDetection::Docx(DocxSourcePathDetection::Docx(package)) => {
-            Docx::from_source(package, options).expect("adopt source-backed DOCX")
-        },
-        _ => panic!("{} is not detected as DOCX", path.display()),
+    match crate::open_with(path, options) {
+        Ok(crate::File::Docx(docx)) => docx,
+        other => panic!("{} is not opened as DOCX: {other:?}", path.display()),
     }
 }
 
-/// The facade's `Document::from_bytes` route.
 /// The main-document edit an unsigned handle's editor builder returns.
 #[track_caller]
 fn retained_edit(docx: &Docx) -> litchi_docx::document::Edit {
@@ -85,13 +76,12 @@ fn retained_edit(docx: &Docx) -> litchi_docx::document::Edit {
     }
 }
 
+/// The byte route: [`crate::open_bytes_with`], which `litchi::open_bytes`
+/// wraps.
 fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Docx, Error> {
-    use crate::detect::detected::{DocxSourceBytesDetection, detect_docx_source_bytes};
-    match detect_docx_source_bytes(bytes, ReadLimits::default()) {
-        DocxSourceBytesDetection::Docx(package) => Docx::from_source(package, options),
-        DocxSourceBytesDetection::DocxError(error) => Err(error.into()),
-        DocxSourceBytesDetection::OpcError(error) => Err(error.into()),
-        _ => panic!("bytes are not detected as DOCX"),
+    match crate::open_bytes_with(bytes, options)? {
+        crate::File::Docx(docx) => Ok(docx),
+        other => panic!("bytes are not opened as DOCX: {other:?}"),
     }
 }
 

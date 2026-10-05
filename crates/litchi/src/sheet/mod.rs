@@ -37,9 +37,9 @@
 //! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
-//! The `Workbook` type and the boxed `open_*_workbook` functions of this
-//! module predate `litchi::File` and are removed in a later step of the
-//! migration to it; the text workbooks stay.
+//! The text workbooks are concrete types: open one with
+//! [`TextWorkbook`](crate::sheet::text::TextWorkbook) or read rows with the
+//! `formats::read_*` functions of [`text`](crate::sheet::text).
 
 /// Canonical worksheet-view semantics shared by XLSX and XLSB.
 pub mod view {
@@ -49,69 +49,14 @@ pub mod view {
 
 pub use litchi_core::sheet::{traits, types};
 
-// Unified workbook facade implementations require a concrete workbook format.
+/// Formula evaluation over any [`WorkbookTrait`].
 #[cfg(feature = "eval")]
 pub mod eval {
     pub use litchi_eval::*;
 }
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-mod adapters;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub mod functions;
-#[cfg(feature = "xlsx")]
-mod selection;
 pub mod text;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub(crate) mod workbook;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-mod workbook_types;
 
-// Re-exports
-#[cfg(feature = "xlsx")]
-pub use crate::xlsx::{Address, Area, At, Rect};
 #[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub use functions::*;
-#[cfg(feature = "xlsx")]
-pub use selection::{SelectedCell, SelectedCellView, SelectedWorksheet, WorksheetSelector};
 pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
 pub use types::{CellValue, Result};
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub use workbook::Workbook;

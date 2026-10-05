@@ -72,7 +72,7 @@
 //! ```
 //!
 //! With the `markdown` feature a document or presentation converts to
-//! Markdown through [`markdown::ToMarkdown`]:
+//! Markdown through `litchi::markdown::ToMarkdown`:
 //!
 //! ```
 //! # #[cfg(all(feature = "docx", feature = "markdown"))]
@@ -181,12 +181,6 @@
 //! `save` and `create`) and path queries arrive in later releases; until
 //! then, the format modules below write documents.
 //!
-//! # Older entry points
-//!
-//! `Document`, `Presentation` and `sheet::Workbook` predate [`File`] and are
-//! removed in a later step of the migration to it. They report
-//! [`common::Error`], the error of the format crates' shared vocabulary.
-//!
 //! # Low-level modules
 //!
 //! Each format crate is re-exported under its own module for format-specific
@@ -289,19 +283,6 @@ mod metadata_ext;
 #[cfg(feature = "yaml")]
 pub use metadata_ext::MetadataYaml;
 
-/// The word-processing `Document` type that predates [`File`].
-///
-/// Use [`open`] and `File::document` instead. This module is removed in a
-/// later step of the migration to [`File`].
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "rtf",
-    feature = "odt",
-    feature = "pages"
-))]
-pub mod document;
-
 /// Format-neutral repair reports
 ///
 /// See [`ToleranceReport`] and [`File::tolerance_report`].
@@ -331,18 +312,6 @@ pub mod tolerance;
 /// **Note**: This requires the `images` feature to be enabled.
 #[cfg(feature = "images")]
 pub mod images;
-
-/// The `Presentation` type that predates [`File`].
-///
-/// Use [`open`] and `File::presentation` instead. This module is removed in a
-/// later step of the migration to [`File`].
-#[cfg(any(
-    feature = "ppt",
-    feature = "pptx",
-    feature = "odp",
-    feature = "keynote"
-))]
-pub mod presentation;
 
 /// Spreadsheet vocabulary: the generic sheet traits, text workbooks and
 /// formula evaluation.
@@ -448,14 +417,6 @@ pub mod ooxml_common {
         Error, Keywords, Props, Result, XmlError, custom, custom_xml, embedded, external_link,
         leniency, mce, properties, relationships, ribbon, spreadsheet_xml_maps, web, xml, xml_name,
     };
-}
-
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
-    // The unified facade has no concrete OOXML error variant, but these
-    // failures are format/graph validation failures rather than generic
-    // application errors. Preserve that distinction for callers.
-    litchi_core::Error::InvalidFormat(error.to_string())
 }
 
 /// Runtime-neutral Microsoft Office cryptography.
@@ -842,36 +803,9 @@ pub use litchi_ops::{open_prepared, open_prepared_with};
 ))]
 pub use unified::{open, open_bytes, open_bytes_with, open_with};
 
-// The format-family types that predate `File`. They report
-// `common::Error`, and are removed in M0a step S9.
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "rtf",
-    feature = "odt",
-    feature = "pages"
-))]
-pub use document::{Document, DocumentElement};
-
-#[cfg(any(
-    feature = "ppt",
-    feature = "pptx",
-    feature = "odp",
-    feature = "keynote"
-))]
-pub use presentation::Presentation;
-
+// One entry of `format::pptx::Pptx::slide_catalog`, also named at the root.
 #[cfg(feature = "pptx")]
-pub use presentation::SlideDescriptor;
-
-#[cfg(any(
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "ods",
-    feature = "numbers"
-))]
-pub use sheet::Workbook;
+pub use litchi_ops::format::pptx::SlideDescriptor;
 
 #[cfg(any(
     feature = "doc",

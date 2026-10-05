@@ -803,3 +803,396 @@ mod tail {
         assert_eq!(file.format(), Some(FileFormat::Rtf));
     }
 }
+
+/// ZIP inputs at the edges of OOXML and OpenDocument detection, through the
+/// openers. M0a step S9 moved these cases here from the tests of the
+/// per-family probes (`detect_docx_source_bytes`,
+/// `detect_workbook_source_bytes`, `detect_presentation_source_bytes`,
+/// `detect_prepared_ods`, `detect_prepared_odp` and
+/// `detect_workbook_source_path`) that the format-family types used, which
+/// S9 deleted with those types.
+#[cfg(any(
+    feature = "docx",
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "odp"
+))]
+mod zip_candidates {
+    use std::io::Write as _;
+
+    /// A ZIP of stored members.
+    #[allow(
+        dead_code,
+        reason = "used by the cases of whichever formats are enabled"
+    )]
+    fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, data) in entries {
+            writer.start_file(*name, options).unwrap();
+            writer.write_all(data).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    /// An ODF package of `mimetype` whose `content.xml` is `content`, plus
+    /// the `extra` members.
+    #[cfg(any(feature = "ods", feature = "odp"))]
+    fn odf(mimetype: &str, content: &[u8], extra: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(mimetype).unwrap();
+        writer
+            .add_file(litchi_odf_common::constants::ODF_CONTENT, content)
+            .unwrap();
+        for (name, data) in extra {
+            writer.add_file(name, data).unwrap();
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
+    #[cfg(feature = "ods")]
+    const ODS_CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
+
+    /// An OOXML/ODF polyglot whose OPC catalog the cheap probe cannot vouch
+    /// for: a harmless `./custom.xml` alias makes it answer "uncertain",
+    /// while the full OPC reader normalizes the alias and sees a valid DOCX.
+    #[cfg(all(
+        any(feature = "ods", feature = "odp"),
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    fn uncertain_ooxml_odf_polyglot(mimetype: &str) -> Vec<u8> {
+        zip(&[
+            ("mimetype", mimetype.as_bytes()),
+            (
+                "content.xml",
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body/></office:document-content>"#,
+            ),
+            (
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+            ),
+            (
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            ),
+            (
+                "word/document.xml",
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+            ),
+            ("./custom.xml", b"alias"),
+        ])
+    }
+
+    /// The polyglot keeps OOXML precedence: it opens as the DOCX its catalog
+    /// names (refused as a disabled format without `docx`) after one OPC
+    /// probe, never as the ODF package its `mimetype` names.
+    #[cfg(all(
+        any(feature = "ods", feature = "odp"),
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[track_caller]
+    fn assert_ooxml_precedence(mimetype: &str) {
+        use crate::detect::{opc_probe_count, reset_opc_probe_count};
+
+        let bytes = uncertain_ooxml_odf_polyglot(mimetype);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes),
+            None
+        );
+        reset_opc_probe_count();
+        let opened = crate::open_bytes(bytes);
+        assert_eq!(opc_probe_count(), 1);
+        #[cfg(feature = "docx")]
+        assert!(matches!(opened, Ok(crate::File::Docx(_))), "{opened:?}");
+        #[cfg(not(feature = "docx"))]
+        {
+            let error = opened.expect_err("DOCX is not enabled");
+            assert_eq!(error.code(), crate::Code::UnsupportedFormat);
+            assert_eq!(error.detected(), Some(litchi_core::FileFormat::Docx));
+        }
+    }
+
+    /// An ordinary ODS opens from the package detection prepared.
+    #[cfg(feature = "ods")]
+    #[test]
+    fn an_ordinary_ods_opens_as_ods() {
+        let bytes = odf(
+            litchi_odf_common::constants::ODF_SPREADSHEET,
+            ODS_CONTENT,
+            &[],
+        );
+        assert!(matches!(
+            crate::detect::detect_format_smart(bytes.clone()),
+            Some(crate::detect::DetectedFormat::Ods(_))
+        ));
+        let file = crate::open_bytes(bytes).unwrap();
+        assert!(matches!(file, crate::File::Ods(_)), "{file:?}");
+        assert_eq!(
+            file.workbook().unwrap().worksheet_names().unwrap(),
+            ["Sheet1"]
+        );
+    }
+
+    /// An ODS whose `[Content_Types].xml` is not an OPC catalog is still an
+    /// ODS: the declined OPC probe falls back to the ODF owner, by path and
+    /// from bytes. An ordinary ODS needs no OPC probe at all.
+    #[cfg(all(
+        feature = "ods",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[test]
+    fn ods_opens_with_ordinary_and_malformed_ooxml_catalogs() {
+        use crate::detect::{
+            DetectedFormat, detect_format_smart, detect_format_smart_with_limits, opc_probe_count,
+            reset_opc_probe_count,
+        };
+
+        let ordinary = odf(
+            litchi_odf_common::constants::ODF_SPREADSHEET,
+            ODS_CONTENT,
+            &[],
+        );
+        reset_opc_probe_count();
+        assert!(matches!(
+            detect_format_smart(ordinary.clone()),
+            Some(DetectedFormat::Ods(_))
+        ));
+        assert_eq!(opc_probe_count(), 0);
+        let limits = crate::opc::ReadLimits::builder()
+            .max_archive_members(1)
+            .expect("test member limit")
+            .max_parts(1)
+            .expect("test part limit")
+            .max_relationship_parts(1)
+            .expect("test relationship limit")
+            .build()
+            .expect("consistent test limits");
+        reset_opc_probe_count();
+        assert!(matches!(
+            detect_format_smart_with_limits(ordinary.clone(), limits),
+            Some(DetectedFormat::Ods(_))
+        ));
+        assert_eq!(opc_probe_count(), 0);
+        reset_opc_probe_count();
+        assert!(matches!(
+            crate::open_bytes(ordinary).unwrap(),
+            crate::File::Ods(_)
+        ));
+        assert_eq!(opc_probe_count(), 0);
+
+        let malformed = odf(
+            litchi_odf_common::constants::ODF_SPREADSHEET,
+            ODS_CONTENT,
+            &[("[Content_Types].xml", b"<not-an-opc-types-root/>")],
+        );
+        reset_opc_probe_count();
+        assert!(matches!(
+            detect_format_smart(malformed.clone()),
+            Some(DetectedFormat::Ods(_))
+        ));
+        assert_eq!(opc_probe_count(), 1);
+        reset_opc_probe_count();
+        assert!(matches!(
+            crate::open_bytes(malformed.clone()).unwrap(),
+            crate::File::Ods(_)
+        ));
+        assert_eq!(opc_probe_count(), 1);
+        #[cfg(any(unix, windows))]
+        {
+            let temporary = super::super::temporary_with(&malformed, "");
+            assert!(matches!(
+                crate::open(temporary.path()).unwrap(),
+                crate::File::Ods(_)
+            ));
+        }
+    }
+
+    #[cfg(all(
+        feature = "ods",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[test]
+    fn ods_keeps_ooxml_precedence_for_an_uncertain_alias_catalog() {
+        assert_ooxml_precedence(litchi_odf_common::constants::ODF_SPREADSHEET);
+    }
+
+    /// An ordinary ODP opens from the package detection prepared.
+    #[cfg(feature = "odp")]
+    #[test]
+    fn an_ordinary_odp_opens_as_odp() {
+        let bytes = odf(
+            litchi_odf_common::constants::ODF_PRESENTATION,
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#,
+            &[],
+        );
+        assert!(matches!(
+            crate::detect::detect_format_smart(bytes.clone()),
+            Some(crate::detect::DetectedFormat::Odp(_))
+        ));
+        let file = crate::open_bytes(bytes).unwrap();
+        assert!(matches!(file, crate::File::Odp(_)), "{file:?}");
+        assert_eq!(file.presentation().unwrap().slide_count().unwrap(), 0);
+    }
+
+    #[cfg(all(
+        feature = "odp",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[test]
+    fn odp_keeps_ooxml_precedence_for_an_uncertain_alias_catalog() {
+        assert_ooxml_precedence(litchi_odf_common::constants::ODF_PRESENTATION);
+    }
+
+    /// A valid OPC package whose main part is a presentation is classified
+    /// as PPTX for good: it is opened, or refused, as PPTX, and never handed
+    /// to the lower-precedence candidates.
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn a_valid_non_docx_opc_package_is_classified_terminally() {
+        let bytes = super::super::minimal_ooxml(
+            "ppt/presentation.xml",
+            super::super::content_type::PPTX,
+            br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+            None,
+        );
+        match crate::open_bytes(bytes) {
+            Ok(file) => assert_eq!(
+                file.format(),
+                Some(litchi_core::FileFormat::Pptx),
+                "{file:?}"
+            ),
+            Err(error) => assert_eq!(
+                error.format().or(error.detected()),
+                Some(litchi_core::FileFormat::Pptx),
+                "{error:?}"
+            ),
+        }
+    }
+
+    /// A DOCX catalog whose package lacks the officeDocument relationship
+    /// is still a DOCX: the DOCX owner's refusal is reported, not a
+    /// lower-precedence fallback.
+    #[cfg(feature = "docx")]
+    #[test]
+    fn a_docx_catalog_without_its_relationship_reports_the_docx_error() {
+        let bytes = zip(&[
+            (
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+            ),
+            (
+                "word/document.xml",
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            ),
+        ]);
+        let error = crate::open_bytes(bytes).expect_err("no officeDocument relationship");
+        assert_eq!(
+            error.format(),
+            Some(litchi_core::FileFormat::Docx),
+            "{error:?}"
+        );
+        assert_eq!(error.code(), crate::Code::CorruptFile, "{error:?}");
+    }
+
+    /// Bytes that are not a ZIP, a ZIP without an OPC catalog and a valid OPC
+    /// package with no Office main part are not Office files.
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn zip_inputs_without_an_office_main_part_are_unsupported() {
+        let inputs = [
+            b"not an XLSX package".to_vec(),
+            zip(&[("plain.txt", b"not an OPC package")]),
+            zip(&[
+                (
+                    "[Content_Types].xml",
+                    br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="txt" ContentType="text/plain"/></Types>"#,
+                ),
+                ("plain.txt", b"not a workbook"),
+            ]),
+        ];
+        for bytes in inputs {
+            let error = crate::open_bytes(bytes).expect_err("not an Office file");
+            assert_eq!(error.code(), crate::Code::UnsupportedFormat, "{error:?}");
+            assert_eq!(error.detected(), None, "{error:?}");
+        }
+    }
+
+    /// The OOXML read limits refuse a ZIP candidate with the exact resource,
+    /// count and bound.
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn ooxml_limits_refuse_a_zip_candidate_with_the_exact_bound() {
+        use crate::error::Source;
+        use crate::opc::{OpcError, ReadLimits, ReadResource};
+
+        let input = ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("test input limit")
+            .build()
+            .expect("consistent test limits");
+        let error = crate::open_bytes_with(
+            b"PK\x03\x04".to_vec(),
+            &crate::OpenOptions::new().ooxml_limits(input),
+        )
+        .expect_err("the input exceeds the limit");
+        assert_eq!(error.code(), crate::Code::LimitExceeded, "{error:?}");
+        assert!(
+            matches!(
+                error.leaf(),
+                Source::Opc(OpcError::ReadLimit {
+                    resource: ReadResource::InputBytes,
+                    actual: 4,
+                    maximum: 1,
+                })
+            ),
+            "{error:?}"
+        );
+
+        let parts = ReadLimits::builder()
+            .max_parts(1)
+            .expect("test part limit")
+            .build()
+            .expect("consistent test limits");
+        let bytes = zip(&[
+            (
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="txt" ContentType="text/plain"/></Types>"#,
+            ),
+            ("one.txt", b"one"),
+            ("two.txt", b"two"),
+        ]);
+        let error = crate::open_bytes_with(bytes, &crate::OpenOptions::new().ooxml_limits(parts))
+            .expect_err("the package exceeds the part limit");
+        assert_eq!(error.code(), crate::Code::LimitExceeded, "{error:?}");
+        assert!(
+            matches!(
+                error.leaf(),
+                Source::Opc(OpcError::ReadLimit {
+                    resource: ReadResource::Parts,
+                    actual: 2,
+                    maximum: 1,
+                })
+            ),
+            "{error:?}"
+        );
+    }
+
+    /// A truncated ZIP candidate is a corrupt file, with the OPC reader's ZIP
+    /// error as the leaf; it is not handed to a lower-precedence candidate.
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn a_malformed_zip_candidate_is_refused() {
+        let error = crate::open_bytes(b"PK\x03\x04malformed".to_vec()).expect_err("malformed");
+        assert_eq!(error.code(), crate::Code::CorruptFile, "{error:?}");
+        assert!(
+            matches!(
+                error.leaf(),
+                crate::error::Source::Opc(crate::opc::OpcError::ZipError(_))
+            ),
+            "{error:?}"
+        );
+    }
+}

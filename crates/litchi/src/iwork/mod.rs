@@ -1,10 +1,10 @@
 //! Bounded, format-neutral Apple iWork reading.
 //!
-//! [`Document`] detects Pages, Keynote, or Numbers once, consumes the same
-//! immutable package state into its concrete format owner, and eagerly
-//! validates an archive-free semantic snapshot. Public values never expose
-//! native object numbers, protobuf messages, package internals, or concrete
-//! format types.
+//! [`Document`](crate::iwork::Document) detects Pages, Keynote, or Numbers
+//! once, consumes the same immutable package state into its concrete format
+//! owner, and eagerly validates an archive-free semantic snapshot. Public
+//! values never expose native object numbers, protobuf messages, package
+//! internals, or concrete format types.
 //!
 //! ```no_run
 //! use litchi::iwork::{Document, TextRole};

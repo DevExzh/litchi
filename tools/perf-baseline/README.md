@@ -597,6 +597,8 @@ an adapter-parity oracle rather than an independent parser implementation. The
 default `plain` variant is ASCII-only and remains runnable on a pre-ingress
 control build:
 
+> M0a step S9 removed `rtf_file_open` and `rtf_file_open_lifecycle`; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 ```sh
 cargo run --manifest-path tools/perf-baseline/Cargo.toml --release -- \
   --case rtf_file_open,rtf_file_open_lifecycle \
@@ -694,9 +696,10 @@ refused by this reader, and holding the refusal identical across legs is the
 point. `second-cell` exists to size a repeated query on one worksheet, which is
 the scenario a retained sheet index would serve.
 
-`eager-file` and `facade-file` reject all three: neither control implements a
-source-backed whole-sheet walk or a source-backed text projection, and their
-`limitation` field says so.
+`eager-file` rejects all three: the control implements no source-backed
+whole-sheet walk or source-backed text projection, and its `limitation` field
+says so. (The `facade-file` mode, which rejected them too, timed the facade
+workbook M0a step S9 deleted, and was removed with it.)
 
 ## Change 0259 relationship-heavy OPC structural open
 
@@ -1018,6 +1021,8 @@ text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
 selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
+> M0a step S9 removed the `xlsx_file_*` and `xlsx_bytes_*` selectors above; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 One additional opt-in native DOC semantic selector
 (`doc_semantic_paragraph_count`) times `Document::paragraph_count()` over the
 same deterministic writer corpora as `doc_semantic_list_paragraphs`. An
@@ -1034,6 +1039,8 @@ text after the clock stops. The formula-string digest is length-delimited and
 computed before timing. These selectors bring the
 selectable matrix to 349 names while leaving the default 36 cases / 198 records
 unchanged.
+> M0a step S9 removed the `pptx_file_*`, `odp_file_*`, `ods_file_*_open` and `docx_file_*` selectors this paragraph introduces; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -1995,6 +2002,8 @@ invented for immutable slice ownership. OPC materialization counts are
 recorded when exposed by the public API. After every prime and
 measured child, the parent re-reads the source and checks its pinned SHA-256
 before proceeding to the next sample.
+
+> M0a step S9 removed the `pptx_file_{eager,source}_*` selectors; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
 
 Measure the matched ordinary-root PPTX filesystem controls:
 
@@ -3186,6 +3195,8 @@ move for them.
 
 ### Six facade selectors
 
+> M0a step S9 removed these six selectors; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 ```text
 doc_facade_file_open            ppt_facade_file_open
 doc_facade_file_full_text       ppt_facade_file_full_text
@@ -3335,8 +3346,10 @@ predecessor:
   roots after every operation-only snapshot, and the DOC and PPT routes open
   afresh in every sample.
 
-The predecessors stay registered until step S9 deletes the facade types they
-call. Their recorded results are frozen and are never rewritten.
+M0a step S9 deleted the 47 predecessors that timed the deleted facade types
+(see "Predecessors removed in M0a step S9" below); the 15 that time the
+detection functions or the DOCX leaf owner stay registered. Recorded results
+are frozen and are never rewritten.
 
 | Family | Selectors | Runner | Corpus |
 |---|---|---|---|
@@ -3429,6 +3442,48 @@ the same CPU pin, warm cache, corpus and group sizes, with ABBA ordering.
    whichever is larger.
 
 These selectors make no performance claim.
+
+### Predecessors removed in M0a step S9
+
+M0a step S9 deleted `litchi::Document`, `litchi::Presentation`,
+`litchi::sheet::Workbook` and their element types, and with them the 47
+predecessor selectors whose timed scope ran through them. The registry went
+from 652 to 605 names, and `parse_case` refuses each removed name. Their
+frozen records keep the names, and the S10 A legs run them in the pre-M0a
+binary. The passages earlier in this file describe them as they were:
+
+| Family | Removed selectors | Successors |
+|---|---|---|
+| DOCX file | `docx_file_{eager,source}_{open,paragraph_count,list_paragraphs,full_text,open_paragraph_count_lifecycle,open_full_text_lifecycle}` (12) | `docx_file_{unified,leaf}_*` |
+| PPTX file | `pptx_file_{eager,source}_{open,list_slides,slide_count,selected_slide,open_slide_count_lifecycle,open_selected_slide_lifecycle}` (12) | `pptx_file_{unified,leaf}_*` |
+| XLSX file | `xlsx_file_open`, `xlsx_file_open_lifecycle`, `xlsx_file_selected_cell` | `xlsx_file_{unified,leaf}_*` |
+| XLSX bytes | `xlsx_bytes_open`, `xlsx_bytes_open_lifecycle` | `xlsx_bytes_{unified,leaf}_*` |
+| DOC, PPT (change 0638) | `doc_facade_file_{open,full_text,one_paragraph}`, `ppt_facade_file_{open,full_text,one_slide_text}` | `{doc,ppt}_file_{unified,leaf}_*` |
+| RTF | `rtf_file_open`, `rtf_file_open_lifecycle` | `rtf_file_{unified,leaf}_*` |
+| ODT | `odt_file_{eager,source}_open`, `odt_file_{eager,source}_open_full_text_lifecycle` | `odt_file_{unified,leaf}_*` |
+| ODP | `odp_file_{eager,source}_{open,selected_slide}` | `odp_file_{unified,leaf}_*` |
+| ODS | `ods_file_eager_open`, `ods_file_source_open` | `ods_file_{unified,leaf}_*` |
+
+What stays:
+
+- The source replays of the DOCX and PPTX source routes. The paired
+  source-backed routes keep their predecessors' untimed leaf replay, now keyed
+  by `filesystem::SourceReplay`, whose evidence still names the predecessor.
+- `ods_file_{eager,source}_selected_{cell,media}`. They time the ODS leaf
+  owners only. Their workbook-level expectations now come from the typed
+  `litchi_ods::Spreadsheet`, which reports the values the deleted facade
+  workbook did (the unified ODS routes check `litchi::File` against the same
+  owner), so the timed scope and the recorded values are unchanged.
+- The `xlsx_source_*` named-sheet oracle checks `litchi::open_bytes` and the
+  workbook view where it checked the facade workbook.
+- The binaries: `docx_source_selected_paragraph`'s untimed facade oracle reads
+  `litchi::open` and the document view; `xlsb_crud`'s `open_identify` times the
+  leaf call the deleted `sheet::open_xlsb_workbook_from_bytes` wrapped, and its
+  `full_text` case times `litchi::open_bytes` plus `File::text`, the unified
+  successor of the deleted `sheet::Workbook::from_bytes`; and
+  `xls_source_attribution` no longer has a `facade-file` mode.
+- `tests/xlsx_filesystem.rs` runs its fresh-child and cold-verified checks on
+  the unified XLSX successors, which report the same evidence.
 
 ## Opt-in marker-bearing corpora and their controls (change 0664)
 
@@ -4077,6 +4132,8 @@ owner preparation. The candidate records either that pre-cache shape or the
 cache-enabled `[2, 4, 2, 2]` shape (ten total observations). This is
 phase/correctness evidence only; no latency claim is made.
 
+> M0a step S9 removed the four `odt_file_*` selectors below; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
+
 Four unified-root ODT filesystem selectors (`odt_file_eager_open`,
 `odt_file_source_open`, `odt_file_eager_open_full_text_lifecycle`, and
 `odt_file_source_open_full_text_lifecycle`) are also opt-in over this same
@@ -4237,6 +4294,8 @@ bytes from uncompressed payload bytes/digest. The eager records retain the
 same semantic/media digests but intentionally have no source vectors. These
 selectors provide correctness/logical-read evidence only; they make no
 latency, physical-I/O, decompression, allocation, RSS, or release ABBA claim.
+
+> M0a step S9 removed the four `odp_file_*` selectors below; see [Predecessors removed in M0a step S9](#predecessors-removed-in-m0a-step-s9).
 
 `odp_file_eager_open` and `odp_file_source_open` are matched unified-root
 controls over the existing 12-slide/eight-2 MiB `Pictures/` corpus;
@@ -4693,18 +4752,18 @@ native-Office claim is made.
 - `xlsx_source_narrow_column_range_scan`: cold-read and verify every address
   and value in `B1:B<rows>` through the source-backed public API, with the same
   second-sheet deferral proof.
-- `xlsx_file_open`: open the deterministic medium cell-CRUD XLSX corpus through
+- `xlsx_file_open` (removed in M0a step S9): open the deterministic medium cell-CRUD XLSX corpus through
   the high-level `litchi::Workbook::open(Path)` filesystem route in a fresh
   child. The timed scope is exactly that public path call; untimed typed
   `litchi_xlsx::Workbook` cell/full-text checks and an independently opened
   OPC/property metadata oracle validate the exact child workbook and final
   actual source hash (the fixed ordinary pin or the aligned cold-copy hash).
-- `xlsx_file_open_lifecycle`: use the same fixed source and independent
+- `xlsx_file_open_lifecycle` (removed in M0a step S9): use the same fixed source and independent
   oracles in a fresh child, but time the high-level path open followed by
   worksheet names, worksheet count, and full text. The report classifies
   logical reads as unavailable for this facade path and makes no physical-I/O
   or speedup claim; cold-verified remains an explicit fincore/procfs proof.
-- `xlsx_file_selected_cell`: prepare `litchi::Workbook::open(Path)` outside
+- `xlsx_file_selected_cell` (removed in M0a step S9): prepare `litchi::Workbook::open(Path)` outside
   the timer, then case-insensitively select canonical `Bench01` through the
   prepared mixed-case query `bEnCh01` and read its non-first `M29` cell through
   the unified facade. The timed scope is
@@ -4741,11 +4800,11 @@ native-Office claim is made.
   and its [results](../../docs/performance/results/change-0401/); allocator
   elapsed-time, live/peak/RSS, physical-I/O, cold, throughput, other
   cell/query/range/corpus, and general XLSX claims remain excluded.
-- `xlsx_bytes_open`: move a prepared owned XLSX allocation into
+- `xlsx_bytes_open` (removed in M0a step S9): move a prepared owned XLSX allocation into
   `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
   semantic/hash guards are outside timing, so the measured scope is exactly
   the facade bytes construction.
-- `xlsx_bytes_open_lifecycle`: use the same owned bytes path and guards, but
+- `xlsx_bytes_open_lifecycle` (removed in M0a step S9): use the same owned bytes path and guards, but
   time facade construction followed by worksheet names, worksheet count, and
   full text. These selectors are opt-in and do not claim a source-backed or
   physical-I/O result.
@@ -4766,7 +4825,8 @@ native-Office claim is made.
   caller-named real fixture supplied with `--ole2-file PATH`. See *Opt-in OLE2
   range-source selectors (change 0627)*.
 - `doc_facade_file_open` / `_full_text` / `_one_paragraph` and
-  `ppt_facade_file_open` / `_full_text` / `_one_slide_text`: the documented
+  `ppt_facade_file_open` / `_full_text` / `_one_slide_text` (removed in M0a
+  step S9): the documented
   `litchi::Document::open` and `litchi::Presentation::open` routes over a
   caller-named `--ole2-file` fixture. See *Opt-in facade and ordinary-save
   selectors (change 0638)*.

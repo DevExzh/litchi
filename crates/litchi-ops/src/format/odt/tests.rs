@@ -25,24 +25,13 @@ fn open_prepared(bytes: Vec<u8>) -> Odt {
     }
 }
 
-/// The facade's path route: the document path probe hands back a
-/// source-pinned ODT candidate.
+/// The path route: [`crate::open`] classifies the package by its MIME and
+/// builds the source-backed owner from the source-pinned candidate.
 #[cfg(any(unix, windows))]
 fn open_source(path: &Path) -> Odt {
-    #[cfg(feature = "docx")]
-    let detected = crate::detect::detected::detect_document_source_path_with_limits(
-        path,
-        crate::opc::ReadLimits::default(),
-    )
-    .expect("probe ODT path");
-    #[cfg(not(feature = "docx"))]
-    let detected =
-        crate::detect::detected::detect_document_source_path(path).expect("probe ODT path");
-    match detected {
-        crate::detect::detected::DocumentSourcePathDetection::Odt(candidate) => {
-            Odt::from_source_candidate(candidate, &OpenOptions::default()).expect("open ODT source")
-        },
-        _ => panic!("expected an ODT source candidate"),
+    match crate::open(path).expect("open ODT path") {
+        crate::File::Odt(handle) => handle,
+        other => panic!("expected ODT, got {other:?}"),
     }
 }
 

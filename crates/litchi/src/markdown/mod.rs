@@ -29,54 +29,8 @@
 //! # Ok::<(), litchi::Error>(())
 //! ```
 //!
-//! The conversion lives in `litchi-ops`, next to [`File`](crate::File). The
-//! format-family types that predate `File` (`Document`, `Presentation` and
-//! their element types) keep their own conversion here, with the same
-//! output and their [`common::Error`](crate::common::Error), until they are
-//! removed in M0a step S9.
-
-// Module declarations
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "odt",
-    feature = "rtf",
-    feature = "pages"
-))]
-mod writer;
-
-// Document and presentation markdown implementations are only available when their respective features are enabled
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "odt",
-    feature = "rtf",
-    feature = "pages"
-))]
-mod document;
-#[cfg(feature = "docx")]
-mod docx;
-#[cfg(feature = "doc")]
-pub(crate) use document::resolve_doc_lists;
-#[cfg(feature = "docx")]
-pub(crate) use document::resolve_docx_lists;
-
-#[cfg(any(
-    feature = "ppt",
-    feature = "pptx",
-    feature = "odp",
-    feature = "keynote"
-))]
-mod presentation;
-
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "odt",
-    feature = "rtf",
-    feature = "pages"
-))]
-pub(crate) use writer::ListItemInfo;
+//! The conversion lives in `litchi-ops`, next to [`File`](crate::File),
+//! because the trait and `File` are both foreign to this crate.
 
 // Re-export public API (format-agnostic helpers live in litchi-markdown)
 pub use litchi_markdown::{

@@ -15,9 +15,10 @@ const FIXTURES: [&str; 3] = [
     "odf/corpus/calc-unicode-chinese.ods",
 ];
 
-/// The facade's first byte-route arm: checked ODS preparation.
+/// The byte route's first arm: the ODF package an ordinary ODS prepares,
+/// which the byte opener adopts (`prepared_or_original`).
 fn open_prepared(bytes: Vec<u8>) -> Ods {
-    let prepared = crate::detect::detected::detect_prepared_ods(bytes)
+    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)
         .unwrap_or_else(|_| panic!("expected a prepared ODS package"));
     Ods::from_prepared(prepared, &OpenOptions::default()).expect("open prepared ODS")
 }
@@ -35,14 +36,12 @@ fn open_detected(bytes: Vec<u8>) -> Ods {
     }
 }
 
-/// The facade's path route: the workbook path probe builds the source owner.
+/// The path route: [`crate::open`] builds the source-backed owner.
 #[cfg(any(unix, windows))]
 fn open_source(path: &Path) -> Ods {
-    match crate::detect::detected::detect_workbook_source_path(path).expect("probe ODS path") {
-        crate::detect::detected::WorkbookSourcePathDetection::Ods(spreadsheet) => {
-            Ods::from_source(spreadsheet, &OpenOptions::default()).expect("open ODS source")
-        },
-        _ => panic!("expected an ODS source owner"),
+    match crate::open(path).expect("open ODS path") {
+        crate::File::Ods(handle) => handle,
+        other => panic!("expected ODS, got {other:?}"),
     }
 }
 

@@ -43,9 +43,6 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.ole2_range_source = (
             PERF_BASELINE / "src" / "ole2_range_source.rs"
         ).read_text(encoding="utf-8")
-        cls.facade_ole2 = (PERF_BASELINE / "src" / "facade_ole2.rs").read_text(
-            encoding="utf-8"
-        )
         cls.ordinary_save = (PERF_BASELINE / "src" / "ordinary_save.rs").read_text(
             encoding="utf-8"
         )
@@ -330,39 +327,34 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
             self.assertNotIn(case, default_matrix)
 
 
-    def test_facade_and_ordinary_save_modules_own_no_unsafe_or_ambient_surface(self):
-        # Change 0638's two modules. The facade module reads a caller-named
-        # path; the ordinary-save module writes into a caller-named directory
-        # through `filesystem::scratch_root`, which is where `std::env` lives
-        # in this harness. Neither may reach for an ambient one itself.
-        self.assertIn("mod facade_ole2;", self.library)
+    def test_ordinary_save_module_owns_no_unsafe_or_ambient_surface(self):
+        # Change 0638's ordinary-save module writes into a caller-named
+        # directory through `filesystem::scratch_root`, which is where
+        # `std::env` lives in this harness; it may not reach for an ambient
+        # one itself. (The change's OLE2 facade module timed the facade types
+        # M0a step S9 deleted, and went with them.)
+        self.assertNotIn("mod facade_ole2;", self.library)
+        self.assertFalse((PERF_BASELINE / "src" / "facade_ole2.rs").exists())
         self.assertIn("mod ordinary_save;", self.library)
-        for module in (self.facade_ole2, self.ordinary_save):
-            self.assertNotIn("unsafe", module)
-            self.assertNotIn("#[global_allocator]", module)
-            self.assertNotIn("std::env", module)
-            self.assertNotIn("Command", module)
+        self.assertNotIn("unsafe", self.ordinary_save)
+        self.assertNotIn("#[global_allocator]", self.ordinary_save)
+        self.assertNotIn("std::env", self.ordinary_save)
+        self.assertNotIn("Command", self.ordinary_save)
         self.assertIn(
             "crate::filesystem::scratch_root(requested_root, \"ordinary-save\")",
             self.ordinary_save,
         )
 
-    def test_facade_selectors_reuse_the_bounded_ole2_file_input(self):
-        # The facade family names no new caller-supplied input: it reads the
-        # same `--ole2-file` fixture change 0627 bounded, through the same
-        # bounded reader, and the module performs no whole-file read of its
-        # own.
-        self.assertEqual(self.facade_ole2.count("fs::read("), 0)
-        self.assertIn("ole2_range_source::{cfb_inventory, provenance_of, read_bounded}", self.facade_ole2)
-        self.assertIn("fn build_doc_corpus(path: &Path)", self.facade_ole2)
-        self.assertIn("fn build_ppt_corpus(path: &Path)", self.facade_ole2)
-        self.assertIn("struct FacadeEvidence", self.facade_ole2)
-        for field in ("real_file: RealFileProvenance", "cfb_stream_count: usize"):
-            self.assertIn(field, self.facade_ole2)
-        # `--ole2-file` now classifies DOC as well, and stays the single
-        # authority for a caller-named OLE2 fixture.
+    def test_ole2_file_input_stays_the_single_doc_and_ppt_authority(self):
+        # `--ole2-file` classifies DOC as well as XLS and PPT, and stays the
+        # single authority for a caller-named OLE2 fixture: the paired OLE2
+        # routes of M0a step S8b read it through change 0627's bounded reader.
         self.assertIn("Format::Doc => &mut inputs.doc,", self.ole2_range_source)
         self.assertIn("fn classify_inputs(paths: &[PathBuf])", self.ole2_range_source)
+        self.assertIn(
+            'const DOC_REAL_FILE_GENERATOR: &str = "litchi-doc-facade-real-file-v1";',
+            self.ole2_range_source,
+        )
 
     def test_ooxml_file_selectors_are_opt_in_bounded_and_self_identifying(self):
         # `--ooxml-file` is the third input whose bytes come from outside the
@@ -402,12 +394,6 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         end = self.library.index("];", start)
         default_matrix = self.library[start:end]
         for case in (
-            "DocFacadeFileOpen",
-            "DocFacadeFileFullText",
-            "DocFacadeFileOneParagraph",
-            "PptFacadeFileOpen",
-            "PptFacadeFileFullText",
-            "PptFacadeFileOneSlideText",
             "DocxOrdinarySaveLifecycle",
             "DocxOrdinarySaveEdit",
             "DocxOrdinarySaveAtomicPublish",
@@ -544,8 +530,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         # Plan 0003 section 5.3: every re-measured scenario gets a `unified_`
         # route through `litchi::open*` and `litchi::File`, and a `leaf_` twin
         # that makes the same leaf calls directly. Both names are the
-        # predecessor's with the leg infix inserted, and the predecessor stays
-        # registered: its frozen records are never rewritten.
+        # predecessor's with the leg infix inserted. M0a step S9 deleted the 47
+        # predecessors that timed the deleted facade types (their frozen
+        # records keep the names); the 15 others stay registered.
         from tools.validate_crud_coverage_index import _selector_registry_names
 
         names = _selector_registry_names(self.library)
@@ -554,14 +541,35 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         leaf = [name for name in names if "_leaf_" in name]
         self.assertEqual(len(unified), 62)
         self.assertEqual(len(leaf), 56)
+        guard_start = self.library.index(
+            "fn m0a_s9_deleted_the_facade_predecessor_selectors()"
+        )
+        guard_body = self.library[
+            self.library.index("let deleted = [", guard_start) : self.library.index(
+                "];", guard_start
+            )
+        ]
+        deleted = set(re.findall(r'"([a-z0-9_]+)"', guard_body))
+        self.assertEqual(len(deleted), 47)
+        self.assertFalse(deleted & registry)
+        kept = set()
         for name in unified + leaf:
             infix = "_unified_" if "_unified_" in name else "_leaf_"
             predecessor = name.replace(infix, "_", 1)
-            if predecessor not in registry:
+            if predecessor not in registry and predecessor not in deleted:
                 predecessor = predecessor.replace("_file_", "_facade_file_", 1)
-            self.assertIn(predecessor, registry, name)
             self.assertNotIn("_unified_", predecessor)
             self.assertNotIn("_leaf_", predecessor)
+            if predecessor in deleted:
+                self.assertNotIn(predecessor, registry, name)
+            else:
+                self.assertIn(predecessor, registry, name)
+                kept.add(predecessor)
+        self.assertEqual(len(kept), 15)
+        for name in kept:
+            self.assertTrue(
+                name.startswith(("detect_", "docx_semantic_", "docx_producer_")), name
+            )
         for name in leaf:
             self.assertIn(name.replace("_leaf_", "_unified_", 1), registry)
         # Only the detection inputs that two leaf owners decide by the
@@ -578,17 +586,17 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
                 for mode in ("polyglot", "catalog_alias")
             ),
         )
-        # The predecessors keep their names, among them the six facade
-        # selectors change 0638 registered.
+        # Among the deleted predecessors are the six facade selectors change
+        # 0638 registered; the detection predecessors stay.
         for name in (
             "docx_file_source_open",
             "pptx_file_eager_open",
             "xlsx_file_selected_cell",
             "doc_facade_file_open",
             "ppt_facade_file_one_slide_text",
-            "detect_odt_bytes",
         ):
-            self.assertIn(name, registry)
+            self.assertIn(name, deleted)
+        self.assertIn("detect_odt_bytes", registry)
         start = self.library.index("const DEFAULT: ")
         end = self.library.index("];", start)
         default_matrix = self.library[start:end]

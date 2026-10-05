@@ -8,8 +8,8 @@
 use std::io::{Read, Seek};
 
 use litchi_core::detection::FileFormat;
-use litchi_ops::__migration::detect::ZipTail;
 use litchi_ops::detect::DetectedFormat;
+use litchi_ops::detect::tail::ZipTail;
 
 /// Classifies the ZIP candidates no other detector claimed as Pages, Keynote
 /// or Numbers.

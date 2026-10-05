@@ -339,8 +339,8 @@ mod tests {
         }
     }
 
-    /// The facade's filesystem route, through the same path detector the
-    /// facade calls in this build.
+    /// The filesystem route: [`crate::open_with`] opens the positional
+    /// PowerPoint package.
     #[cfg(any(unix, windows))]
     fn open_path(name: &str, options: &OpenOptions) -> Result<Ppt> {
         open_file(&fixture_path(name), options)
@@ -348,28 +348,10 @@ mod tests {
 
     #[cfg(any(unix, windows))]
     fn open_file(path: &std::path::Path, options: &OpenOptions) -> Result<Ppt> {
-        let name = path.display();
-        #[cfg(feature = "pptx")]
-        let package = {
-            use crate::detect::detected::{
-                PptxSourcePathDetection, detect_pptx_source_path_with_limits,
-            };
-            match detect_pptx_source_path_with_limits(path, litchi_opc::ReadLimits::default()) {
-                Ok(Some(PptxSourcePathDetection::Ppt(package))) => package,
-                _ => panic!("{name} was not detected as a positional PPT"),
-            }
-        };
-        #[cfg(not(feature = "pptx"))]
-        let package = {
-            use crate::detect::detected::{
-                PresentationSourcePathDetection, detect_presentation_source_path,
-            };
-            match detect_presentation_source_path(path) {
-                Ok(PresentationSourcePathDetection::Ppt(package)) => package,
-                _ => panic!("{name} was not detected as a positional PPT"),
-            }
-        };
-        Ppt::from_source_package(package, options)
+        match crate::open_with(path, options)? {
+            crate::File::Ppt(ppt) => Ok(ppt),
+            other => panic!("{} was not opened as PPT: {other:?}", path.display()),
+        }
     }
 
     /// The leaf pipeline the facade wraps, as an independent oracle.

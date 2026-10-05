@@ -527,15 +527,12 @@ mod tests {
         }
     }
 
-    /// The facade's filesystem route, through the facade's path detector.
+    /// The filesystem route: [`crate::open`] opens the positional workbook.
     #[cfg(any(unix, windows))]
     fn open_path(path: &Path) -> Xls {
-        use crate::detect::detected::{WorkbookSourcePathDetection, detect_workbook_source_path};
-        match detect_workbook_source_path(path).unwrap() {
-            WorkbookSourcePathDetection::Xls { workbook, cfb } => {
-                Xls::from_source(workbook, cfb, &OpenOptions::default())
-            },
-            _ => panic!("{} was not detected as a positional XLS", path.display()),
+        match crate::open(path).unwrap() {
+            crate::File::Xls(xls) => xls,
+            other => panic!("{} was not opened as XLS: {other:?}", path.display()),
         }
     }
 
@@ -656,19 +653,18 @@ mod tests {
     #[cfg(any(unix, windows))]
     #[test]
     fn filesystem_route_matches_the_source_leaf_and_the_byte_route() {
-        use crate::detect::detected::{WorkbookSourcePathDetection, detect_workbook_source_path};
-
         let mut compared = 0_usize;
         let mut diverged = Vec::new();
         for name in corpus() {
             let path = fixture_path(&name);
-            let Ok(WorkbookSourcePathDetection::Xls { workbook, cfb }) =
-                detect_workbook_source_path(&path)
-            else {
+            // The workbooks the positional owner reads; the path route reads
+            // the others (BIFF5 and older, encrypted) eagerly or refuses them.
+            let Ok(crate::File::Xls(xls)) = crate::open(&path) else {
                 continue;
             };
-            let xls = Xls::from_source(workbook, cfb, &OpenOptions::default());
-            assert!(matches!(xls.owner(), XlsOwner::Source(_)));
+            if !matches!(xls.owner(), XlsOwner::Source(_)) {
+                continue;
+            }
             let owner = SourceBackedWorkbook::from_path(&path).unwrap();
             assert_same(xls.text(), owner.text(), &name);
             assert_same(xls.worksheet_names(), owner.worksheet_names(), &name);

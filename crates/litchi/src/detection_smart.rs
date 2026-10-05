@@ -4,8 +4,9 @@
 //! This module keeps the facade's detection API and paths unchanged and adds
 //! the iWork arms, which `litchi-ops` may not own because it must stay
 //! iWork-free (`tools/non_iwork_gate.py`). iWork is the last ZIP candidate:
-//! the ops detectors call the tail below only after OOXML and ODF have
-//! declined a ZIP input, exactly where the iWork arms used to run.
+//! each function here calls the `_with_tail` form of its `litchi_ops::detect`
+//! counterpart with the facade's iWork tail, which runs only after OOXML and
+//! ODF have declined a ZIP input.
 
 pub mod detected {
     //! Smart format detection with reusable owned results.
@@ -17,12 +18,6 @@ pub mod detected {
 
     use super::FacadeTail;
 
-    // The facade's open paths call the per-family source detectors directly.
-    #[allow(
-        unused_imports,
-        reason = "an iWork-only build opens through none of the per-family detectors"
-    )]
-    pub(crate) use litchi_ops::__migration::detect::*;
     pub use litchi_ops::detect::DetectedFormat;
     #[cfg(all(
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
@@ -48,7 +43,7 @@ pub mod detected {
     /// * `Some(DetectedFormat)` - Format detected with a reusable owner or byte buffer
     /// * `None` - Format not recognized
     pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
-        litchi_ops::__migration::detect::detect_format_smart_with_tail(bytes, &FacadeTail)
+        litchi_ops::detect::detect_format_smart_with_tail(bytes, &FacadeTail)
     }
 
     /// Detect a format while applying an explicit OPC resource policy to an OOXML
@@ -64,25 +59,7 @@ pub mod detected {
         bytes: Vec<u8>,
         limits: crate::opc::ReadLimits,
     ) -> Option<DetectedFormat> {
-        litchi_ops::__migration::detect::detect_format_smart_with_limits_and_tail(
-            bytes,
-            limits,
-            &FacadeTail,
-        )
-    }
-
-    /// Parse a path with an OOXML filename extension or ZIP magic, classifying
-    /// a rejected ZIP with the iWork tail as the facade always has.
-    #[cfg(any(feature = "docx", feature = "pptx"))]
-    #[allow(
-        dead_code,
-        reason = "the unified Presentation path uses the source-backed probe on positional platforms; the eager helper remains for Document and non-positional builds"
-    )]
-    pub(crate) fn detect_ooxml_path_with_limits(
-        path: impl AsRef<std::path::Path>,
-        limits: crate::opc::ReadLimits,
-    ) -> crate::opc::Result<Option<DetectedFormat>> {
-        litchi_ops::__migration::detect::detect_ooxml_path_with_limits(path, limits, &FacadeTail)
+        litchi_ops::detect::detect_format_smart_with_limits_and_tail(bytes, limits, &FacadeTail)
     }
 }
 
@@ -130,7 +107,7 @@ pub mod functions {
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
-        litchi_ops::__migration::detect::detect_file_format_with_tail(path, &FacadeTail)
+        litchi_ops::detect::detect_file_format_with_tail(path, &FacadeTail)
     }
 
     /// Detect a file format and retain the OOXML package the detection built.
@@ -200,11 +177,7 @@ pub mod functions {
         path: P,
         limits: crate::opc::ReadLimits,
     ) -> Option<PreparedDetection> {
-        litchi_ops::__migration::detect::detect_and_prepare_with_limits_and_tail(
-            path,
-            limits,
-            &FacadeTail,
-        )
+        litchi_ops::detect::detect_and_prepare_with_limits_and_tail(path, limits, &FacadeTail)
     }
 
     /// Detect file format from a byte slice.
@@ -236,7 +209,7 @@ pub mod functions {
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
-        litchi_ops::__migration::detect::detect_file_format_from_bytes_with_tail(bytes, &FacadeTail)
+        litchi_ops::detect::detect_file_format_from_bytes_with_tail(bytes, &FacadeTail)
     }
 
     /// Detect file format from any reader that implements Read + Seek.
@@ -255,7 +228,7 @@ pub mod functions {
     /// * `None` if the format is not recognized
     ///
     pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
-        litchi_ops::__migration::detect::detect_format_from_reader_with_tail(reader, &FacadeTail)
+        litchi_ops::detect::detect_format_from_reader_with_tail(reader, &FacadeTail)
     }
 }
 
@@ -271,10 +244,16 @@ pub(crate) mod iwork_tail;
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 pub(crate) use iwork_tail::IworkTail as FacadeTail;
 #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
-pub(crate) use litchi_ops::__migration::detect::NoZipTail as FacadeTail;
+pub(crate) use litchi_ops::detect::tail::NoZipTail as FacadeTail;
 
-#[cfg(test)]
-pub(crate) use litchi_ops::__migration::detect::{opc_probe_count, reset_opc_probe_count};
+// The probe counter of `litchi-ops`'s `test-support` feature, which this
+// crate's dev-dependency enables; only the OOXML detection tests read it.
+#[cfg(all(
+    test,
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub(crate) use litchi_ops::detect::{opc_probe_count, reset_opc_probe_count};
 
 #[cfg(all(
     test,

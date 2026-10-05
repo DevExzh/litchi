@@ -27,9 +27,7 @@
 //! format's `Defect::Properties` entries, and OLE property-set repairs as
 //! `Defect::PropertySet` entries of the legacy formats.
 //!
-//! The type is `litchi_ops::ToleranceReport`. The format-family types
-//! `Document`, `Presentation` and `sheet::Workbook` return it too, until they
-//! are removed.
+//! The type is `litchi_ops::ToleranceReport`, re-exported here.
 //!
 //! Apple iWork documents, which [`litchi::open`](crate::open) refuses and the
 //! `iwork` module reads, keep no repair report;

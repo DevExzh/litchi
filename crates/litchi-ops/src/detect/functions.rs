@@ -53,6 +53,9 @@ pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
 }
 
 /// [`detect_file_format`] with a lowest-precedence ZIP candidate.
+///
+/// `tail` classifies a ZIP input that every other candidate declined; see
+/// [`tail`](super::tail) for when it runs.
 pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
     path: P,
     tail: &T,
@@ -67,17 +70,19 @@ pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
 /// classify an OOXML package, so a caller that detects and then opens indexes
 /// the same ZIP twice. This entry point returns the same neutral
 /// classification **and**, for an OOXML package, an opaque handle to the
-/// already-validated package. Pass that handle to `Document::from_prepared`,
-/// `Presentation::from_prepared`, or `Workbook::from_prepared` and the open
-/// reuses the existing index instead of building a second one.
+/// already-validated package. Pass the detection to
+/// [`open_prepared`](crate::open_prepared) and the open reuses the existing
+/// index instead of building a second one.
 ///
 /// # Returns
 ///
 /// * `Some(PreparedDetection)` when a supported format is detected. The format
 ///   is always reported; [`PreparedDetection::prepared`] carries a handle only
-///   for an OOXML package. A legacy OLE2 file, an OpenDocument package, RTF and
-///   iWork are classified with no handle, because they have no OOXML adopter
-///   to hand a prepared OPC package to.
+///   for an OOXML package. A legacy OLE2 file, an OpenDocument package and RTF
+///   are classified with no handle, because they have no OOXML adopter to
+///   hand a prepared OPC package to. An iWork package is not recognized: this
+///   detector runs no [`ZipTail`](super::tail::ZipTail);
+///   [`detect_and_prepare_with_limits_and_tail`] takes one.
 /// * `None` when the format is not recognized or the file cannot be read —
 ///   exactly when [`detect_file_format`] returns `None`.
 ///
@@ -123,6 +128,9 @@ pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
 }
 
 /// [`detect_and_prepare_with_limits`] with a lowest-precedence ZIP candidate.
+///
+/// `tail` classifies a ZIP input that every other candidate declined; see
+/// [`tail`](super::tail) for when it runs.
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
@@ -168,6 +176,9 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 }
 
 /// [`detect_file_format_from_bytes`] with a lowest-precedence ZIP candidate.
+///
+/// `tail` classifies a ZIP input that every other candidate declined; see
+/// [`tail`](super::tail) for when it runs.
 pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
     bytes: &[u8],
     tail: &T,
@@ -221,7 +232,8 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
             return Some(result);
         }
 
-        // Finally try iWork detection
+        // Finally the tail: the lowest-precedence ZIP candidate (iWork, in the
+        // `litchi` facade)
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
         if let Some(result) = tail.classify_bytes(bytes) {
             return Some(result);
@@ -282,6 +294,9 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
 }
 
 /// [`detect_format_from_reader`] with a lowest-precedence ZIP candidate.
+///
+/// `tail` classifies a ZIP input that every other candidate declined; see
+/// [`tail`](super::tail) for when it runs.
 pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
     reader: &mut R,
     tail: &T,

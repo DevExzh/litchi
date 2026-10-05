@@ -39,14 +39,12 @@ fn open_path(path: &std::path::Path, options: &OpenOptions) -> Xlsb {
     }
 }
 
-/// The byte route: the source-backed workbook byte probe, then the handle.
+/// The byte route, through the unified opener.
 fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Xlsb {
-    let crate::detect::detected::WorkbookSourceBytesDetection::Xlsb(package) =
-        crate::detect::detected::detect_workbook_source_bytes(bytes)
-    else {
-        panic!("byte detection did not find an XLSB package");
-    };
-    Xlsb::from_source_package(package, options).expect("bytes open")
+    match crate::open_bytes_with(bytes, options).expect("bytes open") {
+        crate::File::Xlsb(xlsb) => xlsb,
+        other => panic!("bytes opened as {other:?}"),
+    }
 }
 
 /// The eager fallback route: smart detection's parsed OPC package.

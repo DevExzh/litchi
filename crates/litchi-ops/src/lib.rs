@@ -192,43 +192,14 @@ pub use litchi_crypto::ooxml::Password;
 ))]
 pub mod detect;
 
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb",
-    feature = "rtf",
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "pages",
-    feature = "keynote",
-    feature = "numbers"
-))]
-#[doc(hidden)]
-pub mod __migration;
-
-// `detect` moved verbatim from the facade, which names its leaf owners
-// through the re-export modules `crate::opc`, `crate::docx`, and so on. These
-// private aliases keep those paths, so the move stays reviewable as a move.
-#[cfg(feature = "docx")]
-use litchi_docx as docx;
+// `detect` moved verbatim from the facade, which names its OPC and PPTX leaf
+// owners through the re-export modules `crate::opc` and `crate::pptx`. These
+// private aliases keep those paths.
 #[cfg(feature = "opc")]
 #[allow(
     unused_imports,
     reason = "an `opc` build without an OPC-consuming format names no `crate::opc` path"
 )]
 use litchi_opc as opc;
-#[cfg(feature = "ppt")]
-use litchi_ppt as ppt;
 #[cfg(feature = "pptx")]
 use litchi_pptx as pptx;
-#[cfg(feature = "xls")]
-use litchi_xls as xls;
-#[cfg(feature = "xlsb")]
-use litchi_xlsb as xlsb;
-#[cfg(feature = "xlsx")]
-use litchi_xlsx as xlsx;

@@ -7,10 +7,12 @@
 //! their owning leaf crates.
 //!
 //! The iWork arms are not here. iWork is the last ZIP candidate, and
-//! `litchi-ops` must not depend on an iWork crate, so the `litchi` facade
-//! supplies them as a lowest-precedence tail. The detectors exported here
-//! classify every other format with unchanged precedence and report an iWork
-//! package as unrecognized.
+//! `litchi-ops` must not depend on an iWork crate, so the detectors without a
+//! tail classify every other format with unchanged precedence and report an
+//! iWork package as unrecognized. Each detector has a `_with_tail` form that
+//! takes a [`ZipTail`](crate::detect::tail::ZipTail): the classifier of the
+//! ZIP inputs every other candidate declined. The `litchi` facade passes its
+//! iWork classifier there.
 
 pub(crate) mod detected;
 pub(crate) mod functions;
@@ -18,7 +20,7 @@ pub(crate) mod functions;
 // Format-family probes used by `functions`.
 pub(crate) mod ole2;
 pub mod ooxml;
-pub(crate) mod tail;
+pub mod tail;
 #[cfg(any(feature = "xlsx", feature = "xlsb"))]
 pub(crate) mod workbook_metadata;
 
@@ -51,22 +53,48 @@ pub(crate) fn record_opc_probe() {
     OPC_PROBE_COUNT.with(|count| count.set(count.get().saturating_add(1)));
 }
 
+/// Resets the current thread's OPC probe counter to zero.
+///
+/// Test support, compiled only with the `test-support` feature: never part
+/// of a release build. The counter records each OPC package index that a
+/// detection or an open builds on the current thread, so a test can prove
+/// that an open indexes its container once; see [`opc_probe_count`].
 #[cfg(any(test, feature = "test-support"))]
 #[allow(
     dead_code,
     reason = "the probe counter is used only by feature-gated detection tests"
 )]
-#[doc(hidden)]
 pub fn reset_opc_probe_count() {
     OPC_PROBE_COUNT.with(|count| count.set(0));
 }
 
+/// The number of OPC package indexes built on the current thread since the
+/// last [`reset_opc_probe_count`].
+///
+/// Test support, compiled only with the `test-support` feature.
+///
+/// ```
+/// # #[cfg(all(feature = "test-support", feature = "docx"))]
+/// # {
+/// use litchi_ops::detect::{opc_probe_count, reset_opc_probe_count};
+///
+/// let path = concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/../../test-data/ooxml/docx/documentProperties.docx"
+/// );
+/// reset_opc_probe_count();
+/// let file = litchi_ops::open(path)?;
+/// assert_eq!(file.text()?.trim(), "Hello World!");
+/// // Detection and the open share one index of the package.
+/// assert_eq!(opc_probe_count(), 1);
+/// # }
+/// # Ok::<(), litchi_ops::Error>(())
+/// ```
 #[cfg(any(test, feature = "test-support"))]
 #[allow(
     dead_code,
     reason = "the probe counter is used only by feature-gated detection tests"
 )]
-#[doc(hidden)]
 pub fn opc_probe_count() -> usize {
     OPC_PROBE_COUNT.with(Cell::get)
 }
@@ -94,12 +122,17 @@ pub(crate) fn catalog_probe_limits(
     any(unix, windows)
 ))]
 pub use detected::PreparedDetection;
+pub use detected::{DetectedFormat, detect_format_smart, detect_format_smart_with_tail};
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-pub use detected::detect_format_smart_with_limits;
-pub use detected::{DetectedFormat, detect_format_smart};
+pub use detected::{detect_format_smart_with_limits, detect_format_smart_with_limits_and_tail};
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
-pub use functions::{detect_and_prepare, detect_and_prepare_with_limits};
-pub use functions::{detect_file_format, detect_file_format_from_bytes, detect_format_from_reader};
+pub use functions::{
+    detect_and_prepare, detect_and_prepare_with_limits, detect_and_prepare_with_limits_and_tail,
+};
+pub use functions::{
+    detect_file_format, detect_file_format_from_bytes, detect_file_format_from_bytes_with_tail,
+    detect_file_format_with_tail, detect_format_from_reader, detect_format_from_reader_with_tail,
+};

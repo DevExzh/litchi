@@ -3,13 +3,22 @@
 //! iWork is the last ZIP candidate every detector tries: OOXML first (unless
 //! the input is a validated ordinary ODF package), then ODF, then iWork.
 //! `litchi-ops` must not depend on an iWork crate (`tools/non_iwork_gate.py`),
-//! so the iWork arms stay in the `litchi` facade and reach detection through
-//! this trait. Each detector invokes the tail at exactly the point where the
-//! iWork arm used to run: after every other ZIP candidate has declined the
-//! input, and never after a hard OPC policy error or a failed cursor restore.
+//! so the iWork arms live in the `litchi` facade and reach detection through
+//! [`ZipTail`]. A detector invokes the tail at exactly the point where the
+//! iWork arm belongs: after every other ZIP candidate has declined the input,
+//! and never after a hard OPC policy error or a failed cursor restore.
 //!
-//! The public detectors in [`crate::detect`] pass [`NoZipTail`], so they
-//! classify every format except iWork, with unchanged precedence.
+//! The `_with_tail` detectors of [`crate::detect`] and
+//! [`open_with_tail`](crate::open_with_tail) /
+//! [`open_bytes_with_tail`](crate::open_bytes_with_tail) take a tail. The
+//! detectors and openers without one pass [`NoZipTail`], so they classify
+//! every format except iWork, with unchanged precedence.
+//!
+//! The detectors consult a tail only in a build with at least one of the
+//! `pages`, `keynote` and `numbers` features, which shape [`DetectedFormat`]
+//! and carry no dependency. The openers consult it in every build, and
+//! refuse a ZIP it names with
+//! [`Error::iwork_unsupported`](crate::Error::iwork_unsupported).
 
 use std::io::{Read, Seek};
 

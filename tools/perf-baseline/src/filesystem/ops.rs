@@ -29,10 +29,10 @@ use litchi_core::{FileSource, Metadata, OwnedSource};
 use sha2::{Digest, Sha256};
 
 use super::{
-    DOCX_FILE_CORPUS_GENERATOR, Operation, PPTX_FILE_CORPUS_GENERATOR, PPTX_FILE_SELECTED_POSITION,
-    XLSX_FILE_SELECTED_CELL_TARGET, XlsxRootSemanticProjection, XlsxSelectedCellEvidence,
-    assert_pinned_xlsx_corpus, assert_source_sha256, docx_archive_signature,
-    docx_package_signature, mixed_ascii_case, verify_docx_timed_full_text,
+    DOCX_FILE_CORPUS_GENERATOR, PPTX_FILE_CORPUS_GENERATOR, PPTX_FILE_SELECTED_POSITION,
+    SourceReplay, XLSX_FILE_SELECTED_CELL_TARGET, XlsxRootSemanticProjection,
+    XlsxSelectedCellEvidence, assert_pinned_xlsx_corpus, assert_source_sha256,
+    docx_archive_signature, docx_package_signature, mixed_ascii_case, verify_docx_timed_full_text,
     xlsx_selected_cell_evidence_digest, xlsx_semantic_projection_sha256,
     xlsx_typed_semantic_oracle,
 };
@@ -663,39 +663,41 @@ impl Route {
         )
     }
 
-    /// The predecessor operation whose untimed leaf source replay also
-    /// describes this route: source-backed DOCX and PPTX routes on both legs.
+    /// The predecessor query whose untimed leaf source replay also describes
+    /// this route: source-backed DOCX and PPTX routes on both legs.
     /// The replay opens the leaf owner over the same file and runs the same
     /// query, so its evidence has the predecessor's shape; it does not
     /// replay the unified route's format-detection reads.
-    pub(super) const fn source_replay(self) -> Option<Operation> {
+    pub(super) const fn source_replay(self) -> Option<SourceReplay> {
         match self {
             Self::Docx {
                 ingress: Ingress::Source,
                 query,
                 ..
             } => Some(match query {
-                DocxQuery::Open => Operation::DocxSourceOpen,
-                DocxQuery::ParagraphCount => Operation::DocxSourceParagraphCount,
-                DocxQuery::ListParagraphs => Operation::DocxSourceListParagraphs,
-                DocxQuery::FullText => Operation::DocxSourceFullText,
+                DocxQuery::Open => SourceReplay::DocxSourceOpen,
+                DocxQuery::ParagraphCount => SourceReplay::DocxSourceParagraphCount,
+                DocxQuery::ListParagraphs => SourceReplay::DocxSourceListParagraphs,
+                DocxQuery::FullText => SourceReplay::DocxSourceFullText,
                 DocxQuery::OpenParagraphCountLifecycle => {
-                    Operation::DocxSourceOpenParagraphCountLifecycle
+                    SourceReplay::DocxSourceOpenParagraphCountLifecycle
                 },
-                DocxQuery::OpenFullTextLifecycle => Operation::DocxSourceOpenFullTextLifecycle,
+                DocxQuery::OpenFullTextLifecycle => SourceReplay::DocxSourceOpenFullTextLifecycle,
             }),
             Self::Pptx {
                 ingress: Ingress::Source,
                 query,
                 ..
             } => Some(match query {
-                PptxQuery::Open => Operation::PptxSourceOpen,
-                PptxQuery::ListSlides => Operation::PptxSourceListSlides,
-                PptxQuery::SlideCount => Operation::PptxSourceSlideCount,
-                PptxQuery::SelectedSlide => Operation::PptxSourceSelectedSlide,
-                PptxQuery::OpenSlideCountLifecycle => Operation::PptxSourceOpenSlideCountLifecycle,
+                PptxQuery::Open => SourceReplay::PptxSourceOpen,
+                PptxQuery::ListSlides => SourceReplay::PptxSourceListSlides,
+                PptxQuery::SlideCount => SourceReplay::PptxSourceSlideCount,
+                PptxQuery::SelectedSlide => SourceReplay::PptxSourceSelectedSlide,
+                PptxQuery::OpenSlideCountLifecycle => {
+                    SourceReplay::PptxSourceOpenSlideCountLifecycle
+                },
                 PptxQuery::OpenSelectedSlideLifecycle => {
-                    Operation::PptxSourceOpenSelectedSlideLifecycle
+                    SourceReplay::PptxSourceOpenSelectedSlideLifecycle
                 },
             }),
             _ => None,
@@ -1769,7 +1771,7 @@ mod tests {
     #[test]
     fn query_routes_are_prepared_and_never_cold_verified() {
         for (route, case) in ROUTES {
-            let operation = Operation::Ops(route);
+            let operation = super::super::Operation::Ops(route);
             let name = case.name();
             let prepared = !name.contains("_open");
             assert_eq!(route.is_prepared_query(), prepared, "{name}");
@@ -1788,7 +1790,7 @@ mod tests {
                         .split_once("_source_")
                         .map(|(_, suffix)| suffix)
                         .expect("source route name");
-                    assert!(predecessor.case().name().ends_with(suffix), "{name}");
+                    assert!(predecessor.predecessor_name().ends_with(suffix), "{name}");
                     assert_eq!(
                         route.logical_read_counter_scope(),
                         "untimed_source_replay_only"

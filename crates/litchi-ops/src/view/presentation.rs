@@ -180,17 +180,19 @@ impl<'a> PresentationView<'a> {
         }
     }
 
-    /// Slide text for the facade's Markdown adapter: `(slide number, text)`
-    /// per slide. Legacy PowerPoint takes its fast path, which skips shape
-    /// parsing; the other formats project [`Self::slides`].
-    ///
-    /// Not public API; the Markdown adapter moves onto the node view in M1.
+    /// Slide text for the Markdown adapter: `(slide number, text)` per slide.
+    /// Legacy PowerPoint takes its fast path, which skips shape parsing; the
+    /// other formats project [`Self::slides`]. The adapter moves onto the node
+    /// view in M1.
     ///
     /// # Errors
     ///
     /// As [`Self::slides`].
-    #[doc(hidden)]
-    pub fn extract_text_for_markdown(&self) -> Result<Vec<(usize, String)>> {
+    #[cfg(any(
+        feature = "markdown",
+        all(test, any(feature = "ppt", feature = "pptx"))
+    ))]
+    pub(crate) fn extract_text_for_markdown(&self) -> Result<Vec<(usize, String)>> {
         match self.0 {
             #[cfg(feature = "ppt")]
             Inner::Ppt(ppt) => Ok(ppt.reader().extract_text_fast()?),

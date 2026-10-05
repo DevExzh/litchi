@@ -1,7 +1,9 @@
 //! Opt-in XLSB semantic CRUD baseline.
 //!
 //! This binary intentionally lives outside the default perf matrix. It uses
-//! only the public XLSB owner and umbrella-facade APIs, and keeps the complete
+//! only the public XLSB owner and umbrella-facade APIs (since M0a step S9,
+//! `litchi::open_bytes` and `litchi::File` for the umbrella's full text, in
+//! place of the deleted `litchi::sheet::Workbook`), and keeps the complete
 //! reopen/preservation checks outside the timed sample interval. The default
 //! corpus is a public POI workbook with opaque members and a VBA payload; the
 //! payload is treated as inert and is checked as an untouched package member.
@@ -913,7 +915,13 @@ fn run_case_with_opener(
                 if format != FileFormat::Xlsb {
                     return Err(format!("facade identified fixture as {format:?}, not XLSB").into());
                 }
-                let workbook = litchi::sheet::open_xlsb_workbook_from_bytes(&corpus.bytes)?;
+                // The leaf call the deleted `sheet::open_xlsb_workbook_from_bytes`
+                // wrapped (M0a step S9), with the same default read limits.
+                let workbook = litchi_xlsb::Package::from_slice_with_limits(
+                    &corpus.bytes,
+                    litchi_xlsb::ReadLimits::default(),
+                )?
+                .into_workbook()?;
                 return Ok(RunOutcome::Projection {
                     count: workbook.worksheet_count(),
                     text: None,
@@ -1374,8 +1382,11 @@ fn open_direct_without_drawings(bytes: &[u8]) -> Result<litchi_xlsb::Workbook> {
     )?)
 }
 
+/// The umbrella's full text of an XLSB workbook: `litchi::open_bytes` and
+/// `File::text`, the unified successor of the deleted
+/// `litchi::sheet::Workbook::from_bytes` byte route (M0a step S9).
 fn facade_text(bytes: &[u8]) -> Result<String> {
-    litchi::sheet::Workbook::from_bytes(bytes.to_vec())?.text()
+    Ok(litchi::open_bytes(bytes.to_vec())?.text()?)
 }
 
 fn save_workbook(workbook: &litchi_xlsb::Workbook) -> Result<Vec<u8>> {

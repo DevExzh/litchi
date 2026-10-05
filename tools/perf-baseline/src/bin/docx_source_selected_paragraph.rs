@@ -1479,7 +1479,10 @@ fn run_facade_oracle(corpus: &Corpus) -> AnyResult<FacadeStatus> {
     let owner = create_temp_corpus(&corpus.archive)?;
     let path = owner.path.clone();
     let result = (|| {
-        let document = litchi::Document::open(&path)?;
+        // The facade's document API: `litchi::open` and the document view
+        // (M0a step S9 deleted the `litchi::Document` this oracle used).
+        let file = litchi::open(&path)?;
+        let document = file.document()?;
         let selected = document.paragraph_text(TARGET_INDEX)?;
         let out_of_bounds = document.paragraph_text(usize::MAX)?.is_none();
         if selected.as_deref() != Some(TARGET_TEXT) || !out_of_bounds {
@@ -1490,12 +1493,12 @@ fn run_facade_oracle(corpus: &Corpus) -> AnyResult<FacadeStatus> {
         append.flush()?;
         let stale = matches!(
             document.paragraph_text(TARGET_INDEX),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(error) if is_source_change(&error)
         );
         if !stale {
             return Err("facade stale-source oracle failed".into());
         }
-        drop(document);
+        drop(file);
         Ok(FacadeStatus {
             selected_text: selected.ok_or("facade selected paragraph was absent")?,
             out_of_bounds_none: out_of_bounds,
@@ -1504,6 +1507,20 @@ fn run_facade_oracle(corpus: &Corpus) -> AnyResult<FacadeStatus> {
     })();
     drop(owner);
     result
+}
+
+/// Whether a unified error reports a source that changed after open, as the
+/// typed leaf of whichever layer noticed it.
+fn is_source_change(error: &litchi::Error) -> bool {
+    use litchi::error::Source;
+    use litchi_opc::OpcError;
+
+    matches!(
+        error.leaf(),
+        Source::Core(litchi_core::Error::SourceChanged { .. })
+            | Source::Opc(OpcError::SourceChanged { .. })
+            | Source::Docx(litchi_docx::Error::Opc(OpcError::SourceChanged { .. }))
+    )
 }
 
 fn managed_context(

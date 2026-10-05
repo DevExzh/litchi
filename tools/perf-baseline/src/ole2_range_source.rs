@@ -65,6 +65,10 @@ use crate::{
 /// Generator identity of the XLS range-source family. Nothing in it is
 /// generated, so the identity says so.
 pub(crate) const XLS_REAL_FILE_GENERATOR: &str = "litchi-xls-real-file-v1";
+/// Generator identity of a caller-named DOC fixture: the identity change
+/// 0638's DOC facade family recorded, which M0a step S9 deleted with the
+/// facade types. Nothing in it is generated, so the identity says so.
+const DOC_REAL_FILE_GENERATOR: &str = "litchi-doc-facade-real-file-v1";
 /// Generator identity of the PPT range-source family.
 pub(crate) const PPT_REAL_FILE_GENERATOR: &str = "litchi-ppt-real-file-v1";
 
@@ -108,7 +112,7 @@ impl Format {
 
     const fn generator(self) -> &'static str {
         match self {
-            Self::Doc => crate::facade_ole2::DOC_FACADE_GENERATOR,
+            Self::Doc => DOC_REAL_FILE_GENERATOR,
             Self::Xls => XLS_REAL_FILE_GENERATOR,
             Self::Ppt => PPT_REAL_FILE_GENERATOR,
         }

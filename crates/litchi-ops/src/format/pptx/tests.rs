@@ -25,27 +25,20 @@ fn options() -> OpenOptions {
 
 // ---- constructor routes -------------------------------------------------
 
+/// The path route: [`crate::open_with`].
 #[cfg(any(unix, windows))]
 fn open_path(path: &Path, options: &OpenOptions) -> Pptx {
-    use crate::detect::detected::{PptxSourcePathDetection, detect_pptx_source_path_with_limits};
-    match detect_pptx_source_path_with_limits(path, opc::ReadLimits::default())
-        .expect("path detection")
-        .expect("a PPTX is recognized")
-    {
-        PptxSourcePathDetection::Pptx(presentation) => Pptx::from_source(presentation, options),
-        _ => panic!("the path route must produce the source-backed owner"),
+    match crate::open_with(path, options).expect("path route") {
+        crate::File::Pptx(pptx) => pptx,
+        other => panic!("{} opened as {other:?}", path.display()),
     }
 }
 
+/// The byte route: [`crate::open_bytes`].
 fn open_bytes(bytes: Vec<u8>) -> Pptx {
-    use crate::detect::detected::{
-        PresentationSourceBytesDetection, detect_presentation_source_bytes,
-    };
-    match detect_presentation_source_bytes(bytes, opc::ReadLimits::default()) {
-        PresentationSourceBytesDetection::Pptx(presentation) => {
-            Pptx::from_source(presentation, &options())
-        },
-        _ => panic!("the byte route must produce the source-backed owner"),
+    match crate::open_bytes_with(bytes, &options()).expect("byte route") {
+        crate::File::Pptx(pptx) => pptx,
+        other => panic!("bytes opened as {other:?}"),
     }
 }
 

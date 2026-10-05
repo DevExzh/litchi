@@ -890,39 +890,14 @@ enum Operation {
     ProviderAtomicSave,
     CfbOverlaySave,
     CfbOwnedOverlaySave,
-    PptxEagerOpen,
-    PptxSourceOpen,
-    PptxEagerListSlides,
-    PptxSourceListSlides,
-    PptxEagerSlideCount,
-    PptxSourceSlideCount,
-    PptxEagerSelectedSlide,
-    PptxSourceSelectedSlide,
-    PptxEagerOpenSlideCountLifecycle,
-    PptxSourceOpenSlideCountLifecycle,
-    PptxEagerOpenSelectedSlideLifecycle,
-    PptxSourceOpenSelectedSlideLifecycle,
-    DocxEagerOpen,
-    DocxSourceOpen,
-    DocxEagerParagraphCount,
-    DocxSourceParagraphCount,
-    DocxEagerListParagraphs,
-    DocxSourceListParagraphs,
-    DocxEagerFullText,
-    DocxSourceFullText,
-    DocxEagerOpenParagraphCountLifecycle,
-    DocxSourceOpenParagraphCountLifecycle,
-    DocxEagerOpenFullTextLifecycle,
-    DocxSourceOpenFullTextLifecycle,
-    XlsxFileOpen,
-    XlsxFileOpenLifecycle,
-    XlsxFileSelectedCell,
     XlsxSourceRepeatedStoreMedium,
     XlsxSourceRepeatedStoreMediumReacquisitionControl,
     XlsxSourceRepeatedStoreOversized,
     XlsxSourceRepeatedStoreOversizedReacquisitionControl,
     /// A paired unified-API or leaf-API DOCX, PPTX or XLSX route of M0a step
-    /// S8b (`ops`). The predecessor operations above keep their own variants.
+    /// S8b (`ops`). M0a step S9 deleted the predecessor DOCX, PPTX and XLSX
+    /// root operations with the facade types they timed; the source replay
+    /// they shared with these routes is [`SourceReplay`].
     Ops(ops::Route),
 }
 
@@ -937,49 +912,6 @@ impl Operation {
             "provider_atomic_save" => Some(Self::ProviderAtomicSave),
             "cfb_file_same_length_overlay_atomic_save" => Some(Self::CfbOverlaySave),
             "cfb_file_owned_same_length_overlay_atomic_save" => Some(Self::CfbOwnedOverlaySave),
-            "pptx_file_eager_open" => Some(Self::PptxEagerOpen),
-            "pptx_file_source_open" => Some(Self::PptxSourceOpen),
-            "pptx_file_eager_list_slides" => Some(Self::PptxEagerListSlides),
-            "pptx_file_source_list_slides" => Some(Self::PptxSourceListSlides),
-            "pptx_file_eager_slide_count" => Some(Self::PptxEagerSlideCount),
-            "pptx_file_source_slide_count" => Some(Self::PptxSourceSlideCount),
-            "pptx_file_eager_selected_slide" => Some(Self::PptxEagerSelectedSlide),
-            "pptx_file_source_selected_slide" => Some(Self::PptxSourceSelectedSlide),
-            "pptx_file_eager_open_slide_count_lifecycle" => {
-                Some(Self::PptxEagerOpenSlideCountLifecycle)
-            },
-            "pptx_file_source_open_slide_count_lifecycle" => {
-                Some(Self::PptxSourceOpenSlideCountLifecycle)
-            },
-            "pptx_file_eager_open_selected_slide_lifecycle" => {
-                Some(Self::PptxEagerOpenSelectedSlideLifecycle)
-            },
-            "pptx_file_source_open_selected_slide_lifecycle" => {
-                Some(Self::PptxSourceOpenSelectedSlideLifecycle)
-            },
-            "docx_file_eager_open" => Some(Self::DocxEagerOpen),
-            "docx_file_source_open" => Some(Self::DocxSourceOpen),
-            "docx_file_eager_paragraph_count" => Some(Self::DocxEagerParagraphCount),
-            "docx_file_source_paragraph_count" => Some(Self::DocxSourceParagraphCount),
-            "docx_file_eager_list_paragraphs" => Some(Self::DocxEagerListParagraphs),
-            "docx_file_source_list_paragraphs" => Some(Self::DocxSourceListParagraphs),
-            "docx_file_eager_full_text" => Some(Self::DocxEagerFullText),
-            "docx_file_source_full_text" => Some(Self::DocxSourceFullText),
-            "docx_file_eager_open_paragraph_count_lifecycle" => {
-                Some(Self::DocxEagerOpenParagraphCountLifecycle)
-            },
-            "docx_file_source_open_paragraph_count_lifecycle" => {
-                Some(Self::DocxSourceOpenParagraphCountLifecycle)
-            },
-            "docx_file_eager_open_full_text_lifecycle" => {
-                Some(Self::DocxEagerOpenFullTextLifecycle)
-            },
-            "docx_file_source_open_full_text_lifecycle" => {
-                Some(Self::DocxSourceOpenFullTextLifecycle)
-            },
-            "xlsx_file_open" => Some(Self::XlsxFileOpen),
-            "xlsx_file_open_lifecycle" => Some(Self::XlsxFileOpenLifecycle),
-            "xlsx_file_selected_cell" => Some(Self::XlsxFileSelectedCell),
             "xlsx_source_repeated_store_medium" => Some(Self::XlsxSourceRepeatedStoreMedium),
             "xlsx_source_repeated_store_medium_reacquisition_control" => {
                 Some(Self::XlsxSourceRepeatedStoreMediumReacquisitionControl)
@@ -1002,47 +934,6 @@ impl Operation {
             Self::ProviderAtomicSave => super::Case::ProviderAtomicSave,
             Self::CfbOverlaySave => super::Case::CfbFileSameLengthOverlayAtomicSave,
             Self::CfbOwnedOverlaySave => super::Case::CfbFileOwnedSameLengthOverlayAtomicSave,
-            Self::PptxEagerOpen => super::Case::PptxFileEagerOpen,
-            Self::PptxSourceOpen => super::Case::PptxFileSourceOpen,
-            Self::PptxEagerListSlides => super::Case::PptxFileEagerListSlides,
-            Self::PptxSourceListSlides => super::Case::PptxFileSourceListSlides,
-            Self::PptxEagerSlideCount => super::Case::PptxFileEagerSlideCount,
-            Self::PptxSourceSlideCount => super::Case::PptxFileSourceSlideCount,
-            Self::PptxEagerSelectedSlide => super::Case::PptxFileEagerSelectedSlide,
-            Self::PptxSourceSelectedSlide => super::Case::PptxFileSourceSelectedSlide,
-            Self::PptxEagerOpenSlideCountLifecycle => {
-                super::Case::PptxFileEagerOpenSlideCountLifecycle
-            },
-            Self::PptxSourceOpenSlideCountLifecycle => {
-                super::Case::PptxFileSourceOpenSlideCountLifecycle
-            },
-            Self::PptxEagerOpenSelectedSlideLifecycle => {
-                super::Case::PptxFileEagerOpenSelectedSlideLifecycle
-            },
-            Self::PptxSourceOpenSelectedSlideLifecycle => {
-                super::Case::PptxFileSourceOpenSelectedSlideLifecycle
-            },
-            Self::DocxEagerOpen => super::Case::DocxFileEagerOpen,
-            Self::DocxSourceOpen => super::Case::DocxFileSourceOpen,
-            Self::DocxEagerParagraphCount => super::Case::DocxFileEagerParagraphCount,
-            Self::DocxSourceParagraphCount => super::Case::DocxFileSourceParagraphCount,
-            Self::DocxEagerListParagraphs => super::Case::DocxFileEagerListParagraphs,
-            Self::DocxSourceListParagraphs => super::Case::DocxFileSourceListParagraphs,
-            Self::DocxEagerFullText => super::Case::DocxFileEagerFullText,
-            Self::DocxSourceFullText => super::Case::DocxFileSourceFullText,
-            Self::DocxEagerOpenParagraphCountLifecycle => {
-                super::Case::DocxFileEagerOpenParagraphCountLifecycle
-            },
-            Self::DocxSourceOpenParagraphCountLifecycle => {
-                super::Case::DocxFileSourceOpenParagraphCountLifecycle
-            },
-            Self::DocxEagerOpenFullTextLifecycle => super::Case::DocxFileEagerOpenFullTextLifecycle,
-            Self::DocxSourceOpenFullTextLifecycle => {
-                super::Case::DocxFileSourceOpenFullTextLifecycle
-            },
-            Self::XlsxFileOpen => super::Case::XlsxFileOpen,
-            Self::XlsxFileOpenLifecycle => super::Case::XlsxFileOpenLifecycle,
-            Self::XlsxFileSelectedCell => super::Case::XlsxFileSelectedCell,
             Self::XlsxSourceRepeatedStoreMedium => super::Case::XlsxSourceRepeatedStoreMedium,
             Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
                 super::Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
@@ -1087,52 +978,15 @@ impl Operation {
     }
 
     const fn is_pptx(self) -> bool {
-        matches!(
-            self,
-            Self::PptxEagerOpen
-                | Self::PptxSourceOpen
-                | Self::PptxEagerListSlides
-                | Self::PptxSourceListSlides
-                | Self::PptxEagerSlideCount
-                | Self::PptxSourceSlideCount
-                | Self::PptxEagerSelectedSlide
-                | Self::PptxSourceSelectedSlide
-                | Self::PptxEagerOpenSlideCountLifecycle
-                | Self::PptxSourceOpenSlideCountLifecycle
-                | Self::PptxEagerOpenSelectedSlideLifecycle
-                | Self::PptxSourceOpenSelectedSlideLifecycle
-        ) || matches!(self, Self::Ops(route) if route.is_pptx())
+        matches!(self, Self::Ops(route) if route.is_pptx())
     }
 
     const fn is_docx(self) -> bool {
-        matches!(
-            self,
-            Self::DocxEagerOpen
-                | Self::DocxSourceOpen
-                | Self::DocxEagerParagraphCount
-                | Self::DocxSourceParagraphCount
-                | Self::DocxEagerListParagraphs
-                | Self::DocxSourceListParagraphs
-                | Self::DocxEagerFullText
-                | Self::DocxSourceFullText
-                | Self::DocxEagerOpenParagraphCountLifecycle
-                | Self::DocxSourceOpenParagraphCountLifecycle
-                | Self::DocxEagerOpenFullTextLifecycle
-                | Self::DocxSourceOpenFullTextLifecycle
-        ) || matches!(self, Self::Ops(route) if route.is_docx())
+        matches!(self, Self::Ops(route) if route.is_docx())
     }
 
     const fn is_xlsx(self) -> bool {
-        matches!(
-            self,
-            Self::XlsxFileOpen
-                | Self::XlsxFileOpenLifecycle
-                | Self::XlsxFileSelectedCell
-                | Self::XlsxSourceRepeatedStoreMedium
-                | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
-                | Self::XlsxSourceRepeatedStoreOversized
-                | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
-        ) || matches!(self, Self::Ops(route) if route.is_xlsx())
+        self.is_xlsx_repeated_store() || matches!(self, Self::Ops(route) if route.is_xlsx())
     }
 
     const fn is_xlsx_repeated_store(self) -> bool {
@@ -1145,23 +999,15 @@ impl Operation {
         )
     }
 
-    const fn is_xlsx_selected_cell(self) -> bool {
-        matches!(self, Self::XlsxFileSelectedCell)
-    }
-
     /// Whether a sample of this operation must carry selected-cell evidence:
-    /// the predecessor selected-cell operation and both paired legs.
+    /// both legs of the paired selected-cell route.
     const fn reports_xlsx_selected_cell(self) -> bool {
-        self.is_xlsx_selected_cell()
-            || matches!(self, Self::Ops(route) if route.is_xlsx_selected_cell())
+        matches!(self, Self::Ops(route) if route.is_xlsx_selected_cell())
     }
 
     /// Whether a sample carries the timed DOCX full-text evidence.
     const fn is_docx_full_text_lifecycle(self) -> bool {
-        matches!(
-            self,
-            Self::DocxEagerOpenFullTextLifecycle | Self::DocxSourceOpenFullTextLifecycle
-        ) || matches!(self, Self::Ops(route) if route.is_docx_full_text_lifecycle())
+        matches!(self, Self::Ops(route) if route.is_docx_full_text_lifecycle())
     }
 
     const fn xlsx_repeated_store_scenario(self) -> Option<XlsxRepeatStoreScenario> {
@@ -1186,105 +1032,102 @@ impl Operation {
         )
     }
 
+    /// Prepared query controls have already opened/materialized their source
+    /// before the timed interval, so a page-cache proof would not describe the
+    /// operation being measured.  Open and lifecycle controls remain eligible.
+    const fn supports_cold_verified(self) -> bool {
+        !self.is_xlsx_repeated_store()
+            && !matches!(self, Self::Ops(route) if route.is_prepared_query())
+    }
+}
+
+/// The source-backed DOCX or PPTX query whose untimed leaf replay describes a
+/// paired source-backed route ([`ops::Route::source_replay`]): the query of
+/// the predecessor selector of that route. M0a step S9 deleted the
+/// predecessors with the facade types they timed; the replay evidence keeps
+/// each predecessor's name and shape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SourceReplay {
+    PptxSourceOpen,
+    PptxSourceListSlides,
+    PptxSourceSlideCount,
+    PptxSourceSelectedSlide,
+    PptxSourceOpenSlideCountLifecycle,
+    PptxSourceOpenSelectedSlideLifecycle,
+    DocxSourceOpen,
+    DocxSourceParagraphCount,
+    DocxSourceListParagraphs,
+    DocxSourceFullText,
+    DocxSourceOpenParagraphCountLifecycle,
+    DocxSourceOpenFullTextLifecycle,
+}
+
+impl SourceReplay {
+    /// The name of the predecessor selector whose query this replays.
+    pub(super) const fn predecessor_name(self) -> &'static str {
+        match self {
+            Self::PptxSourceOpen => "pptx_file_source_open",
+            Self::PptxSourceListSlides => "pptx_file_source_list_slides",
+            Self::PptxSourceSlideCount => "pptx_file_source_slide_count",
+            Self::PptxSourceSelectedSlide => "pptx_file_source_selected_slide",
+            Self::PptxSourceOpenSlideCountLifecycle => {
+                "pptx_file_source_open_slide_count_lifecycle"
+            },
+            Self::PptxSourceOpenSelectedSlideLifecycle => {
+                "pptx_file_source_open_selected_slide_lifecycle"
+            },
+            Self::DocxSourceOpen => "docx_file_source_open",
+            Self::DocxSourceParagraphCount => "docx_file_source_paragraph_count",
+            Self::DocxSourceListParagraphs => "docx_file_source_list_paragraphs",
+            Self::DocxSourceFullText => "docx_file_source_full_text",
+            Self::DocxSourceOpenParagraphCountLifecycle => {
+                "docx_file_source_open_paragraph_count_lifecycle"
+            },
+            Self::DocxSourceOpenFullTextLifecycle => "docx_file_source_open_full_text_lifecycle",
+        }
+    }
+
     const fn is_docx_lifecycle(self) -> bool {
         matches!(
             self,
-            Self::DocxEagerOpenParagraphCountLifecycle
-                | Self::DocxSourceOpenParagraphCountLifecycle
-                | Self::DocxEagerOpenFullTextLifecycle
-                | Self::DocxSourceOpenFullTextLifecycle
-        )
-    }
-
-    const fn is_source_docx(self) -> bool {
-        matches!(
-            self,
-            Self::DocxSourceOpen
-                | Self::DocxSourceParagraphCount
-                | Self::DocxSourceListParagraphs
-                | Self::DocxSourceFullText
-                | Self::DocxSourceOpenParagraphCountLifecycle
-                | Self::DocxSourceOpenFullTextLifecycle
+            Self::DocxSourceOpenParagraphCountLifecycle | Self::DocxSourceOpenFullTextLifecycle
         )
     }
 
     const fn is_docx_query(self) -> bool {
         matches!(
             self,
-            Self::DocxEagerParagraphCount
-                | Self::DocxSourceParagraphCount
-                | Self::DocxEagerListParagraphs
+            Self::DocxSourceParagraphCount
                 | Self::DocxSourceListParagraphs
-                | Self::DocxEagerFullText
                 | Self::DocxSourceFullText
         )
     }
 
     const fn docx_query_name(self) -> Option<&'static str> {
         match self {
-            Self::DocxEagerOpen | Self::DocxSourceOpen => None,
-            Self::DocxEagerParagraphCount | Self::DocxSourceParagraphCount => {
-                Some("paragraph_count")
-            },
-            Self::DocxEagerListParagraphs | Self::DocxSourceListParagraphs => {
-                Some("list_paragraphs")
-            },
-            Self::DocxEagerFullText | Self::DocxSourceFullText => Some("full_text"),
-            Self::DocxEagerOpenParagraphCountLifecycle
-            | Self::DocxSourceOpenParagraphCountLifecycle => Some("open_paragraph_count_lifecycle"),
-            Self::DocxEagerOpenFullTextLifecycle | Self::DocxSourceOpenFullTextLifecycle => {
-                Some("open_full_text_lifecycle")
-            },
+            Self::DocxSourceParagraphCount => Some("paragraph_count"),
+            Self::DocxSourceListParagraphs => Some("list_paragraphs"),
+            Self::DocxSourceFullText => Some("full_text"),
+            Self::DocxSourceOpenParagraphCountLifecycle => Some("open_paragraph_count_lifecycle"),
+            Self::DocxSourceOpenFullTextLifecycle => Some("open_full_text_lifecycle"),
             _ => None,
         }
-    }
-
-    const fn is_source_pptx(self) -> bool {
-        matches!(
-            self,
-            Self::PptxSourceOpen
-                | Self::PptxSourceListSlides
-                | Self::PptxSourceSlideCount
-                | Self::PptxSourceSelectedSlide
-                | Self::PptxSourceOpenSlideCountLifecycle
-                | Self::PptxSourceOpenSelectedSlideLifecycle
-        )
     }
 
     const fn is_pptx_query(self) -> bool {
         matches!(
             self,
-            Self::PptxEagerListSlides
-                | Self::PptxSourceListSlides
-                | Self::PptxEagerSlideCount
-                | Self::PptxSourceSlideCount
-                | Self::PptxEagerSelectedSlide
-                | Self::PptxSourceSelectedSlide
+            Self::PptxSourceListSlides | Self::PptxSourceSlideCount | Self::PptxSourceSelectedSlide
         )
-    }
-
-    /// Prepared query controls have already opened/materialized their source
-    /// before the timed interval, so a page-cache proof would not describe the
-    /// operation being measured.  Open and lifecycle controls remain eligible.
-    const fn supports_cold_verified(self) -> bool {
-        !self.is_pptx_query()
-            && !self.is_docx_query()
-            && !self.is_xlsx_repeated_store()
-            && !matches!(self, Self::XlsxFileSelectedCell)
-            && !matches!(self, Self::Ops(route) if route.is_prepared_query())
     }
 
     const fn pptx_query_name(self) -> Option<&'static str> {
         match self {
-            Self::PptxEagerOpen | Self::PptxSourceOpen => None,
-            Self::PptxEagerListSlides | Self::PptxSourceListSlides => Some("list_slides"),
-            Self::PptxEagerSlideCount | Self::PptxSourceSlideCount => Some("slide_count"),
-            Self::PptxEagerSelectedSlide | Self::PptxSourceSelectedSlide => Some("selected_slide"),
-            Self::PptxEagerOpenSlideCountLifecycle | Self::PptxSourceOpenSlideCountLifecycle => {
-                Some("open_slide_count_lifecycle")
-            },
-            Self::PptxEagerOpenSelectedSlideLifecycle
-            | Self::PptxSourceOpenSelectedSlideLifecycle => Some("open_selected_slide_lifecycle"),
+            Self::PptxSourceListSlides => Some("list_slides"),
+            Self::PptxSourceSlideCount => Some("slide_count"),
+            Self::PptxSourceSelectedSlide => Some("selected_slide"),
+            Self::PptxSourceOpenSlideCountLifecycle => Some("open_slide_count_lifecycle"),
+            Self::PptxSourceOpenSelectedSlideLifecycle => Some("open_selected_slide_lifecycle"),
             _ => None,
         }
     }
@@ -2629,35 +2472,6 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         Operation::OpcEagerOpen
         | Operation::OpcSourceOpen
         | Operation::ProviderFileReadAt
-        | Operation::PptxEagerOpen
-        | Operation::PptxSourceOpen
-        | Operation::PptxEagerListSlides
-        | Operation::PptxSourceListSlides
-        | Operation::PptxEagerSlideCount
-        | Operation::PptxSourceSlideCount
-        | Operation::PptxEagerSelectedSlide
-        | Operation::PptxSourceSelectedSlide
-        | Operation::PptxEagerOpenSlideCountLifecycle
-        | Operation::PptxSourceOpenSlideCountLifecycle
-        | Operation::PptxEagerOpenSelectedSlideLifecycle
-        | Operation::PptxSourceOpenSelectedSlideLifecycle
-        | Operation::DocxEagerOpen
-        | Operation::DocxSourceOpen
-        | Operation::DocxEagerParagraphCount
-        | Operation::DocxSourceParagraphCount
-        | Operation::DocxEagerListParagraphs
-        | Operation::DocxSourceListParagraphs
-        | Operation::DocxEagerFullText
-        | Operation::DocxSourceFullText
-        | Operation::DocxEagerOpenParagraphCountLifecycle
-        | Operation::DocxSourceOpenParagraphCountLifecycle
-        | Operation::DocxEagerOpenFullTextLifecycle
-        | Operation::DocxSourceOpenFullTextLifecycle => {
-            Err("open operation has no output digest".into())
-        },
-        Operation::XlsxFileOpen
-        | Operation::XlsxFileOpenLifecycle
-        | Operation::XlsxFileSelectedCell
         | Operation::XlsxSourceRepeatedStoreMedium
         | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Operation::XlsxSourceRepeatedStoreOversized
@@ -2866,35 +2680,8 @@ where
     } else {
         (None, None)
     };
-    // Existing query controls compare prepared eager/source roots, so root
-    // construction is outside their query timer. Lifecycle controls leave
-    // the root unprepared and include fresh open plus the selected query in
-    // the timed operation.
-    let prepared_pptx = if operation.is_pptx_query() {
-        if operation.is_source_pptx() {
-            Some(litchi::Presentation::open(&source)?)
-        } else {
-            Some(litchi::Presentation::from_bytes(fs::read(&source)?)?)
-        }
-    } else {
-        None
-    };
-    let prepared_docx = if operation.is_docx_query() {
-        Some(if operation.is_source_docx() {
-            PreparedDocx::source(&source)?
-        } else {
-            PreparedDocx::eager(fs::read(&source)?)?
-        })
-    } else {
-        None
-    };
     let mut deferred_xlsx_repeat_store_operation = if operation.is_xlsx_repeated_store() {
         Some(prepare_xlsx_repeat_store_operation(operation, &source)?)
-    } else {
-        None
-    };
-    let mut deferred_xlsx_operation = if operation.is_xlsx_selected_cell() {
-        Some(prepare_xlsx_file_selected_cell_operation(&source)?)
     } else {
         None
     };
@@ -2943,43 +2730,6 @@ where
             Operation::CfbOverlaySave => run_cfb_overlay_save(&source, &destination, &mut details)?,
             Operation::CfbOwnedOverlaySave => {
                 run_cfb_owned_overlay_save(&source, &destination, &mut details)?
-            },
-            Operation::PptxEagerOpen
-            | Operation::PptxSourceOpen
-            | Operation::PptxEagerListSlides
-            | Operation::PptxSourceListSlides
-            | Operation::PptxEagerSlideCount
-            | Operation::PptxSourceSlideCount
-            | Operation::PptxEagerSelectedSlide
-            | Operation::PptxSourceSelectedSlide
-            | Operation::PptxEagerOpenSlideCountLifecycle
-            | Operation::PptxSourceOpenSlideCountLifecycle
-            | Operation::PptxEagerOpenSelectedSlideLifecycle
-            | Operation::PptxSourceOpenSelectedSlideLifecycle => {
-                run_pptx_operation(operation, &source, prepared_pptx.as_ref())?;
-                None
-            },
-            Operation::DocxEagerOpen
-            | Operation::DocxSourceOpen
-            | Operation::DocxEagerParagraphCount
-            | Operation::DocxSourceParagraphCount
-            | Operation::DocxEagerListParagraphs
-            | Operation::DocxSourceListParagraphs
-            | Operation::DocxEagerFullText
-            | Operation::DocxSourceFullText
-            | Operation::DocxEagerOpenParagraphCountLifecycle
-            | Operation::DocxSourceOpenParagraphCountLifecycle
-            | Operation::DocxEagerOpenFullTextLifecycle
-            | Operation::DocxSourceOpenFullTextLifecycle => {
-                timed_docx_full_text =
-                    run_docx_operation(operation, &source, prepared_docx.as_ref())?;
-                None
-            },
-            Operation::XlsxFileOpen
-            | Operation::XlsxFileOpenLifecycle
-            | Operation::XlsxFileSelectedCell => {
-                run_xlsx_operation(operation, &source, &mut deferred_xlsx_operation)?;
-                None
             },
             Operation::XlsxSourceRepeatedStoreMedium
             | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
@@ -3047,18 +2797,6 @@ where
         "not_applicable_immutable_owned_slice"
     } else if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
         "not_applicable_eager_opc"
-    } else if operation.is_pptx() {
-        if operation.is_source_pptx() {
-            "untimed_source_replay_only"
-        } else {
-            "not_applicable_eager_pptx"
-        }
-    } else if operation.is_docx() {
-        if operation.is_source_docx() {
-            "untimed_source_replay_only"
-        } else {
-            "not_applicable_eager_docx"
-        }
     } else if operation.is_xlsx() {
         "not_applicable_filesystem_xlsx"
     } else {
@@ -3071,11 +2809,7 @@ where
     let (pptx_replay_operation, docx_replay_operation) = match operation.ops() {
         Some(route) if route.is_pptx() => (route.source_replay(), None),
         Some(route) if route.is_docx() => (None, route.source_replay()),
-        Some(_) => (None, None),
-        None => (
-            operation.is_source_pptx().then_some(operation),
-            operation.is_source_docx().then_some(operation),
-        ),
+        _ => (None, None),
     };
     let pptx_source_replay = pptx_replay_operation
         .map(|replay_operation| {
@@ -3121,17 +2855,6 @@ where
         } else {
             None
         }
-    } else if operation.is_xlsx() && !operation.is_xlsx_repeated_store() {
-        let deferred = deferred_xlsx_operation
-            .as_ref()
-            .ok_or("XLSX child operation did not retain its timed workbook")?;
-        Some(verify_xlsx_operation(
-            operation,
-            &source,
-            &corpus,
-            matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
-            deferred,
-        )?)
     } else {
         None
     };
@@ -3157,15 +2880,6 @@ where
         matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
         timed_docx_full_text.as_deref(),
     )?;
-    if let Some(deferred) = deferred_xlsx_operation.take() {
-        // Only release the exact timed workbook, selected result, and
-        // lifecycle projection after their correctness validation and every
-        // operation-only snapshot.
-        std::hint::black_box(deferred.timed_projection);
-        std::hint::black_box(deferred.timed_selected_sheet);
-        std::hint::black_box(deferred.timed_selected_cell);
-        std::hint::black_box(deferred.workbook);
-    }
     if let Some(deferred) = deferred_xlsx_repeat_store_operation.take() {
         std::hint::black_box(deferred.workbook);
         std::hint::black_box(deferred.worksheet);
@@ -4745,7 +4459,7 @@ fn pptx_payload_ranges(bytes: &[u8]) -> Result<(Vec<Range<u64>>, Vec<Range<u64>>
 
 fn replay_pptx_source(
     source: &Path,
-    operation: Operation,
+    operation: SourceReplay,
     child_mode: ChildMode,
     corpus: &super::Corpus,
     aligned_mode: bool,
@@ -4768,13 +4482,14 @@ fn replay_pptx_source(
     let slide_count = presentation.slide_count();
     let mut semantic = Sha256::new();
     match operation {
-        Operation::PptxSourceOpen => {},
-        Operation::PptxSourceSlideCount | Operation::PptxSourceOpenSlideCountLifecycle => {
+        SourceReplay::PptxSourceOpen => {},
+        SourceReplay::PptxSourceSlideCount | SourceReplay::PptxSourceOpenSlideCountLifecycle => {
             if slide_count != super::PPTX_SOURCE_SLIDE_COUNT {
                 return Err("PPTX source replay slide count differs from corpus".into());
             }
         },
-        Operation::PptxSourceSelectedSlide | Operation::PptxSourceOpenSelectedSlideLifecycle => {
+        SourceReplay::PptxSourceSelectedSlide
+        | SourceReplay::PptxSourceOpenSelectedSlideLifecycle => {
             let slide = presentation
                 .slide(PPTX_FILE_SELECTED_POSITION)
                 .ok_or("PPTX source replay selected slide is missing")?;
@@ -4783,7 +4498,7 @@ fn replay_pptx_source(
             semantic.update([0]);
             semantic.update(name.as_bytes());
         },
-        Operation::PptxSourceListSlides => {
+        SourceReplay::PptxSourceListSlides => {
             for slide in presentation.slides() {
                 let (text, name) = slide.text_and_name()?;
                 semantic.update(text.as_bytes());
@@ -4866,9 +4581,9 @@ fn replay_pptx_source(
     let open_classified =
         pptx_open_phase_classified(&open_phase, aligned_eocd_tail_probe.is_some());
     let classification = match operation {
-        Operation::PptxSourceOpen
-        | Operation::PptxSourceSlideCount
-        | Operation::PptxSourceOpenSlideCountLifecycle
+        SourceReplay::PptxSourceOpen
+        | SourceReplay::PptxSourceSlideCount
+        | SourceReplay::PptxSourceOpenSlideCountLifecycle
             if open_classified && query_payload_zero =>
         {
             if aligned_eocd_tail_probe.is_some() {
@@ -4877,7 +4592,7 @@ fn replay_pptx_source(
                 "catalog-only:zero-slide-and-media-overlap"
             }
         },
-        Operation::PptxSourceSelectedSlide | Operation::PptxSourceOpenSelectedSlideLifecycle
+        SourceReplay::PptxSourceSelectedSlide | SourceReplay::PptxSourceOpenSelectedSlideLifecycle
             if open_classified
                 && query_selected_slide_payload_fully_covered
                 && query_selected_slide_payload_covered_bytes
@@ -4894,7 +4609,7 @@ fn replay_pptx_source(
                 "selected-slide-only:target-slide-no-unselected-or-media-overlap"
             }
         },
-        Operation::PptxSourceListSlides
+        SourceReplay::PptxSourceListSlides
             if open_classified
                 && query_slide_payload_ranges_fully_covered == slide_range_count
                 && query_slide_payload_covered_bytes == slide_payload_total_bytes
@@ -4916,7 +4631,7 @@ fn replay_pptx_source(
         let raw_reads = replay.raw_read_observations()?;
         let media_payload_total_bytes = covered_bytes(&media_ranges, &media_ranges)?;
         let diagnostic = PptxReplayClassificationDiagnostic {
-            operation: operation.case().name().to_owned(),
+            operation: operation.predecessor_name().to_owned(),
             child_mode: child_mode.name().to_owned(),
             open_read_count,
             classification: classification.clone(),
@@ -4959,7 +4674,7 @@ fn replay_pptx_source(
         let diagnostic = serde_json::to_string(&diagnostic)?;
         return Err(format!(
             "PPTX source replay violated {} payload-range classification; diagnostic={diagnostic}",
-            operation.case().name(),
+            operation.predecessor_name(),
         )
         .into());
     }
@@ -4970,7 +4685,10 @@ fn replay_pptx_source(
         source_sha256: super::sha256_hex(&bytes),
         slide_count,
         selected_position: (operation.is_pptx_query()
-            || matches!(operation, Operation::PptxSourceOpenSelectedSlideLifecycle))
+            || matches!(
+                operation,
+                SourceReplay::PptxSourceOpenSelectedSlideLifecycle
+            ))
         .then_some(PPTX_FILE_SELECTED_POSITION),
         read_calls: counters.read_calls,
         read_bytes: counters.read_bytes,
@@ -5445,7 +5163,7 @@ fn docx_aligned_eocd_tail_probe(
 
 fn replay_docx_source(
     source: &Path,
-    operation: Operation,
+    operation: SourceReplay,
     corpus: &super::Corpus,
     aligned_mode: bool,
     aligned_proof: Option<&cold_verified::Sample>,
@@ -5462,12 +5180,12 @@ fn replay_docx_source(
         let document = package.document()?;
         let prepared = replay.snapshot()?;
         match operation {
-            Operation::DocxSourceParagraphCount
-            | Operation::DocxSourceOpenParagraphCountLifecycle => {
+            SourceReplay::DocxSourceParagraphCount
+            | SourceReplay::DocxSourceOpenParagraphCountLifecycle => {
                 paragraph_count = document.paragraph_count()?;
                 semantic.update(paragraph_count.to_le_bytes());
             },
-            Operation::DocxSourceListParagraphs => {
+            SourceReplay::DocxSourceListParagraphs => {
                 let paragraphs = document.paragraphs()?;
                 paragraph_count = paragraphs.len();
                 for paragraph in paragraphs {
@@ -5476,7 +5194,7 @@ fn replay_docx_source(
                     semantic.update([0]);
                 }
             },
-            Operation::DocxSourceFullText | Operation::DocxSourceOpenFullTextLifecycle => {
+            SourceReplay::DocxSourceFullText | SourceReplay::DocxSourceOpenFullTextLifecycle => {
                 let text = document.extract_text()?;
                 paragraph_count = document.paragraph_count()?;
                 semantic.update(text.as_bytes());
@@ -5568,7 +5286,7 @@ fn replay_docx_source(
     if classification == "classification-failed" {
         return Err(format!(
             "DOCX source replay violated {} payload-range classification",
-            operation.case().name()
+            operation.predecessor_name()
         )
         .into());
     }
@@ -5929,230 +5647,6 @@ fn run_opc_source_open(
     Ok((Some(counter), package))
 }
 
-fn run_pptx_operation(
-    operation: Operation,
-    source: &Path,
-    prepared: Option<&litchi::Presentation>,
-) -> Result<(), Box<dyn Error>> {
-    match operation {
-        Operation::PptxEagerOpen => {
-            let presentation = litchi::Presentation::from_bytes(fs::read(source)?)?;
-            std::hint::black_box(presentation);
-        },
-        Operation::PptxSourceOpen => {
-            // This is the candidate path under measurement. The root facade
-            // must open the filesystem path directly rather than replaying a
-            // caller-owned byte buffer.
-            let presentation = litchi::Presentation::open(source)?;
-            std::hint::black_box(presentation);
-        },
-        Operation::PptxEagerListSlides | Operation::PptxSourceListSlides => {
-            let presentation = prepared.ok_or("PPTX list-slides operation has no prepared root")?;
-            // `slides()` returns owned Slide values. This control deliberately
-            // materializes the complete vector and never uses a lazy iterator.
-            let slides = presentation.slides()?;
-            if slides.len() != super::PPTX_SOURCE_SLIDE_COUNT {
-                return Err("PPTX list-slides count differs from fixed corpus".into());
-            }
-            std::hint::black_box(slides);
-        },
-        Operation::PptxEagerSlideCount | Operation::PptxSourceSlideCount => {
-            let presentation = prepared.ok_or("PPTX slide-count operation has no prepared root")?;
-            let count = presentation.slide_count()?;
-            if count != super::PPTX_SOURCE_SLIDE_COUNT {
-                return Err("PPTX slide-count differs from fixed corpus".into());
-            }
-            std::hint::black_box(count);
-        },
-        Operation::PptxEagerSelectedSlide | Operation::PptxSourceSelectedSlide => {
-            let presentation =
-                prepared.ok_or("PPTX selected-slide operation has no prepared root")?;
-            let slide = presentation
-                .slide(PPTX_FILE_SELECTED_POSITION)?
-                .ok_or("PPTX selected slide is missing")?;
-            // Use the selector-first public primitive. In particular, do not
-            // replace this with `slides().nth(...)`, which would materialize
-            // every slide on the source-backed path.
-            std::hint::black_box(slide);
-        },
-        Operation::PptxEagerOpenSlideCountLifecycle
-        | Operation::PptxSourceOpenSlideCountLifecycle => {
-            let presentation = if operation.is_source_pptx() {
-                litchi::Presentation::open(source)?
-            } else {
-                litchi::Presentation::from_bytes(fs::read(source)?)?
-            };
-            let count = presentation.slide_count()?;
-            if count != super::PPTX_SOURCE_SLIDE_COUNT {
-                return Err("PPTX lifecycle slide-count differs from fixed corpus".into());
-            }
-            std::hint::black_box((presentation, count));
-        },
-        Operation::PptxEagerOpenSelectedSlideLifecycle
-        | Operation::PptxSourceOpenSelectedSlideLifecycle => {
-            let presentation = if operation.is_source_pptx() {
-                litchi::Presentation::open(source)?
-            } else {
-                litchi::Presentation::from_bytes(fs::read(source)?)?
-            };
-            let slide = presentation
-                .slide(PPTX_FILE_SELECTED_POSITION)?
-                .ok_or("PPTX lifecycle selected slide is missing")?;
-            std::hint::black_box(slide);
-            std::hint::black_box(&presentation);
-        },
-        _ => return Err("non-PPTX operation passed to run_pptx_operation".into()),
-    }
-    Ok(())
-}
-
-#[allow(
-    clippy::large_enum_variant,
-    reason = "the harness compares the typed eager owner with the unified source owner"
-)]
-enum PreparedDocx {
-    Eager(litchi_docx::Package, litchi_core::Metadata),
-    Source(litchi::Document),
-}
-
-impl PreparedDocx {
-    fn eager(bytes: Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        let detected = litchi::detection_smart::detect_format_smart_with_limits(
-            bytes,
-            litchi_docx::ReadLimits::default(),
-        )
-        .ok_or("DOCX eager detector did not identify a supported package")?;
-        let package = match detected {
-            litchi::detection_smart::DetectedFormat::Docx(opc) => {
-                litchi_docx::Package::from_opc_package(opc)?
-            },
-            _ => return Err("DOCX eager detector returned a non-DOCX package".into()),
-        };
-        package.document()?.text()?;
-        let metadata = package
-            .props()
-            .cloned()
-            .map(litchi_core::Metadata::from)
-            .unwrap_or_default();
-        Ok(Self::Eager(package, metadata))
-    }
-
-    fn source(source: &Path) -> Result<Self, Box<dyn Error>> {
-        Ok(Self::Source(litchi::Document::open(source)?))
-    }
-
-    fn paragraph_count(&self) -> Result<usize, Box<dyn Error>> {
-        match self {
-            Self::Eager(package, _) => Ok(package.document()?.paragraph_count()?),
-            Self::Source(document) => Ok(document.paragraph_count()?),
-        }
-    }
-
-    fn list_paragraphs(&self) -> Result<(), Box<dyn Error>> {
-        match self {
-            Self::Eager(package, _) => {
-                let paragraphs = package
-                    .document()?
-                    .paragraphs()?
-                    .into_iter()
-                    .map(litchi::document::Paragraph::Docx)
-                    .collect::<Vec<_>>();
-                std::hint::black_box(paragraphs);
-            },
-            Self::Source(document) => {
-                let paragraphs = document.paragraphs()?;
-                std::hint::black_box(paragraphs);
-            },
-        }
-        Ok(())
-    }
-
-    fn text(&self) -> Result<String, Box<dyn Error>> {
-        match self {
-            Self::Eager(package, _) => Ok(package.document()?.text()?),
-            Self::Source(document) => Ok(document.text()?),
-        }
-    }
-
-    fn semantic_signature(&self) -> Result<String, Box<dyn Error>> {
-        match self {
-            Self::Eager(package, metadata) => docx_package_signature(package, metadata),
-            Self::Source(document) => docx_document_signature(document),
-        }
-    }
-}
-
-fn run_docx_operation(
-    operation: Operation,
-    source: &Path,
-    prepared: Option<&PreparedDocx>,
-) -> Result<Option<String>, Box<dyn Error>> {
-    match operation {
-        Operation::DocxEagerOpen => {
-            let document = PreparedDocx::eager(fs::read(source)?)?;
-            std::hint::black_box(document);
-            Ok(None)
-        },
-        Operation::DocxSourceOpen => {
-            // This is the candidate path under measurement. The root facade
-            // must adopt the filesystem source rather than replaying a byte
-            // buffer through the eager compatibility path.
-            let document = litchi::Document::open(source)?;
-            std::hint::black_box(document);
-            Ok(None)
-        },
-        Operation::DocxEagerParagraphCount | Operation::DocxSourceParagraphCount => {
-            let document = prepared.ok_or("DOCX paragraph-count operation has no prepared root")?;
-            let count = document.paragraph_count()?;
-            std::hint::black_box(count);
-            Ok(None)
-        },
-        Operation::DocxEagerListParagraphs | Operation::DocxSourceListParagraphs => {
-            let document = prepared.ok_or("DOCX list-paragraphs operation has no prepared root")?;
-            document.list_paragraphs()?;
-            Ok(None)
-        },
-        Operation::DocxEagerFullText | Operation::DocxSourceFullText => {
-            let document = prepared.ok_or("DOCX full-text operation has no prepared root")?;
-            let text = document.text()?;
-            std::hint::black_box(text);
-            Ok(None)
-        },
-        Operation::DocxEagerOpenParagraphCountLifecycle
-        | Operation::DocxSourceOpenParagraphCountLifecycle => {
-            let document = if operation.is_source_docx() {
-                PreparedDocx::source(source)?
-            } else {
-                PreparedDocx::eager(fs::read(source)?)?
-            };
-            let count = document.paragraph_count()?;
-            if count != super::SemanticShape::Medium.docx_paragraphs() {
-                return Err("DOCX lifecycle paragraph count differs from fixed corpus".into());
-            }
-            std::hint::black_box((document, count));
-            Ok(None)
-        },
-        Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle => {
-            // Keep the returned String alive after the timer while the
-            // document is dropped before this function returns.  This binds
-            // post-timer correctness to the exact value observed by the
-            // measured lifecycle without charging its digest to elapsed_ns.
-            let text = {
-                let document = if operation.is_source_docx() {
-                    PreparedDocx::source(source)?
-                } else {
-                    PreparedDocx::eager(fs::read(source)?)?
-                };
-                let text = document.text()?;
-                std::hint::black_box(&text);
-                text
-            };
-            Ok(Some(text))
-        },
-        _ => Err("non-DOCX operation passed to run_docx_operation".into()),
-    }
-}
-
 /// Returns the fixed full-text projection implied by the deterministic DOCX
 /// corpus inputs. This oracle does not reopen the measured source or invoke
 /// the timed facade; it is built from the pinned paragraph payloads.
@@ -6254,28 +5748,6 @@ fn xlsx_semantic_projection_sha256(
     ))?))
 }
 
-fn xlsx_timed_names_count_text(
-    workbook: &litchi::Workbook,
-) -> Result<(Vec<String>, usize, String), Box<dyn Error>> {
-    let worksheet_names = workbook
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    let worksheet_count = workbook
-        .worksheet_count()
-        .map_err(|error| error.to_string())?;
-    let full_text = workbook.text().map_err(|error| error.to_string())?;
-    Ok((worksheet_names, worksheet_count, full_text))
-}
-
-struct DeferredXlsxOperation {
-    workbook: litchi::Workbook,
-    timed_projection: Option<(Vec<String>, usize, String)>,
-    selected_sheet_query: Option<String>,
-    selected_cell_address: Option<String>,
-    timed_selected_sheet: Option<litchi::sheet::SelectedWorksheet>,
-    timed_selected_cell: Option<litchi::sheet::SelectedCellView>,
-}
-
 const XLSX_FILE_SELECTED_CELL_TARGET: super::XlsxCoordinate = super::XlsxCoordinate {
     sheet: 1,
     row: 28,
@@ -6294,127 +5766,6 @@ fn mixed_ascii_case(value: &str) -> String {
             }
         })
         .collect()
-}
-
-fn prepare_xlsx_file_selected_cell_operation(
-    source: &Path,
-) -> Result<DeferredXlsxOperation, Box<dyn Error>> {
-    let target = XLSX_FILE_SELECTED_CELL_TARGET;
-    let workbook = litchi::Workbook::open(source).map_err(|error| error.to_string())?;
-    let selected_sheet_query = mixed_ascii_case(&super::xlsx_sheet_name(target.sheet));
-    let selected_cell_address = super::xlsx_address(target.row, target.column)?;
-    Ok(DeferredXlsxOperation {
-        workbook,
-        timed_projection: None,
-        selected_sheet_query: Some(selected_sheet_query),
-        selected_cell_address: Some(selected_cell_address),
-        timed_selected_sheet: None,
-        timed_selected_cell: None,
-    })
-}
-
-fn xlsx_deferred_semantic_projection(
-    operation: Operation,
-    deferred: &DeferredXlsxOperation,
-) -> Result<XlsxRootSemanticProjection, Box<dyn Error>> {
-    let (worksheet_names, worksheet_count, full_text) =
-        match (operation, deferred.timed_projection.as_ref()) {
-            (Operation::XlsxFileOpen, None) => xlsx_timed_names_count_text(&deferred.workbook)?,
-            (Operation::XlsxFileOpenLifecycle, Some((names, count, text))) => {
-                // Clone only after the timer and evidence snapshots: these are
-                // the exact names/count/text values produced by the timed scope.
-                (names.clone(), *count, text.clone())
-            },
-            (Operation::XlsxFileOpen, Some(_)) => {
-                return Err("XLSX open retained an unexpected lifecycle projection".into());
-            },
-            (Operation::XlsxFileOpenLifecycle, None) => {
-                return Err("XLSX lifecycle omitted its timed projection".into());
-            },
-            (Operation::XlsxFileSelectedCell, None) => {
-                xlsx_timed_names_count_text(&deferred.workbook)?
-            },
-            (Operation::XlsxFileSelectedCell, Some(_)) => {
-                return Err(
-                    "XLSX selected-cell operation retained an unexpected projection".into(),
-                );
-            },
-            _ => return Err("non-XLSX operation passed to deferred XLSX projection".into()),
-        };
-    let metadata = deferred
-        .workbook
-        .metadata()
-        .map_err(|error| error.to_string())?;
-    let metadata_sha256 = super::xlsx_root_metadata_digest(&metadata)?;
-    Ok(XlsxRootSemanticProjection {
-        worksheet_names,
-        worksheet_count,
-        full_text,
-        metadata_sha256,
-    })
-}
-
-fn run_xlsx_operation(
-    operation: Operation,
-    source: &Path,
-    deferred: &mut Option<DeferredXlsxOperation>,
-) -> Result<(), Box<dyn Error>> {
-    match operation {
-        Operation::XlsxFileOpen => {
-            // The open-only selector measures only path open and root
-            // construction. Its full semantic projection is consumed after
-            // the timer in `run_child_arguments`.
-            *deferred = Some(DeferredXlsxOperation {
-                workbook: litchi::Workbook::open(source).map_err(|error| error.to_string())?,
-                timed_projection: None,
-                selected_sheet_query: None,
-                selected_cell_address: None,
-                timed_selected_sheet: None,
-                timed_selected_cell: None,
-            });
-        },
-        Operation::XlsxFileOpenLifecycle => {
-            // Keep this timed boundary to exactly path open plus the declared
-            // names/count/full-text projection. Semantic hashing, JSON
-            // serialization, and metadata I/O are deferred until after the
-            // operation-only evidence snapshots.
-            let workbook = litchi::Workbook::open(source).map_err(|error| error.to_string())?;
-            let projection = xlsx_timed_names_count_text(&workbook)?;
-            *deferred = Some(DeferredXlsxOperation {
-                workbook,
-                timed_projection: Some(projection),
-                selected_sheet_query: None,
-                selected_cell_address: None,
-                timed_selected_sheet: None,
-                timed_selected_cell: None,
-            });
-        },
-        Operation::XlsxFileSelectedCell => {
-            let deferred = deferred
-                .as_mut()
-                .ok_or("XLSX selected-cell operation has no prepared workbook")?;
-            let selector = deferred
-                .selected_sheet_query
-                .as_deref()
-                .ok_or("XLSX selected-cell operation has no prepared sheet selector")?;
-            let address = deferred
-                .selected_cell_address
-                .as_deref()
-                .ok_or("XLSX selected-cell operation has no prepared cell address")?;
-            let sheet = deferred
-                .workbook
-                .sheet(selector)
-                .map_err(|error| error.to_string())?
-                .ok_or("XLSX selected-cell operation target sheet is missing")?;
-            let cell = sheet.cell(address).map_err(|error| error.to_string())?;
-            std::hint::black_box(&sheet);
-            std::hint::black_box(&cell);
-            deferred.timed_selected_sheet = Some(sheet);
-            deferred.timed_selected_cell = Some(cell);
-        },
-        _ => return Err("non-XLSX operation passed to run_xlsx_operation".into()),
-    }
-    Ok(())
 }
 
 fn run_opc_eager_save(
@@ -6642,42 +5993,7 @@ fn verify_child_output(
             }
             Ok(())
         },
-        Operation::PptxEagerOpen
-        | Operation::PptxSourceOpen
-        | Operation::PptxEagerListSlides
-        | Operation::PptxSourceListSlides
-        | Operation::PptxEagerSlideCount
-        | Operation::PptxSourceSlideCount
-        | Operation::PptxEagerSelectedSlide
-        | Operation::PptxSourceSelectedSlide
-        | Operation::PptxEagerOpenSlideCountLifecycle
-        | Operation::PptxSourceOpenSlideCountLifecycle
-        | Operation::PptxEagerOpenSelectedSlideLifecycle
-        | Operation::PptxSourceOpenSelectedSlideLifecycle => {
-            verify_pptx_operation(source, corpus, allow_page_aligned_source)
-        },
-        Operation::DocxEagerOpen
-        | Operation::DocxSourceOpen
-        | Operation::DocxEagerParagraphCount
-        | Operation::DocxSourceParagraphCount
-        | Operation::DocxEagerListParagraphs
-        | Operation::DocxSourceListParagraphs
-        | Operation::DocxEagerFullText
-        | Operation::DocxSourceFullText
-        | Operation::DocxEagerOpenParagraphCountLifecycle
-        | Operation::DocxSourceOpenParagraphCountLifecycle
-        | Operation::DocxEagerOpenFullTextLifecycle
-        | Operation::DocxSourceOpenFullTextLifecycle => verify_docx_operation(
-            operation,
-            source,
-            corpus,
-            allow_page_aligned_source,
-            timed_docx_full_text,
-        ),
-        Operation::XlsxFileOpen
-        | Operation::XlsxFileOpenLifecycle
-        | Operation::XlsxFileSelectedCell
-        | Operation::XlsxSourceRepeatedStoreMedium
+        Operation::XlsxSourceRepeatedStoreMedium
         | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Operation::XlsxSourceRepeatedStoreOversized
         | Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
@@ -6692,203 +6008,6 @@ fn verify_child_output(
             allow_page_aligned_source,
             timed_docx_full_text,
         ),
-    }
-}
-
-fn verify_pptx_operation(
-    source: &Path,
-    corpus: &super::Corpus,
-    allow_page_aligned_source: bool,
-) -> Result<(), Box<dyn Error>> {
-    if corpus.manifest.generator != PPTX_FILE_CORPUS_GENERATOR {
-        return Err("PPTX filesystem source has the wrong corpus generator".into());
-    }
-    let bytes = fs::read(source)?;
-    if !allow_page_aligned_source {
-        if super::sha256_hex(&bytes) != corpus.manifest.archive_sha256 {
-            return Err("PPTX filesystem source hash differs from corpus manifest".into());
-        }
-        if bytes.len() != corpus.manifest.archive_bytes {
-            return Err("PPTX filesystem source length differs from corpus manifest".into());
-        }
-    }
-    let eager = litchi::Presentation::from_bytes(bytes)?;
-    let source_backed = litchi::Presentation::open(source)?;
-    let eager_signature = pptx_presentation_signature(&eager)?;
-    let source_signature = pptx_presentation_signature(&source_backed)?;
-    if eager_signature != source_signature {
-        return Err("PPTX eager/source ordinary-root semantic signatures differ".into());
-    }
-    if eager.slide_count()? != super::PPTX_SOURCE_SLIDE_COUNT {
-        return Err("PPTX filesystem corpus slide count differs from specification".into());
-    }
-    Ok(())
-}
-
-fn verify_docx_operation(
-    operation: Operation,
-    source: &Path,
-    corpus: &super::Corpus,
-    allow_page_aligned_source: bool,
-    timed_docx_full_text: Option<&str>,
-) -> Result<(), Box<dyn Error>> {
-    if corpus.manifest.generator != DOCX_FILE_CORPUS_GENERATOR {
-        return Err("DOCX filesystem source has the wrong corpus generator".into());
-    }
-    let bytes = fs::read(source)?;
-    let source_sha256 = super::sha256_hex(&bytes);
-    if !allow_page_aligned_source {
-        if bytes.len() != corpus.manifest.archive_bytes {
-            return Err("DOCX filesystem source length differs from corpus manifest".into());
-        }
-        if source_sha256 != corpus.manifest.archive_sha256 {
-            return Err("DOCX filesystem source hash differs from corpus manifest".into());
-        }
-    }
-    let eager = PreparedDocx::eager(bytes.clone())?;
-    let source_backed = PreparedDocx::source(source)?;
-    if eager.semantic_signature()? != source_backed.semantic_signature()? {
-        return Err("DOCX eager/source ordinary-root semantic signatures differ".into());
-    }
-    if eager.paragraph_count()? != super::SemanticShape::Medium.docx_paragraphs() {
-        return Err("DOCX filesystem corpus paragraph count differs from specification".into());
-    }
-    let is_full_text_lifecycle = matches!(
-        operation,
-        Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle
-    );
-    if let Some(observed) = timed_docx_full_text {
-        if !is_full_text_lifecycle {
-            return Err(
-                "non-lifecycle DOCX operation unexpectedly retained timed full text".into(),
-            );
-        }
-        verify_docx_timed_full_text(observed)?;
-    }
-    let aligned_signature = docx_archive_signature(&bytes)?;
-    let corpus_signature = docx_archive_signature(&corpus.archive)?;
-    if aligned_signature.semantic_sha256 != corpus_signature.semantic_sha256 {
-        return Err(format!(
-            "DOCX filesystem archive topology or payload hashes differ (aligned bytes {}, corpus bytes {})",
-            aligned_signature.physical_bytes, corpus_signature.physical_bytes
-        )
-        .into());
-    }
-    assert_source_sha256(source, &source_sha256)?;
-    Ok(())
-}
-
-fn verify_xlsx_operation(
-    operation: Operation,
-    source: &Path,
-    corpus: &super::Corpus,
-    allow_page_aligned_source: bool,
-    deferred: &DeferredXlsxOperation,
-) -> Result<(String, String, Option<XlsxSelectedCellEvidence>), Box<dyn Error>> {
-    assert_pinned_xlsx_corpus(corpus)?;
-    let initial_bytes = fs::read(source)?;
-    if !allow_page_aligned_source && initial_bytes.len() != XLSX_FILE_SOURCE_ARCHIVE_BYTES {
-        return Err("XLSX filesystem source length differs from corpus manifest".into());
-    }
-    // The typed owner and independent OPC package are both opened only after
-    // the operation evidence has been sampled. The exact facade workbook from
-    // the timed operation is checked against that oracle rather than a second
-    // path open or a facade-from-bytes oracle.
-    let expected = xlsx_typed_semantic_oracle(corpus)?;
-    let observed = xlsx_deferred_semantic_projection(operation, deferred)?;
-    if observed != expected {
-        return Err("XLSX filesystem semantic projection differs from deterministic corpus".into());
-    }
-    let selected_cell_evidence = operation
-        .is_xlsx_selected_cell()
-        .then(|| verify_xlsx_selected_cell(corpus, deferred))
-        .transpose()?;
-    let semantic_sha256 = xlsx_semantic_projection_sha256(&observed)?;
-
-    // Read and hash the source only after semantic verification. This is the
-    // final exact source identity, including the aligned cold-verifier copy;
-    // the parent additionally checks it against the prepared aligned hash.
-    let final_bytes = fs::read(source)?;
-    let source_sha256 = super::sha256_hex(&final_bytes);
-    if !allow_page_aligned_source
-        && (final_bytes.len() != XLSX_FILE_SOURCE_ARCHIVE_BYTES
-            || source_sha256 != XLSX_FILE_SOURCE_SHA256)
-    {
-        return Err("XLSX filesystem source hash or length differs from its fixed pin".into());
-    }
-    Ok((source_sha256, semantic_sha256, selected_cell_evidence))
-}
-
-fn verify_xlsx_selected_cell(
-    corpus: &super::Corpus,
-    deferred: &DeferredXlsxOperation,
-) -> Result<XlsxSelectedCellEvidence, Box<dyn Error>> {
-    let target = XLSX_FILE_SELECTED_CELL_TARGET;
-    let observed = deferred
-        .timed_selected_cell
-        .as_ref()
-        .ok_or("XLSX selected-cell operation omitted its timed cell view")?;
-    let expected_sheet_name = super::xlsx_sheet_name(target.sheet);
-    let expected_address = super::xlsx_address(target.row, target.column)?;
-    let expected_query = mixed_ascii_case(&expected_sheet_name);
-    if deferred.selected_sheet_query.as_deref() != Some(expected_query.as_str())
-        || deferred.selected_cell_address.as_deref() != Some(expected_address.as_str())
-    {
-        return Err("XLSX selected-cell operation changed its prepared selector".into());
-    }
-    let selected_sheet = deferred
-        .timed_selected_sheet
-        .as_ref()
-        .ok_or("XLSX selected-cell operation omitted its timed worksheet handle")?;
-    if selected_sheet.name() != expected_sheet_name.as_str()
-        || selected_sheet.position() != target.sheet
-    {
-        return Err("XLSX selected-cell worksheet identity differs from typed oracle".into());
-    }
-
-    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
-    let sheet = typed
-        .sheet(expected_sheet_name.as_str())?
-        .ok_or("typed XLSX selected-cell oracle target sheet is missing")?;
-    if sheet.name() != expected_sheet_name.as_str() || sheet.position() != target.sheet {
-        return Err("typed XLSX selected-cell worksheet identity differs from corpus".into());
-    }
-    let expected = match sheet.cell(expected_address.as_str())? {
-        litchi_xlsx::cell::View::Missing => litchi::sheet::SelectedCellView::Missing,
-        litchi_xlsx::cell::View::Covered(range) => litchi::sheet::SelectedCellView::Covered(range),
-        litchi_xlsx::cell::View::Stored(cell) => {
-            litchi::sheet::SelectedCellView::Stored(cell.clone())
-        },
-        _ => {
-            return Err("typed XLSX selected-cell oracle returned an unknown view".into());
-        },
-    };
-    if observed != &expected {
-        return Err("XLSX selected-cell view differs from typed eager oracle".into());
-    }
-    let expected_value = super::xlsx_value(target).to_string();
-    match observed {
-        litchi::sheet::SelectedCellView::Stored(litchi_xlsx::Cell::Value(
-            litchi_xlsx::Value::Number(value),
-        )) if value.as_str() == expected_value => {
-            let prepared_selector = deferred
-                .selected_sheet_query
-                .as_ref()
-                .ok_or("XLSX selected-cell operation omitted prepared selector")?;
-            let evidence = XlsxSelectedCellEvidence {
-                canonical_sheet_name: expected_sheet_name,
-                sheet_position: target.sheet,
-                prepared_selector: prepared_selector.clone(),
-                cell_address: expected_address,
-                view: "stored".to_owned(),
-                value_kind: "number".to_owned(),
-                lexical_value: value.as_str().to_owned(),
-                digest: String::new(),
-            };
-            let digest = xlsx_selected_cell_evidence_digest(&evidence)?;
-            Ok(XlsxSelectedCellEvidence { digest, ..evidence })
-        },
-        _ => Err("XLSX selected-cell value differs from deterministic generator".into()),
     }
 }
 
@@ -7236,44 +6355,6 @@ fn verify_xlsx_repeat_store_operation(
     Ok((source_sha256, semantic_sha256, evidence))
 }
 
-fn docx_document_signature(document: &litchi::Document) -> Result<String, Box<dyn Error>> {
-    let paragraphs = document
-        .paragraphs()?
-        .into_iter()
-        .map(|paragraph| paragraph.text())
-        .collect::<Result<Vec<_>, _>>()?;
-    let tables = document
-        .tables()?
-        .into_iter()
-        .map(|table| docx_table_projection(&table))
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    let elements = document
-        .elements()?
-        .into_iter()
-        .map(|element| {
-            if let Some(paragraph) = element.as_paragraph() {
-                return Ok(("paragraph", paragraph.text()?));
-            }
-            if let Some(table) = element.as_table() {
-                return Ok((
-                    "table",
-                    serde_json::to_string(&docx_table_projection(table)?)?,
-                ));
-            }
-            Err("DOCX element has no supported projection".into())
-        })
-        .collect::<Result<Vec<(&str, String)>, Box<dyn Error>>>()?;
-    let metadata = document.metadata()?;
-    Ok(super::sha256_hex(&serde_json::to_vec(&(
-        document.paragraph_count()?,
-        document.text()?,
-        paragraphs,
-        tables,
-        elements,
-        metadata,
-    ))?))
-}
-
 fn docx_package_signature(
     package: &litchi_docx::Package,
     metadata: &litchi_core::Metadata,
@@ -7317,32 +6398,6 @@ fn docx_package_signature(
         elements,
         metadata,
     ))?))
-}
-
-fn docx_table_projection(
-    table: &litchi::document::Table,
-) -> Result<(usize, Vec<(usize, Vec<String>)>), Box<dyn Error>> {
-    let row_count = table.row_count()?;
-    let rows = table.rows()?;
-    if rows.len() != row_count {
-        return Err("DOCX table row count disagrees with its row projection".into());
-    }
-    let rows = rows
-        .into_iter()
-        .map(|row| {
-            let cell_count = row.cell_count()?;
-            let cells = row
-                .cells()?
-                .into_iter()
-                .map(|cell| cell.text())
-                .collect::<Result<Vec<_>, _>>()?;
-            if cells.len() != cell_count {
-                return Err("DOCX table cell count disagrees with its cell projection".into());
-            }
-            Ok((cell_count, cells))
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    Ok((row_count, rows))
 }
 
 fn docx_package_table_projection(
@@ -7445,39 +6500,6 @@ fn docx_archive_signature(bytes: &[u8]) -> Result<DocxArchiveSignature, Box<dyn 
             parts,
         ))?),
     })
-}
-
-fn pptx_presentation_signature(
-    presentation: &litchi::Presentation,
-) -> Result<(usize, Option<i64>, Option<i64>, String, String, String), Box<dyn Error>> {
-    let metadata = serde_json::to_string(&presentation.metadata()?)?;
-    let mut slides_hasher = Sha256::new();
-    for (position, slide) in presentation.slides()?.into_iter().enumerate() {
-        let text = slide.text()?;
-        let name = slide.name()?.unwrap_or_default();
-        slides_hasher.update(position.to_le_bytes());
-        slides_hasher.update((text.len() as u64).to_le_bytes());
-        slides_hasher.update(text.as_bytes());
-        slides_hasher.update((name.len() as u64).to_le_bytes());
-        slides_hasher.update(name.as_bytes());
-    }
-    let selected = presentation
-        .slide(PPTX_FILE_SELECTED_POSITION)?
-        .ok_or("PPTX signature selected slide is missing")?;
-    let selected_text = selected.text()?;
-    let selected_name = selected.name()?.unwrap_or_default();
-    let mut selected_hasher = Sha256::new();
-    selected_hasher.update(selected_text.as_bytes());
-    selected_hasher.update([0]);
-    selected_hasher.update(selected_name.as_bytes());
-    Ok((
-        presentation.slide_count()?,
-        presentation.slide_width()?,
-        presentation.slide_height()?,
-        metadata,
-        super::sha256_hex(slides_hasher.finalize().as_slice()),
-        super::sha256_hex(selected_hasher.finalize().as_slice()),
-    ))
 }
 
 fn verify_opc_package(package: &OpcPackage, corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
@@ -7637,6 +6659,13 @@ mod tests {
             "provider_atomic_save",
             "cfb_file_same_length_overlay_atomic_save",
             "cfb_file_owned_same_length_overlay_atomic_save",
+        ] {
+            assert!(Operation::parse(name).is_some(), "{name}");
+        }
+        assert!(Operation::parse("ole2_same_length_overlay_atomic_save").is_none());
+        // M0a step S9 deleted the predecessor DOCX, PPTX and XLSX root
+        // selectors with the facade types they timed.
+        for name in [
             "pptx_file_eager_open",
             "pptx_file_source_open",
             "pptx_file_eager_list_slides",
@@ -7665,9 +6694,8 @@ mod tests {
             "xlsx_file_open_lifecycle",
             "xlsx_file_selected_cell",
         ] {
-            assert!(Operation::parse(name).is_some(), "{name}");
+            assert!(Operation::parse(name).is_none(), "{name}");
         }
-        assert!(Operation::parse("ole2_same_length_overlay_atomic_save").is_none());
     }
 
     #[test]
@@ -7768,43 +6796,49 @@ mod tests {
     }
 
     #[test]
-    fn pptx_root_operation_scopes_are_explicit() {
-        assert!(Operation::PptxEagerOpen.is_pptx());
-        assert!(Operation::PptxSourceSelectedSlide.is_source_pptx());
-        assert!(Operation::PptxSourceSelectedSlide.is_pptx_query());
-        assert!(!Operation::PptxSourceOpen.is_pptx_query());
-        assert!(!Operation::PptxSourceOpenSlideCountLifecycle.is_pptx_query());
-        assert!(Operation::PptxSourceOpenSlideCountLifecycle.is_source_pptx());
+    fn pptx_source_replay_scopes_are_explicit() {
+        use super::SourceReplay;
+
+        assert!(SourceReplay::PptxSourceSelectedSlide.is_pptx_query());
+        assert!(!SourceReplay::PptxSourceOpen.is_pptx_query());
+        assert!(!SourceReplay::PptxSourceOpenSlideCountLifecycle.is_pptx_query());
         assert_eq!(
-            Operation::PptxSourceListSlides.pptx_query_name(),
+            SourceReplay::PptxSourceListSlides.pptx_query_name(),
             Some("list_slides")
         );
         assert_eq!(
-            Operation::PptxEagerSlideCount.pptx_query_name(),
+            SourceReplay::PptxSourceSlideCount.pptx_query_name(),
             Some("slide_count")
+        );
+        assert_eq!(
+            SourceReplay::PptxSourceOpenSelectedSlideLifecycle.predecessor_name(),
+            "pptx_file_source_open_selected_slide_lifecycle"
         );
     }
 
     #[test]
-    fn docx_root_operation_scopes_are_explicit() {
-        assert!(Operation::DocxEagerOpen.is_docx());
-        assert!(Operation::DocxSourceFullText.is_source_docx());
-        assert!(Operation::DocxSourceFullText.is_docx_query());
-        assert!(!Operation::DocxSourceOpen.is_docx_query());
-        assert!(Operation::DocxSourceOpenFullTextLifecycle.is_docx_lifecycle());
-        assert!(!Operation::DocxSourceOpenFullTextLifecycle.is_docx_query());
-        assert!(Operation::DocxSourceOpenFullTextLifecycle.is_source_docx());
+    fn docx_source_replay_scopes_are_explicit() {
+        use super::SourceReplay;
+
+        assert!(SourceReplay::DocxSourceFullText.is_docx_query());
+        assert!(!SourceReplay::DocxSourceOpen.is_docx_query());
+        assert!(SourceReplay::DocxSourceOpenFullTextLifecycle.is_docx_lifecycle());
+        assert!(!SourceReplay::DocxSourceOpenFullTextLifecycle.is_docx_query());
         assert_eq!(
-            Operation::DocxSourceParagraphCount.docx_query_name(),
+            SourceReplay::DocxSourceParagraphCount.docx_query_name(),
             Some("paragraph_count")
         );
         assert_eq!(
-            Operation::DocxSourceListParagraphs.docx_query_name(),
+            SourceReplay::DocxSourceListParagraphs.docx_query_name(),
             Some("list_paragraphs")
         );
         assert_eq!(
-            Operation::DocxSourceFullText.docx_query_name(),
+            SourceReplay::DocxSourceFullText.docx_query_name(),
             Some("full_text")
+        );
+        assert_eq!(
+            SourceReplay::DocxSourceFullText.predecessor_name(),
+            "docx_file_source_full_text"
         );
     }
 
@@ -7824,7 +6858,8 @@ mod tests {
             super::ChildResult::ineligible_cold_verified(super::cold_verified::Sample::ineligible(
                 super::cold_verified::Status::IneligiblePreparedQueryControl,
             ));
-        let operation = Operation::DocxSourceOpenFullTextLifecycle;
+        let operation = Operation::parse("docx_file_unified_source_open_full_text_lifecycle")
+            .expect("paired DOCX lifecycle route");
         assert!(super::validate_docx_timed_full_text_evidence(operation, &child).is_err());
         let (digest, bytes) =
             super::docx_timed_full_text_digest(&super::expected_docx_full_text()).unwrap();
@@ -7838,10 +6873,9 @@ mod tests {
         child.docx_timed_full_text_bytes = Some(bytes);
         child.docx_timed_full_text_sha256 = Some("0".repeat(64));
         assert!(super::validate_docx_timed_full_text_evidence(operation, &child).is_err());
-        assert!(
-            super::validate_docx_timed_full_text_evidence(Operation::DocxSourceFullText, &child)
-                .is_err()
-        );
+        let query = Operation::parse("docx_file_unified_source_full_text")
+            .expect("paired DOCX query route");
+        assert!(super::validate_docx_timed_full_text_evidence(query, &child).is_err());
     }
 
     #[test]
@@ -8413,14 +7447,9 @@ mod tests {
 
     #[test]
     fn prepared_query_controls_are_not_cold_verified() {
-        assert!(!Operation::PptxSourceSelectedSlide.supports_cold_verified());
-        assert!(!Operation::DocxSourceFullText.supports_cold_verified());
-        assert!(Operation::PptxSourceOpen.supports_cold_verified());
-        assert!(Operation::DocxSourceOpenFullTextLifecycle.supports_cold_verified());
+        // The paired DOCX, PPTX and XLSX routes are covered route by route in
+        // `ops` (`query_routes_are_prepared_and_never_cold_verified`).
         assert!(Operation::OpcSourceOpen.supports_cold_verified());
-        assert!(Operation::XlsxFileOpen.supports_cold_verified());
-        assert!(Operation::XlsxFileOpenLifecycle.supports_cold_verified());
-        assert!(!Operation::XlsxFileSelectedCell.supports_cold_verified());
         assert!(!Operation::XlsxSourceRepeatedStoreMedium.supports_cold_verified());
         assert!(
             !Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl.supports_cold_verified()
@@ -8434,17 +7463,17 @@ mod tests {
 
     #[test]
     fn xlsx_filesystem_operations_preserve_open_vs_lifecycle_scopes() {
-        let open = Operation::parse("xlsx_file_open").expect("XLSX open selector parses");
-        let lifecycle =
-            Operation::parse("xlsx_file_open_lifecycle").expect("XLSX lifecycle selector parses");
-        let selected = Operation::parse("xlsx_file_selected_cell")
+        let open = Operation::parse("xlsx_file_unified_open").expect("XLSX open selector parses");
+        let lifecycle = Operation::parse("xlsx_file_unified_open_lifecycle")
+            .expect("XLSX lifecycle selector parses");
+        let selected = Operation::parse("xlsx_file_unified_selected_cell")
             .expect("XLSX selected-cell selector parses");
         assert!(open.is_xlsx());
         assert!(lifecycle.is_xlsx());
         assert!(selected.is_xlsx());
-        assert_eq!(open.case().name(), "xlsx_file_open");
-        assert_eq!(lifecycle.case().name(), "xlsx_file_open_lifecycle");
-        assert_eq!(selected.case().name(), "xlsx_file_selected_cell");
+        assert_eq!(open.case().name(), "xlsx_file_unified_open");
+        assert_eq!(lifecycle.case().name(), "xlsx_file_unified_open_lifecycle");
+        assert_eq!(selected.case().name(), "xlsx_file_unified_selected_cell");
         assert_eq!(Operation::parse(open.case().name()), Some(open));
         assert_eq!(Operation::parse(lifecycle.case().name()), Some(lifecycle));
         assert_eq!(Operation::parse(selected.case().name()), Some(selected));
@@ -8514,22 +7543,21 @@ mod tests {
         let cache_selection = CacheSelection::parse("cold-verified").unwrap();
         let eligible = Some(super::cold_verified::Status::Eligible);
 
-        for operation in [
-            Operation::OpcEagerOpen,
-            Operation::OpcSourceOpen,
-            Operation::PptxEagerOpen,
-            Operation::PptxSourceOpen,
-            Operation::PptxEagerOpenSlideCountLifecycle,
-            Operation::PptxSourceOpenSlideCountLifecycle,
-            Operation::PptxEagerOpenSelectedSlideLifecycle,
-            Operation::PptxSourceOpenSelectedSlideLifecycle,
-            Operation::DocxEagerOpen,
-            Operation::DocxSourceOpen,
-            Operation::DocxEagerOpenParagraphCountLifecycle,
-            Operation::DocxSourceOpenParagraphCountLifecycle,
-            Operation::DocxEagerOpenFullTextLifecycle,
-            Operation::DocxSourceOpenFullTextLifecycle,
-        ] {
+        let paired = [
+            "pptx_file_unified_eager_open",
+            "pptx_file_leaf_source_open",
+            "pptx_file_unified_source_open_slide_count_lifecycle",
+            "pptx_file_leaf_eager_open_selected_slide_lifecycle",
+            "docx_file_unified_eager_open",
+            "docx_file_leaf_source_open",
+            "docx_file_unified_source_open_paragraph_count_lifecycle",
+            "docx_file_leaf_eager_open_full_text_lifecycle",
+        ]
+        .map(|name| Operation::parse(name).expect("paired open route"));
+        for operation in [Operation::OpcEagerOpen, Operation::OpcSourceOpen]
+            .into_iter()
+            .chain(paired)
+        {
             assert!(operation.supports_cold_verified());
             assert!(!operation.is_save());
             assert_eq!(
@@ -8644,26 +7672,17 @@ mod tests {
                 .as_nanos()
         ));
         fs::write(&path, &aligned).unwrap();
-        let deferred = super::DeferredXlsxOperation {
-            workbook: litchi::Workbook::open(&path).unwrap(),
-            timed_projection: None,
-            selected_sheet_query: None,
-            selected_cell_address: None,
-            timed_selected_sheet: None,
-            timed_selected_cell: None,
-        };
-        let (source_sha256, semantic_sha256, selected_cell) = super::verify_xlsx_operation(
-            super::Operation::XlsxFileOpen,
-            &path,
-            &corpus,
-            true,
-            &deferred,
-        )
-        .unwrap();
+        // The paired unified open route (M0a step S8b) verifies the padded
+        // archive as the deleted predecessor `xlsx_file_open` did.
+        let route = super::ops::Route::parse("xlsx_file_unified_open").expect("paired XLSX route");
+        let mut prepared = None;
+        let timed = super::ops::run_timed(route, &path, &mut prepared).unwrap();
+        let (source_sha256, semantic_sha256, selected_cell) =
+            super::ops::verify_xlsx(route, &path, &corpus, true, &timed).unwrap();
         assert_eq!(source_sha256, crate::sha256_hex(&aligned));
         assert_eq!(semantic_sha256, expected);
         assert!(selected_cell.is_none());
-        drop(deferred);
+        drop(timed);
         fs::remove_file(path).unwrap();
     }
 

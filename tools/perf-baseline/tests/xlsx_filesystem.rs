@@ -1,3 +1,8 @@
+//! The XLSX filesystem selectors' fresh-child protocol. M0a step S9 deleted
+//! the predecessor `xlsx_file_*` selectors with the facade workbook they
+//! timed; these checks run on their unified successors (step S8b), which
+//! report the same source, semantic and selected-cell evidence.
+
 use std::{
     collections::HashSet,
     fs,
@@ -32,7 +37,7 @@ fn xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children() {
     let output = Command::new(env!("CARGO_BIN_EXE_litchi-perf-baseline"))
         .args([
             "--case",
-            "xlsx_file_open,xlsx_file_open_lifecycle",
+            "xlsx_file_unified_open,xlsx_file_unified_open_lifecycle",
             "--samples",
             "2",
             "--warmup",
@@ -65,7 +70,7 @@ fn xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children() {
             .iter()
             .map(|entry| entry["case"].as_str().expect("result case"))
             .collect::<Vec<_>>(),
-        ["xlsx_file_open", "xlsx_file_open_lifecycle"]
+        ["xlsx_file_unified_open", "xlsx_file_unified_open_lifecycle"]
     );
     let evidence = report_value["filesystem_evidence"]
         .as_array()
@@ -112,7 +117,7 @@ fn xlsx_file_cold_verified_is_eligible_or_explicitly_ineligible() {
     let output = Command::new(env!("CARGO_BIN_EXE_litchi-perf-baseline"))
         .args([
             "--case",
-            "xlsx_file_open",
+            "xlsx_file_unified_open",
             "--samples",
             "1",
             "--warmup",
@@ -166,7 +171,7 @@ fn xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible() {
     let output = Command::new(env!("CARGO_BIN_EXE_litchi-perf-baseline"))
         .args([
             "--case",
-            "xlsx_file_selected_cell",
+            "xlsx_file_unified_selected_cell",
             "--samples",
             "2",
             "--warmup",
@@ -188,10 +193,10 @@ fn xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible() {
             .expect("parse selected-cell report");
     assert_eq!(
         report_value["results"][0]["case"],
-        "xlsx_file_selected_cell"
+        "xlsx_file_unified_selected_cell"
     );
     let evidence = &report_value["filesystem_evidence"][0];
-    assert_eq!(evidence["case"], "xlsx_file_selected_cell");
+    assert_eq!(evidence["case"], "xlsx_file_unified_selected_cell");
     assert_eq!(evidence["fresh_child_per_sample"], true);
     assert_eq!(evidence["sample_count"], 2);
     let samples = evidence["samples"]
@@ -229,7 +234,7 @@ fn xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible() {
     let output = Command::new(env!("CARGO_BIN_EXE_litchi-perf-baseline"))
         .args([
             "--case",
-            "xlsx_file_selected_cell",
+            "xlsx_file_unified_selected_cell",
             "--samples",
             "1",
             "--warmup",

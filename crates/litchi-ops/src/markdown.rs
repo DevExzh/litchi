@@ -4,10 +4,11 @@
 //! refusal is typed.
 //!
 //! The adapter moved here from the `litchi` facade, where it served the
-//! facade's format-family types. `ToMarkdown` and `File` are both foreign to
-//! the facade, so the implementation must live next to `File`. The rendering
-//! is unchanged: an input both accept produces the same bytes. What changed
-//! is the error, which is the typed [`Error`] of this crate.
+//! facade's format-family types (deleted in M0a step S9). `ToMarkdown` and
+//! `File` are both foreign to the facade, so the implementation must live
+//! next to `File`. The rendering is unchanged: the facade's Markdown corpus
+//! goldens, recorded from the deleted types, pin it. What changed is the
+//! error, which is the typed [`Error`] of this crate.
 
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 mod document;

@@ -31,9 +31,9 @@
   "selector_registry": {
     "source": "tools/perf-baseline/src/lib.rs",
     "registry_format": "case-name-utf8-newline-v1",
-    "minimum_selectable_cases": 652,
-    "selector_count": 652,
-    "selector_names_sha256": "61ce017357dca944e478cfa22bc3605beb18770def66269d377d0cf709fbab9d",
+    "minimum_selectable_cases": 605,
+    "selector_count": 605,
+    "selector_names_sha256": "c0e60833f573fdf289c1444a0ddc8cd1b8733d8f6791ad7a29fb248cd9f1a76b",
     "selector_names": [
       "zip_index",
       "zip_read_one",
@@ -74,34 +74,6 @@
       "provider_atomic_save",
       "cfb_file_same_length_overlay_atomic_save",
       "cfb_file_owned_same_length_overlay_atomic_save",
-      "pptx_file_eager_open",
-      "pptx_file_source_open",
-      "pptx_file_eager_list_slides",
-      "pptx_file_source_list_slides",
-      "pptx_file_eager_slide_count",
-      "pptx_file_source_slide_count",
-      "pptx_file_eager_selected_slide",
-      "pptx_file_source_selected_slide",
-      "pptx_file_eager_open_slide_count_lifecycle",
-      "pptx_file_source_open_slide_count_lifecycle",
-      "pptx_file_eager_open_selected_slide_lifecycle",
-      "pptx_file_source_open_selected_slide_lifecycle",
-      "docx_file_eager_open",
-      "docx_file_source_open",
-      "docx_file_eager_paragraph_count",
-      "docx_file_source_paragraph_count",
-      "docx_file_eager_list_paragraphs",
-      "docx_file_source_list_paragraphs",
-      "docx_file_eager_full_text",
-      "docx_file_source_full_text",
-      "docx_file_eager_open_paragraph_count_lifecycle",
-      "docx_file_source_open_paragraph_count_lifecycle",
-      "docx_file_eager_open_full_text_lifecycle",
-      "docx_file_source_open_full_text_lifecycle",
-      "odt_file_eager_open",
-      "odt_file_source_open",
-      "odt_file_eager_open_full_text_lifecycle",
-      "odt_file_source_open_full_text_lifecycle",
       "docx_source_backed_one_edit_save",
       "docx_source_backed_existing_section_layout_edit_save",
       "docx_story_hyperlink_plan",
@@ -286,12 +258,6 @@
       "ppt_range_source_open_one_shape_text",
       "ppt_owned_source_control_open",
       "ppt_owned_source_control_open_one_shape_text",
-      "doc_facade_file_open",
-      "doc_facade_file_full_text",
-      "doc_facade_file_one_paragraph",
-      "ppt_facade_file_open",
-      "ppt_facade_file_full_text",
-      "ppt_facade_file_one_slide_text",
       "ppt_semantic_full_text",
       "ppt_slide_order_snapshot_open",
       "ppt_text_edit_one_edit_save",
@@ -327,15 +293,10 @@
       "xlsx_source_list_sheets",
       "xlsx_source_first_cell",
       "xlsx_source_narrow_column_range_scan",
-      "xlsx_file_open",
-      "xlsx_file_open_lifecycle",
-      "xlsx_file_selected_cell",
       "xlsx_source_repeated_store_medium",
       "xlsx_source_repeated_store_medium_reacquisition_control",
       "xlsx_source_repeated_store_oversized",
       "xlsx_source_repeated_store_oversized_reacquisition_control",
-      "xlsx_bytes_open",
-      "xlsx_bytes_open_lifecycle",
       "xlsx_producer_medium_source_open",
       "xlsx_producer_medium_source_selected_cell",
       "xlsx_producer_medium_source_full_cell_scan",
@@ -414,8 +375,6 @@
       "xlsx_range_source_narrow_column_range_scan",
       "opc_open_session_scaling",
       "cfb_bulk_read_scaling",
-      "rtf_file_open",
-      "rtf_file_open_lifecycle",
       "rtf_semantic_open",
       "rtf_semantic_paragraph_count",
       "rtf_semantic_list_paragraphs",
@@ -550,17 +509,11 @@
       "detect_odp_reader",
       "detect_odp_polyglot",
       "detect_odp_catalog_alias",
-      "odp_file_eager_open",
-      "odp_file_source_open",
-      "odp_file_eager_selected_slide",
-      "odp_file_source_selected_slide",
       "odp_source_backed_repeated_text_uncached",
       "odp_source_backed_repeated_text_cached",
       "odp_source_backed_catalog_open",
       "odp_source_backed_catalog_list",
       "odp_source_backed_catalog_query",
-      "ods_file_eager_open",
-      "ods_file_source_open",
       "ods_file_eager_selected_cell",
       "ods_file_source_selected_cell",
       "ods_file_eager_selected_media",
@@ -1138,18 +1091,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "doc_facade_file_full_text",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "doc_facade_file_one_paragraph",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "doc_facade_file_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "doc_file_leaf_full_text",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1210,30 +1151,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "docx_file_eager_full_text",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_eager_list_paragraphs",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_eager_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_eager_open_full_text_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_eager_open_paragraph_count_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_eager_paragraph_count",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "docx_file_leaf_eager_full_text",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1279,30 +1196,6 @@
         },
         {
           "selector": "docx_file_leaf_source_paragraph_count",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_source_full_text",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_source_list_paragraphs",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_source_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_source_open_full_text_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_source_open_paragraph_count_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "docx_file_source_paragraph_count",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1546,14 +1439,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "odp_file_eager_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "odp_file_eager_selected_slide",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "odp_file_leaf_eager_open",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1567,14 +1452,6 @@
         },
         {
           "selector": "odp_file_leaf_source_selected_slide",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "odp_file_source_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "odp_file_source_selected_slide",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1698,10 +1575,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ods_file_eager_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "ods_file_eager_selected_cell",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1723,10 +1596,6 @@
         },
         {
           "selector": "ods_file_source_cell_sweep",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "ods_file_source_open",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -1830,14 +1699,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "odt_file_eager_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "odt_file_eager_open_full_text_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "odt_file_leaf_eager_open",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -1851,14 +1712,6 @@
         },
         {
           "selector": "odt_file_leaf_source_open_full_text_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "odt_file_source_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "odt_file_source_open_full_text_lifecycle",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2130,18 +1983,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_facade_file_full_text",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "ppt_facade_file_one_slide_text",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "ppt_facade_file_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "ppt_file_leaf_full_text",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -2294,30 +2135,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "pptx_file_eager_list_slides",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_eager_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_eager_open_selected_slide_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_eager_open_slide_count_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_eager_selected_slide",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_eager_slide_count",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "pptx_file_leaf_eager_list_slides",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -2363,30 +2180,6 @@
         },
         {
           "selector": "pptx_file_leaf_source_slide_count",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_source_list_slides",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_source_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_source_open_selected_slide_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_source_open_slide_count_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_source_selected_slide",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "pptx_file_source_slide_count",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2631,14 +2424,6 @@
         },
         {
           "selector": "rtf_file_leaf_open_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "rtf_file_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "rtf_file_open_lifecycle",
           "reason": "not-selected-in-representative-matrix"
         },
         {
@@ -2918,14 +2703,6 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "xlsx_bytes_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "xlsx_bytes_open_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
           "selector": "xlsx_bytes_unified_open",
           "reason": "not-selected-in-representative-matrix"
         },
@@ -3011,18 +2788,6 @@
         },
         {
           "selector": "xlsx_file_leaf_selected_cell",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "xlsx_file_open",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "xlsx_file_open_lifecycle",
-          "reason": "not-selected-in-representative-matrix"
-        },
-        {
-          "selector": "xlsx_file_selected_cell",
           "reason": "not-selected-in-representative-matrix"
         },
         {

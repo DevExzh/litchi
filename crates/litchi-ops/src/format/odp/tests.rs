@@ -15,9 +15,10 @@ const FIXTURES: [&str; 3] = [
     "odf/corpus/impress-embedded-spreadsheet.odp",
 ];
 
-/// The facade's first byte-route arm: checked ODP preparation.
+/// The byte route's first arm: the ODF package an ordinary ODP prepares,
+/// which the byte opener adopts (`prepared_or_original`).
 fn open_prepared(bytes: Vec<u8>) -> Odp {
-    let prepared = crate::detect::detected::detect_prepared_odp(bytes)
+    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)
         .unwrap_or_else(|_| panic!("expected a prepared ODP package"));
     Odp::from_prepared(prepared, &OpenOptions::default()).expect("open prepared ODP")
 }
@@ -35,29 +36,13 @@ fn open_detected(bytes: Vec<u8>) -> Odp {
     }
 }
 
-/// The facade's path route: a presentation path probe builds the source
-/// owner (the PPTX-aware probe when PPTX is enabled).
+/// The path route: [`crate::open`] builds the source-backed owner.
 #[cfg(any(unix, windows))]
 fn open_source(path: &Path) -> Odp {
-    #[cfg(feature = "pptx")]
-    let presentation = match crate::detect::detected::detect_pptx_source_path_with_limits(
-        path,
-        crate::opc::ReadLimits::default(),
-    )
-    .expect("probe ODP path")
-    {
-        Some(crate::detect::detected::PptxSourcePathDetection::Odp(presentation)) => presentation,
-        _ => panic!("expected an ODP source owner"),
-    };
-    #[cfg(not(feature = "pptx"))]
-    let presentation = {
-        // Builds without PPTX but with another OOXML leaf keep the eager
-        // fallback in the probe, so build the same leaf owner directly.
-        let source: Arc<dyn litchi_core::ReadAt> =
-            Arc::new(litchi_core::FileSource::open(path).expect("open source"));
-        litchi_odp::SourceBackedPresentation::from_read_at(source).expect("ODP source owner")
-    };
-    Odp::from_source(presentation, &OpenOptions::default()).expect("open ODP source")
+    match crate::open(path).expect("open ODP path") {
+        crate::File::Odp(handle) => handle,
+        other => panic!("expected ODP, got {other:?}"),
+    }
 }
 
 fn assert_matches_leaf(odp: &Odp, leaf: &litchi_odp::Presentation, name: &str) {

@@ -135,11 +135,29 @@ pub fn open_bytes_with(bytes: impl Into<Vec<u8>>, options: &OpenOptions) -> Resu
 
 /// [`open_with`] with a lowest-precedence ZIP classifier.
 ///
-/// The `litchi` facade passes its iWork classifier here: a ZIP that every
-/// other candidate declined and `tail` names is refused with
-/// [`Error::iwork_unsupported`] instead of an unrecognized format. Not
-/// public API.
-#[doc(hidden)]
+/// A ZIP input that no other candidate claims (neither an OOXML nor an
+/// OpenDocument package) is handed to `tail`; see
+/// [`detect::tail`](crate::detect::tail). An input the tail names is refused
+/// with [`Error::iwork_unsupported`], with the format the tail reported. The
+/// `litchi` facade passes its iWork classifier here, so that a Pages, Keynote
+/// or Numbers package is reported as such instead of as unrecognized.
+///
+/// # Errors
+///
+/// As [`open_with`], plus [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat)
+/// with the tail's format for an input the tail names.
+///
+/// ```no_run
+/// use litchi_ops::OpenOptions;
+/// use litchi_ops::detect::tail::NoZipTail;
+///
+/// # fn main() -> litchi_ops::Result<()> {
+/// // With the empty tail this is exactly `open_with`.
+/// let file = litchi_ops::open_with_tail("report.docx", &OpenOptions::new(), &NoZipTail)?;
+/// # let _ = file;
+/// # Ok(())
+/// # }
+/// ```
 pub fn open_with_tail<T: ZipTail>(
     path: impl AsRef<Path>,
     options: &OpenOptions,
@@ -152,8 +170,13 @@ pub fn open_with_tail<T: ZipTail>(
 }
 
 /// [`open_bytes_with`] with a lowest-precedence ZIP classifier; see
-/// [`open_with_tail`]. Not public API.
-#[doc(hidden)]
+/// [`open_with_tail`].
+///
+/// # Errors
+///
+/// As [`open_bytes_with`], plus
+/// [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat) with the
+/// tail's format for an input the tail names.
 pub fn open_bytes_with_tail<T: ZipTail>(
     bytes: impl Into<Vec<u8>>,
     options: &OpenOptions,

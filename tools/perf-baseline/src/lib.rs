@@ -22,7 +22,6 @@ pub mod docx_section_retention;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod docx_streaming_create;
-mod facade_ole2;
 mod filesystem;
 mod marker_shape;
 pub mod odp_append_attribution;
@@ -723,7 +722,6 @@ impl RtfSemanticVariant {
                     | Case::RtfLogicalTailPlanNoopSave
             ) || matches!(self, Self::Plain))
             && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
-            && (!case.is_rtf_root_file() || !matches!(self, Self::Watermark))
     }
 
     const fn supports_validation(self) -> bool {
@@ -1152,34 +1150,6 @@ enum Case {
     ProviderAtomicSave,
     CfbFileSameLengthOverlayAtomicSave,
     CfbFileOwnedSameLengthOverlayAtomicSave,
-    PptxFileEagerOpen,
-    PptxFileSourceOpen,
-    PptxFileEagerListSlides,
-    PptxFileSourceListSlides,
-    PptxFileEagerSlideCount,
-    PptxFileSourceSlideCount,
-    PptxFileEagerSelectedSlide,
-    PptxFileSourceSelectedSlide,
-    PptxFileEagerOpenSlideCountLifecycle,
-    PptxFileSourceOpenSlideCountLifecycle,
-    PptxFileEagerOpenSelectedSlideLifecycle,
-    PptxFileSourceOpenSelectedSlideLifecycle,
-    DocxFileEagerOpen,
-    DocxFileSourceOpen,
-    DocxFileEagerParagraphCount,
-    DocxFileSourceParagraphCount,
-    DocxFileEagerListParagraphs,
-    DocxFileSourceListParagraphs,
-    DocxFileEagerFullText,
-    DocxFileSourceFullText,
-    DocxFileEagerOpenParagraphCountLifecycle,
-    DocxFileSourceOpenParagraphCountLifecycle,
-    DocxFileEagerOpenFullTextLifecycle,
-    DocxFileSourceOpenFullTextLifecycle,
-    OdtFileEagerOpen,
-    OdtFileSourceOpen,
-    OdtFileEagerOpenFullTextLifecycle,
-    OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
     DocxSourceBackedExistingSectionLayoutEditSave,
     DocxStoryHyperlinkPlan,
@@ -1364,12 +1334,6 @@ enum Case {
     PptRangeSourceOpenOneShapeText,
     PptOwnedSourceControlOpen,
     PptOwnedSourceControlOpenOneShapeText,
-    DocFacadeFileOpen,
-    DocFacadeFileFullText,
-    DocFacadeFileOneParagraph,
-    PptFacadeFileOpen,
-    PptFacadeFileFullText,
-    PptFacadeFileOneSlideText,
     PptSemanticFullText,
     PptSlideOrderSnapshotOpen,
     PptTextEditOneEditSave,
@@ -1405,15 +1369,10 @@ enum Case {
     XlsxSourceListSheets,
     XlsxSourceFirstCell,
     XlsxSourceNarrowColumnRangeScan,
-    XlsxFileOpen,
-    XlsxFileOpenLifecycle,
-    XlsxFileSelectedCell,
     XlsxSourceRepeatedStoreMedium,
     XlsxSourceRepeatedStoreMediumReacquisitionControl,
     XlsxSourceRepeatedStoreOversized,
     XlsxSourceRepeatedStoreOversizedReacquisitionControl,
-    XlsxBytesOpen,
-    XlsxBytesOpenLifecycle,
     XlsxProducerMediumSourceOpen,
     XlsxProducerMediumSourceSelectedCell,
     XlsxProducerMediumSourceFullCellScan,
@@ -1492,8 +1451,6 @@ enum Case {
     XlsxRangeSourceNarrowColumnRangeScan,
     OpcOpenSessionScaling,
     CfbBulkReadScaling,
-    RtfFileOpen,
-    RtfFileOpenLifecycle,
     RtfSemanticOpen,
     RtfSemanticParagraphCount,
     RtfSemanticListParagraphs,
@@ -1628,17 +1585,11 @@ enum Case {
     DetectOdpReader,
     DetectOdpPolyglot,
     DetectOdpCatalogAlias,
-    OdpFileEagerOpen,
-    OdpFileSourceOpen,
-    OdpFileEagerSelectedSlide,
-    OdpFileSourceSelectedSlide,
     OdpSourceBackedRepeatedTextUncached,
     OdpSourceBackedRepeatedTextCached,
     OdpSourceBackedCatalogOpen,
     OdpSourceBackedCatalogList,
     OdpSourceBackedCatalogQuery,
-    OdsFileEagerOpen,
-    OdsFileSourceOpen,
     OdsFileEagerSelectedCell,
     OdsFileSourceSelectedCell,
     OdsFileEagerSelectedMedia,
@@ -1855,48 +1806,6 @@ impl Case {
             Self::CfbFileOwnedSameLengthOverlayAtomicSave => {
                 "cfb_file_owned_same_length_overlay_atomic_save"
             },
-            Self::PptxFileEagerOpen => "pptx_file_eager_open",
-            Self::PptxFileSourceOpen => "pptx_file_source_open",
-            Self::PptxFileEagerListSlides => "pptx_file_eager_list_slides",
-            Self::PptxFileSourceListSlides => "pptx_file_source_list_slides",
-            Self::PptxFileEagerSlideCount => "pptx_file_eager_slide_count",
-            Self::PptxFileSourceSlideCount => "pptx_file_source_slide_count",
-            Self::PptxFileEagerSelectedSlide => "pptx_file_eager_selected_slide",
-            Self::PptxFileSourceSelectedSlide => "pptx_file_source_selected_slide",
-            Self::PptxFileEagerOpenSlideCountLifecycle => {
-                "pptx_file_eager_open_slide_count_lifecycle"
-            },
-            Self::PptxFileSourceOpenSlideCountLifecycle => {
-                "pptx_file_source_open_slide_count_lifecycle"
-            },
-            Self::PptxFileEagerOpenSelectedSlideLifecycle => {
-                "pptx_file_eager_open_selected_slide_lifecycle"
-            },
-            Self::PptxFileSourceOpenSelectedSlideLifecycle => {
-                "pptx_file_source_open_selected_slide_lifecycle"
-            },
-            Self::DocxFileEagerOpen => "docx_file_eager_open",
-            Self::DocxFileSourceOpen => "docx_file_source_open",
-            Self::DocxFileEagerParagraphCount => "docx_file_eager_paragraph_count",
-            Self::DocxFileSourceParagraphCount => "docx_file_source_paragraph_count",
-            Self::DocxFileEagerListParagraphs => "docx_file_eager_list_paragraphs",
-            Self::DocxFileSourceListParagraphs => "docx_file_source_list_paragraphs",
-            Self::DocxFileEagerFullText => "docx_file_eager_full_text",
-            Self::DocxFileSourceFullText => "docx_file_source_full_text",
-            Self::DocxFileEagerOpenParagraphCountLifecycle => {
-                "docx_file_eager_open_paragraph_count_lifecycle"
-            },
-            Self::DocxFileSourceOpenParagraphCountLifecycle => {
-                "docx_file_source_open_paragraph_count_lifecycle"
-            },
-            Self::DocxFileEagerOpenFullTextLifecycle => "docx_file_eager_open_full_text_lifecycle",
-            Self::DocxFileSourceOpenFullTextLifecycle => {
-                "docx_file_source_open_full_text_lifecycle"
-            },
-            Self::OdtFileEagerOpen => "odt_file_eager_open",
-            Self::OdtFileSourceOpen => "odt_file_source_open",
-            Self::OdtFileEagerOpenFullTextLifecycle => "odt_file_eager_open_full_text_lifecycle",
-            Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::DocxSourceBackedExistingSectionLayoutEditSave => {
                 "docx_source_backed_existing_section_layout_edit_save"
@@ -2167,12 +2076,6 @@ impl Case {
             Self::PptOwnedSourceControlOpenOneShapeText => {
                 "ppt_owned_source_control_open_one_shape_text"
             },
-            Self::DocFacadeFileOpen => "doc_facade_file_open",
-            Self::DocFacadeFileFullText => "doc_facade_file_full_text",
-            Self::DocFacadeFileOneParagraph => "doc_facade_file_one_paragraph",
-            Self::PptFacadeFileOpen => "ppt_facade_file_open",
-            Self::PptFacadeFileFullText => "ppt_facade_file_full_text",
-            Self::PptFacadeFileOneSlideText => "ppt_facade_file_one_slide_text",
             Self::PptSemanticFullText => "ppt_semantic_full_text",
             Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
             Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
@@ -2210,9 +2113,6 @@ impl Case {
             Self::XlsxSourceListSheets => "xlsx_source_list_sheets",
             Self::XlsxSourceFirstCell => "xlsx_source_first_cell",
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
-            Self::XlsxFileOpen => "xlsx_file_open",
-            Self::XlsxFileOpenLifecycle => "xlsx_file_open_lifecycle",
-            Self::XlsxFileSelectedCell => "xlsx_file_selected_cell",
             Self::XlsxSourceRepeatedStoreMedium => "xlsx_source_repeated_store_medium",
             Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
                 "xlsx_source_repeated_store_medium_reacquisition_control"
@@ -2221,8 +2121,6 @@ impl Case {
             Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
                 "xlsx_source_repeated_store_oversized_reacquisition_control"
             },
-            Self::XlsxBytesOpen => "xlsx_bytes_open",
-            Self::XlsxBytesOpenLifecycle => "xlsx_bytes_open_lifecycle",
             Self::XlsxProducerMediumSourceOpen => "xlsx_producer_medium_source_open",
             Self::XlsxProducerMediumSourceSelectedCell => {
                 "xlsx_producer_medium_source_selected_cell"
@@ -2341,8 +2239,6 @@ impl Case {
             },
             Self::OpcOpenSessionScaling => "opc_open_session_scaling",
             Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
-            Self::RtfFileOpen => "rtf_file_open",
-            Self::RtfFileOpenLifecycle => "rtf_file_open_lifecycle",
             Self::RtfSemanticOpen => "rtf_semantic_open",
             Self::RtfSemanticParagraphCount => "rtf_semantic_paragraph_count",
             Self::RtfSemanticListParagraphs => "rtf_semantic_list_paragraphs",
@@ -2479,17 +2375,11 @@ impl Case {
             Self::DetectOdpReader => "detect_odp_reader",
             Self::DetectOdpPolyglot => "detect_odp_polyglot",
             Self::DetectOdpCatalogAlias => "detect_odp_catalog_alias",
-            Self::OdpFileEagerOpen => "odp_file_eager_open",
-            Self::OdpFileSourceOpen => "odp_file_source_open",
-            Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
-            Self::OdpFileSourceSelectedSlide => "odp_file_source_selected_slide",
             Self::OdpSourceBackedRepeatedTextUncached => "odp_source_backed_repeated_text_uncached",
             Self::OdpSourceBackedRepeatedTextCached => "odp_source_backed_repeated_text_cached",
             Self::OdpSourceBackedCatalogOpen => "odp_source_backed_catalog_open",
             Self::OdpSourceBackedCatalogList => "odp_source_backed_catalog_list",
             Self::OdpSourceBackedCatalogQuery => "odp_source_backed_catalog_query",
-            Self::OdsFileEagerOpen => "ods_file_eager_open",
-            Self::OdsFileSourceOpen => "ods_file_source_open",
             Self::OdsFileEagerSelectedCell => "ods_file_eager_selected_cell",
             Self::OdsFileSourceSelectedCell => "ods_file_source_selected_cell",
             Self::OdsFileEagerSelectedMedia => "ods_file_eager_selected_media",
@@ -3027,9 +2917,7 @@ impl Case {
     const fn uses_semantic_rtf(self) -> bool {
         matches!(
             self,
-            Self::RtfFileOpen
-                | Self::RtfFileOpenLifecycle
-                | Self::RtfSemanticOpen
+            Self::RtfSemanticOpen
                 | Self::RtfSemanticParagraphCount
                 | Self::RtfSemanticListParagraphs
                 | Self::RtfSemanticCollectParagraphs
@@ -3051,10 +2939,6 @@ impl Case {
                 | Self::RtfLogicalTailCommitNoopSave
                 | Self::RtfLogicalTailPlanNoopSave
         )
-    }
-
-    const fn is_rtf_root_file(self) -> bool {
-        matches!(self, Self::RtfFileOpen | Self::RtfFileOpenLifecycle)
     }
 
     const fn is_rtf_picture_crud(self) -> bool {
@@ -3178,16 +3062,6 @@ impl Case {
             Self::OdtSourceBackedCatalogOpen
                 | Self::OdtSourceBackedCatalogList
                 | Self::OdtSourceBackedCatalogQuery
-        )
-    }
-
-    const fn is_odt_root_file(self) -> bool {
-        matches!(
-            self,
-            Self::OdtFileEagerOpen
-                | Self::OdtFileSourceOpen
-                | Self::OdtFileEagerOpenFullTextLifecycle
-                | Self::OdtFileSourceOpenFullTextLifecycle
         )
     }
 
@@ -3595,41 +3469,10 @@ impl Case {
                 | Self::ProviderAtomicSave
                 | Self::CfbFileSameLengthOverlayAtomicSave
                 | Self::CfbFileOwnedSameLengthOverlayAtomicSave
-                | Self::PptxFileEagerOpen
-                | Self::PptxFileSourceOpen
-                | Self::PptxFileEagerListSlides
-                | Self::PptxFileSourceListSlides
-                | Self::PptxFileEagerSlideCount
-                | Self::PptxFileSourceSlideCount
-                | Self::PptxFileEagerSelectedSlide
-                | Self::PptxFileSourceSelectedSlide
-                | Self::PptxFileEagerOpenSlideCountLifecycle
-                | Self::PptxFileSourceOpenSlideCountLifecycle
-                | Self::PptxFileEagerOpenSelectedSlideLifecycle
-                | Self::PptxFileSourceOpenSelectedSlideLifecycle
-                | Self::DocxFileEagerOpen
-                | Self::DocxFileSourceOpen
-                | Self::DocxFileEagerParagraphCount
-                | Self::DocxFileSourceParagraphCount
-                | Self::DocxFileEagerListParagraphs
-                | Self::DocxFileSourceListParagraphs
-                | Self::DocxFileEagerFullText
-                | Self::DocxFileSourceFullText
-                | Self::DocxFileEagerOpenParagraphCountLifecycle
-                | Self::DocxFileSourceOpenParagraphCountLifecycle
-                | Self::DocxFileEagerOpenFullTextLifecycle
-                | Self::DocxFileSourceOpenFullTextLifecycle
-                | Self::XlsxFileOpen
-                | Self::XlsxFileOpenLifecycle
-                | Self::XlsxFileSelectedCell
                 | Self::XlsxSourceRepeatedStoreMedium
                 | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
                 | Self::XlsxSourceRepeatedStoreOversized
                 | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
-                | Self::OdtFileEagerOpen
-                | Self::OdtFileSourceOpen
-                | Self::OdtFileEagerOpenFullTextLifecycle
-                | Self::OdtFileSourceOpenFullTextLifecycle
         ) || self.is_unified_ops_filesystem()
     }
 
@@ -3778,16 +3621,6 @@ impl Case {
         )
     }
 
-    const fn is_odp_root_file(self) -> bool {
-        matches!(
-            self,
-            Self::OdpFileEagerOpen
-                | Self::OdpFileSourceOpen
-                | Self::OdpFileEagerSelectedSlide
-                | Self::OdpFileSourceSelectedSlide
-        )
-    }
-
     const fn is_odp_repeated_text(self) -> bool {
         matches!(
             self,
@@ -3807,9 +3640,7 @@ impl Case {
     const fn is_ods_root_file(self) -> bool {
         matches!(
             self,
-            Self::OdsFileEagerOpen
-                | Self::OdsFileSourceOpen
-                | Self::OdsFileEagerSelectedCell
+            Self::OdsFileEagerSelectedCell
                 | Self::OdsFileSourceSelectedCell
                 | Self::OdsFileEagerSelectedMedia
                 | Self::OdsFileSourceSelectedMedia
@@ -3818,17 +3649,6 @@ impl Case {
                 | Self::OdsFileEagerCellBatchSweep
                 | Self::OdsFileSourceCellBatchSweep
         )
-    }
-
-    const fn is_xlsx_root_file(self) -> bool {
-        matches!(
-            self,
-            Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle | Self::XlsxFileSelectedCell
-        )
-    }
-
-    const fn is_xlsx_bytes_root_file(self) -> bool {
-        matches!(self, Self::XlsxBytesOpen | Self::XlsxBytesOpenLifecycle)
     }
 
     /// Opt-in producer-shape selectors (change 0601).  These run the ordinary
@@ -3887,28 +3707,6 @@ impl Case {
             Self::PptOwnedSourceControlOpenOneShapeText => {
                 Some((Scenario::PptOneShapeText, Transport::OwnedSource))
             },
-            _ => None,
-        }
-    }
-
-    /// Opt-in facade selectors for the OLE2 document and presentation routes
-    /// (change 0638).  Six run `litchi::Document::open` and
-    /// `litchi::Presentation::open` over a caller-named real file, which is
-    /// the first half of change 0587's evidence gap 5.  None is in
-    /// `Case::DEFAULT`, and every one needs `--ole2-file PATH`.
-    const fn is_facade_ole2(self) -> bool {
-        self.facade_ole2_scenario().is_some()
-    }
-
-    const fn facade_ole2_scenario(self) -> Option<facade_ole2::Scenario> {
-        use facade_ole2::Scenario;
-        match self {
-            Self::DocFacadeFileOpen => Some(Scenario::DocOpen),
-            Self::DocFacadeFileFullText => Some(Scenario::DocFullText),
-            Self::DocFacadeFileOneParagraph => Some(Scenario::DocOneParagraph),
-            Self::PptFacadeFileOpen => Some(Scenario::PptOpen),
-            Self::PptFacadeFileFullText => Some(Scenario::PptFullText),
-            Self::PptFacadeFileOneSlideText => Some(Scenario::PptOneSlideText),
             _ => None,
         }
     }
@@ -5955,8 +5753,6 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     ole2_range_source: Option<Box<ole2_range_source::Ole2RangeSourceSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    facade_ole2: Option<Box<facade_ole2::FacadeOle2Summary>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     ordinary_save: Option<Box<ordinary_save::OrdinarySaveSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
@@ -6007,8 +5803,6 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_media: Option<OdpMediaSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    odp_root: Option<OdpRootSourceSummary>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     odp_repeated_text: Option<OdpRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_catalog: Option<OdpCatalogSummary>,
@@ -6016,8 +5810,6 @@ struct SourceSummary {
     odt_repeated_text: Option<OdtRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_catalog: Option<OdtCatalogSummary>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    odt_root: Option<OdtFileRootSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -6034,8 +5826,6 @@ struct SourceSummary {
     odf_content_cow: Option<OdfContentCowSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    rtf_root: Option<RtfRootSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_picture_crud: Option<RtfPictureCrudSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -6515,36 +6305,6 @@ struct RtfTailPublicationSummary {
     expected_output_sha256: String,
 }
 
-/// Evidence for the opt-in unified `litchi::Document` owned-byte RTF ingress.
-/// The facade's semantic projection is compared with a separately opened
-/// native `litchi_rtf::Document` before the timed loop and again after every
-/// timed construction. Both seams deliberately use the same native RTF
-/// parser/model; this verifies facade adapter parity, not parser independence.
-/// The byte clone and all oracle setup stay outside the measured interval.
-/// This is scoped to the named synthetic RTF corpus and makes no generic
-/// latency, allocation, I/O, or producer claim.
-#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
-struct RtfRootSummary {
-    implementation: &'static str,
-    phase: &'static str,
-    timing_scope: &'static str,
-    performance_claim: &'static str,
-    transport_variant: &'static str,
-    source_bytes: u64,
-    source_sha256: String,
-    canonical_text_sha256: String,
-    paragraph_text_sha256: String,
-    paragraph_count: usize,
-    native_semantic_parity_verified: bool,
-    native_exact_source_roundtrip_verified: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct RtfRootSemanticProjection {
-    text: String,
-    paragraphs: Vec<String>,
-}
-
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
 ///
 /// The harness reports bytes observed in the exact stream payload range.  It
@@ -6609,42 +6369,6 @@ struct OdpMediaSourceSummary {
     pictures_uncompressed_payload_bytes: u64,
     pictures_uncompressed_payload_sha256: String,
     canonical_semantic_sha256: String,
-    source_read_calls: Vec<u64>,
-    source_read_bytes: Vec<u64>,
-    source_read_range_overlap_bytes: Vec<u64>,
-    pictures_read_calls: Vec<u64>,
-    pictures_read_compressed_range_bytes: Vec<u64>,
-    selected_media_read_calls: Vec<u64>,
-    selected_media_read_bytes: Vec<u64>,
-    selected_media_read_prior_range_overlap_bytes: Vec<u64>,
-    selected_media_read_compressed_range_overlap_bytes: Vec<u64>,
-    selected_media_read_non_picture_overlap_bytes: Vec<u64>,
-}
-
-/// Matched unified-root ODP filesystem evidence. The timed root operation is
-/// independent from the direct typed-facade replay used to prove positional
-/// source laziness; eager records intentionally leave replay vectors empty.
-#[derive(Clone, Debug, Default, Serialize)]
-struct OdpRootSourceSummary {
-    implementation: &'static str,
-    phase: &'static str,
-    timing_scope: &'static str,
-    timed_root_adapter: &'static str,
-    read_evidence_adapter: &'static str,
-    read_evidence_scope: &'static str,
-    source_path_bytes: u64,
-    source_path_sha256: String,
-    target_slide: usize,
-    canonical_semantic_sha256: String,
-    metadata_sha256: String,
-    selected_media_path: String,
-    selected_media_compressed_range_bytes: u64,
-    selected_media_uncompressed_bytes: u64,
-    selected_media_uncompressed_payload_sha256: String,
-    pictures_count: usize,
-    pictures_compressed_range_bytes: u64,
-    pictures_uncompressed_payload_bytes: u64,
-    pictures_uncompressed_payload_sha256: String,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
     source_read_range_overlap_bytes: Vec<u64>,
@@ -6950,84 +6674,6 @@ struct OdpCatalogSummary {
     observed_catalog_entries_sha256: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     observed_slide_text_sha256: Vec<String>,
-}
-
-/// Unified-root ODT filesystem ingress evidence over the fixed large
-/// media-rich source.  The four selectors below deliberately keep corpus
-/// creation, temporary-file setup, parity, archive identity, and the
-/// independent positional replay outside the elapsed interval.  This is
-/// correctness/source-range evidence only; it makes no latency, allocation,
-/// RSS, or physical-I/O claim.
-#[derive(Clone, Debug, Default, Serialize)]
-struct OdtFileRootSummary {
-    implementation: &'static str,
-    phase: &'static str,
-    timing_scope: &'static str,
-    timed_root_adapter: &'static str,
-    read_evidence_adapter: &'static str,
-    read_evidence_scope: &'static str,
-    source_path_bytes: u64,
-    source_path_sha256: String,
-    archive_member_count: usize,
-    archive_member_names_sha256: String,
-    pictures_count: usize,
-    pictures_member_names_sha256: String,
-    pictures_compressed_range_bytes: u64,
-    pictures_uncompressed_payload_bytes: u64,
-    pictures_uncompressed_payload_sha256: String,
-    canonical_text_sha256: String,
-    paragraph_count: usize,
-    paragraph_text_sha256: String,
-    table_count: usize,
-    element_count: usize,
-    element_text_sha256: String,
-    metadata_sha256: String,
-    semantic_parity_verified: bool,
-    archive_identity_verified: bool,
-    media_identity_verified: bool,
-    source_ranges_verified: bool,
-    zero_picture_payload_overlap_verified: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_content_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_content_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_untouched_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_untouched_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_pictures_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_preparation_pictures_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_content_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_content_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_untouched_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_untouched_read_bytes: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_pictures_read_calls: Vec<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    source_query_pictures_read_bytes: Vec<u64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct OdtRootSemanticProjection {
-    text: String,
-    paragraphs: Vec<String>,
-    tables: Vec<String>,
-    elements: Vec<String>,
-    metadata_sha256: String,
 }
 
 /// Matched ODS filesystem/root and typed selected-owner evidence. Root open
@@ -10985,7 +10631,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odt_media()
                     && !case.is_odt_repeated_text()
                     && !case.is_odt_source_backed_catalog()
-                    && !case.is_odt_root_file()
                     && !case.uses_odt_resource_batch()
                     && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
@@ -10994,16 +10639,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
-                    && !case.is_odp_root_file()
                     && !case.is_odp_repeated_text()
                     && !case.is_odp_source_backed_catalog()
                     && !case.is_ods_root_file()
-                    && !case.is_xlsx_root_file()
-                    && !case.is_xlsx_bytes_root_file()
                     && !case.is_producer_shape()
                     && !case.is_marker_shape()
                     && !case.is_ole2_range_source()
-                    && !case.is_facade_ole2()
                     && !case.is_ordinary_save()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
@@ -12489,23 +12130,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if options.cases.iter().any(|case| case.is_odt_root_file()) {
-        let corpus = build_odt_repeated_text_corpus()?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_odt_root_file())
-        {
-            results.push(run_odt_file_root(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-            )?);
-        }
-    }
-
     if options
         .cases
         .iter()
@@ -12723,24 +12347,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if options.cases.iter().any(|case| case.is_odp_root_file()) {
-        let corpus = build_odp_media_corpus()?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_odp_root_file())
-        {
-            results.push(run_case_with_config(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-                options.range_simulation,
-            )?);
-        }
-    }
-
     if options.cases.iter().any(|case| case.is_odp_repeated_text()) {
         let corpus = build_odp_media_corpus()?;
         for case in options
@@ -12788,53 +12394,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             .iter()
             .copied()
             .filter(|case| case.is_ods_root_file())
-        {
-            results.push(run_case_with_config(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-                options.range_simulation,
-            )?);
-        }
-    }
-
-    // Unified XLSX path selectors are fresh-child filesystem evidence. Keep
-    // this branch for any future non-filesystem root variant, but never route
-    // the current selectors through the legacy in-process temp-path loop.
-    if options
-        .cases
-        .iter()
-        .any(|case| case.is_xlsx_root_file() && !case.is_filesystem())
-    {
-        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium)?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_xlsx_root_file() && !case.is_filesystem())
-        {
-            results.push(run_case_with_config(
-                case,
-                &corpus,
-                options.warmup_iterations,
-                options.samples,
-                options.range_simulation,
-            )?);
-        }
-    }
-
-    if options
-        .cases
-        .iter()
-        .any(|case| case.is_xlsx_bytes_root_file())
-    {
-        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium)?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_xlsx_bytes_root_file())
         {
             results.push(run_case_with_config(
                 case,
@@ -13049,57 +12608,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 options.warmup_iterations,
                 options.samples,
                 options.range_simulation,
-            )?);
-        }
-    }
-
-    // Opt-in OLE2 facade selectors (change 0638).  They read the same
-    // `--ole2-file` inputs as change 0627's range-source family, because the
-    // flag is the single classification authority for a caller-named OLE2
-    // fixture, and they hand the path itself to the facade.
-    if options.cases.iter().any(|case| case.is_facade_ole2()) {
-        if options.ole2_files.is_empty() {
-            return Err("the OLE2 facade selectors require --ole2-file PATH (repeatable)".into());
-        }
-        let inputs = ole2_range_source::classify_inputs(&options.ole2_files)?;
-        let mut doc_corpus = None;
-        let mut ppt_corpus = None;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_facade_ole2())
-        {
-            let scenario = case
-                .facade_ole2_scenario()
-                .ok_or("OLE2 facade case has no scenario")?;
-            let corpus =
-                match scenario.route() {
-                    facade_ole2::Route::Document => {
-                        if doc_corpus.is_none() {
-                            let path = inputs.doc.as_deref().ok_or(
-                                "the DOC facade selectors require an --ole2-file DOC fixture",
-                            )?;
-                            doc_corpus = Some(facade_ole2::build_doc_corpus(path)?);
-                        }
-                        doc_corpus.as_ref().ok_or("DOC facade corpus is absent")?
-                    },
-                    facade_ole2::Route::Presentation => {
-                        if ppt_corpus.is_none() {
-                            let path = inputs.ppt.as_deref().ok_or(
-                                "the PPT facade selectors require an --ole2-file PPT fixture",
-                            )?;
-                            ppt_corpus = Some(facade_ole2::build_ppt_corpus(path)?);
-                        }
-                        ppt_corpus.as_ref().ok_or("PPT facade corpus is absent")?
-                    },
-                };
-            results.push(facade_ole2::run_case(
-                case,
-                scenario,
-                corpus,
-                options.warmup_iterations,
-                options.samples,
             )?);
         }
     }
@@ -13810,52 +13318,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_file_owned_same_length_overlay_atomic_save" => {
             Some(Case::CfbFileOwnedSameLengthOverlayAtomicSave)
         },
-        "pptx_file_eager_open" => Some(Case::PptxFileEagerOpen),
-        "pptx_file_source_open" => Some(Case::PptxFileSourceOpen),
-        "pptx_file_eager_list_slides" => Some(Case::PptxFileEagerListSlides),
-        "pptx_file_source_list_slides" => Some(Case::PptxFileSourceListSlides),
-        "pptx_file_eager_slide_count" => Some(Case::PptxFileEagerSlideCount),
-        "pptx_file_source_slide_count" => Some(Case::PptxFileSourceSlideCount),
-        "pptx_file_eager_selected_slide" => Some(Case::PptxFileEagerSelectedSlide),
-        "pptx_file_source_selected_slide" => Some(Case::PptxFileSourceSelectedSlide),
-        "pptx_file_eager_open_slide_count_lifecycle" => {
-            Some(Case::PptxFileEagerOpenSlideCountLifecycle)
-        },
-        "pptx_file_source_open_slide_count_lifecycle" => {
-            Some(Case::PptxFileSourceOpenSlideCountLifecycle)
-        },
-        "pptx_file_eager_open_selected_slide_lifecycle" => {
-            Some(Case::PptxFileEagerOpenSelectedSlideLifecycle)
-        },
-        "pptx_file_source_open_selected_slide_lifecycle" => {
-            Some(Case::PptxFileSourceOpenSelectedSlideLifecycle)
-        },
-        "docx_file_eager_open" => Some(Case::DocxFileEagerOpen),
-        "docx_file_source_open" => Some(Case::DocxFileSourceOpen),
-        "docx_file_eager_paragraph_count" => Some(Case::DocxFileEagerParagraphCount),
-        "docx_file_source_paragraph_count" => Some(Case::DocxFileSourceParagraphCount),
-        "docx_file_eager_list_paragraphs" => Some(Case::DocxFileEagerListParagraphs),
-        "docx_file_source_list_paragraphs" => Some(Case::DocxFileSourceListParagraphs),
-        "docx_file_eager_full_text" => Some(Case::DocxFileEagerFullText),
-        "docx_file_source_full_text" => Some(Case::DocxFileSourceFullText),
-        "docx_file_eager_open_paragraph_count_lifecycle" => {
-            Some(Case::DocxFileEagerOpenParagraphCountLifecycle)
-        },
-        "docx_file_source_open_paragraph_count_lifecycle" => {
-            Some(Case::DocxFileSourceOpenParagraphCountLifecycle)
-        },
-        "docx_file_eager_open_full_text_lifecycle" => {
-            Some(Case::DocxFileEagerOpenFullTextLifecycle)
-        },
-        "docx_file_source_open_full_text_lifecycle" => {
-            Some(Case::DocxFileSourceOpenFullTextLifecycle)
-        },
-        "odt_file_eager_open" => Some(Case::OdtFileEagerOpen),
-        "odt_file_source_open" => Some(Case::OdtFileSourceOpen),
-        "odt_file_eager_open_full_text_lifecycle" => Some(Case::OdtFileEagerOpenFullTextLifecycle),
-        "odt_file_source_open_full_text_lifecycle" => {
-            Some(Case::OdtFileSourceOpenFullTextLifecycle)
-        },
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
         "cfb_selective_mini_4095_legacy_read" => Some(Case::CfbSelectiveMini4095LegacyRead),
@@ -14140,12 +13602,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_owned_source_control_open_one_shape_text" => {
             Some(Case::PptOwnedSourceControlOpenOneShapeText)
         },
-        "doc_facade_file_open" => Some(Case::DocFacadeFileOpen),
-        "doc_facade_file_full_text" => Some(Case::DocFacadeFileFullText),
-        "doc_facade_file_one_paragraph" => Some(Case::DocFacadeFileOneParagraph),
-        "ppt_facade_file_open" => Some(Case::PptFacadeFileOpen),
-        "ppt_facade_file_full_text" => Some(Case::PptFacadeFileFullText),
-        "ppt_facade_file_one_slide_text" => Some(Case::PptFacadeFileOneSlideText),
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
         "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
         "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
@@ -14185,9 +13641,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_list_sheets" => Some(Case::XlsxSourceListSheets),
         "xlsx_source_first_cell" => Some(Case::XlsxSourceFirstCell),
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
-        "xlsx_file_open" => Some(Case::XlsxFileOpen),
-        "xlsx_file_open_lifecycle" => Some(Case::XlsxFileOpenLifecycle),
-        "xlsx_file_selected_cell" => Some(Case::XlsxFileSelectedCell),
         "xlsx_source_repeated_store_medium" => Some(Case::XlsxSourceRepeatedStoreMedium),
         "xlsx_source_repeated_store_medium_reacquisition_control" => {
             Some(Case::XlsxSourceRepeatedStoreMediumReacquisitionControl)
@@ -14196,8 +13649,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_repeated_store_oversized_reacquisition_control" => {
             Some(Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl)
         },
-        "xlsx_bytes_open" => Some(Case::XlsxBytesOpen),
-        "xlsx_bytes_open_lifecycle" => Some(Case::XlsxBytesOpenLifecycle),
         "xlsx_producer_medium_source_open" => Some(Case::XlsxProducerMediumSourceOpen),
         "xlsx_producer_medium_source_selected_cell" => {
             Some(Case::XlsxProducerMediumSourceSelectedCell)
@@ -14326,8 +13777,6 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
         "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
-        "rtf_file_open" => Some(Case::RtfFileOpen),
-        "rtf_file_open_lifecycle" => Some(Case::RtfFileOpenLifecycle),
         "rtf_semantic_open" => Some(Case::RtfSemanticOpen),
         "rtf_semantic_paragraph_count" => Some(Case::RtfSemanticParagraphCount),
         "rtf_semantic_list_paragraphs" => Some(Case::RtfSemanticListParagraphs),
@@ -14472,10 +13921,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "detect_odp_reader" => Some(Case::DetectOdpReader),
         "detect_odp_polyglot" => Some(Case::DetectOdpPolyglot),
         "detect_odp_catalog_alias" => Some(Case::DetectOdpCatalogAlias),
-        "odp_file_eager_open" => Some(Case::OdpFileEagerOpen),
-        "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
-        "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
-        "odp_file_source_selected_slide" => Some(Case::OdpFileSourceSelectedSlide),
         "odp_source_backed_repeated_text_uncached" => {
             Some(Case::OdpSourceBackedRepeatedTextUncached)
         },
@@ -14483,8 +13928,6 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_source_backed_catalog_open" => Some(Case::OdpSourceBackedCatalogOpen),
         "odp_source_backed_catalog_list" => Some(Case::OdpSourceBackedCatalogList),
         "odp_source_backed_catalog_query" => Some(Case::OdpSourceBackedCatalogQuery),
-        "ods_file_eager_open" => Some(Case::OdsFileEagerOpen),
-        "ods_file_source_open" => Some(Case::OdsFileSourceOpen),
         "ods_file_eager_selected_cell" => Some(Case::OdsFileEagerSelectedCell),
         "ods_file_source_selected_cell" => Some(Case::OdsFileSourceSelectedCell),
         "ods_file_eager_selected_media" => Some(Case::OdsFileEagerSelectedMedia),
@@ -14782,25 +14225,6 @@ fn usage_text() -> String {
                                        provider_file_read_at,provider_atomic_save,\n\
                                        cfb_file_same_length_overlay_atomic_save,\n\
                                        cfb_file_owned_same_length_overlay_atomic_save,\n\
-                                       pptx_file_eager_open,pptx_file_source_open,\n\
-                                       pptx_file_eager_list_slides,pptx_file_source_list_slides,\n\
-                                       pptx_file_eager_slide_count,pptx_file_source_slide_count,\n\
-                                       pptx_file_eager_selected_slide,pptx_file_source_selected_slide,\n\
-                                       pptx_file_eager_open_slide_count_lifecycle,\n\
-                                       pptx_file_source_open_slide_count_lifecycle,\n\
-                                       pptx_file_eager_open_selected_slide_lifecycle,\n\
-                                       pptx_file_source_open_selected_slide_lifecycle,\n\
-                                       docx_file_eager_open,docx_file_source_open,\n\
-                                       docx_file_eager_paragraph_count,docx_file_source_paragraph_count,\n\
-                                       docx_file_eager_list_paragraphs,docx_file_source_list_paragraphs,\n\
-                                       docx_file_eager_full_text,docx_file_source_full_text,\n\
-                                       docx_file_eager_open_paragraph_count_lifecycle,\n\
-                                       docx_file_source_open_paragraph_count_lifecycle,\n\
-                                       docx_file_eager_open_full_text_lifecycle,\n\
-                                       docx_file_source_open_full_text_lifecycle,\n\
-                                       odt_file_eager_open,odt_file_source_open,\n\
-                                       odt_file_eager_open_full_text_lifecycle,\n\
-                                       odt_file_source_open_full_text_lifecycle,\n\
                                        docx_file_unified_eager_open,docx_file_unified_source_open,\n\
                                        docx_file_unified_eager_paragraph_count,\n\
                                        docx_file_unified_source_paragraph_count,\n\
@@ -15034,12 +14458,6 @@ fn usage_text() -> String {
                                        ppt_range_source_open_one_shape_text,\n\
                                        ppt_owned_source_control_open,\n\
                                        ppt_owned_source_control_open_one_shape_text,\n\
-                                       doc_facade_file_open,\n\
-                                       doc_facade_file_full_text,\n\
-                                       doc_facade_file_one_paragraph,\n\
-                                       ppt_facade_file_open,\n\
-                                       ppt_facade_file_full_text,\n\
-                                       ppt_facade_file_one_slide_text,\n\
                                        docx_ordinary_save_lifecycle,\n\
                                        docx_ordinary_save_edit,\n\
                                        docx_ordinary_save_atomic_publish,\n\
@@ -15136,13 +14554,10 @@ fn usage_text() -> String {
                                        xlsx_source_named_sheet_lookup_large,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
-                                       xlsx_file_open,xlsx_file_open_lifecycle,\n\
-                                       xlsx_file_selected_cell,\n\
                                        xlsx_source_repeated_store_medium,\n\
                                        xlsx_source_repeated_store_medium_reacquisition_control,\n\
                                        xlsx_source_repeated_store_oversized,\n\
                                        xlsx_source_repeated_store_oversized_reacquisition_control,\n\
-                                       xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
                                        xlsx_producer_medium_source_open,\n\
                                        xlsx_producer_medium_source_selected_cell,\n\
                                        xlsx_producer_medium_source_full_cell_scan,\n\
@@ -15167,7 +14582,6 @@ fn usage_text() -> String {
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
                                        opc_open_session_scaling,cfb_bulk_read_scaling,\n\
-                                       rtf_file_open,rtf_file_open_lifecycle,\n\
                                        rtf_semantic_open,rtf_semantic_paragraph_count,\n\
                                        rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,\n\
                                        rtf_semantic_one_paragraph,rtf_semantic_full_text,\n\
@@ -15250,14 +14664,11 @@ fn usage_text() -> String {
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
                                        detect_odp_bytes,detect_odp_reader,\n\
                                        detect_odp_polyglot,detect_odp_catalog_alias,\n\
-                                       odp_file_eager_open,odp_file_source_open,\n\
-                                       odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        odp_source_backed_repeated_text_uncached,\n\
                                        odp_source_backed_repeated_text_cached,\n\
                                        odp_source_backed_catalog_open,\n\
                                        odp_source_backed_catalog_list,\n\
                                        odp_source_backed_catalog_query,\n\
-                                       ods_file_eager_open,ods_file_source_open,\n\
                                        ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
                                        ods_file_eager_selected_media,ods_file_source_selected_media,\n\
                                        ods_file_eager_cell_sweep,ods_file_source_cell_sweep,\n\
@@ -23266,10 +22677,11 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     let bytes = committed.to_bytes()?;
     let owned = Workbook::from_bytes(bytes.clone())?;
     let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))?;
-    // On native targets, the umbrella byte facade retains this same source-backed
+    // On native targets, `litchi::open_bytes` retains this same source-backed
     // catalog. Check its lightweight projection so the index stays compatible
-    // with that newly landed ingress path without adding another timed selector.
-    let facade = litchi::Workbook::from_bytes(bytes).map_err(|error| error.to_string())?;
+    // with that ingress path without adding another timed selector.
+    let facade = litchi::open_bytes(bytes)?;
+    let facade_view = facade.workbook()?;
     let expected = [
         "Résumé".to_owned(),
         "Στοιχεία".to_owned(),
@@ -23284,12 +22696,8 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
-    let facade_names = facade
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    let facade_count = facade
-        .worksheet_count()
-        .map_err(|error| error.to_string())?;
+    let facade_names = facade_view.worksheet_names()?;
+    let facade_count = facade_view.worksheet_count()?;
     if owned_names != expected
         || source_names != expected
         || facade_names != expected
@@ -23342,7 +22750,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         .set_blob(duplicate_xml.into_bytes());
     let duplicate_archive = PackageWriter::to_bytes(&duplicate_package)?;
     if Workbook::from_bytes(duplicate_archive.clone()).is_ok()
-        || litchi::Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+        || litchi::open_bytes(duplicate_archive.clone()).is_ok()
         || SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate_archive))).is_ok()
     {
         return Err("XLSX selector oracle accepted duplicate parsed catalog names".into());
@@ -25862,38 +25270,8 @@ fn run_case_with_config(
         | Case::ProviderFileReadAt
         | Case::ProviderAtomicSave
         | Case::CfbFileSameLengthOverlayAtomicSave
-        | Case::CfbFileOwnedSameLengthOverlayAtomicSave
-        | Case::PptxFileEagerOpen
-        | Case::PptxFileSourceOpen
-        | Case::PptxFileEagerListSlides
-        | Case::PptxFileSourceListSlides
-        | Case::PptxFileEagerSlideCount
-        | Case::PptxFileSourceSlideCount
-        | Case::PptxFileEagerSelectedSlide
-        | Case::PptxFileSourceSelectedSlide
-        | Case::PptxFileEagerOpenSlideCountLifecycle
-        | Case::PptxFileSourceOpenSlideCountLifecycle
-        | Case::PptxFileEagerOpenSelectedSlideLifecycle
-        | Case::PptxFileSourceOpenSelectedSlideLifecycle
-        | Case::DocxFileEagerOpen
-        | Case::DocxFileSourceOpen
-        | Case::DocxFileEagerParagraphCount
-        | Case::DocxFileSourceParagraphCount
-        | Case::DocxFileEagerListParagraphs
-        | Case::DocxFileSourceListParagraphs
-        | Case::DocxFileEagerFullText
-        | Case::DocxFileSourceFullText
-        | Case::DocxFileEagerOpenParagraphCountLifecycle
-        | Case::DocxFileSourceOpenParagraphCountLifecycle
-        | Case::DocxFileEagerOpenFullTextLifecycle
-        | Case::DocxFileSourceOpenFullTextLifecycle => {
+        | Case::CfbFileOwnedSameLengthOverlayAtomicSave => {
             Err("filesystem cases are dispatched by the child-process evidence runner".into())
-        },
-        Case::OdtFileEagerOpen
-        | Case::OdtFileSourceOpen
-        | Case::OdtFileEagerOpenFullTextLifecycle
-        | Case::OdtFileSourceOpenFullTextLifecycle => {
-            run_odt_file_root(case, corpus, warmup_iterations, samples)
         },
         Case::DocxSourceBackedOneEditSave => {
             run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
@@ -26207,17 +25585,11 @@ fn run_case_with_config(
         Case::XlsxSourceNarrowColumnRangeScan => {
             run_xlsx_source_narrow_column_range_scan(corpus, warmup_iterations, samples)
         },
-        Case::XlsxFileOpen
-        | Case::XlsxFileOpenLifecycle
-        | Case::XlsxFileSelectedCell
-        | Case::XlsxSourceRepeatedStoreMedium
+        Case::XlsxSourceRepeatedStoreMedium
         | Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Case::XlsxSourceRepeatedStoreOversized
         | Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
             Err("XLSX filesystem cases are dispatched by the child-process evidence runner".into())
-        },
-        Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
-            run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
         },
         Case::PptxMarkerEagerFullText
         | Case::PptxMarkerSourceFullText
@@ -26263,14 +25635,6 @@ fn run_case_with_config(
         | Case::PptOwnedSourceControlOpen
         | Case::PptOwnedSourceControlOpenOneShapeText => {
             Err("OLE2 range-source cases use their own corpus runner".into())
-        },
-        Case::DocFacadeFileOpen
-        | Case::DocFacadeFileFullText
-        | Case::DocFacadeFileOneParagraph
-        | Case::PptFacadeFileOpen
-        | Case::PptFacadeFileFullText
-        | Case::PptFacadeFileOneSlideText => {
-            Err("OLE2 facade cases use their own corpus runner".into())
         },
         Case::DocxOrdinarySaveLifecycle
         | Case::DocxOrdinarySaveEdit
@@ -26345,9 +25709,6 @@ fn run_case_with_config(
                 samples,
                 range_simulation,
             )
-        },
-        Case::RtfFileOpen | Case::RtfFileOpenLifecycle => {
-            run_rtf_root_access(case, corpus, warmup_iterations, samples)
         },
         Case::RtfSemanticOpen
         | Case::RtfSemanticParagraphCount
@@ -26557,12 +25918,6 @@ fn run_case_with_config(
         | Case::OdpMediaSourceBackedOneSlide => {
             run_odp_media_source_access(case, corpus, warmup_iterations, samples)
         },
-        Case::OdpFileEagerOpen
-        | Case::OdpFileSourceOpen
-        | Case::OdpFileEagerSelectedSlide
-        | Case::OdpFileSourceSelectedSlide => {
-            run_odp_root_file_access(case, corpus, warmup_iterations, samples)
-        },
         Case::OdpSourceBackedRepeatedTextUncached | Case::OdpSourceBackedRepeatedTextCached => {
             run_odp_repeated_text(case, corpus, warmup_iterations, samples)
         },
@@ -26571,9 +25926,7 @@ fn run_case_with_config(
         | Case::OdpSourceBackedCatalogQuery => {
             run_odp_source_backed_catalog(case, corpus, warmup_iterations, samples)
         },
-        Case::OdsFileEagerOpen
-        | Case::OdsFileSourceOpen
-        | Case::OdsFileEagerSelectedCell
+        Case::OdsFileEagerSelectedCell
         | Case::OdsFileSourceSelectedCell
         | Case::OdsFileEagerSelectedMedia
         | Case::OdsFileSourceSelectedMedia => {
@@ -26965,149 +26318,6 @@ fn verify_semantic_rtf(
         }
     }
     Ok(())
-}
-
-fn rtf_root_semantic_projection(
-    document: &litchi::Document,
-) -> Result<RtfRootSemanticProjection, Box<dyn Error>> {
-    let text = document.text()?;
-    let paragraphs = document
-        .paragraphs()?
-        .into_iter()
-        .map(|paragraph| paragraph.text())
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(RtfRootSemanticProjection { text, paragraphs })
-}
-
-fn rtf_root_values_digest(values: &[String]) -> String {
-    let mut digest = Sha256::new();
-    for (index, value) in values.iter().enumerate() {
-        digest.update((index as u64).to_le_bytes());
-        digest.update((value.len() as u64).to_le_bytes());
-        digest.update(value.as_bytes());
-    }
-    fingerprint_hex(&digest.finalize().into())
-}
-
-fn rtf_root_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
-    match case {
-        Case::RtfFileOpen => Ok(false),
-        Case::RtfFileOpenLifecycle => Ok(true),
-        _ => Err("non-root RTF case passed to RTF root case parameters".into()),
-    }
-}
-
-fn run_rtf_root_access(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    if !case.is_rtf_root_file() {
-        return Err("non-root RTF case passed to RTF root runner".into());
-    }
-    let shape = semantic_shape(corpus)?;
-    let variant = semantic_rtf_variant(corpus)?;
-    let lifecycle = rtf_root_case_parameters(case)?;
-
-    // Build the native typed seam oracle before timing. It deliberately does
-    // not use the unified facade, so a facade adapter regression cannot
-    // certify itself through its own projection. Both seams still share the
-    // native RTF parser/model; this is not an independent parser oracle.
-    let native = litchi_rtf::Document::from_bytes(&corpus.archive)?;
-    verify_semantic_rtf(&native, shape, variant, &[])?;
-    let expected_projection = RtfRootSemanticProjection {
-        text: native.text().to_owned(),
-        paragraphs: native
-            .body()
-            .paragraphs()
-            .map(|paragraph| paragraph.to_text())
-            .collect(),
-    };
-    if native.to_bytes()? != corpus.archive {
-        return Err("RTF root native oracle changed exact source bytes".into());
-    }
-    let source_sha256 = sha256_hex(&corpus.archive);
-    if source_sha256 != corpus.manifest.archive_sha256
-        || corpus.archive.len() != corpus.manifest.archive_bytes
-    {
-        return Err("RTF root source hash differs from deterministic manifest".into());
-    }
-
-    // This preflight is also the native semantic-parity gate for every
-    // selected transport. For the historical facade implementation, the
-    // default plain ASCII corpus succeeds; CP-1252/LZFu selectors become
-    // runnable as soon as the native byte ingress lands.
-    let facade = litchi::Document::from_bytes(corpus.archive.clone())?;
-    let facade_projection = rtf_root_semantic_projection(&facade)?;
-    if facade_projection != expected_projection {
-        return Err("RTF unified facade differs from native semantic oracle".into());
-    }
-    let paragraph_count = expected_projection.paragraphs.len();
-    if paragraph_count != semantic_rtf_paragraph_count(shape, variant)
-        || facade.paragraph_count()? != paragraph_count
-    {
-        return Err("RTF unified facade paragraph count differs from native oracle".into());
-    }
-
-    let mut elapsed = Vec::with_capacity(samples);
-    for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Keep the owned-byte clone outside the measured native ingress. This
-        // isolates `Document::from_bytes(Vec<u8>)` from caller setup/copy cost.
-        let owned = corpus.archive.clone();
-        let started = Instant::now();
-        let document = litchi::Document::from_bytes(owned)?;
-        let lifecycle_text = lifecycle.then(|| document.text()).transpose()?;
-        let duration = started.elapsed();
-
-        // Semantic verification is intentionally outside the clock. It both
-        // protects each timed construction and keeps the interval limited to
-        // the selected open/open-plus-text lifecycle.
-        let measured_projection = rtf_root_semantic_projection(&document)?;
-        if measured_projection != expected_projection {
-            return Err("RTF timed unified facade differs from native oracle".into());
-        }
-        if let Some(text) = lifecycle_text {
-            if text != expected_projection.text {
-                return Err("RTF timed unified lifecycle text differs from oracle".into());
-            }
-            std::hint::black_box(text);
-        }
-        std::hint::black_box(document);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-    }
-
-    let summary = RtfRootSummary {
-        implementation: "unified_owned_bytes_facade",
-        phase: if lifecycle {
-            "owned_bytes_open_and_full_text_lifecycle"
-        } else {
-            "owned_bytes_open_only"
-        },
-        timing_scope: if lifecycle {
-            "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer"
-        } else {
-            "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer"
-        },
-        performance_claim: "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
-        transport_variant: variant.name(),
-        source_bytes: u64::try_from(corpus.archive.len())?,
-        source_sha256,
-        canonical_text_sha256: sha256_hex(expected_projection.text.as_bytes()),
-        paragraph_text_sha256: rtf_root_values_digest(&expected_projection.paragraphs),
-        paragraph_count,
-        native_semantic_parity_verified: true,
-        native_exact_source_roundtrip_verified: true,
-    };
-    Ok(result_with_source(
-        case,
-        corpus,
-        elapsed,
-        SourceSummary {
-            rtf_root: Some(summary),
-            ..SourceSummary::default()
-        },
-    ))
 }
 
 fn semantic_rtf_lifecycle_projection(
@@ -39214,391 +38424,6 @@ fn run_odp_media_source_access(
     Ok(result_with_source(case, corpus, elapsed, source))
 }
 
-fn odp_root_file_case_parameters(
-    case: Case,
-) -> Result<(&'static str, &'static str, bool), Box<dyn Error>> {
-    match case {
-        Case::OdpFileEagerOpen => Ok(("eager_root", "presentation_open_no_slide_query", false)),
-        Case::OdpFileSourceOpen => Ok((
-            "source_backed_root",
-            "presentation_open_no_slide_query",
-            false,
-        )),
-        Case::OdpFileEagerSelectedSlide => Ok(("eager_root", "one_middle_slide_query", true)),
-        Case::OdpFileSourceSelectedSlide => {
-            Ok(("source_backed_root", "one_middle_slide_query", true))
-        },
-        _ => Err("non-root ODP case passed to root ODP case parameters".into()),
-    }
-}
-
-fn odp_root_semantic_projection(
-    presentation: &litchi::Presentation,
-) -> Result<(Vec<String>, String), Box<dyn Error>> {
-    let slides = presentation.slides()?;
-    let mut texts = Vec::with_capacity(slides.len());
-    let mut digest = Sha256::new();
-    for (index, slide) in slides.iter().enumerate() {
-        let text = slide.text()?;
-        digest.update((index as u64).to_le_bytes());
-        digest.update((text.len() as u64).to_le_bytes());
-        digest.update(text.as_bytes());
-        texts.push(text);
-    }
-    Ok((texts, fingerprint_hex(&digest.finalize().into())))
-}
-
-fn odp_root_metadata_digest(
-    metadata: &Option<litchi_core::Metadata>,
-) -> Result<String, Box<dyn Error>> {
-    Ok(sha256_hex(&serde_json::to_vec(metadata)?))
-}
-
-fn create_odp_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| format!("ODP root source timestamp is before epoch: {error}"))?
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!(
-        "litchi-perf-baseline-odp-root-{}-{stamp}.odp",
-        std::process::id()
-    ));
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)?;
-    file.write_all(archive)?;
-    file.flush()?;
-    Ok(path)
-}
-
-fn verify_odp_root_postconditions(
-    presentation: &litchi::Presentation,
-    source_path: &std::path::Path,
-    corpus: &Corpus,
-    expected_texts: &[String],
-    expected_semantic_sha256: &str,
-    expected_metadata_sha256: &str,
-    expected_typed_slides: &[litchi_odp::model::Slide],
-    expected_typed_semantic_sha256: &str,
-    target_slide: usize,
-    selected_media_path: &str,
-    selected_media_payload: &[u8],
-) -> Result<(), Box<dyn Error>> {
-    let (texts, semantic_sha256) = odp_root_semantic_projection(presentation)?;
-    if texts != expected_texts || semantic_sha256 != expected_semantic_sha256 {
-        return Err("ODP unified root semantic projection differs from eager oracle".into());
-    }
-    let selected = presentation
-        .slide(target_slide)?
-        .ok_or("ODP unified root selected slide is missing")?;
-    if selected.text()? != expected_texts[target_slide] {
-        return Err("ODP unified root selected slide differs from corpus".into());
-    }
-    if odp_root_metadata_digest(&presentation.metadata()?)? != expected_metadata_sha256 {
-        return Err("ODP unified root metadata differs between matched controls".into());
-    }
-
-    let bytes = fs::read(source_path)?;
-    if bytes != corpus.archive
-        || sha256_hex(&bytes) != corpus.manifest.archive_sha256
-        || bytes.len() != corpus.manifest.archive_bytes
-    {
-        return Err("ODP unified root source file differs from deterministic archive".into());
-    }
-    verify_odp_media_archive(&bytes, false)?;
-    let typed = litchi_odp::Presentation::from_bytes(bytes)?;
-    verify_odp_media_eager_semantics_and_media(
-        &typed,
-        expected_typed_slides,
-        expected_typed_semantic_sha256,
-        selected_media_path,
-        selected_media_payload,
-    )?;
-    Ok(())
-}
-
-fn run_odp_root_file_access(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    if corpus.manifest.generator != ODP_MEDIA_CORPUS_GENERATOR {
-        return Err("ODP root filesystem cases require the fixed media-rich corpus".into());
-    }
-    let (implementation, phase, query) = odp_root_file_case_parameters(case)?;
-    let target_slide = SemanticShape::Medium.pptx_slides() / 2;
-    let expected_root = litchi::Presentation::from_bytes(corpus.archive.clone())?;
-    let (expected_texts, canonical_semantic_sha256) = odp_root_semantic_projection(&expected_root)?;
-    let canonical_metadata_sha256 = odp_root_metadata_digest(&expected_root.metadata()?)?;
-    let (expected_typed_slides, canonical_typed_semantic_sha256) =
-        odp_media_eager_semantics(&corpus.archive)?;
-    if canonical_semantic_sha256 != canonical_typed_semantic_sha256 {
-        return Err("ODP unified root and typed semantic digests differ".into());
-    }
-    if expected_texts.len() != SemanticShape::Medium.pptx_slides()
-        || expected_texts[target_slide]
-            != format!(
-                "{}\n{}",
-                semantic_odp_title(target_slide, false),
-                semantic_odp_text(target_slide, false)
-            )
-    {
-        return Err("ODP unified root canonical corpus projection differs".into());
-    }
-    let (picture_members, selected_range) = odp_media_payload_inventory(corpus)?;
-    let picture_ranges = picture_members
-        .iter()
-        .map(|(_name, range)| range.clone())
-        .collect::<Vec<_>>();
-    let selected_media_path = odp_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
-    let selected_media_payload = odp_media_payload(ODS_MEDIA_ENTRY_COUNT / 2);
-    let selected_media_uncompressed_bytes = u64::try_from(selected_media_payload.len())?;
-    let selected_media_compressed_range_bytes =
-        selected_range.end.saturating_sub(selected_range.start);
-    let pictures_compressed_range_bytes =
-        picture_members
-            .iter()
-            .try_fold(0_u64, |total, (_name, range)| {
-                total
-                    .checked_add(range.end.saturating_sub(range.start))
-                    .ok_or("ODP compressed Pictures byte count overflows u64")
-            })?;
-    let pictures_uncompressed_payload_bytes = u64::try_from(
-        ODS_MEDIA_ENTRY_COUNT
-            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
-            .ok_or("ODP uncompressed Pictures byte count overflows usize")?,
-    )?;
-    let pictures_uncompressed_payload_sha256 = odp_media_payload_digest();
-    let source_path = create_odp_root_source_file(&corpus.archive)?;
-    let result = (|| {
-        let mut elapsed = Vec::with_capacity(samples);
-        let mut source_summary = OdpRootSourceSummary {
-            implementation,
-            phase,
-            timing_scope: if query {
-                "one_middle_slide_query_after_untimed_root_open"
-            } else {
-                "unified_root_presentation_open"
-            },
-            timed_root_adapter: if implementation == "source_backed_root" {
-                "litchi::Presentation::open(Path)"
-            } else {
-                "litchi::Presentation::from_bytes(Vec<u8>)"
-            },
-            read_evidence_adapter: if implementation == "source_backed_root" {
-                "litchi_odp::SourceBackedPresentation+harness::InstrumentedSource"
-            } else {
-                "not_applicable"
-            },
-            read_evidence_scope: if implementation == "source_backed_root" {
-                "separate_untimed_direct_typed_replay_per_measured_sample"
-            } else {
-                "not_applicable"
-            },
-            source_path_bytes: u64::try_from(corpus.archive.len())?,
-            source_path_sha256: corpus.manifest.archive_sha256.clone(),
-            target_slide,
-            canonical_semantic_sha256: canonical_semantic_sha256.clone(),
-            metadata_sha256: canonical_metadata_sha256.clone(),
-            selected_media_path: selected_media_path.clone(),
-            selected_media_compressed_range_bytes,
-            selected_media_uncompressed_bytes,
-            selected_media_uncompressed_payload_sha256: sha256_hex(&selected_media_payload),
-            pictures_count: picture_members.len(),
-            pictures_compressed_range_bytes,
-            pictures_uncompressed_payload_bytes,
-            pictures_uncompressed_payload_sha256,
-            ..OdpRootSourceSummary::default()
-        };
-
-        for iteration in 0..iteration_count(warmup_iterations, samples)? {
-            let duration = if implementation == "source_backed_root" {
-                if query {
-                    let presentation = litchi::Presentation::open(&source_path)?;
-                    let started = Instant::now();
-                    let slide = presentation
-                        .slide(target_slide)?
-                        .ok_or("ODP unified source root selected slide is missing")?;
-                    let duration = started.elapsed();
-                    verify_odp_root_postconditions(
-                        &presentation,
-                        &source_path,
-                        corpus,
-                        &expected_texts,
-                        &canonical_semantic_sha256,
-                        &canonical_metadata_sha256,
-                        &expected_typed_slides,
-                        &canonical_typed_semantic_sha256,
-                        target_slide,
-                        &selected_media_path,
-                        &selected_media_payload,
-                    )?;
-                    if slide.text()? != expected_texts[target_slide] {
-                        return Err("ODP unified source root selected slide differs".into());
-                    }
-                    duration
-                } else {
-                    let started = Instant::now();
-                    let presentation = litchi::Presentation::open(&source_path)?;
-                    let duration = started.elapsed();
-                    verify_odp_root_postconditions(
-                        &presentation,
-                        &source_path,
-                        corpus,
-                        &expected_texts,
-                        &canonical_semantic_sha256,
-                        &canonical_metadata_sha256,
-                        &expected_typed_slides,
-                        &canonical_typed_semantic_sha256,
-                        target_slide,
-                        &selected_media_path,
-                        &selected_media_payload,
-                    )?;
-                    duration
-                }
-            } else if query {
-                let presentation = litchi::Presentation::from_bytes(corpus.archive.clone())?;
-                let started = Instant::now();
-                let slide = presentation
-                    .slide(target_slide)?
-                    .ok_or("ODP unified eager root selected slide is missing")?;
-                let duration = started.elapsed();
-                verify_odp_root_postconditions(
-                    &presentation,
-                    &source_path,
-                    corpus,
-                    &expected_texts,
-                    &canonical_semantic_sha256,
-                    &canonical_metadata_sha256,
-                    &expected_typed_slides,
-                    &canonical_typed_semantic_sha256,
-                    target_slide,
-                    &selected_media_path,
-                    &selected_media_payload,
-                )?;
-                if slide.text()? != expected_texts[target_slide] {
-                    return Err("ODP unified eager root selected slide differs".into());
-                }
-                duration
-            } else {
-                let owned = corpus.archive.clone();
-                let started = Instant::now();
-                let presentation = litchi::Presentation::from_bytes(owned)?;
-                let duration = started.elapsed();
-                verify_odp_root_postconditions(
-                    &presentation,
-                    &source_path,
-                    corpus,
-                    &expected_texts,
-                    &canonical_semantic_sha256,
-                    &canonical_metadata_sha256,
-                    &expected_typed_slides,
-                    &canonical_typed_semantic_sha256,
-                    target_slide,
-                    &selected_media_path,
-                    &selected_media_payload,
-                )?;
-                duration
-            };
-            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-        }
-
-        if implementation == "source_backed_root" {
-            let selected_range_len = selected_media_compressed_range_bytes;
-            let mut exact_phase = None;
-            let mut exact_media = None;
-            for _ in 0..samples {
-                let snapshot = collect_odp_media_source_phase(
-                    &corpus.archive,
-                    &picture_ranges,
-                    target_slide,
-                    query,
-                )?;
-                verify_odp_media_source_phase(snapshot, phase)?;
-                if let Some(expected) = exact_phase {
-                    if expected != snapshot {
-                        return Err("ODP root source phase counters are not deterministic".into());
-                    }
-                } else {
-                    exact_phase = Some(snapshot);
-                }
-                source_summary.source_read_calls.push(snapshot.read_calls);
-                source_summary.source_read_bytes.push(snapshot.read_bytes);
-                source_summary
-                    .source_read_range_overlap_bytes
-                    .push(snapshot.read_range_overlap_bytes);
-                source_summary
-                    .pictures_read_calls
-                    .push(snapshot.ordinary_payload_read_calls);
-                source_summary
-                    .pictures_read_compressed_range_bytes
-                    .push(snapshot.ordinary_payload_read_bytes);
-
-                let (all_snapshot, selected_snapshot) = collect_odp_media_selected_media(
-                    &corpus.archive,
-                    &picture_ranges,
-                    selected_range.clone(),
-                    &selected_media_path,
-                )?;
-                if all_snapshot.ordinary_payload_read_bytes != selected_range_len
-                    || selected_snapshot.ordinary_payload_read_bytes != selected_range_len
-                    || all_snapshot.ordinary_payload_read_calls == 0
-                    || selected_snapshot.ordinary_payload_read_calls == 0
-                {
-                    return Err(
-                        "ODP root selected media replay did not cover exactly one Pictures range"
-                            .into(),
-                    );
-                }
-                if let Some(expected) = exact_media {
-                    if expected != (all_snapshot, selected_snapshot) {
-                        return Err("ODP root selected media counters are not deterministic".into());
-                    }
-                } else {
-                    exact_media = Some((all_snapshot, selected_snapshot));
-                }
-                source_summary
-                    .selected_media_read_calls
-                    .push(all_snapshot.read_calls);
-                source_summary
-                    .selected_media_read_bytes
-                    .push(all_snapshot.read_bytes);
-                source_summary
-                    .selected_media_read_prior_range_overlap_bytes
-                    .push(all_snapshot.read_range_overlap_bytes);
-                source_summary
-                    .selected_media_read_compressed_range_overlap_bytes
-                    .push(all_snapshot.ordinary_payload_read_bytes);
-                source_summary
-                    .selected_media_read_non_picture_overlap_bytes
-                    .push(
-                        all_snapshot
-                            .read_bytes
-                            .saturating_sub(all_snapshot.ordinary_payload_read_bytes),
-                    );
-            }
-        }
-
-        Ok(result_with_source(
-            case,
-            corpus,
-            elapsed,
-            SourceSummary {
-                odp_root: Some(source_summary),
-                ..SourceSummary::default()
-            },
-        ))
-    })();
-    let cleanup = fs::remove_file(&source_path);
-    match (result, cleanup) {
-        (Ok(result), Ok(())) => Ok(result),
-        (Ok(_), Err(error)) => Err(error.into()),
-        (Err(error), _) => Err(error),
-    }
-}
-
 fn odt_repeated_text_ranges(
     corpus: &Corpus,
 ) -> Result<(Range<u64>, Vec<Range<u64>>, Vec<Range<u64>>), Box<dyn Error>> {
@@ -39614,439 +38439,6 @@ fn odt_repeated_text_ranges(
         return Err("ODT repeated-text source evidence found an empty Pictures range".into());
     }
     Ok((content_range, untouched_ranges, picture_ranges))
-}
-
-fn odt_root_case_parameters(case: Case) -> Result<(&'static str, bool), Box<dyn Error>> {
-    match case {
-        Case::OdtFileEagerOpen => Ok(("eager_root", false)),
-        Case::OdtFileSourceOpen => Ok(("source_backed_root", false)),
-        Case::OdtFileEagerOpenFullTextLifecycle => Ok(("eager_root", true)),
-        Case::OdtFileSourceOpenFullTextLifecycle => Ok(("source_backed_root", true)),
-        _ => Err("non-root ODT case passed to ODT root case parameters".into()),
-    }
-}
-
-fn odt_root_table_text(table: &litchi::document::Table) -> Result<String, Box<dyn Error>> {
-    let mut text = String::new();
-    for row in table.rows()? {
-        for cell in row.cells()? {
-            text.push_str(&cell.text()?);
-        }
-    }
-    Ok(text)
-}
-
-fn odt_root_semantic_projection(
-    document: &litchi::Document,
-) -> Result<OdtRootSemanticProjection, Box<dyn Error>> {
-    let text = document.text()?;
-    let paragraphs = document
-        .paragraphs()?
-        .into_iter()
-        .map(|paragraph| paragraph.text())
-        .collect::<Result<Vec<_>, _>>()?;
-    let tables = document
-        .tables()?
-        .into_iter()
-        .map(|table| odt_root_table_text(&table))
-        .collect::<Result<Vec<_>, _>>()?;
-    let elements = document
-        .elements()?
-        .into_iter()
-        .map(|element| {
-            if let Some(paragraph) = element.as_paragraph() {
-                Ok(format!("paragraph:{}", paragraph.text()?))
-            } else if let Some(table) = element.as_table() {
-                Ok(format!("table:{}", odt_root_table_text(table)?))
-            } else {
-                Err("ODT unified root returned an unsupported document element".into())
-            }
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    let metadata_sha256 = sha256_hex(&serde_json::to_vec(&document.metadata()?)?);
-    Ok(OdtRootSemanticProjection {
-        text,
-        paragraphs,
-        tables,
-        elements,
-        metadata_sha256,
-    })
-}
-
-fn odt_root_values_digest(values: &[String]) -> String {
-    let mut digest = Sha256::new();
-    for (index, value) in values.iter().enumerate() {
-        digest.update((index as u64).to_le_bytes());
-        digest.update((value.len() as u64).to_le_bytes());
-        digest.update(value.as_bytes());
-    }
-    fingerprint_hex(&digest.finalize().into())
-}
-
-fn odt_root_names_digest(names: &[String]) -> String {
-    odt_root_values_digest(names)
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct OdtRootArchiveIdentity {
-    archive_member_count: usize,
-    archive_member_names_sha256: String,
-    pictures_count: usize,
-    pictures_member_names_sha256: String,
-    pictures_compressed_range_bytes: u64,
-    pictures_uncompressed_payload_bytes: u64,
-    pictures_uncompressed_payload_sha256: String,
-}
-
-fn odt_root_archive_identity(bytes: &[u8]) -> Result<OdtRootArchiveIdentity, Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
-    let mut member_names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
-    member_names.sort();
-
-    let mut picture_members = zip_member_ranges(bytes)?
-        .into_iter()
-        .filter(|(name, _range)| name.starts_with("Pictures/"))
-        .collect::<Vec<_>>();
-    picture_members.sort_by(|left, right| left.0.cmp(&right.0));
-    if picture_members.len() != ODS_MEDIA_ENTRY_COUNT {
-        return Err("ODT unified root archive has an unexpected Pictures count".into());
-    }
-    let picture_names = picture_members
-        .iter()
-        .map(|(name, _range)| name.clone())
-        .collect::<Vec<_>>();
-    let pictures_compressed_range_bytes =
-        picture_members
-            .iter()
-            .try_fold(0_u64, |total, (_name, range)| {
-                total
-                    .checked_add(range.end.saturating_sub(range.start))
-                    .ok_or("ODT unified root compressed Pictures byte count overflows u64")
-            })?;
-
-    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
-    let package = package.package()?;
-    for index in 0..ODS_MEDIA_ENTRY_COUNT {
-        let path = odt_media_path(index);
-        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
-            return Err(format!("ODT unified root manifest entry differs for '{path}'").into());
-        }
-        if package.get_file(&path)? != odt_media_payload(index) {
-            return Err(format!("ODT unified root payload differs for '{path}'").into());
-        }
-    }
-
-    Ok(OdtRootArchiveIdentity {
-        archive_member_count: member_names.len(),
-        archive_member_names_sha256: odt_root_names_digest(&member_names),
-        pictures_count: picture_members.len(),
-        pictures_member_names_sha256: odt_root_names_digest(&picture_names),
-        pictures_compressed_range_bytes,
-        pictures_uncompressed_payload_bytes: u64::try_from(
-            ODS_MEDIA_ENTRY_COUNT
-                .checked_mul(ODS_MEDIA_ENTRY_BYTES)
-                .ok_or("ODT unified root uncompressed Pictures byte count overflows usize")?,
-        )?,
-        pictures_uncompressed_payload_sha256: odt_repeated_text_media_payload_digest(),
-    })
-}
-
-fn create_odt_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| format!("ODT root source timestamp is before epoch: {error}"))?
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!(
-        "litchi-perf-baseline-odt-root-{}-{stamp}.odt",
-        std::process::id()
-    ));
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)?;
-    if let Err(error) = file.write_all(archive).and_then(|()| file.flush()) {
-        drop(file);
-        let _ = fs::remove_file(&path);
-        return Err(error.into());
-    }
-    Ok(path)
-}
-
-#[derive(Clone, Copy, Debug)]
-struct OdtRootReplay {
-    preparation: SourceSnapshot,
-    query: SourceSnapshot,
-}
-
-fn replay_odt_root_source(
-    corpus: &Corpus,
-    expected_text: &str,
-) -> Result<OdtRootReplay, Box<dyn Error>> {
-    let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
-    let source = Arc::new(InstrumentedSource::new_odf(
-        corpus.archive.clone(),
-        vec![content_range],
-        untouched_ranges,
-        picture_ranges,
-    ));
-    let document = litchi_odt::SourceBackedDocument::from_read_at(source.clone())?;
-    let preparation = source.snapshot();
-    if preparation.read_calls == 0
-        || preparation.read_bytes == 0
-        || preparation.odf.content.read_calls == 0
-        || preparation.odf.content.read_bytes == 0
-        || preparation.odf.pictures.read_calls != 0
-        || preparation.odf.pictures.read_bytes != 0
-    {
-        return Err("ODT unified root source preparation failed source-range gates".into());
-    }
-    source.reset();
-    if document.text()? != expected_text {
-        return Err("ODT unified root source query differs from eager text".into());
-    }
-    let query = source.snapshot();
-    if query.odf.pictures.read_calls != 0 || query.odf.pictures.read_bytes != 0 {
-        return Err("ODT unified root source query overlapped Pictures payload".into());
-    }
-    Ok(OdtRootReplay { preparation, query })
-}
-
-fn run_odt_file_root(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    if !case.is_odt_root_file() {
-        return Err("non-root ODT case passed to ODT root runner".into());
-    }
-    if corpus.manifest.generator != ODT_REPEATED_TEXT_CORPUS_GENERATOR {
-        return Err("ODT root filesystem cases require the fixed large media-rich corpus".into());
-    }
-    let (implementation, lifecycle) = odt_root_case_parameters(case)?;
-    let source_path = create_odt_root_source_file(&corpus.archive)?;
-    let result = (|| {
-        let source_bytes = fs::read(&source_path)?;
-        if source_bytes != corpus.archive
-            || sha256_hex(&source_bytes) != corpus.manifest.archive_sha256
-            || source_bytes.len() != corpus.manifest.archive_bytes
-        {
-            return Err("ODT unified root source file differs from deterministic archive".into());
-        }
-        let archive_identity = odt_root_archive_identity(&corpus.archive)?;
-        let source_identity = odt_root_archive_identity(&source_bytes)?;
-        if source_identity != archive_identity
-            || archive_identity.archive_member_count != corpus.manifest.archive_member_count
-        {
-            return Err("ODT unified root source archive identity differs from corpus".into());
-        }
-
-        let eager = litchi::Document::from_bytes(corpus.archive.clone())?;
-        let source = litchi::Document::open(&source_path)?;
-        let eager_semantics = odt_root_semantic_projection(&eager)?;
-        let source_semantics = odt_root_semantic_projection(&source)?;
-        if source_semantics != eager_semantics {
-            return Err("ODT unified root eager/source semantic parity failed".into());
-        }
-        if eager_semantics.paragraphs.len() != SemanticShape::Large.docx_paragraphs()
-            || eager_semantics
-                .paragraphs
-                .iter()
-                .enumerate()
-                .any(|(index, value)| value != &semantic_odt_text(index, false))
-        {
-            return Err("ODT unified root paragraph content differs from corpus".into());
-        }
-        if eager_semantics.text != eager_semantics.paragraphs.join("\n") {
-            return Err("ODT unified root text differs from paragraph content".into());
-        }
-
-        let mut elapsed = Vec::with_capacity(samples);
-        let mut summary = OdtFileRootSummary {
-            implementation,
-            phase: if lifecycle {
-                "open_and_full_text_lifecycle"
-            } else {
-                "open_only"
-            },
-            timing_scope: if lifecycle {
-                "filesystem_read_or_path_open_and_unified_document_full_text_query_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer"
-            } else {
-                "filesystem_read_or_path_open_and_unified_document_ownership_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer"
-            },
-            timed_root_adapter: if implementation == "source_backed_root" {
-                if lifecycle {
-                    "litchi::Document::open(Path)+Document::text"
-                } else {
-                    "litchi::Document::open(Path)"
-                }
-            } else if lifecycle {
-                "fs::read(Path)+litchi::Document::from_bytes(Vec<u8>)+Document::text"
-            } else {
-                "fs::read(Path)+litchi::Document::from_bytes(Vec<u8>)"
-            },
-            read_evidence_adapter: if implementation == "source_backed_root" {
-                "litchi_odt::SourceBackedDocument+harness::InstrumentedSource"
-            } else {
-                "not_applicable"
-            },
-            read_evidence_scope: if implementation == "source_backed_root" {
-                "separate_untimed_instrumented_source_replay_per_measured_sample"
-            } else {
-                "not_applicable"
-            },
-            source_path_bytes: u64::try_from(source_bytes.len())?,
-            source_path_sha256: sha256_hex(&source_bytes),
-            archive_member_count: archive_identity.archive_member_count,
-            archive_member_names_sha256: archive_identity.archive_member_names_sha256.clone(),
-            pictures_count: archive_identity.pictures_count,
-            pictures_member_names_sha256: archive_identity.pictures_member_names_sha256.clone(),
-            pictures_compressed_range_bytes: archive_identity.pictures_compressed_range_bytes,
-            pictures_uncompressed_payload_bytes: archive_identity
-                .pictures_uncompressed_payload_bytes,
-            pictures_uncompressed_payload_sha256: archive_identity
-                .pictures_uncompressed_payload_sha256
-                .clone(),
-            canonical_text_sha256: sha256_hex(eager_semantics.text.as_bytes()),
-            paragraph_count: eager_semantics.paragraphs.len(),
-            paragraph_text_sha256: odt_root_values_digest(&eager_semantics.paragraphs),
-            table_count: eager_semantics.tables.len(),
-            element_count: eager_semantics.elements.len(),
-            element_text_sha256: odt_root_values_digest(&eager_semantics.elements),
-            metadata_sha256: eager_semantics.metadata_sha256.clone(),
-            semantic_parity_verified: true,
-            archive_identity_verified: true,
-            media_identity_verified: true,
-            source_ranges_verified: implementation != "source_backed_root",
-            zero_picture_payload_overlap_verified: implementation != "source_backed_root",
-            ..OdtFileRootSummary::default()
-        };
-
-        for iteration in 0..iteration_count(warmup_iterations, samples)? {
-            let started = Instant::now();
-            let document = if implementation == "source_backed_root" {
-                litchi::Document::open(&source_path)?
-            } else {
-                let bytes = fs::read(&source_path)?;
-                litchi::Document::from_bytes(bytes)?
-            };
-            let text = if lifecycle {
-                Some(document.text()?)
-            } else {
-                None
-            };
-            let duration = started.elapsed();
-            if let Some(text) = text.as_deref()
-                && text != eager_semantics.text
-            {
-                return Err(
-                    "ODT unified root timed full-text lifecycle differs from oracle".into(),
-                );
-            }
-            std::hint::black_box(document);
-            std::hint::black_box(text);
-            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-        }
-
-        if implementation == "source_backed_root" {
-            let mut expected_replay = None;
-            for _ in 0..samples {
-                let replay = replay_odt_root_source(corpus, &eager_semantics.text)?;
-                let tuple = (replay.preparation, replay.query);
-                if let Some(expected) = expected_replay {
-                    if expected != tuple {
-                        return Err(
-                            "ODT unified root source replay counters are not deterministic".into(),
-                        );
-                    }
-                } else {
-                    expected_replay = Some(tuple);
-                }
-                summary
-                    .source_preparation_read_calls
-                    .push(replay.preparation.read_calls);
-                summary
-                    .source_preparation_read_bytes
-                    .push(replay.preparation.read_bytes);
-                summary
-                    .source_preparation_content_read_calls
-                    .push(replay.preparation.odf.content.read_calls);
-                summary
-                    .source_preparation_content_read_bytes
-                    .push(replay.preparation.odf.content.read_bytes);
-                summary
-                    .source_preparation_untouched_read_calls
-                    .push(replay.preparation.odf.untouched.read_calls);
-                summary
-                    .source_preparation_untouched_read_bytes
-                    .push(replay.preparation.odf.untouched.read_bytes);
-                summary
-                    .source_preparation_pictures_read_calls
-                    .push(replay.preparation.odf.pictures.read_calls);
-                summary
-                    .source_preparation_pictures_read_bytes
-                    .push(replay.preparation.odf.pictures.read_bytes);
-                summary
-                    .source_query_read_calls
-                    .push(replay.query.read_calls);
-                summary
-                    .source_query_read_bytes
-                    .push(replay.query.read_bytes);
-                summary
-                    .source_query_content_read_calls
-                    .push(replay.query.odf.content.read_calls);
-                summary
-                    .source_query_content_read_bytes
-                    .push(replay.query.odf.content.read_bytes);
-                summary
-                    .source_query_untouched_read_calls
-                    .push(replay.query.odf.untouched.read_calls);
-                summary
-                    .source_query_untouched_read_bytes
-                    .push(replay.query.odf.untouched.read_bytes);
-                summary
-                    .source_query_pictures_read_calls
-                    .push(replay.query.odf.pictures.read_calls);
-                summary
-                    .source_query_pictures_read_bytes
-                    .push(replay.query.odf.pictures.read_bytes);
-            }
-            summary.source_ranges_verified = true;
-            summary.zero_picture_payload_overlap_verified = summary
-                .source_preparation_pictures_read_calls
-                .iter()
-                .chain(summary.source_query_pictures_read_calls.iter())
-                .all(|&calls| calls == 0)
-                && summary
-                    .source_preparation_pictures_read_bytes
-                    .iter()
-                    .chain(summary.source_query_pictures_read_bytes.iter())
-                    .all(|&bytes| bytes == 0);
-            if !summary.zero_picture_payload_overlap_verified {
-                return Err("ODT unified root source replay picture overlap gate failed".into());
-            }
-        }
-
-        Ok(result_with_source(
-            case,
-            corpus,
-            elapsed,
-            SourceSummary {
-                read_calls: summary.source_preparation_read_calls.clone(),
-                read_bytes: summary.source_preparation_read_bytes.clone(),
-                ordinary_payload_read_calls: vec![0; summary.source_preparation_read_calls.len()],
-                ordinary_payload_read_bytes: vec![0; summary.source_preparation_read_calls.len()],
-                odt_root: Some(summary),
-                ..SourceSummary::default()
-            },
-        ))
-    })();
-    let cleanup = fs::remove_file(&source_path);
-    match (result, cleanup) {
-        (Ok(result), Ok(())) => Ok(result),
-        (Ok(_), Err(error)) => Err(error.into()),
-        (Err(error), _) => Err(error),
-    }
 }
 
 fn odt_repeated_text_media_payload_digest() -> String {
@@ -42037,8 +40429,6 @@ fn ods_root_file_case_parameters(
     case: Case,
 ) -> Result<(&'static str, &'static str, bool, bool), Box<dyn Error>> {
     match case {
-        Case::OdsFileEagerOpen => Ok(("eager_root", "workbook_open", false, false)),
-        Case::OdsFileSourceOpen => Ok(("source_backed_root", "workbook_open", false, false)),
         Case::OdsFileEagerSelectedCell => Ok(("eager_typed", "selected_cell_query", true, false)),
         Case::OdsFileSourceSelectedCell => {
             Ok(("source_backed_typed", "selected_cell_query", true, false))
@@ -42865,7 +41255,6 @@ struct OdsRootExpectations<'a> {
     worksheet_count: usize,
     text: &'a str,
     metadata_sha256: &'a str,
-    typed: &'a litchi_ods::Spreadsheet,
     target_sheet: &'a str,
     target_row: usize,
     target_column: usize,
@@ -42964,53 +41353,6 @@ fn verify_ods_source_identity_postconditions(
     Ok(())
 }
 
-fn verify_ods_root_postconditions(
-    workbook: &litchi::Workbook,
-    expected: &OdsRootExpectations<'_>,
-) -> Result<(), Box<dyn Error>> {
-    let names = workbook
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    if names != expected.worksheet_names {
-        return Err("ODS unified root worksheet names differ from eager oracle".into());
-    }
-    if workbook
-        .worksheet_count()
-        .map_err(|error| error.to_string())?
-        != expected.worksheet_count
-    {
-        return Err("ODS unified root worksheet count differs from eager oracle".into());
-    }
-    let text = workbook.text().map_err(|error| error.to_string())?;
-    if text != expected.text {
-        return Err("ODS unified root text differs from eager oracle".into());
-    }
-    if ods_root_metadata_digest(&workbook.metadata().map_err(|error| error.to_string())?)?
-        != expected.metadata_sha256
-    {
-        return Err("ODS unified root metadata differs from eager oracle".into());
-    }
-
-    verify_semantic_ods(expected.typed, SemanticShape::Medium, false)?;
-    let typed_cell = ods_root_typed_cell(
-        expected.typed,
-        expected.target_sheet,
-        expected.target_row,
-        expected.target_column,
-    )?;
-    if typed_cell != expected.cell_text {
-        return Err("ODS typed selected cell differs from canonical oracle".into());
-    }
-    if expected.cell_text
-        != semantic_ods_text(1, expected.target_row, expected.target_column, false)
-    {
-        return Err("ODS typed selected cell differs from deterministic corpus".into());
-    }
-
-    verify_ods_source_identity_postconditions(expected)?;
-    Ok(())
-}
-
 fn run_ods_root_file_access(
     case: Case,
     corpus: &Corpus,
@@ -43026,21 +41368,15 @@ fn run_ods_root_file_access(
     let target_column = SemanticShape::Medium.ods_columns_per_sheet() / 2;
     let selected_media_path = ods_media_path(ODS_MEDIA_ENTRY_COUNT / 2);
     let selected_media_payload = ods_media_payload(ODS_MEDIA_ENTRY_COUNT / 2);
-    let expected_root =
-        litchi::Workbook::from_bytes(corpus.archive.clone()).map_err(|error| error.to_string())?;
-    let expected_names = expected_root
-        .worksheet_names()
-        .map_err(|error| error.to_string())?;
-    let expected_count = expected_root
-        .worksheet_count()
-        .map_err(|error| error.to_string())?;
-    let expected_text = expected_root.text().map_err(|error| error.to_string())?;
-    let expected_metadata_sha256 = ods_root_metadata_digest(
-        &expected_root
-            .metadata()
-            .map_err(|error| error.to_string())?,
-    )?;
+    // The workbook-level expectations come from the typed owner. They are
+    // the values the facade workbook these routes were recorded against
+    // reported (M0a step S9 deleted it), which the unified ODS routes (S8b)
+    // check `litchi::File` against.
     let expected_typed = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected_names = expected_typed.sheet_names();
+    let expected_count = expected_typed.sheet_count();
+    let expected_text = expected_typed.text()?;
+    let expected_metadata_sha256 = ods_root_metadata_digest(expected_typed.metadata())?;
     let expected_cell_text =
         ods_root_typed_cell(&expected_typed, &target_sheet, target_row, target_column)?;
     let (picture_members, selected_range) = ods_media_payload_inventory(corpus)?;
@@ -43071,7 +41407,6 @@ fn run_ods_root_file_access(
         worksheet_count: expected_count,
         text: &expected_text,
         metadata_sha256: &expected_metadata_sha256,
-        typed: &expected_typed,
         target_sheet: &target_sheet,
         target_row,
         target_column,
@@ -43086,16 +41421,10 @@ fn run_ods_root_file_access(
             phase,
             timing_scope: if media_query {
                 "selected_media_query_after_untimed_typed_owner_open"
-            } else if query {
-                "selected_cell_query_after_untimed_typed_owner_open"
             } else {
-                "unified_root_workbook_open"
+                "selected_cell_query_after_untimed_typed_owner_open"
             },
-            timed_root_adapter: match implementation {
-                "source_backed_root" => "litchi::Workbook::open(Path)",
-                "eager_root" => "litchi::Workbook::from_bytes(Vec<u8>)",
-                _ => "not_applicable",
-            },
+            timed_root_adapter: "not_applicable",
             typed_query_adapter: if media_query {
                 if implementation == "source_backed_typed" {
                     "litchi_ods::SourceBackedSpreadsheet::media_data"
@@ -43144,23 +41473,6 @@ fn run_ods_root_file_access(
 
         for iteration in 0..iteration_count(warmup_iterations, samples)? {
             let duration = match implementation {
-                "source_backed_root" => {
-                    let started = Instant::now();
-                    let workbook =
-                        litchi::Workbook::open(&source_path).map_err(|error| error.to_string())?;
-                    let duration = started.elapsed();
-                    verify_ods_root_postconditions(&workbook, &expectations)?;
-                    duration
-                },
-                "eager_root" => {
-                    let owned = corpus.archive.clone();
-                    let started = Instant::now();
-                    let workbook =
-                        litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
-                    let duration = started.elapsed();
-                    verify_ods_root_postconditions(&workbook, &expectations)?;
-                    duration
-                },
                 "source_backed_typed" => {
                     let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
                     let started = Instant::now();
@@ -44136,103 +42448,6 @@ fn xlsx_root_metadata_oracle(
 
 fn xlsx_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, Box<dyn Error>> {
     Ok(sha256_hex(&serde_json::to_vec(metadata)?))
-}
-
-fn xlsx_bytes_root_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
-    match case {
-        Case::XlsxBytesOpen => Ok(false),
-        Case::XlsxBytesOpenLifecycle => Ok(true),
-        _ => Err("non-bytes XLSX root case passed to XLSX bytes root case parameters".into()),
-    }
-}
-
-fn run_xlsx_bytes_root_access(
-    case: Case,
-    corpus: &Corpus,
-    warmup_iterations: usize,
-    samples: usize,
-) -> Result<CaseResult, Box<dyn Error>> {
-    let spec = xlsx_spec(corpus)?;
-    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR {
-        return Err("XLSX bytes root cases require the deterministic cell-CRUD XLSX corpus".into());
-    }
-    let lifecycle = xlsx_bytes_root_case_parameters(case)?;
-
-    // Keep the eager owner as an independent semantic oracle. These checks are
-    // deliberately outside the timed facade lifecycle, as is the archive hash.
-    let eager = Workbook::from_bytes(corpus.archive.clone())?;
-    verify_xlsx_cells(&eager, spec, &[])?;
-    let expected_names = eager
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
-        .collect::<Vec<_>>();
-    let expected_count = eager.len();
-    if expected_names.len() != spec.sheet_count || expected_count != spec.sheet_count {
-        return Err("typed eager XLSX bytes oracle worksheet shape differs from corpus".into());
-    }
-    let expected_text = xlsx_typed_full_text(&eager, spec)?;
-    drop(eager);
-    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
-        || corpus.archive.len() != corpus.manifest.archive_bytes
-    {
-        return Err("XLSX bytes root archive differs from its deterministic manifest".into());
-    }
-
-    // Read metadata through an independently opened eager OPC/property path;
-    // the facade workbook is never used to manufacture its own oracle.
-    let package = OpcPackage::from_bytes(&corpus.archive)?;
-    let expected_metadata = xlsx_root_metadata_oracle(&package)?;
-    let expected_metadata_sha256 = xlsx_root_metadata_digest(&expected_metadata)?;
-    drop(expected_metadata);
-    drop(package);
-
-    let mut elapsed = Vec::with_capacity(samples);
-    for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Keep Vec ownership preparation outside the measurement interval.
-        let owned = corpus.archive.clone();
-        let started = Instant::now();
-        let workbook = litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
-        let measured_projection = if lifecycle {
-            Some((
-                workbook
-                    .worksheet_names()
-                    .map_err(|error| error.to_string())?,
-                workbook
-                    .worksheet_count()
-                    .map_err(|error| error.to_string())?,
-                workbook.text().map_err(|error| error.to_string())?,
-            ))
-        } else {
-            None
-        };
-        let duration = started.elapsed();
-
-        let (names, count, text) = match measured_projection {
-            Some(projection) => projection,
-            None => (
-                workbook
-                    .worksheet_names()
-                    .map_err(|error| error.to_string())?,
-                workbook
-                    .worksheet_count()
-                    .map_err(|error| error.to_string())?,
-                workbook.text().map_err(|error| error.to_string())?,
-            ),
-        };
-        let metadata_sha256 =
-            xlsx_root_metadata_digest(&workbook.metadata().map_err(|error| error.to_string())?)?;
-        if names != expected_names
-            || count != expected_count
-            || text != expected_text
-            || metadata_sha256 != expected_metadata_sha256
-        {
-            return Err("XLSX bytes root projection differs from typed/eager oracle".into());
-        }
-        std::hint::black_box(&workbook);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
-    }
-
-    Ok(result(case, corpus, elapsed, None))
 }
 
 fn verify_unselected_xlsx_ranges_untouched(
@@ -62700,7 +60915,7 @@ mod tests {
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
         SimulatedRangeSource, SinkSummary, SourceBackedPackage, TransferDelayPolicy,
-        WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
+        WindowedHashingSink, WriteSizeBuckets, WriterShape,
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
         XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
@@ -62748,9 +60963,9 @@ mod tests {
         validate_opc_serial_eager_open_options, validate_pptx_source_image_query_options,
         validate_provider_axis_options, validate_xls_source_locality, validate_xls_source_options,
         verify_opc_materialized_package, verify_opc_serial_eager_fixed_corpus_preflight,
-        verify_xlsx_cells, writer_shape, xls_owned_source_dispatch_cases,
-        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
-        xlsb_expected_cells, xlsx_cell_count, xlsx_spec, zip_member_ranges,
+        writer_shape, xls_owned_source_dispatch_cases, xls_source_family_dispatch_cases,
+        xls_writer_semantic_dispatch_selected, xlsb_cells_digest, xlsb_expected_cells,
+        xlsx_cell_count, zip_member_ranges,
     };
 
     #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize)]
@@ -64231,14 +62446,77 @@ mod tests {
     }
 
     #[test]
+    fn m0a_s9_deleted_the_facade_predecessor_selectors() {
+        // M0a step S9 deleted the facade types these 47 selectors timed. Their
+        // frozen records keep the names, and the unified-API and leaf-API
+        // pairs of step S8b re-measure their scenarios; the names must not
+        // select anything again.
+        let deleted = [
+            "docx_file_eager_open",
+            "docx_file_source_open",
+            "docx_file_eager_paragraph_count",
+            "docx_file_source_paragraph_count",
+            "docx_file_eager_list_paragraphs",
+            "docx_file_source_list_paragraphs",
+            "docx_file_eager_full_text",
+            "docx_file_source_full_text",
+            "docx_file_eager_open_paragraph_count_lifecycle",
+            "docx_file_source_open_paragraph_count_lifecycle",
+            "docx_file_eager_open_full_text_lifecycle",
+            "docx_file_source_open_full_text_lifecycle",
+            "pptx_file_eager_open",
+            "pptx_file_source_open",
+            "pptx_file_eager_list_slides",
+            "pptx_file_source_list_slides",
+            "pptx_file_eager_slide_count",
+            "pptx_file_source_slide_count",
+            "pptx_file_eager_selected_slide",
+            "pptx_file_source_selected_slide",
+            "pptx_file_eager_open_slide_count_lifecycle",
+            "pptx_file_source_open_slide_count_lifecycle",
+            "pptx_file_eager_open_selected_slide_lifecycle",
+            "pptx_file_source_open_selected_slide_lifecycle",
+            "xlsx_file_open",
+            "xlsx_file_open_lifecycle",
+            "xlsx_file_selected_cell",
+            "xlsx_bytes_open",
+            "xlsx_bytes_open_lifecycle",
+            "doc_facade_file_open",
+            "doc_facade_file_full_text",
+            "doc_facade_file_one_paragraph",
+            "ppt_facade_file_open",
+            "ppt_facade_file_full_text",
+            "ppt_facade_file_one_slide_text",
+            "rtf_file_open",
+            "rtf_file_open_lifecycle",
+            "odt_file_eager_open",
+            "odt_file_source_open",
+            "odt_file_eager_open_full_text_lifecycle",
+            "odt_file_source_open_full_text_lifecycle",
+            "odp_file_eager_open",
+            "odp_file_source_open",
+            "odp_file_eager_selected_slide",
+            "odp_file_source_selected_slide",
+            "ods_file_eager_open",
+            "ods_file_source_open",
+        ];
+        assert_eq!(deleted.len(), 47);
+        for name in deleted {
+            assert_eq!(parse_case(name), None, "{name}");
+        }
+    }
+
+    #[test]
     fn selectable_case_count_matches_current_enumeration() {
         // `Case` is the central selectable-name enumeration. Keep the
         // documented current count mechanically tied to that enum until a
         // generated registry replaces the exhaustive `Case::name` match. The
         // four provider-axis controls below are deliberately opt-in: they
         // increase the selectable registry without changing the default
-        // cases or the separate default allocator contract.
-        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 652;
+        // cases or the separate default allocator contract. M0a step S9
+        // removed the 47 predecessor selectors that timed the deleted facade
+        // types (652 -> 605).
+        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 605;
         let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")
@@ -65269,50 +63547,6 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::PptxValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfValidationReport));
         assert!(!Case::DEFAULT.contains(&Case::OdfMimetypeRepairPlan));
-    }
-
-    #[test]
-    fn docx_root_filesystem_matrix_is_opt_in_and_complete() {
-        let names = [
-            "docx_file_eager_open",
-            "docx_file_source_open",
-            "docx_file_eager_paragraph_count",
-            "docx_file_source_paragraph_count",
-            "docx_file_eager_list_paragraphs",
-            "docx_file_source_list_paragraphs",
-            "docx_file_eager_full_text",
-            "docx_file_source_full_text",
-            "docx_file_eager_open_paragraph_count_lifecycle",
-            "docx_file_source_open_paragraph_count_lifecycle",
-            "docx_file_eager_open_full_text_lifecycle",
-            "docx_file_source_open_full_text_lifecycle",
-        ];
-        for name in names {
-            let case = parse_case(name).expect("DOCX root selector parses");
-            assert_eq!(case.name(), name);
-            assert!(case.is_filesystem());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(names.len(), 12);
-        assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
-    fn pptx_root_filesystem_lifecycle_matrix_is_opt_in_and_complete() {
-        let names = [
-            "pptx_file_eager_open_slide_count_lifecycle",
-            "pptx_file_source_open_slide_count_lifecycle",
-            "pptx_file_eager_open_selected_slide_lifecycle",
-            "pptx_file_source_open_selected_slide_lifecycle",
-        ];
-        for name in names {
-            let case = parse_case(name).expect("PPTX lifecycle selector parses");
-            assert_eq!(case.name(), name);
-            assert!(case.is_filesystem());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(names.len(), 4);
-        assert_eq!(Case::DEFAULT.len(), 41);
     }
 
     #[test]
@@ -68631,59 +66865,6 @@ mod tests {
     }
 
     #[test]
-    fn unified_rtf_owned_byte_selectors_are_opt_in_and_native_oracles_are_exact() {
-        let cases = [Case::RtfFileOpen, Case::RtfFileOpenLifecycle];
-        for case in cases {
-            assert_eq!(parse_case(case.name()), Some(case));
-            assert!(case.is_rtf_root_file());
-            assert!(case.uses_semantic_rtf());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-
-        let plain =
-            build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Plain).unwrap();
-        for case in cases {
-            let result = run_case(case, &plain, 0, 1).unwrap();
-            assert_eq!(result.elapsed_ns.samples.len(), 1);
-            let evidence = result
-                .source
-                .unwrap()
-                .rtf_root
-                .expect("unified RTF root evidence");
-            assert_eq!(evidence.transport_variant, "plain");
-            assert_eq!(evidence.source_bytes, plain.archive.len() as u64);
-            assert_eq!(evidence.source_sha256, plain.manifest.archive_sha256);
-            assert!(evidence.native_semantic_parity_verified);
-            assert!(evidence.native_exact_source_roundtrip_verified);
-            assert!(evidence.performance_claim.starts_with("none:"));
-            assert_eq!(
-                evidence.paragraph_count,
-                SemanticShape::Tiny.rtf_paragraphs()
-            );
-        }
-
-        // Keep transport correctness independently testable on the historical
-        // control tree, where the unified facade still rejects non-UTF-8 RTF
-        // before the native byte-ingress change. Post-change runs can promote
-        // these same corpora to facade parity without changing the timed plain
-        // selector's scope.
-        for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
-            let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
-            let native = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
-            super::verify_semantic_rtf(&native, SemanticShape::Tiny, variant, &[]).unwrap();
-            assert_eq!(native.to_bytes().unwrap(), corpus.archive);
-            assert_eq!(sha256_hex(&corpus.archive), corpus.manifest.archive_sha256);
-        }
-        for case in cases {
-            assert!(RtfSemanticVariant::Plain.supports_case(case));
-            assert!(RtfSemanticVariant::Byte1252.supports_case(case));
-            assert!(RtfSemanticVariant::Lzfu.supports_case(case));
-            assert!(!RtfSemanticVariant::Watermark.supports_case(case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
     fn semantic_rtf_tiny_variants_are_deterministic_and_capability_bounded() {
         let cases = [
             Case::RtfSemanticOpen,
@@ -70185,75 +68366,6 @@ mod tests {
     }
 
     #[test]
-    fn large_odt_unified_root_filesystem_selectors_are_opt_in_and_matched() {
-        let cases = [
-            Case::OdtFileEagerOpen,
-            Case::OdtFileSourceOpen,
-            Case::OdtFileEagerOpenFullTextLifecycle,
-            Case::OdtFileSourceOpenFullTextLifecycle,
-        ];
-        for case in cases {
-            assert_eq!(parse_case(case.name()), Some(case));
-            assert!(!Case::DEFAULT.contains(&case));
-            assert!(case.is_filesystem());
-            assert!(case.is_odt_root_file());
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-
-        let corpus = build_odt_repeated_text_corpus().unwrap();
-        let results = cases
-            .into_iter()
-            .map(|case| run_case(case, &corpus, 0, 1).unwrap())
-            .collect::<Vec<_>>();
-        let evidence = results
-            .iter()
-            .map(|result| result.source.as_ref().unwrap().odt_root.as_ref().unwrap())
-            .collect::<Vec<_>>();
-        for current in &evidence {
-            assert!(current.semantic_parity_verified);
-            assert!(current.archive_identity_verified);
-            assert!(current.media_identity_verified);
-            assert_eq!(
-                current.archive_member_count,
-                corpus.manifest.archive_member_count
-            );
-            assert_eq!(current.source_path_sha256, corpus.manifest.archive_sha256);
-            assert_eq!(
-                current.paragraph_count,
-                SemanticShape::Large.docx_paragraphs()
-            );
-        }
-        assert_eq!(
-            evidence[0].canonical_text_sha256,
-            evidence[1].canonical_text_sha256
-        );
-        assert_eq!(
-            evidence[0].canonical_text_sha256,
-            evidence[2].canonical_text_sha256
-        );
-        assert_eq!(
-            evidence[0].canonical_text_sha256,
-            evidence[3].canonical_text_sha256
-        );
-        assert_eq!(
-            evidence[0].archive_member_names_sha256,
-            evidence[1].archive_member_names_sha256
-        );
-        assert_eq!(
-            evidence[0].pictures_member_names_sha256,
-            evidence[1].pictures_member_names_sha256
-        );
-        assert!(evidence[1].source_ranges_verified);
-        assert!(evidence[1].zero_picture_payload_overlap_verified);
-        assert_eq!(evidence[1].source_preparation_pictures_read_calls, vec![0]);
-        assert_eq!(evidence[1].source_query_pictures_read_calls, vec![0]);
-        assert!(evidence[3].source_ranges_verified);
-        assert!(evidence[3].zero_picture_payload_overlap_verified);
-        assert_eq!(evidence[3].source_preparation_pictures_read_calls, vec![0]);
-        assert_eq!(evidence[3].source_query_pictures_read_calls, vec![0]);
-    }
-
-    #[test]
     fn media_rich_odt_line_break_is_deterministic_and_preserves_untouched_members() {
         let corpus = build_odt_media_corpus().unwrap();
         let result = run_case(Case::OdtMediaLineBreakEditSave, &corpus, 0, 1).unwrap();
@@ -70655,101 +68767,6 @@ mod tests {
     }
 
     #[test]
-    fn media_rich_odp_unified_root_file_selectors_are_matched_and_lazy() {
-        for (name, case) in [
-            ("odp_file_eager_open", Case::OdpFileEagerOpen),
-            ("odp_file_source_open", Case::OdpFileSourceOpen),
-            (
-                "odp_file_eager_selected_slide",
-                Case::OdpFileEagerSelectedSlide,
-            ),
-            (
-                "odp_file_source_selected_slide",
-                Case::OdpFileSourceSelectedSlide,
-            ),
-        ] {
-            assert_eq!(parse_case(name), Some(case));
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-
-        let corpus = build_odp_media_corpus().unwrap();
-        let eager_open = run_case(Case::OdpFileEagerOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-        let source_open = run_case(Case::OdpFileSourceOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-        let eager_slide = run_case(Case::OdpFileEagerSelectedSlide, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-        let source_slide = run_case(Case::OdpFileSourceSelectedSlide, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .odp_root
-            .unwrap();
-
-        assert_eq!(
-            eager_open.canonical_semantic_sha256,
-            source_open.canonical_semantic_sha256
-        );
-        assert_eq!(
-            eager_slide.canonical_semantic_sha256,
-            source_slide.canonical_semantic_sha256
-        );
-        assert_eq!(eager_open.metadata_sha256, source_open.metadata_sha256);
-        assert_eq!(eager_slide.metadata_sha256, source_slide.metadata_sha256);
-        assert_eq!(
-            eager_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
-        assert_eq!(
-            source_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
-        assert_eq!(
-            eager_open.selected_media_uncompressed_payload_sha256,
-            source_open.selected_media_uncompressed_payload_sha256
-        );
-        assert_eq!(
-            eager_slide.selected_media_uncompressed_payload_sha256,
-            source_slide.selected_media_uncompressed_payload_sha256
-        );
-        assert!(eager_open.source_read_calls.is_empty());
-        assert!(eager_slide.source_read_calls.is_empty());
-        assert!(eager_open.selected_media_read_calls.is_empty());
-        assert!(eager_slide.selected_media_read_calls.is_empty());
-        assert_eq!(source_open.source_read_calls.len(), 2);
-        assert_eq!(source_open.source_read_bytes.len(), 2);
-        assert_eq!(source_slide.source_read_calls, vec![0, 0]);
-        assert_eq!(source_slide.source_read_bytes, vec![0, 0]);
-        assert_eq!(
-            source_slide.pictures_read_compressed_range_bytes,
-            vec![0, 0]
-        );
-        assert_eq!(source_slide.pictures_read_calls, vec![0, 0]);
-        let selected_compressed_bytes = source_open.selected_media_compressed_range_bytes;
-        for source in [source_open, source_slide] {
-            assert_eq!(source.selected_media_read_calls.len(), 2);
-            assert_eq!(source.selected_media_read_bytes.len(), 2);
-            assert_eq!(
-                source.selected_media_read_compressed_range_overlap_bytes,
-                vec![selected_compressed_bytes; 2]
-            );
-        }
-    }
-
-    #[test]
     fn media_rich_odp_repeated_text_selectors_are_matched_and_source_fresh() {
         for (name, case) in [
             (
@@ -70764,7 +68781,6 @@ mod tests {
             assert_eq!(parse_case(name), Some(case));
             assert_eq!(case.name(), name);
             assert!(!Case::DEFAULT.contains(&case));
-            assert!(!case.is_odp_root_file());
             assert!(case.is_odp_repeated_text());
         }
         assert_eq!(Case::DEFAULT.len(), 41);
@@ -70875,8 +68891,6 @@ mod tests {
     #[test]
     fn media_rich_ods_unified_root_file_selectors_are_matched_and_lazy() {
         for (name, case) in [
-            ("ods_file_eager_open", Case::OdsFileEagerOpen),
-            ("ods_file_source_open", Case::OdsFileSourceOpen),
             (
                 "ods_file_eager_selected_cell",
                 Case::OdsFileEagerSelectedCell,
@@ -70900,18 +68914,6 @@ mod tests {
         assert_eq!(Case::DEFAULT.len(), 41);
 
         let corpus = build_ods_media_corpus().unwrap();
-        let eager_open = run_case(Case::OdsFileEagerOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .ods_root
-            .unwrap();
-        let source_open = run_case(Case::OdsFileSourceOpen, &corpus, 0, 2)
-            .unwrap()
-            .source
-            .unwrap()
-            .ods_root
-            .unwrap();
         let eager_cell = run_case(Case::OdsFileEagerSelectedCell, &corpus, 0, 2)
             .unwrap()
             .source
@@ -70937,21 +68939,22 @@ mod tests {
             .ods_root
             .unwrap();
 
-        assert_eq!(eager_open.worksheet_names, source_open.worksheet_names);
-        assert_eq!(eager_open.worksheet_count, source_open.worksheet_count);
-        assert_eq!(
-            eager_open.canonical_text_sha256,
-            source_open.canonical_text_sha256
-        );
-        assert_eq!(eager_open.metadata_sha256, source_open.metadata_sha256);
-        assert_eq!(
-            eager_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
-        assert_eq!(
-            source_open.source_path_sha256,
-            corpus.manifest.archive_sha256
-        );
+        // The workbook-level expectations every route records come from one
+        // oracle (M0a step S9 moved it from the deleted facade workbook to the
+        // typed owner, which reports the same values).
+        for summary in [&source_cell, &eager_media, &source_media] {
+            assert_eq!(summary.worksheet_names, eager_cell.worksheet_names);
+            assert_eq!(summary.worksheet_count, eager_cell.worksheet_count);
+            assert_eq!(
+                summary.canonical_text_sha256,
+                eager_cell.canonical_text_sha256
+            );
+            assert_eq!(summary.metadata_sha256, eager_cell.metadata_sha256);
+        }
+        for summary in [&eager_cell, &source_cell, &eager_media, &source_media] {
+            assert_eq!(summary.source_path_sha256, corpus.manifest.archive_sha256);
+            assert_eq!(summary.timed_root_adapter, "not_applicable");
+        }
         assert_eq!(
             eager_cell.target_cell_text_sha256,
             source_cell.target_cell_text_sha256
@@ -70968,12 +68971,11 @@ mod tests {
             eager_media.selected_media_compressed_range_bytes,
             source_media.selected_media_compressed_range_bytes
         );
-        for eager in [eager_open, eager_cell, eager_media] {
+        for eager in [eager_cell, eager_media] {
             assert!(eager.source_read_calls.is_empty());
             assert!(eager.pictures_read_calls.is_empty());
             assert!(eager.selected_media_read_calls.is_empty());
         }
-        assert_eq!(source_open.source_read_calls.len(), 2);
         assert_eq!(source_cell.source_read_calls, vec![0, 0]);
         assert_eq!(source_cell.pictures_read_compressed_range_bytes, vec![0, 0]);
         assert_eq!(source_cell.selected_media_read_calls.len(), 0);
@@ -71013,23 +69015,6 @@ mod tests {
     }
 
     #[test]
-    fn xlsx_unified_root_selectors_are_fresh_filesystem_cases() {
-        for (name, case) in [
-            ("xlsx_file_open", Case::XlsxFileOpen),
-            ("xlsx_file_open_lifecycle", Case::XlsxFileOpenLifecycle),
-            ("xlsx_file_selected_cell", Case::XlsxFileSelectedCell),
-        ] {
-            assert_eq!(parse_case(name), Some(case));
-            assert_eq!(case.name(), name);
-            assert!(case.is_xlsx_root_file());
-            assert!(case.is_filesystem());
-            assert!(!case.uses_xlsx());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
     fn xlsx_repeated_store_selectors_are_in_usage_and_roundtrip() {
         for name in [
             "xlsx_source_repeated_store_medium",
@@ -71044,39 +69029,6 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
         }
         assert_eq!(Case::DEFAULT.len(), 41);
-    }
-
-    #[test]
-    fn xlsx_unified_bytes_selectors_use_facade_bytes_lifecycle() {
-        for (name, case) in [
-            ("xlsx_bytes_open", Case::XlsxBytesOpen),
-            ("xlsx_bytes_open_lifecycle", Case::XlsxBytesOpenLifecycle),
-        ] {
-            assert_eq!(parse_case(name), Some(case));
-            assert_eq!(case.name(), name);
-            assert!(case.is_xlsx_bytes_root_file());
-            assert!(!case.is_xlsx_root_file());
-            assert!(!case.uses_xlsx());
-            assert!(!Case::DEFAULT.contains(&case));
-        }
-        assert_eq!(Case::DEFAULT.len(), 41);
-
-        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
-        let eager = Workbook::from_bytes(corpus.archive.clone()).unwrap();
-        verify_xlsx_cells(&eager, xlsx_spec(&corpus).unwrap(), &[]).unwrap();
-        for case in [Case::XlsxBytesOpen, Case::XlsxBytesOpenLifecycle] {
-            let result = run_case(case, &corpus, 0, 2).unwrap();
-            assert_eq!(result.elapsed_ns.samples.len(), 2);
-            assert!(
-                result.source.is_none(),
-                "the selector keeps the existing schema"
-            );
-            assert_eq!(
-                result.corpus.generator,
-                XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
-            );
-            assert_eq!(result.corpus.archive_sha256, corpus.manifest.archive_sha256);
-        }
     }
 
     #[test]

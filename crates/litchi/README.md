@@ -18,27 +18,36 @@ litchi = { version = "0", features = ["docx", "pptx", "xlsx"] }
 ```
 
 ```rust
-use litchi::{Document, Presentation, Workbook};
+fn main() -> litchi::Result<()> {
+    // One entry point for every format: the content decides the format.
+    let file = litchi::open("report.docx")?;
+    println!("{}", file.text()?);
 
-fn main() -> Result<(), litchi::Error> {
-    let doc = Document::open("report.docx")?;
-    println!("{}", doc.text()?);
+    let deck = litchi::open("slides.pptx")?;
+    println!("slides: {}", deck.presentation()?.slide_count()?);
 
-    let pres = Presentation::open("slides.pptx")?;
-    println!("slides: {}", pres.slide_count()?);
-
-    let wb = Workbook::open("data.xlsx")?;
-    println!("sheets: {}", wb.worksheet_count());
+    let book = litchi::open("data.xlsx")?;
+    println!("sheets: {:?}", book.workbook()?.worksheet_names()?);
     Ok(())
 }
 ```
 
 ## Entry Points
 
-- `Document::open` — unified Word reader (`.doc`, `.docx`, `.odt`, `.rtf`, `.pages`).
-- `Presentation::open` — unified PowerPoint reader (`.ppt`, `.pptx`, `.odp`, `.key`).
-- `Workbook::open` — unified spreadsheet reader (`.xls`, `.xlsx`, `.xlsb`, `.ods`, `.numbers`).
-- `detect_file_format` / `detect_file_format_from_bytes` — format sniffing without parsing.
+- `litchi::open` / `litchi::open_bytes` — detect the format from the content
+  in one pass and return a `File`, one variant per format (`.doc`, `.docx`,
+  `.rtf`, `.odt`, `.ppt`, `.pptx`, `.odp`, `.xls`, `.xlsx`, `.xlsb`, `.ods`),
+  plus `File::Locked` for an encrypted input and `File::Signed` for a signed
+  one. `open_with` / `open_bytes_with` take `OpenOptions` for limits and
+  policy.
+- `File::document`, `File::presentation`, `File::workbook` — the family views;
+  each refuses a file of another family and names the format it found.
+- `litchi::iwork::Document` — Pages, Keynote and Numbers (the `iwork`
+  feature), which `litchi::open` recognizes and refuses with a suggestion.
+- `detect_file_format` / `detect_file_format_from_bytes` — format sniffing
+  without parsing.
+
+Every failure is one `litchi::Error` with a stable `litchi::Code`.
 
 ## Bounded OOXML Ingestion
 

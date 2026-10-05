@@ -19,10 +19,11 @@
 //!   is the unified layer's own work.
 //!
 //! Each route mirrors the predecessor selector it re-measures: corpus,
-//! ingress, untimed preparation and timer placement. The predecessors stay
-//! registered until M0a step S9 deletes the types they call; their frozen
-//! records are never rewritten, and S10 compares a predecessor's pre-M0a
-//! record with its unified successor's post-S9 record.
+//! ingress, untimed preparation and timer placement. M0a step S9 deleted the
+//! 47 predecessors that timed the deleted facade types; the 15 that time the
+//! detection functions or the DOCX leaf owner stay registered. Frozen records
+//! are never rewritten, and S10 compares a predecessor's pre-M0a record with
+//! its unified successor's post-S9 record.
 //!
 //! The DOCX, PPTX and XLSX filesystem pairs run in fresh child processes
 //! (`crate::filesystem`); the other pairs run here, in process. Detection has
@@ -140,8 +141,10 @@ pub(crate) enum Plan {
 pub(crate) struct Entry {
     pub(crate) case: Case,
     pub(crate) leg: Leg,
-    /// The pre-M0a selector whose scenario this route re-measures.
-    pub(crate) predecessor: Case,
+    /// The name of the pre-M0a selector whose scenario this route
+    /// re-measures. M0a step S9 deleted the predecessors that timed the
+    /// facade types; their frozen records keep the name.
+    pub(crate) predecessor: &'static str,
     /// The other leg of the pair. `None` only for the detection inputs that no
     /// single leaf detector decides.
     pub(crate) twin: Option<Case>,
@@ -153,567 +156,567 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DocxFileUnifiedEagerOpen,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileEagerOpen,
+        predecessor: "docx_file_eager_open",
         twin: Some(Case::DocxFileLeafEagerOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedSourceOpen,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileSourceOpen,
+        predecessor: "docx_file_source_open",
         twin: Some(Case::DocxFileLeafSourceOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedEagerParagraphCount,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileEagerParagraphCount,
+        predecessor: "docx_file_eager_paragraph_count",
         twin: Some(Case::DocxFileLeafEagerParagraphCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedSourceParagraphCount,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileSourceParagraphCount,
+        predecessor: "docx_file_source_paragraph_count",
         twin: Some(Case::DocxFileLeafSourceParagraphCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedEagerListParagraphs,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileEagerListParagraphs,
+        predecessor: "docx_file_eager_list_paragraphs",
         twin: Some(Case::DocxFileLeafEagerListParagraphs),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedSourceListParagraphs,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileSourceListParagraphs,
+        predecessor: "docx_file_source_list_paragraphs",
         twin: Some(Case::DocxFileLeafSourceListParagraphs),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedEagerFullText,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileEagerFullText,
+        predecessor: "docx_file_eager_full_text",
         twin: Some(Case::DocxFileLeafEagerFullText),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedSourceFullText,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileSourceFullText,
+        predecessor: "docx_file_source_full_text",
         twin: Some(Case::DocxFileLeafSourceFullText),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedEagerOpenParagraphCountLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileEagerOpenParagraphCountLifecycle,
+        predecessor: "docx_file_eager_open_paragraph_count_lifecycle",
         twin: Some(Case::DocxFileLeafEagerOpenParagraphCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedSourceOpenParagraphCountLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileSourceOpenParagraphCountLifecycle,
+        predecessor: "docx_file_source_open_paragraph_count_lifecycle",
         twin: Some(Case::DocxFileLeafSourceOpenParagraphCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedEagerOpenFullTextLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileEagerOpenFullTextLifecycle,
+        predecessor: "docx_file_eager_open_full_text_lifecycle",
         twin: Some(Case::DocxFileLeafEagerOpenFullTextLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileUnifiedSourceOpenFullTextLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::DocxFileSourceOpenFullTextLifecycle,
+        predecessor: "docx_file_source_open_full_text_lifecycle",
         twin: Some(Case::DocxFileLeafSourceOpenFullTextLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafEagerOpen,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileEagerOpen,
+        predecessor: "docx_file_eager_open",
         twin: Some(Case::DocxFileUnifiedEagerOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafSourceOpen,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileSourceOpen,
+        predecessor: "docx_file_source_open",
         twin: Some(Case::DocxFileUnifiedSourceOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafEagerParagraphCount,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileEagerParagraphCount,
+        predecessor: "docx_file_eager_paragraph_count",
         twin: Some(Case::DocxFileUnifiedEagerParagraphCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafSourceParagraphCount,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileSourceParagraphCount,
+        predecessor: "docx_file_source_paragraph_count",
         twin: Some(Case::DocxFileUnifiedSourceParagraphCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafEagerListParagraphs,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileEagerListParagraphs,
+        predecessor: "docx_file_eager_list_paragraphs",
         twin: Some(Case::DocxFileUnifiedEagerListParagraphs),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafSourceListParagraphs,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileSourceListParagraphs,
+        predecessor: "docx_file_source_list_paragraphs",
         twin: Some(Case::DocxFileUnifiedSourceListParagraphs),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafEagerFullText,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileEagerFullText,
+        predecessor: "docx_file_eager_full_text",
         twin: Some(Case::DocxFileUnifiedEagerFullText),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafSourceFullText,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileSourceFullText,
+        predecessor: "docx_file_source_full_text",
         twin: Some(Case::DocxFileUnifiedSourceFullText),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafEagerOpenParagraphCountLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileEagerOpenParagraphCountLifecycle,
+        predecessor: "docx_file_eager_open_paragraph_count_lifecycle",
         twin: Some(Case::DocxFileUnifiedEagerOpenParagraphCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafSourceOpenParagraphCountLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileSourceOpenParagraphCountLifecycle,
+        predecessor: "docx_file_source_open_paragraph_count_lifecycle",
         twin: Some(Case::DocxFileUnifiedSourceOpenParagraphCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafEagerOpenFullTextLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileEagerOpenFullTextLifecycle,
+        predecessor: "docx_file_eager_open_full_text_lifecycle",
         twin: Some(Case::DocxFileUnifiedEagerOpenFullTextLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::DocxFileLeafSourceOpenFullTextLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::DocxFileSourceOpenFullTextLifecycle,
+        predecessor: "docx_file_source_open_full_text_lifecycle",
         twin: Some(Case::DocxFileUnifiedSourceOpenFullTextLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedEagerOpen,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileEagerOpen,
+        predecessor: "pptx_file_eager_open",
         twin: Some(Case::PptxFileLeafEagerOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedSourceOpen,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileSourceOpen,
+        predecessor: "pptx_file_source_open",
         twin: Some(Case::PptxFileLeafSourceOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedEagerListSlides,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileEagerListSlides,
+        predecessor: "pptx_file_eager_list_slides",
         twin: Some(Case::PptxFileLeafEagerListSlides),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedSourceListSlides,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileSourceListSlides,
+        predecessor: "pptx_file_source_list_slides",
         twin: Some(Case::PptxFileLeafSourceListSlides),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedEagerSlideCount,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileEagerSlideCount,
+        predecessor: "pptx_file_eager_slide_count",
         twin: Some(Case::PptxFileLeafEagerSlideCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedSourceSlideCount,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileSourceSlideCount,
+        predecessor: "pptx_file_source_slide_count",
         twin: Some(Case::PptxFileLeafSourceSlideCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedEagerSelectedSlide,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileEagerSelectedSlide,
+        predecessor: "pptx_file_eager_selected_slide",
         twin: Some(Case::PptxFileLeafEagerSelectedSlide),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedSourceSelectedSlide,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileSourceSelectedSlide,
+        predecessor: "pptx_file_source_selected_slide",
         twin: Some(Case::PptxFileLeafSourceSelectedSlide),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedEagerOpenSlideCountLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileEagerOpenSlideCountLifecycle,
+        predecessor: "pptx_file_eager_open_slide_count_lifecycle",
         twin: Some(Case::PptxFileLeafEagerOpenSlideCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedSourceOpenSlideCountLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileSourceOpenSlideCountLifecycle,
+        predecessor: "pptx_file_source_open_slide_count_lifecycle",
         twin: Some(Case::PptxFileLeafSourceOpenSlideCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedEagerOpenSelectedSlideLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileEagerOpenSelectedSlideLifecycle,
+        predecessor: "pptx_file_eager_open_selected_slide_lifecycle",
         twin: Some(Case::PptxFileLeafEagerOpenSelectedSlideLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileUnifiedSourceOpenSelectedSlideLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::PptxFileSourceOpenSelectedSlideLifecycle,
+        predecessor: "pptx_file_source_open_selected_slide_lifecycle",
         twin: Some(Case::PptxFileLeafSourceOpenSelectedSlideLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafEagerOpen,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileEagerOpen,
+        predecessor: "pptx_file_eager_open",
         twin: Some(Case::PptxFileUnifiedEagerOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafSourceOpen,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileSourceOpen,
+        predecessor: "pptx_file_source_open",
         twin: Some(Case::PptxFileUnifiedSourceOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafEagerListSlides,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileEagerListSlides,
+        predecessor: "pptx_file_eager_list_slides",
         twin: Some(Case::PptxFileUnifiedEagerListSlides),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafSourceListSlides,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileSourceListSlides,
+        predecessor: "pptx_file_source_list_slides",
         twin: Some(Case::PptxFileUnifiedSourceListSlides),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafEagerSlideCount,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileEagerSlideCount,
+        predecessor: "pptx_file_eager_slide_count",
         twin: Some(Case::PptxFileUnifiedEagerSlideCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafSourceSlideCount,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileSourceSlideCount,
+        predecessor: "pptx_file_source_slide_count",
         twin: Some(Case::PptxFileUnifiedSourceSlideCount),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafEagerSelectedSlide,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileEagerSelectedSlide,
+        predecessor: "pptx_file_eager_selected_slide",
         twin: Some(Case::PptxFileUnifiedEagerSelectedSlide),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafSourceSelectedSlide,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileSourceSelectedSlide,
+        predecessor: "pptx_file_source_selected_slide",
         twin: Some(Case::PptxFileUnifiedSourceSelectedSlide),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafEagerOpenSlideCountLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileEagerOpenSlideCountLifecycle,
+        predecessor: "pptx_file_eager_open_slide_count_lifecycle",
         twin: Some(Case::PptxFileUnifiedEagerOpenSlideCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafSourceOpenSlideCountLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileSourceOpenSlideCountLifecycle,
+        predecessor: "pptx_file_source_open_slide_count_lifecycle",
         twin: Some(Case::PptxFileUnifiedSourceOpenSlideCountLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafEagerOpenSelectedSlideLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileEagerOpenSelectedSlideLifecycle,
+        predecessor: "pptx_file_eager_open_selected_slide_lifecycle",
         twin: Some(Case::PptxFileUnifiedEagerOpenSelectedSlideLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::PptxFileLeafSourceOpenSelectedSlideLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::PptxFileSourceOpenSelectedSlideLifecycle,
+        predecessor: "pptx_file_source_open_selected_slide_lifecycle",
         twin: Some(Case::PptxFileUnifiedSourceOpenSelectedSlideLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxFileUnifiedOpen,
         leg: Leg::Unified,
-        predecessor: Case::XlsxFileOpen,
+        predecessor: "xlsx_file_open",
         twin: Some(Case::XlsxFileLeafOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxFileUnifiedOpenLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::XlsxFileOpenLifecycle,
+        predecessor: "xlsx_file_open_lifecycle",
         twin: Some(Case::XlsxFileLeafOpenLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxFileUnifiedSelectedCell,
         leg: Leg::Unified,
-        predecessor: Case::XlsxFileSelectedCell,
+        predecessor: "xlsx_file_selected_cell",
         twin: Some(Case::XlsxFileLeafSelectedCell),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxFileLeafOpen,
         leg: Leg::Leaf,
-        predecessor: Case::XlsxFileOpen,
+        predecessor: "xlsx_file_open",
         twin: Some(Case::XlsxFileUnifiedOpen),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxFileLeafOpenLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::XlsxFileOpenLifecycle,
+        predecessor: "xlsx_file_open_lifecycle",
         twin: Some(Case::XlsxFileUnifiedOpenLifecycle),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxFileLeafSelectedCell,
         leg: Leg::Leaf,
-        predecessor: Case::XlsxFileSelectedCell,
+        predecessor: "xlsx_file_selected_cell",
         twin: Some(Case::XlsxFileUnifiedSelectedCell),
         plan: Plan::Filesystem,
     },
     Entry {
         case: Case::XlsxBytesUnifiedOpen,
         leg: Leg::Unified,
-        predecessor: Case::XlsxBytesOpen,
+        predecessor: "xlsx_bytes_open",
         twin: Some(Case::XlsxBytesLeafOpen),
         plan: Plan::XlsxBytes { lifecycle: false },
     },
     Entry {
         case: Case::XlsxBytesUnifiedOpenLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::XlsxBytesOpenLifecycle,
+        predecessor: "xlsx_bytes_open_lifecycle",
         twin: Some(Case::XlsxBytesLeafOpenLifecycle),
         plan: Plan::XlsxBytes { lifecycle: true },
     },
     Entry {
         case: Case::XlsxBytesLeafOpen,
         leg: Leg::Leaf,
-        predecessor: Case::XlsxBytesOpen,
+        predecessor: "xlsx_bytes_open",
         twin: Some(Case::XlsxBytesUnifiedOpen),
         plan: Plan::XlsxBytes { lifecycle: false },
     },
     Entry {
         case: Case::XlsxBytesLeafOpenLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::XlsxBytesOpenLifecycle,
+        predecessor: "xlsx_bytes_open_lifecycle",
         twin: Some(Case::XlsxBytesUnifiedOpenLifecycle),
         plan: Plan::XlsxBytes { lifecycle: true },
     },
     Entry {
         case: Case::DocxSemanticUnifiedOneParagraph,
         leg: Leg::Unified,
-        predecessor: Case::DocxSemanticOneParagraph,
+        predecessor: "docx_semantic_one_paragraph",
         twin: Some(Case::DocxSemanticLeafOneParagraph),
         plan: Plan::DocxSemantic { text: false },
     },
     Entry {
         case: Case::DocxSemanticUnifiedOneParagraphText,
         leg: Leg::Unified,
-        predecessor: Case::DocxSemanticOneParagraphText,
+        predecessor: "docx_semantic_one_paragraph_text",
         twin: Some(Case::DocxSemanticLeafOneParagraphText),
         plan: Plan::DocxSemantic { text: true },
     },
     Entry {
         case: Case::DocxSemanticLeafOneParagraph,
         leg: Leg::Leaf,
-        predecessor: Case::DocxSemanticOneParagraph,
+        predecessor: "docx_semantic_one_paragraph",
         twin: Some(Case::DocxSemanticUnifiedOneParagraph),
         plan: Plan::DocxSemantic { text: false },
     },
     Entry {
         case: Case::DocxSemanticLeafOneParagraphText,
         leg: Leg::Leaf,
-        predecessor: Case::DocxSemanticOneParagraphText,
+        predecessor: "docx_semantic_one_paragraph_text",
         twin: Some(Case::DocxSemanticUnifiedOneParagraphText),
         plan: Plan::DocxSemantic { text: true },
     },
     Entry {
         case: Case::DocxProducerUnifiedSourceSelectedParagraph,
         leg: Leg::Unified,
-        predecessor: Case::DocxProducerSourceSelectedParagraph,
+        predecessor: "docx_producer_source_selected_paragraph",
         twin: Some(Case::DocxProducerLeafSourceSelectedParagraph),
         plan: Plan::DocxProducer,
     },
     Entry {
         case: Case::DocxProducerLeafSourceSelectedParagraph,
         leg: Leg::Leaf,
-        predecessor: Case::DocxProducerSourceSelectedParagraph,
+        predecessor: "docx_producer_source_selected_paragraph",
         twin: Some(Case::DocxProducerUnifiedSourceSelectedParagraph),
         plan: Plan::DocxProducer,
     },
     Entry {
         case: Case::DocFileUnifiedOpen,
         leg: Leg::Unified,
-        predecessor: Case::DocFacadeFileOpen,
+        predecessor: "doc_facade_file_open",
         twin: Some(Case::DocFileLeafOpen),
         plan: Plan::Ole2(Ole2Query::DocOpen),
     },
     Entry {
         case: Case::DocFileUnifiedFullText,
         leg: Leg::Unified,
-        predecessor: Case::DocFacadeFileFullText,
+        predecessor: "doc_facade_file_full_text",
         twin: Some(Case::DocFileLeafFullText),
         plan: Plan::Ole2(Ole2Query::DocFullText),
     },
     Entry {
         case: Case::DocFileUnifiedOneParagraph,
         leg: Leg::Unified,
-        predecessor: Case::DocFacadeFileOneParagraph,
+        predecessor: "doc_facade_file_one_paragraph",
         twin: Some(Case::DocFileLeafOneParagraph),
         plan: Plan::Ole2(Ole2Query::DocOneParagraph),
     },
     Entry {
         case: Case::DocFileLeafOpen,
         leg: Leg::Leaf,
-        predecessor: Case::DocFacadeFileOpen,
+        predecessor: "doc_facade_file_open",
         twin: Some(Case::DocFileUnifiedOpen),
         plan: Plan::Ole2(Ole2Query::DocOpen),
     },
     Entry {
         case: Case::DocFileLeafFullText,
         leg: Leg::Leaf,
-        predecessor: Case::DocFacadeFileFullText,
+        predecessor: "doc_facade_file_full_text",
         twin: Some(Case::DocFileUnifiedFullText),
         plan: Plan::Ole2(Ole2Query::DocFullText),
     },
     Entry {
         case: Case::DocFileLeafOneParagraph,
         leg: Leg::Leaf,
-        predecessor: Case::DocFacadeFileOneParagraph,
+        predecessor: "doc_facade_file_one_paragraph",
         twin: Some(Case::DocFileUnifiedOneParagraph),
         plan: Plan::Ole2(Ole2Query::DocOneParagraph),
     },
     Entry {
         case: Case::PptFileUnifiedOpen,
         leg: Leg::Unified,
-        predecessor: Case::PptFacadeFileOpen,
+        predecessor: "ppt_facade_file_open",
         twin: Some(Case::PptFileLeafOpen),
         plan: Plan::Ole2(Ole2Query::PptOpen),
     },
     Entry {
         case: Case::PptFileUnifiedFullText,
         leg: Leg::Unified,
-        predecessor: Case::PptFacadeFileFullText,
+        predecessor: "ppt_facade_file_full_text",
         twin: Some(Case::PptFileLeafFullText),
         plan: Plan::Ole2(Ole2Query::PptFullText),
     },
     Entry {
         case: Case::PptFileUnifiedOneSlideText,
         leg: Leg::Unified,
-        predecessor: Case::PptFacadeFileOneSlideText,
+        predecessor: "ppt_facade_file_one_slide_text",
         twin: Some(Case::PptFileLeafOneSlideText),
         plan: Plan::Ole2(Ole2Query::PptOneSlideText),
     },
     Entry {
         case: Case::PptFileLeafOpen,
         leg: Leg::Leaf,
-        predecessor: Case::PptFacadeFileOpen,
+        predecessor: "ppt_facade_file_open",
         twin: Some(Case::PptFileUnifiedOpen),
         plan: Plan::Ole2(Ole2Query::PptOpen),
     },
     Entry {
         case: Case::PptFileLeafFullText,
         leg: Leg::Leaf,
-        predecessor: Case::PptFacadeFileFullText,
+        predecessor: "ppt_facade_file_full_text",
         twin: Some(Case::PptFileUnifiedFullText),
         plan: Plan::Ole2(Ole2Query::PptFullText),
     },
     Entry {
         case: Case::PptFileLeafOneSlideText,
         leg: Leg::Leaf,
-        predecessor: Case::PptFacadeFileOneSlideText,
+        predecessor: "ppt_facade_file_one_slide_text",
         twin: Some(Case::PptFileUnifiedOneSlideText),
         plan: Plan::Ole2(Ole2Query::PptOneSlideText),
     },
     Entry {
         case: Case::RtfFileUnifiedOpen,
         leg: Leg::Unified,
-        predecessor: Case::RtfFileOpen,
+        predecessor: "rtf_file_open",
         twin: Some(Case::RtfFileLeafOpen),
         plan: Plan::Rtf { lifecycle: false },
     },
     Entry {
         case: Case::RtfFileUnifiedOpenLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::RtfFileOpenLifecycle,
+        predecessor: "rtf_file_open_lifecycle",
         twin: Some(Case::RtfFileLeafOpenLifecycle),
         plan: Plan::Rtf { lifecycle: true },
     },
     Entry {
         case: Case::RtfFileLeafOpen,
         leg: Leg::Leaf,
-        predecessor: Case::RtfFileOpen,
+        predecessor: "rtf_file_open",
         twin: Some(Case::RtfFileUnifiedOpen),
         plan: Plan::Rtf { lifecycle: false },
     },
     Entry {
         case: Case::RtfFileLeafOpenLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::RtfFileOpenLifecycle,
+        predecessor: "rtf_file_open_lifecycle",
         twin: Some(Case::RtfFileUnifiedOpenLifecycle),
         plan: Plan::Rtf { lifecycle: true },
     },
     Entry {
         case: Case::OdtFileUnifiedEagerOpen,
         leg: Leg::Unified,
-        predecessor: Case::OdtFileEagerOpen,
+        predecessor: "odt_file_eager_open",
         twin: Some(Case::OdtFileLeafEagerOpen),
         plan: Plan::Odt {
             ingress: Ingress::Eager,
@@ -723,7 +726,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileUnifiedSourceOpen,
         leg: Leg::Unified,
-        predecessor: Case::OdtFileSourceOpen,
+        predecessor: "odt_file_source_open",
         twin: Some(Case::OdtFileLeafSourceOpen),
         plan: Plan::Odt {
             ingress: Ingress::Source,
@@ -733,7 +736,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileUnifiedEagerOpenFullTextLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::OdtFileEagerOpenFullTextLifecycle,
+        predecessor: "odt_file_eager_open_full_text_lifecycle",
         twin: Some(Case::OdtFileLeafEagerOpenFullTextLifecycle),
         plan: Plan::Odt {
             ingress: Ingress::Eager,
@@ -743,7 +746,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileUnifiedSourceOpenFullTextLifecycle,
         leg: Leg::Unified,
-        predecessor: Case::OdtFileSourceOpenFullTextLifecycle,
+        predecessor: "odt_file_source_open_full_text_lifecycle",
         twin: Some(Case::OdtFileLeafSourceOpenFullTextLifecycle),
         plan: Plan::Odt {
             ingress: Ingress::Source,
@@ -753,7 +756,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileLeafEagerOpen,
         leg: Leg::Leaf,
-        predecessor: Case::OdtFileEagerOpen,
+        predecessor: "odt_file_eager_open",
         twin: Some(Case::OdtFileUnifiedEagerOpen),
         plan: Plan::Odt {
             ingress: Ingress::Eager,
@@ -763,7 +766,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileLeafSourceOpen,
         leg: Leg::Leaf,
-        predecessor: Case::OdtFileSourceOpen,
+        predecessor: "odt_file_source_open",
         twin: Some(Case::OdtFileUnifiedSourceOpen),
         plan: Plan::Odt {
             ingress: Ingress::Source,
@@ -773,7 +776,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileLeafEagerOpenFullTextLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::OdtFileEagerOpenFullTextLifecycle,
+        predecessor: "odt_file_eager_open_full_text_lifecycle",
         twin: Some(Case::OdtFileUnifiedEagerOpenFullTextLifecycle),
         plan: Plan::Odt {
             ingress: Ingress::Eager,
@@ -783,7 +786,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdtFileLeafSourceOpenFullTextLifecycle,
         leg: Leg::Leaf,
-        predecessor: Case::OdtFileSourceOpenFullTextLifecycle,
+        predecessor: "odt_file_source_open_full_text_lifecycle",
         twin: Some(Case::OdtFileUnifiedSourceOpenFullTextLifecycle),
         plan: Plan::Odt {
             ingress: Ingress::Source,
@@ -793,7 +796,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileUnifiedEagerOpen,
         leg: Leg::Unified,
-        predecessor: Case::OdpFileEagerOpen,
+        predecessor: "odp_file_eager_open",
         twin: Some(Case::OdpFileLeafEagerOpen),
         plan: Plan::Odp {
             ingress: Ingress::Eager,
@@ -803,7 +806,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileUnifiedSourceOpen,
         leg: Leg::Unified,
-        predecessor: Case::OdpFileSourceOpen,
+        predecessor: "odp_file_source_open",
         twin: Some(Case::OdpFileLeafSourceOpen),
         plan: Plan::Odp {
             ingress: Ingress::Source,
@@ -813,7 +816,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileUnifiedEagerSelectedSlide,
         leg: Leg::Unified,
-        predecessor: Case::OdpFileEagerSelectedSlide,
+        predecessor: "odp_file_eager_selected_slide",
         twin: Some(Case::OdpFileLeafEagerSelectedSlide),
         plan: Plan::Odp {
             ingress: Ingress::Eager,
@@ -823,7 +826,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileUnifiedSourceSelectedSlide,
         leg: Leg::Unified,
-        predecessor: Case::OdpFileSourceSelectedSlide,
+        predecessor: "odp_file_source_selected_slide",
         twin: Some(Case::OdpFileLeafSourceSelectedSlide),
         plan: Plan::Odp {
             ingress: Ingress::Source,
@@ -833,7 +836,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileLeafEagerOpen,
         leg: Leg::Leaf,
-        predecessor: Case::OdpFileEagerOpen,
+        predecessor: "odp_file_eager_open",
         twin: Some(Case::OdpFileUnifiedEagerOpen),
         plan: Plan::Odp {
             ingress: Ingress::Eager,
@@ -843,7 +846,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileLeafSourceOpen,
         leg: Leg::Leaf,
-        predecessor: Case::OdpFileSourceOpen,
+        predecessor: "odp_file_source_open",
         twin: Some(Case::OdpFileUnifiedSourceOpen),
         plan: Plan::Odp {
             ingress: Ingress::Source,
@@ -853,7 +856,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileLeafEagerSelectedSlide,
         leg: Leg::Leaf,
-        predecessor: Case::OdpFileEagerSelectedSlide,
+        predecessor: "odp_file_eager_selected_slide",
         twin: Some(Case::OdpFileUnifiedEagerSelectedSlide),
         plan: Plan::Odp {
             ingress: Ingress::Eager,
@@ -863,7 +866,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdpFileLeafSourceSelectedSlide,
         leg: Leg::Leaf,
-        predecessor: Case::OdpFileSourceSelectedSlide,
+        predecessor: "odp_file_source_selected_slide",
         twin: Some(Case::OdpFileUnifiedSourceSelectedSlide),
         plan: Plan::Odp {
             ingress: Ingress::Source,
@@ -873,7 +876,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdsFileUnifiedEagerOpen,
         leg: Leg::Unified,
-        predecessor: Case::OdsFileEagerOpen,
+        predecessor: "ods_file_eager_open",
         twin: Some(Case::OdsFileLeafEagerOpen),
         plan: Plan::Ods {
             ingress: Ingress::Eager,
@@ -882,7 +885,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdsFileUnifiedSourceOpen,
         leg: Leg::Unified,
-        predecessor: Case::OdsFileSourceOpen,
+        predecessor: "ods_file_source_open",
         twin: Some(Case::OdsFileLeafSourceOpen),
         plan: Plan::Ods {
             ingress: Ingress::Source,
@@ -891,7 +894,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdsFileLeafEagerOpen,
         leg: Leg::Leaf,
-        predecessor: Case::OdsFileEagerOpen,
+        predecessor: "ods_file_eager_open",
         twin: Some(Case::OdsFileUnifiedEagerOpen),
         plan: Plan::Ods {
             ingress: Ingress::Eager,
@@ -900,7 +903,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::OdsFileLeafSourceOpen,
         leg: Leg::Leaf,
-        predecessor: Case::OdsFileSourceOpen,
+        predecessor: "ods_file_source_open",
         twin: Some(Case::OdsFileUnifiedSourceOpen),
         plan: Plan::Ods {
             ingress: Ingress::Source,
@@ -909,7 +912,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdtUnifiedBytes,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdtBytes,
+        predecessor: "detect_odt_bytes",
         twin: Some(Case::DetectOdtLeafBytes),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odt,
@@ -919,7 +922,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdtUnifiedReader,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdtReader,
+        predecessor: "detect_odt_reader",
         twin: Some(Case::DetectOdtLeafReader),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odt,
@@ -929,7 +932,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdtUnifiedPolyglot,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdtPolyglot,
+        predecessor: "detect_odt_polyglot",
         twin: None,
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odt,
@@ -939,7 +942,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdtUnifiedCatalogAlias,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdtCatalogAlias,
+        predecessor: "detect_odt_catalog_alias",
         twin: None,
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odt,
@@ -949,7 +952,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdtLeafBytes,
         leg: Leg::Leaf,
-        predecessor: Case::DetectOdtBytes,
+        predecessor: "detect_odt_bytes",
         twin: Some(Case::DetectOdtUnifiedBytes),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odt,
@@ -959,7 +962,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdtLeafReader,
         leg: Leg::Leaf,
-        predecessor: Case::DetectOdtReader,
+        predecessor: "detect_odt_reader",
         twin: Some(Case::DetectOdtUnifiedReader),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odt,
@@ -969,7 +972,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdsUnifiedBytes,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdsBytes,
+        predecessor: "detect_ods_bytes",
         twin: Some(Case::DetectOdsLeafBytes),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Ods,
@@ -979,7 +982,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdsUnifiedReader,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdsReader,
+        predecessor: "detect_ods_reader",
         twin: Some(Case::DetectOdsLeafReader),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Ods,
@@ -989,7 +992,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdsUnifiedPolyglot,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdsPolyglot,
+        predecessor: "detect_ods_polyglot",
         twin: None,
         plan: Plan::Detect {
             family: DetectionOdfFamily::Ods,
@@ -999,7 +1002,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdsUnifiedCatalogAlias,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdsCatalogAlias,
+        predecessor: "detect_ods_catalog_alias",
         twin: None,
         plan: Plan::Detect {
             family: DetectionOdfFamily::Ods,
@@ -1009,7 +1012,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdsLeafBytes,
         leg: Leg::Leaf,
-        predecessor: Case::DetectOdsBytes,
+        predecessor: "detect_ods_bytes",
         twin: Some(Case::DetectOdsUnifiedBytes),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Ods,
@@ -1019,7 +1022,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdsLeafReader,
         leg: Leg::Leaf,
-        predecessor: Case::DetectOdsReader,
+        predecessor: "detect_ods_reader",
         twin: Some(Case::DetectOdsUnifiedReader),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Ods,
@@ -1029,7 +1032,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdpUnifiedBytes,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdpBytes,
+        predecessor: "detect_odp_bytes",
         twin: Some(Case::DetectOdpLeafBytes),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odp,
@@ -1039,7 +1042,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdpUnifiedReader,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdpReader,
+        predecessor: "detect_odp_reader",
         twin: Some(Case::DetectOdpLeafReader),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odp,
@@ -1049,7 +1052,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdpUnifiedPolyglot,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdpPolyglot,
+        predecessor: "detect_odp_polyglot",
         twin: None,
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odp,
@@ -1059,7 +1062,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdpUnifiedCatalogAlias,
         leg: Leg::Unified,
-        predecessor: Case::DetectOdpCatalogAlias,
+        predecessor: "detect_odp_catalog_alias",
         twin: None,
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odp,
@@ -1069,7 +1072,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdpLeafBytes,
         leg: Leg::Leaf,
-        predecessor: Case::DetectOdpBytes,
+        predecessor: "detect_odp_bytes",
         twin: Some(Case::DetectOdpUnifiedBytes),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odp,
@@ -1079,7 +1082,7 @@ pub(crate) const CATALOG: [Entry; 118] = [
     Entry {
         case: Case::DetectOdpLeafReader,
         leg: Leg::Leaf,
-        predecessor: Case::DetectOdpReader,
+        predecessor: "detect_odp_reader",
         twin: Some(Case::DetectOdpUnifiedReader),
         plan: Plan::Detect {
             family: DetectionOdfFamily::Odp,
@@ -1132,7 +1135,7 @@ impl RouteSummary {
         let entry = entry(case).ok_or("case is not a paired unified/leaf route")?;
         Ok(Self {
             leg: entry.leg.name(),
-            predecessor: entry.predecessor.name(),
+            predecessor: entry.predecessor,
             twin: entry.twin.map(Case::name),
             timed_calls,
             performance_claim: PERFORMANCE_CLAIM,
@@ -1455,7 +1458,11 @@ pub(crate) fn run_selected(selection: &Selection<'_>) -> Result<Vec<CaseResult>,
     if !detect.is_empty() {
         for shape in selection.semantic_shapes {
             for entry in &detect {
-                let corpus = crate::build_detection_corpus(entry.predecessor, *shape)?;
+                // The detection predecessors time the facade's detection
+                // functions, which M0a step S9 kept, so they stay registered.
+                let predecessor = crate::parse_case(entry.predecessor)
+                    .ok_or("a detection route's predecessor is not registered")?;
+                let corpus = crate::build_detection_corpus(predecessor, *shape)?;
                 results.push(run_detection(entry, &corpus, warmup, samples)?);
             }
         }
@@ -2769,6 +2776,8 @@ mod tests {
     #[test]
     fn catalog_pairs_every_route_with_its_twin_and_predecessor() {
         let mut names = std::collections::BTreeSet::new();
+        let mut kept = std::collections::BTreeSet::new();
+        let mut deleted = std::collections::BTreeSet::new();
         for entry in CATALOG {
             let name = entry.case.name();
             assert!(names.insert(name), "{name} is registered twice");
@@ -2780,17 +2789,26 @@ mod tests {
             };
             assert!(name.contains(infix), "{name}");
             // The name is the predecessor's with the leg infix inserted.
-            let predecessor = entry.predecessor.name();
+            let predecessor = entry.predecessor;
             let stripped = name.replacen(infix, "_", 1);
             assert!(
                 stripped == predecessor
                     || stripped.replacen("_file_", "_facade_file_", 1) == predecessor,
                 "{name} does not re-measure {predecessor}"
             );
-            // The predecessor stays registered: its frozen records are what
-            // S10 compares against.
-            assert_eq!(crate::parse_case(predecessor), Some(entry.predecessor));
-            assert!(super::entry(entry.predecessor).is_none(), "{predecessor}");
+            // M0a step S9 deleted the predecessors that timed the facade
+            // types; their frozen records keep their names, which S10
+            // compares against. The others stay registered and are not
+            // themselves paired routes.
+            match crate::parse_case(predecessor) {
+                Some(case) => {
+                    assert!(super::entry(case).is_none(), "{predecessor}");
+                    kept.insert(predecessor);
+                },
+                None => {
+                    deleted.insert(predecessor);
+                },
+            }
             match entry.twin {
                 Some(twin) => {
                     let twin_entry = super::entry(twin).expect("twin is registered");
@@ -2821,6 +2839,15 @@ mod tests {
             );
         }
         assert_eq!(CATALOG.len(), 118);
+        // 47 predecessors timed the deleted facade types; the 15 kept ones
+        // time the detection functions and the DOCX leaf owner.
+        assert_eq!(deleted.len(), 47, "{deleted:?}");
+        assert_eq!(kept.len(), 15, "{kept:?}");
+        assert!(kept.iter().all(|name| {
+            name.starts_with("detect_")
+                || name.starts_with("docx_semantic_")
+                || name.starts_with("docx_producer_")
+        }));
     }
 
     #[test]
@@ -2838,7 +2865,7 @@ mod tests {
             assert_eq!(result.elapsed_ns.samples.len(), 1);
             let summary = result.source.unwrap().unified_ops.unwrap();
             assert_eq!(summary.verified_samples, Some(1));
-            assert_eq!(summary.predecessor, entry.predecessor.name());
+            assert_eq!(summary.predecessor, entry.predecessor);
         }
     }
 
@@ -2882,8 +2909,8 @@ mod tests {
             .iter()
             .filter(|entry| matches!(entry.plan, Plan::Detect { .. }))
         {
-            let corpus =
-                crate::build_detection_corpus(entry.predecessor, SemanticShape::Tiny).unwrap();
+            let predecessor = crate::parse_case(entry.predecessor).unwrap();
+            let corpus = crate::build_detection_corpus(predecessor, SemanticShape::Tiny).unwrap();
             let result = run_detection(entry, &corpus, 0, 1).unwrap();
             assert_eq!(result.case, entry.case.name());
         }

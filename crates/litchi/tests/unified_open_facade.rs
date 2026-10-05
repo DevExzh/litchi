@@ -8,9 +8,9 @@
 //! from the format handles with the same values.
 //!
 //! S7 compared those reads with the format-family types directly. M0a step
-//! S8c recorded the format-family types' values in `tests/golden/` (pinned
-//! to those types by `markdown_file_parity.rs` until S9 removes them), and
-//! these tests compare the handles with the recorded values.
+//! S8c recorded the format-family types' values in `tests/golden/`, and
+//! these tests compare the handles with the recorded values. Step S9 deleted
+//! the format-family types, so the goldens are fixed reference data.
 
 #![cfg(any(
     feature = "doc",
