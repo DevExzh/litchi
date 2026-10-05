@@ -1537,6 +1537,68 @@ fn authored_fragment_cannot_transfer_a_foreign_package_budget() {
 }
 
 #[test]
+fn authored_fragment_transfers_between_clones_of_one_package() {
+    let source_archive = archive_bytes(VALID_SOURCE, true, false);
+    let (budget, _cancellation, context) = managed_context_with_budget();
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(source_archive.clone())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .expect("managed source must open");
+    let clone = package.clone();
+    let baseline = budget.used(Resource::Memory);
+    let length = FRAGMENT.len() as u64;
+    let limits = SourcePartSpliceLimits::default();
+
+    // The same splice prepared by the package from its own fragment.
+    let mut own = package
+        .allocate_source_part_splice_fragment(length, length)
+        .expect("fragment must allocate");
+    own.as_mut_slice().copy_from_slice(FRAGMENT);
+    let mut expected = Vec::new();
+    package
+        .prepare_source_part_splice_with_fragment(
+            &pack(DOCUMENT_URI),
+            proof(&package, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+            own,
+            limits,
+        )
+        .expect("own fragment must transfer")
+        .write_to_stream(&mut expected)
+        .expect("splice must publish");
+    assert_eq!(budget.used(Resource::Memory), baseline);
+
+    // A clone shares the package's execution budget, so a fragment it
+    // allocated may transfer into a plan of the original, and back.
+    for (allocator, planner) in [(&clone, &package), (&package, &clone)] {
+        let mut fragment = allocator
+            .allocate_source_part_splice_fragment(length, length)
+            .expect("clone fragment must allocate");
+        fragment.as_mut_slice().copy_from_slice(FRAGMENT);
+        assert_eq!(budget.used(Resource::Memory), baseline + length);
+        let plan = planner
+            .prepare_source_part_splice_with_fragment(
+                &pack(DOCUMENT_URI),
+                proof(planner, VALID_SOURCE, INSERTION_OFFSET, FRAGMENT),
+                fragment,
+                limits,
+            )
+            .expect("a clone's fragment belongs to the same opened package");
+        assert_eq!(
+            budget.used(Resource::Memory),
+            baseline + length + xml_workspace_requirement(limits),
+            "the transfer keeps exactly one fragment charge"
+        );
+        let mut output = Vec::new();
+        plan.write_to_stream(&mut output)
+            .expect("splice must publish");
+        assert_eq!(output, expected);
+        assert_eq!(budget.used(Resource::Memory), baseline);
+    }
+}
+
+#[test]
 fn authored_fragment_refusals_release_memory_and_preserve_typed_limits() {
     let archive = archive_bytes(VALID_SOURCE, false, false);
     let (budget, cancellation, context) = managed_context_with_budget();

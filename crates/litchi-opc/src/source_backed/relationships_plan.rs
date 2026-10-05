@@ -97,11 +97,14 @@ pub(crate) fn plan_relationship_publications(
             package.part_index(&owner)
         };
         let (mut effective, owner_base) = if owner.as_str() == PACKAGE_URI {
-            (package.package_relationships.clone(), "/".to_string())
+            (
+                package.catalog.package_relationships.clone(),
+                "/".to_string(),
+            )
         } else if let Some(index) = owner_index {
             (
-                package.parts[index].relationships.clone(),
-                package.parts[index].partname.base_uri().to_string(),
+                package.catalog.parts[index].relationships.clone(),
+                package.catalog.parts[index].partname.base_uri().to_string(),
             )
         } else {
             (
@@ -222,11 +225,11 @@ pub(crate) fn plan_relationship_publications(
         let existing_entry =
             package.source_entry_id_case_insensitive(&member_name, physical_members)?;
         let source = if owner.as_str() == PACKAGE_URI {
-            Some(&package.package_relationships)
+            Some(&package.catalog.package_relationships)
         } else {
             package
                 .part_index(owner)
-                .map(|index| &package.parts[index].relationships)
+                .map(|index| &package.catalog.parts[index].relationships)
         };
         let relationship_count = effective.len();
         let canonical_len = super::canonical_relationship_xml_len(effective)?;
@@ -297,6 +300,7 @@ pub(crate) fn plan_relationship_publications(
                 final_bytes: canonical_len as u64,
                 final_events: canonical_events,
                 source_event_count: package
+                    .catalog
                     .relationship_xml_metrics
                     .get(owner)
                     .map(|metrics| metrics.event_count),
@@ -375,6 +379,7 @@ pub(crate) fn plan_relationship_publications(
                 final_bytes: final_len as u64,
                 final_events,
                 source_event_count: package
+                    .catalog
                     .relationship_xml_metrics
                     .get(owner)
                     .map(|metrics| metrics.event_count),
@@ -425,6 +430,7 @@ pub(crate) fn plan_relationship_publications(
                 final_bytes: final_len as u64,
                 final_events,
                 source_event_count: package
+                    .catalog
                     .relationship_xml_metrics
                     .get(owner)
                     .map(|metrics| metrics.event_count),

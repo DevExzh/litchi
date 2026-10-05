@@ -666,7 +666,9 @@ impl<'package> SourcePartSplicePlan<'package> {
             ));
         }
 
-        let target_name = self.package.parts[self.target].partname.membername();
+        let target_name = self.package.catalog.parts[self.target]
+            .partname
+            .membername();
         let preserved_target = index
             .entries()
             .iter()
@@ -1065,10 +1067,11 @@ impl SourceBackedPackage {
     /// Prepare an insertion while transferring the fragment's original
     /// preallocation reservation into the returned plan.
     ///
-    /// The fragment must have been allocated by this exact package instance;
-    /// another instance, even over identical source bytes, cannot substitute
-    /// a different execution budget. All ordinary splice proof, XML, source,
-    /// and publication checks remain in force.
+    /// The fragment must have been allocated by this package or by a clone of
+    /// it, which shares this package's execution budget. A separately opened
+    /// package, even over identical source bytes, cannot substitute a
+    /// different execution budget. All ordinary splice proof, XML, source, and
+    /// publication checks remain in force.
     pub fn prepare_source_part_splice_with_fragment(
         &self,
         partname: &PackURI,
@@ -1076,7 +1079,7 @@ impl SourceBackedPackage {
         fragment: SourcePartSpliceFragment<'_>,
         limits: SourcePartSpliceLimits,
     ) -> Result<SourcePartSplicePlan<'_>> {
-        if !std::ptr::eq(self, fragment.package) {
+        if !self.is_same_opened_package(fragment.package) {
             return Err(overlay_unavailable(
                 "decoded splice fragment belongs to a different source package",
             ));
@@ -1152,9 +1155,9 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let audit_xml = xml_minifier::audit::package::is_xml_part(
             partname.as_str(),
-            self.parts[target].content_type.as_str(),
+            self.catalog.parts[target].content_type.as_str(),
         );
-        let target_entry = self.parts[target].entry_id;
+        let target_entry = self.catalog.parts[target].entry_id;
         let source_version = self.source.version();
         if proof.source_version != source_version {
             return Err(OpcError::SourceChanged {
@@ -1300,9 +1303,9 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let audit_xml = xml_minifier::audit::package::is_xml_part(
             partname.as_str(),
-            self.parts[target].content_type.as_str(),
+            self.catalog.parts[target].content_type.as_str(),
         );
-        let target_entry = self.parts[target].entry_id;
+        let target_entry = self.catalog.parts[target].entry_id;
         let source_version = self.source.version();
         if proof.source_version != source_version {
             return Err(OpcError::SourceChanged {

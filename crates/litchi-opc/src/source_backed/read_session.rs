@@ -18,9 +18,11 @@ use soapberry_zip::office::IndexedReadSession;
 /// temporary decoded allocation, and this session retains no decoder or
 /// scratch allocation across managed reads.
 ///
-/// Every read verifies exact package identity before inspecting the supplied
-/// [`PartView`].  This prevents a view from another package that happens to
-/// use the same source or part index from crossing the session boundary.
+/// Every read verifies package identity before inspecting the supplied
+/// [`PartView`]: the view must come from this package or a clone of it, which
+/// shares its catalog.  This prevents a view from another package that
+/// happens to use the same source or part index from crossing the session
+/// boundary.
 #[must_use = "a PartReadSession should be used for the intended package operation"]
 pub struct PartReadSession<'package> {
     package: &'package SourceBackedPackage,
@@ -68,8 +70,9 @@ impl<'package> PartReadSession<'package> {
     ) -> Result<PartData> {
         // Keep this check before touching `part.index`: PartView is a compact
         // metadata handle, and an index from another package is not meaningful
-        // even when both packages were opened over equal source bytes.
-        if !std::ptr::eq(part.package, self.package) {
+        // even when both packages were opened over equal source bytes. A clone
+        // shares this package's catalog, so its indices are this package's.
+        if !self.package.is_same_opened_package(part.package) {
             return Err(OpcError::ForeignPartView);
         }
         let index = part.index;
@@ -292,6 +295,37 @@ mod tests {
         ));
         assert_eq!(accounting, OpcOperationAccounting::default());
         assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+    }
+
+    #[test]
+    fn a_clone_view_reads_through_the_original_session_and_back() {
+        let source = Arc::new(CountingSource::new(mixed_archive()));
+        let original = SourceBackedPackage::from_read_at(source).unwrap();
+        let clone = original.clone();
+
+        // A clone shares the catalog, so its views index this package.
+        let mut session = original.read_session();
+        for (uri, expected) in [
+            (document_uri(), DOCUMENT),
+            (second_uri(), SECOND),
+            (orphan_uri(), ORPHAN),
+        ] {
+            let view = clone.part(&uri).unwrap();
+            assert_eq!(session.read(view).unwrap().as_bytes(), expected);
+        }
+        let mut session = clone.read_session();
+        let view = original.part(&document_uri()).unwrap();
+        assert_eq!(session.read(view).unwrap().as_bytes(), DOCUMENT);
+
+        // A separate open of the same source is still foreign to both.
+        let reopened =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(mixed_archive())))
+                .unwrap();
+        let foreign = reopened.part(&document_uri()).unwrap();
+        assert!(matches!(
+            clone.read_session().read(foreign),
+            Err(OpcError::ForeignPartView)
+        ));
     }
 
     #[test]

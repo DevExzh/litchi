@@ -1,0 +1,7 @@
+# taskset -c 12 bench-after-clone <route> test-data/ooxml/docx/drawing.docx 100 2000 (load: 2.92 3.95 3.15)
+{"route":"opc-clone-ns","path":"/home/zhuhe/code/litchi-worktrees/uo-0012-opc-shared-package/test-data/ooxml/docx/drawing.docx","batches":2000,"p10_ns":74.9,"p50_ns":75.0,"p90_ns":75.2}
+{"route":"opc-clone-ns-managed","path":"/home/zhuhe/code/litchi-worktrees/uo-0012-opc-shared-package/test-data/ooxml/docx/drawing.docx","batches":2000,"p10_ns":127.5,"p50_ns":127.9,"p90_ns":132.7}
+{"route":"opc-clone-ns","path":"/home/zhuhe/code/litchi-worktrees/uo-0012-opc-shared-package/test-data/ooxml/docx/drawing.docx","batches":2000,"p10_ns":71.5,"p50_ns":71.6,"p90_ns":71.8}
+{"route":"opc-clone-ns-managed","path":"/home/zhuhe/code/litchi-worktrees/uo-0012-opc-shared-package/test-data/ooxml/docx/drawing.docx","batches":2000,"p10_ns":121.8,"p50_ns":122.0,"p90_ns":126.5}
+{"route":"opc-clone-ns","path":"/home/zhuhe/code/litchi-worktrees/uo-0012-opc-shared-package/test-data/ooxml/docx/drawing.docx","batches":2000,"p10_ns":77.3,"p50_ns":77.4,"p90_ns":77.7}
+{"route":"opc-clone-ns-managed","path":"/home/zhuhe/code/litchi-worktrees/uo-0012-opc-shared-package/test-data/ooxml/docx/drawing.docx","batches":2000,"p10_ns":129.6,"p50_ns":130.0,"p90_ns":134.6}

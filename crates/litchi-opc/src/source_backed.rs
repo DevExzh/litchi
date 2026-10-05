@@ -65,6 +65,8 @@ pub(crate) mod content_types_plan;
 mod read_session;
 mod relationships_plan;
 pub use read_session::PartReadSession;
+#[cfg(test)]
+mod shared_clone_tests;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 
@@ -2686,7 +2688,7 @@ impl PreparedPart {
         package: &'prepared SourceBackedPackage,
     ) -> &'prepared PackURI {
         self.source_index
-            .and_then(|index| package.parts.get(index))
+            .and_then(|index| package.catalog.parts.get(index))
             .map(|part| &part.partname)
             .or(self.partname.as_ref())
             .expect("prepared Part must retain source index or owned name")
@@ -2697,7 +2699,7 @@ impl PreparedPart {
         package: &'prepared SourceBackedPackage,
     ) -> &'prepared str {
         self.source_index
-            .and_then(|index| package.parts.get(index))
+            .and_then(|index| package.catalog.parts.get(index))
             .map(|part| part.content_type.as_str())
             .or_else(|| self.content_type.as_ref().map(ContentType::as_str))
             .expect("prepared Part must retain source index or owned content type")
@@ -2711,7 +2713,7 @@ impl PreparedPart {
             .as_ref()
             .or_else(|| {
                 self.source_index
-                    .and_then(|index| package.parts.get(index))
+                    .and_then(|index| package.catalog.parts.get(index))
                     .map(|part| &part.relationships)
             })
             .expect("prepared Part must retain source relationship source or overlay")
@@ -2931,7 +2933,7 @@ impl<'prepared> EffectiveTopology<'prepared> {
             .effective_data()
             .package_relationships
             .as_ref()
-            .unwrap_or(&self.package.package_relationships)
+            .unwrap_or(&self.package.catalog.package_relationships)
     }
 
     /// Return the effective Part catalog in deterministic source/addition
@@ -3003,7 +3005,7 @@ impl<'prepared> EffectiveTopology<'prepared> {
         // preserving the candidate API.
         let part = &data.parts[index];
         part.source_index
-            .and_then(|source_index| self.package.parts.get(source_index))
+            .and_then(|source_index| self.package.catalog.parts.get(source_index))
             .map(|source_part| &source_part.content_type)
             .or(part.content_type.as_ref())
             .ok_or_else(|| OpcError::ContentTypeNotFound(partname.to_string()))
@@ -3818,7 +3820,8 @@ impl SourceInput {
 ///
 /// A lineage is intentionally distinct from [`SourceVersion`]. Two source
 /// adapters may report the same caller-chosen version token while still being
-/// different package instances; patches must never cross that boundary.
+/// different opened packages; patches must never cross that boundary. Clones
+/// of one opened [`SourceBackedPackage`] share its lineage.
 #[derive(Clone, Debug)]
 pub struct SourceLineage(Arc<()>);
 
@@ -4555,19 +4558,19 @@ impl<'package> PartView<'package> {
     /// The part's absolute OPC URI.
     #[must_use]
     pub fn partname(&self) -> &'package PackURI {
-        &self.package.parts[self.index].partname
+        &self.package.catalog.parts[self.index].partname
     }
 
     /// The content type declared by `[Content_Types].xml`.
     #[must_use]
     pub fn content_type(&self) -> &'package str {
-        self.package.parts[self.index].content_type.as_str()
+        self.package.catalog.parts[self.index].content_type.as_str()
     }
 
     /// The part's already-validated relationships.
     #[must_use]
     pub fn rels(&self) -> &'package Relationships {
-        &self.package.parts[self.index].relationships
+        &self.package.catalog.parts[self.index].relationships
     }
 
     /// Return the ZIP central-directory declaration for this part's
@@ -4586,6 +4589,7 @@ impl<'package> PartView<'package> {
             .map_err(map_execution_error)?;
         let entry_id = self
             .package
+            .catalog
             .parts
             .get(self.index)
             .ok_or_else(|| OpcError::PartNotFound(self.index.to_string()))?
@@ -4828,6 +4832,7 @@ impl SourceBackedPackage {
             .map_err(opc_error)?;
 
         let part = self
+            .catalog
             .parts
             .get(index)
             .ok_or_else(|| opc_error(OpcError::PartNotFound(index.to_string())))?;
@@ -4940,7 +4945,7 @@ impl SourceBackedPackage {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
 
-        let part = self.parts.get(index).ok_or_else(|| {
+        let part = self.catalog.parts.get(index).ok_or_else(|| {
             OpcError::IoError(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "invalid source-backed part view",
@@ -5416,8 +5421,8 @@ impl soapberry_zip::office::ScopedWorkers for BridgedScopedWorkers {
 
 /// Budget permits a package holds while its write session owns a worker pool.
 ///
-/// The permits are released when the package is dropped, which is also when
-/// the pool they admitted is dropped.
+/// The permits are released when the last clone of the package is dropped,
+/// which is also when the pool they admitted is dropped.
 #[derive(Debug)]
 struct WritePermits {
     width: NonZeroUsize,
@@ -5454,8 +5459,12 @@ struct PartCache {
     budget: Option<ExecutionContext>,
     /// Explicit write scheduler for this package's publications.
     ///
-    /// Present only for a managed package, inert until a publication's changed
-    /// set earns a wave wider than one, and never shared with another package.
+    /// Present only for a managed package and inert until a publication's
+    /// changed set earns a wave wider than one. Every clone of the package
+    /// shares it, so publications from different clones may run waves on it
+    /// concurrently: the session builds at most one pool behind its own lock,
+    /// concurrent waves share that pool's threads, and output bytes do not
+    /// depend on a wave's width. No other package ever shares it.
     write_session: Option<ParallelWriteSession>,
     /// Budget permits held for the lifetime of the write session's pool.
     write_permits: Mutex<Option<WritePermits>>,
@@ -6577,16 +6586,54 @@ fn build_casefold_order(parts: &[CatalogPart]) -> Result<Vec<usize>> {
 /// XML without materializing ordinary part payloads. Existing constructors use
 /// exact reads; an explicit read-ahead policy may fetch adjacent compressed
 /// bytes within its bounded window. The ordinary view is immutable.
-/// [`Self::write_part_overlays_to_stream`] is a narrow, consuming publisher for
-/// a bounded same-topology Part replacement set that raw-copies every other
-/// ZIP member; call [`Self::into_opc_package`] when a general owning mutable
-/// package is needed.
+/// [`Self::write_part_overlays_to_stream`] is a narrow publisher for a bounded
+/// same-topology Part replacement set that raw-copies every other ZIP member;
+/// call [`Self::into_opc_package`] when a general owning mutable package is
+/// needed.
+///
+/// # Clones share one opened package
+///
+/// `Clone` allocates nothing and copies no index, catalog or payload. It
+/// increments the reference counts of the source handle, the archive index,
+/// the admitted catalog and the payload cache, plus the fingerprint memo,
+/// read-ahead window and catalog budget reservation when the package has them, and copies the
+/// read limits. Every clone is the same opened package: clones return equal
+/// [`Self::source_lineage`] tokens and the same [`Self::source_version`], read
+/// through one bounded cache under one execution context, and a payload
+/// decoded through one clone is a cache hit for the others. A clone therefore
+/// behaves as a shared borrow of the package would, except that it is owned.
+///
+/// The publishers that take `self` consume one clone; publish from
+/// `package.clone()` to keep the package readable. Publication mutates no
+/// part, catalog or source state: edits travel in their own plans, so every
+/// clone may publish any number of times and its output depends only on the
+/// source and the plan. Each publication checks the source version again, so
+/// the source checked while editing is the source copied to output, and a
+/// source changed in place refuses every clone with
+/// [`OpcError::SourceChanged`].
+///
+/// The shared state that does change over the package's life changes no part
+/// bytes, refusal or published byte; it changes speed and diagnostics only:
+/// the cache contents, the read-ahead window (a publication or materialization
+/// from any clone returns every clone to exact reads), and a managed package's
+/// write pool and worker permits. The cache, the budget reservations, the
+/// read-ahead window and the write pool are released when the last clone is
+/// dropped.
 pub struct SourceBackedPackage {
     source: SourceSnapshot,
     fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
-    archive: IndexedArchive<SourceReader>,
+    archive: Arc<IndexedArchive<SourceReader>>,
     read_ahead: Option<Arc<ArchiveReadAhead>>,
     limits: ReadLimits,
+    catalog: Arc<AdmittedCatalog>,
+    cache: Arc<PartCache>,
+    catalog_object_reservation: Option<Arc<Reservation>>,
+}
+
+/// The catalog admitted by one open, shared by every clone of the package.
+///
+/// It is built once by the open and never mutated afterwards.
+struct AdmittedCatalog {
     content_types_member: String,
     package_relationships: Relationships,
     parts: Vec<CatalogPart>,
@@ -6603,8 +6650,45 @@ pub struct SourceBackedPackage {
     non_part_members: Vec<NonPartMember>,
     /// Reference-compatible repairs applied while the catalog was admitted.
     tolerance_report: ToleranceReport,
-    cache: PartCache,
-    catalog_object_reservation: Option<Arc<Reservation>>,
+}
+
+// Clones are only useful as handles if each one can move to another thread
+// while the others keep reading and publishing. This fails to compile if a
+// future field breaks that.
+const _: () = {
+    const fn assert_shareable<T: Clone + Send + Sync>() {}
+    assert_shareable::<SourceBackedPackage>();
+};
+
+impl Clone for SourceBackedPackage {
+    /// Share this opened package (see the type documentation).
+    ///
+    /// The destructuring is exhaustive on purpose: a field added later must
+    /// be classified here as shared, copied or rebuilt before this compiles.
+    fn clone(&self) -> Self {
+        let Self {
+            source,
+            fingerprint_memo,
+            archive,
+            read_ahead,
+            limits,
+            catalog,
+            cache,
+            catalog_object_reservation,
+        } = self;
+        Self {
+            // A handle whose source, lineage and monitored-read depth are
+            // `Arc`-shared; its version and length are plain copies.
+            source: source.clone(),
+            fingerprint_memo: fingerprint_memo.clone(),
+            archive: Arc::clone(archive),
+            read_ahead: read_ahead.clone(),
+            limits: *limits,
+            catalog: Arc::clone(catalog),
+            cache: Arc::clone(cache),
+            catalog_object_reservation: catalog_object_reservation.clone(),
+        }
+    }
 }
 
 /// Validation-only open failure with exact ingress phase provenance.
@@ -6761,18 +6845,23 @@ impl SourceBackedPackage {
         Ok(Self {
             source: snapshot,
             fingerprint_memo: None,
-            archive,
+            archive: Arc::new(archive),
             read_ahead: None,
             limits,
-            content_types_member,
-            package_relationships,
-            parts: catalog_parts,
-            relationship_xml_metrics,
-            parts_by_name,
-            casefold_order,
-            non_part_members,
-            tolerance_report,
-            cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
+            catalog: Arc::new(AdmittedCatalog {
+                content_types_member,
+                package_relationships,
+                parts: catalog_parts,
+                relationship_xml_metrics,
+                parts_by_name,
+                casefold_order,
+                non_part_members,
+                tolerance_report,
+            }),
+            cache: Arc::new(PartCache::new_with_diagnostics(
+                SourceCacheLimits::default(),
+                diagnostics,
+            )),
             catalog_object_reservation: None,
         })
     }
@@ -6946,9 +7035,10 @@ impl SourceBackedPackage {
     ///
     /// Read-ahead fetches adjacent compressed bytes and may increase input-byte
     /// use. Publication and mutable materialization permanently switch this
-    /// package back to exact reads and release the read-ahead window. Existing
-    /// constructors remain exact. Use the execution-context variant to charge
-    /// physical reads and retained memory to a hierarchical budget.
+    /// package, and every clone of it, back to exact reads and release the
+    /// read-ahead window. Existing constructors remain exact. Use the
+    /// execution-context variant to charge physical reads and retained memory
+    /// to a hierarchical budget.
     pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
         source: Arc<dyn ReadAt>,
         limits: ReadLimits,
@@ -6968,8 +7058,9 @@ impl SourceBackedPackage {
     ///
     /// Input charges follow accepted physical reads, including overfetch; cache
     /// hits consume no additional input bytes. The window's memory reservation
-    /// remains live until the window is released or the package is dropped.
-    /// Publication permanently returns this package to exact reads.
+    /// remains live until the window is released or the last clone of the
+    /// package is dropped. Publication from any clone permanently returns
+    /// every clone to exact reads.
     pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
         source: Arc<dyn ReadAt>,
         limits: ReadLimits,
@@ -7065,7 +7156,8 @@ impl SourceBackedPackage {
             context.check().map_err(map_execution_error)?;
         }
         // The indexed archive and its source catalog remain owned by the
-        // package for its whole lifetime. Reserve one object for the package
+        // package, shared by its clones, until the last clone drops; so does
+        // this reservation. Reserve one object for the package
         // catalog owner and one for every physical member before parsing the
         // source catalog and projecting deferred part vectors; this is a
         // bounded retained charge, not a cumulative event. Payloads and
@@ -7204,26 +7296,43 @@ impl SourceBackedPackage {
         Ok(Self {
             source: snapshot,
             fingerprint_memo,
-            archive,
+            archive: Arc::new(archive),
             read_ahead,
             limits,
-            content_types_member,
-            package_relationships,
-            parts: catalog_parts,
-            relationship_xml_metrics,
-            parts_by_name,
-            casefold_order,
-            non_part_members,
-            tolerance_report,
-            cache,
+            catalog: Arc::new(AdmittedCatalog {
+                content_types_member,
+                package_relationships,
+                parts: catalog_parts,
+                relationship_xml_metrics,
+                parts_by_name,
+                casefold_order,
+                non_part_members,
+                tolerance_report,
+            }),
+            cache: Arc::new(cache),
             catalog_object_reservation,
         })
+    }
+
+    /// Whether `other` is this package or a clone of it.
+    ///
+    /// Each open builds one admitted catalog, and only `Clone` makes a second
+    /// value that holds it, so sharing the catalog allocation is sharing the
+    /// opened package: the same lineage, source, archive index, cache and
+    /// execution budget. A separate open of equal bytes is a different package.
+    fn is_same_opened_package(&self, other: &Self) -> bool {
+        let same = Arc::ptr_eq(&self.catalog, &other.catalog);
+        debug_assert_eq!(same, Arc::ptr_eq(&self.archive, &other.archive));
+        debug_assert_eq!(same, Arc::ptr_eq(&self.cache, &other.cache));
+        debug_assert_eq!(same, self.source.lineage == other.source.lineage);
+        same
     }
 
     /// Inspect the explicitly enabled source-read window and its counters.
     ///
     /// Exact constructors return `None`. A policy disabled by publication
-    /// retains its diagnostic counters but reports no retained window.
+    /// retains its diagnostic counters but reports no retained window. Clones
+    /// share one window, so every clone reports the same counters.
     pub fn source_read_diagnostics(&self) -> Result<Option<SourceReadDiagnostics>> {
         self.read_ahead
             .as_ref()
@@ -7241,12 +7350,12 @@ impl SourceBackedPackage {
     /// Package-level relationships parsed during opening.
     #[must_use]
     pub fn rels(&self) -> &Relationships {
-        &self.package_relationships
+        &self.catalog.package_relationships
     }
 
     /// Return metadata-only views of every ordinary part.
     pub fn iter_parts(&self) -> impl Iterator<Item = PartView<'_>> {
-        (0..self.parts.len()).map(|index| PartView {
+        (0..self.catalog.parts.len()).map(|index| PartView {
             package: self,
             index,
         })
@@ -7381,8 +7490,10 @@ impl SourceBackedPackage {
         self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
-        let Some(entry) = self.archive.entry_id(&self.content_types_member) else {
-            return Err(OpcError::PartNotFound(self.content_types_member.clone()));
+        let Some(entry) = self.archive.entry_id(&self.catalog.content_types_member) else {
+            return Err(OpcError::PartNotFound(
+                self.catalog.content_types_member.clone(),
+            ));
         };
         let metadata = self.archive.metadata_for(entry)?;
         let maximum = maximum.min(self.limits.max_content_types_bytes());
@@ -7503,6 +7614,7 @@ impl SourceBackedPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let part = self
+            .catalog
             .parts
             .get(index)
             .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
@@ -7584,32 +7696,44 @@ impl SourceBackedPackage {
     /// immutable order index resolve misses with a binary search that allocates
     /// no folded names; managed opens retain the bounded linear fallback.
     fn part_index(&self, partname: &PackURI) -> Option<usize> {
-        self.parts_by_name.get(partname).copied().or_else(|| {
-            let wanted = partname.as_str();
-            if let Some(casefold_order) = self.casefold_order.as_ref() {
-                casefold_order
-                    .binary_search_by(|index| {
-                        cmp_ascii_case_insensitive(self.parts[*index].partname.as_str(), wanted)
-                    })
-                    .ok()
-                    .map(|position| casefold_order[position])
-            } else {
-                self.parts
-                    .iter()
-                    .position(|part| part.partname.as_str().eq_ignore_ascii_case(wanted))
-            }
-        })
+        self.catalog
+            .parts_by_name
+            .get(partname)
+            .copied()
+            .or_else(|| {
+                let wanted = partname.as_str();
+                if let Some(casefold_order) = self.catalog.casefold_order.as_ref() {
+                    casefold_order
+                        .binary_search_by(|index| {
+                            cmp_ascii_case_insensitive(
+                                self.catalog.parts[*index].partname.as_str(),
+                                wanted,
+                            )
+                        })
+                        .ok()
+                        .map(|position| casefold_order[position])
+                } else {
+                    self.catalog
+                        .parts
+                        .iter()
+                        .position(|part| part.partname.as_str().eq_ignore_ascii_case(wanted))
+                }
+            })
     }
 
     /// Return the unique main document part without reading its payload.
     pub fn main_document_part(&self) -> Result<PartView<'_>> {
         self.source.ensure_current()?;
-        let mut matching = self.package_relationships.iter().filter(|relationship| {
-            matches!(
-                relationship.reltype(),
-                relationship_type::OFFICE_DOCUMENT | relationship_type::STRICT_OFFICE_DOCUMENT
-            )
-        });
+        let mut matching = self
+            .catalog
+            .package_relationships
+            .iter()
+            .filter(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    relationship_type::OFFICE_DOCUMENT | relationship_type::STRICT_OFFICE_DOCUMENT
+                )
+            });
         let relationship = matching.next().ok_or_else(|| {
             OpcError::InvalidRelationship("main-document relationship is missing".to_string())
         })?;
@@ -7630,7 +7754,7 @@ impl SourceBackedPackage {
     /// ZIP items present in the source but not modelled as OPC parts.
     #[must_use]
     pub fn non_part_members(&self) -> &[NonPartMember] {
-        &self.non_part_members
+        &self.catalog.non_part_members
     }
 
     /// Reference-compatible repairs applied while the source was admitted.
@@ -7640,7 +7764,7 @@ impl SourceBackedPackage {
     /// [`OpcPackage`] carries the report over.
     #[must_use]
     pub fn tolerance_report(&self) -> &ToleranceReport {
-        &self.tolerance_report
+        &self.catalog.tolerance_report
     }
 
     /// Return content-free payload-cache and managed-publication activity.
@@ -7650,7 +7774,8 @@ impl SourceBackedPackage {
     /// managed packages it also reports cumulative direct-publication
     /// `OutputBytes` usage/limit and budget refusal counts; this includes
     /// [`SourceArtifact::write_to_stream`] and bounded overlay sinks, while
-    /// unmanaged compatibility publication remains uncharged.
+    /// unmanaged compatibility publication remains uncharged. Clones share the
+    /// cache, so the counters cover reads and publications through every clone.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
         let mut observer = NoopDiagnosticObserver;
@@ -7767,7 +7892,9 @@ impl SourceBackedPackage {
     ///
     /// The returned token is clone-cheap and cannot be constructed by a
     /// caller. It lets a semantic facade bind snapshots and patches to this
-    /// opened package rather than to a merely equal [`SourceVersion`].
+    /// opened package rather than to a merely equal [`SourceVersion`]. Every
+    /// clone of this package returns an equal token; every open mints a new
+    /// one, even over the same source.
     #[must_use]
     pub fn source_lineage(&self) -> SourceLineage {
         self.source.lineage.clone()
@@ -7832,6 +7959,7 @@ impl SourceBackedPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let part = self
+            .catalog
             .parts
             .get(index)
             .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
@@ -8004,8 +8132,12 @@ impl SourceBackedPackage {
     /// source-backed view while that context is active. A materialized signed
     /// graph retains borrowed-ingress policy and must be explicitly stripped
     /// or resigned before ordinary publication.
+    ///
+    /// Clones of this package share its catalog, so the conversion copies the
+    /// non-part member list exactly as [`Self::to_opc_package`] does and leaves
+    /// every other clone readable.
     pub fn into_opc_package(self) -> Result<OpcPackage> {
-        self.into_opc_package_inner(None)
+        self.to_opc_package_inner(None)
     }
 
     /// Fully materialize this immutable view while recording cold Part reads
@@ -8022,23 +8154,7 @@ impl SourceBackedPackage {
         self,
         accounting: &mut OpcOperationAccounting,
     ) -> Result<OpcPackage> {
-        self.into_opc_package_inner(Some(accounting))
-    }
-
-    fn into_opc_package_inner(
-        self,
-        accounting: Option<&mut OpcOperationAccounting>,
-    ) -> Result<OpcPackage> {
-        self.disable_read_ahead_for_publication()?;
-        self.source.ensure_current()?;
-        self.cache.check_context().map_err(map_execution_error)?;
-        if self.cache.is_managed() {
-            return Err(OpcError::ManagedPackageMaterialization);
-        }
-        let mut package = self;
-        let non_part_members = std::mem::take(&mut package.non_part_members);
-        let result = package.materialize_opc_package_with_accounting(non_part_members, accounting);
-        package.finish_stage(result)
+        self.to_opc_package_inner(Some(accounting))
     }
 
     /// Materialize this immutable view into an owning package without
@@ -8095,13 +8211,13 @@ impl SourceBackedPackage {
     fn cloned_non_part_members(&self) -> Result<Vec<NonPartMember>> {
         let mut members = Vec::new();
         let reserve = members
-            .try_reserve_exact(self.non_part_members.len())
+            .try_reserve_exact(self.catalog.non_part_members.len())
             .map_err(|source| OpcError::Allocation {
                 resource: "source-backed OPC non-part members",
                 source,
             });
         self.finish_stage(reserve)?;
-        for member in &self.non_part_members {
+        for member in &self.catalog.non_part_members {
             let result = NonPartMember::new(member.name(), member.reason());
             members.push(self.finish_stage(result)?);
         }
@@ -8117,16 +8233,16 @@ impl SourceBackedPackage {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         let mut package = OpcPackage::new();
-        let result = copy_relationships(&self.package_relationships, package.rels_mut());
+        let result = copy_relationships(&self.catalog.package_relationships, package.rels_mut());
         self.finish_stage(result)?;
         let mut read_session = self.archive.read_session();
-        for index in 0..self.parts.len() {
+        for index in 0..self.catalog.parts.len() {
             let bytes = self.finish_stage(self.read_part_with_session(
                 index,
                 &mut read_session,
                 accounting.as_deref_mut(),
             ))?;
-            let catalog_part = &self.parts[index];
+            let catalog_part = &self.catalog.parts[index];
             let part_result = PartFactory::load_shared(
                 catalog_part.partname.clone(),
                 catalog_part.content_type.as_str().to_owned(),
@@ -8139,7 +8255,7 @@ impl SourceBackedPackage {
             self.finish_stage(result)?;
         }
         package.set_non_part_members(non_part_members);
-        package.set_tolerance_report(self.tolerance_report.clone());
+        package.set_tolerance_report(self.catalog.tolerance_report.clone());
         package.mark_source_ingress_signature_policy();
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -8305,7 +8421,7 @@ impl SourceBackedPackage {
 
         let (physical_members, _physical_member_memory) = self.build_physical_member_lookup()?;
         let content_types_key = folded_ascii_name(
-            &self.content_types_member,
+            &self.catalog.content_types_member,
             "source-backed OPC folded physical member name",
         )?;
         let content_types_member_count = physical_members
@@ -8339,8 +8455,8 @@ impl SourceBackedPackage {
                 let destination_original = self.read_part(target)?;
                 source_xml.check_for_replacement(
                     &self.source,
-                    &self.parts[target].partname,
-                    self.parts[target].content_type.as_str(),
+                    &self.catalog.parts[target].partname,
+                    self.catalog.parts[target].content_type.as_str(),
                     destination_original.as_bytes(),
                     self.limits,
                 )?;
@@ -8365,7 +8481,7 @@ impl SourceBackedPackage {
                 .is_some()
             {
                 return Err(OpcError::DuplicatePartName(
-                    self.parts[replacement.target].partname.to_string(),
+                    self.catalog.parts[replacement.target].partname.to_string(),
                 ));
             }
         }
@@ -8405,6 +8521,7 @@ impl SourceBackedPackage {
         // Build the source/new Part namespace with the same duplicate,
         // equivalent, and derived-name rules used by package ingestion.
         let namespace_capacity = self
+            .catalog
             .parts
             .len()
             .checked_sub(pending_removals.len())
@@ -8417,7 +8534,7 @@ impl SourceBackedPackage {
             self.limits.max_parts() as u64,
         )?;
         let mut part_names = PartNameIndex::try_with_capacity(namespace_capacity)?;
-        for (index, part) in self.parts.iter().enumerate() {
+        for (index, part) in self.catalog.parts.iter().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
@@ -8458,7 +8575,7 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC topology canonical Part lookup",
                 source,
             })?;
-        for (index, part) in self.parts.iter().enumerate() {
+        for (index, part) in self.catalog.parts.iter().enumerate() {
             if pending_removal_set.contains(&index) {
                 continue;
             }
@@ -8469,7 +8586,7 @@ impl SourceBackedPackage {
                 ));
             }
         }
-        let additions_offset = self.parts.len();
+        let additions_offset = self.catalog.parts.len();
         for (index, addition) in additions.iter().enumerate() {
             let key = folded_part_name(&addition.partname)?;
             let encoded = additions_offset
@@ -8500,7 +8617,7 @@ impl SourceBackedPackage {
                     )));
                 };
                 relationship.owner = if owner_index < additions_offset {
-                    self.parts[owner_index].partname.clone()
+                    self.catalog.parts[owner_index].partname.clone()
                 } else {
                     additions[owner_index - additions_offset].partname.clone()
                 };
@@ -8526,7 +8643,7 @@ impl SourceBackedPackage {
                 )));
             };
             *target = if target_index < additions_offset {
-                self.parts[target_index].partname.clone()
+                self.catalog.parts[target_index].partname.clone()
             } else {
                 additions[target_index - additions_offset].partname.clone()
             };
@@ -8553,7 +8670,7 @@ impl SourceBackedPackage {
                     )
             })
         };
-        for relationship in self.package_relationships.iter() {
+        for relationship in self.catalog.package_relationships.iter() {
             if relationship.is_external() {
                 continue;
             }
@@ -8570,7 +8687,7 @@ impl SourceBackedPackage {
                 )));
             }
         }
-        for (owner_index, owner) in self.parts.iter().enumerate() {
+        for (owner_index, owner) in self.catalog.parts.iter().enumerate() {
             if pending_removal_set.contains(&owner_index) {
                 continue;
             }
@@ -8690,7 +8807,7 @@ impl SourceBackedPackage {
             })?;
         if let Some(source_content_types) = source_content_types.as_ref() {
             for target in &pending_removals {
-                let partname = &self.parts[*target].partname;
+                let partname = &self.catalog.parts[*target].partname;
                 if source_content_types.override_for(partname).is_some() {
                     removed_content_type_overrides.push(partname.clone());
                 }
@@ -8790,9 +8907,9 @@ impl SourceBackedPackage {
                 self.part_index(&owner)
             };
             let source_owner_relationships = if owner.as_str() == PACKAGE_URI {
-                Some(&self.package_relationships)
+                Some(&self.catalog.package_relationships)
             } else {
-                owner_index.map(|index| &self.parts[index].relationships)
+                owner_index.map(|index| &self.catalog.parts[index].relationships)
             };
             let mut additional_relationships = 0usize;
             let mut additional_string_bytes = 0usize;
@@ -8889,14 +9006,14 @@ impl SourceBackedPackage {
                 self.part_index(&owner)
             };
             let source_owner_relationships = if owner.as_str() == PACKAGE_URI {
-                Some(&self.package_relationships)
+                Some(&self.catalog.package_relationships)
             } else {
-                owner_index.map(|index| &self.parts[index].relationships)
+                owner_index.map(|index| &self.catalog.parts[index].relationships)
             };
             let owner_base = if owner.as_str() == PACKAGE_URI {
                 "/".to_string()
             } else if let Some(index) = owner_index {
-                self.parts[index].partname.base_uri().to_string()
+                self.catalog.parts[index].partname.base_uri().to_string()
             } else {
                 owner.base_uri().to_string()
             };
@@ -9430,7 +9547,7 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
-            let part = self.parts.get(*target).ok_or_else(|| {
+            let part = self.catalog.parts.get(*target).ok_or_else(|| {
                 overlay_unavailable("topology removal target index is out of bounds")
             })?;
             let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
@@ -9496,8 +9613,8 @@ impl SourceBackedPackage {
         let package_owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let mut relationship_count = relationship_overrides
             .get(&package_owner)
-            .map_or(self.package_relationships.len(), Relationships::len);
-        for (index, part) in self.parts.iter().enumerate() {
+            .map_or(self.catalog.package_relationships.len(), Relationships::len);
+        for (index, part) in self.catalog.parts.iter().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
@@ -9660,7 +9777,7 @@ impl SourceBackedPackage {
                 if original.as_bytes() == replacement.replacement.as_slice() {
                     continue;
                 }
-                let part = &self.parts[replacement.target];
+                let part = &self.catalog.parts[replacement.target];
                 if replacement.source_xml.is_some() {
                     // The source proof already validated the complete
                     // assembled XML with source-compatible rules. Its
@@ -9705,7 +9822,7 @@ impl SourceBackedPackage {
         }
         if let Some(content_types) = &content_types_replacement {
             changed.push(ChangedOverlay {
-                target: ChangedOverlayTarget::Member(self.content_types_member.clone()),
+                target: ChangedOverlayTarget::Member(self.catalog.content_types_member.clone()),
                 replacement: ChangedOverlayPayload::Shared(Arc::clone(content_types)),
             });
         }
@@ -9718,7 +9835,7 @@ impl SourceBackedPackage {
                 source,
             })?;
         for target in &pending_removals {
-            let part = &self.parts[*target];
+            let part = &self.catalog.parts[*target];
             omitted_members.push(part.partname.membername().to_string());
             let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
             let relationship_member = relationships_uri.membername().to_string();
@@ -9751,7 +9868,7 @@ impl SourceBackedPackage {
                 no_op: true,
             });
         }
-        if !self.non_part_members.is_empty() {
+        if !self.catalog.non_part_members.is_empty() {
             return Err(overlay_unavailable(
                 "topology publication refuses non-Part or opaque physical members",
             ));
@@ -9778,6 +9895,7 @@ impl SourceBackedPackage {
         let package_owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let effective_package_relationships = relationship_overrides.remove(&package_owner);
         let effective_part_count = self
+            .catalog
             .parts
             .len()
             .checked_sub(pending_removals.len())
@@ -9840,7 +9958,7 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC effective Part catalog",
                 source,
             })?;
-        for (index, part) in self.parts.iter().enumerate() {
+        for (index, part) in self.catalog.parts.iter().enumerate() {
             if pending_removal_set.contains(&index) {
                 continue;
             }
@@ -10213,6 +10331,7 @@ impl SourceBackedPackage {
     {
         self.disable_read_ahead_for_publication()?;
         let target = self
+            .catalog
             .parts_by_name
             .get(partname)
             .copied()
@@ -10241,7 +10360,7 @@ impl SourceBackedPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
 
-        let target_part = &self.parts[target];
+        let target_part = &self.catalog.parts[target];
         if xml_minifier::audit::package::is_xml_part(
             target_part.partname.as_str(),
             target_part.content_type.as_str(),
@@ -10311,11 +10430,12 @@ impl SourceBackedPackage {
         }
 
         let target = self
+            .catalog
             .parts_by_name
             .get(partname)
             .copied()
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
-        let target_part = &self.parts[target];
+        let target_part = &self.catalog.parts[target];
         for id in &removed_relationship_ids {
             let relationship = target_part.relationships.get(id).ok_or_else(|| {
                 OpcError::RelationshipNotFound(format!("relationship '{id}' was not found"))
@@ -10453,11 +10573,12 @@ impl SourceBackedPackage {
                 )));
             }
             let target = self
+                .catalog
                 .parts_by_name
                 .get(&partname)
                 .copied()
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
-            let target_part = &self.parts[target];
+            let target_part = &self.catalog.parts[target];
             if removed_relationship_ids.is_empty() {
                 part_overlays.push(PendingOverlay {
                     target,
@@ -10516,7 +10637,7 @@ impl SourceBackedPackage {
                 }
             }
             for part in &part_overlays {
-                if self.parts[part.target].partname.membername() == left.2 {
+                if self.catalog.parts[part.target].partname.membername() == left.2 {
                     return Err(overlay_unavailable(
                         "a relationship overlay collides with a Part ZIP member",
                     ));
@@ -10563,7 +10684,7 @@ impl SourceBackedPackage {
                 Err(error) => return Err(map_preservation_error(error)),
             };
             self.source.ensure_current()?;
-            let relationship_uri = self.parts[*target]
+            let relationship_uri = self.catalog.parts[*target]
                 .partname
                 .rels_uri()
                 .map_err(OpcError::InvalidPackUri)?;
@@ -10589,7 +10710,7 @@ impl SourceBackedPackage {
         for overlay in part_overlays {
             let original = self.read_part(overlay.target)?;
             self.source.ensure_current()?;
-            let target_part = &self.parts[overlay.target];
+            let target_part = &self.catalog.parts[overlay.target];
             if xml_minifier::audit::package::is_xml_part(
                 target_part.partname.as_str(),
                 target_part.content_type.as_str(),
@@ -10790,7 +10911,7 @@ impl SourceBackedPackage {
             let target = self
                 .part_index(&partname)
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
-            omitted_members.push(self.parts[target].partname.membername().to_string());
+            omitted_members.push(self.catalog.parts[target].partname.membername().to_string());
         }
         self.validate_overlay_limits(
             overlays
@@ -10841,7 +10962,7 @@ impl SourceBackedPackage {
                 source,
             })?;
         for (overlay, original) in changed {
-            let target_part = &self.parts[overlay.target];
+            let target_part = &self.catalog.parts[overlay.target];
             if xml_minifier::audit::package::is_xml_part(
                 target_part.partname.as_str(),
                 target_part.content_type.as_str(),
@@ -10886,7 +11007,7 @@ impl SourceBackedPackage {
 
         let mut part_total = 0_u64;
         let mut archive_total = 0_u64;
-        for part in &self.parts {
+        for part in &self.catalog.parts {
             let bytes = self
                 .archive
                 .metadata_for(part.entry_id)?
@@ -10911,7 +11032,7 @@ impl SourceBackedPackage {
         for (target, replacement_len) in overlays {
             let target_bytes = self
                 .archive
-                .metadata_for(self.parts[target].entry_id)?
+                .metadata_for(self.catalog.parts[target].entry_id)?
                 .uncompressed_size();
             let replacement_bytes = replacement_len as u64;
             adjusted_parts = adjusted_overlay_total(
@@ -10985,7 +11106,7 @@ impl SourceBackedPackage {
         }
         let original_part = self
             .archive
-            .metadata_for(self.parts[target].entry_id)?
+            .metadata_for(self.catalog.parts[target].entry_id)?
             .uncompressed_size();
         let original_relationship = self
             .archive
@@ -11078,7 +11199,7 @@ impl SourceBackedPackage {
                 )?;
             }
         }
-        for (index, part) in self.parts.iter().enumerate() {
+        for (index, part) in self.catalog.parts.iter().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
@@ -11097,7 +11218,7 @@ impl SourceBackedPackage {
         for (target, replacement_len) in part_overlays {
             let original = self
                 .archive
-                .metadata_for(self.parts[*target].entry_id)?
+                .metadata_for(self.catalog.parts[*target].entry_id)?
                 .uncompressed_size();
             adjusted_archive = adjusted_overlay_total(
                 adjusted_archive,
@@ -11180,7 +11301,7 @@ impl SourceBackedPackage {
                 )?;
             }
         }
-        for metrics in self.relationship_xml_metrics.values() {
+        for metrics in self.catalog.relationship_xml_metrics.values() {
             relationship_event_total = checked_overlay_total(
                 relationship_event_total,
                 metrics.event_count,
@@ -11198,7 +11319,7 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
-            let part = self.parts.get(*target).ok_or_else(|| {
+            let part = self.catalog.parts.get(*target).ok_or_else(|| {
                 overlay_unavailable("topology removal target index is out of bounds")
             })?;
             let part_bytes = self
@@ -11233,6 +11354,7 @@ impl SourceBackedPackage {
                 self.limits.max_total_relationship_xml_bytes() as u64,
             )?;
             let metrics = self
+                .catalog
                 .relationship_xml_metrics
                 .get(&part.partname)
                 .ok_or_else(|| {
@@ -11246,7 +11368,7 @@ impl SourceBackedPackage {
                 self.limits.max_total_relationship_xml_events() as u64,
             )?;
         }
-        for (index, part) in self.parts.iter().enumerate() {
+        for (index, part) in self.catalog.parts.iter().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
@@ -11263,7 +11385,7 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
-            let part = self.parts.get(*target).ok_or_else(|| {
+            let part = self.catalog.parts.get(*target).ok_or_else(|| {
                 overlay_unavailable("topology removal target index is out of bounds")
             })?;
             let part_bytes = self
@@ -11296,7 +11418,7 @@ impl SourceBackedPackage {
             )?;
             let original = self
                 .archive
-                .metadata_for(self.parts[replacement.target].entry_id)?
+                .metadata_for(self.catalog.parts[replacement.target].entry_id)?
                 .uncompressed_size();
             part_total = adjusted_overlay_total(
                 part_total,
@@ -11381,8 +11503,8 @@ impl SourceBackedPackage {
             )?;
             let entry = self
                 .archive
-                .entry_id(&self.content_types_member)
-                .ok_or_else(|| OpcError::PartNotFound(self.content_types_member.clone()))?;
+                .entry_id(&self.catalog.content_types_member)
+                .ok_or_else(|| OpcError::PartNotFound(self.catalog.content_types_member.clone()))?;
             let original = self.archive.metadata_for(entry)?.uncompressed_size();
             archive_total = adjusted_overlay_total(
                 archive_total,
@@ -11440,6 +11562,7 @@ impl SourceBackedPackage {
                     self.limits.max_total_relationship_xml_bytes() as u64,
                 )?;
                 let original_events = self
+                    .catalog
                     .relationship_xml_metrics
                     .get(publication.owner())
                     .map(|metrics| metrics.event_count)
@@ -11571,7 +11694,7 @@ impl SourceBackedPackage {
         let package_owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let package_relationships = relationship_overrides
             .get(&package_owner)
-            .unwrap_or(&self.package_relationships);
+            .unwrap_or(&self.catalog.package_relationships);
         let mut visited = HashSet::new();
         let mut work_queue = Vec::new();
         for relationship in package_relationships.iter() {
@@ -11665,7 +11788,7 @@ impl SourceBackedPackage {
             if pending_removals.contains(&index) {
                 return Ok(None);
             }
-            let source = &self.parts[index];
+            let source = &self.catalog.parts[index];
             Ok(relationship_overrides
                 .get(&source.partname)
                 .or(Some(&source.relationships)))
@@ -11695,10 +11818,11 @@ impl SourceBackedPackage {
         // not be retained in `self.non_part_members` for classification.
         self.archive.file_names().any(is_signature_member_path)
             || self
+                .catalog
                 .package_relationships
                 .iter()
                 .any(is_signature_relationship_or_target)
-            || self.parts.iter().any(|part| {
+            || self.catalog.parts.iter().any(|part| {
                 is_signature_path(part.partname.as_str())
                     || is_signature_content_type(part.content_type.as_str())
                     || part
@@ -11719,8 +11843,8 @@ impl SourceBackedPackage {
         self.cache.check_context().map_err(map_execution_error)?;
         let entry = self
             .archive
-            .entry_id(&self.content_types_member)
-            .ok_or_else(|| OpcError::PartNotFound(self.content_types_member.clone()))?;
+            .entry_id(&self.catalog.content_types_member)
+            .ok_or_else(|| OpcError::PartNotFound(self.catalog.content_types_member.clone()))?;
         let metadata = self.archive.metadata_for(entry)?;
         let declared_bytes = metadata.uncompressed_size();
         self.limits.check(
@@ -11965,7 +12089,7 @@ impl SourceBackedPackage {
                 source,
             })?;
         for replacement in replacements {
-            let target_name = replacement_member_name(replacement, &self.parts);
+            let target_name = replacement_member_name(replacement, &self.catalog.parts);
             replacement_lookup.push((target_name.as_bytes(), replacement));
         }
         replacement_lookup.sort_unstable_by(|left, right| left.0.cmp(right.0));
@@ -12092,7 +12216,7 @@ impl SourceBackedPackage {
                 .binary_search_by(|candidate| candidate.0.cmp(entry.raw_name_bytes()))
             {
                 let replacement = replacement_lookup[replacement_index].1;
-                let target_name = replacement_member_name(replacement, &self.parts);
+                let target_name = replacement_member_name(replacement, &self.catalog.parts);
                 let compression = entry.compression_method();
                 let regenerated = match &replacement.replacement {
                     ChangedOverlayPayload::Shared(data) => {
@@ -12373,6 +12497,7 @@ impl SourceBackedPackage {
     {
         self.cache.check_context().map_err(map_execution_error)?;
         let catalog_entry = self
+            .catalog
             .parts
             .get(index)
             .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
@@ -12497,7 +12622,8 @@ impl SourceBackedPackage {
             // It precedes the catalog lookup so a changed source still
             // outranks `PartNotFound`.
             self.source.ensure_current()?;
-            self.parts
+            self.catalog
+                .parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
             let bytes = if let Some(capture) = capture {
@@ -16551,7 +16677,7 @@ mod tests {
         .unwrap();
         let entry = package
             .archive
-            .entry_id(&package.content_types_member)
+            .entry_id(&package.catalog.content_types_member)
             .expect("the content-types member is present");
         let expected = package.archive.read_entry(entry).unwrap();
         let memory_before = budget.used(Resource::Memory);
@@ -16595,7 +16721,7 @@ mod tests {
         .unwrap();
         let entry = package
             .archive
-            .entry_id(&package.content_types_member)
+            .entry_id(&package.catalog.content_types_member)
             .expect("the content-types member is present");
         let declared = package
             .archive
@@ -17686,7 +17812,7 @@ mod tests {
         let bytes = archive_with_ordered_xml_parts(&parts);
 
         fn assert_lookup_behavior(package: &SourceBackedPackage) {
-            assert!(package.casefold_order.is_none());
+            assert!(package.catalog.casefold_order.is_none());
             let source_order = [
                 "/zeta.xml",
                 "/ALPHA.xml",
@@ -17737,7 +17863,10 @@ mod tests {
         package: &SourceBackedPackage,
         expects_casefold_index: bool,
     ) {
-        assert_eq!(package.casefold_order.is_some(), expects_casefold_index);
+        assert_eq!(
+            package.catalog.casefold_order.is_some(),
+            expects_casefold_index
+        );
         let iterated: Vec<_> = package
             .iter_parts()
             .map(|part| part.partname().as_str())
@@ -17800,7 +17929,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(package.casefold_order.is_none());
+        assert!(package.catalog.casefold_order.is_none());
         assert_eq!(budget.used(Resource::Memory), 0);
 
         assert_large_catalog_lookup_behavior(&package, false);
@@ -18109,7 +18238,7 @@ mod tests {
         .unwrap();
         let part = package.main_document_part().unwrap();
         let index = part.index;
-        let entry_id = package.parts[index].entry_id;
+        let entry_id = package.catalog.parts[index].entry_id;
         let declared = package
             .archive
             .metadata_for(entry_id)
@@ -18729,8 +18858,8 @@ mod tests {
                 context,
             )
             .unwrap();
-        let first_name = package.parts[0].partname.clone();
-        let second_name = package.parts[1].partname.clone();
+        let first_name = package.catalog.parts[0].partname.clone();
+        let second_name = package.catalog.parts[1].partname.clone();
         let first = package.part(&first_name).unwrap().data().unwrap();
         assert_eq!(budget.used(Resource::Memory), b"document".len() as u64);
         drop(first);
@@ -18766,8 +18895,8 @@ mod tests {
                 context,
             )
             .unwrap();
-        let first_name = package.parts[0].partname.clone();
-        let second_name = package.parts[1].partname.clone();
+        let first_name = package.catalog.parts[0].partname.clone();
+        let second_name = package.catalog.parts[1].partname.clone();
         let first = package.part(&first_name).unwrap().data().unwrap();
         let first_error = first.into_arc().expect_err("managed Arc escape must fail");
         assert_eq!(budget.used(Resource::Memory), b"document".len() as u64);
@@ -18797,7 +18926,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .entries
-                .contains_key(&package.parts[0].entry_id)
+                .contains_key(&package.catalog.parts[0].entry_id)
         );
 
         drop(second);
@@ -19647,8 +19776,8 @@ mod tests {
             archive_bytes(root_relationships(), b"document", false),
         )))
         .unwrap();
-        let first_id = package.parts[0].entry_id;
-        let second_id = package.parts[1].entry_id;
+        let first_id = package.catalog.parts[0].entry_id;
+        let second_id = package.catalog.parts[1].entry_id;
         let cache = PartCache::new(SourceCacheLimits::new(32, 3).unwrap());
         let old_flight = Arc::new(LoadFlight::new(None, None, None));
         let new_flight = Arc::new(LoadFlight::new(None, None, None));
@@ -19744,8 +19873,8 @@ mod tests {
             archive_bytes(root_relationships(), b"cache hint state", false),
         )))
         .unwrap();
-        let first_id = package.parts[0].entry_id;
-        let second_id = package.parts[1].entry_id;
+        let first_id = package.catalog.parts[0].entry_id;
+        let second_id = package.catalog.parts[1].entry_id;
         let cache = PartCache::new(SourceCacheLimits::new(32, 3).unwrap());
         assert!(!cache.all_entries_ready([first_id].into_iter()));
         assert!(matches!(
@@ -19836,8 +19965,8 @@ mod tests {
             archive_bytes(root_relationships(), b"document", false),
         )))
         .unwrap();
-        let first_id = package.parts[0].entry_id;
-        let second_id = package.parts[1].entry_id;
+        let first_id = package.catalog.parts[0].entry_id;
+        let second_id = package.catalog.parts[1].entry_id;
         let cache = PartCache::new(SourceCacheLimits::new(3, 3).unwrap());
         let first = Arc::new(vec![1, 2]);
         assert!(matches!(
@@ -20107,7 +20236,7 @@ mod tests {
             ),
         )))
         .unwrap();
-        assert_eq!(package.parts.len(), 2);
+        assert_eq!(package.catalog.parts.len(), 2);
 
         let bytes_budget_a = Budget::root(
             "diagnostic-gauge-bytes-a",
@@ -20147,8 +20276,8 @@ mod tests {
         );
         let mut state = package.cache.state.lock().expect("unpoisoned cache state");
         for (index, (entry_id, bytes, objects)) in [
-            (package.parts[0].entry_id, bytes_a, objects_a),
-            (package.parts[1].entry_id, bytes_b, objects_b),
+            (package.catalog.parts[0].entry_id, bytes_a, objects_a),
+            (package.catalog.parts[1].entry_id, bytes_b, objects_b),
         ]
         .into_iter()
         .enumerate()
@@ -20215,6 +20344,7 @@ mod tests {
         .unwrap();
         let part = package.main_document_part().unwrap();
         let catalog = package
+            .catalog
             .parts
             .iter()
             .find(|catalog| catalog.partname == *part.partname())
@@ -22696,7 +22826,7 @@ mod tests {
             ]
         );
 
-        let entry_id = package.parts[0].entry_id;
+        let entry_id = package.catalog.parts[0].entry_id;
         let flight = Arc::new(LoadFlight::new(None, None, None));
         package
             .cache
@@ -23560,7 +23690,9 @@ mod callback_scoped_verified_reader_tests {
             .unwrap();
         let reader_memory = probe
             .archive
-            .verified_entry_reader_memory_upper_bound(probe.parts[probe_part.index].entry_id)
+            .verified_entry_reader_memory_upper_bound(
+                probe.catalog.parts[probe_part.index].entry_id,
+            )
             .unwrap();
         drop(probe);
         let (budget, _cancellation_source, context) = managed_context(reader_memory);

@@ -383,6 +383,7 @@ impl PreparedBatch {
             fence(package)?;
             let index = resolve_part_index(package, name, context)?;
             let entry_id = package
+                .catalog
                 .parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?
@@ -1175,15 +1176,15 @@ fn resolve_part_index(
     partname: &PackURI,
     context: Option<&ExecutionContext>,
 ) -> Result<usize> {
-    if let Some(index) = package.parts_by_name.get(partname).copied() {
+    if let Some(index) = package.catalog.parts_by_name.get(partname).copied() {
         return Ok(index);
     }
-    if package.casefold_order.is_some() {
+    if package.catalog.casefold_order.is_some() {
         return package
             .part_index(partname)
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()));
     }
-    for (position, part) in package.parts.iter().enumerate() {
+    for (position, part) in package.catalog.parts.iter().enumerate() {
         if let Some(context) = context
             && position & 0xff == 0
         {
@@ -1307,11 +1308,12 @@ mod tests {
     fn stale_ready_hint_after_eviction_uses_authoritative_prepared_read() {
         let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
         let index = package
+            .catalog
             .parts
             .iter()
             .position(|part| part.partname.as_str() == "/word/document.xml")
             .unwrap();
-        let entry_id = package.parts[index].entry_id;
+        let entry_id = package.catalog.parts[index].entry_id;
         let declared_bytes = package
             .archive
             .metadata_for(entry_id)

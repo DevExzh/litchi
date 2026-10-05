@@ -506,6 +506,68 @@ fn equal_version_foreign_lineage_falls_back_to_current_original() {
 }
 
 #[test]
+fn a_hint_crosses_clones_of_one_package_but_not_a_reopen() {
+    let version = SourceVersion::new(0x0012_434c_4f4e_4500, 3);
+    let (package, budget, _cancellation) = managed_package(
+        Arc::new(FixedVersionSource::new(
+            archive_bytes(FORMATTED_DOCUMENT),
+            version,
+        )),
+        ReadLimits::default(),
+        "opc-hint-clone",
+    );
+    let clone = package.clone();
+    assert_eq!(package.source_lineage(), clone.source_lineage());
+
+    // A proof captured through either clone is a proof about the one opened
+    // package, so the other clone reuses its allocation.
+    for (capturer, reuser) in [(&clone, &package), (&package, &clone)] {
+        let hint = capturer
+            .part(&pack(DOCUMENT_URI))
+            .unwrap()
+            .source_xml()
+            .unwrap();
+        let reused = reuser
+            .part(&pack(DOCUMENT_URI))
+            .unwrap()
+            .source_xml_with_hint(&hint)
+            .expect("a clone's hint must be accepted");
+        assert_eq!(reused.bytes(), FORMATTED_DOCUMENT);
+        assert_eq!(
+            reused.bytes().as_ptr(),
+            hint.bytes().as_ptr(),
+            "a clone shares the lineage, so its hint is a hit"
+        );
+    }
+
+    // A re-open of equal bytes at an equal version is another package.
+    let (reopened, _reopened_budget, _reopened_cancellation) = managed_package(
+        Arc::new(FixedVersionSource::new(
+            archive_bytes(FORMATTED_DOCUMENT),
+            version,
+        )),
+        ReadLimits::default(),
+        "opc-hint-clone-reopened",
+    );
+    let hint = clone
+        .part(&pack(DOCUMENT_URI))
+        .unwrap()
+        .source_xml()
+        .unwrap();
+    let current = reopened
+        .part(&pack(DOCUMENT_URI))
+        .unwrap()
+        .source_xml_with_hint(&hint)
+        .expect("a foreign hint must fall back to the current source Part");
+    assert_eq!(current.bytes(), FORMATTED_DOCUMENT);
+    assert_ne!(current.bytes().as_ptr(), hint.bytes().as_ptr());
+
+    drop((current, hint, reopened, package, clone));
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
 fn different_part_and_content_type_hints_return_the_target_original() {
     let archive = archive_with_other(FORMATTED_DOCUMENT, "application/vnd.example.other+xml");
     let (package, budget, _cancellation) =
