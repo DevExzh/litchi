@@ -48,3 +48,29 @@
   - `test-data/odf/corpus/impress-*.odp` never gets the source-backed owner from `detect_pptx_source_path_with_limits`: the path probe returns `Bytes`, so these files take the eager parse. The facade behaves the same today. It may affect the S10 ODP open timings.
   - ODP `metadata()` is `Some(Metadata::default())`, as in the facade, although the leaf can read `meta.xml`. This is an M1 fidelity item.
 - 20 tests; clippy (all features and each single feature), docs, and the boundary/non-iWork gates pass. On the merged tree: litchi-ops clippy passes, and 115 unit tests plus 26 doctests pass.
+
+## S5b — `Pptx` handle and L-PPTX-1 (`ff9fc9f0a9`, after the rewrite)
+- `Pptx(Arc<PptxState>)` holds a `Source(SourceBackedPresentation)` or `Eager(Box<pptx::Package>)` owner with a lazy metadata cache. Constructors take detection output (source, source package, prepared, eager OPC). Typed reads: `text`, `slide_count`, `slides`, `slide`, `slide_catalog`, `slide_size`, `metadata`, `tolerance_report`. A changed source is `io_error` with the OPC `SourceChanged` kept as the leaf error (fixes F10). OPC read limits now report `limit_exceeded` and cancellation reports `cancelled` (the facade reported a core `ResourceLimit` and `Other`).
+- L-PPTX-1: `SourceBackedPresentation::try_into_editor(self)` builds the editor from the package and slide list indexed at open, reading no source bytes. Open records one flag saying whether the slide list needed a repair. Leaf `Send + Sync` assertions (R3) pass.
+- 13 ops tests and 5 leaf tests. Two `source_backed_svg_lifecycle` tests need the untracked `3rdparty` corpus that the sparse worktree lacks; they pass with the corpus present.
+
+## S5c — `Xlsx`/`Xlsb` handles, L-XLSX-1, L-XLSB-1 (`b32505fc8d`, after the rewrite)
+- Two-state `Arc` handles. The facade's sheet adapters and selection moved over with typed errors. `WorkbookTrait` is implemented directly on both handles, so S6 delegates by `match`. Case-folding is unchanged: case-insensitive for XLSX, exact for XLSB (F15). `Xlsx::sheet(selector)` is the leak method.
+- Leaf changes:
+  - L-XLSX-1: `SourceBackedWorkbook::source_backed_package()` and `try_into_source_backed_package()`.
+  - L-XLSB-1: `SourceBackedWorkbook::to_workbook()`.
+  - R3 `Send + Sync` assertions pass.
+- 24 ops tests, including route parity against values captured from the current facade.
+- Four litchi-xlsx test targets (`form_control_properties`, `form_control_scalar_lifecycle`, `form_control_owner_read`, `drawing_svg_read`) `include_bytes!` files that the sparse checkout omits. Run them on a full checkout before the M0a merge.
+- For S6:
+  - Declare `format/cell_text.rs` once in `format/mod.rs`; it is currently `#[path]`-included by both handles.
+  - XLSB source worksheets keep one-based coordinates while the eager owner is zero-based, as in the facade. This is an M1 normalization item.
+
+## Cross-cutting M2 prerequisite (R4): editing a shared snapshot
+- The leaf source-backed publishers consume their package: `docx` `publish_document_commit_to_stream(self)`, the pptx `SourceBackedPresentationEditor` publishers, and the xlsx `SourceBackedPackage`. None of these packages can be cloned.
+- So a handle can hand its package to an editor only when it is the sole owner. Per format, when the handle is shared:
+  - xlsx falls back to an eager snapshot built from the existing index (no re-index);
+  - pptx has no fallback, because the reader is not retained;
+  - docx has the same publish-time constraint.
+- ADR 0003 and design §3/§8 require the old snapshot to stay readable after a write. M2 therefore needs one of: a non-consuming publish (or cheap package clone) in the leaves or litchi-opc; a retained reader for a cheap re-open; or consuming Rust verbs plus a documented clone-then-edit fallback. Record 0009 will decide this before M2.
+- Merged tree after S5a/b/c/e: litchi-ops clippy passes with all features and with each of pptx, xlsx, xlsb, xlsx+xlsb and pptx+xlsx; 153 unit tests and 29 doctests pass; `cargo check -p litchi --all-features` passes.
