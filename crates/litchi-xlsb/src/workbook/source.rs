@@ -129,6 +129,15 @@ pub struct SourceBackedWorksheet {
     catalog_position: usize,
 }
 
+// Shared handles: the unified operations layer keeps these in `Arc`-backed,
+// `Send + Sync` file handles (record 0003 risk R3).
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedWorkbook>();
+    assert_send_sync::<SourceBackedWorksheet>();
+    assert_send_sync::<Workbook>();
+};
+
 /// Cached cell values accessed through a verified worksheet binary index.
 ///
 /// Construction materializes the selected worksheet and index parts and checks
@@ -966,6 +975,33 @@ impl SourceBackedWorkbook {
         let version = preflight_package(&self.inner.package)?;
         postflight_package(&self.inner.package)?;
         Ok(version)
+    }
+
+    /// Materialize the eager, editable [`Workbook`] from this catalog.
+    ///
+    /// The owning OPC graph is built from the package indexed at open,
+    /// through the same positional source: no format detection, ZIP
+    /// directory, or relationship index is repeated, and this lazy catalog
+    /// stays usable. Ordinary Part payloads are read, so the cost is that of
+    /// an eager open's payload reads. The workbook keeps this catalog's
+    /// external-link limits and [`Leniency`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed source-change error when the source changed after
+    /// open, `OpcError::ManagedPackageMaterialization` for a catalog opened
+    /// with an execution context, and the eager workbook's own validation,
+    /// limit and allocation errors otherwise.
+    pub fn to_workbook(&self) -> Result<Workbook> {
+        preflight_package(&self.inner.package)?;
+        let package = self.inner.package.to_opc_package()?;
+        let mut workbook = Workbook::from_opc_package_with_external_link_limits(
+            package,
+            self.inner.external_link_limits,
+        )?;
+        workbook.leniency = self.inner.leniency;
+        postflight_package(&self.inner.package)?;
+        Ok(workbook)
     }
 
     /// Read the workbook's optional theme without materializing worksheets.
@@ -2073,5 +2109,54 @@ mod tests {
             assert!(Arc::ptr_eq(&expected_strings, &strings));
             assert!(Arc::ptr_eq(&expected_styles, &styles));
         }
+    }
+}
+
+#[cfg(test)]
+mod materialize_tests {
+    use std::io::Cursor;
+
+    use litchi_core::sheet::WorkbookTrait;
+
+    use super::{SourceBackedWorkbook, Workbook};
+
+    fn fixture() -> Vec<u8> {
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsb/Simple.xlsb"
+        ))
+        .expect("read XLSB fixture")
+    }
+
+    #[test]
+    fn to_workbook_matches_an_eager_open_and_keeps_the_catalog_usable() {
+        let bytes = fixture();
+        let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+        let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+
+        let materialized = source.to_workbook().expect("materialize from the catalog");
+        assert_eq!(materialized.worksheet_names(), eager.worksheet_names());
+        assert_eq!(
+            materialized.active_worksheet_index(),
+            eager.active_worksheet_index()
+        );
+        assert_eq!(
+            materialized.is_1904_date_system(),
+            eager.is_1904_date_system()
+        );
+        for index in 0..eager.worksheet_count() {
+            let left = materialized.worksheet(index).unwrap();
+            let right = eager.worksheet(index).unwrap();
+            assert_eq!(
+                litchi_core::sheet::Worksheet::dimensions(&left),
+                litchi_core::sheet::Worksheet::dimensions(&right)
+            );
+        }
+        // The materialized owner is the eager edit entry.
+        materialized
+            .edit_cell_values(0)
+            .expect("eager cell-value edit");
+        // The lazy catalog stays readable after materialization.
+        assert_eq!(source.worksheet_names().unwrap(), eager.worksheet_names());
     }
 }

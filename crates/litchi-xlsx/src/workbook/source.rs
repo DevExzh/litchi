@@ -125,6 +125,14 @@ pub struct SourceWorksheet {
     data: Arc<SourceSheetData>,
 }
 
+// Shared handles: the unified operations layer keeps these in `Arc`-backed,
+// `Send + Sync` file handles (record 0003 risk R3).
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedWorkbook>();
+    assert_send_sync::<SourceWorksheet>();
+};
+
 /// Owned semantic state at one coordinate in a source-backed worksheet.
 ///
 /// This mirrors [`crate::cell::View`] without borrowing a lazily retained
@@ -612,6 +620,37 @@ impl SourceBackedWorkbook {
     /// Exact source identity and revision captured by this facade.
     pub fn source_version(&self) -> Result<SourceVersion> {
         self.inner.package.source_version().map_err(Into::into)
+    }
+
+    /// Borrow the validated deferred OPC package this catalog reads from.
+    ///
+    /// This is the package indexed when the workbook was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::to_opc_package`], read through the same
+    /// positional source and observe the same source-version fence.
+    #[must_use]
+    pub fn source_backed_package(&self) -> &SourceBackedPackage {
+        &self.inner.package
+    }
+
+    /// Recover the validated deferred OPC package without re-indexing it.
+    ///
+    /// The returned package is the one this catalog was opened from, so a
+    /// per-feature `SourceBackedEditor` (for example
+    /// [`crate::cell_values::SourceBackedEditor::from_source_backed_package`])
+    /// can adopt it without a second container index. The lazily parsed
+    /// catalog, shared strings and styles are released.
+    ///
+    /// # Errors
+    ///
+    /// Returns `self` unchanged while another clone of this workbook, or a
+    /// [`SourceWorksheet`] handle selected from it, still shares the catalog.
+    pub fn try_into_source_backed_package(self) -> std::result::Result<SourceBackedPackage, Self> {
+        match Arc::try_unwrap(self.inner) {
+            Ok(inner) => Ok(inner.package),
+            Err(inner) => Err(Self { inner }),
+        }
     }
 
     /// Number of logical workbook sheets.
@@ -4205,5 +4244,58 @@ mod tests {
             assert_eq!(cells.len(), 5);
             assert_eq!(cells.capacity(), cells.len());
         }
+    }
+}
+
+#[cfg(test)]
+mod package_handoff_tests {
+    use std::io::Cursor;
+
+    use super::SourceBackedWorkbook;
+
+    fn fixture() -> Vec<u8> {
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsx/DateFormatTests.xlsx"
+        ))
+        .expect("read XLSX fixture")
+    }
+
+    #[test]
+    fn package_handoff_returns_the_package_indexed_at_open() {
+        let workbook = SourceBackedWorkbook::from_reader(Cursor::new(fixture())).unwrap();
+        let lineage = workbook.source_backed_package().source_lineage();
+        assert_eq!(
+            workbook.source_backed_package().source_version().unwrap(),
+            workbook.source_version().unwrap()
+        );
+        let selected = workbook.sheet(0_usize).unwrap().expect("first sheet");
+
+        // A selected worksheet handle and a workbook clone both share the
+        // catalog, so the handoff refuses and returns the workbook intact.
+        let workbook = workbook
+            .try_into_source_backed_package()
+            .err()
+            .expect("a selected worksheet shares the catalog");
+        drop(selected);
+        let clone = workbook.clone();
+        let workbook = workbook
+            .try_into_source_backed_package()
+            .err()
+            .expect("a workbook clone shares the catalog");
+        assert_eq!(clone.len(), workbook.len());
+        drop(clone);
+
+        let package = workbook
+            .try_into_source_backed_package()
+            .ok()
+            .expect("the sole owner recovers its package");
+        // Same lineage token: the very package opened above, not a re-index.
+        assert!(package.source_lineage() == lineage);
+        let editor =
+            crate::tab_state::SourceBackedEditor::from_source_backed_package(package).unwrap();
+        editor
+            .snapshot()
+            .expect("a per-feature editor adopts the recovered package");
     }
 }
