@@ -371,3 +371,38 @@
   - Python 132;
   - the boundary and non-iWork gates and their tests, and the perf policy and CRUD index tests.
 - Note: `tools.test_perf_baseline_source_policy` and `tools.test_crud_coverage_index` read top-level files under `docs/performance/results/`, which the sparse worktrees exclude. With `/docs/performance/results/*.json` and `*.md` added to the sparse checkout, both pass on the merged `uo/m0a`.
+
+## S10 — before/after performance gate (`d10dd4c747`, `c475a527df`, `1c00c6cd68`; record `docs/unified-ops/s10-measurement.md`)
+- Verdict: M0a passes the gate on the plan's terms ("blocks the merge until explained or fixed"), not under the raw rule.
+  - 91 of the 99 facade rows pass S1's rule, and all 47 kept predecessors pass (0.87–1.03).
+  - The other 8 are explained by two measured mechanisms. Neither is a cost of M0a's code, and no fix to M0a's code is needed.
+- E1, the first call in a fresh process (7 rows): XLSX open and open lifecycle, both PPTX slide counts, PPTX selected slide, and DOCX eager paragraph count and full text.
+  - These routes time one call in a fresh child, so their result depends on the harness executable.
+  - Standalone probes built from the same sources give the same first-call time at both revisions: XLSX open 187.6 vs 187.9 µs, PPTX `slide_count` 0.54 vs 0.47 µs.
+  - Callgrind shows the same work (XLSX open +0.75% instructions).
+- E2, the RTF sample loop's allocator state (`rtf_file_unified_open`): the untimed projection decides whether the next timed open re-faults about 10 MiB. With malloc trimming off, the unified open is 0.98× the pre-M0a one.
+- The DOCX eager full-text row also carries S8a's paragraph separator (B3, an accepted change), which costs +2.77% instructions on the first call.
+- Budgets: in a fresh process the unified XLSX open costs +8.9 µs over the leaf calls and the DOCX source open +10.0 µs, both within 20 µs. DOCX `list_paragraphs` costs 1.3× the leaf for the `compat` wrappers; M1's node view replaces them.
+- Memory (R5):
+  - DOC (path and bytes) and PPT (bytes) hold +1.01× to +1.94× the input size after open, which is the input plus its CFB index.
+  - Peak memory during open is unchanged, and `retain_source(false)` removes the retention.
+  - Other formats hold +0.6 to +4.3 KB more.
+- Harness fix: the DOCX leaf full-text leg now pairs with `File::text`'s separator (`d10dd4c747`), and an oracle test pins it (`c475a527df`).
+- Owner decisions (record §9):
+  - F1: accept E1, or give fresh-child routes a warm-up call, or gate first calls with standalone binaries.
+  - F2: accept E2, or fix the malloc tunables, or add bare-loop variants.
+  - S10 recommends accepting both.
+- Follow-ups:
+  - F3: drop S1's whole-child RSS tripwire; it measures the `git` child the harness runs, not the harness.
+  - F6: keep future captures off the shared tmpfs.
+- Merged into `uo/m0a` (`80f2642b01`). Coordinator fix (`31d6b31d2f`): the oracle test wrote under `std::env::temp_dir()`, which the source policy forbids in the unified-ops modules. It now writes under `filesystem::scratch_root`.
+
+## Landing
+- Base (DOCX section commit-target reuse, perf records) merged into trunk (`08c26f7f3d`), then trunk into `uo/m0a` (`4e16969ffd`), with no conflicts.
+- Gates on the merged `uo/m0a`:
+  - clippy: litchi-docx, ops, the facade, litchi-py and the harness;
+  - tests: litchi-docx (2040), litchi-ops (445), the facade targets, Python and the harness (633);
+  - rustdoc (litchi, ops; all features);
+  - the boundary and non-iWork gates and their tests, and the perf policy and CRUD index tests.
+- Workspace fmt fails only on the base's iwa-archive and soapberry-zip, as before.
+- The OfficeCLI delta table is an M1 tool and is not on `uo/m0a`.
