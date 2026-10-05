@@ -436,6 +436,13 @@ impl Patch {
 
     /// Apply this patch atomically after checking the complete slide source.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.

@@ -639,6 +639,12 @@ impl Package {
 
     /// Publish a committed change-tracking edit atomically.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error when the selected slide no longer exactly matches the
@@ -659,6 +665,12 @@ impl Package {
     }
 
     /// Apply an exact-source reversible change-tracking patch atomically.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -712,6 +724,12 @@ impl Package {
     /// and related payloads retained by the graph are never interpreted or
     /// activated.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error when the source graph is stale, malformed, encrypted
@@ -728,6 +746,12 @@ impl Package {
     }
 
     /// Publish a committed source-checked notes edit atomically.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -747,6 +771,12 @@ impl Package {
     }
 
     /// Publish a reversible source-checked notes patch atomically.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -771,6 +801,12 @@ impl Package {
     /// the removed Notes Slide are collected only when package-wide inbound
     /// edge validation proves exclusive ownership.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error for a missing, ambiguous, or out-of-range selector,
@@ -790,6 +826,12 @@ impl Package {
     }
 
     /// Remove notes from every slide while retaining shared notes resources.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -822,6 +864,12 @@ impl Package {
     /// This is the explicit, inert font-resource API. It remains independent
     /// from the optional system-font discovery policy used at managed save.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -830,6 +878,12 @@ impl Package {
     }
 
     /// Remove all presentation-owned embedded fonts and orphaned resources.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -899,6 +953,12 @@ impl Package {
     /// The list is moved into the package transaction and the staged owner
     /// relationship and part are published together.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -916,6 +976,12 @@ impl Package {
     ///
     /// Removal is idempotent and only collects an orphaned tag part after the
     /// package-wide inbound-edge check succeeds.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -960,6 +1026,12 @@ impl Package {
 
     /// Create or replace Designer tags on one stable slide ID atomically.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -976,6 +1048,12 @@ impl Package {
     }
 
     /// Create or replace slide-ID Designer tags under explicit bounds.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1001,6 +1079,12 @@ impl Package {
 
     /// Remove Designer tags from one stable slide ID atomically.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1015,6 +1099,12 @@ impl Package {
     }
 
     /// Remove slide-ID Designer tags under explicit resource bounds.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1054,6 +1144,12 @@ impl Package {
 
     /// Replace the document-level math defaults transactionally.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1066,6 +1162,12 @@ impl Package {
     }
 
     /// Remove the document-level math defaults transactionally.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1240,6 +1342,12 @@ impl Package {
 
     /// Replace one slide's zoom owner transactionally.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1254,6 +1362,12 @@ impl Package {
     }
 
     /// Remove all zoom metadata from one slide while retaining its other XML.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1285,6 +1399,12 @@ impl Package {
 
     /// Create or replace one semantic shape's programmable-tag list.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1300,6 +1420,12 @@ impl Package {
     }
 
     /// Remove one semantic shape's programmable-tag list.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1334,6 +1460,12 @@ impl Package {
     /// Create or replace one semantic shape's typed classification outcome
     /// transactionally while retaining unrelated extension markup.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1352,6 +1484,12 @@ impl Package {
 
     /// Remove one semantic shape's typed classification element
     /// transactionally. Unknown extension entries remain intact.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1386,6 +1524,12 @@ impl Package {
     /// Create or replace one shape's typed `p15:designElem` boolean
     /// transactionally while retaining unrelated extension entries.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1401,6 +1545,12 @@ impl Package {
     }
 
     /// Remove one shape's typed `p15:designElem` value transactionally.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1450,6 +1600,12 @@ impl Package {
 
     /// Create or replace one shape's Designer drawing properties atomically.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1470,6 +1626,12 @@ impl Package {
     }
 
     /// Create or replace shape Designer properties under explicit bounds.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1500,6 +1662,12 @@ impl Package {
 
     /// Remove one shape's Designer drawing properties atomically.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1519,6 +1687,12 @@ impl Package {
     }
 
     /// Remove shape Designer properties under explicit resource bounds.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1577,6 +1751,12 @@ impl Package {
 
     /// Replace one existing model3d owner transactionally.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1594,6 +1774,12 @@ impl Package {
     }
 
     /// Remove one model3d owner and collect unreachable binary resources.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1622,6 +1808,12 @@ impl Package {
 
     /// Create or replace the presentation's table-style catalog atomically.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1630,6 +1822,12 @@ impl Package {
     }
 
     /// Remove the presentation's optional table-style catalog atomically.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1640,6 +1838,12 @@ impl Package {
 
     /// Add a slide master and update the `PresentationML` relationship graph.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1648,6 +1852,12 @@ impl Package {
     }
 
     /// Add a layout to an existing master and update both sides of the graph.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1677,6 +1887,12 @@ impl Package {
     }
 
     /// Add or update one slide, master, or layout placeholder shape.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
     ///
     /// # Errors
     ///
@@ -1810,6 +2026,12 @@ impl Package {
 
     /// Remove an unreferenced layout and its owning relationship.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`]. An exact no-op keeps the
+    /// signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1855,12 +2077,15 @@ impl Package {
     ///
     /// Every signature relationship and signature part is removed, and the
     /// resulting unsigned graph is authorized for publication
-    /// ([`OpcPackage::unsign`]). A changed opened-presentation commit refuses
-    /// a signed package ([`crate::opened::Transaction::commit`]), because the
-    /// change invalidates every signature: call this before starting the
-    /// transaction to edit one. A signed package that is saved unchanged keeps
-    /// its signature byte for byte without it. A package that carries no
-    /// signature, and no signature-policy requirement, is left untouched.
+    /// ([`OpcPackage::unsign`]). A changed edit refuses a signed package,
+    /// because the change invalidates every signature: a changed
+    /// opened-presentation commit ([`crate::opened::Transaction::commit`]),
+    /// the package-level edit families of this crate (their methods on this
+    /// facade and their functions on an [`OpcPackage`]), and a changed
+    /// [`Self::edit_opc`]. Call this first to edit one. A signed package that
+    /// is saved unchanged, or edited by an exact no-op, keeps its signature
+    /// byte for byte. A package that carries no signature, and no
+    /// signature-policy requirement, is left untouched.
     ///
     /// ```
     /// use litchi_pptx::Package;
@@ -1896,9 +2121,20 @@ impl Package {
     /// choosing this raw escape hatch explicitly declassifies the package. A
     /// successful edit clears provenance; a failed edit preserves it.
     ///
+    /// Signature state is preserved (ADR 0006). A closure that changes a
+    /// signed package must remove the signature explicitly with
+    /// [`OpcPackage::unsign`], or the caller calls [`Self::unsign`] before
+    /// the edit; deleting signature parts alone does not authorize the change
+    /// of a signature the package was opened with. The package-level edit
+    /// families refuse a signed package themselves. A closure that changes
+    /// nothing keeps the signature byte for byte.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
+    /// Returns the closure's error, and [`Error::Opc`] with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// for a changed signed package that still carries its signature; the
+    /// graph is rolled back either way.
     pub fn edit_opc<T>(
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
@@ -1909,11 +2145,17 @@ impl Package {
                 .then(|| litchi_opc::PackageWriter::to_bytes(opc))
                 .transpose()?;
             let value = operation(opc)?;
-            if let Some(source) = signed_source {
-                let candidate = litchi_opc::PackageWriter::to_bytes(opc)?;
-                if candidate != source {
-                    opc.unsign();
-                }
+            // Unless the closure removed the signature explicitly, it must
+            // have changed nothing: a signed candidate that publishes other
+            // bytes is refused, and one the writer refuses to publish (a
+            // changed signed source) is refused with the writer's error.
+            if let Some(source) = signed_source
+                && crate::package::signature::requires_disposition(opc)
+                && litchi_opc::PackageWriter::to_bytes(opc)? != source
+            {
+                return Err(Error::Opc(
+                    litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+                ));
             }
             Ok(value)
         })?;

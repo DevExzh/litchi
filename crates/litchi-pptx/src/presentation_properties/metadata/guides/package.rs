@@ -7,6 +7,7 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::model::Guides;
 use super::transaction::{Commit, Patch, Snapshot};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 /// Read the typed extended-guide value from the package's main presentation.
@@ -35,6 +36,13 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 
 /// Replace the typed guide value while preserving unrelated presentation XML.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
@@ -47,6 +55,13 @@ pub fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
 }
 
 /// Remove both guide lists and return their previous typed value.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -61,6 +76,13 @@ pub fn remove(package: &mut OpcPackage) -> Result<Guides> {
 }
 
 /// Apply a committed guide patch atomically after a complete source check.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -82,6 +104,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     }
     let presentation_name =
         PackURI::new(patch.before().presentation_part_name()).map_err(Error::Uri)?;
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     candidate
         .get_part_mut(&presentation_name)?
@@ -92,12 +115,19 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
             "published extended-guide source differs from the commit",
         ));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(result)
 }
 
 /// Apply a committed edit and return its validated post-publication snapshot.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///

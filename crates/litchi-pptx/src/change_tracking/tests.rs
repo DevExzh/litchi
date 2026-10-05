@@ -174,9 +174,32 @@ fn facade_publishes_and_reverses_exact_source_checked_commit() {
     let stale_commit = stale_edit.commit().unwrap();
     let mut current = package.change_tracking(0_usize).unwrap().edit();
     current.set_creation_id(100_u32);
-    package
-        .apply_change_tracking_commit(current.commit().unwrap())
-        .unwrap();
+    let current = current.commit().unwrap();
+    // A changed commit refuses the signed package (ADR 0006) and leaves it
+    // untouched; it is published after the signature is removed explicitly.
+    let signed = package.change_tracking(0_usize).unwrap();
+    assert!(matches!(
+        package.apply_change_tracking_commit(current.clone()),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.opc.is_signed());
+    assert_eq!(
+        package.change_tracking(0_usize).unwrap().state(),
+        signed.state()
+    );
+    package.unsign().unwrap();
+    package.apply_change_tracking_commit(current).unwrap();
+    assert!(!package.opc.is_signed());
+    assert_eq!(
+        package
+            .change_tracking(0_usize)
+            .unwrap()
+            .state()
+            .creation_id(),
+        Some(Id::new(100))
+    );
     assert!(package.apply_change_tracking_commit(stale_commit).is_err());
 }
 

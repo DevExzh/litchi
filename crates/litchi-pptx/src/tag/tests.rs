@@ -450,6 +450,16 @@ fn mark_signed(package: &mut OpcPackage) {
     assert!(package.is_signed());
 }
 
+/// A changed edit of a signed package is refused (ADR 0006).
+fn is_signature_refusal<T>(result: &Result<T>) -> bool {
+    matches!(
+        result,
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    )
+}
+
 #[test]
 fn anchored_crud_is_strict_profiled_and_signature_safe() {
     use std::sync::Arc;
@@ -511,6 +521,21 @@ fn anchored_crud_is_strict_profiled_and_signature_safe() {
         &package.get_part(created.part()).unwrap().blob_arc()
     ));
 
+    assert!(is_signature_refusal(&put(
+        &mut package,
+        &owner,
+        list("Reviewer", "Bob")
+    )));
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &owner_before,
+        &package.get_part(&owner).unwrap().blob_arc()
+    ));
+    assert!(Arc::ptr_eq(
+        &part_before,
+        &package.get_part(created.part()).unwrap().blob_arc()
+    ));
+    package.unsign();
     let old = put(&mut package, &owner, list("Reviewer", "Bob"))
         .unwrap()
         .unwrap();
@@ -528,6 +553,10 @@ fn anchored_crud_is_strict_profiled_and_signature_safe() {
     );
 
     mark_signed(&mut package);
+    assert!(is_signature_refusal(&remove(&mut package, &owner)));
+    assert!(package.is_signed());
+    assert!(package.get_part(created.part()).is_ok());
+    package.unsign();
     let removed = remove(&mut package, &owner).unwrap().unwrap();
     assert_eq!(removed.get("reviewer").unwrap().value(), "Bob");
     assert!(!package.is_signed());
@@ -870,6 +899,13 @@ fn direct_owner_mutates_active_mce_fallback_and_preserves_inactive_source() {
 
     let before = package.get_part(&owner).unwrap().blob_arc();
     mark_signed(&mut package);
+    assert!(is_signature_refusal(&put(
+        &mut package,
+        &owner,
+        list("Reviewer", "Ada")
+    )));
+    assert!(package.is_signed());
+    package.unsign();
     let old = put(&mut package, &owner, list("Reviewer", "Ada"))
         .unwrap()
         .unwrap();
@@ -891,6 +927,9 @@ fn direct_owner_mutates_active_mce_fallback_and_preserves_inactive_source() {
     ));
 
     mark_signed(&mut package);
+    assert!(is_signature_refusal(&remove(&mut package, &owner)));
+    assert!(package.is_signed());
+    package.unsign();
     let removed = remove(&mut package, &owner).unwrap().unwrap();
     assert_eq!(removed.get("reviewer").unwrap().value(), "Ada");
     assert!(!package.is_signed());

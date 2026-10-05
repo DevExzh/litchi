@@ -8,6 +8,7 @@ use super::{
     MAX_SLIDE_XML, MAX_THEME_XML, MAX_TOTAL_BYTES, SLIDE_CT, THEME_CT, allocation, checked_add,
     invalid, limit, own_blob,
 };
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 #[cfg(test)]
 use litchi_opc::TargetMode;
@@ -373,6 +374,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
     if patch.is_empty() {
         return Ok(current);
     }
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     for part in &patch.after().parts {
         let target = candidate.get_part_mut(&part.name)?;
@@ -400,7 +402,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
     if !resulting.same_source(patch.after()) {
         return Err(invalid("published notes graph differs from the commit"));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(resulting)
 }
@@ -1168,8 +1170,10 @@ fn apply_notes_removals(
         package.get_part(descendant)?;
     }
 
-    // Every operation below is infallible after validation and staging. Exact
-    // stored part names avoid the case-insensitive lookup/exact-removal trap.
+    // Every mutation below is infallible after validation, staging and the
+    // signature refusal. Exact stored part names avoid the case-insensitive
+    // lookup/exact-removal trap.
+    refuse_signed_change(package)?;
     for staged in staged_slides {
         package.add_part(staged);
     }
@@ -1179,7 +1183,7 @@ fn apply_notes_removals(
     for descendant in descendants {
         package.remove_part(descendant);
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(removals.len())
 }
 
@@ -1381,8 +1385,10 @@ pub(crate) fn put_changed(
         return Err(invalid("notes graph contains an unknown slide owner"));
     }
 
-    // Commit is infallible after all URI, graph, allocation, and relationship
-    // checks succeed. Owned payload buffers move into their canonical parts.
+    // Commit is infallible after all URI, graph, allocation, relationship and
+    // signature checks succeed. Owned payload buffers move into their
+    // canonical parts.
+    refuse_signed_change(package)?;
     package.add_part(Box::new(theme_part));
     package.add_part(Box::new(master_part));
     for part in note_parts {
@@ -1392,7 +1398,7 @@ pub(crate) fn put_changed(
     for slide in staged_slides {
         package.add_part(slide);
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
 }
 

@@ -293,6 +293,20 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
         &package.get_part(&owner).expect("owner").blob_arc()
     ));
 
+    // Removing the attachment refuses the signed package (ADR 0006) and
+    // leaves it untouched until the signature is removed explicitly.
+    assert!(matches!(
+        remove(&mut package, &owner, "Title"),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &owner_before,
+        &package.get_part(&owner).expect("owner").blob_arc()
+    ));
+    package.unsign();
     let removed = remove(&mut package, &owner, "Title")
         .expect("remove")
         .expect("old list");

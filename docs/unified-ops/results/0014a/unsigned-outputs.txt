@@ -1,0 +1,145 @@
+UNSIGNED | hello-world-signed.pptx: legacy comments | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: legacy comments no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: legacy comments change | result=Ok(()) | output=31241:ac1b5b5689f0ae36
+UNSIGNED | hello-world-signed.pptx: modern comments | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: modern comments no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: modern comments change | result=Ok(()) | output=31317:0d284748d025633b
+UNSIGNED | hello-world-signed.pptx: notes | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: notes no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide tags | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide tags no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide tags change | result=Ok(()) | output=31497:f13264a9a4e1a3b4
+UNSIGNED | hello-world-signed.pptx: shape tags | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: shape tags no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: shape tags change | result=Ok(()) | output=31500:c50c62430a9e08fb
+UNSIGNED | hello-world-signed.pptx: change tracking | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: change tracking no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: change tracking change | result=Ok(()) | output=31258:bbc00f55507e1228
+UNSIGNED | hello-world-signed.pptx: shape classification | source=31184:989598ef795ebedf
+UNSIGNED | hello-world-signed.pptx: shape classification no-op | result=Ok(()) | output=31184:989598ef795ebedf
+UNSIGNED | hello-world-signed.pptx: shape classification change | result=Ok(()) | output=31297:1b548174b9b048e4
+UNSIGNED | hello-world-signed.pptx: shape design element | source=31184:989598ef795ebedf
+UNSIGNED | hello-world-signed.pptx: shape design element no-op | result=Ok(()) | output=31184:989598ef795ebedf
+UNSIGNED | hello-world-signed.pptx: shape design element change | result=Ok(()) | output=31293:9dc82dce79cc0637
+UNSIGNED | hello-world-signed.pptx: shape Designer properties | source=31184:989598ef795ebedf
+UNSIGNED | hello-world-signed.pptx: shape Designer properties no-op | result=Ok(()) | output=31184:989598ef795ebedf
+UNSIGNED | hello-world-signed.pptx: shape Designer properties change | result=Ok(()) | output=31299:11386b61373ce1d8
+UNSIGNED | hello-world-signed.pptx: zoom and model3d owners | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: zoom and model3d owners no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: themes | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: themes no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: themes change | result=Ok(()) | output=32325:f55b44f37fc1c854
+UNSIGNED | hello-world-signed.pptx: math properties | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: math properties no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: math properties change | result=Ok(()) | output=31292:810ed8e7c5fe6658
+UNSIGNED | hello-world-signed.pptx: presentation structure (sections) | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: presentation structure (sections) no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: presentation structure (sections) change | result=Ok(()) | output=31275:33c55dca93818d01
+UNSIGNED | hello-world-signed.pptx: custom shows | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: custom shows no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: custom shows change | result=Ok(()) | output=31190:a01c31a505e3bd57
+UNSIGNED | hello-world-signed.pptx: slide-show events | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide-show events no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide-show events change | result=Ok(()) | output=31272:c31529ad3adaf022
+UNSIGNED | hello-world-signed.pptx: extended guides | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: extended guides no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide Designer tags | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide Designer tags no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide Designer tags change | result=Ok(()) | output=31264:e4b4384092cf586a
+UNSIGNED | hello-world-signed.pptx: Changes Information | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: Changes Information no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: Changes Information change | result=Ok(()) | output=31418:e2e8a1c9b5786c69
+UNSIGNED | hello-world-signed.pptx: embedded OLE objects | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: embedded OLE objects no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: embedded OLE objects change | result=Ok(()) | output=31496:93e153a8769c1061
+UNSIGNED | hello-world-signed.pptx: embedded fonts | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: embedded fonts no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: embedded fonts change | result=Ok(()) | output=31150:10225101ea9af053
+UNSIGNED | hello-world-signed.pptx: table styles | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: table styles no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: table styles change | result=Ok(()) | output=31160:6a60c89b3fda42af
+UNSIGNED | hello-world-signed.pptx: slide masters, layouts and placeholders | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide masters, layouts and placeholders no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: slide masters, layouts and placeholders change | result=Ok(()) | output=32153:3972b2d530727358
+UNSIGNED | hello-world-signed.pptx: charts | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: charts change | result=Ok(()) | output=32061:ccf4a996400ea62b
+UNSIGNED | hello-world-signed.pptx: Package::edit_opc | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: Package::edit_opc no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: Package::edit_opc change | result=Ok(()) | output=31150:d8f435196f12a75d
+UNSIGNED | hello-world-signed.pptx: opened-presentation transaction | source=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: opened-presentation transaction no-op | result=Ok(()) | output=31151:bb72fb8d656066ab
+UNSIGNED | hello-world-signed.pptx: opened-presentation transaction change | result=Ok(()) | output=31241:ac1b5b5689f0ae36
+UNSIGNED | ms-office-2010-signed.pptx: legacy comments | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: legacy comments no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: legacy comments change | result=Ok(()) | output=33773:21df9184b28a2038
+UNSIGNED | ms-office-2010-signed.pptx: modern comments | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: modern comments no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: modern comments change | result=Ok(()) | output=33849:330a80de49cb3f20
+UNSIGNED | ms-office-2010-signed.pptx: notes | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: notes no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide tags | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide tags no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide tags change | result=Ok(()) | output=34022:31bd3b1822eda144
+UNSIGNED | ms-office-2010-signed.pptx: shape tags | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: shape tags no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: shape tags change | result=Ok(()) | output=34027:70f021316b043df8
+UNSIGNED | ms-office-2010-signed.pptx: change tracking | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: change tracking no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: change tracking change | result=Ok(()) | output=33672:4fbd4d068d253eae
+UNSIGNED | ms-office-2010-signed.pptx: shape classification | source=33710:dc8d17349c56f30f
+UNSIGNED | ms-office-2010-signed.pptx: shape classification no-op | result=Ok(()) | output=33710:dc8d17349c56f30f
+UNSIGNED | ms-office-2010-signed.pptx: shape classification change | result=Ok(()) | output=33780:8500079a1dddd493
+UNSIGNED | ms-office-2010-signed.pptx: shape design element | source=33710:dc8d17349c56f30f
+UNSIGNED | ms-office-2010-signed.pptx: shape design element no-op | result=Ok(()) | output=33710:dc8d17349c56f30f
+UNSIGNED | ms-office-2010-signed.pptx: shape design element change | result=Ok(()) | output=33776:c05017a8da6edf9c
+UNSIGNED | ms-office-2010-signed.pptx: shape Designer properties | source=33710:dc8d17349c56f30f
+UNSIGNED | ms-office-2010-signed.pptx: shape Designer properties no-op | result=Ok(()) | output=33710:dc8d17349c56f30f
+UNSIGNED | ms-office-2010-signed.pptx: shape Designer properties change | result=Ok(()) | output=33789:9abd11d84ef5c37b
+UNSIGNED | ms-office-2010-signed.pptx: zoom and model3d owners | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: zoom and model3d owners no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: themes | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: themes no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: themes change | result=Ok(()) | output=34868:200cd2892b7589f3
+UNSIGNED | ms-office-2010-signed.pptx: math properties | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: math properties no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: math properties change | result=Ok(()) | output=33772:acac8070a101010e
+UNSIGNED | ms-office-2010-signed.pptx: presentation structure (sections) | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: presentation structure (sections) no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: presentation structure (sections) change | result=Ok(()) | output=33807:0d8d319345622c84
+UNSIGNED | ms-office-2010-signed.pptx: custom shows | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: custom shows no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: custom shows change | result=Ok(()) | output=33722:b0194b552c4e5205
+UNSIGNED | ms-office-2010-signed.pptx: slide-show events | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide-show events no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide-show events change | result=Ok(()) | output=33758:becd1cb5d44e0345
+UNSIGNED | ms-office-2010-signed.pptx: extended guides | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: extended guides no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide Designer tags | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide Designer tags no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide Designer tags change | result=Ok(()) | output=33797:ff1bb8ebe1ce4251
+UNSIGNED | ms-office-2010-signed.pptx: Changes Information | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: Changes Information no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: Changes Information change | result=Ok(()) | output=33950:1564e596197e7cb1
+UNSIGNED | ms-office-2010-signed.pptx: embedded OLE objects | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: embedded OLE objects no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: embedded OLE objects change | result=Ok(()) | output=34023:ca42d79337011b91
+UNSIGNED | ms-office-2010-signed.pptx: embedded fonts | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: embedded fonts no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: embedded fonts change | result=Ok(()) | output=33682:990331407e04f1d5
+UNSIGNED | ms-office-2010-signed.pptx: table styles | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: table styles no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: table styles change | result=Ok(()) | output=33692:d57bb82e6207837c
+UNSIGNED | ms-office-2010-signed.pptx: slide masters, layouts and placeholders | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide masters, layouts and placeholders no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: slide masters, layouts and placeholders change | result=Ok(()) | output=34685:f89ef32cb44a8ee3
+UNSIGNED | ms-office-2010-signed.pptx: charts | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: charts change | result=Ok(()) | output=34593:55926b726af26a3c
+UNSIGNED | ms-office-2010-signed.pptx: Package::edit_opc | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: Package::edit_opc no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: Package::edit_opc change | result=Ok(()) | output=33679:830fa60395b33b0f
+UNSIGNED | ms-office-2010-signed.pptx: opened-presentation transaction | source=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: opened-presentation transaction no-op | result=Ok(()) | output=33683:06d7f2c7f831c954
+UNSIGNED | ms-office-2010-signed.pptx: opened-presentation transaction change | result=Ok(()) | output=33773:21df9184b28a2038
+UNSIGNED | legacy c base=31644:66d493918cb915e9
+UNSIGNED | legacy c no-ops | result=Ok(()) | output=31644:66d493918cb915e9
+UNSIGNED | legacy c change | result=Ok(()) | output=31645:317ddf0aa7ae8ad8

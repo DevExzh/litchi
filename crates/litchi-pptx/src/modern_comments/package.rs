@@ -16,6 +16,7 @@ mod comments {
         MODERN_COMMENT_RELATIONSHIP_TYPE, OpcPackage, PackURI, Part, Reply, Result,
         SLIDE_CONTENT_TYPE, load_modern_comment_authors, validate_modern_comment_author_references,
     };
+    use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 
     fn invalid(message: impl Into<String>) -> Error {
         Error::Invalid(message.into())
@@ -191,6 +192,13 @@ mod comments {
 
     /// Add a modern comment to a slide, creating a collision-safe part when necessary.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -230,6 +238,7 @@ mod comments {
         validate_modern_comment_graph_for_mutation(package, &parts)?;
         let xml = staged.comments.to_xml()?;
         List::parse(&xml)?;
+        refuse_signed_change(package)?;
         package.try_add_part(Box::new(BlobPart::new(
             part_name.clone(),
             MODERN_COMMENT_CONTENT_TYPE.into(),
@@ -244,11 +253,18 @@ mod comments {
                 relationship_id,
                 false,
             );
-        package.unsign();
+        settle_unsigned_change(package)?;
         Ok(staged)
     }
 
     /// Update a modern comment without permitting its stable GUID to change.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -307,6 +323,13 @@ mod comments {
 
     /// Replace a modern comment without permitting its stable GUID to change.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -325,6 +348,13 @@ mod comments {
     }
 
     /// Remove a modern comment and remove an empty per-slide part unless another owner shares it.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -359,6 +389,7 @@ mod comments {
         let removed = parts.remove(part_index);
         validate_modern_comment_graph_for_mutation(package, &parts)?;
         let part_name = PackURI::new(&removed.part_name).map_err(invalid)?;
+        refuse_signed_change(package)?;
         package
             .get_part_mut(slide_part_name)?
             .rels_mut()
@@ -366,11 +397,18 @@ mod comments {
         if !modern_comment_part_is_referenced(package, &part_name) {
             package.remove_part(&part_name);
         }
-        package.unsign();
+        settle_unsigned_change(package)?;
         Ok(true)
     }
 
     /// Reorder every modern comment in one slide part by a complete GUID list.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -438,6 +476,13 @@ mod comments {
 
     /// Add a reply to a modern comment thread.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -461,6 +506,13 @@ mod comments {
     }
 
     /// Update a reply without permitting its stable GUID to change.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -517,6 +569,13 @@ mod comments {
     /// Transactionally update one comment's typed task/reaction extension
     /// envelope while retaining all opaque extension entries.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -572,6 +631,13 @@ mod comments {
 
     /// Transactionally update one reply's typed reaction extension envelope.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -609,6 +675,13 @@ mod comments {
 
     /// Replace a reply without permitting its stable GUID to change.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -634,6 +707,13 @@ mod comments {
     }
 
     /// Remove a reply from a modern comment thread.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -670,8 +750,14 @@ mod comments {
         let xml = staged.comments.to_xml()?;
         List::parse(&xml)?;
         let part_name = PackURI::new(&staged.part_name).map_err(invalid)?;
+        // A list that serializes to the stored bytes publishes nothing, so an
+        // exact no-op keeps a signed package byte for byte.
+        if package.get_part(&part_name)?.blob() == xml.as_slice() {
+            return Ok(());
+        }
+        refuse_signed_change(package)?;
         package.get_part_mut(&part_name)?.set_blob(xml);
-        package.unsign();
+        settle_unsigned_change(package)?;
         Ok(())
     }
 
@@ -791,6 +877,7 @@ mod authors {
         MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE, OpcPackage,
         PackURI, Part, Result, load_modern_comments,
     };
+    use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 
     /// # Errors
     ///
@@ -1063,6 +1150,13 @@ mod authors {
 
     /// Add a modern comment author, allocating a collision-safe part and relationship if needed.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1103,6 +1197,7 @@ mod authors {
         validate_modern_comment_author_references(Some(&part), &graph.comments)?;
         let xml = part.authors.to_xml()?;
         Authors::parse(&xml)?;
+        refuse_signed_change(package)?;
         package.try_add_part(Box::new(BlobPart::new(
             part_name.clone(),
             MODERN_COMMENT_AUTHOR_CONTENT_TYPE.into(),
@@ -1117,11 +1212,18 @@ mod authors {
                 relationship_id,
                 false,
             );
-        package.unsign();
+        settle_unsigned_change(package)?;
         Ok(part)
     }
 
     /// Update a modern comment author while keeping its stable GUID unchanged.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -1156,6 +1258,13 @@ mod authors {
 
     /// Replace a modern comment author while keeping its stable GUID unchanged.
     ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -1171,6 +1280,13 @@ mod authors {
     }
 
     /// Remove an unreferenced modern comment author.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -1201,6 +1317,7 @@ mod authors {
 
         let presentation_name = package.main_document_part()?.partname().clone();
         let part_name = PackURI::new(&part.part_name).map_err(invalid)?;
+        refuse_signed_change(package)?;
         package
             .get_part_mut(&presentation_name)?
             .rels_mut()
@@ -1208,11 +1325,18 @@ mod authors {
         if !modern_author_part_is_referenced(package, &part_name) {
             package.remove_part(&part_name);
         }
-        package.unsign();
+        settle_unsigned_change(package)?;
         Ok(true)
     }
 
     /// Reorder modern comment authors by a complete, duplicate-free GUID list.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
@@ -1263,8 +1387,14 @@ mod authors {
         let xml = part.authors.to_xml()?;
         Authors::parse(&xml)?;
         let part_name = PackURI::new(&part.part_name).map_err(invalid)?;
+        // Authors that serialize to the stored bytes publish nothing, so an
+        // exact no-op keeps a signed package byte for byte.
+        if package.get_part(&part_name)?.blob() == xml.as_slice() {
+            return Ok(());
+        }
+        refuse_signed_change(package)?;
         package.get_part_mut(&part_name)?.set_blob(xml);
-        package.unsign();
+        settle_unsigned_change(package)?;
         Ok(())
     }
 

@@ -15,6 +15,7 @@ use super::validation::{
     presentation_later, resolve_anchor, validate_relative_target, validate_selected_relationship,
     xml_position,
 };
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{
     Capabilities, Limits, OffsetLimits, active_offsets, process_markup_compatibility,
@@ -130,6 +131,13 @@ pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
 /// byte-identical replacement is a signature-preserving no-op. The returned
 /// value is the previous list, or `None` when a new attachment was created.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -205,6 +213,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
             (attached.source.relationship_id.clone(), None)
         };
 
+        refuse_signed_change(package)?;
         {
             let owner = package.get_part_mut(&owner_name)?;
             validate_selected_relationship(
@@ -232,7 +241,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
             }
         }
         package.add_part(Box::new(XmlPart::new(part_name, CONTENT_TYPE.into(), xml)));
-        package.unsign();
+        settle_unsigned_change(package)?;
         return Ok(Some(attached.source.into_list()));
     }
 
@@ -253,6 +262,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
         (relationship_id, part_name, target_ref, owner_xml)
     };
     package.validate_new_part_name(&part_name)?;
+    refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
         let current = scan_owner_source(owner.blob(), owner.content_type())?;
@@ -268,7 +278,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
         );
     }
     package.add_part(Box::new(XmlPart::new(part_name, CONTENT_TYPE.into(), xml)));
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(None)
 }
 
@@ -278,6 +288,13 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
 /// Other customer-data children remain byte-for-byte intact; a customer-data
 /// container is removed only when the tag anchor was its sole content. The tag
 /// part is collected only when no other package edge retains it.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -316,6 +333,7 @@ pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>>
         )
     };
 
+    refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
         let current = scan_owner_source(owner.blob(), owner.content_type())?;
@@ -338,7 +356,7 @@ pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>>
     if orphan {
         let _ = package.remove_part(attached.source.part());
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(attached.source.into_list()))
 }
 

@@ -7,6 +7,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use super::codec;
 use super::model::Part as ChangesPart;
 use super::transaction::{Commit, Patch, Snapshot};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 /// Read the unique Changes Information part after validating its OPC graph.
@@ -20,16 +21,24 @@ pub fn load(package: &OpcPackage) -> Result<Option<ChangesPart>> {
 
 /// Add a new Changes Information owner atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()> {
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     codec::store(&mut candidate, value)?;
     if codec::load(&candidate)?.is_none() {
         return Err(invalid("stored Changes Information part cannot be read"));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(())
 }
@@ -65,6 +74,13 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 
 /// Apply an already committed Changes Information patch atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -73,6 +89,13 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed Changes Information edit atomically.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -87,6 +110,13 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 
 /// Remove the Changes Information owner and its Presentation relationship.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -95,6 +125,7 @@ pub fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
     let Some(value) = codec::load(&candidate)? else {
         return Ok(None);
     };
+    refuse_signed_change(package)?;
     let presentation_name = candidate.main_document_part()?.partname().clone();
     let target = PackURI::new(&value.part_name).map_err(Error::Uri)?;
     let actual_target = candidate
@@ -124,7 +155,7 @@ pub fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
     if codec::load(&candidate)?.is_some() {
         return Err(invalid("Changes Information removal left an owner behind"));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(Some(value))
 }
@@ -142,6 +173,7 @@ pub(crate) fn replace_snapshot(package: &mut OpcPackage, after: &Snapshot) -> Re
         ));
     }
     let target = PackURI::new(after.part_name()).map_err(Error::Uri)?;
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     candidate
         .get_part_mut(&target)?
@@ -153,7 +185,7 @@ pub(crate) fn replace_snapshot(package: &mut OpcPackage, after: &Snapshot) -> Re
             "published Changes Information source differs from the commit",
         ));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(resulting)
 }

@@ -6,6 +6,7 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec;
 use super::model::Chart;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::parts::{is_relationship_type, validate_content_type};
 use crate::{Error, Result};
 
@@ -70,6 +71,13 @@ pub fn related<'a>(package: &'a OpcPackage, source: &dyn OpcPart) -> Result<Vec<
 
 /// Add a chart part and relationship to an existing source part.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -80,6 +88,7 @@ pub fn add(package: &mut OpcPackage, source_name: &str, chart: &Chart) -> Result
     let target = next_uri(package)?;
     let target_ref = target.relative_ref(source_uri.base_uri());
     let xml = codec::encode(chart)?.into_bytes();
+    refuse_signed_change(package)?;
     package.add_part(Box::new(BlobPart::new(
         target.clone(),
         CONTENT_TYPE.to_owned(),
@@ -88,7 +97,7 @@ pub fn add(package: &mut OpcPackage, source_name: &str, chart: &Chart) -> Result
     let relationship_id = package
         .get_part_mut(&source_uri)?
         .relate_to(&target_ref, rt::CHART);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(relationship_id)
 }
 

@@ -16,6 +16,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{DrawingProperties, Limits, P202_NAMESPACE, PROPERTIES_EXTENSION_URI};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -273,7 +274,10 @@ pub(crate) fn apply_properties(
         ));
     }
 
-    let part = package.get_part_mut(&snapshot.owner)?;
+    // The source is checked before the package is borrowed mutably, so an
+    // exact no-op keeps the exact source, and with it a signature, byte for
+    // byte.
+    let part = package.get_part(&snapshot.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != original {
         return Err(Error::UnsafeEdit {
@@ -284,9 +288,12 @@ pub(crate) fn apply_properties(
     if staged == original {
         return Ok(snapshot);
     }
+    refuse_signed_change(package)?;
     let staged = Arc::new(staged);
-    part.set_blob_shared(Arc::clone(&staged));
-    package.unsign();
+    package
+        .get_part_mut(&snapshot.owner)?
+        .set_blob_shared(Arc::clone(&staged));
+    settle_unsigned_change(package)?;
     Ok(PropertiesSnapshot {
         owner: snapshot.owner,
         source: staged,

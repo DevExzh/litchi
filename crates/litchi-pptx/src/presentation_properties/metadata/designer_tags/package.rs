@@ -8,6 +8,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use super::codec::{self, Located};
 use super::model::{Binding, Snapshot};
 use super::{Commit, Limits, Patch, Tags};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
@@ -78,6 +79,13 @@ pub fn load_snapshot_with_limits(
 
 /// Store a singular tag list atomically and return the previous value.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
@@ -96,6 +104,13 @@ pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Op
 }
 
 /// Remove a singular tag list atomically and return the previous value.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -117,6 +132,13 @@ pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
 
 /// Apply a committed edit atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -129,6 +151,13 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// Reordering sibling `p:sldId` elements is allowed because the source check
 /// is scoped to the selected host. Deletion, rebinding, duplicate identity,
 /// and concurrent edits of that host are refused.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -159,6 +188,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
         current.limits,
     )?;
     let part_name = PackURI::new(&current.presentation_part_name).map_err(Error::Uri)?;
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     candidate
         .get_part_mut(&part_name)?
@@ -176,7 +206,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
             "published Designer-tag candidate differs from the committed host".into(),
         ));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(published)
 }

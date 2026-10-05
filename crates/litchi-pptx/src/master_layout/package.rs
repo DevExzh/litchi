@@ -1,5 +1,6 @@
 //! Package-level authoring and relationship-graph operations.
 
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -90,6 +91,13 @@ pub(crate) fn preflight_add_slide_layout(
 /// slide-master relationship plus a `p:sldMasterId` entry whose ID is one
 /// above the current maximum (starting at [`MIN_MASTER_OR_LAYOUT_ID`]).
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -114,6 +122,7 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
 
     let (theme_target, new_theme) = theme_target_for_new_master(package, master_dir)?;
 
+    refuse_signed_change(package)?;
     let presentation = package.get_part_mut(&presentation_name)?;
     let relationship_id = presentation.relate_to(
         &format!("slideMasters/slideMaster{master_index}.xml"),
@@ -152,7 +161,7 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
     master_part.relate_to(&theme_target, rt::THEME);
     package.add_part(Box::new(master_part));
 
-    invalidate_signatures(package);
+    settle_unsigned_change(package)?;
     validate_master_layout_graph(package)?;
     Ok(AuthoredSlideMaster {
         master_id,
@@ -168,6 +177,13 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
 /// part is written with the given `ST_SlideLayoutType` kind, name, and
 /// optional placeholder shapes, and carries the required relationship back to
 /// its owning master.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -213,6 +229,7 @@ fn add_slide_layout_inner(
         .map_err(|error| Error::Uri(format!("slide layout partname: {error}")))?;
     let layout_xml = layout_xml(kind, name, placeholders)?;
 
+    refuse_signed_change(package)?;
     let master_part = package.get_part_mut(&master_uri)?;
     let relationship_id = master_part.relate_to(
         &format!("../slideLayouts/slideLayout{layout_index}.xml"),
@@ -247,7 +264,7 @@ fn add_slide_layout_inner(
     );
     package.add_part(Box::new(layout_part));
 
-    invalidate_signatures(package);
+    settle_unsigned_change(package)?;
     validate_master_layout_graph(package)?;
     Ok(AuthoredSlideLayout {
         layout_id,
@@ -266,6 +283,13 @@ fn add_slide_layout_inner(
 /// shape is appended to the shape tree with the next free shape ID. The
 /// optional text replaces the placeholder's prompt text.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
@@ -282,6 +306,13 @@ pub fn store_placeholder_shape(
 /// The owning master's `p:sldLayoutIdLst` entry and relationship are removed
 /// together with the layout part itself. Layouts still referenced by a slide,
 /// or not owned by any master, are rejected.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -356,6 +387,7 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI)
 
     let master_xml = package.get_part(&master_uri)?.blob().to_vec();
     let patched = remove_id_list_entry(&master_xml, "sldLayoutId", &relationship_id)?;
+    refuse_signed_change(package)?;
     let master_part = package.get_part_mut(&master_uri)?;
     master_part.set_blob(patched);
     if master_part.rels_mut().remove(&relationship_id).is_none() {
@@ -365,7 +397,7 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI)
     }
     package.remove_part(&layout_uri);
 
-    invalidate_signatures(package);
+    settle_unsigned_change(package)?;
     validate_master_layout_graph(package)?;
     Ok(())
 }
@@ -929,8 +961,4 @@ fn require_placeholders(placeholders: &[PlaceholderSpec]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn invalidate_signatures(package: &mut OpcPackage) {
-    package.unsign();
 }

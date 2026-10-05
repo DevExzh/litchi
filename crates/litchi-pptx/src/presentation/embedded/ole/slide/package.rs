@@ -11,6 +11,7 @@ use super::transaction::{
     Commit, PartSource, Patch, RelationshipState, Snapshot, sorted_parts, sorted_relationships,
 };
 use super::validation::{MAX_RELATIONSHIPS, validate_source};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::presentation::embedded::invalid;
 use crate::{Error, Result};
 
@@ -63,6 +64,13 @@ pub fn load(
 
 /// Publish a committed OLE graph replacement atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -78,8 +86,9 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if patch.is_empty() {
         return Ok(current);
     }
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     install(&mut candidate, patch)?;
     let resulting = load(
         &candidate,
@@ -95,6 +104,13 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     Ok(resulting)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.

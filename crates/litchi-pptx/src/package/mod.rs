@@ -8,6 +8,7 @@ mod codec;
 #[cfg(feature = "encryption")]
 mod encryption;
 mod model;
+pub(crate) mod signature;
 
 #[cfg(test)]
 mod tests;

@@ -325,7 +325,7 @@ fn unchanged_inner_signature_survives_encrypt_open_and_reencrypt() {
 }
 
 #[test]
-fn raw_opc_noop_preserves_signature_but_changed_edit_unsigns() {
+fn raw_opc_noop_preserves_signature_and_changed_edit_requires_explicit_unsign() {
     let mut package = Package::new().unwrap();
     package
         .edit_opc(|opc| {
@@ -339,15 +339,43 @@ fn raw_opc_noop_preserves_signature_but_changed_edit_unsigns() {
     assert!(package.opc().unwrap().is_signed());
     assert_eq!(package.to_bytes().unwrap(), signed);
 
+    let add_raw_part = |opc: &mut OpcPackage| {
+        opc.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/raw.bin").unwrap(),
+            "application/octet-stream".into(),
+            vec![1, 2, 3],
+        )));
+    };
+    // A changed raw edit refuses the signed package and rolls back (ADR
+    // 0006); removing the signature inside the closure authorizes it.
+    let error = package
+        .edit_opc(|opc| {
+            add_raw_part(opc);
+            Ok(())
+        })
+        .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+        ),
+        "{error:?}"
+    );
+    assert!(package.opc().unwrap().is_signed());
+    assert_eq!(package.to_bytes().unwrap(), signed);
+
     package
         .edit_opc(|opc| {
-            opc.add_part(Box::new(BlobPart::new(
-                PackURI::new("/custom/raw.bin").unwrap(),
-                "application/octet-stream".into(),
-                vec![1, 2, 3],
-            )));
+            add_raw_part(opc);
+            opc.unsign();
             Ok(())
         })
         .unwrap();
     assert!(!package.opc().unwrap().is_signed());
+    assert!(
+        package
+            .opc()
+            .unwrap()
+            .contains_part(&PackURI::new("/custom/raw.bin").unwrap())
+    );
 }

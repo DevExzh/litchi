@@ -37,7 +37,7 @@ fn notes_master_template_is_canonical_and_deterministic() {
 }
 
 #[test]
-fn consuming_put_moves_changed_xml_and_preserves_signed_no_ops() {
+fn consuming_put_moves_changed_xml_and_refuses_signed_changes_until_unsigned() {
     let (mut package, name) = synthetic(Conformance::Transitional);
     let graph = load(&package, &name).unwrap().unwrap();
     package.relate_to(
@@ -49,8 +49,25 @@ fn consuming_put_moves_changed_xml_and_preserves_signed_no_ops() {
     put(&mut package, &name, graph).unwrap();
     assert!(package.is_signed());
 
-    let mut graph = load(&package, &name).unwrap().unwrap();
-    graph.slides_mut()[0].replace_xml(write_text("Updated note").unwrap());
+    // A changed graph refuses the signed package (ADR 0006) and leaves it
+    // untouched; it is published after the signature is removed explicitly.
+    let updated = |package: &OpcPackage| {
+        let mut graph = load(package, &name).unwrap().unwrap();
+        graph.slides_mut()[0].replace_xml(write_text("Updated note").unwrap());
+        graph
+    };
+    let graph = updated(&package);
+    let before = load(&package, &name).unwrap().unwrap();
+    assert!(matches!(
+        put(&mut package, &name, graph),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert_eq!(load(&package, &name).unwrap().unwrap(), before);
+    package.unsign();
+    let graph = updated(&package);
     put(&mut package, &name, graph).unwrap();
     assert!(!package.is_signed());
     assert_eq!(

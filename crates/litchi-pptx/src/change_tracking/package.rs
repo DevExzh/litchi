@@ -4,6 +4,7 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::{Commit, Patch, Snapshot};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 pub(crate) fn load(package: &OpcPackage, owner: &PackURI) -> Result<Snapshot> {
@@ -38,6 +39,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
         ));
     }
     if patch.is_changed() {
+        refuse_signed_change(package)?;
         let mutable_part = package.get_part_mut(&patch.owner)?;
         crate::parts::validate_content_type(mutable_part, ct::PML_SLIDE)?;
         if mutable_part.blob() != patch.source {
@@ -47,7 +49,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
             });
         }
         mutable_part.set_blob(patch.target.clone());
-        package.unsign();
+        settle_unsigned_change(package)?;
     }
     Ok(snapshot)
 }

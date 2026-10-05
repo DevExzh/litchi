@@ -11,6 +11,7 @@ use super::{
     STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid,
 };
 use crate::leniency::{CommentDefect, ToleranceReport};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::collections::{HashMap, HashSet};
@@ -292,6 +293,13 @@ pub fn find_presentation_comment_author(
     }))
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -310,8 +318,9 @@ pub fn add_presentation_comment_author(
             authors: vec![author],
             slides: Vec::new(),
         };
+        refuse_signed_change(package)?;
         store_presentation_comments(package, &graph, conformance)?;
-        package.unsign();
+        settle_unsigned_change(package)?;
         return Ok(());
     };
     if graph.authors.iter().any(|item| item.id == author.id) {
@@ -324,6 +333,13 @@ pub fn add_presentation_comment_author(
     commit_legacy_authors(package, &graph, conformance)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -347,6 +363,13 @@ pub fn update_presentation_comment_author(
     commit_legacy_authors(package, &graph, conformance)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -359,6 +382,13 @@ pub fn replace_presentation_comment_author(
     update_presentation_comment_author(package, author_id, author, conformance)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -390,6 +420,13 @@ pub fn remove_presentation_comment_author(
     Ok(true)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -450,6 +487,13 @@ pub fn find_presentation_comment(
     }))
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -491,6 +535,7 @@ pub fn add_presentation_comment(
         let xml = write_slide_comments(&slide.comments, conformance)?;
         parse_slide_comments_strict(&xml)?;
         let uri = PackURI::new(&slide.part_name).map_err(invalid)?;
+        refuse_signed_change(package)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     } else {
         let slide_uri = PackURI::new(slide_part_name).map_err(invalid)?;
@@ -499,6 +544,7 @@ pub fn add_presentation_comment(
         let relationship_id = next_relationship_id(slide, "rIdComments")?;
         let part_uri = next_legacy_comment_part_name(package)?;
         let xml = write_slide_comments(std::slice::from_ref(&comment), conformance)?;
+        refuse_signed_change(package)?;
         package.try_add_part(Box::new(BlobPart::new(
             part_uri.clone(),
             COMMENTS_CONTENT_TYPE.into(),
@@ -515,10 +561,17 @@ pub fn add_presentation_comment(
             );
     }
     commit_legacy_authors(package, &graph, conformance)?;
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -549,6 +602,13 @@ pub fn update_presentation_comment(
     commit_legacy_slide_comments(package, slide, comments, conformance)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -570,6 +630,13 @@ pub fn replace_presentation_comment(
     )
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -601,6 +668,7 @@ pub fn remove_presentation_comment(
     if comments.is_empty() {
         let slide_uri = PackURI::new(slide_part_name).map_err(invalid)?;
         let part_uri = PackURI::new(&slide.part_name).map_err(invalid)?;
+        refuse_signed_change(package)?;
         package
             .get_part_mut(&slide_uri)?
             .rels_mut()
@@ -608,13 +676,20 @@ pub fn remove_presentation_comment(
         if !part_is_referenced(package, &part_uri) {
             package.remove_part(&part_uri);
         }
-        package.unsign();
+        settle_unsigned_change(package)?;
     } else {
         commit_legacy_slide_comments(package, slide, comments, conformance)?;
     }
     Ok(true)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -668,8 +743,14 @@ fn commit_legacy_authors(
     let xml = write_comment_authors(&graph.authors, conformance)?;
     parse_comment_authors(&xml)?;
     let uri = PackURI::new(&graph.author_part_name).map_err(invalid)?;
+    // Authors that serialize to the stored bytes publish nothing, so an exact
+    // no-op keeps a signed package byte for byte.
+    if package.get_part(&uri)?.blob() == xml.as_slice() {
+        return Ok(());
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
@@ -682,8 +763,14 @@ fn commit_legacy_slide_comments(
     let xml = write_slide_comments(&comments, conformance)?;
     parse_slide_comments_strict(&xml)?;
     let uri = PackURI::new(&slide.part_name).map_err(invalid)?;
+    // Comments that serialize to the stored bytes publish nothing, so an
+    // exact no-op keeps a signed package byte for byte.
+    if package.get_part(&uri)?.blob() == xml.as_slice() {
+        return Ok(());
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 

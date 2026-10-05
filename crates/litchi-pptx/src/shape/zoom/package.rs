@@ -2,6 +2,7 @@
 
 use litchi_opc::{OpcPackage, PackURI};
 
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::parts::SlidePart;
 use crate::{Error, Result};
 
@@ -46,9 +47,10 @@ pub(crate) fn store(
     if previous.xml() == staged {
         return Ok(Some(previous));
     }
+    refuse_signed_change(package)?;
 
     package.get_part_mut(slide_name)?.set_blob(staged);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(previous))
 }
 

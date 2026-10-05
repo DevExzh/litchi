@@ -6,6 +6,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use super::codec;
 use super::model::{Outcome, Snapshot};
 use super::transaction;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 /// Read a classification snapshot from one selected shape in a slide part.
@@ -55,6 +56,12 @@ pub(crate) fn put<'k>(
     let staged_shape = transaction::set(&shape_blob, &source, outcome)?;
     let staged_owner = codec::replace(&owner_blob, span.clone(), &staged_shape)?;
     validate_staged(&staged_owner, key, outcome)?;
+    // An exact no-op returns before the package is borrowed mutably, so it
+    // keeps the exact source, and with it a signature, byte for byte.
+    if staged_owner == owner_blob {
+        return Ok(previous);
+    }
+    refuse_signed_change(package)?;
 
     let part = package.get_part_mut(&owner_name)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
@@ -64,11 +71,8 @@ pub(crate) fn put<'k>(
             reason: "the selected slide changed during classification staging",
         });
     }
-    if staged_owner == owner_blob {
-        return Ok(previous);
-    }
     part.set_blob(staged_owner);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(previous)
 }
 
@@ -104,6 +108,12 @@ pub(crate) fn remove<'k>(
     };
     let staged_owner = codec::replace(&owner_blob, span, &staged_shape)?;
     validate_removed(&staged_owner, key)?;
+    // An exact no-op returns before the package is borrowed mutably, so it
+    // keeps the exact source, and with it a signature, byte for byte.
+    if staged_owner == owner_blob {
+        return Ok(Some(previous));
+    }
+    refuse_signed_change(package)?;
 
     let part = package.get_part_mut(&owner_name)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
@@ -113,10 +123,8 @@ pub(crate) fn remove<'k>(
             reason: "the selected slide changed during classification staging",
         });
     }
-    if staged_owner != owner_blob {
-        part.set_blob(staged_owner);
-        package.unsign();
-    }
+    part.set_blob(staged_owner);
+    settle_unsigned_change(package)?;
     Ok(Some(previous))
 }
 

@@ -9,6 +9,7 @@ use super::codec::{self, LoadLimits};
 use super::model::{Draft, Event};
 use super::transaction::{Commit, Patch, Snapshot};
 use super::validation::validate_events;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 /// Discover the typed event records on one slide without executing them.
@@ -42,23 +43,38 @@ pub fn load_snapshot(package: &OpcPackage, slide_part_name: &PackURI) -> Result<
 
 /// Add a new slide-show event extension atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, slide_part_name: &PackURI, events: &[Draft]) -> Result<()> {
     validate_events(events)?;
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     codec::store(&mut candidate, slide_part_name, events)?;
     if load_snapshot(&candidate, slide_part_name)?.is_none() {
         return Err(invalid("stored slide-show events cannot be read back"));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(())
 }
 
 /// Remove only the MS-PPTX show-event extension, retaining neighboring opaque
 /// extension blocks and all other slide XML.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -70,17 +86,25 @@ pub fn remove(package: &mut OpcPackage, slide_part_name: &PackURI) -> Result<Opt
     let located = codec::locate(0, before.source_xml(), &mut LoadLimits::default())?
         .ok_or_else(|| invalid("slide-show event source disappeared during removal"))?;
     let updated = codec::remove_extension(before.source_xml(), &located)?;
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     candidate.get_part_mut(slide_part_name)?.set_blob(updated);
     if load_snapshot(&candidate, slide_part_name)?.is_some() {
         return Err(invalid("slide-show event removal left an event extension"));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(Some(before))
 }
 
 /// Apply a committed source-checked event patch atomically.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -95,6 +119,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if patch.is_empty() {
         return Ok(current);
     }
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
     candidate
         .get_part_mut(&slide_name)?
@@ -106,12 +131,19 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
             "published slide-show event source differs from the patch",
         ));
     }
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     *package = candidate;
     Ok(result)
 }
 
 /// Apply a committed edit and return its validated post-publication snapshot.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///

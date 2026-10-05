@@ -98,6 +98,21 @@ fn semantic_noop_keeps_preserved_and_opaque_whitespace_distinct() {
     );
     assert!(package.is_signed());
 
+    // Distinct opaque whitespace is a change, so it refuses the signed
+    // package (ADR 0006) until the signature is removed explicitly.
+    let candidate = List::parse(changed_opaque.as_bytes().to_vec()).unwrap();
+    assert!(matches!(
+        put(&mut package, candidate),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert_eq!(
+        load(&package).unwrap().unwrap().source_xml(),
+        Some(opaque.as_bytes())
+    );
+    package.unsign();
     let candidate = List::parse(changed_opaque.as_bytes().to_vec()).unwrap();
     assert!(put(&mut package, candidate).unwrap());
     assert!(!package.is_signed());
@@ -246,10 +261,25 @@ fn package_crud_round_trips_all_main_profiles_and_both_conformances() {
             assert!(!put(&mut package, semantic).unwrap());
             assert!(package.is_signed());
 
-            let mut changed = load(&package).unwrap().unwrap();
-            changed
-                .rename(Id::parse(FIRST).unwrap(), "Changed")
-                .unwrap();
+            let renamed = |package: &OpcPackage| {
+                let mut changed = load(package).unwrap().unwrap();
+                changed
+                    .rename(Id::parse(FIRST).unwrap(), "Changed")
+                    .unwrap();
+                changed
+            };
+            // A changed catalog refuses the signed package (ADR 0006) until
+            // the signature is removed explicitly.
+            let changed = renamed(&package);
+            assert!(matches!(
+                put(&mut package, changed),
+                Err(crate::Error::Opc(
+                    litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+                ))
+            ));
+            assert!(package.is_signed());
+            package.unsign();
+            let changed = renamed(&package);
             assert!(put(&mut package, changed).unwrap());
             assert!(!package.is_signed());
             assert_eq!(

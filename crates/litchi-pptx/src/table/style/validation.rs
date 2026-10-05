@@ -7,6 +7,7 @@ use super::{
     MAX_PRESENTATION_BYTES, MAX_STYLES, P, PART_NAME_ATTEMPTS, PS, RELATIONSHIP_ID_ATTEMPTS,
     STRICT_REL, allocation, invalid, limit, xml_error,
 };
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
@@ -89,6 +90,13 @@ pub fn load(package: &OpcPackage) -> Result<Option<List>> {
 /// load→put is a signature-preserving no-op; changed XML moves into a staged
 /// part only after conformance, topology, and relationship checks succeed.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -105,9 +113,10 @@ pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
         if stored == xml || semantic_xml_eq(stored, &xml)? {
             return Ok(false);
         }
+        refuse_signed_change(package)?;
         let staged = BlobPart::new(attachment.part, ct::PML_TABLE_STYLES.into(), xml);
         package.add_part(Box::new(staged));
-        package.unsign();
+        settle_unsigned_change(package)?;
         return Ok(true);
     }
 
@@ -127,9 +136,10 @@ pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
     package.validate_new_part_name(&part_name)?;
     let staged = BlobPart::new(part_name, ct::PML_TABLE_STYLES.into(), xml);
 
+    refuse_signed_change(package)?;
     package.add_part(Box::new(staged));
     package.add_part(staged_presentation);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
 }
 
@@ -138,6 +148,13 @@ pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
 /// Absence is an idempotent, signature-preserving `Ok(None)`. A catalog with
 /// any unexpected inbound edge is rejected before either relationship or part
 /// is changed.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -163,9 +180,10 @@ pub fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
         ));
     }
 
+    refuse_signed_change(package)?;
     package.add_part(staged_presentation);
     let _ = package.remove_part(&attachment.part);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(list))
 }
 

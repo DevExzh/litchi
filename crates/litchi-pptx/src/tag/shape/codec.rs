@@ -24,6 +24,7 @@ use super::validation::{
     shape_mce_capabilities, take_active, try_push, validate_owner_content_type,
     validate_staged_anchor, xml_error, xml_position,
 };
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::tag::{
     CONTENT_TYPE, Conformance, List, Source, available_part_name, available_relationship_id,
     has_other_inbound, invalid, pml, relationship_namespace, staged_xml, validate_relative_target,
@@ -75,6 +76,13 @@ pub fn load<'k>(
 /// another preserved raw anchor uses the same relationship ID, or any other
 /// package edge reaches the target part, replacement forks the selected
 /// attachment.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -151,6 +159,7 @@ pub fn put<'k>(
             (attached.source.rel().to_owned(), None)
         };
 
+        refuse_signed_change(package)?;
         {
             let owner = package.get_part_mut(&owner_name)?;
             validate_selected_relationship(
@@ -182,7 +191,7 @@ pub fn put<'k>(
             CONTENT_TYPE.into(),
             tag_xml,
         )));
-        package.unsign();
+        settle_unsigned_change(package)?;
         return Ok(Some(attached.source.into_list()));
     }
 
@@ -198,6 +207,7 @@ pub fn put<'k>(
     };
     package.validate_new_part_name(&part_name)?;
 
+    refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
         let current = selected_layout(owner, key)?;
@@ -217,7 +227,7 @@ pub fn put<'k>(
         CONTENT_TYPE.into(),
         tag_xml,
     )));
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(None)
 }
 
@@ -228,6 +238,13 @@ pub fn put<'k>(
 /// untouched. The relationship remains while another preserved raw anchor
 /// uses its ID, and the target part is collected only after the package graph
 /// proves it orphaned.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -269,6 +286,7 @@ pub fn remove<'k>(
         )
     };
 
+    refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
         let current = selected_layout(owner, key)?;
@@ -291,7 +309,7 @@ pub fn remove<'k>(
     if orphan {
         let _ = package.remove_part(attached.source.part());
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(attached.source.into_list()))
 }
 

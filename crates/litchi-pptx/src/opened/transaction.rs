@@ -11,6 +11,13 @@ use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// One failure-atomic edit rooted in an immutable opened-package snapshot.
+///
+/// A signed package is edited only after its signature is removed
+/// explicitly with [`Package::unsign`](crate::Package::unsign) (ADR 0006):
+/// [`Self::commit`] refuses a changed commit over a signed package, and the
+/// verbs that stage through the package-level edit families (comments,
+/// modern comments, table styles, charts, masters and layouts) refuse it
+/// while staging.
 #[derive(Clone)]
 pub struct Transaction {
     source: Snapshot,
@@ -691,6 +698,12 @@ impl Transaction {
 
     /// Create or replace the validated table-style catalog in this transaction.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error when the catalog or its attachment graph is invalid.
@@ -699,6 +712,12 @@ impl Transaction {
     }
 
     /// Remove the optional table-style catalog and its relationship.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -743,6 +762,12 @@ impl Transaction {
     }
 
     /// Add an ordinary chart part, relationship, and visible graphic frame.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -791,6 +816,12 @@ impl Transaction {
 
     /// Add a slide master and all required theme relationships.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error when the master/layout graph cannot be extended safely.
@@ -800,6 +831,12 @@ impl Transaction {
     }
 
     /// Add a typed slide layout to an existing master.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -817,6 +854,12 @@ impl Transaction {
 
     /// Remove an unreferenced slide layout and its exact graph edges.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error when the layout is still used or its graph is malformed.
@@ -826,6 +869,12 @@ impl Transaction {
     }
 
     /// Add a legacy comment author to the presentation comment graph.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -839,6 +888,12 @@ impl Transaction {
     }
 
     /// Add a legacy comment owned by one selected slide.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -859,6 +914,12 @@ impl Transaction {
     }
 
     /// Remove one legacy comment by stable author/index identity.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -885,6 +946,12 @@ impl Transaction {
     /// A missing author part and presentation relationship are allocated
     /// collision-safely by the modern-comment owner.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error for duplicate/invalid authors or a malformed graph.
@@ -900,6 +967,12 @@ impl Transaction {
     }
 
     /// Replace a modern-comment author without changing its stable GUID.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -923,6 +996,12 @@ impl Transaction {
 
     /// Remove one unreferenced modern-comment author.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error while any modeled comment/reply still references the
@@ -937,6 +1016,12 @@ impl Transaction {
     }
 
     /// Reorder all modern-comment authors by a complete stable-GUID list.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -956,6 +1041,12 @@ impl Transaction {
     }
 
     /// Add a typed `PowerPoint` 2018 modern comment to one selected slide.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -979,6 +1070,12 @@ impl Transaction {
     }
 
     /// Replace one modern comment without changing its stable GUID.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -1005,6 +1102,12 @@ impl Transaction {
 
     /// Reorder all modern comments on one slide by a complete stable-GUID list.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error for unknown, duplicate, or incomplete identities.
@@ -1026,6 +1129,12 @@ impl Transaction {
     }
 
     /// Add a stable-ID reply to one modern-comment thread.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -1051,6 +1160,12 @@ impl Transaction {
     }
 
     /// Replace one modern-comment reply without changing its stable GUID.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -1080,6 +1195,12 @@ impl Transaction {
     /// Update typed task/reaction extensions on one modern comment while
     /// retaining opaque extension entries.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error for a missing/malformed thread or invalid extension.
@@ -1107,6 +1228,12 @@ impl Transaction {
 
     /// Update typed reaction extensions on one modern-comment reply while
     /// retaining opaque extension entries.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///
@@ -1137,6 +1264,12 @@ impl Transaction {
 
     /// Remove one modern comment and its empty per-slide part when unshared.
     ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
+    ///
     /// # Errors
     ///
     /// Returns an error when the modern-comment graph is malformed.
@@ -1158,6 +1291,12 @@ impl Transaction {
     }
 
     /// Remove one modern-comment reply by stable identity.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006): remove the signature explicitly with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts.
     ///
     /// # Errors
     ///

@@ -11,6 +11,7 @@ use super::model::{
 };
 use super::validation;
 use super::{MAX_TOTAL_PAYLOAD_BYTES, MODEL_CONTENT_TYPE, MODEL_RELATIONSHIP};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::shape::Key;
 use crate::{Error, Result};
 
@@ -74,6 +75,7 @@ pub(crate) fn put(
     if value.semantic_eq(&previous) {
         return Ok(Some(previous));
     }
+    refuse_signed_change(package)?;
 
     let old_xml = source.blob_arc();
     let mut scene = value.scene.wire.clone();
@@ -113,7 +115,7 @@ pub(crate) fn put(
     for relationship_id in old_relationships {
         cleanup_relationship(package, slide_name, &updated, &relationship_id)?;
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(previous))
 }
 
@@ -134,11 +136,12 @@ pub(crate) fn remove(
         .find(|model| model.shape.index() == location.shape_index)
         .ok_or_else(|| invalid("model3d shape anchor disappeared during preflight"))?;
     let updated = codec::replace(source.blob(), location.range.clone(), &[])?;
+    refuse_signed_change(package)?;
     package.get_part_mut(slide_name)?.set_blob(updated.clone());
     for relationship_id in old_model_relationships(&previous.origin) {
         cleanup_relationship(package, slide_name, &updated, &relationship_id)?;
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(previous))
 }
 

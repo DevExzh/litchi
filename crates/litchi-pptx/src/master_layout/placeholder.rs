@@ -24,6 +24,7 @@ use super::codec::{
     scan_element_span, validate_xml10_chars,
 };
 use super::model::PlaceholderSpec;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::shape::{Key, PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension, Scene};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -416,6 +417,8 @@ pub fn apply_patch_with_policy(
         ));
     }
     if matches!(policy, SignaturePolicy::Invalidate) {
+        // The caller chose the explicit Invalidate disposition; Reject
+        // refused a signed package above.
         candidate.unsign();
     }
     *package = candidate;
@@ -982,6 +985,8 @@ pub fn apply_slot_patch_with_policy(
         ));
     }
     if matches!(policy, SignaturePolicy::Invalidate) {
+        // The caller chose the explicit Invalidate disposition; Reject
+        // refused a signed package above.
         candidate.unsign();
     }
     *package = candidate;
@@ -1002,6 +1007,13 @@ pub fn apply_slot_commit(package: &mut OpcPackage, commit: SlotCommit) -> Result
 /// and p232 slot; a new shape is appended only when the requested placeholder
 /// does not exist.  Slide, slide-master, and slide-layout owners are all
 /// accepted.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 pub fn store_placeholder_shape_source(
     package: &mut OpcPackage,
     part_name: &PackURI,
@@ -1026,13 +1038,15 @@ pub fn store_placeholder_shape_source(
     if patched == source {
         return Ok(());
     }
+    // A changed owner invalidates every signature, so this compatibility
+    // authoring API refuses a signed package (ADR 0006). Callers remove the
+    // signature explicitly first, or use the source checked slot transactions
+    // above with the explicit Invalidate policy.
+    refuse_signed_change(package)?;
     package
         .get_part_mut(part_name)?
         .set_blob(std::mem::take(&mut patched));
-    // This compatibility authoring API has always invalidated signatures on a
-    // changed owner.  Source checked slot transactions above expose the
-    // explicit Reject/Invalidate policy for callers that need that choice.
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 

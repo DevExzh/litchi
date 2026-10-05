@@ -2,6 +2,7 @@ use super::codec::OLE_GRAPHIC_DATA_URI;
 use super::model::{Authored, Frame, Kind};
 use super::package::load_slide;
 use super::{Limits, Mode};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::presentation::embedded::{MAX_XML_DEPTH, invalid, is_presentationml_name, limit};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -19,6 +20,13 @@ const MAX_NAME_CHARS: usize = 256;
 
 /// Add an inert embedded OLE/package payload and verify it through the read
 /// inventory before publishing the package mutation.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -70,6 +78,7 @@ pub fn add(
     let fragment = frame_xml(shape_id, name, program_id, "rIdPending", frame);
     let _ = insert_frame(&slide_xml, fragment.as_bytes())?;
     let target = part_name.relative_ref(slide_uri.base_uri());
+    refuse_signed_change(package)?;
     let relationship_id = package
         .get_part_mut(&slide_uri)?
         .relate_to(&target, relationship_type);
@@ -92,7 +101,7 @@ pub fn add(
     }) {
         return Err(invalid("authored OLE object failed read-side verification"));
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Authored {
         part_name,
         relationship_id,

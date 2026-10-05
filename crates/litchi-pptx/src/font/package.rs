@@ -13,6 +13,7 @@ use super::{
     MAX_XML_BYTES, MCE_NS, PML, STRICT_PML, invalid, limit,
 };
 use crate::error::{Error, Result};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, OffsetLimits, active_offsets};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -248,8 +249,9 @@ pub(super) fn put_raw(
         }
     }
 
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     let existing_font_relationships = candidate
         .get_part(&presentation_name)?
         .rels()
@@ -317,9 +319,16 @@ pub fn load(package: &OpcPackage) -> Result<Option<Fonts>> {
 
 /// Atomically publish a complete collection, consuming its owned values.
 ///
-/// Returns `false` for an exact semantic and physical no-op, preserving any
-/// valid package signatures. A real mutation invalidates signatures only after
-/// every bounded validation and staging operation succeeds.
+/// Returns `false` for an exact semantic and physical no-op. A real mutation
+/// is published only after every bounded validation and staging operation
+/// succeeds.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -339,6 +348,13 @@ pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
 
 /// Remove the complete embedded-font graph and return its previous semantic
 /// value. Absence is an exact no-op.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///

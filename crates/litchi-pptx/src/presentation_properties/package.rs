@@ -3,6 +3,7 @@
 use super::model::Properties;
 use super::{CONTENT_TYPE, REL, STRICT_REL};
 use crate::leniency::ToleranceReport;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -79,6 +80,13 @@ pub fn load_math_from_package(
 
 /// Replace the typed document-level math defaults as one package transaction.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
@@ -91,6 +99,7 @@ pub fn put_math_to_package(
     if previous.as_ref() == Some(&value) {
         return Ok(previous);
     }
+    refuse_signed_change(package)?;
 
     let mut staged = package.clone();
     let properties = find_properties_part(&staged)?;
@@ -128,7 +137,7 @@ pub fn put_math_to_package(
             .get_part_mut(&presentation)?
             .relate_to(&target, rt::PRES_PROPS);
     }
-    staged.unsign();
+    settle_unsigned_change(&mut staged)?;
     if load_math_from_package(&staged)?.as_ref() != Some(&value) {
         return Err(invalid("published presentation math did not validate"));
     }
@@ -137,6 +146,13 @@ pub fn put_math_to_package(
 }
 
 /// Remove the typed document-level math defaults as one package transaction.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
 ///
 /// # Errors
 ///
@@ -148,6 +164,7 @@ pub fn remove_math_from_package(
     let Some(previous_value) = previous.clone() else {
         return Ok(None);
     };
+    refuse_signed_change(package)?;
 
     let mut staged = package.clone();
     let uri = find_properties_part(&staged)?.ok_or_else(|| {
@@ -168,7 +185,7 @@ pub fn remove_math_from_package(
         ));
     }
     staged.get_part_mut(&uri)?.set_blob(blob);
-    staged.unsign();
+    settle_unsigned_change(&mut staged)?;
     if load_math_from_package(&staged)?.is_some() {
         return Err(invalid(
             "published presentation math removal did not validate",
