@@ -315,3 +315,20 @@ __marimo__/
 # after every broad log rule; callers still choose which historical or new
 # result logs to add explicitly.
 !docs/performance/results/**/*.log
+
+# Command logs of 1 MiB or more were purged from history on 2026-10-05 (see
+# AGENTS.md); keep the copies still on disk in older checkouts untracked.
+/docs/performance/results/change-0410/checks/guard-recheck-summary.log
+/docs/performance/results/change-0410/checks/guards-summary.log
+/docs/performance/results/change-0756/gates/tests.log
+/docs/performance/results/change-0759/gates/tests.log
+/docs/performance/results/change-0759/postmerge-gates/tests.log
+/docs/performance/results/change-0794/quality-0/02.log
+/docs/performance/results/change-0794/quality-4/02.log
+/docs/performance/results/change-0806/quality-2/02.log
+/docs/performance/results/change-0836/commands/symbols-baseline-demangled/output.log
+/docs/performance/results/change-0836/commands/symbols-baseline-raw/output.log
+/docs/performance/results/change-0836/commands/symbols-fp-demangled/output.log
+/docs/performance/results/change-0836/commands/symbols-fp-raw/output.log
+/docs/performance/results/change-0837/commands/final-tests/output.log
+/docs/performance/results/change-0842/commands/perf-baseline-locked-metadata/output.log
