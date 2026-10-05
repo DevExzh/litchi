@@ -73,6 +73,12 @@ macro_rules! graph_invalid {
     };
 }
 
+/// Store or replace the workbook's connections part.
+///
+/// Storing always writes the part, so a signed package is refused with a
+/// boxed [`XlsxError::Signed`] before anything is changed, even when the
+/// serialized connections equal the stored ones: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
 pub fn store_in_package(package: &mut OpcPackage, value: &Connections, strict: bool) -> Result<()> {
     store_in_package_with_query_table_validator(package, value, strict, query_table_connection_id)
 }
@@ -131,10 +137,12 @@ where
                 "existing connections part has invalid content type",
             ));
         }
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&part_name)?.set_blob(xml);
     } else {
         let part_name = next_connections_part_name(package)?;
         let relationship_id = next_connections_relationship_id(package, &workbook_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
             part_name.clone(),
             CONNECTIONS_CONTENT_TYPE.into(),
@@ -155,10 +163,15 @@ where
                 false,
             );
     }
-    package.unsign();
     Ok(())
 }
 
+/// Remove the workbook's connections relationship and its unreferenced part.
+///
+/// A workbook without connections is left untouched and returns `false`,
+/// signed or not. Removing the part changes the package, so a signed package
+/// is refused with a boxed [`XlsxError::Signed`]: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
 pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     // Refuse to repair or partially remove an invalid graph. In particular,
     // this keeps orphan query-table parts and foreign recognized edges from
@@ -197,6 +210,7 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     let Some((relationship_id, part_name)) = relationship else {
         return Ok(false);
     };
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(&workbook_name)?
         .rels_mut()
@@ -204,7 +218,6 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     if !package_part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -1115,11 +1128,19 @@ impl<'a> Transaction<'a> {
         self.before.connections.as_ref() != self.draft.as_ref()
     }
 
+    /// Validate and atomically publish the staged connections.
+    ///
+    /// A transaction without a change publishes nothing, so a signed package
+    /// keeps its signature byte for byte. A changed commit over a signed
+    /// package is refused with a boxed [`XlsxError::Signed`] and leaves it
+    /// untouched: remove the signature explicitly first
+    /// ([`OpcPackage::unsign`]).
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
         }
+        crate::signature_policy::ensure_unsigned(self.target)?;
         let current = Snapshot::load(self.target)?;
         if !current.same_source(&self.before) {
             return Err(invalid("connections transaction source is stale"));
@@ -1180,6 +1201,14 @@ impl Patch {
         }
     }
 
+    /// Apply atomically after checking the connections source graph.
+    ///
+    /// An empty patch publishes nothing and keeps a signed target exactly as
+    /// it was. Any other patch changes the target, so a signed target is
+    /// refused up front with a boxed [`XlsxError::Signed`] (it used to be
+    /// changed in memory and refused only when saved): remove its signature
+    /// explicitly first ([`OpcPackage::unsign`]). The inverse never restores
+    /// a signature.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
@@ -1188,6 +1217,7 @@ impl Patch {
         if self.is_empty() {
             return Ok(());
         }
+        crate::signature_policy::ensure_unsigned(target)?;
         let mut candidate = target.clone();
         restore_snapshot(&mut candidate, &self.after)?;
         let resulting = Snapshot::load(&candidate)?;
@@ -1275,6 +1305,11 @@ fn apply_connections(
                 .map(|target| (relationship.r_id().to_owned(), target))?)
         })
         .transpose()?;
+    if owner.is_none() && after.is_none() {
+        // Nothing to publish: an absent owner stays absent, signed or not.
+        return validate_graph(package).map(|_| ());
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     match (owner, after) {
         (Some((relationship_id, part_name)), Some(after)) => {
             let source = package.get_part(&part_name)?.blob().to_vec();
@@ -1323,7 +1358,6 @@ fn apply_connections(
         },
         (None, None) => {},
     }
-    package.unsign();
     validate_graph(package).map(|_| ())
 }
 

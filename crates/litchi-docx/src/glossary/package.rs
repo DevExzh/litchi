@@ -50,6 +50,10 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
 /// Move a semantic catalog into the package while preserving its auxiliary graph.
 ///
 /// An unchanged package-loaded catalog is a byte- and signature-preserving no-op.
+/// Any other catalog changes the package, so a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] before anything is changed
+/// (ADR 0006): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
@@ -220,6 +224,9 @@ pub(in crate::glossary) fn free_part_name(
 }
 
 /// Remove the glossary graph. Absence is a signature-preserving no-op.
+/// Removing a glossary from a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006): remove the
+/// signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// Use [`raw::remove`] to move the complete physical graph elsewhere.
 ///

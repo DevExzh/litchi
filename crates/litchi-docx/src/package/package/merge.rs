@@ -68,6 +68,12 @@ impl Package {
 
     /// Set or replace the complete mail-merge graph atomically.
     ///
+    /// Setting always republishes the settings part and its sources, so a
+    /// signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] before
+    /// anything is changed (ADR 0006): remove the signature explicitly first
+    /// with [`Package::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -171,6 +177,7 @@ impl Package {
         }
         DocumentSettings::extract_from_part(&replacement)?;
 
+        crate::signature_policy::ensure_unsigned(&self.opc)?;
         let mut installed = Vec::new();
         for part in staged_parts {
             let name = part.partname().clone();
@@ -193,11 +200,12 @@ impl Package {
                 self.opc.remove_part(&old_target);
             }
         }
-        self.opc.unsign();
         Ok(())
     }
 
     /// Update settings and sources using the same atomic replacement semantics.
+    ///
+    /// The signature policy is [`Self::set_mail_merge`]'s.
     ///
     /// # Errors
     ///
@@ -220,6 +228,8 @@ impl Package {
     }
 
     /// Replace recipient inclusion flags while retaining inert source targets and settings.
+    ///
+    /// The signature policy is [`Self::set_mail_merge`]'s.
     ///
     /// # Errors
     ///
@@ -257,6 +267,12 @@ impl Package {
 
     /// Clear mail-merge XML, relationships, and unreachable owned targets.
     ///
+    /// A document without mail merge is left untouched and returns `false`,
+    /// signed or not. Clearing changes the package, so a signed package is
+    /// refused with [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`]
+    /// (ADR 0006): remove the signature explicitly first with
+    /// [`Package::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -282,13 +298,13 @@ impl Package {
             replacement.rels_mut().remove(&id);
         }
         DocumentSettings::extract_from_part(&replacement)?;
+        crate::signature_policy::ensure_unsigned(&self.opc)?;
         self.commit_settings_part(&snapshot, replacement)?;
         for old_target in old_targets {
             if !self.part_is_referenced(&old_target) {
                 self.opc.remove_part(&old_target);
             }
         }
-        self.opc.unsign();
         Ok(true)
     }
 

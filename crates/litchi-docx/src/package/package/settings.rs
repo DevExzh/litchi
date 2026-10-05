@@ -24,6 +24,10 @@ impl Package {
 
     /// Move complete web-output settings into package ownership.
     ///
+    /// The signature policy is [`docx_web::put`]'s: equal settings publish
+    /// nothing, and a change to a signed package is refused until
+    /// [`Self::unsign`] removes the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -36,6 +40,9 @@ impl Package {
     }
 
     /// Remove the document-owned web-settings part.
+    ///
+    /// The signature policy is [`docx_web::remove`]'s: removing a part from a
+    /// signed package is refused until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
     ///
@@ -231,6 +238,10 @@ impl Package {
 
     /// Move a complete semantic catalog into the package.
     ///
+    /// The signature policy is [`glossary::put`]'s: an unchanged catalog
+    /// publishes nothing, and a change to a signed package is refused until
+    /// [`Self::unsign`] removes the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -254,7 +265,10 @@ impl Package {
     /// Publish a complete low-level glossary OPC graph into the package.
     ///
     /// Returns `false` when the graph is already identical, preserving package
-    /// bytes and digital signatures.
+    /// bytes and digital signatures. A different graph changes the package,
+    /// so a signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006)
+    /// until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
     ///
@@ -265,6 +279,8 @@ impl Package {
 
     /// Remove and return the complete low-level glossary OPC graph.
     ///
+    /// The signature policy is [`Self::remove_glossary`]'s.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -273,6 +289,11 @@ impl Package {
     }
 
     /// Remove the complete glossary-owned graph.
+    ///
+    /// A package without a glossary is left untouched, signed or not. Removing
+    /// one from a signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006)
+    /// until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
     ///

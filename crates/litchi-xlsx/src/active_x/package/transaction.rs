@@ -178,7 +178,7 @@ fn install_graph(
     worksheet_uri: &PackURI,
     prepared: PreparedGraph,
 ) -> Result<()> {
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     for (uri, content_type, bytes) in prepared.resources {
         package.try_add_part(Box::new(BlobPart::new(uri, content_type, bytes)))?;
     }

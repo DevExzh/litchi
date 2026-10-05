@@ -9,6 +9,13 @@ use litchi_opc::{OpcPackage, PackURI};
 /// Every operation works on a private candidate. An error therefore cannot
 /// publish a partial graph, and dropping the transaction is an implicit
 /// rollback. The commit boundary performs the complete owner graph check.
+///
+/// An operation that would change a signed package is refused with
+/// [`crate::Error::Signed`] and stages nothing (ADR 0006); an operation that
+/// changes nothing (an absent name, a reorder into the stored bytes) keeps the
+/// signature byte for byte. Remove the signature explicitly before the
+/// transaction starts ([`crate::Package::unsign`] or
+/// [`OpcPackage::unsign`]) to edit a signed workbook.
 pub struct Transaction<'a> {
     target: &'a mut OpcPackage,
     staged: OpcPackage,

@@ -112,6 +112,12 @@ pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>
     Ok(Some(value))
 }
 
+/// Store a complete revision owner in a package that has none.
+///
+/// The graph is staged on a clone, so every failure leaves `package` as it
+/// was. Storing changes the package, so a signed package is refused with
+/// [`crate::Error::Signed`]: remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn store_workbook_revisions(
     package: &mut OpcPackage,
     value: &Revisions,
@@ -169,6 +175,7 @@ fn store_workbook_revisions_inner(
             .validate_new_part_name(&uri)
             .map_err(|error| invalid(error.to_string()))?;
     }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         users_uri.clone(),
         USERS_CT.into(),
@@ -209,7 +216,6 @@ fn store_workbook_revisions_inner(
                 litchi_opc::TargetMode::Internal,
             )?;
     }
-    package.unsign();
     Ok(())
 }
 
@@ -243,6 +249,11 @@ pub(crate) fn replace_workbook_revisions(
 }
 
 /// Remove the complete workbook revision owner atomically.
+///
+/// A package without revisions is left untouched and returns `false`, signed
+/// or not. Removing an owner changes the package, so a signed package is
+/// refused with [`crate::Error::Signed`]: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
 pub fn remove_workbook_revisions(package: &mut OpcPackage) -> Result<bool> {
     let mut candidate = package.clone();
     let Some(value) = load_workbook_revisions(&candidate)? else {
@@ -283,6 +294,7 @@ fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) 
         .filter(|relationship| is_log_rel(relationship.reltype()))
         .map(|relationship| relationship.r_id().to_owned())
         .collect::<Vec<_>>();
+    crate::signature_policy::ensure_unsigned(package)?;
     {
         let workbook_part = package.get_part_mut(&workbook)?;
         workbook_part
@@ -301,7 +313,6 @@ fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) 
         let actual = package.get_part(&name)?.partname().clone();
         package.remove_part(&actual);
     }
-    package.unsign();
     Ok(())
 }
 
@@ -409,6 +420,12 @@ fn update_in_place(
         }
     }
 
+    // An unchanged owner publishes nothing, so a signed package keeps its
+    // signature; a change is refused until the signature is removed.
+    if !(users_changed || headers_changed || current.logs != value.logs || conformance_changed) {
+        return validate_graph(package);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     let users_uri = PackURI::new(&value.users_part_name).map_err(invalid)?;
     let headers_uri = PackURI::new(&value.headers_part_name).map_err(invalid)?;
     if let Some(xml) = users_xml {
@@ -478,9 +495,6 @@ fn update_in_place(
             &value.headers_relationship_id,
             conformance.headers_relationship(),
         )?;
-    }
-    if users_changed || headers_changed || current.logs != value.logs || conformance_changed {
-        package.unsign();
     }
     validate_graph(package)
 }

@@ -299,3 +299,122 @@ fn raw_threaded_comment_stores_refuse_a_signed_package() {
     assert!(!litchi_xlsb::comments::threaded::remove_graph(&mut package).unwrap());
     assert_eq!(PackageWriter::to_bytes(&package).unwrap(), bytes);
 }
+
+/// Follow-up F2 of record 0013: task panes and the Ribbon refuse a change to a
+/// signed workbook up front, with the typed signed error. Task panes used to
+/// refuse with the shared OOXML owner's `SignedSourceRequiresExplicitPolicy`
+/// wrapped as `PackageError::Common`; the Ribbon used to remove the signature.
+mod task_panes_and_ribbon {
+    use super::*;
+    use litchi_ooxml_common::ribbon::{Family, Version};
+    use litchi_ooxml_common::web;
+
+    const UI_2007: &[u8] =
+        br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"/>"#;
+    const UI_2007_CHANGED: &[u8] =
+        br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#;
+
+    fn panes(id: &str) -> web::Panes {
+        let add_in = web::AddIn::new(
+            id,
+            web::Reference::new("ref-1", "1", web::Store::Registry).unwrap(),
+        )
+        .unwrap();
+        let mut panes = web::Panes::new();
+        panes.push(web::Pane::new(add_in)).unwrap();
+        panes
+    }
+
+    /// `Simple.xlsb` edited by `edit` while unsigned, then signed.
+    fn signed_workbook_with(edit: impl FnOnce(&mut Workbook)) -> (Vec<u8>, Workbook) {
+        let mut plain = Package::from_bytes(fixture("Simple.xlsb"))
+            .unwrap()
+            .into_workbook()
+            .unwrap();
+        edit(&mut plain);
+        let bytes = signed(&save(&plain));
+        let workbook = Package::from_bytes(bytes.clone())
+            .unwrap()
+            .into_workbook()
+            .unwrap();
+        assert!(workbook.is_signed());
+        (bytes, workbook)
+    }
+
+    #[track_caller]
+    fn assert_signed<T: std::fmt::Debug>(result: litchi_xlsb::package::PackageResult<T>) {
+        let error = result.expect_err("a change to a signed workbook must be refused");
+        assert!(matches!(error, PackageError::Signed), "{error:?}");
+    }
+
+    #[test]
+    fn task_pane_changes_are_refused_up_front_and_noops_kept() {
+        let (bytes, mut workbook) = signed_workbook();
+        assert_signed(workbook.put_task_panes(panes("add-in-1"), web::Conformance::Transitional));
+        assert!(!workbook.remove_task_panes().unwrap());
+        assert_eq!(save(&workbook), bytes);
+
+        let (bytes, mut workbook) = signed_workbook_with(|plain| {
+            plain
+                .put_task_panes(panes("add-in-1"), web::Conformance::Transitional)
+                .unwrap();
+        });
+        // Equal panes publish nothing.
+        workbook
+            .put_task_panes(panes("add-in-1"), web::Conformance::Transitional)
+            .unwrap();
+        assert_eq!(save(&workbook), bytes);
+        assert_signed(workbook.put_task_panes(panes("add-in-2"), web::Conformance::Transitional));
+        assert_signed(workbook.remove_task_panes());
+        assert!(workbook.is_signed());
+        assert_eq!(save(&workbook), bytes);
+
+        workbook.unsign();
+        assert!(workbook.remove_task_panes().unwrap());
+        let output = save(&workbook);
+        assert!(!carries_signature(&output));
+        let reopened = Package::from_bytes(output)
+            .unwrap()
+            .into_workbook()
+            .unwrap();
+        assert!(reopened.task_panes().unwrap().is_none());
+    }
+
+    #[test]
+    fn ribbon_changes_are_refused_up_front_and_noops_kept() {
+        let (bytes, mut workbook) = signed_workbook();
+        assert_signed(workbook.put_ribbon(Version::V2007, UI_2007.to_vec()));
+        assert!(!workbook.remove_ribbon(Family::Legacy).unwrap());
+        assert_eq!(save(&workbook), bytes);
+
+        let (bytes, mut workbook) = signed_workbook_with(|plain| {
+            plain.put_ribbon(Version::V2007, UI_2007.to_vec()).unwrap();
+        });
+        // The stored version and bytes publish nothing; an absent family is
+        // not removed.
+        workbook
+            .put_ribbon(Version::V2007, UI_2007.to_vec())
+            .unwrap();
+        assert!(!workbook.remove_ribbon(Family::Modern).unwrap());
+        assert_eq!(save(&workbook), bytes);
+        assert_signed(workbook.put_ribbon(Version::V2007, UI_2007_CHANGED.to_vec()));
+        assert_signed(workbook.remove_ribbon(Family::Legacy));
+        assert!(workbook.is_signed());
+        assert_eq!(save(&workbook), bytes);
+
+        workbook.unsign();
+        workbook
+            .put_ribbon(Version::V2007, UI_2007_CHANGED.to_vec())
+            .unwrap();
+        let output = save(&workbook);
+        assert!(!carries_signature(&output));
+        let reopened = Package::from_bytes(output)
+            .unwrap()
+            .into_workbook()
+            .unwrap();
+        assert_eq!(
+            reopened.ribbon().unwrap().legacy().unwrap().xml(),
+            UI_2007_CHANGED
+        );
+    }
+}

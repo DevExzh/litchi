@@ -55,6 +55,10 @@ pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Res
 }
 
 /// Stores a complete, inert `ActiveX` graph on a worksheet that has no controls.
+///
+/// Storing changes the package, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
 pub fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
@@ -67,6 +71,10 @@ pub fn store_on_worksheet(
 ///
 /// An empty set removes the graph. A typed package clone is used only for
 /// rollback; `ActiveX` payloads are still copied and never interpreted.
+///
+/// The signature policy is [`remove_from_worksheet`]'s and
+/// [`store_on_worksheet`]'s: a signed package is refused unless the call
+/// removes nothing from a worksheet without controls.
 pub fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
@@ -93,6 +101,11 @@ pub fn replace_on_worksheet(
 ///
 /// Shared descriptor, binary, or preview parts are retained while any other
 /// internal relationship still targets them.
+///
+/// A worksheet without controls is left untouched and returns `false`, signed
+/// or not. Removing controls changes the package, so a signed package is
+/// refused with [`crate::Error::Signed`]: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
 pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) -> Result<bool> {
     let loaded = load_from_worksheet(package, worksheet_uri)?;
     if loaded.controls.is_empty() {
@@ -111,7 +124,7 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) 
         .filter_map(|item| item.preview.as_ref().map(|p| p.relationship_id.clone()))
         .collect();
     let remaining_ids = relationship_ids_in_xml(&updated)?;
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     {
         let worksheet = package.get_part_mut(worksheet_uri)?;
         for id in &control_ids {

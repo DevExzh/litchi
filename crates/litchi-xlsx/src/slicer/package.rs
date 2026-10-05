@@ -10,6 +10,9 @@ pub fn load_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
 }
 
 /// Store one workbook-owned slicer cache atomically at the part layer.
+///
+/// A signed package is refused with [`crate::Error::Signed`]: remove the
+/// signature explicitly first ([`OpcPackage::unsign`]).
 pub fn store_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
     crate::slicer_cache::package::store_slicer_cache(package, value)
 }
@@ -20,6 +23,10 @@ pub fn load_parts(package: &OpcPackage, worksheet: &PackURI) -> Result<Vec<Part>
 }
 
 /// Store one worksheet-owned slicers part and its relationship.
+///
+/// A signed package is refused with [`crate::Error::Signed`] before anything
+/// is changed: remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn store_part(package: &mut OpcPackage, worksheet: &PackURI, value: &Part) -> Result<()> {
     crate::slicer_cache::views::store_slicer_part(package, worksheet, value)
 }

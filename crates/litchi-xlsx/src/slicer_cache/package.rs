@@ -108,6 +108,10 @@ pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
 /// Add one Slicer Cache part and append its workbook integration reference.
 /// The operation is staged on a package clone so malformed graphs cannot
 /// partially mutate the caller's package.
+///
+/// Adding a cache changes the package, so a signed package is refused with
+/// [`crate::Error::Signed`]: remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
     validate(&value.definition)?;
     let mut staged = package.clone();
@@ -176,6 +180,7 @@ fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cache) -> Resul
         "slicerCache",
         X14,
     )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
         SLICER_CACHE_CONTENT_TYPE.into(),
@@ -191,7 +196,6 @@ fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cache) -> Resul
             false,
         );
     package.get_part_mut(&workbook_name)?.set_blob(updated);
-    package.unsign();
     Ok(())
 }
 

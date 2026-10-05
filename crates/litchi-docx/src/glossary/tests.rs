@@ -1892,7 +1892,18 @@ fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
         .get_part_mut(&PackURI::new("/word/glossary/document.xml").unwrap())
         .unwrap()
         .set_blob(b"<stale/>".to_vec());
+    // A changed commit over the signed package is refused (it used to remove
+    // the signature); the patch below comes from an explicitly unsigned copy.
     let mut target = package.clone();
+    let mut refused = Transaction::new(&mut target).unwrap();
+    refused.add_entry(entry("New")).unwrap();
+    assert!(matches!(
+        refused.commit(),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(target.is_signed());
+
+    target.unsign();
     let mut editing = Transaction::new(&mut target).unwrap();
     editing.add_entry(entry("New")).unwrap();
     let changed = editing.commit().unwrap();

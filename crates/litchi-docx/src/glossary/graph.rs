@@ -234,6 +234,11 @@ pub mod raw {
 
     /// Publish a complete graph without consuming the caller's recovery copy.
     ///
+    /// An identical graph publishes nothing and keeps a signature; a different
+    /// one is refused on a signed package with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006)
+    /// until [`litchi_opc::OpcPackage::unsign`] removes it.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -242,6 +247,11 @@ pub mod raw {
     }
 
     /// Remove and return the complete graph for graph-preserving transfer.
+    ///
+    /// Absence is a signature-preserving no-op; removing a graph from a signed
+    /// package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006)
+    /// until [`litchi_opc::OpcPackage::unsign`] removes the signature.
     ///
     /// # Errors
     ///
@@ -436,8 +446,8 @@ pub(in crate::glossary) fn put_graph(package: &mut OpcPackage, value: &raw::Grap
     };
 
     let main = package.main_document_part()?.partname().clone();
+    crate::signature_policy::ensure_unsigned(package)?;
     let mut candidate = package.clone();
-    candidate.unsign();
     if let Some(owner) = &owner {
         candidate
             .get_part_mut(&main)?
@@ -497,8 +507,8 @@ pub(in crate::glossary) fn remove_graph(package: &mut OpcPackage) -> Result<Opti
     validate_exclusive_ownership(package, &owner, &owned)?;
     validate_all_internal_targets(package)?;
 
+    crate::signature_policy::ensure_unsigned(package)?;
     let mut candidate = package.clone();
-    candidate.unsign();
     candidate
         .get_part_mut(&owner.main)?
         .rels_mut()

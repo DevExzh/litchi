@@ -533,7 +533,7 @@ fn ensure_word_font_settings(
         return Ok(false);
     }
 
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     if exists {
         let part = package.get_part(&target)?;
         let mut checked = part.clone_part();
@@ -554,6 +554,14 @@ fn ensure_word_font_settings(
             .relate_to(&target_ref, relationship_type);
     }
     Ok(true)
+}
+
+/// The Ribbon customization a package stores in `family`.
+fn ribbon_slot(set: ribbon::Set<'_>, family: ribbon::Family) -> Option<ribbon::Ui<'_>> {
+    match family {
+        ribbon::Family::Legacy => set.legacy(),
+        ribbon::Family::Modern => set.modern(),
+    }
 }
 
 impl Package {
@@ -727,20 +735,45 @@ impl Package {
 
     /// Store opaque Ribbon XML by moving its `Vec` into package ownership.
     ///
+    /// The version and bytes the family already stores publish nothing, so a
+    /// signed package keeps its signature byte for byte. Any other store
+    /// changes the package, so a signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] before
+    /// anything is changed (ADR 0006): remove the signature explicitly first
+    /// with [`Self::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
+        // The shared Ribbon owner removes signatures itself, so a change to a
+        // signed package is refused here, before it is reached.
+        if crate::signature_policy::is_signed(&self.opc) {
+            let stored = ribbon_slot(ribbon::load(&self.opc)?, version.family());
+            if !stored.is_some_and(|ui| ui.version() == version && ui.xml() == xml.as_slice()) {
+                crate::signature_policy::ensure_unsigned(&self.opc)?;
+            }
+        }
         ribbon::put(&mut self.opc, version, xml)?;
         Ok(self)
     }
 
     /// Remove one package-level Ribbon relationship family and its orphaned part.
     ///
+    /// An absent family leaves the package untouched and returns `false`,
+    /// signed or not. Removing a family from a signed package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+    /// remove the signature explicitly first with [`Self::unsign`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
+        if crate::signature_policy::is_signed(&self.opc)
+            && ribbon_slot(ribbon::load(&self.opc)?, family).is_some()
+        {
+            crate::signature_policy::ensure_unsigned(&self.opc)?;
+        }
         Ok(ribbon::remove(&mut self.opc, family)?)
     }
 
@@ -755,6 +788,9 @@ impl Package {
 
     /// Move a complete font table into this package.
     ///
+    /// The signature policy is [`font::put`]'s: a change to a signed package
+    /// is refused until [`Self::unsign`] removes the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -768,6 +804,9 @@ impl Package {
 
     /// Remove the font table and font resources that become unreferenced.
     ///
+    /// The signature policy is [`font::remove`]'s: removing a table from a
+    /// signed package is refused until [`Self::unsign`] removes the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -777,6 +816,12 @@ impl Package {
 
     /// Select the font publication policy used by managed save operations.
     #[cfg(feature = "automatic-fonts")]
+    ///
+    /// A save that would add fonts or change the font settings of a signed
+    /// package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] and leaves
+    /// the package as it was (ADR 0006): remove the signature explicitly first
+    /// with [`Self::unsign`].
     ///
     /// # Errors
     ///
@@ -1006,5 +1051,104 @@ mod font_settings_tests {
                 .content_type(),
             ct::WML_SETTINGS
         );
+    }
+
+    /// `plain` with an OPC signature origin part and relationship, written
+    /// out so the signature is an ingressed source signature.
+    fn signed_source(plain: &OpcPackage) -> Vec<u8> {
+        let mut package = OpcPackage::new();
+        for relationship in plain.rels().iter() {
+            package
+                .rels_mut()
+                .try_add_relationship(
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.r_id().to_owned(),
+                    relationship.target_mode(),
+                )
+                .expect("package relationship");
+        }
+        let names: Vec<_> = plain
+            .iter_parts()
+            .map(|part| part.partname().clone())
+            .collect();
+        for name in names {
+            let part = plain.get_part(&name).expect("part");
+            let mut copy = BlobPart::new(
+                name.clone(),
+                part.content_type().to_owned(),
+                part.blob().to_vec(),
+            );
+            for relationship in part.rels().iter() {
+                copy.rels_mut()
+                    .try_add_relationship(
+                        relationship.reltype().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.r_id().to_owned(),
+                        relationship.target_mode(),
+                    )
+                    .expect("part relationship");
+            }
+            package.try_add_part(Box::new(copy)).expect("part copy");
+        }
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").expect("origin name"),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                Vec::new(),
+            )))
+            .expect("origin part");
+        package.relate_to(
+            "_xmlsignatures/origin.sigs",
+            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        );
+        litchi_opc::PackageWriter::to_bytes(&package).expect("signed source")
+    }
+
+    // Record 0014b: the managed font settings used to remove a signature
+    // before patching the settings part. A change to a signed package is
+    // refused instead; an unchanged one keeps the signature byte for byte.
+    #[test]
+    fn font_settings_refuse_a_signed_package_until_it_is_unsigned() {
+        let transitional = font::Conformance::Transitional;
+        for name in ["hello-world-signed.docx", "ms-office-2010-signed.docx"] {
+            let original = std::fs::read(format!(
+                "{}/../../test-data/poi/test-data/xmldsign/{name}",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .expect("signed fixture");
+            let mut signed = OpcPackage::from_vec(original.clone()).expect("signed open");
+            let result = ensure_word_font_settings(&mut signed, transitional, true);
+            assert!(
+                matches!(
+                    result,
+                    Err(Error::Opc(
+                        litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+                    ))
+                ),
+                "{name}: {result:?}"
+            );
+            assert_eq!(
+                litchi_opc::PackageWriter::to_bytes(&signed).expect("unchanged"),
+                original,
+                "{name}"
+            );
+
+            signed.unsign();
+            assert!(ensure_word_font_settings(&mut signed, transitional, true).expect("patched"));
+            assert!(!signed.is_signed());
+
+            // Settings that already carry the flags publish nothing, so a
+            // signed package keeps its exact source.
+            let resigned = signed_source(&signed);
+            let mut package = OpcPackage::from_vec(resigned.clone()).expect("resigned open");
+            assert!(package.is_signed());
+            assert!(!ensure_word_font_settings(&mut package, transitional, true).expect("no-op"));
+            assert_eq!(
+                litchi_opc::PackageWriter::to_bytes(&package).expect("exact"),
+                resigned,
+                "{name}"
+            );
+        }
     }
 }

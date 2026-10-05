@@ -217,6 +217,12 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate and atomically publish the transaction.
+    ///
+    /// A transaction without a change publishes nothing, so a signed package
+    /// keeps its signature byte for byte. A changed commit over a signed
+    /// package is refused with [`crate::Error::Signed`] and leaves it
+    /// untouched: remove the signature explicitly first
+    /// ([`OpcPackage::unsign`]).
     pub fn commit(self) -> Result<Commit> {
         let changed = self.is_changed();
         if !changed {
@@ -227,6 +233,7 @@ impl<'a> Transaction<'a> {
                 changed: false,
             });
         }
+        crate::signature_policy::ensure_unsigned(self.target)?;
 
         let mut candidate = self.target.clone();
         match &self.draft {

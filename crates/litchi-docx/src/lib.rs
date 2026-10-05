@@ -47,6 +47,7 @@ pub mod run_symbols;
 pub mod sanitize;
 pub mod section;
 pub mod settings;
+mod signature_policy;
 pub mod smart_tag;
 pub mod smartart;
 pub mod source_backed;

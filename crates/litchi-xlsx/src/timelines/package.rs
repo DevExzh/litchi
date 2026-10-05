@@ -124,6 +124,11 @@ pub fn load_timeline_caches(package: &OpcPackage, workbook_name: &PackURI) -> Re
 }
 
 /// Store a complete workbook View Cache set and its single integration extension.
+///
+/// Storing changes the package, so a signed package is refused up front with
+/// [`crate::Error::Signed`] (it used to be changed in memory and refused only
+/// when saved): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn store_timeline_caches(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
@@ -189,6 +194,7 @@ pub fn store_timeline_caches(
         TIMELINE_CACHE_EXTENSION_URI,
         &fragment,
     )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     for (_, uri, xml) in &plans {
         package.add_part(Box::new(BlobPart::new(
             uri.clone(),
@@ -325,6 +331,11 @@ pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<V
 }
 
 /// Store one worksheet's Views part, then validate it against all workbook caches and views.
+///
+/// Storing changes the package, so a signed package is refused up front with
+/// [`crate::Error::Signed`] (it used to be changed in memory and refused only
+/// when saved): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn store_worksheet_timelines(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
@@ -401,6 +412,7 @@ pub fn store_worksheet_timelines(
         &fragment,
     )?;
     let xml = write_timelines(&value.timelines)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.add_part(Box::new(BlobPart::new(
         target_uri.clone(),
         TIMELINES_CONTENT_TYPE.into(),

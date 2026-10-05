@@ -231,6 +231,40 @@ impl Package {
         self.0.is_signed()
     }
 
+    /// Remove every package signature explicitly (ADR 0006).
+    ///
+    /// Every signature relationship and signature part is removed, and the
+    /// resulting unsigned graph is authorized for publication
+    /// ([`OpcPackage::unsign`]). Package edits never remove a signature
+    /// themselves: a change to a signed package (slicers, timelines, smart
+    /// tags and the package-level families that edit the OPC graph) is
+    /// refused with [`crate::Error::Signed`] until this is called, because
+    /// the change invalidates every signature. An exact no-op keeps the
+    /// signature byte for byte without it. A package that carries no
+    /// signature, and no signature-policy requirement, is left untouched,
+    /// exact source included.
+    ///
+    /// ```
+    /// use litchi_xlsx::Package;
+    ///
+    /// let mut package = Package::create()?;
+    /// package.unsign()?;
+    /// assert!(!package.is_signed());
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package opened with a
+    /// password, whose mutations are refused.
+    pub fn unsign(&mut self) -> Result<&mut Self> {
+        self.ensure_mutation_allowed("unsign")?;
+        if self.0.is_signed() || self.0.requires_signature_edit_policy() {
+            self.0.unsign();
+        }
+        Ok(self)
+    }
+
     /// Read the package's core properties, recording the repairs the reader
     /// applies in `report`.
     ///
@@ -715,6 +749,8 @@ impl Package {
     ///
     /// Dropping the returned transaction rolls back; `commit` publishes the
     /// validated feature graph without rebuilding unrelated workbook parts.
+    /// On a signed package every changing operation is refused with
+    /// [`crate::Error::Signed`]; call [`Self::unsign`] first to edit it.
     pub fn edit_slicers(&mut self) -> Result<crate::slicer::Transaction<'_>> {
         self.ensure_mutation_allowed("edit_slicers")?;
         crate::slicer::Transaction::new(&mut self.0)
@@ -724,7 +760,9 @@ impl Package {
     ///
     /// Timeline cache references are workbook-owned, so the workbook part
     /// identity is captured once at transaction start and is not exposed by
-    /// the ordinary package facade.
+    /// the ordinary package facade. On a signed package every changing
+    /// operation is refused with [`crate::Error::Signed`]; call
+    /// [`Self::unsign`] first to edit it.
     pub fn edit_timelines(&mut self) -> Result<crate::timeline::Transaction<'_>> {
         self.ensure_mutation_allowed("edit_timelines")?;
         let workbook = self.0.main_document_part()?.partname().clone();
@@ -771,6 +809,10 @@ impl Package {
     }
 
     /// Start an atomic smart-tag transaction for a semantic worksheet.
+    ///
+    /// On a signed package every operation that changes the worksheet is
+    /// refused with [`crate::Error::Signed`]; call [`Self::unsign`] first to
+    /// edit it.
     pub fn edit_smart_tags<'a>(
         &mut self,
         sheet: impl Into<crate::workbook::Selector<'a>>,

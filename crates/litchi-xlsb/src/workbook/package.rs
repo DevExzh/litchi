@@ -51,6 +51,14 @@ fn is_worksheet_relationship(reltype: &str) -> bool {
     )
 }
 
+/// The Ribbon customization a package stores in `family`.
+fn ribbon_slot(set: ribbon::Set<'_>, family: ribbon::Family) -> Option<ribbon::Ui<'_>> {
+    match family {
+        ribbon::Family::Legacy => set.legacy(),
+        ribbon::Family::Modern => set.modern(),
+    }
+}
+
 fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
     CHART_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
         || DIALOG_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
@@ -599,17 +607,32 @@ impl Workbook {
     }
 
     /// Store task panes after validating every binary worksheet `appRef`.
+    ///
+    /// Panes equal to the stored graph publish nothing, so a signed workbook
+    /// keeps its signature byte for byte. Any other store changes the
+    /// package, so a signed workbook is refused up front with
+    /// [`crate::package::PackageError::Signed`] (ADR 0006): remove the
+    /// signature explicitly first with [`Self::unsign`].
     pub fn put_task_panes(
         &mut self,
         panes: web::Panes,
         conformance: web::Conformance,
     ) -> Result<&mut Self> {
         self.validate_task_pane_bindings(&panes)?;
-        web::put(&mut self.package, panes, conformance)?;
+        let patch = web::plan_put(&self.package, panes, conformance)?;
+        if !patch.is_empty() {
+            crate::signature_policy::ensure_unsigned(&self.package)?;
+        }
+        patch.apply(&mut self.package)?;
         Ok(self)
     }
 
     /// Remove task panes only when no binary worksheet binding would dangle.
+    ///
+    /// A workbook without task panes is left untouched and returns `false`,
+    /// signed or not. Removing them from a signed workbook is refused up front
+    /// with [`crate::package::PackageError::Signed`] (ADR 0006): remove the
+    /// signature explicitly first with [`Self::unsign`].
     pub fn remove_task_panes(&mut self) -> Result<bool> {
         if !self
             .package
@@ -620,7 +643,11 @@ impl Workbook {
             return Ok(false);
         }
         self.validate_task_pane_bindings(&web::Panes::new())?;
-        Ok(web::remove(&mut self.package)?)
+        let patch = web::plan_remove(&self.package)?;
+        if !patch.is_empty() {
+            crate::signature_policy::ensure_unsigned(&self.package)?;
+        }
+        Ok(patch.apply(&mut self.package)?)
     }
 
     fn validate_task_pane_bindings(&self, panes: &web::Panes) -> Result<()> {
@@ -641,13 +668,37 @@ impl Workbook {
     }
 
     /// Create or replace one Ribbon customization family.
+    ///
+    /// The version and bytes the family already stores publish nothing, so a
+    /// signed workbook keeps its signature byte for byte. Any other store
+    /// changes the package, so a signed workbook is refused up front with
+    /// [`crate::package::PackageError::Signed`] (ADR 0006): remove the
+    /// signature explicitly first with [`Self::unsign`].
     pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
+        // The shared Ribbon owner removes signatures itself, so a change to a
+        // signed workbook is refused here, before it is reached.
+        if self.package.is_signed() || self.package.requires_signature_edit_policy() {
+            let stored = ribbon_slot(ribbon::load(&self.package)?, version.family());
+            if !stored.is_some_and(|ui| ui.version() == version && ui.xml() == xml.as_slice()) {
+                crate::signature_policy::ensure_unsigned(&self.package)?;
+            }
+        }
         ribbon::put(&mut self.package, version, xml)?;
         Ok(self)
     }
 
     /// Remove one Ribbon relationship family and its unreferenced part.
+    ///
+    /// An absent family leaves the workbook untouched and returns `false`,
+    /// signed or not. Removing a family from a signed workbook is refused up
+    /// front with [`crate::package::PackageError::Signed`] (ADR 0006): remove
+    /// the signature explicitly first with [`Self::unsign`].
     pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
+        if (self.package.is_signed() || self.package.requires_signature_edit_policy())
+            && ribbon_slot(ribbon::load(&self.package)?, family).is_some()
+        {
+            crate::signature_policy::ensure_unsigned(&self.package)?;
+        }
         Ok(ribbon::remove(&mut self.package, family)?)
     }
 

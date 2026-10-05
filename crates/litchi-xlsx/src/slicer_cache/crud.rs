@@ -64,10 +64,10 @@ pub fn add_slicer(
         let xml = write_slicers(&part.slicers)?;
         let staged = part.clone();
         validate_slicer_views(package, Some((&staged.part_name, &staged.slicers)), &caches)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package
             .get_part_mut(&uri(&staged.part_name)?)?
             .set_blob(xml);
-        package.unsign();
         return Ok(staged);
     }
     let part_name = next_part_name(package, "/xl/slicers/slicer%d.xml")?;
@@ -78,7 +78,6 @@ pub fn add_slicer(
         slicers: Slicers::new(vec![slicer]),
     };
     store_slicer_part(package, worksheet_name, &value)?;
-    package.unsign();
     Ok(value)
 }
 
@@ -124,8 +123,8 @@ where
     )?;
     let xml = write_slicers(&parts[index].slicers)?;
     let part_name = uri(&parts[index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -164,6 +163,7 @@ pub fn remove_slicer(
         .position(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name))
         .unwrap_or_else(|| crate::error::panic_missing_invariant("located"));
     parts[part_index].slicers.slicers.remove(item_index);
+    crate::signature_policy::ensure_unsigned(package)?;
     if parts[part_index].slicers.slicers.is_empty() {
         let removed = parts.remove(part_index);
         let uri = uri(&removed.part_name)?;
@@ -179,7 +179,6 @@ pub fn remove_slicer(
         let uri = uri(&parts[part_index].part_name)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -209,10 +208,13 @@ pub fn reorder_slicers(
         .iter()
         .map(|part| Ok((uri(&part.part_name)?, write_slicers(&part.slicers)?)))
         .collect::<Result<_>>()?;
+    if rewrites_nothing(package, &plans)? {
+        return Ok(ordered);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     for (uri, xml) in plans {
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    package.unsign();
     Ok(ordered)
 }
 
@@ -234,7 +236,6 @@ pub fn add_slicer_cache(
     };
     validate_slicer_cache_pivot_links(package, std::slice::from_ref(&value))?;
     store_slicer_cache(package, &value)?;
-    package.unsign();
     Ok(value)
 }
 
@@ -256,8 +257,8 @@ where
     validate_slicer_cache_set(package, &caches)?;
     let xml = write_slicer_cache_definition(&caches[index].definition)?;
     let uri = uri(&caches[index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -303,6 +304,7 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
         "slicerCache",
         &ids,
     )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook_name)?.set_blob(updated);
     package
         .get_part_mut(&workbook_name)?
@@ -312,7 +314,6 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -340,8 +341,11 @@ pub fn reorder_slicer_caches(
         "slicerCache",
         &ids,
     )?;
+    if updated.as_slice() == package.get_part(&workbook_name)?.blob() {
+        return Ok(caches);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook_name)?.set_blob(updated);
-    package.unsign();
     Ok(caches)
 }
 
@@ -363,7 +367,6 @@ pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition)
     validate_timeline_cache_set(package, std::slice::from_ref(&value))?;
     if caches.is_empty() {
         store_timeline_caches(package, &workbook, std::slice::from_ref(&value))?;
-        package.unsign();
         return Ok(value);
     }
     caches.push(value.clone());
@@ -382,6 +385,7 @@ pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition)
     )?;
     let uri = uri(&value.part_name)?;
     let xml = write_timeline_cache_definition(&value.definition)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
         TIMELINE_CACHE_CONTENT_TYPE.into(),
@@ -397,7 +401,6 @@ pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition)
             false,
         );
     package.get_part_mut(&workbook)?.set_blob(updated);
-    package.unsign();
     Ok(value)
 }
 
@@ -420,8 +423,8 @@ where
     validate_timeline_cache_set(package, &caches)?;
     let xml = write_timeline_cache_definition(&caches[index].definition)?;
     let uri = uri(&caches[index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -470,6 +473,7 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
         "timelineCacheRef",
         &ids,
     )?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook)?.set_blob(updated);
     package
         .get_part_mut(&workbook)?
@@ -479,7 +483,6 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -507,8 +510,11 @@ pub fn reorder_timeline_caches(
         "timelineCacheRef",
         &ids,
     )?;
+    if updated.as_slice() == package.get_part(&workbook)?.blob() {
+        return Ok(caches);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&workbook)?.set_blob(updated);
-    package.unsign();
     Ok(caches)
 }
 
@@ -557,8 +563,8 @@ pub fn add_timeline(
         validate_timeline_views(&sheets, &caches)?;
         let xml = write_timelines(&sheets[index].timelines)?;
         let uri = uri(&sheets[index].part_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&uri)?.set_blob(xml);
-        package.unsign();
         return Ok(sheets[index].clone());
     }
     let value = TimelinePart {
@@ -570,7 +576,6 @@ pub fn add_timeline(
         },
     };
     store_worksheet_timelines(package, &workbook, &value)?;
-    package.unsign();
     Ok(value)
 }
 
@@ -610,8 +615,8 @@ where
     validate_timeline_views(&sheets, &caches)?;
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
     let uri = uri(&sheets[sheet_index].part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(true)
 }
 
@@ -659,6 +664,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
             "timelineRef",
             &[],
         )?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(worksheet)?.set_blob(updated);
         package
             .get_part_mut(worksheet)?
@@ -672,9 +678,9 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
         validate_timeline_views(&sheets, &caches)?;
         let xml = write_timelines(&sheets[sheet_index].timelines)?;
         let uri = uri(&sheets[sheet_index].part_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -705,9 +711,23 @@ pub fn reorder_timelines(
     validate_timeline_views(&sheets, &caches)?;
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
     let uri = uri(&sheets[sheet_index].part_name)?;
+    if xml.as_slice() == package.get_part(&uri)?.blob() {
+        return Ok(ordered);
+    }
+    crate::signature_policy::ensure_unsigned(package)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    package.unsign();
     Ok(ordered)
+}
+
+/// Whether every planned part rewrite reproduces the part's current bytes,
+/// so the reorder publishes nothing (a worksheet without slicers plans none).
+fn rewrites_nothing(package: &OpcPackage, plans: &[(PackURI, Vec<u8>)]) -> Result<bool> {
+    for (uri, xml) in plans {
+        if package.get_part(uri)?.blob() != xml.as_slice() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn validate_slicer_cache_set(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {

@@ -46,6 +46,12 @@ impl Patch {
     }
 
     /// Apply atomically after checking the workbook and owned-part source.
+    ///
+    /// An empty patch publishes nothing and keeps a signed target exactly as
+    /// it was. Any other patch changes the target, so a signed target is
+    /// refused with a boxed [`crate::Error::Signed`]: remove its signature
+    /// explicitly first ([`OpcPackage::unsign`]). The inverse never restores
+    /// a signature.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
@@ -54,6 +60,7 @@ impl Patch {
         if self.is_empty() {
             return Ok(());
         }
+        crate::signature_policy::ensure_unsigned(target)?;
 
         let mut candidate = target.clone();
         self.after.restore_into(&mut candidate)?;

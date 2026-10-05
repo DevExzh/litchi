@@ -132,10 +132,16 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
 ///
 /// Font bytes are stored exactly as supplied. Callers that have unobfuscated
 /// bytes must explicitly call [`crate::font::obfuscate`] first. The API
-/// operates on an already decrypted in-memory `OpcPackage` and invalidates any
-/// package signatures immediately before the mutation phase. Moving a default,
+/// operates on an already decrypted in-memory `OpcPackage`. Moving a default,
 /// empty [`Table`] removes the optional font-table graph and any font resources
 /// that become unreferenced.
+///
+/// An equal table (or an empty one where no table exists) publishes nothing,
+/// so a signed package keeps its signature byte for byte. Any other table
+/// changes the package, so a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] before the mutation phase
+/// (ADR 0006): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
@@ -305,7 +311,7 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
                 .map_err(Error::Uri)
         })
         .collect::<Result<Vec<_>>>()?;
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
 
     for (uri, content_type, data) in resource_parts {
         match package.get_part_mut(&uri) {
@@ -373,8 +379,12 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
 /// Remove the optional font-table graph and every font resource that becomes
 /// unreferenced.
 ///
-/// The complete relationship graph is validated before signatures, parts, or
-/// relationships are mutated. Resources shared by another source are retained.
+/// The complete relationship graph is validated before parts or relationships
+/// are mutated. Resources shared by another source are retained. A package
+/// without a font table is left untouched and returns `false`, signed or not;
+/// removing one from a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006): remove the
+/// signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
@@ -446,7 +456,7 @@ fn remove_graph(
     }
     validate_all_internal_relationship_targets(package)?;
 
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(main_name)?
         .rels_mut()

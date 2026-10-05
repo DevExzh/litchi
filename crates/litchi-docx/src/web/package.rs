@@ -67,6 +67,12 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 /// content-type, conformance, relationship, and semantic validation. A
 /// failure leaves the caller's package and signatures untouched.
 ///
+/// A patch that leaves the part's bytes as they are publishes nothing, so a
+/// signed package keeps its signature byte for byte. Any other patch changes
+/// the package, so a signed package is refused with
+/// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+/// remove the signature explicitly first ([`OpcPackage::unsign`]).
+///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
@@ -80,6 +86,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
         return Ok(current);
     }
 
+    crate::signature_policy::ensure_unsigned(package)?;
     let mut staged = package.clone();
     staged
         .get_part_mut(&owner.target)?
@@ -87,12 +94,13 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     validate_internal_targets(&staged)?;
     let published = load_snapshot(&staged)?
         .ok_or_else(|| invalid("staged web-settings ownership disappeared"))?;
-    staged.unsign();
     *package = staged;
     Ok(published)
 }
 
 /// Apply a committed web-settings edit to its owning OPC part.
+///
+/// The signature policy is [`apply_patch`]'s.
 ///
 /// # Errors
 ///
@@ -104,11 +112,13 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// Move a complete model into package ownership.
 ///
 /// Serialization, graph validation, and a semantic round trip complete before
-/// signatures or package members are changed. Semantic/conformance equality is
-/// a no-op that retains the producer's exact original bytes and signatures.
-/// A different requested conformance is rejected before mutation. A real
-/// semantic edit writes canonical modeled XML; ignored or unknown extension
-/// markup is not retained source-surgically.
+/// package members are changed. Semantic/conformance equality is a no-op that
+/// retains the producer's exact original bytes and signatures. A different
+/// requested conformance is rejected before mutation. A real semantic edit
+/// writes canonical modeled XML; ignored or unknown extension markup is not
+/// retained source-surgically. A real edit of a signed package is refused with
+/// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+/// remove the signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
@@ -149,8 +159,8 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
         }
         validate_internal_targets(package)?;
 
+        crate::signature_policy::ensure_unsigned(package)?;
         package.add_part(Box::new(staged));
-        package.unsign();
         return Ok(true);
     }
 
@@ -165,12 +175,12 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
     let target_ref = target.relative_ref(main.base_uri());
     let relationship_type = conformance.relationship();
 
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(&main)?
         .rels_mut()
         .get_or_add(relationship_type, &target_ref);
     package.add_part(Box::new(staged));
-    package.unsign();
     Ok(true)
 }
 
@@ -178,6 +188,9 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
 ///
 /// A part shared by another relationship is rejected rather than silently
 /// detached or deleted. Absence is an exact, signature-preserving no-op.
+/// Removing a part from a signed package is refused with
+/// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+/// remove the signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
@@ -201,12 +214,12 @@ pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     }
     validate_internal_targets(package)?;
 
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(&owner.main)?
         .rels_mut()
         .remove(&owner.relationship_id);
     package.remove_part(&owner.target);
-    package.unsign();
     Ok(true)
 }
 

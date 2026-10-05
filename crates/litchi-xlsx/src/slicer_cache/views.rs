@@ -383,6 +383,11 @@ pub fn load_slicer_parts(
 }
 
 /// Adds one leaf Slicers part and its explicit worksheet relationship.
+///
+/// Adding a part changes the package, so a signed package is refused up front
+/// with [`crate::Error::Signed`] (it used to be changed in memory and refused
+/// only when saved): remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn store_slicer_part(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
@@ -418,6 +423,7 @@ pub fn store_slicer_part(
         )));
     }
     let target = part_name.relative_ref(worksheet_name.base_uri());
+    crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         part_name,
         SLICERS_CONTENT_TYPE.into(),

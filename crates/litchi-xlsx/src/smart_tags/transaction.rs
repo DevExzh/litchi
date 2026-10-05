@@ -10,6 +10,13 @@ use crate::error::Result;
 ///
 /// Every operation validates a cloned candidate. Dropping without calling
 /// [`commit`](Self::commit) leaves the source package unchanged.
+///
+/// An operation that would change the worksheet of a signed package is
+/// refused with [`crate::Error::Signed`] and stages nothing; one that leaves
+/// the worksheet bytes as they are (removing an absent annotation, clearing an
+/// empty collection) publishes nothing and keeps the signature byte for byte.
+/// Remove the signature explicitly before the transaction starts
+/// ([`crate::Package::unsign`]) to edit a signed workbook.
 pub struct Transaction<'a> {
     target: &'a mut OpcPackage,
     staged: OpcPackage,

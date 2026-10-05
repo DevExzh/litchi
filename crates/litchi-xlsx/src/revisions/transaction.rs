@@ -272,11 +272,18 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate and publish the staged owner atomically.
+    ///
+    /// A transaction without a change publishes nothing, so a signed package
+    /// keeps its signature byte for byte. A changed commit over a signed
+    /// package is refused with [`crate::Error::Signed`] and leaves it
+    /// untouched: remove the signature explicitly first
+    /// ([`OpcPackage::unsign`]).
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
         }
+        crate::signature_policy::ensure_unsigned(self.target)?;
         let mut candidate = self.target.clone();
         replace_workbook_revisions(&mut candidate, self.draft.as_ref(), self.conformance)?;
         let snapshot = Snapshot::load(&candidate)?;

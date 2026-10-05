@@ -52,6 +52,11 @@ impl Patch {
     /// mismatch therefore leaves the caller's package untouched. The captured
     /// comments bytes are restored after the existing package writer has
     /// planned the relationship operation, preserving the exact patch source.
+    ///
+    /// An empty patch publishes nothing and keeps a signed target exactly as
+    /// it was. Any other patch changes the target, so a signed target is
+    /// refused with [`crate::Error::Signed`]: remove its signature explicitly
+    /// first ([`OpcPackage::unsign`]). The inverse never restores a signature.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target, self.before.worksheet())?;
         if !current.same_source(&self.before) {
@@ -62,6 +67,7 @@ impl Patch {
         if self.is_empty() {
             return Ok(());
         }
+        crate::signature_policy::ensure_unsigned(target)?;
 
         let mut candidate = target.clone();
         if let Some(part) = self.after.part() {

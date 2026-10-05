@@ -450,6 +450,13 @@ impl<'a> Transaction<'a> {
 
     /// Validate and publish the staged graph atomically.
     ///
+    /// A transaction without a change publishes nothing, so a signed package
+    /// keeps its signature byte for byte. A changed commit over a signed
+    /// package is refused with
+    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] and leaves
+    /// it untouched (ADR 0006): remove the signature explicitly first
+    /// ([`OpcPackage::unsign`]).
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -458,6 +465,7 @@ impl<'a> Transaction<'a> {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
         }
+        crate::signature_policy::ensure_unsigned(self.target)?;
         let current = Snapshot::load(self.target)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary transaction source is stale"));
@@ -578,6 +586,12 @@ impl Patch {
 
     /// Apply the patch atomically after checking the complete owner graph.
     ///
+    /// An empty patch publishes nothing and keeps a signed target exactly as
+    /// it was. Any other patch changes the target, so a signed target is
+    /// refused with [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`]
+    /// (ADR 0006): remove its signature explicitly first
+    /// ([`OpcPackage::unsign`]). The inverse never restores a signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -589,6 +603,7 @@ impl Patch {
         if self.is_empty() {
             return Ok(current);
         }
+        crate::signature_policy::ensure_unsigned(target)?;
         let mut candidate = target.clone();
         match self.after.graph.as_ref() {
             Some(graph) => {

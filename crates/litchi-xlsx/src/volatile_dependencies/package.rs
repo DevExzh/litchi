@@ -34,6 +34,11 @@ pub fn load_from_package_with_conformance(
 /// Existing invalid package graphs are rejected before mutation. The writer only
 /// persists the supplied dependency records and never performs RTD, cube, or
 /// formula evaluation work.
+///
+/// Storing always writes the part, so a signed package is refused with a
+/// boxed [`crate::Error::Signed`] before anything is changed, even when the
+/// serialized records equal the stored ones: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
 pub fn store_in_package(
     package: &mut OpcPackage,
     value: &VolatileDependencies,
@@ -46,6 +51,7 @@ pub fn store_in_package(
     if let Some(existing) = existing {
         validate_volatile_dependencies_graph(package, &workbook_uri, Some(&existing))?;
         validate_volatile_dependencies_part(package, &existing.part_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package.get_part_mut(&existing.part_name)?.set_blob(xml);
         if existing.conformance != conformance {
             let workbook = package.get_part_mut(&workbook_uri)?;
@@ -62,6 +68,7 @@ pub fn store_in_package(
         let part_name = next_volatile_dependencies_part_name(package)?;
         let relationship_id = next_volatile_dependencies_relationship_id(package, &workbook_uri)?;
         let target = part_name.relative_ref(workbook_uri.base_uri());
+        crate::signature_policy::ensure_unsigned(package)?;
         package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
             part_name,
             CONTENT_TYPE.into(),
@@ -77,8 +84,6 @@ pub fn store_in_package(
                 false,
             );
     }
-
-    package.unsign();
     Ok(())
 }
 
@@ -86,6 +91,11 @@ pub fn store_in_package(
 ///
 /// No RTD, cube, or formula work is performed. A target retained by another
 /// relationship is left in the package.
+///
+/// A workbook without the part is left untouched and returns `false`, signed
+/// or not. Removing it changes the package, so a signed package is refused
+/// with a boxed [`crate::Error::Signed`]: remove the signature explicitly first
+/// ([`OpcPackage::unsign`]).
 pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     let workbook_uri = main_workbook_uri(package)?;
     let Some(existing) = volatile_dependencies_relationship(package, &workbook_uri)? else {
@@ -94,6 +104,7 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     };
     validate_volatile_dependencies_graph(package, &workbook_uri, Some(&existing))?;
     validate_volatile_dependencies_part(package, &existing.part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
 
     package
         .get_part_mut(&workbook_uri)?
@@ -102,7 +113,6 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     if !package_part_is_referenced(package, &existing.part_name) {
         package.remove_part(&existing.part_name);
     }
-    package.unsign();
     Ok(true)
 }
 

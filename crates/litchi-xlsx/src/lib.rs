@@ -120,6 +120,7 @@ pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+mod signature_policy;
 pub mod slicer;
 #[allow(
     dead_code,

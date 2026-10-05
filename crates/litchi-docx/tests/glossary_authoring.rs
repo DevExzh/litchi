@@ -245,7 +245,7 @@ fn invalid_graph_update_is_failure_atomic() {
 }
 
 #[test]
-fn graph_noop_preserves_signature_and_real_change_unsigns() {
+fn graph_noop_preserves_signature_and_real_change_requires_explicit_unsign() {
     let mut package = Package::new().unwrap();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep", None)).unwrap();
@@ -264,10 +264,35 @@ fn graph_noop_preserves_signature_and_real_change_unsigns() {
     assert!(package.is_signed());
     assert!(package.opc_package().contains_part(&signature_origin));
 
+    // A real change used to remove the signature as a side effect; it is
+    // refused until the signature is removed explicitly (ADR 0006).
     let mut changed = package.glossary_graph().unwrap().unwrap();
     changed.catalog.add(entry("Changed", None)).unwrap();
+    let error = package.put_glossary_graph(&changed).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            litchi_docx::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+        ),
+        "{error:?}"
+    );
+    assert!(package.is_signed());
+    assert!(package.opc_package().contains_part(&signature_origin));
+    assert!(
+        package
+            .glossary()
+            .unwrap()
+            .unwrap()
+            .0
+            .get("changed")
+            .unwrap()
+            .is_none()
+    );
+
+    package.unsign();
     assert!(package.put_glossary_graph(&changed).unwrap());
     assert!(!package.is_signed());
+    assert!(!package.opc_package().contains_part(&signature_origin));
     assert!(
         package
             .glossary()

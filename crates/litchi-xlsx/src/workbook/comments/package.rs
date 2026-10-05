@@ -42,6 +42,11 @@ pub fn load_from_worksheet(
 }
 
 /// Store or replace the worksheet's sole classic comments part.
+///
+/// Storing always writes the part, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed, even when the
+/// serialized comments equal the stored ones: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
 pub fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
@@ -72,6 +77,7 @@ pub fn store_on_worksheet(
         };
 
     let xml = write_comments(value)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     match package.get_part(&part_name) {
         Ok(_) => package.get_part_mut(&part_name)?.set_blob(xml),
         Err(OpcError::PartNotFound(_)) => {
@@ -99,7 +105,6 @@ pub fn store_on_worksheet(
                 false,
             );
     }
-    package.unsign();
     Ok(CommentsPart {
         worksheet_part_name: worksheet_part.to_string(),
         relationship_id,
@@ -109,6 +114,8 @@ pub fn store_on_worksheet(
 }
 
 /// Replace the worksheet's classic comments graph atomically at the semantic level.
+///
+/// The signature policy is [`store_on_worksheet`]'s.
 pub fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
@@ -118,6 +125,11 @@ pub fn replace_on_worksheet(
 }
 
 /// Remove the worksheet's classic comments relationship and unreferenced part.
+///
+/// A worksheet without comments is left untouched and returns `false`, signed
+/// or not. Removing comments changes the package, so a signed package is
+/// refused with [`crate::Error::Signed`]: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
 pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI) -> Result<bool> {
     let Some((relationship_id, part_name)) = find_relationship(package.get_part(worksheet_part)?)?
         .map(|relationship| {
@@ -130,6 +142,7 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI)
     else {
         return Ok(false);
     };
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(worksheet_part)?
         .rels_mut()
@@ -137,7 +150,6 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI)
     if !part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    package.unsign();
     Ok(true)
 }
 

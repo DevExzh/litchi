@@ -107,6 +107,11 @@ impl Package {
     }
 
     /// Remove all package signatures.
+    ///
+    /// This is the explicit authorization ADR 0006 requires: a package-level
+    /// edit never removes a signature itself, so a change to a signed package
+    /// (mail merge, glossary, web settings, fonts, Ribbon, document patches)
+    /// is refused until this is called.
     pub fn unsign(&mut self) -> &mut Self {
         self.opc.unsign();
         self

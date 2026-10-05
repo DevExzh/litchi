@@ -115,6 +115,7 @@ impl Snapshot {
                 "custom XML maps patch targets a different workbook",
             ));
         }
+        crate::signature_policy::ensure_unsigned(package)?;
 
         let existing = package
             .get_part(&workbook_uri)?
@@ -193,7 +194,6 @@ impl Snapshot {
                     owner.mode == TargetMode::External,
                 );
         }
-        package.unsign();
         Ok(())
     }
 }
