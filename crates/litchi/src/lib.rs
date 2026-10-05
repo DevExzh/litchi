@@ -52,15 +52,20 @@
 //! Format-specific reads live on the handle a variant carries;
 //! [`format`](mod@format) documents each handle:
 //!
-//! ```no_run
+//! ```
 //! # #[cfg(feature = "pptx")]
 //! # {
 //! use litchi::File;
 //!
-//! let file = litchi::open("deck.pptx")?;
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/ooxml/pptx/SmartArt.pptx"
+//! # );
+//! let file = litchi::open(path)?;
 //! if let File::Pptx(pptx) = &file {
 //!     let (width, height) = pptx.slide_size()?;
-//!     println!("{} slides of {width} x {height} EMU", pptx.slide_catalog()?.len());
+//!     assert_eq!((width, height), (12_192_000, 6_858_000)); // EMU, 16:9
+//!     assert_eq!(pptx.slide_catalog()?.len(), 1);
 //! }
 //! # }
 //! # Ok::<(), litchi::Error>(())
@@ -84,13 +89,74 @@
 //! # Ok::<(), litchi::Error>(())
 //! ```
 //!
+//! # Encrypted and signed files
+//!
+//! An encrypted input opens as [`File::Locked`]. Its reads refuse with
+//! [`Code::DocumentProtected`] and a suggestion, until `Locked::unlock` (the
+//! `encryption` feature) consumes the handle with the password. The password
+//! never passes through [`OpenOptions`].
+//!
+//! ```
+//! # #[cfg(all(feature = "doc", feature = "encryption"))]
+//! # {
+//! use litchi::{Code, EncryptionKind, File, FileFormat, Password};
+//!
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/poi/test-data/document/password_password_cryptoapi.doc"
+//! # );
+//! let file = litchi::open(path)?;
+//! let error = file.text().unwrap_err();
+//! assert_eq!(error.code(), Code::DocumentProtected);
+//! assert!(error.suggestion().is_some_and(|hint| hint.contains("Locked::unlock")));
+//!
+//! let file = match file {
+//!     File::Locked(locked) => {
+//!         assert_eq!(locked.format(), Some(FileFormat::Doc));
+//!         assert_eq!(locked.encryption(), EncryptionKind::CryptoApi);
+//!         locked.unlock(Password::new("password".to_owned()))?
+//!     },
+//!     file => file,
+//! };
+//! assert!(!file.text()?.is_empty());
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
+//!
+//! A signed OOXML or legacy binary input opens as [`File::Signed`]. It reads
+//! like the file it wraps, and nothing is verified at open. Editing a signed
+//! file requires consuming the signature first with [`Signed::unsign`], so
+//! that no edit strips a signature silently.
+//!
+//! ```
+//! # #[cfg(feature = "docx")]
+//! # {
+//! use litchi::{File, SignatureOrigin};
+//!
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/poi/test-data/xmldsign/hello-world-signed.docx"
+//! # );
+//! let file = litchi::open(path)?;
+//! assert!(file.is_signed());
+//! assert_eq!(file.text()?.trim(), "Hello world");
+//! if let File::Signed(signed) = file {
+//!     assert_eq!(signed.origin(), SignatureOrigin::Opc);
+//!     let unsigned: File = signed.unsign();
+//!     assert!(!unsigned.is_signed());
+//! }
+//! # }
+//! # Ok::<(), litchi::Error>(())
+//! ```
+//!
 //! # Errors
 //!
 //! Every failure of the unified API is one [`Error`] with a stable [`Code`]
 //! (OfficeCLI's code list plus Litchi's `unsupported_capability`,
-//! `limit_exceeded` and `cancelled`), a message, an optional suggestion, the
-//! format involved and the typed error of the format crate that failed
-//! ([`Error::leaf`]).
+//! `limit_exceeded` and `cancelled`), a message, an optional suggestion
+//! ([`Error::suggestion`]), the format involved and the typed error of the
+//! format crate that failed ([`Error::leaf`], also its
+//! [`source`](std::error::Error::source)).
 //!
 //! ```
 //! # #[cfg(feature = "docx")]
@@ -108,6 +174,12 @@
 //! (the `iwork` feature). [`open`] recognizes them and refuses them with
 //! [`Code::UnsupportedFormat`] and a suggestion to use
 //! `litchi::iwork::Document::open`.
+//!
+//! # Not here yet
+//!
+//! The unified API reads. Its edit verbs (`set`, `add`, `remove`, batches,
+//! `save` and `create`) and path queries arrive in later releases; until
+//! then, the format modules below write documents.
 //!
 //! # Older entry points
 //!
@@ -217,10 +289,10 @@ mod metadata_ext;
 #[cfg(feature = "yaml")]
 pub use metadata_ext::MetadataYaml;
 
-/// Unified Word document API
+/// The word-processing `Document` type that predates [`File`].
 ///
-/// Provides format-agnostic interface for .doc, .docx, .rtf, and .odt files.
-/// Use [`Document::open()`] to get started.
+/// Use [`open`] and `File::document` instead. This module is removed in a
+/// later step of the migration to [`File`].
 #[cfg(any(
     feature = "doc",
     feature = "docx",
@@ -260,12 +332,10 @@ pub mod tolerance;
 #[cfg(feature = "images")]
 pub mod images;
 
-/// Unified PowerPoint presentation API
+/// The `Presentation` type that predates [`File`].
 ///
-/// Provides format-agnostic interface for both .ppt and .pptx files.
-/// Use [`Presentation::open()`] to get started.
-///
-/// **Note**: This requires at least one presentation-format feature to be enabled.
+/// Use [`open`] and `File::presentation` instead. This module is removed in a
+/// later step of the migration to [`File`].
 #[cfg(any(
     feature = "ppt",
     feature = "pptx",
@@ -274,14 +344,8 @@ pub mod images;
 ))]
 pub mod presentation;
 
-/// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
-///
-/// Requires the corresponding feature flags:
-/// - `xls` for .xls
-/// - `xlsx` for .xlsx
-/// - `xlsb` for .xlsb
-/// - `ods` for .ods
-/// - `numbers` for .numbers
+/// Spreadsheet vocabulary: the generic sheet traits, text workbooks and
+/// formula evaluation.
 #[cfg(feature = "sheet")]
 pub mod sheet;
 
@@ -660,8 +724,8 @@ pub mod odf_common {
 /// RTF (Rich Text Format) Support
 ///
 /// Provides high-performance parsing of RTF documents with support for RTF 1.9.1.
-/// RTF documents are automatically integrated with the unified Document API.
-/// Use [`Document::open()`] to parse RTF files.
+/// [`open`] reads RTF files as [`File::Rtf`]; this module is the RTF format
+/// crate, for format-specific reading and writing.
 ///
 /// **Note**: This requires the `rtf` feature to be enabled.
 #[cfg(feature = "rtf")]

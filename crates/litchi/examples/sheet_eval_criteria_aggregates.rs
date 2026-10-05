@@ -6,10 +6,10 @@
 //! Run with:
 //!
 //! ```bash
-//! cargo run --example sheet_eval_criteria_aggregates --features ooxml -- sheet_eval_criteria_aggregates.xlsx
+//! cargo run --example sheet_eval_criteria_aggregates --features xlsx,eval -- sheet_eval_criteria_aggregates.xlsx
 //! ```
 
-use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
+use litchi::sheet::FormulaEvaluator;
 use litchi::xlsx::{Formula, Workbook};
 use std::env;
 use std::error::Error;
@@ -27,8 +27,11 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = open_workbook(path)?;
-    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
+    // Reopen the workbook with `litchi::open`. Its workbook view implements
+    // `WorkbookTrait` by static dispatch, so the evaluator borrows it directly.
+    let file = litchi::open(path)?;
+    let workbook = file.workbook()?;
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     println!("Evaluating criteria-based aggregates on Crit in {}", path);
 

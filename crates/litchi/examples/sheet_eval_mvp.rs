@@ -1,8 +1,8 @@
-//! MVP formula evaluator example using the unified `sheet` API.
+//! MVP formula evaluator example using the unified `litchi::open` API.
 //!
 //! This example builds a small XLSX workbook using the XLSX writer,
-//! then reopens it via the unified `sheet::Workbook` and evaluates
-//! a few simple formulas with `FormulaEvaluator`.
+//! then reopens it with `litchi::open` and evaluates a few simple
+//! formulas on its workbook view with `FormulaEvaluator`.
 //!
 //! It demonstrates Phase 1 capabilities:
 //! - Prefer cached results when present (not exercised here, formulas have no cache).
@@ -15,10 +15,10 @@
 //! Run with:
 //!
 //! ```bash
-//! cargo run --example sheet_eval_mvp --features ooxml -- sheet_eval_mvp.xlsx
+//! cargo run --example sheet_eval_mvp --features xlsx,eval -- sheet_eval_mvp.xlsx
 //! ```
 
-use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
+use litchi::sheet::FormulaEvaluator;
 use litchi::xlsx::{Formula, Workbook};
 use std::env;
 use std::error::Error;
@@ -37,9 +37,11 @@ async fn main() -> ExampleResult<()> {
     // 1) Build a small XLSX workbook with a few formulas and no cached values.
     build_sample_xlsx(path)?;
 
-    // 2) Open via the XLSX workbook type that implements WorkbookTrait.
-    let xlsx_wb = open_workbook(path)?;
-    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
+    // 2) Reopen it with `litchi::open`. The workbook view implements
+    // `WorkbookTrait` by static dispatch, so the evaluator borrows it directly.
+    let file = litchi::open(path)?;
+    let workbook = file.workbook()?;
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     // 3) Evaluate a few cells on Sheet1.
     println!("Evaluating formulas on Sheet1 in {}", path);

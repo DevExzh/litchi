@@ -1,47 +1,45 @@
-//! Unified spreadsheet API for Excel and Numbers files.
+//! The module holds the vocabulary the workbook formats share:
 //!
-//! This module provides a unified interface for working with spreadsheets,
-//! supporting multiple formats with automatic detection.
+//! - The generic sheet traits: [`WorkbookTrait`](crate::sheet::WorkbookTrait),
+//!   [`Worksheet`](crate::sheet::Worksheet), [`Cell`](crate::sheet::Cell)
+//!   and their iterators, over [`CellValue`](crate::sheet::CellValue).
+//! - [`text`](crate::sheet::text): CSV, TSV, PRN, SYLK, DIF and fixed-width
+//!   text workbooks.
+//! - [`view`](crate::sheet::view): worksheet-view semantics shared by XLSX
+//!   and XLSB.
+//! - `FormulaEvaluator` (the `eval` feature): formula evaluation over any
+//!   `WorkbookTrait`.
 //!
-//! # Supported Formats
+//! # Reading workbooks
 //!
-//! - `.xls` - Microsoft Excel 97-2003 (OLE2)
-//! - `.xlsx` - Microsoft Excel 2007+ (Office Open XML)
-//! - `.xlsb` - Microsoft Excel Binary Workbook
-//! - `.ods` - OpenDocument Spreadsheet
-//! - `.numbers` - Apple Numbers (iWork Archive)
+//! Open an XLS, XLSX, XLSB or ODS workbook with `litchi::open`. Its workbook
+//! view (`File::workbook`) lists the worksheets and implements
+//! `WorkbookTrait` by static dispatch, so generic sheet code and the formula
+//! evaluator borrow it directly. The traits report boxed errors.
 //!
-//! # Quick Start
+//! ```
+//! # #[cfg(feature = "xlsx")]
+//! # {
+//! use litchi::sheet::WorkbookTrait;
 //!
-//! ```rust,ignore
-//! use litchi::sheet::Workbook;
+//! # let path = concat!(
+//! #     env!("CARGO_MANIFEST_DIR"),
+//! #     "/../../test-data/ooxml/xlsx/ExcelTables.xlsx"
+//! # );
+//! let file = litchi::open(path)?;
+//! let workbook = file.workbook()?;
+//! assert_eq!(workbook.worksheet_names()?, ["ExcelTable"]);
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//! // Open any spreadsheet format - auto-detected
-//! let workbook = Workbook::open("data.numbers")?;
-//!
-//! // Get worksheet names
-//! let names = workbook.worksheet_names()?;
-//! println!("Worksheets: {:?}", names);
-//!
-//! // Extract all text
-//! let text = workbook.text()?;
-//! println!("{}", text);
-//!
-//! // Get metadata
-//! let metadata = workbook.metadata()?;
-//! if let Some(title) = metadata.title {
-//!     println!("Title: {}", title);
-//! }
-//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+//! // The same view through the generic sheet trait.
+//! let sheet = WorkbookTrait::worksheet_by_index(&workbook, 0)?;
+//! assert_eq!(sheet.name(), "ExcelTable");
 //! # }
+//! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 //!
-//! # Architecture
-//!
-//! The module provides both:
-//! - **Unified API**: `Workbook` struct for high-level operations
-//! - **Trait-based API**: `Workbook`, `Worksheet`, `Cell` traits for advanced use
+//! The `Workbook` type and the boxed `open_*_workbook` functions of this
+//! module predate `litchi::File` and are removed in a later step of the
+//! migration to it; the text workbooks stay.
 
 /// Canonical worksheet-view semantics shared by XLSX and XLSB.
 pub mod view {

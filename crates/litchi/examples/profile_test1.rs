@@ -5,18 +5,17 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo build --profile profiling --features formula --example profile_test1
+//! cargo build --profile profiling --features all --example profile_test1
 //! samply record ./target/profiling/examples/profile_test1
 //! ```
 
-use litchi::Document;
 use litchi::markdown::{MarkdownOptions, ToMarkdown};
 
 fn main() -> Result<(), litchi::Error> {
     println!("Starting profiling run for test_1.docx...");
 
     // Open test_1.docx which has 14,937 formulas
-    let doc = Document::open("test_1.docx")?;
+    let doc = litchi::open("test_1.docx")?;
 
     println!("Document loaded. Starting formula conversion...");
 

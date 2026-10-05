@@ -139,9 +139,10 @@ pub mod functions {
     /// classify an OOXML package, so a caller that detects and then opens indexes
     /// the same ZIP twice. This entry point returns the same neutral
     /// classification **and**, for an OOXML package, an opaque handle to the
-    /// already-validated package. Pass that handle to `Document::from_prepared`,
-    /// `Presentation::from_prepared`, or `Workbook::from_prepared` and the open
-    /// reuses the existing index instead of building a second one.
+    /// already-validated package. Pass the detection to
+    /// [`open_prepared`](crate::open_prepared) and the open reuses the existing
+    /// index instead of building a second one. ([`open`](crate::open) detects
+    /// and indexes in one pass, so it needs no separate detection.)
     ///
     /// # Returns
     ///
@@ -158,19 +159,24 @@ pub mod functions {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```
+    /// # #[cfg(feature = "docx")]
+    /// # {
     /// use litchi::common::detection::{FileFormat, detect_and_prepare};
-    /// use litchi::Document;
     ///
-    /// if let Some(detected) = detect_and_prepare("document.docx") {
-    ///     if detected.format() == FileFormat::Docx
-    ///         && let Some(prepared) = detected.into_prepared()
-    ///     {
-    ///         let document = Document::from_prepared(prepared)?;
-    ///         println!("{}", document.text()?);
-    ///     }
+    /// # let path = concat!(
+    /// #     env!("CARGO_MANIFEST_DIR"),
+    /// #     "/../../test-data/ooxml/docx/documentProperties.docx"
+    /// # );
+    /// if let Some(detection) = detect_and_prepare(path)
+    ///     && detection.format() == FileFormat::Docx
+    ///     && detection.is_prepared()
+    /// {
+    ///     let file = litchi::open_prepared(detection)?;
+    ///     assert_eq!(file.text()?.trim(), "Hello World!");
     /// }
-    /// # Ok::<(), litchi::common::Error>(())
+    /// # }
+    /// # Ok::<(), litchi::Error>(())
     /// ```
     #[cfg(all(
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),

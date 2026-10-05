@@ -9,8 +9,8 @@ use crate::config::MarkdownOptions;
 ///
 /// Each implementor names the error its conversion reports, so a format
 /// adapter keeps its own typed error instead of flattening it into another
-/// crate's: the `litchi` facade's unified `File` reports `litchi::Error`,
-/// for example.
+/// crate's. The `litchi` facade's unified `File`, for example, converts with
+/// `litchi::open("report.docx")?.to_markdown()?` and reports `litchi::Error`.
 ///
 /// # Examples
 ///
@@ -42,6 +42,32 @@ pub trait ToMarkdown {
     ///
     /// Returns an error if the underlying document content cannot be read
     /// or converted to Markdown.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_markdown::{MarkdownOptions, ToMarkdown};
+    ///
+    /// struct Note(&'static str);
+    ///
+    /// impl ToMarkdown for Note {
+    ///     type Error = std::fmt::Error;
+    ///
+    ///     fn to_markdown_with_options(
+    ///         &self,
+    ///         options: &MarkdownOptions,
+    ///     ) -> Result<String, Self::Error> {
+    ///         Ok(if options.include_styles {
+    ///             format!("**{}**", self.0)
+    ///         } else {
+    ///             self.0.to_owned()
+    ///         })
+    ///     }
+    /// }
+    ///
+    /// // The default options keep inline styles.
+    /// assert_eq!(Note("Done").to_markdown().unwrap(), "**Done**");
+    /// ```
     fn to_markdown(&self) -> Result<String, Self::Error> {
         self.to_markdown_with_options(&MarkdownOptions::default())
     }
@@ -56,5 +82,30 @@ pub trait ToMarkdown {
     ///
     /// Returns an error if the underlying document content cannot be read
     /// or converted to Markdown.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_markdown::{MarkdownOptions, ToMarkdown};
+    ///
+    /// # struct Note(&'static str);
+    /// #
+    /// # impl ToMarkdown for Note {
+    /// #     type Error = std::fmt::Error;
+    /// #
+    /// #     fn to_markdown_with_options(
+    /// #         &self,
+    /// #         options: &MarkdownOptions,
+    /// #     ) -> Result<String, Self::Error> {
+    /// #         Ok(if options.include_styles {
+    /// #             format!("**{}**", self.0)
+    /// #         } else {
+    /// #             self.0.to_owned()
+    /// #         })
+    /// #     }
+    /// # }
+    /// let plain = MarkdownOptions::new().with_styles(false);
+    /// assert_eq!(Note("Done").to_markdown_with_options(&plain).unwrap(), "Done");
+    /// ```
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String, Self::Error>;
 }
