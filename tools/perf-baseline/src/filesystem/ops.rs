@@ -1809,6 +1809,42 @@ mod tests {
     }
 
     #[test]
+    fn docx_full_text_legs_time_the_separated_text_of_the_oracle() {
+        let corpus = crate::build_docx_source_edit_corpus().unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "litchi-perf-docx-full-text-legs-{}-{}.docx",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::write(&path, &corpus.archive).unwrap();
+        let expected = super::super::expected_docx_full_text();
+        assert_eq!(
+            expected.matches(DOCX_PARAGRAPH_SEPARATOR).count() + 1,
+            SemanticShape::Medium.docx_paragraphs()
+        );
+        let mut legs = 0;
+        for (route, case) in ROUTES {
+            if !matches!(
+                route,
+                Route::Docx {
+                    query: DocxQuery::FullText,
+                    ..
+                }
+            ) {
+                continue;
+            }
+            let root = prepare(route, &path).unwrap();
+            assert_eq!(docx_text(&root).unwrap(), expected, "{}", case.name());
+            legs += 1;
+        }
+        fs::remove_file(&path).unwrap();
+        assert_eq!(legs, 4);
+    }
+
+    #[test]
     fn leaf_xlsx_text_matches_the_unified_handle_and_the_typed_oracle() {
         let corpus = crate::build_xlsx_cell_crud_corpus(crate::XlsxCellCrudShape::Medium).unwrap();
         let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(
