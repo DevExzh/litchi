@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0917 — DOC handoff already exists; repeated-edit costs remain
+
+[0917](0917-doc-repeated-edit-retention.md) corrects 0906's stale recommendation:
+0730 already adopted the bounded DOC render handoff. Current-source policy
+comparisons show fewer requested allocation bytes/calls with default retention,
+but identical whole-lifecycle peak live across policies. At 32 edits default
+requests 16.8 MB for NoHeadFoot and 164.2 MB for FloatingPictures; peak live
+still grows with edit count. Profile many-edit staging/allocation costs before
+another implementation. Mandatory stage and publication validation remains.
+The noisy FloatingPictures two-edit tails and RSS flag prevent a blanket
+performance claim. No production change is made.
+
 ## 0916 — duplicate commit target parsing removed
 
 [0916](0916-docx-section-commit-target-reuse.md) profiles the target parse

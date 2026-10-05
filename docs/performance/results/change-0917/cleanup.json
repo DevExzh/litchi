@@ -1,0 +1,24 @@
+{
+  "recorded_utc": "2026-10-05T18:00:55.114254+00:00",
+  "removed": [
+    "external exported source/tree (regenerable from retained archive and committed probe)",
+    "target build/quality caches except two final release executables",
+    "three named exploratory /tmp JSONs and owned Python bytecode cache"
+  ],
+  "disk_bytes_before": 6607990784,
+  "disk_bytes_retained": 110313472,
+  "disk_bytes_released": 6497677312,
+  "retained_binaries": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe",
+      "bytes": 55146832,
+      "sha256": "2ae48b4f7548c1468c8e7691d56d89b231c4a63f52ed48383f07fe3609c59a13"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe_alloc",
+      "bytes": 55150520,
+      "sha256": "927606880090f9169e222254944df92366dd1cb0e1aa37fc0861234c466ccf1b"
+    }
+  ],
+  "retained_evidence": "source-base.tar; before/build/quality/capture source manifests; all qualification and capture artifacts; committed raw logs and summaries"
+}

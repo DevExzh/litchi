@@ -1,0 +1,40 @@
+{
+  "binaries": {
+    "allocator": {
+      "bytes": 55150520,
+      "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe_alloc",
+      "sha256": "927606880090f9169e222254944df92366dd1cb0e1aa37fc0861234c466ccf1b"
+    },
+    "native": {
+      "bytes": 55146832,
+      "path": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe",
+      "sha256": "2ae48b4f7548c1468c8e7691d56d89b231c4a63f52ed48383f07fe3609c59a13"
+    }
+  },
+  "binaries_stable": true,
+  "children": 48,
+  "cpu": 16,
+  "failed_children": 0,
+  "lane_counts": {
+    "allocator": 24,
+    "native": 24
+  },
+  "negative_control": {
+    "bytes": 619,
+    "path": "/home/zhuhe/litchi-performance-0917/qualification/negative-control.json",
+    "sha256": "7344cc23bf4e670103c9791127ee0f5b84cd8e3518556df39c0fc2ad79a58335"
+  },
+  "passed_children": 48,
+  "probe_tree_sha256": "c701c9fe99dae5a4f95e32c7b8ee32d67c0706fe1da10ebfb60372806b8602eb",
+  "probe_tree_stable": true,
+  "qualification": {
+    "bytes": 32418,
+    "path": "/home/zhuhe/litchi-performance-0917/qualification/qualification.json",
+    "sha256": "1979eaa72a55b131396d69317b2702be668f2fe26ea2f78f1ee0a34f6fa135cf"
+  },
+  "samples": 1,
+  "schema": "litchi.performance.0917.qualification-packet-receipt.v1",
+  "source_head": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "status": "passed",
+  "warmups": 0
+}

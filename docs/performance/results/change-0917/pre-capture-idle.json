@@ -1,0 +1,17 @@
+{
+  "recorded_utc": "2026-10-05T17:53:36.089271+00:00",
+  "coordinated_0917_cpu_processes": [],
+  "agent_confirmations": [
+    "doc_probe_0917 frozen and idle",
+    "doc_build_0917 build/quality complete and idle",
+    "doc_capture_0917 qualification complete and idle",
+    "review_0916_final independent qualification review complete",
+    "doc_handoff_0917 review complete"
+  ],
+  "host_load": [
+    3.5078125,
+    4.5654296875,
+    4.28759765625
+  ],
+  "limitation": "Only coordinated batch CPU work is idle; shared-host work is uncontrolled."
+}

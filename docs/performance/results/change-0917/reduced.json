@@ -1,0 +1,6480 @@
+{
+  "adoption": "No optimization or production adoption gate; review flags are descriptive.",
+  "allocator": {
+    "cells": [
+      {
+        "case": "docfloat",
+        "edits": 1,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 14304400,
+            "allocation_calls": 15498,
+            "deallocated_bytes": 13961872,
+            "peak_live_bytes": 4284552,
+            "retained_bytes": 342528
+          },
+          {
+            "allocated_bytes": 14304400,
+            "allocation_calls": 15498,
+            "deallocated_bytes": 13961872,
+            "peak_live_bytes": 4284552,
+            "retained_bytes": 342528
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 14304400.0,
+            "p50": 14304400.0,
+            "p95": 14304400.0,
+            "p99": 14304400.0
+          },
+          "allocation_calls": {
+            "mean": 15498.0,
+            "p50": 15498.0,
+            "p95": 15498.0,
+            "p99": 15498.0
+          },
+          "deallocated_bytes": {
+            "mean": 13961872.0,
+            "p50": 13961872.0,
+            "p95": 13961872.0,
+            "p99": 13961872.0
+          },
+          "peak_live_bytes": {
+            "mean": 4284552.0,
+            "p50": 4284552.0,
+            "p95": 4284552.0,
+            "p99": 4284552.0
+          },
+          "retained_bytes": {
+            "mean": 342528.0,
+            "p50": 342528.0,
+            "p95": 342528.0,
+            "p99": 342528.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 1,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 15722762,
+            "allocation_calls": 16666,
+            "deallocated_bytes": 15380234,
+            "peak_live_bytes": 4284552,
+            "retained_bytes": 342528
+          },
+          {
+            "allocated_bytes": 15722762,
+            "allocation_calls": 16666,
+            "deallocated_bytes": 15380234,
+            "peak_live_bytes": 4284552,
+            "retained_bytes": 342528
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 15722762.0,
+            "p50": 15722762.0,
+            "p95": 15722762.0,
+            "p99": 15722762.0
+          },
+          "allocation_calls": {
+            "mean": 16666.0,
+            "p50": 16666.0,
+            "p95": 16666.0,
+            "p99": 16666.0
+          },
+          "deallocated_bytes": {
+            "mean": 15380234.0,
+            "p50": 15380234.0,
+            "p95": 15380234.0,
+            "p99": 15380234.0
+          },
+          "peak_live_bytes": {
+            "mean": 4284552.0,
+            "p50": 4284552.0,
+            "p95": 4284552.0,
+            "p99": 4284552.0
+          },
+          "retained_bytes": {
+            "mean": 342528.0,
+            "p50": 342528.0,
+            "p95": 342528.0,
+            "p99": 342528.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 1,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 15722762,
+            "allocation_calls": 16666,
+            "deallocated_bytes": 15380234,
+            "peak_live_bytes": 4284552,
+            "retained_bytes": 342528
+          },
+          {
+            "allocated_bytes": 15722762,
+            "allocation_calls": 16666,
+            "deallocated_bytes": 15380234,
+            "peak_live_bytes": 4284552,
+            "retained_bytes": 342528
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 15722762.0,
+            "p50": 15722762.0,
+            "p95": 15722762.0,
+            "p99": 15722762.0
+          },
+          "allocation_calls": {
+            "mean": 16666.0,
+            "p50": 16666.0,
+            "p95": 16666.0,
+            "p99": 16666.0
+          },
+          "deallocated_bytes": {
+            "mean": 15380234.0,
+            "p50": 15380234.0,
+            "p95": 15380234.0,
+            "p99": 15380234.0
+          },
+          "peak_live_bytes": {
+            "mean": 4284552.0,
+            "p50": 4284552.0,
+            "p95": 4284552.0,
+            "p99": 4284552.0
+          },
+          "retained_bytes": {
+            "mean": 342528.0,
+            "p50": 342528.0,
+            "p95": 342528.0,
+            "p99": 342528.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 2,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 17369691,
+            "allocation_calls": 18014,
+            "deallocated_bytes": 17016411,
+            "peak_live_bytes": 4370204,
+            "retained_bytes": 353280
+          },
+          {
+            "allocated_bytes": 17369691,
+            "allocation_calls": 18014,
+            "deallocated_bytes": 17016411,
+            "peak_live_bytes": 4370204,
+            "retained_bytes": 353280
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 17369691.0,
+            "p50": 17369691.0,
+            "p95": 17369691.0,
+            "p99": 17369691.0
+          },
+          "allocation_calls": {
+            "mean": 18014.0,
+            "p50": 18014.0,
+            "p95": 18014.0,
+            "p99": 18014.0
+          },
+          "deallocated_bytes": {
+            "mean": 17016411.0,
+            "p50": 17016411.0,
+            "p95": 17016411.0,
+            "p99": 17016411.0
+          },
+          "peak_live_bytes": {
+            "mean": 4370204.0,
+            "p50": 4370204.0,
+            "p95": 4370204.0,
+            "p99": 4370204.0
+          },
+          "retained_bytes": {
+            "mean": 353280.0,
+            "p50": 353280.0,
+            "p95": 353280.0,
+            "p99": 353280.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 2,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 18799147,
+            "allocation_calls": 19183,
+            "deallocated_bytes": 18445867,
+            "peak_live_bytes": 4370204,
+            "retained_bytes": 353280
+          },
+          {
+            "allocated_bytes": 18799147,
+            "allocation_calls": 19183,
+            "deallocated_bytes": 18445867,
+            "peak_live_bytes": 4370204,
+            "retained_bytes": 353280
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 18799147.0,
+            "p50": 18799147.0,
+            "p95": 18799147.0,
+            "p99": 18799147.0
+          },
+          "allocation_calls": {
+            "mean": 19183.0,
+            "p50": 19183.0,
+            "p95": 19183.0,
+            "p99": 19183.0
+          },
+          "deallocated_bytes": {
+            "mean": 18445867.0,
+            "p50": 18445867.0,
+            "p95": 18445867.0,
+            "p99": 18445867.0
+          },
+          "peak_live_bytes": {
+            "mean": 4370204.0,
+            "p50": 4370204.0,
+            "p95": 4370204.0,
+            "p99": 4370204.0
+          },
+          "retained_bytes": {
+            "mean": 353280.0,
+            "p50": 353280.0,
+            "p95": 353280.0,
+            "p99": 353280.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 2,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 18799147,
+            "allocation_calls": 19183,
+            "deallocated_bytes": 18445867,
+            "peak_live_bytes": 4370204,
+            "retained_bytes": 353280
+          },
+          {
+            "allocated_bytes": 18799147,
+            "allocation_calls": 19183,
+            "deallocated_bytes": 18445867,
+            "peak_live_bytes": 4370204,
+            "retained_bytes": 353280
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 18799147.0,
+            "p50": 18799147.0,
+            "p95": 18799147.0,
+            "p99": 18799147.0
+          },
+          "allocation_calls": {
+            "mean": 19183.0,
+            "p50": 19183.0,
+            "p95": 19183.0,
+            "p99": 19183.0
+          },
+          "deallocated_bytes": {
+            "mean": 18445867.0,
+            "p50": 18445867.0,
+            "p95": 18445867.0,
+            "p99": 18445867.0
+          },
+          "peak_live_bytes": {
+            "mean": 4370204.0,
+            "p50": 4370204.0,
+            "p95": 4370204.0,
+            "p99": 4370204.0
+          },
+          "retained_bytes": {
+            "mean": 353280.0,
+            "p50": 353280.0,
+            "p95": 353280.0,
+            "p99": 353280.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 8,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 37737565,
+            "allocation_calls": 33187,
+            "deallocated_bytes": 37319261,
+            "peak_live_bytes": 4891053,
+            "retained_bytes": 418304
+          },
+          {
+            "allocated_bytes": 37737565,
+            "allocation_calls": 33187,
+            "deallocated_bytes": 37319261,
+            "peak_live_bytes": 4891053,
+            "retained_bytes": 418304
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 37737565.0,
+            "p50": 37737565.0,
+            "p95": 37737565.0,
+            "p99": 37737565.0
+          },
+          "allocation_calls": {
+            "mean": 33187.0,
+            "p50": 33187.0,
+            "p95": 33187.0,
+            "p99": 33187.0
+          },
+          "deallocated_bytes": {
+            "mean": 37319261.0,
+            "p50": 37319261.0,
+            "p95": 37319261.0,
+            "p99": 37319261.0
+          },
+          "peak_live_bytes": {
+            "mean": 4891053.0,
+            "p50": 4891053.0,
+            "p95": 4891053.0,
+            "p99": 4891053.0
+          },
+          "retained_bytes": {
+            "mean": 418304.0,
+            "p50": 418304.0,
+            "p95": 418304.0,
+            "p99": 418304.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 8,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 39236818,
+            "allocation_calls": 34365,
+            "deallocated_bytes": 38818514,
+            "peak_live_bytes": 4891053,
+            "retained_bytes": 418304
+          },
+          {
+            "allocated_bytes": 39236818,
+            "allocation_calls": 34365,
+            "deallocated_bytes": 38818514,
+            "peak_live_bytes": 4891053,
+            "retained_bytes": 418304
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 39236818.0,
+            "p50": 39236818.0,
+            "p95": 39236818.0,
+            "p99": 39236818.0
+          },
+          "allocation_calls": {
+            "mean": 34365.0,
+            "p50": 34365.0,
+            "p95": 34365.0,
+            "p99": 34365.0
+          },
+          "deallocated_bytes": {
+            "mean": 38818514.0,
+            "p50": 38818514.0,
+            "p95": 38818514.0,
+            "p99": 38818514.0
+          },
+          "peak_live_bytes": {
+            "mean": 4891053.0,
+            "p50": 4891053.0,
+            "p95": 4891053.0,
+            "p99": 4891053.0
+          },
+          "retained_bytes": {
+            "mean": 418304.0,
+            "p50": 418304.0,
+            "p95": 418304.0,
+            "p99": 418304.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 8,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 39236818,
+            "allocation_calls": 34365,
+            "deallocated_bytes": 38818514,
+            "peak_live_bytes": 4891053,
+            "retained_bytes": 418304
+          },
+          {
+            "allocated_bytes": 39236818,
+            "allocation_calls": 34365,
+            "deallocated_bytes": 38818514,
+            "peak_live_bytes": 4891053,
+            "retained_bytes": 418304
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 39236818.0,
+            "p50": 39236818.0,
+            "p95": 39236818.0,
+            "p99": 39236818.0
+          },
+          "allocation_calls": {
+            "mean": 34365.0,
+            "p50": 34365.0,
+            "p95": 34365.0,
+            "p99": 34365.0
+          },
+          "deallocated_bytes": {
+            "mean": 38818514.0,
+            "p50": 38818514.0,
+            "p95": 38818514.0,
+            "p99": 38818514.0
+          },
+          "peak_live_bytes": {
+            "mean": 4891053.0,
+            "p50": 4891053.0,
+            "p95": 4891053.0,
+            "p99": 4891053.0
+          },
+          "retained_bytes": {
+            "mean": 418304.0,
+            "p50": 418304.0,
+            "p95": 418304.0,
+            "p99": 418304.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 32,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 164233879,
+            "allocation_calls": 95057,
+            "deallocated_bytes": 163547287,
+            "peak_live_bytes": 7635361,
+            "retained_bytes": 686592
+          },
+          {
+            "allocated_bytes": 164233879,
+            "allocation_calls": 95057,
+            "deallocated_bytes": 163547287,
+            "peak_live_bytes": 7635361,
+            "retained_bytes": 686592
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 164233879.0,
+            "p50": 164233879.0,
+            "p95": 164233879.0,
+            "p99": 164233879.0
+          },
+          "allocation_calls": {
+            "mean": 95057.0,
+            "p50": 95057.0,
+            "p95": 95057.0,
+            "p99": 95057.0
+          },
+          "deallocated_bytes": {
+            "mean": 163547287.0,
+            "p50": 163547287.0,
+            "p95": 163547287.0,
+            "p99": 163547287.0
+          },
+          "peak_live_bytes": {
+            "mean": 7635361.0,
+            "p50": 7635361.0,
+            "p95": 7635361.0,
+            "p99": 7635361.0
+          },
+          "retained_bytes": {
+            "mean": 686592.0,
+            "p50": 686592.0,
+            "p95": 686592.0,
+            "p99": 686592.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 32,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 167215584,
+            "allocation_calls": 96264,
+            "deallocated_bytes": 166528992,
+            "peak_live_bytes": 7635361,
+            "retained_bytes": 686592
+          },
+          {
+            "allocated_bytes": 167215584,
+            "allocation_calls": 96264,
+            "deallocated_bytes": 166528992,
+            "peak_live_bytes": 7635361,
+            "retained_bytes": 686592
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 167215584.0,
+            "p50": 167215584.0,
+            "p95": 167215584.0,
+            "p99": 167215584.0
+          },
+          "allocation_calls": {
+            "mean": 96264.0,
+            "p50": 96264.0,
+            "p95": 96264.0,
+            "p99": 96264.0
+          },
+          "deallocated_bytes": {
+            "mean": 166528992.0,
+            "p50": 166528992.0,
+            "p95": 166528992.0,
+            "p99": 166528992.0
+          },
+          "peak_live_bytes": {
+            "mean": 7635361.0,
+            "p50": 7635361.0,
+            "p95": 7635361.0,
+            "p99": 7635361.0
+          },
+          "retained_bytes": {
+            "mean": 686592.0,
+            "p50": 686592.0,
+            "p95": 686592.0,
+            "p99": 686592.0
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 32,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 167215584,
+            "allocation_calls": 96264,
+            "deallocated_bytes": 166528992,
+            "peak_live_bytes": 7635361,
+            "retained_bytes": 686592
+          },
+          {
+            "allocated_bytes": 167215584,
+            "allocation_calls": 96264,
+            "deallocated_bytes": 166528992,
+            "peak_live_bytes": 7635361,
+            "retained_bytes": 686592
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 167215584.0,
+            "p50": 167215584.0,
+            "p95": 167215584.0,
+            "p99": 167215584.0
+          },
+          "allocation_calls": {
+            "mean": 96264.0,
+            "p50": 96264.0,
+            "p95": 96264.0,
+            "p99": 96264.0
+          },
+          "deallocated_bytes": {
+            "mean": 166528992.0,
+            "p50": 166528992.0,
+            "p95": 166528992.0,
+            "p99": 166528992.0
+          },
+          "peak_live_bytes": {
+            "mean": 7635361.0,
+            "p50": 7635361.0,
+            "p95": 7635361.0,
+            "p99": 7635361.0
+          },
+          "retained_bytes": {
+            "mean": 686592.0,
+            "p50": 686592.0,
+            "p95": 686592.0,
+            "p99": 686592.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 1,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 1008777,
+            "allocation_calls": 1768,
+            "deallocated_bytes": 981129,
+            "peak_live_bytes": 303110,
+            "retained_bytes": 27648
+          },
+          {
+            "allocated_bytes": 1008777,
+            "allocation_calls": 1768,
+            "deallocated_bytes": 981129,
+            "peak_live_bytes": 303110,
+            "retained_bytes": 27648
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 1008777.0,
+            "p50": 1008777.0,
+            "p95": 1008777.0,
+            "p99": 1008777.0
+          },
+          "allocation_calls": {
+            "mean": 1768.0,
+            "p50": 1768.0,
+            "p95": 1768.0,
+            "p99": 1768.0
+          },
+          "deallocated_bytes": {
+            "mean": 981129.0,
+            "p50": 981129.0,
+            "p95": 981129.0,
+            "p99": 981129.0
+          },
+          "peak_live_bytes": {
+            "mean": 303110.0,
+            "p50": 303110.0,
+            "p95": 303110.0,
+            "p99": 303110.0
+          },
+          "retained_bytes": {
+            "mean": 27648.0,
+            "p50": 27648.0,
+            "p95": 27648.0,
+            "p99": 27648.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 1,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 1128699,
+            "allocation_calls": 2056,
+            "deallocated_bytes": 1101051,
+            "peak_live_bytes": 303110,
+            "retained_bytes": 27648
+          },
+          {
+            "allocated_bytes": 1128699,
+            "allocation_calls": 2056,
+            "deallocated_bytes": 1101051,
+            "peak_live_bytes": 303110,
+            "retained_bytes": 27648
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 1128699.0,
+            "p50": 1128699.0,
+            "p95": 1128699.0,
+            "p99": 1128699.0
+          },
+          "allocation_calls": {
+            "mean": 2056.0,
+            "p50": 2056.0,
+            "p95": 2056.0,
+            "p99": 2056.0
+          },
+          "deallocated_bytes": {
+            "mean": 1101051.0,
+            "p50": 1101051.0,
+            "p95": 1101051.0,
+            "p99": 1101051.0
+          },
+          "peak_live_bytes": {
+            "mean": 303110.0,
+            "p50": 303110.0,
+            "p95": 303110.0,
+            "p99": 303110.0
+          },
+          "retained_bytes": {
+            "mean": 27648.0,
+            "p50": 27648.0,
+            "p95": 27648.0,
+            "p99": 27648.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 1,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 1128699,
+            "allocation_calls": 2056,
+            "deallocated_bytes": 1101051,
+            "peak_live_bytes": 303110,
+            "retained_bytes": 27648
+          },
+          {
+            "allocated_bytes": 1128699,
+            "allocation_calls": 2056,
+            "deallocated_bytes": 1101051,
+            "peak_live_bytes": 303110,
+            "retained_bytes": 27648
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 1128699.0,
+            "p50": 1128699.0,
+            "p95": 1128699.0,
+            "p99": 1128699.0
+          },
+          "allocation_calls": {
+            "mean": 2056.0,
+            "p50": 2056.0,
+            "p95": 2056.0,
+            "p99": 2056.0
+          },
+          "deallocated_bytes": {
+            "mean": 1101051.0,
+            "p50": 1101051.0,
+            "p95": 1101051.0,
+            "p99": 1101051.0
+          },
+          "peak_live_bytes": {
+            "mean": 303110.0,
+            "p50": 303110.0,
+            "p95": 303110.0,
+            "p99": 303110.0
+          },
+          "retained_bytes": {
+            "mean": 27648.0,
+            "p50": 27648.0,
+            "p95": 27648.0,
+            "p99": 27648.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 2,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 1282207,
+            "allocation_calls": 2269,
+            "deallocated_bytes": 1253535,
+            "peak_live_bytes": 312324,
+            "retained_bytes": 28672
+          },
+          {
+            "allocated_bytes": 1282207,
+            "allocation_calls": 2269,
+            "deallocated_bytes": 1253535,
+            "peak_live_bytes": 312324,
+            "retained_bytes": 28672
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 1282207.0,
+            "p50": 1282207.0,
+            "p95": 1282207.0,
+            "p99": 1282207.0
+          },
+          "allocation_calls": {
+            "mean": 2269.0,
+            "p50": 2269.0,
+            "p95": 2269.0,
+            "p99": 2269.0
+          },
+          "deallocated_bytes": {
+            "mean": 1253535.0,
+            "p50": 1253535.0,
+            "p95": 1253535.0,
+            "p99": 1253535.0
+          },
+          "peak_live_bytes": {
+            "mean": 312324.0,
+            "p50": 312324.0,
+            "p95": 312324.0,
+            "p99": 312324.0
+          },
+          "retained_bytes": {
+            "mean": 28672.0,
+            "p50": 28672.0,
+            "p95": 28672.0,
+            "p99": 28672.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 2,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 1403356,
+            "allocation_calls": 2558,
+            "deallocated_bytes": 1374684,
+            "peak_live_bytes": 312324,
+            "retained_bytes": 28672
+          },
+          {
+            "allocated_bytes": 1403356,
+            "allocation_calls": 2558,
+            "deallocated_bytes": 1374684,
+            "peak_live_bytes": 312324,
+            "retained_bytes": 28672
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 1403356.0,
+            "p50": 1403356.0,
+            "p95": 1403356.0,
+            "p99": 1403356.0
+          },
+          "allocation_calls": {
+            "mean": 2558.0,
+            "p50": 2558.0,
+            "p95": 2558.0,
+            "p99": 2558.0
+          },
+          "deallocated_bytes": {
+            "mean": 1374684.0,
+            "p50": 1374684.0,
+            "p95": 1374684.0,
+            "p99": 1374684.0
+          },
+          "peak_live_bytes": {
+            "mean": 312324.0,
+            "p50": 312324.0,
+            "p95": 312324.0,
+            "p99": 312324.0
+          },
+          "retained_bytes": {
+            "mean": 28672.0,
+            "p50": 28672.0,
+            "p95": 28672.0,
+            "p99": 28672.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 2,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 1403356,
+            "allocation_calls": 2558,
+            "deallocated_bytes": 1374684,
+            "peak_live_bytes": 312324,
+            "retained_bytes": 28672
+          },
+          {
+            "allocated_bytes": 1403356,
+            "allocation_calls": 2558,
+            "deallocated_bytes": 1374684,
+            "peak_live_bytes": 312324,
+            "retained_bytes": 28672
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 1403356.0,
+            "p50": 1403356.0,
+            "p95": 1403356.0,
+            "p99": 1403356.0
+          },
+          "allocation_calls": {
+            "mean": 2558.0,
+            "p50": 2558.0,
+            "p95": 2558.0,
+            "p99": 2558.0
+          },
+          "deallocated_bytes": {
+            "mean": 1374684.0,
+            "p50": 1374684.0,
+            "p95": 1374684.0,
+            "p99": 1374684.0
+          },
+          "peak_live_bytes": {
+            "mean": 312324.0,
+            "p50": 312324.0,
+            "p95": 312324.0,
+            "p99": 312324.0
+          },
+          "retained_bytes": {
+            "mean": 28672.0,
+            "p50": 28672.0,
+            "p95": 28672.0,
+            "p99": 28672.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 8,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 3181346,
+            "allocation_calls": 5368,
+            "deallocated_bytes": 3145506,
+            "peak_live_bytes": 370820,
+            "retained_bytes": 35840
+          },
+          {
+            "allocated_bytes": 3181346,
+            "allocation_calls": 5368,
+            "deallocated_bytes": 3145506,
+            "peak_live_bytes": 370820,
+            "retained_bytes": 35840
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 3181346.0,
+            "p50": 3181346.0,
+            "p95": 3181346.0,
+            "p99": 3181346.0
+          },
+          "allocation_calls": {
+            "mean": 5368.0,
+            "p50": 5368.0,
+            "p95": 5368.0,
+            "p99": 5368.0
+          },
+          "deallocated_bytes": {
+            "mean": 3145506.0,
+            "p50": 3145506.0,
+            "p95": 3145506.0,
+            "p99": 3145506.0
+          },
+          "peak_live_bytes": {
+            "mean": 370820.0,
+            "p50": 370820.0,
+            "p95": 370820.0,
+            "p99": 370820.0
+          },
+          "retained_bytes": {
+            "mean": 35840.0,
+            "p50": 35840.0,
+            "p95": 35840.0,
+            "p99": 35840.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 8,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 3310243,
+            "allocation_calls": 5666,
+            "deallocated_bytes": 3274403,
+            "peak_live_bytes": 370820,
+            "retained_bytes": 35840
+          },
+          {
+            "allocated_bytes": 3310243,
+            "allocation_calls": 5666,
+            "deallocated_bytes": 3274403,
+            "peak_live_bytes": 370820,
+            "retained_bytes": 35840
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 3310243.0,
+            "p50": 3310243.0,
+            "p95": 3310243.0,
+            "p99": 3310243.0
+          },
+          "allocation_calls": {
+            "mean": 5666.0,
+            "p50": 5666.0,
+            "p95": 5666.0,
+            "p99": 5666.0
+          },
+          "deallocated_bytes": {
+            "mean": 3274403.0,
+            "p50": 3274403.0,
+            "p95": 3274403.0,
+            "p99": 3274403.0
+          },
+          "peak_live_bytes": {
+            "mean": 370820.0,
+            "p50": 370820.0,
+            "p95": 370820.0,
+            "p99": 370820.0
+          },
+          "retained_bytes": {
+            "mean": 35840.0,
+            "p50": 35840.0,
+            "p95": 35840.0,
+            "p99": 35840.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 8,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 3310243,
+            "allocation_calls": 5666,
+            "deallocated_bytes": 3274403,
+            "peak_live_bytes": 370820,
+            "retained_bytes": 35840
+          },
+          {
+            "allocated_bytes": 3310243,
+            "allocation_calls": 5666,
+            "deallocated_bytes": 3274403,
+            "peak_live_bytes": 370820,
+            "retained_bytes": 35840
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 3310243.0,
+            "p50": 3310243.0,
+            "p95": 3310243.0,
+            "p99": 3310243.0
+          },
+          "allocation_calls": {
+            "mean": 5666.0,
+            "p50": 5666.0,
+            "p95": 5666.0,
+            "p99": 5666.0
+          },
+          "deallocated_bytes": {
+            "mean": 3274403.0,
+            "p50": 3274403.0,
+            "p95": 3274403.0,
+            "p99": 3274403.0
+          },
+          "peak_live_bytes": {
+            "mean": 370820.0,
+            "p50": 370820.0,
+            "p95": 370820.0,
+            "p99": 370820.0
+          },
+          "retained_bytes": {
+            "mean": 35840.0,
+            "p50": 35840.0,
+            "p95": 35840.0,
+            "p99": 35840.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 32,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 16781690,
+            "allocation_calls": 19024,
+            "deallocated_bytes": 16718202,
+            "peak_live_bytes": 642194,
+            "retained_bytes": 63488
+          },
+          {
+            "allocated_bytes": 16781690,
+            "allocation_calls": 19024,
+            "deallocated_bytes": 16718202,
+            "peak_live_bytes": 642194,
+            "retained_bytes": 63488
+          }
+        ],
+        "retention": "default",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 16781690.0,
+            "p50": 16781690.0,
+            "p95": 16781690.0,
+            "p99": 16781690.0
+          },
+          "allocation_calls": {
+            "mean": 19024.0,
+            "p50": 19024.0,
+            "p95": 19024.0,
+            "p99": 19024.0
+          },
+          "deallocated_bytes": {
+            "mean": 16718202.0,
+            "p50": 16718202.0,
+            "p95": 16718202.0,
+            "p99": 16718202.0
+          },
+          "peak_live_bytes": {
+            "mean": 642194.0,
+            "p50": 642194.0,
+            "p95": 642194.0,
+            "p99": 642194.0
+          },
+          "retained_bytes": {
+            "mean": 63488.0,
+            "p50": 63488.0,
+            "p95": 63488.0,
+            "p99": 63488.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 32,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 17017321,
+            "allocation_calls": 19353,
+            "deallocated_bytes": 16953833,
+            "peak_live_bytes": 642194,
+            "retained_bytes": 63488
+          },
+          {
+            "allocated_bytes": 17017321,
+            "allocation_calls": 19353,
+            "deallocated_bytes": 16953833,
+            "peak_live_bytes": 642194,
+            "retained_bytes": 63488
+          }
+        ],
+        "retention": "release",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 17017321.0,
+            "p50": 17017321.0,
+            "p95": 17017321.0,
+            "p99": 17017321.0
+          },
+          "allocation_calls": {
+            "mean": 19353.0,
+            "p50": 19353.0,
+            "p95": 19353.0,
+            "p99": 19353.0
+          },
+          "deallocated_bytes": {
+            "mean": 16953833.0,
+            "p50": 16953833.0,
+            "p95": 16953833.0,
+            "p99": 16953833.0
+          },
+          "peak_live_bytes": {
+            "mean": 642194.0,
+            "p50": 642194.0,
+            "p95": 642194.0,
+            "p99": 642194.0
+          },
+          "retained_bytes": {
+            "mean": 63488.0,
+            "p50": 63488.0,
+            "p95": 63488.0,
+            "p99": 63488.0
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 32,
+        "repeat_equal": true,
+        "repetitions": [
+          {
+            "allocated_bytes": 17017321,
+            "allocation_calls": 19353,
+            "deallocated_bytes": 16953833,
+            "peak_live_bytes": 642194,
+            "retained_bytes": 63488
+          },
+          {
+            "allocated_bytes": 17017321,
+            "allocation_calls": 19353,
+            "deallocated_bytes": 16953833,
+            "peak_live_bytes": 642194,
+            "retained_bytes": 63488
+          }
+        ],
+        "retention": "zero",
+        "variability": {
+          "allocated_bytes": {
+            "mean": 17017321.0,
+            "p50": 17017321.0,
+            "p95": 17017321.0,
+            "p99": 17017321.0
+          },
+          "allocation_calls": {
+            "mean": 19353.0,
+            "p50": 19353.0,
+            "p95": 19353.0,
+            "p99": 19353.0
+          },
+          "deallocated_bytes": {
+            "mean": 16953833.0,
+            "p50": 16953833.0,
+            "p95": 16953833.0,
+            "p99": 16953833.0
+          },
+          "peak_live_bytes": {
+            "mean": 642194.0,
+            "p50": 642194.0,
+            "p95": 642194.0,
+            "p99": 642194.0
+          },
+          "retained_bytes": {
+            "mean": 63488.0,
+            "p50": 63488.0,
+            "p95": 63488.0,
+            "p99": 63488.0
+          }
+        }
+      }
+    ],
+    "children": 48,
+    "claim": "allocator region metrics only; no latency claim",
+    "comparisons": [
+      {
+        "allocated": {
+          "after": 1008777.0,
+          "before": 1128699.0,
+          "flag": false,
+          "increase_fraction": -0.1062479899424027
+        },
+        "case": "docnohf",
+        "edits": 1,
+        "peak_live": {
+          "after": 303110.0,
+          "before": 303110.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 27648.0,
+          "before": 27648.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7500.0,
+          "before": 7736.0,
+          "flag": false,
+          "increase_fraction": -0.030506721820062088
+        }
+      },
+      {
+        "allocated": {
+          "after": 1128699.0,
+          "before": 1128699.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 1,
+        "peak_live": {
+          "after": 303110.0,
+          "before": 303110.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 27648.0,
+          "before": 27648.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7472.0,
+          "before": 7736.0,
+          "flag": false,
+          "increase_fraction": -0.03412616339193386
+        }
+      },
+      {
+        "allocated": {
+          "after": 1008777.0,
+          "before": 1128699.0,
+          "flag": false,
+          "increase_fraction": -0.1062479899424027
+        },
+        "case": "docnohf",
+        "edits": 1,
+        "peak_live": {
+          "after": 303110.0,
+          "before": 303110.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 27648.0,
+          "before": 27648.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7548.0,
+          "before": 7452.0,
+          "flag": false,
+          "increase_fraction": 0.012882447665056418
+        }
+      },
+      {
+        "allocated": {
+          "after": 1128699.0,
+          "before": 1128699.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 1,
+        "peak_live": {
+          "after": 303110.0,
+          "before": 303110.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 27648.0,
+          "before": 27648.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7480.0,
+          "before": 7452.0,
+          "flag": false,
+          "increase_fraction": 0.0037573805689747886
+        }
+      },
+      {
+        "allocated": {
+          "after": 1282207.0,
+          "before": 1403356.0,
+          "flag": false,
+          "increase_fraction": -0.0863280593092558
+        },
+        "case": "docnohf",
+        "edits": 2,
+        "peak_live": {
+          "after": 312324.0,
+          "before": 312324.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 28672.0,
+          "before": 28672.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7520.0,
+          "before": 7648.0,
+          "flag": false,
+          "increase_fraction": -0.01673640167364021
+        }
+      },
+      {
+        "allocated": {
+          "after": 1403356.0,
+          "before": 1403356.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 2,
+        "peak_live": {
+          "after": 312324.0,
+          "before": 312324.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 28672.0,
+          "before": 28672.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7556.0,
+          "before": 7648.0,
+          "flag": false,
+          "increase_fraction": -0.012029288702928853
+        }
+      },
+      {
+        "allocated": {
+          "after": 1282207.0,
+          "before": 1403356.0,
+          "flag": false,
+          "increase_fraction": -0.0863280593092558
+        },
+        "case": "docnohf",
+        "edits": 2,
+        "peak_live": {
+          "after": 312324.0,
+          "before": 312324.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 28672.0,
+          "before": 28672.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7620.0,
+          "before": 7868.0,
+          "flag": false,
+          "increase_fraction": -0.031520081342145345
+        }
+      },
+      {
+        "allocated": {
+          "after": 1403356.0,
+          "before": 1403356.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 2,
+        "peak_live": {
+          "after": 312324.0,
+          "before": 312324.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 28672.0,
+          "before": 28672.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7420.0,
+          "before": 7868.0,
+          "flag": false,
+          "increase_fraction": -0.05693950177935947
+        }
+      },
+      {
+        "allocated": {
+          "after": 3181346.0,
+          "before": 3310243.0,
+          "flag": false,
+          "increase_fraction": -0.038938833191400124
+        },
+        "case": "docnohf",
+        "edits": 8,
+        "peak_live": {
+          "after": 370820.0,
+          "before": 370820.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 35840.0,
+          "before": 35840.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7724.0,
+          "before": 7756.0,
+          "flag": false,
+          "increase_fraction": -0.004125838060856091
+        }
+      },
+      {
+        "allocated": {
+          "after": 3310243.0,
+          "before": 3310243.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 8,
+        "peak_live": {
+          "after": 370820.0,
+          "before": 370820.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 35840.0,
+          "before": 35840.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7616.0,
+          "before": 7756.0,
+          "flag": false,
+          "increase_fraction": -0.018050541516245522
+        }
+      },
+      {
+        "allocated": {
+          "after": 3181346.0,
+          "before": 3310243.0,
+          "flag": false,
+          "increase_fraction": -0.038938833191400124
+        },
+        "case": "docnohf",
+        "edits": 8,
+        "peak_live": {
+          "after": 370820.0,
+          "before": 370820.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 35840.0,
+          "before": 35840.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7656.0,
+          "before": 7420.0,
+          "flag": false,
+          "increase_fraction": 0.031805929919137554
+        }
+      },
+      {
+        "allocated": {
+          "after": 3310243.0,
+          "before": 3310243.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 8,
+        "peak_live": {
+          "after": 370820.0,
+          "before": 370820.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 35840.0,
+          "before": 35840.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7432.0,
+          "before": 7420.0,
+          "flag": false,
+          "increase_fraction": 0.0016172506738545422
+        }
+      },
+      {
+        "allocated": {
+          "after": 16781690.0,
+          "before": 17017321.0,
+          "flag": false,
+          "increase_fraction": -0.01384653906452138
+        },
+        "case": "docnohf",
+        "edits": 32,
+        "peak_live": {
+          "after": 642194.0,
+          "before": 642194.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 63488.0,
+          "before": 63488.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7700.0,
+          "before": 7764.0,
+          "flag": false,
+          "increase_fraction": -0.008243173621844457
+        }
+      },
+      {
+        "allocated": {
+          "after": 17017321.0,
+          "before": 17017321.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 32,
+        "peak_live": {
+          "after": 642194.0,
+          "before": 642194.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 63488.0,
+          "before": 63488.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7868.0,
+          "before": 7764.0,
+          "flag": false,
+          "increase_fraction": 0.013395157135497104
+        }
+      },
+      {
+        "allocated": {
+          "after": 16781690.0,
+          "before": 17017321.0,
+          "flag": false,
+          "increase_fraction": -0.01384653906452138
+        },
+        "case": "docnohf",
+        "edits": 32,
+        "peak_live": {
+          "after": 642194.0,
+          "before": 642194.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 63488.0,
+          "before": 63488.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 7628.0,
+          "before": 7804.0,
+          "flag": false,
+          "increase_fraction": -0.022552537160430597
+        }
+      },
+      {
+        "allocated": {
+          "after": 17017321.0,
+          "before": 17017321.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docnohf",
+        "edits": 32,
+        "peak_live": {
+          "after": 642194.0,
+          "before": 642194.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 63488.0,
+          "before": 63488.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 7704.0,
+          "before": 7804.0,
+          "flag": false,
+          "increase_fraction": -0.012813941568426412
+        }
+      },
+      {
+        "allocated": {
+          "after": 14304400.0,
+          "before": 15722762.0,
+          "flag": false,
+          "increase_fraction": -0.09021074032666776
+        },
+        "case": "docfloat",
+        "edits": 1,
+        "peak_live": {
+          "after": 4284552.0,
+          "before": 4284552.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 342528.0,
+          "before": 342528.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 13844.0,
+          "before": 13428.0,
+          "flag": false,
+          "increase_fraction": 0.03098004170390234
+        }
+      },
+      {
+        "allocated": {
+          "after": 15722762.0,
+          "before": 15722762.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 1,
+        "peak_live": {
+          "after": 4284552.0,
+          "before": 4284552.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 342528.0,
+          "before": 342528.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 13908.0,
+          "before": 13428.0,
+          "flag": false,
+          "increase_fraction": 0.03574620196604106
+        }
+      },
+      {
+        "allocated": {
+          "after": 14304400.0,
+          "before": 15722762.0,
+          "flag": false,
+          "increase_fraction": -0.09021074032666776
+        },
+        "case": "docfloat",
+        "edits": 1,
+        "peak_live": {
+          "after": 4284552.0,
+          "before": 4284552.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 342528.0,
+          "before": 342528.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 13508.0,
+          "before": 14052.0,
+          "flag": false,
+          "increase_fraction": -0.03871335041275259
+        }
+      },
+      {
+        "allocated": {
+          "after": 15722762.0,
+          "before": 15722762.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 1,
+        "peak_live": {
+          "after": 4284552.0,
+          "before": 4284552.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 342528.0,
+          "before": 342528.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 13480.0,
+          "before": 14052.0,
+          "flag": false,
+          "increase_fraction": -0.04070594933105609
+        }
+      },
+      {
+        "allocated": {
+          "after": 17369691.0,
+          "before": 18799147.0,
+          "flag": false,
+          "increase_fraction": -0.07603834365463502
+        },
+        "case": "docfloat",
+        "edits": 2,
+        "peak_live": {
+          "after": 4370204.0,
+          "before": 4370204.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 353280.0,
+          "before": 353280.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 13436.0,
+          "before": 13232.0,
+          "flag": false,
+          "increase_fraction": 0.01541717049576774
+        }
+      },
+      {
+        "allocated": {
+          "after": 18799147.0,
+          "before": 18799147.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 2,
+        "peak_live": {
+          "after": 4370204.0,
+          "before": 4370204.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 353280.0,
+          "before": 353280.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 13468.0,
+          "before": 13232.0,
+          "flag": false,
+          "increase_fraction": 0.0178355501813785
+        }
+      },
+      {
+        "allocated": {
+          "after": 17369691.0,
+          "before": 18799147.0,
+          "flag": false,
+          "increase_fraction": -0.07603834365463502
+        },
+        "case": "docfloat",
+        "edits": 2,
+        "peak_live": {
+          "after": 4370204.0,
+          "before": 4370204.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 353280.0,
+          "before": 353280.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 14228.0,
+          "before": 13236.0,
+          "flag": true,
+          "increase_fraction": 0.0749471139317015
+        }
+      },
+      {
+        "allocated": {
+          "after": 18799147.0,
+          "before": 18799147.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 2,
+        "peak_live": {
+          "after": 4370204.0,
+          "before": 4370204.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 353280.0,
+          "before": 353280.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 13428.0,
+          "before": 13236.0,
+          "flag": false,
+          "increase_fraction": 0.014505893019038929
+        }
+      },
+      {
+        "allocated": {
+          "after": 37737565.0,
+          "before": 39236818.0,
+          "flag": false,
+          "increase_fraction": -0.038210361502810986
+        },
+        "case": "docfloat",
+        "edits": 8,
+        "peak_live": {
+          "after": 4891053.0,
+          "before": 4891053.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 418304.0,
+          "before": 418304.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 13720.0,
+          "before": 13968.0,
+          "flag": false,
+          "increase_fraction": -0.017754868270332236
+        }
+      },
+      {
+        "allocated": {
+          "after": 39236818.0,
+          "before": 39236818.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 8,
+        "peak_live": {
+          "after": 4891053.0,
+          "before": 4891053.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 418304.0,
+          "before": 418304.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 13848.0,
+          "before": 13968.0,
+          "flag": false,
+          "increase_fraction": -0.00859106529209619
+        }
+      },
+      {
+        "allocated": {
+          "after": 37737565.0,
+          "before": 39236818.0,
+          "flag": false,
+          "increase_fraction": -0.038210361502810986
+        },
+        "case": "docfloat",
+        "edits": 8,
+        "peak_live": {
+          "after": 4891053.0,
+          "before": 4891053.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 418304.0,
+          "before": 418304.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 13808.0,
+          "before": 14044.0,
+          "flag": false,
+          "increase_fraction": -0.016804329250925676
+        }
+      },
+      {
+        "allocated": {
+          "after": 39236818.0,
+          "before": 39236818.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 8,
+        "peak_live": {
+          "after": 4891053.0,
+          "before": 4891053.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 418304.0,
+          "before": 418304.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 13640.0,
+          "before": 14044.0,
+          "flag": false,
+          "increase_fraction": -0.028766733124465982
+        }
+      },
+      {
+        "allocated": {
+          "after": 164233879.0,
+          "before": 167215584.0,
+          "flag": false,
+          "increase_fraction": -0.01783150187724125
+        },
+        "case": "docfloat",
+        "edits": 32,
+        "peak_live": {
+          "after": 7635361.0,
+          "before": 7635361.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 686592.0,
+          "before": 686592.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 15940.0,
+          "before": 15816.0,
+          "flag": false,
+          "increase_fraction": 0.007840161861406125
+        }
+      },
+      {
+        "allocated": {
+          "after": 167215584.0,
+          "before": 167215584.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 32,
+        "peak_live": {
+          "after": 7635361.0,
+          "before": 7635361.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 1,
+        "retained": {
+          "after": 686592.0,
+          "before": 686592.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 15556.0,
+          "before": 15816.0,
+          "flag": false,
+          "increase_fraction": -0.016439049064238764
+        }
+      },
+      {
+        "allocated": {
+          "after": 164233879.0,
+          "before": 167215584.0,
+          "flag": false,
+          "increase_fraction": -0.01783150187724125
+        },
+        "case": "docfloat",
+        "edits": 32,
+        "peak_live": {
+          "after": 7635361.0,
+          "before": 7635361.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 686592.0,
+          "before": 686592.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "default",
+        "rss": {
+          "after": 16108.0,
+          "before": 15552.0,
+          "flag": false,
+          "increase_fraction": 0.03575102880658432
+        }
+      },
+      {
+        "allocated": {
+          "after": 167215584.0,
+          "before": 167215584.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "case": "docfloat",
+        "edits": 32,
+        "peak_live": {
+          "after": 7635361.0,
+          "before": 7635361.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "repetition": 2,
+        "retained": {
+          "after": 686592.0,
+          "before": 686592.0,
+          "flag": false,
+          "increase_fraction": 0.0
+        },
+        "route": "release",
+        "rss": {
+          "after": 15072.0,
+          "before": 15552.0,
+          "flag": false,
+          "increase_fraction": -0.030864197530864224
+        }
+      }
+    ],
+    "schema": "litchi.performance.0917.allocator-reduction.v1"
+  },
+  "generated_utc": "2026-10-05T17:57:07.191405+00:00",
+  "manifest": {
+    "bytes": 3726,
+    "path": "docs/performance/results/change-0917/manifest.json",
+    "sha256": "39f320a7003289c9a41e26fc1a4612c64a4461e2fbf8846f29241e21ea4e02ef"
+  },
+  "native": {
+    "bootstrap": {
+      "draws": 10000,
+      "interval": "nearest-rank2.5th/97.5th percentiles",
+      "seed": 917,
+      "statistic": "median of per-round zero-p50/route-p50 ratios for default and release",
+      "unit": "matched round within fixed fixture/edit count"
+    },
+    "cells": [
+      {
+        "case": "docnohf",
+        "edits": 1,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 119339.11111111111,
+              "p50": 117851.0,
+              "p95": 132190.0,
+              "p99": 142871.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7646.0,
+              "p50": 7648.0,
+              "p95": 7736.0,
+              "p99": 7736.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.1197191601350704,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.1362298211186532
+              },
+              "draws": 10000,
+              "median_ratio": 1.1256353121910463,
+              "ratios": [
+                1.1279525040305038,
+                1.1172667181440972,
+                1.122171602126044,
+                1.1376378303008527,
+                1.1348218119364535,
+                1.123318120351589
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e01-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7720.0,
+                  "before": 7724.0,
+                  "flag": false,
+                  "increase_fraction": -0.0005178663904712444
+                },
+                "rss_kib": 7720.0,
+                "stats": {
+                  "mean": 118651.9,
+                  "p50": 117231.0,
+                  "p95": 131451.0,
+                  "p99": 134241.0
+                },
+                "zero_rss_kib": 7724.0
+              },
+              {
+                "label": "native-r02-docnohf-e01-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7648.0,
+                  "before": 7764.0,
+                  "flag": false,
+                  "increase_fraction": -0.01494075218959301
+                },
+                "rss_kib": 7648.0,
+                "stats": {
+                  "mean": 119827.93333333333,
+                  "p50": 117851.0,
+                  "p95": 136331.0,
+                  "p99": 156401.0
+                },
+                "zero_rss_kib": 7764.0
+              },
+              {
+                "label": "native-r03-docnohf-e01-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7516.0,
+                  "before": 7584.0,
+                  "flag": false,
+                  "increase_fraction": -0.00896624472573837
+                },
+                "rss_kib": 7516.0,
+                "stats": {
+                  "mean": 120336.53333333334,
+                  "p50": 118530.0,
+                  "p95": 134570.0,
+                  "p99": 142790.0
+                },
+                "zero_rss_kib": 7584.0
+              },
+              {
+                "label": "native-r04-docnohf-e01-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7736.0,
+                  "before": 7604.0,
+                  "flag": false,
+                  "increase_fraction": 0.017359284587059376
+                },
+                "rss_kib": 7736.0,
+                "stats": {
+                  "mean": 118771.26666666666,
+                  "p50": 116901.0,
+                  "p95": 130840.0,
+                  "p99": 138960.0
+                },
+                "zero_rss_kib": 7604.0
+              },
+              {
+                "label": "native-r05-docnohf-e01-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7596.0,
+                  "before": 7624.0,
+                  "flag": false,
+                  "increase_fraction": -0.003672612801678854
+                },
+                "rss_kib": 7596.0,
+                "stats": {
+                  "mean": 118335.83333333333,
+                  "p50": 116450.0,
+                  "p95": 131361.0,
+                  "p99": 142871.0
+                },
+                "zero_rss_kib": 7624.0
+              },
+              {
+                "label": "native-r06-docnohf-e01-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7660.0,
+                  "before": 7748.0,
+                  "flag": false,
+                  "increase_fraction": -0.01135776974703151
+                },
+                "rss_kib": 7660.0,
+                "stats": {
+                  "mean": 120111.2,
+                  "p50": 118320.0,
+                  "p95": 133110.0,
+                  "p99": 134911.0
+                },
+                "zero_rss_kib": 7748.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7654.0,
+              "before": 7674.0,
+              "flag": false,
+              "increase_fraction": -0.0026062027625749495
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 133962.88333333333,
+              "p50": 133130.0,
+              "p95": 144491.0,
+              "p99": 156810.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7585.333333333333,
+              "p50": 7548.0,
+              "p95": 7676.0,
+              "p99": 7676.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9879552661842916,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0003751368698355
+              },
+              "draws": 10000,
+              "median_ratio": 0.9951112055197796,
+              "ratios": [
+                0.9988669068824076,
+                0.9914163736437493,
+                0.9988060373958099,
+                1.0018833668572633,
+                0.9869231745842078,
+                0.9889873577843754
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e01-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7612.0,
+                  "before": 7724.0,
+                  "flag": false,
+                  "increase_fraction": -0.014500258933195287
+                },
+                "rss_kib": 7612.0,
+                "stats": {
+                  "mean": 131882.23333333334,
+                  "p50": 132381.0,
+                  "p95": 137971.0,
+                  "p99": 139941.0
+                },
+                "zero_rss_kib": 7724.0
+              },
+              {
+                "label": "native-r02-docnohf-e01-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7676.0,
+                  "before": 7764.0,
+                  "flag": false,
+                  "increase_fraction": -0.011334363730036046
+                },
+                "rss_kib": 7676.0,
+                "stats": {
+                  "mean": 133810.96666666667,
+                  "p50": 132811.0,
+                  "p95": 143810.0,
+                  "p99": 145141.0
+                },
+                "zero_rss_kib": 7764.0
+              },
+              {
+                "label": "native-r03-docnohf-e01-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7508.0,
+                  "before": 7584.0,
+                  "flag": false,
+                  "increase_fraction": -0.010021097046413519
+                },
+                "rss_kib": 7508.0,
+                "stats": {
+                  "mean": 133268.3,
+                  "p50": 133170.0,
+                  "p95": 140780.0,
+                  "p99": 152961.0
+                },
+                "zero_rss_kib": 7584.0
+              },
+              {
+                "label": "native-r04-docnohf-e01-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7548.0,
+                  "before": 7604.0,
+                  "flag": false,
+                  "increase_fraction": -0.007364544976328213
+                },
+                "rss_kib": 7548.0,
+                "stats": {
+                  "mean": 133394.23333333334,
+                  "p50": 132741.0,
+                  "p95": 142301.0,
+                  "p99": 152821.0
+                },
+                "zero_rss_kib": 7604.0
+              },
+              {
+                "label": "native-r05-docnohf-e01-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7500.0,
+                  "before": 7624.0,
+                  "flag": false,
+                  "increase_fraction": -0.01626442812172091
+                },
+                "rss_kib": 7500.0,
+                "stats": {
+                  "mean": 134775.96666666667,
+                  "p50": 133901.0,
+                  "p95": 144511.0,
+                  "p99": 145450.0
+                },
+                "zero_rss_kib": 7624.0
+              },
+              {
+                "label": "native-r06-docnohf-e01-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7668.0,
+                  "before": 7748.0,
+                  "flag": false,
+                  "increase_fraction": -0.01032524522457412
+                },
+                "rss_kib": 7668.0,
+                "stats": {
+                  "mean": 136645.6,
+                  "p50": 134391.0,
+                  "p95": 156810.0,
+                  "p99": 163380.0
+                },
+                "zero_rss_kib": 7748.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7580.0,
+              "before": 7674.0,
+              "flag": false,
+              "increase_fraction": -0.012249152984102119
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 134061.61666666667,
+              "p50": 132621.0,
+              "p95": 146671.0,
+              "p99": 170051.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7674.666666666667,
+              "p50": 7624.0,
+              "p95": 7764.0,
+              "p99": 7764.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e01-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7724.0,
+                  "before": 7724.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7724.0,
+                "stats": {
+                  "mean": 133833.26666666666,
+                  "p50": 132231.0,
+                  "p95": 149570.0,
+                  "p99": 165281.0
+                },
+                "zero_rss_kib": 7724.0
+              },
+              {
+                "label": "native-r02-docnohf-e01-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7764.0,
+                  "before": 7764.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7764.0,
+                "stats": {
+                  "mean": 132388.33333333334,
+                  "p50": 131671.0,
+                  "p95": 142881.0,
+                  "p99": 147801.0
+                },
+                "zero_rss_kib": 7764.0
+              },
+              {
+                "label": "native-r03-docnohf-e01-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7584.0,
+                  "before": 7584.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7584.0,
+                "stats": {
+                  "mean": 134978.9,
+                  "p50": 133011.0,
+                  "p95": 147751.0,
+                  "p99": 170051.0
+                },
+                "zero_rss_kib": 7584.0
+              },
+              {
+                "label": "native-r04-docnohf-e01-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7604.0,
+                  "before": 7604.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7604.0,
+                "stats": {
+                  "mean": 135466.93333333332,
+                  "p50": 132991.0,
+                  "p95": 148921.0,
+                  "p99": 149301.0
+                },
+                "zero_rss_kib": 7604.0
+              },
+              {
+                "label": "native-r05-docnohf-e01-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7624.0,
+                  "before": 7624.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7624.0,
+                "stats": {
+                  "mean": 133031.66666666666,
+                  "p50": 132150.0,
+                  "p95": 143981.0,
+                  "p99": 146180.0
+                },
+                "zero_rss_kib": 7624.0
+              },
+              {
+                "label": "native-r06-docnohf-e01-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7748.0,
+                  "before": 7748.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7748.0,
+                "stats": {
+                  "mean": 134670.6,
+                  "p50": 132911.0,
+                  "p95": 145770.0,
+                  "p99": 178211.0
+                },
+                "zero_rss_kib": 7748.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7674.0,
+              "before": 7674.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 2,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 147322.38333333333,
+              "p50": 145680.0,
+              "p95": 161791.0,
+              "p99": 168080.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7646.666666666667,
+              "p50": 7556.0,
+              "p95": 7768.0,
+              "p99": 7768.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0919085777323414,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.11167805591634
+              },
+              "draws": 10000,
+              "median_ratio": 1.1006625552104072,
+              "ratios": [
+                1.1116869996055663,
+                1.1116691122271134,
+                1.0882642256984767,
+                1.099013316773615,
+                1.095552929766206,
+                1.1023117936471993
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e02-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7488.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": -0.01577287066246058
+                },
+                "rss_kib": 7488.0,
+                "stats": {
+                  "mean": 146649.46666666667,
+                  "p50": 144511.0,
+                  "p95": 158951.0,
+                  "p99": 164230.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r02-docnohf-e02-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7540.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": -0.008937960042061044
+                },
+                "rss_kib": 7540.0,
+                "stats": {
+                  "mean": 146831.4,
+                  "p50": 145161.0,
+                  "p95": 161791.0,
+                  "p99": 167921.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r03-docnohf-e02-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7764.0,
+                  "before": 7560.0,
+                  "flag": false,
+                  "increase_fraction": 0.026984126984126888
+                },
+                "rss_kib": 7764.0,
+                "stats": {
+                  "mean": 148288.66666666666,
+                  "p50": 146390.0,
+                  "p95": 162831.0,
+                  "p99": 166381.0
+                },
+                "zero_rss_kib": 7560.0
+              },
+              {
+                "label": "native-r04-docnohf-e02-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7556.0,
+                  "before": 7656.0,
+                  "flag": false,
+                  "increase_fraction": -0.013061650992685525
+                },
+                "rss_kib": 7556.0,
+                "stats": {
+                  "mean": 146366.6,
+                  "p50": 144930.0,
+                  "p95": 158351.0,
+                  "p99": 165631.0
+                },
+                "zero_rss_kib": 7656.0
+              },
+              {
+                "label": "native-r05-docnohf-e02-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7768.0,
+                  "before": 7748.0,
+                  "flag": false,
+                  "increase_fraction": 0.0025813113061434745
+                },
+                "rss_kib": 7768.0,
+                "stats": {
+                  "mean": 148447.73333333334,
+                  "p50": 146411.0,
+                  "p95": 168080.0,
+                  "p99": 173021.0
+                },
+                "zero_rss_kib": 7748.0
+              },
+              {
+                "label": "native-r06-docnohf-e02-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7764.0,
+                  "before": 7612.0,
+                  "flag": false,
+                  "increase_fraction": 0.019968470835522778
+                },
+                "rss_kib": 7764.0,
+                "stats": {
+                  "mean": 147350.43333333332,
+                  "p50": 145731.0,
+                  "p95": 162691.0,
+                  "p99": 164720.0
+                },
+                "zero_rss_kib": 7612.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7660.0,
+              "before": 7610.0,
+              "flag": false,
+              "increase_fraction": 0.006570302233902758
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 161735.52777777778,
+              "p50": 160611.0,
+              "p95": 175881.0,
+              "p99": 182881.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7676.0,
+              "p50": 7612.0,
+              "p95": 7900.0,
+              "p99": 7900.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9880329801313754,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0127498635647796
+              },
+              "draws": 10000,
+              "median_ratio": 1.0025261625783974,
+              "ratios": [
+                1.0072099861442876,
+                1.0060473438444897,
+                0.9782022706479759,
+                0.997863689614775,
+                1.0182897409852718,
+                0.9990049813123053
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e02-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7900.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.0383806519453207
+                },
+                "rss_kib": 7900.0,
+                "stats": {
+                  "mean": 161065.7,
+                  "p50": 159501.0,
+                  "p95": 177631.0,
+                  "p99": 179211.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r02-docnohf-e02-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7612.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.000525762355415349
+                },
+                "rss_kib": 7612.0,
+                "stats": {
+                  "mean": 161953.66666666666,
+                  "p50": 160401.0,
+                  "p95": 174091.0,
+                  "p99": 181741.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r03-docnohf-e02-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7548.0,
+                  "before": 7560.0,
+                  "flag": false,
+                  "increase_fraction": -0.0015873015873015817
+                },
+                "rss_kib": 7548.0,
+                "stats": {
+                  "mean": 163305.76666666666,
+                  "p50": 162861.0,
+                  "p95": 176721.0,
+                  "p99": 179230.0
+                },
+                "zero_rss_kib": 7560.0
+              },
+              {
+                "label": "native-r04-docnohf-e02-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7736.0,
+                  "before": 7656.0,
+                  "flag": false,
+                  "increase_fraction": 0.010449320794148287
+                },
+                "rss_kib": 7736.0,
+                "stats": {
+                  "mean": 160694.1,
+                  "p50": 159621.0,
+                  "p95": 175031.0,
+                  "p99": 177251.0
+                },
+                "zero_rss_kib": 7656.0
+              },
+              {
+                "label": "native-r05-docnohf-e02-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7696.0,
+                  "before": 7748.0,
+                  "flag": false,
+                  "increase_fraction": -0.006711409395973145
+                },
+                "rss_kib": 7696.0,
+                "stats": {
+                  "mean": 160396.73333333334,
+                  "p50": 157520.0,
+                  "p95": 175881.0,
+                  "p99": 182881.0
+                },
+                "zero_rss_kib": 7748.0
+              },
+              {
+                "label": "native-r06-docnohf-e02-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7564.0,
+                  "before": 7612.0,
+                  "flag": false,
+                  "increase_fraction": -0.006305832895428298
+                },
+                "rss_kib": 7564.0,
+                "stats": {
+                  "mean": 162997.2,
+                  "p50": 160801.0,
+                  "p95": 181170.0,
+                  "p99": 185051.0
+                },
+                "zero_rss_kib": 7612.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7654.0,
+              "before": 7610.0,
+              "flag": false,
+              "increase_fraction": 0.00578186596583441
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 162046.6888888889,
+              "p50": 160461.0,
+              "p95": 176251.0,
+              "p99": 184111.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7632.0,
+              "p50": 7608.0,
+              "p95": 7748.0,
+              "p99": 7748.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e02-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7608.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7608.0,
+                "stats": {
+                  "mean": 161616.4,
+                  "p50": 160651.0,
+                  "p95": 177881.0,
+                  "p99": 181850.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r02-docnohf-e02-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7608.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7608.0,
+                "stats": {
+                  "mean": 163357.46666666667,
+                  "p50": 161371.0,
+                  "p95": 181761.0,
+                  "p99": 186481.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r03-docnohf-e02-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7560.0,
+                  "before": 7560.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7560.0,
+                "stats": {
+                  "mean": 162107.4,
+                  "p50": 159311.0,
+                  "p95": 174971.0,
+                  "p99": 181640.0
+                },
+                "zero_rss_kib": 7560.0
+              },
+              {
+                "label": "native-r04-docnohf-e02-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7656.0,
+                  "before": 7656.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7656.0,
+                "stats": {
+                  "mean": 160720.06666666668,
+                  "p50": 159280.0,
+                  "p95": 174371.0,
+                  "p99": 184111.0
+                },
+                "zero_rss_kib": 7656.0
+              },
+              {
+                "label": "native-r05-docnohf-e02-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7748.0,
+                  "before": 7748.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7748.0,
+                "stats": {
+                  "mean": 161628.03333333333,
+                  "p50": 160401.0,
+                  "p95": 173300.0,
+                  "p99": 181450.0
+                },
+                "zero_rss_kib": 7748.0
+              },
+              {
+                "label": "native-r06-docnohf-e02-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7612.0,
+                  "before": 7612.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7612.0,
+                "stats": {
+                  "mean": 162850.76666666666,
+                  "p50": 160641.0,
+                  "p95": 176251.0,
+                  "p99": 183580.0
+                },
+                "zero_rss_kib": 7612.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7610.0,
+              "before": 7610.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 8,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 300928.6277777778,
+              "p50": 300211.0,
+              "p95": 312572.0,
+              "p99": 314391.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7858.0,
+              "p50": 7820.0,
+              "p95": 8004.0,
+              "p99": 8004.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0449676423686531,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0621295412769147
+              },
+              "draws": 10000,
+              "median_ratio": 1.0511322378167858,
+              "ratios": [
+                1.0455437782967005,
+                1.047488486880554,
+                1.0568341755693471,
+                1.0547759887530173,
+                1.044391506440606,
+                1.0674249069844823
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e08-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 8004.0,
+                  "before": 7720.0,
+                  "flag": false,
+                  "increase_fraction": 0.03678756476683942
+                },
+                "rss_kib": 8004.0,
+                "stats": {
+                  "mean": 301548.4,
+                  "p50": 301051.0,
+                  "p95": 310261.0,
+                  "p99": 310751.0
+                },
+                "zero_rss_kib": 7720.0
+              },
+              {
+                "label": "native-r02-docnohf-e08-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7944.0,
+                  "before": 7768.0,
+                  "flag": false,
+                  "increase_fraction": 0.022657054582904124
+                },
+                "rss_kib": 7944.0,
+                "stats": {
+                  "mean": 300543.0333333333,
+                  "p50": 299441.0,
+                  "p95": 310932.0,
+                  "p99": 312611.0
+                },
+                "zero_rss_kib": 7768.0
+              },
+              {
+                "label": "native-r03-docnohf-e08-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7768.0,
+                  "before": 7868.0,
+                  "flag": false,
+                  "increase_fraction": -0.012709710218607007
+                },
+                "rss_kib": 7768.0,
+                "stats": {
+                  "mean": 299419.3,
+                  "p50": 298412.0,
+                  "p95": 307551.0,
+                  "p99": 309232.0
+                },
+                "zero_rss_kib": 7868.0
+              },
+              {
+                "label": "native-r04-docnohf-e08-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7704.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.012618296529968376
+                },
+                "rss_kib": 7704.0,
+                "stats": {
+                  "mean": 302707.3333333333,
+                  "p50": 301592.0,
+                  "p95": 313001.0,
+                  "p99": 313652.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r05-docnohf-e08-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7820.0,
+                  "before": 7796.0,
+                  "flag": false,
+                  "increase_fraction": 0.0030785017957926097
+                },
+                "rss_kib": 7820.0,
+                "stats": {
+                  "mean": 301656.36666666664,
+                  "p50": 300981.0,
+                  "p95": 314391.0,
+                  "p99": 315401.0
+                },
+                "zero_rss_kib": 7796.0
+              },
+              {
+                "label": "native-r06-docnohf-e08-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7908.0,
+                  "before": 7796.0,
+                  "flag": false,
+                  "increase_fraction": 0.014366341713699438
+                },
+                "rss_kib": 7908.0,
+                "stats": {
+                  "mean": 299697.3333333333,
+                  "p50": 297531.0,
+                  "p95": 313371.0,
+                  "p99": 313512.0
+                },
+                "zero_rss_kib": 7796.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7864.0,
+              "before": 7782.0,
+              "flag": false,
+              "increase_fraction": 0.010537136982780693
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 318899.5055555556,
+              "p50": 316471.0,
+              "p95": 335861.0,
+              "p99": 343621.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7879.333333333333,
+              "p50": 7800.0,
+              "p95": 8024.0,
+              "p99": 8024.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9760974094216224,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0166777089993988
+              },
+              "draws": 10000,
+              "median_ratio": 0.9939822089664363,
+              "ratios": [
+                0.9935920098992399,
+                1.0093968932326278,
+                0.9663879193849378,
+                0.985806899458307,
+                0.9943724080336327,
+                1.0239585247661698
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e08-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7976.0,
+                  "before": 7720.0,
+                  "flag": false,
+                  "increase_fraction": 0.033160621761658016
+                },
+                "rss_kib": 7976.0,
+                "stats": {
+                  "mean": 321849.1666666667,
+                  "p50": 316792.0,
+                  "p95": 340951.0,
+                  "p99": 352092.0
+                },
+                "zero_rss_kib": 7720.0
+              },
+              {
+                "label": "native-r02-docnohf-e08-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7784.0,
+                  "before": 7768.0,
+                  "flag": false,
+                  "increase_fraction": 0.002059732234809486
+                },
+                "rss_kib": 7784.0,
+                "stats": {
+                  "mean": 316211.8,
+                  "p50": 310741.0,
+                  "p95": 332431.0,
+                  "p99": 333311.0
+                },
+                "zero_rss_kib": 7768.0
+              },
+              {
+                "label": "native-r03-docnohf-e08-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7956.0,
+                  "before": 7868.0,
+                  "flag": false,
+                  "increase_fraction": 0.011184544992374201
+                },
+                "rss_kib": 7956.0,
+                "stats": {
+                  "mean": 324663.8,
+                  "p50": 326341.0,
+                  "p95": 338261.0,
+                  "p99": 339071.0
+                },
+                "zero_rss_kib": 7868.0
+              },
+              {
+                "label": "native-r04-docnohf-e08-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7736.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.016824395373291168
+                },
+                "rss_kib": 7736.0,
+                "stats": {
+                  "mean": 320203.1,
+                  "p50": 322692.0,
+                  "p95": 336382.0,
+                  "p99": 342292.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r05-docnohf-e08-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7800.0,
+                  "before": 7796.0,
+                  "flag": false,
+                  "increase_fraction": 0.0005130836326321386
+                },
+                "rss_kib": 7800.0,
+                "stats": {
+                  "mean": 316304.73333333334,
+                  "p50": 316121.0,
+                  "p95": 323371.0,
+                  "p99": 325212.0
+                },
+                "zero_rss_kib": 7796.0
+              },
+              {
+                "label": "native-r06-docnohf-e08-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 8024.0,
+                  "before": 7796.0,
+                  "flag": false,
+                  "increase_fraction": 0.029245767060030792
+                },
+                "rss_kib": 8024.0,
+                "stats": {
+                  "mean": 314164.43333333335,
+                  "p50": 310161.0,
+                  "p95": 328382.0,
+                  "p99": 343621.0
+                },
+                "zero_rss_kib": 7796.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7878.0,
+              "before": 7782.0,
+              "flag": false,
+              "increase_fraction": 0.012336160370084892
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 317989.02222222224,
+              "p50": 316861.0,
+              "p95": 333181.0,
+              "p99": 344771.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7759.333333333333,
+              "p50": 7768.0,
+              "p95": 7868.0,
+              "p99": 7868.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e08-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7720.0,
+                  "before": 7720.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7720.0,
+                "stats": {
+                  "mean": 317515.5,
+                  "p50": 314762.0,
+                  "p95": 334371.0,
+                  "p99": 334382.0
+                },
+                "zero_rss_kib": 7720.0
+              },
+              {
+                "label": "native-r02-docnohf-e08-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7768.0,
+                  "before": 7768.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7768.0,
+                "stats": {
+                  "mean": 318812.1,
+                  "p50": 313661.0,
+                  "p95": 333181.0,
+                  "p99": 339212.0
+                },
+                "zero_rss_kib": 7768.0
+              },
+              {
+                "label": "native-r03-docnohf-e08-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7868.0,
+                  "before": 7868.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7868.0,
+                "stats": {
+                  "mean": 315842.5333333333,
+                  "p50": 315372.0,
+                  "p95": 328231.0,
+                  "p99": 328572.0
+                },
+                "zero_rss_kib": 7868.0
+              },
+              {
+                "label": "native-r04-docnohf-e08-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7608.0,
+                  "before": 7608.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7608.0,
+                "stats": {
+                  "mean": 318297.8,
+                  "p50": 318112.0,
+                  "p95": 327421.0,
+                  "p99": 330631.0
+                },
+                "zero_rss_kib": 7608.0
+              },
+              {
+                "label": "native-r05-docnohf-e08-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7796.0,
+                  "before": 7796.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7796.0,
+                "stats": {
+                  "mean": 318899.43333333335,
+                  "p50": 314342.0,
+                  "p95": 333201.0,
+                  "p99": 344771.0
+                },
+                "zero_rss_kib": 7796.0
+              },
+              {
+                "label": "native-r06-docnohf-e08-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7796.0,
+                  "before": 7796.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7796.0,
+                "stats": {
+                  "mean": 318566.76666666666,
+                  "p50": 317592.0,
+                  "p95": 335861.0,
+                  "p99": 346082.0
+                },
+                "zero_rss_kib": 7796.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7782.0,
+              "before": 7782.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 32,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 1017823.6333333333,
+              "p50": 1017054.0,
+              "p95": 1032745.0,
+              "p99": 1044114.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7914.666666666667,
+              "p50": 7908.0,
+              "p95": 8012.0,
+              "p99": 8012.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0078528186916929,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0146261035751545
+              },
+              "draws": 10000,
+              "median_ratio": 1.0122531351625241,
+              "ratios": [
+                1.0085188741966462,
+                1.011572748233981,
+                1.0141505728571372,
+                1.0151016342931718,
+                1.0071867631867395,
+                1.0129335220910674
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e32-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7908.0,
+                  "before": 7852.0,
+                  "flag": false,
+                  "increase_fraction": 0.00713194090677538
+                },
+                "rss_kib": 7908.0,
+                "stats": {
+                  "mean": 1014853.6333333333,
+                  "p50": 1015275.0,
+                  "p95": 1027894.0,
+                  "p99": 1030085.0
+                },
+                "zero_rss_kib": 7852.0
+              },
+              {
+                "label": "native-r02-docnohf-e32-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 8012.0,
+                  "before": 7852.0,
+                  "flag": false,
+                  "increase_fraction": 0.02037697401935823
+                },
+                "rss_kib": 8012.0,
+                "stats": {
+                  "mean": 1022076.7,
+                  "p50": 1021365.0,
+                  "p95": 1036905.0,
+                  "p99": 1050655.0
+                },
+                "zero_rss_kib": 7852.0
+              },
+              {
+                "label": "native-r03-docnohf-e32-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7800.0,
+                  "before": 8004.0,
+                  "flag": false,
+                  "increase_fraction": -0.025487256371814038
+                },
+                "rss_kib": 7800.0,
+                "stats": {
+                  "mean": 1019469.3,
+                  "p50": 1018404.0,
+                  "p95": 1030984.0,
+                  "p99": 1031485.0
+                },
+                "zero_rss_kib": 8004.0
+              },
+              {
+                "label": "native-r04-docnohf-e32-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7852.0,
+                  "before": 7812.0,
+                  "flag": false,
+                  "increase_fraction": 0.005120327700972815
+                },
+                "rss_kib": 7852.0,
+                "stats": {
+                  "mean": 1017858.6666666666,
+                  "p50": 1019095.0,
+                  "p95": 1030485.0,
+                  "p99": 1044114.0
+                },
+                "zero_rss_kib": 7812.0
+              },
+              {
+                "label": "native-r05-docnohf-e32-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7956.0,
+                  "before": 7720.0,
+                  "flag": false,
+                  "increase_fraction": 0.030569948186528473
+                },
+                "rss_kib": 7956.0,
+                "stats": {
+                  "mean": 1015616.8666666667,
+                  "p50": 1014504.0,
+                  "p95": 1033995.0,
+                  "p99": 1034095.0
+                },
+                "zero_rss_kib": 7720.0
+              },
+              {
+                "label": "native-r06-docnohf-e32-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7960.0,
+                  "before": 7928.0,
+                  "flag": false,
+                  "increase_fraction": 0.004036326942482349
+                },
+                "rss_kib": 7960.0,
+                "stats": {
+                  "mean": 1017066.6333333333,
+                  "p50": 1013645.0,
+                  "p95": 1040654.0,
+                  "p99": 1042385.0
+                },
+                "zero_rss_kib": 7928.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7932.0,
+              "before": 7852.0,
+              "flag": false,
+              "increase_fraction": 0.010188487009679115
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 1031308.9,
+              "p50": 1030925.0,
+              "p95": 1050605.0,
+              "p99": 1063285.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7876.0,
+              "p50": 7852.0,
+              "p95": 8012.0,
+              "p99": 8012.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9932797630943017,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0053094689721016
+              },
+              "draws": 10000,
+              "median_ratio": 0.9976540239946183,
+              "ratios": [
+                0.9899537374977643,
+                1.002727162440859,
+                0.9982988183553633,
+                1.0078917755033443,
+                0.996605788690839,
+                0.9970092296338734
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e32-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7708.0,
+                  "before": 7852.0,
+                  "flag": false,
+                  "increase_fraction": -0.018339276617422295
+                },
+                "rss_kib": 7708.0,
+                "stats": {
+                  "mean": 1035771.4666666667,
+                  "p50": 1034315.0,
+                  "p95": 1050605.0,
+                  "p99": 1052665.0
+                },
+                "zero_rss_kib": 7852.0
+              },
+              {
+                "label": "native-r02-docnohf-e32-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7900.0,
+                  "before": 7852.0,
+                  "flag": false,
+                  "increase_fraction": 0.006113092205807469
+                },
+                "rss_kib": 7900.0,
+                "stats": {
+                  "mean": 1031689.7666666667,
+                  "p50": 1030375.0,
+                  "p95": 1052175.0,
+                  "p99": 1055805.0
+                },
+                "zero_rss_kib": 7852.0
+              },
+              {
+                "label": "native-r03-docnohf-e32-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 7976.0,
+                  "before": 8004.0,
+                  "flag": false,
+                  "increase_fraction": -0.0034982508745626806
+                },
+                "rss_kib": 7976.0,
+                "stats": {
+                  "mean": 1036272.1,
+                  "p50": 1034575.0,
+                  "p95": 1053175.0,
+                  "p99": 1063285.0
+                },
+                "zero_rss_kib": 8004.0
+              },
+              {
+                "label": "native-r04-docnohf-e32-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7852.0,
+                  "before": 7812.0,
+                  "flag": false,
+                  "increase_fraction": 0.005120327700972815
+                },
+                "rss_kib": 7852.0,
+                "stats": {
+                  "mean": 1027069.3333333334,
+                  "p50": 1026385.0,
+                  "p95": 1051764.0,
+                  "p99": 1063575.0
+                },
+                "zero_rss_kib": 7812.0
+              },
+              {
+                "label": "native-r05-docnohf-e32-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7808.0,
+                  "before": 7720.0,
+                  "flag": false,
+                  "increase_fraction": 0.011398963730570033
+                },
+                "rss_kib": 7808.0,
+                "stats": {
+                  "mean": 1026726.0666666667,
+                  "p50": 1025275.0,
+                  "p95": 1041595.0,
+                  "p99": 1048415.0
+                },
+                "zero_rss_kib": 7720.0
+              },
+              {
+                "label": "native-r06-docnohf-e32-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 8012.0,
+                  "before": 7928.0,
+                  "flag": false,
+                  "increase_fraction": 0.010595358224016138
+                },
+                "rss_kib": 8012.0,
+                "stats": {
+                  "mean": 1030324.6666666666,
+                  "p50": 1029835.0,
+                  "p95": 1048534.0,
+                  "p99": 1054825.0
+                },
+                "zero_rss_kib": 7928.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7876.0,
+              "before": 7852.0,
+              "flag": false,
+              "increase_fraction": 0.0030565461029037344
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 1029707.9444444445,
+              "p50": 1029085.0,
+              "p95": 1047265.0,
+              "p99": 1051745.0
+            },
+            "pooled_rss_kib": {
+              "mean": 7861.333333333333,
+              "p50": 7852.0,
+              "p95": 8004.0,
+              "p99": 8004.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docnohf-e32-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 7852.0,
+                  "before": 7852.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7852.0,
+                "stats": {
+                  "mean": 1025870.3666666667,
+                  "p50": 1023924.0,
+                  "p95": 1042484.0,
+                  "p99": 1043805.0
+                },
+                "zero_rss_kib": 7852.0
+              },
+              {
+                "label": "native-r02-docnohf-e32-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 7852.0,
+                  "before": 7852.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7852.0,
+                "stats": {
+                  "mean": 1033296.4333333333,
+                  "p50": 1033185.0,
+                  "p95": 1049535.0,
+                  "p99": 1051745.0
+                },
+                "zero_rss_kib": 7852.0
+              },
+              {
+                "label": "native-r03-docnohf-e32-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 8004.0,
+                  "before": 8004.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 8004.0,
+                "stats": {
+                  "mean": 1035042.3333333334,
+                  "p50": 1032815.0,
+                  "p95": 1050705.0,
+                  "p99": 1067025.0
+                },
+                "zero_rss_kib": 8004.0
+              },
+              {
+                "label": "native-r04-docnohf-e32-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 7812.0,
+                  "before": 7812.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7812.0,
+                "stats": {
+                  "mean": 1033504.6666666666,
+                  "p50": 1034485.0,
+                  "p95": 1050275.0,
+                  "p99": 1050885.0
+                },
+                "zero_rss_kib": 7812.0
+              },
+              {
+                "label": "native-r05-docnohf-e32-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 7720.0,
+                  "before": 7720.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7720.0,
+                "stats": {
+                  "mean": 1023299.5666666667,
+                  "p50": 1021795.0,
+                  "p95": 1046035.0,
+                  "p99": 1049765.0
+                },
+                "zero_rss_kib": 7720.0
+              },
+              {
+                "label": "native-r06-docnohf-e32-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 7928.0,
+                  "before": 7928.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 7928.0,
+                "stats": {
+                  "mean": 1027234.3,
+                  "p50": 1026755.0,
+                  "p95": 1040445.0,
+                  "p99": 1045055.0
+                },
+                "zero_rss_kib": 7928.0
+              }
+            ],
+            "rss_flag": {
+              "after": 7852.0,
+              "before": 7852.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 1,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 1041267.2333333333,
+              "p50": 988355.0,
+              "p95": 1220046.0,
+              "p99": 1252906.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13665.333333333334,
+              "p50": 13624.0,
+              "p95": 13996.0,
+              "p99": 13996.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9955451233421362,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.2109259636185508
+              },
+              "draws": 10000,
+              "median_ratio": 1.1032217641566278,
+              "ratios": [
+                1.030634349318631,
+                1.112814274542676,
+                0.9604558973656415,
+                1.3090376526944254,
+                1.1021102371900444,
+                1.1043332911232113
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e01-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 13444.0,
+                  "before": 14524.0,
+                  "flag": false,
+                  "increase_fraction": -0.07435968052877995
+                },
+                "rss_kib": 13444.0,
+                "stats": {
+                  "mean": 1178444.7666666666,
+                  "p50": 1201625.0,
+                  "p95": 1252906.0,
+                  "p99": 1267646.0
+                },
+                "zero_rss_kib": 14524.0
+              },
+              {
+                "label": "native-r02-docfloat-e01-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13776.0,
+                  "before": 13856.0,
+                  "flag": false,
+                  "increase_fraction": -0.005773672055427226
+                },
+                "rss_kib": 13776.0,
+                "stats": {
+                  "mean": 977949.4666666667,
+                  "p50": 978245.0,
+                  "p95": 989295.0,
+                  "p99": 1005024.0
+                },
+                "zero_rss_kib": 13856.0
+              },
+              {
+                "label": "native-r03-docfloat-e01-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13668.0,
+                  "before": 13556.0,
+                  "flag": false,
+                  "increase_fraction": 0.00826202419592792
+                },
+                "rss_kib": 13668.0,
+                "stats": {
+                  "mean": 1100993.7333333334,
+                  "p50": 1131395.0,
+                  "p95": 1158465.0,
+                  "p99": 1160986.0
+                },
+                "zero_rss_kib": 13556.0
+              },
+              {
+                "label": "native-r04-docfloat-e01-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13624.0,
+                  "before": 13624.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13624.0,
+                "stats": {
+                  "mean": 1035172.1333333333,
+                  "p50": 1033764.0,
+                  "p95": 1115065.0,
+                  "p99": 1122235.0
+                },
+                "zero_rss_kib": 13624.0
+              },
+              {
+                "label": "native-r05-docfloat-e01-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13996.0,
+                  "before": 14668.0,
+                  "flag": false,
+                  "increase_fraction": -0.04581401690755382
+                },
+                "rss_kib": 13996.0,
+                "stats": {
+                  "mean": 972339.9666666667,
+                  "p50": 974535.0,
+                  "p95": 981295.0,
+                  "p99": 982884.0
+                },
+                "zero_rss_kib": 14668.0
+              },
+              {
+                "label": "native-r06-docfloat-e01-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13484.0,
+                  "before": 14736.0,
+                  "flag": false,
+                  "increase_fraction": -0.08496199782844738
+                },
+                "rss_kib": 13484.0,
+                "stats": {
+                  "mean": 982703.3333333334,
+                  "p50": 987125.0,
+                  "p95": 997424.0,
+                  "p99": 1000384.0
+                },
+                "zero_rss_kib": 14736.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13646.0,
+              "before": 14190.0,
+              "flag": false,
+              "increase_fraction": -0.038336856941508124
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 1166316.3333333333,
+              "p50": 1097825.0,
+              "p95": 1305586.0,
+              "p99": 1355446.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13759.333333333334,
+              "p50": 13696.0,
+              "p95": 14184.0,
+              "p99": 14184.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.8784163898947669,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.1291021422923628
+              },
+              "draws": 10000,
+              "median_ratio": 0.9778151491764662,
+              "ratios": [
+                0.9549967766711187,
+                0.8696414562872568,
+                0.887191323502277,
+                1.2421447814692936,
+                1.0006335216818136,
+                1.0160595031154318
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e01-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 13696.0,
+                  "before": 14524.0,
+                  "flag": false,
+                  "increase_fraction": -0.05700908840539798
+                },
+                "rss_kib": 13696.0,
+                "stats": {
+                  "mean": 1282291.2666666666,
+                  "p50": 1296796.0,
+                  "p95": 1312246.0,
+                  "p99": 1314216.0
+                },
+                "zero_rss_kib": 14524.0
+              },
+              {
+                "label": "native-r02-docfloat-e01-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13552.0,
+                  "before": 13856.0,
+                  "flag": false,
+                  "increase_fraction": -0.021939953810623525
+                },
+                "rss_kib": 13552.0,
+                "stats": {
+                  "mean": 1249724.3666666667,
+                  "p50": 1251786.0,
+                  "p95": 1355446.0,
+                  "p99": 1357166.0
+                },
+                "zero_rss_kib": 13856.0
+              },
+              {
+                "label": "native-r03-docfloat-e01-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13448.0,
+                  "before": 13556.0,
+                  "flag": false,
+                  "increase_fraction": -0.00796695190321628
+                },
+                "rss_kib": 13448.0,
+                "stats": {
+                  "mean": 1227600.7,
+                  "p50": 1224826.0,
+                  "p95": 1286736.0,
+                  "p99": 1295706.0
+                },
+                "zero_rss_kib": 13556.0
+              },
+              {
+                "label": "native-r04-docfloat-e01-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 14184.0,
+                  "before": 13624.0,
+                  "flag": false,
+                  "increase_fraction": 0.041103934233705175
+                },
+                "rss_kib": 14184.0,
+                "stats": {
+                  "mean": 1092401.2666666666,
+                  "p50": 1089435.0,
+                  "p95": 1097825.0,
+                  "p99": 1169805.0
+                },
+                "zero_rss_kib": 13624.0
+              },
+              {
+                "label": "native-r05-docfloat-e01-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13912.0,
+                  "before": 14668.0,
+                  "flag": false,
+                  "increase_fraction": -0.051540769020998134
+                },
+                "rss_kib": 13912.0,
+                "stats": {
+                  "mean": 1074872.5333333334,
+                  "p50": 1073365.0,
+                  "p95": 1095245.0,
+                  "p99": 1125285.0
+                },
+                "zero_rss_kib": 14668.0
+              },
+              {
+                "label": "native-r06-docfloat-e01-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13764.0,
+                  "before": 14736.0,
+                  "flag": false,
+                  "increase_fraction": -0.0659609120521173
+                },
+                "rss_kib": 13764.0,
+                "stats": {
+                  "mean": 1071007.8666666667,
+                  "p50": 1072885.0,
+                  "p95": 1082475.0,
+                  "p99": 1086995.0
+                },
+                "zero_rss_kib": 14736.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13730.0,
+              "before": 14190.0,
+              "flag": false,
+              "increase_fraction": -0.03241719520789288
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 1140638.3444444444,
+              "p50": 1091235.0,
+              "p95": 1384867.0,
+              "p99": 1411456.0
+            },
+            "pooled_rss_kib": {
+              "mean": 14160.666666666666,
+              "p50": 13856.0,
+              "p95": 14736.0,
+              "p99": 14736.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e01-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 14524.0,
+                  "before": 14524.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14524.0,
+                "stats": {
+                  "mean": 1233650.7,
+                  "p50": 1238436.0,
+                  "p95": 1259096.0,
+                  "p99": 1262746.0
+                },
+                "zero_rss_kib": 14524.0
+              },
+              {
+                "label": "native-r02-docfloat-e01-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13856.0,
+                  "before": 13856.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13856.0,
+                "stats": {
+                  "mean": 1087163.3333333333,
+                  "p50": 1088605.0,
+                  "p95": 1107455.0,
+                  "p99": 1107685.0
+                },
+                "zero_rss_kib": 13856.0
+              },
+              {
+                "label": "native-r03-docfloat-e01-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13556.0,
+                  "before": 13556.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13556.0,
+                "stats": {
+                  "mean": 1080978.6,
+                  "p50": 1086655.0,
+                  "p95": 1100635.0,
+                  "p99": 1110555.0
+                },
+                "zero_rss_kib": 13556.0
+              },
+              {
+                "label": "native-r04-docfloat-e01-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13624.0,
+                  "before": 13624.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13624.0,
+                "stats": {
+                  "mean": 1259607.7333333334,
+                  "p50": 1353236.0,
+                  "p95": 1411456.0,
+                  "p99": 1445467.0
+                },
+                "zero_rss_kib": 13624.0
+              },
+              {
+                "label": "native-r05-docfloat-e01-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 14668.0,
+                  "before": 14668.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14668.0,
+                "stats": {
+                  "mean": 1093089.4,
+                  "p50": 1074045.0,
+                  "p95": 1240106.0,
+                  "p99": 1260046.0
+                },
+                "zero_rss_kib": 14668.0
+              },
+              {
+                "label": "native-r06-docfloat-e01-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 14736.0,
+                  "before": 14736.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14736.0,
+                "stats": {
+                  "mean": 1089340.3,
+                  "p50": 1090115.0,
+                  "p95": 1104625.0,
+                  "p99": 1105495.0
+                },
+                "zero_rss_kib": 14736.0
+              }
+            ],
+            "rss_flag": {
+              "after": 14190.0,
+              "before": 14190.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 2,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 1323932.1944444445,
+              "p50": 1341897.0,
+              "p95": 1507967.0,
+              "p99": 1523847.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13442.0,
+              "p50": 13452.0,
+              "p95": 13652.0,
+              "p99": 13652.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.8933374213362846,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0811817716171541
+              },
+              "draws": 10000,
+              "median_ratio": 0.9981194295163568,
+              "ratios": [
+                1.0879795158680192,
+                1.0628584910055106,
+                0.9179647901058525,
+                1.0743840273662888,
+                0.933380368027203,
+                0.8687100525667165
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e02-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 13452.0,
+                  "before": 13648.0,
+                  "flag": false,
+                  "increase_fraction": -0.014361078546307193
+                },
+                "rss_kib": 13452.0,
+                "stats": {
+                  "mean": 1184890.7666666666,
+                  "p50": 1183355.0,
+                  "p95": 1202825.0,
+                  "p99": 1243955.0
+                },
+                "zero_rss_kib": 13648.0
+              },
+              {
+                "label": "native-r02-docfloat-e02-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13460.0,
+                  "before": 13912.0,
+                  "flag": false,
+                  "increase_fraction": -0.03248993674525591
+                },
+                "rss_kib": 13460.0,
+                "stats": {
+                  "mean": 1316992.9666666666,
+                  "p50": 1330926.0,
+                  "p95": 1378366.0,
+                  "p99": 1399596.0
+                },
+                "zero_rss_kib": 13912.0
+              },
+              {
+                "label": "native-r03-docfloat-e02-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13652.0,
+                  "before": 13568.0,
+                  "flag": false,
+                  "increase_fraction": 0.006191037735848948
+                },
+                "rss_kib": 13652.0,
+                "stats": {
+                  "mean": 1379559.3666666667,
+                  "p50": 1399777.0,
+                  "p95": 1519107.0,
+                  "p99": 1521556.0
+                },
+                "zero_rss_kib": 13568.0
+              },
+              {
+                "label": "native-r04-docfloat-e02-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13328.0,
+                  "before": 13472.0,
+                  "flag": false,
+                  "increase_fraction": -0.0106888361045131
+                },
+                "rss_kib": 13328.0,
+                "stats": {
+                  "mean": 1193400.7333333334,
+                  "p50": 1189785.0,
+                  "p95": 1248596.0,
+                  "p99": 1266716.0
+                },
+                "zero_rss_kib": 13472.0
+              },
+              {
+                "label": "native-r05-docfloat-e02-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13272.0,
+                  "before": 13584.0,
+                  "flag": false,
+                  "increase_fraction": -0.02296819787985871
+                },
+                "rss_kib": 13272.0,
+                "stats": {
+                  "mean": 1379715.9666666666,
+                  "p50": 1383376.0,
+                  "p95": 1471107.0,
+                  "p99": 1473817.0
+                },
+                "zero_rss_kib": 13584.0
+              },
+              {
+                "label": "native-r06-docfloat-e02-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13488.0,
+                  "before": 13376.0,
+                  "flag": false,
+                  "increase_fraction": 0.00837320574162681
+                },
+                "rss_kib": 13488.0,
+                "stats": {
+                  "mean": 1489033.3666666667,
+                  "p50": 1497906.0,
+                  "p95": 1523847.0,
+                  "p99": 1529407.0
+                },
+                "zero_rss_kib": 13376.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13456.0,
+              "before": 13576.0,
+              "flag": false,
+              "increase_fraction": -0.008839127872716568
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 1322281.0166666666,
+              "p50": 1287455.0,
+              "p95": 1550087.0,
+              "p99": 1620437.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13654.666666666666,
+              "p50": 13596.0,
+              "p95": 13932.0,
+              "p99": 13932.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9151134866297115,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0617272826999136
+              },
+              "draws": 10000,
+              "median_ratio": 0.9978857591711501,
+              "ratios": [
+                1.0111365396305307,
+                1.1123180257692966,
+                0.9931596635018195,
+                1.0026118548404808,
+                0.9508736116695607,
+                0.8793533615898622
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e02-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 13708.0,
+                  "before": 13648.0,
+                  "flag": false,
+                  "increase_fraction": 0.004396248534583869
+                },
+                "rss_kib": 13708.0,
+                "stats": {
+                  "mean": 1270784.2333333334,
+                  "p50": 1273286.0,
+                  "p95": 1289186.0,
+                  "p99": 1293906.0
+                },
+                "zero_rss_kib": 13648.0
+              },
+              {
+                "label": "native-r02-docfloat-e02-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13464.0,
+                  "before": 13912.0,
+                  "flag": false,
+                  "increase_fraction": -0.03220241518113853
+                },
+                "rss_kib": 13464.0,
+                "stats": {
+                  "mean": 1272358.3,
+                  "p50": 1271746.0,
+                  "p95": 1301406.0,
+                  "p99": 1326046.0
+                },
+                "zero_rss_kib": 13912.0
+              },
+              {
+                "label": "native-r03-docfloat-e02-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13932.0,
+                  "before": 13568.0,
+                  "flag": false,
+                  "increase_fraction": 0.02682783018867929
+                },
+                "rss_kib": 13932.0,
+                "stats": {
+                  "mean": 1293034.5666666667,
+                  "p50": 1293796.0,
+                  "p95": 1312626.0,
+                  "p99": 1316486.0
+                },
+                "zero_rss_kib": 13568.0
+              },
+              {
+                "label": "native-r04-docfloat-e02-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13704.0,
+                  "before": 13472.0,
+                  "flag": false,
+                  "increase_fraction": 0.017220902612826494
+                },
+                "rss_kib": 13704.0,
+                "stats": {
+                  "mean": 1281284.5666666667,
+                  "p50": 1274956.0,
+                  "p95": 1306936.0,
+                  "p99": 1403096.0
+                },
+                "zero_rss_kib": 13472.0
+              },
+              {
+                "label": "native-r05-docfloat-e02-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13596.0,
+                  "before": 13584.0,
+                  "flag": false,
+                  "increase_fraction": 0.0008833922261484162
+                },
+                "rss_kib": 13596.0,
+                "stats": {
+                  "mean": 1355968.8,
+                  "p50": 1357926.0,
+                  "p95": 1400527.0,
+                  "p99": 1401206.0
+                },
+                "zero_rss_kib": 13584.0
+              },
+              {
+                "label": "native-r06-docfloat-e02-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13524.0,
+                  "before": 13376.0,
+                  "flag": false,
+                  "increase_fraction": 0.011064593301435499
+                },
+                "rss_kib": 13524.0,
+                "stats": {
+                  "mean": 1460255.6333333333,
+                  "p50": 1479776.0,
+                  "p95": 1620437.0,
+                  "p99": 1637507.0
+                },
+                "zero_rss_kib": 13376.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13650.0,
+              "before": 13576.0,
+              "flag": false,
+              "increase_fraction": 0.005450795521508622
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 1311989.1722222222,
+              "p50": 1292796.0,
+              "p95": 1424536.0,
+              "p99": 1431137.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13593.333333333334,
+              "p50": 13568.0,
+              "p95": 13912.0,
+              "p99": 13912.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e02-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 13648.0,
+                  "before": 13648.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13648.0,
+                "stats": {
+                  "mean": 1285591.9333333333,
+                  "p50": 1287466.0,
+                  "p95": 1298326.0,
+                  "p99": 1322516.0
+                },
+                "zero_rss_kib": 13648.0
+              },
+              {
+                "label": "native-r02-docfloat-e02-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13912.0,
+                  "before": 13912.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13912.0,
+                "stats": {
+                  "mean": 1398842.1,
+                  "p50": 1414586.0,
+                  "p95": 1431137.0,
+                  "p99": 1437257.0
+                },
+                "zero_rss_kib": 13912.0
+              },
+              {
+                "label": "native-r03-docfloat-e02-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13568.0,
+                  "before": 13568.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13568.0,
+                "stats": {
+                  "mean": 1288551.8666666667,
+                  "p50": 1284946.0,
+                  "p95": 1346936.0,
+                  "p99": 1423436.0
+                },
+                "zero_rss_kib": 13568.0
+              },
+              {
+                "label": "native-r04-docfloat-e02-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13472.0,
+                  "before": 13472.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13472.0,
+                "stats": {
+                  "mean": 1307874.2666666666,
+                  "p50": 1278286.0,
+                  "p95": 1408706.0,
+                  "p99": 1417686.0
+                },
+                "zero_rss_kib": 13472.0
+              },
+              {
+                "label": "native-r05-docfloat-e02-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13584.0,
+                  "before": 13584.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13584.0,
+                "stats": {
+                  "mean": 1290190.2666666666,
+                  "p50": 1291216.0,
+                  "p95": 1308376.0,
+                  "p99": 1312996.0
+                },
+                "zero_rss_kib": 13584.0
+              },
+              {
+                "label": "native-r06-docfloat-e02-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13376.0,
+                  "before": 13376.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13376.0,
+                "stats": {
+                  "mean": 1300884.6,
+                  "p50": 1301246.0,
+                  "p95": 1317846.0,
+                  "p99": 1341226.0
+                },
+                "zero_rss_kib": 13376.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13576.0,
+              "before": 13576.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 8,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 2596309.4111111113,
+              "p50": 2561052.0,
+              "p95": 2763633.0,
+              "p99": 2908813.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13904.0,
+              "p50": 13852.0,
+              "p95": 14380.0,
+              "p99": 14380.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0087806473476915,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.1945184929835824
+              },
+              "draws": 10000,
+              "median_ratio": 1.0694516746875102,
+              "ratios": [
+                1.095011291580791,
+                1.036358654496842,
+                1.2696090151763018,
+                1.1194279707908632,
+                0.981202640198541,
+                1.0438920577942297
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e08-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 14380.0,
+                  "before": 14080.0,
+                  "flag": false,
+                  "increase_fraction": 0.02130681818181812
+                },
+                "rss_kib": 14380.0,
+                "stats": {
+                  "mean": 2618678.6,
+                  "p50": 2635592.0,
+                  "p95": 2675572.0,
+                  "p99": 2723052.0
+                },
+                "zero_rss_kib": 14080.0
+              },
+              {
+                "label": "native-r02-docfloat-e08-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13720.0,
+                  "before": 14304.0,
+                  "flag": false,
+                  "increase_fraction": -0.04082774049216997
+                },
+                "rss_kib": 13720.0,
+                "stats": {
+                  "mean": 2557549.7,
+                  "p50": 2532822.0,
+                  "p95": 2668203.0,
+                  "p99": 2723543.0
+                },
+                "zero_rss_kib": 14304.0
+              },
+              {
+                "label": "native-r03-docfloat-e08-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13612.0,
+                  "before": 13540.0,
+                  "flag": false,
+                  "increase_fraction": 0.005317577548005881
+                },
+                "rss_kib": 13612.0,
+                "stats": {
+                  "mean": 2629472.966666667,
+                  "p50": 2542912.0,
+                  "p95": 2899443.0,
+                  "p99": 2914654.0
+                },
+                "zero_rss_kib": 13540.0
+              },
+              {
+                "label": "native-r04-docfloat-e08-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13852.0,
+                  "before": 14000.0,
+                  "flag": false,
+                  "increase_fraction": -0.010571428571428565
+                },
+                "rss_kib": 13852.0,
+                "stats": {
+                  "mean": 2568698.8,
+                  "p50": 2557282.0,
+                  "p95": 2669983.0,
+                  "p99": 2674832.0
+                },
+                "zero_rss_kib": 14000.0
+              },
+              {
+                "label": "native-r05-docfloat-e08-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13852.0,
+                  "before": 14100.0,
+                  "flag": false,
+                  "increase_fraction": -0.017588652482269485
+                },
+                "rss_kib": 13852.0,
+                "stats": {
+                  "mean": 2661241.5,
+                  "p50": 2661012.0,
+                  "p95": 2763633.0,
+                  "p99": 2908813.0
+                },
+                "zero_rss_kib": 14100.0
+              },
+              {
+                "label": "native-r06-docfloat-e08-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 14008.0,
+                  "before": 13792.0,
+                  "flag": false,
+                  "increase_fraction": 0.015661252900232014
+                },
+                "rss_kib": 14008.0,
+                "stats": {
+                  "mean": 2542214.9,
+                  "p50": 2543991.0,
+                  "p95": 2585592.0,
+                  "p99": 2738693.0
+                },
+                "zero_rss_kib": 13792.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13852.0,
+              "before": 14040.0,
+              "flag": false,
+              "increase_fraction": -0.01339031339031338
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 2743096.1222222224,
+              "p50": 2636432.0,
+              "p95": 3207134.0,
+              "p99": 3441285.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13758.0,
+              "p50": 13724.0,
+              "p95": 13980.0,
+              "p99": 13980.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9873174558906197,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0855011969037975
+              },
+              "draws": 10000,
+              "median_ratio": 1.0053315952230912,
+              "ratios": [
+                1.1045159576748087,
+                1.0075269584869624,
+                1.0664864361327866,
+                1.0031362319592199,
+                0.9930966071821149,
+                0.9815383045991244
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e08-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 13536.0,
+                  "before": 14080.0,
+                  "flag": false,
+                  "increase_fraction": -0.03863636363636369
+                },
+                "rss_kib": 13536.0,
+                "stats": {
+                  "mean": 2629141.1333333333,
+                  "p50": 2612912.0,
+                  "p95": 2678042.0,
+                  "p99": 3013603.0
+                },
+                "zero_rss_kib": 14080.0
+              },
+              {
+                "label": "native-r02-docfloat-e08-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 13772.0,
+                  "before": 14304.0,
+                  "flag": false,
+                  "increase_fraction": -0.037192393736017904
+                },
+                "rss_kib": 13772.0,
+                "stats": {
+                  "mean": 2685114.3666666667,
+                  "p50": 2605302.0,
+                  "p95": 3384945.0,
+                  "p99": 3427045.0
+                },
+                "zero_rss_kib": 14304.0
+              },
+              {
+                "label": "native-r03-docfloat-e08-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13824.0,
+                  "before": 13540.0,
+                  "flag": false,
+                  "increase_fraction": 0.020974889217134418
+                },
+                "rss_kib": 13824.0,
+                "stats": {
+                  "mean": 2895457.6,
+                  "p50": 3027234.0,
+                  "p95": 3207584.0,
+                  "p99": 3239365.0
+                },
+                "zero_rss_kib": 13540.0
+              },
+              {
+                "label": "native-r04-docfloat-e08-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 13724.0,
+                  "before": 14000.0,
+                  "flag": false,
+                  "increase_fraction": -0.019714285714285684
+                },
+                "rss_kib": 13724.0,
+                "stats": {
+                  "mean": 2917508.2666666666,
+                  "p50": 2853743.0,
+                  "p95": 3441285.0,
+                  "p99": 3519006.0
+                },
+                "zero_rss_kib": 14000.0
+              },
+              {
+                "label": "native-r05-docfloat-e08-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 13980.0,
+                  "before": 14100.0,
+                  "flag": false,
+                  "increase_fraction": -0.008510638297872353
+                },
+                "rss_kib": 13980.0,
+                "stats": {
+                  "mean": 2621803.6666666665,
+                  "p50": 2629142.0,
+                  "p95": 2643052.0,
+                  "p99": 2651712.0
+                },
+                "zero_rss_kib": 14100.0
+              },
+              {
+                "label": "native-r06-docfloat-e08-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13712.0,
+                  "before": 13792.0,
+                  "flag": false,
+                  "increase_fraction": -0.0058004640371229765
+                },
+                "rss_kib": 13712.0,
+                "stats": {
+                  "mean": 2709551.7,
+                  "p50": 2705602.0,
+                  "p95": 3052244.0,
+                  "p99": 3117324.0
+                },
+                "zero_rss_kib": 13792.0
+              }
+            ],
+            "rss_flag": {
+              "after": 13748.0,
+              "before": 14040.0,
+              "flag": false,
+              "increase_fraction": -0.020797720797720798
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 2798617.144444444,
+              "p50": 2703452.0,
+              "p95": 3314805.0,
+              "p99": 3349886.0
+            },
+            "pooled_rss_kib": {
+              "mean": 13969.333333333334,
+              "p50": 14000.0,
+              "p95": 14304.0,
+              "p99": 14304.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e08-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 14080.0,
+                  "before": 14080.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14080.0,
+                "stats": {
+                  "mean": 2857392.533333333,
+                  "p50": 2886003.0,
+                  "p95": 3007014.0,
+                  "p99": 3013314.0
+                },
+                "zero_rss_kib": 14080.0
+              },
+              {
+                "label": "native-r02-docfloat-e08-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 14304.0,
+                  "before": 14304.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14304.0,
+                "stats": {
+                  "mean": 2624732.933333333,
+                  "p50": 2624912.0,
+                  "p95": 2659782.0,
+                  "p99": 2675722.0
+                },
+                "zero_rss_kib": 14304.0
+              },
+              {
+                "label": "native-r03-docfloat-e08-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 13540.0,
+                  "before": 13540.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13540.0,
+                "stats": {
+                  "mean": 3147822.1666666665,
+                  "p50": 3228504.0,
+                  "p95": 3349886.0,
+                  "p99": 3362275.0
+                },
+                "zero_rss_kib": 13540.0
+              },
+              {
+                "label": "native-r04-docfloat-e08-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 14000.0,
+                  "before": 14000.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14000.0,
+                "stats": {
+                  "mean": 2861758.7333333334,
+                  "p50": 2862693.0,
+                  "p95": 3224745.0,
+                  "p99": 3329435.0
+                },
+                "zero_rss_kib": 14000.0
+              },
+              {
+                "label": "native-r05-docfloat-e08-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 14100.0,
+                  "before": 14100.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 14100.0,
+                "stats": {
+                  "mean": 2621269.933333333,
+                  "p50": 2610992.0,
+                  "p95": 2713342.0,
+                  "p99": 2776613.0
+                },
+                "zero_rss_kib": 14100.0
+              },
+              {
+                "label": "native-r06-docfloat-e08-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 13792.0,
+                  "before": 13792.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 13792.0,
+                "stats": {
+                  "mean": 2678726.566666667,
+                  "p50": 2655652.0,
+                  "p95": 2809503.0,
+                  "p99": 2839762.0
+                },
+                "zero_rss_kib": 13792.0
+              }
+            ],
+            "rss_flag": {
+              "after": 14040.0,
+              "before": 14040.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 32,
+        "routes": {
+          "default": {
+            "pooled": {
+              "mean": 8135985.566666666,
+              "p50": 8131827.0,
+              "p95": 8600379.0,
+              "p99": 8879060.0
+            },
+            "pooled_rss_kib": {
+              "mean": 16549.333333333332,
+              "p50": 16520.0,
+              "p95": 16924.0,
+              "p99": 16924.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0052335821261411,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0539881119429104
+              },
+              "draws": 10000,
+              "median_ratio": 1.0503151520629626,
+              "ratios": [
+                1.0507572100803688,
+                0.962960231752988,
+                1.0534776707353295,
+                1.0498730940455565,
+                1.047506932499294,
+                1.0544985531504911
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e32-default",
+                "round": 1,
+                "rss_flag": {
+                  "after": 16564.0,
+                  "before": 16632.0,
+                  "flag": false,
+                  "increase_fraction": -0.004088504088504141
+                },
+                "rss_kib": 16564.0,
+                "stats": {
+                  "mean": 7796231.033333333,
+                  "p50": 7814476.0,
+                  "p95": 8076047.0,
+                  "p99": 8109507.0
+                },
+                "zero_rss_kib": 16632.0
+              },
+              {
+                "label": "native-r02-docfloat-e32-default",
+                "round": 2,
+                "rss_flag": {
+                  "after": 16924.0,
+                  "before": 16368.0,
+                  "flag": false,
+                  "increase_fraction": 0.03396871945259039
+                },
+                "rss_kib": 16924.0,
+                "stats": {
+                  "mean": 8270718.866666666,
+                  "p50": 8258448.0,
+                  "p95": 8600379.0,
+                  "p99": 8612979.0
+                },
+                "zero_rss_kib": 16368.0
+              },
+              {
+                "label": "native-r03-docfloat-e32-default",
+                "round": 3,
+                "rss_flag": {
+                  "after": 16520.0,
+                  "before": 16068.0,
+                  "flag": false,
+                  "increase_fraction": 0.028130445606173726
+                },
+                "rss_kib": 16520.0,
+                "stats": {
+                  "mean": 8255452.033333333,
+                  "p50": 8171317.0,
+                  "p95": 8879060.0,
+                  "p99": 8944671.0
+                },
+                "zero_rss_kib": 16068.0
+              },
+              {
+                "label": "native-r04-docfloat-e32-default",
+                "round": 4,
+                "rss_flag": {
+                  "after": 16292.0,
+                  "before": 16284.0,
+                  "flag": false,
+                  "increase_fraction": 0.0004912797838367844
+                },
+                "rss_kib": 16292.0,
+                "stats": {
+                  "mean": 8208043.933333334,
+                  "p50": 8139098.0,
+                  "p95": 8716580.0,
+                  "p99": 8744190.0
+                },
+                "zero_rss_kib": 16284.0
+              },
+              {
+                "label": "native-r05-docfloat-e32-default",
+                "round": 5,
+                "rss_flag": {
+                  "after": 16464.0,
+                  "before": 16244.0,
+                  "flag": false,
+                  "increase_fraction": 0.013543462201428325
+                },
+                "rss_kib": 16464.0,
+                "stats": {
+                  "mean": 8156713.3,
+                  "p50": 8148937.0,
+                  "p95": 8436958.0,
+                  "p99": 8607639.0
+                },
+                "zero_rss_kib": 16244.0
+              },
+              {
+                "label": "native-r06-docfloat-e32-default",
+                "round": 6,
+                "rss_flag": {
+                  "after": 16532.0,
+                  "before": 16380.0,
+                  "flag": false,
+                  "increase_fraction": 0.009279609279609247
+                },
+                "rss_kib": 16532.0,
+                "stats": {
+                  "mean": 8128754.233333333,
+                  "p50": 8108307.0,
+                  "p95": 8473709.0,
+                  "p99": 8633829.0
+                },
+                "zero_rss_kib": 16380.0
+              }
+            ],
+            "rss_flag": {
+              "after": 16526.0,
+              "before": 16326.0,
+              "flag": false,
+              "increase_fraction": 0.012250398137939378
+            }
+          },
+          "release": {
+            "pooled": {
+              "mean": 8378300.805555556,
+              "p50": 8328318.0,
+              "p95": 8880240.0,
+              "p99": 9173692.0
+            },
+            "pooled_rss_kib": {
+              "mean": 16308.666666666666,
+              "p50": 16156.0,
+              "p95": 16736.0,
+              "p99": 16736.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 0.9673506817864107,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0503037346728434
+              },
+              "draws": 10000,
+              "median_ratio": 1.0031954760615647,
+              "ratios": [
+                0.987331055285663,
+                0.9473703082871584,
+                1.0043155596985758,
+                1.0638790320703062,
+                1.0020753924245536,
+                1.0367284372753807
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e32-release",
+                "round": 1,
+                "rss_flag": {
+                  "after": 16156.0,
+                  "before": 16632.0,
+                  "flag": false,
+                  "increase_fraction": -0.028619528619528656
+                },
+                "rss_kib": 16156.0,
+                "stats": {
+                  "mean": 8325934.166666667,
+                  "p50": 8316478.0,
+                  "p95": 8732130.0,
+                  "p99": 9043001.0
+                },
+                "zero_rss_kib": 16632.0
+              },
+              {
+                "label": "native-r02-docfloat-e32-release",
+                "round": 2,
+                "rss_flag": {
+                  "after": 16736.0,
+                  "before": 16368.0,
+                  "flag": false,
+                  "increase_fraction": 0.022482893450635366
+                },
+                "rss_kib": 16736.0,
+                "stats": {
+                  "mean": 8413527.4,
+                  "p50": 8394349.0,
+                  "p95": 8788550.0,
+                  "p99": 9014392.0
+                },
+                "zero_rss_kib": 16368.0
+              },
+              {
+                "label": "native-r03-docfloat-e32-release",
+                "round": 3,
+                "rss_flag": {
+                  "after": 16116.0,
+                  "before": 16068.0,
+                  "flag": false,
+                  "increase_fraction": 0.0029873039581778116
+                },
+                "rss_kib": 16116.0,
+                "stats": {
+                  "mean": 8487170.0,
+                  "p50": 8571310.0,
+                  "p95": 8984671.0,
+                  "p99": 9173692.0
+                },
+                "zero_rss_kib": 16068.0
+              },
+              {
+                "label": "native-r04-docfloat-e32-release",
+                "round": 4,
+                "rss_flag": {
+                  "after": 16336.0,
+                  "before": 16284.0,
+                  "flag": false,
+                  "increase_fraction": 0.0031933185949397647
+                },
+                "rss_kib": 16336.0,
+                "stats": {
+                  "mean": 8101639.6,
+                  "p50": 8031947.0,
+                  "p95": 8444299.0,
+                  "p99": 8817081.0
+                },
+                "zero_rss_kib": 16284.0
+              },
+              {
+                "label": "native-r05-docfloat-e32-release",
+                "round": 5,
+                "rss_flag": {
+                  "after": 16536.0,
+                  "before": 16244.0,
+                  "flag": false,
+                  "increase_fraction": 0.01797586801280482
+                },
+                "rss_kib": 16536.0,
+                "stats": {
+                  "mean": 8501833.0,
+                  "p50": 8518389.0,
+                  "p95": 8781300.0,
+                  "p99": 8797230.0
+                },
+                "zero_rss_kib": 16244.0
+              },
+              {
+                "label": "native-r06-docfloat-e32-release",
+                "round": 6,
+                "rss_flag": {
+                  "after": 15972.0,
+                  "before": 16380.0,
+                  "flag": false,
+                  "increase_fraction": -0.02490842490842493
+                },
+                "rss_kib": 15972.0,
+                "stats": {
+                  "mean": 8439700.666666666,
+                  "p50": 8247288.0,
+                  "p95": 9024941.0,
+                  "p99": 9323122.0
+                },
+                "zero_rss_kib": 16380.0
+              }
+            ],
+            "rss_flag": {
+              "after": 16246.0,
+              "before": 16326.0,
+              "flag": false,
+              "increase_fraction": -0.00490015925517584
+            }
+          },
+          "zero": {
+            "pooled": {
+              "mean": 8397157.727777777,
+              "p50": 8449399.0,
+              "p95": 8842571.0,
+              "p99": 9027951.0
+            },
+            "pooled_rss_kib": {
+              "mean": 16329.333333333334,
+              "p50": 16284.0,
+              "p95": 16632.0,
+              "p99": 16632.0
+            },
+            "ratios": {
+              "confidence_interval_95": {
+                "lower": 1.0,
+                "method": "nearest-rank2.5th/97.5th",
+                "upper": 1.0
+              },
+              "draws": 10000,
+              "median_ratio": 1.0,
+              "ratios": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "seed": 917,
+              "statistic": "median of per-round zero-p50/route-p50 ratios"
+            },
+            "rounds": [
+              {
+                "label": "native-r01-docfloat-e32-zero",
+                "round": 1,
+                "rss_flag": {
+                  "after": 16632.0,
+                  "before": 16632.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 16632.0,
+                "stats": {
+                  "mean": 8201198.7,
+                  "p50": 8211117.0,
+                  "p95": 8481389.0,
+                  "p99": 8511879.0
+                },
+                "zero_rss_kib": 16632.0
+              },
+              {
+                "label": "native-r02-docfloat-e32-zero",
+                "round": 2,
+                "rss_flag": {
+                  "after": 16368.0,
+                  "before": 16368.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 16368.0,
+                "stats": {
+                  "mean": 7973253.133333334,
+                  "p50": 7952557.0,
+                  "p95": 8165448.0,
+                  "p99": 8261598.0
+                },
+                "zero_rss_kib": 16368.0
+              },
+              {
+                "label": "native-r03-docfloat-e32-zero",
+                "round": 3,
+                "rss_flag": {
+                  "after": 16068.0,
+                  "before": 16068.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 16068.0,
+                "stats": {
+                  "mean": 8561176.566666666,
+                  "p50": 8608300.0,
+                  "p95": 8815190.0,
+                  "p99": 8874051.0
+                },
+                "zero_rss_kib": 16068.0
+              },
+              {
+                "label": "native-r04-docfloat-e32-zero",
+                "round": 4,
+                "rss_flag": {
+                  "after": 16284.0,
+                  "before": 16284.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 16284.0,
+                "stats": {
+                  "mean": 8548363.533333333,
+                  "p50": 8545020.0,
+                  "p95": 8903010.0,
+                  "p99": 9085032.0
+                },
+                "zero_rss_kib": 16284.0
+              },
+              {
+                "label": "native-r05-docfloat-e32-zero",
+                "round": 5,
+                "rss_flag": {
+                  "after": 16244.0,
+                  "before": 16244.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 16244.0,
+                "stats": {
+                  "mean": 8547903.2,
+                  "p50": 8536068.0,
+                  "p95": 8931721.0,
+                  "p99": 9027951.0
+                },
+                "zero_rss_kib": 16244.0
+              },
+              {
+                "label": "native-r06-docfloat-e32-zero",
+                "round": 6,
+                "rss_flag": {
+                  "after": 16380.0,
+                  "before": 16380.0,
+                  "flag": false,
+                  "increase_fraction": 0.0
+                },
+                "rss_kib": 16380.0,
+                "stats": {
+                  "mean": 8551051.233333332,
+                  "p50": 8550198.0,
+                  "p95": 8883640.0,
+                  "p99": 8960571.0
+                },
+                "zero_rss_kib": 16380.0
+              }
+            ],
+            "rss_flag": {
+              "after": 16326.0,
+              "before": 16326.0,
+              "flag": false,
+              "increase_fraction": 0.0
+            }
+          }
+        }
+      }
+    ],
+    "children": 144,
+    "claim": "same-build route comparison; no optimization adoption gate",
+    "review_flags": [
+      {
+        "case": "docnohf",
+        "edits": 1,
+        "latency": {
+          "p50": {
+            "after": 117851.0,
+            "before": 132621.0,
+            "flag": false,
+            "increase_fraction": -0.1113699941939813
+          },
+          "p95": {
+            "after": 132190.0,
+            "before": 146671.0,
+            "flag": false,
+            "increase_fraction": -0.09873117385168162
+          },
+          "p99": {
+            "after": 142871.0,
+            "before": 170051.0,
+            "flag": false,
+            "increase_fraction": -0.1598344026203904
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 7654.0,
+          "before": 7674.0,
+          "flag": false,
+          "increase_fraction": -0.0026062027625749495
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 1,
+        "latency": {
+          "p50": {
+            "after": 133130.0,
+            "before": 132621.0,
+            "flag": false,
+            "increase_fraction": 0.003838004539250983
+          },
+          "p95": {
+            "after": 144491.0,
+            "before": 146671.0,
+            "flag": false,
+            "increase_fraction": -0.014863197223718427
+          },
+          "p99": {
+            "after": 156810.0,
+            "before": 170051.0,
+            "flag": false,
+            "increase_fraction": -0.07786487583136825
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 7580.0,
+          "before": 7674.0,
+          "flag": false,
+          "increase_fraction": -0.012249152984102119
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 2,
+        "latency": {
+          "p50": {
+            "after": 145680.0,
+            "before": 160461.0,
+            "flag": false,
+            "increase_fraction": -0.09211584123244898
+          },
+          "p95": {
+            "after": 161791.0,
+            "before": 176251.0,
+            "flag": false,
+            "increase_fraction": -0.08204208770446697
+          },
+          "p99": {
+            "after": 168080.0,
+            "before": 184111.0,
+            "flag": false,
+            "increase_fraction": -0.08707247258447348
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 7660.0,
+          "before": 7610.0,
+          "flag": false,
+          "increase_fraction": 0.006570302233902758
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 2,
+        "latency": {
+          "p50": {
+            "after": 160611.0,
+            "before": 160461.0,
+            "flag": false,
+            "increase_fraction": 0.0009348065885168566
+          },
+          "p95": {
+            "after": 175881.0,
+            "before": 176251.0,
+            "flag": false,
+            "increase_fraction": -0.0020992788693396935
+          },
+          "p99": {
+            "after": 182881.0,
+            "before": 184111.0,
+            "flag": false,
+            "increase_fraction": -0.006680752372210219
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 7654.0,
+          "before": 7610.0,
+          "flag": false,
+          "increase_fraction": 0.00578186596583441
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 8,
+        "latency": {
+          "p50": {
+            "after": 300211.0,
+            "before": 316861.0,
+            "flag": false,
+            "increase_fraction": -0.052546700288139014
+          },
+          "p95": {
+            "after": 312572.0,
+            "before": 333181.0,
+            "flag": false,
+            "increase_fraction": -0.0618552678574108
+          },
+          "p99": {
+            "after": 314391.0,
+            "before": 344771.0,
+            "flag": false,
+            "increase_fraction": -0.08811645991107142
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 7864.0,
+          "before": 7782.0,
+          "flag": false,
+          "increase_fraction": 0.010537136982780693
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 8,
+        "latency": {
+          "p50": {
+            "after": 316471.0,
+            "before": 316861.0,
+            "flag": false,
+            "increase_fraction": -0.0012308236103527603
+          },
+          "p95": {
+            "after": 335861.0,
+            "before": 333181.0,
+            "flag": false,
+            "increase_fraction": 0.008043675959913621
+          },
+          "p99": {
+            "after": 343621.0,
+            "before": 344771.0,
+            "flag": false,
+            "increase_fraction": -0.003335547363322311
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 7878.0,
+          "before": 7782.0,
+          "flag": false,
+          "increase_fraction": 0.012336160370084892
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 32,
+        "latency": {
+          "p50": {
+            "after": 1017054.0,
+            "before": 1029085.0,
+            "flag": false,
+            "increase_fraction": -0.011690968190188333
+          },
+          "p95": {
+            "after": 1032745.0,
+            "before": 1047265.0,
+            "flag": false,
+            "increase_fraction": -0.01386468563353116
+          },
+          "p99": {
+            "after": 1044114.0,
+            "before": 1051745.0,
+            "flag": false,
+            "increase_fraction": -0.007255560996249133
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 7932.0,
+          "before": 7852.0,
+          "flag": false,
+          "increase_fraction": 0.010188487009679115
+        }
+      },
+      {
+        "case": "docnohf",
+        "edits": 32,
+        "latency": {
+          "p50": {
+            "after": 1030925.0,
+            "before": 1029085.0,
+            "flag": false,
+            "increase_fraction": 0.0017879961324867022
+          },
+          "p95": {
+            "after": 1050605.0,
+            "before": 1047265.0,
+            "flag": false,
+            "increase_fraction": 0.0031892596429747844
+          },
+          "p99": {
+            "after": 1063285.0,
+            "before": 1051745.0,
+            "flag": false,
+            "increase_fraction": 0.010972241370294178
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 7876.0,
+          "before": 7852.0,
+          "flag": false,
+          "increase_fraction": 0.0030565461029037344
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 1,
+        "latency": {
+          "p50": {
+            "after": 988355.0,
+            "before": 1091235.0,
+            "flag": false,
+            "increase_fraction": -0.09427850096450352
+          },
+          "p95": {
+            "after": 1220046.0,
+            "before": 1384867.0,
+            "flag": false,
+            "increase_fraction": -0.11901576108030587
+          },
+          "p99": {
+            "after": 1252906.0,
+            "before": 1411456.0,
+            "flag": false,
+            "increase_fraction": -0.11233081300444359
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 13646.0,
+          "before": 14190.0,
+          "flag": false,
+          "increase_fraction": -0.038336856941508124
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 1,
+        "latency": {
+          "p50": {
+            "after": 1097825.0,
+            "before": 1091235.0,
+            "flag": false,
+            "increase_fraction": 0.006039029173367849
+          },
+          "p95": {
+            "after": 1305586.0,
+            "before": 1384867.0,
+            "flag": false,
+            "increase_fraction": -0.05724809674864084
+          },
+          "p99": {
+            "after": 1355446.0,
+            "before": 1411456.0,
+            "flag": false,
+            "increase_fraction": -0.039682427224086325
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 13730.0,
+          "before": 14190.0,
+          "flag": false,
+          "increase_fraction": -0.03241719520789288
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 2,
+        "latency": {
+          "p50": {
+            "after": 1341897.0,
+            "before": 1292796.0,
+            "flag": false,
+            "increase_fraction": 0.03798047023660356
+          },
+          "p95": {
+            "after": 1507967.0,
+            "before": 1424536.0,
+            "flag": true,
+            "increase_fraction": 0.05856714045836675
+          },
+          "p99": {
+            "after": 1523847.0,
+            "before": 1431137.0,
+            "flag": true,
+            "increase_fraction": 0.06478066041196606
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 13456.0,
+          "before": 13576.0,
+          "flag": false,
+          "increase_fraction": -0.008839127872716568
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 2,
+        "latency": {
+          "p50": {
+            "after": 1287455.0,
+            "before": 1292796.0,
+            "flag": false,
+            "increase_fraction": -0.004131355604441889
+          },
+          "p95": {
+            "after": 1550087.0,
+            "before": 1424536.0,
+            "flag": true,
+            "increase_fraction": 0.08813466279546467
+          },
+          "p99": {
+            "after": 1620437.0,
+            "before": 1431137.0,
+            "flag": true,
+            "increase_fraction": 0.13227245190362624
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 13650.0,
+          "before": 13576.0,
+          "flag": false,
+          "increase_fraction": 0.005450795521508622
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 8,
+        "latency": {
+          "p50": {
+            "after": 2561052.0,
+            "before": 2703452.0,
+            "flag": false,
+            "increase_fraction": -0.052673396827463526
+          },
+          "p95": {
+            "after": 2763633.0,
+            "before": 3314805.0,
+            "flag": false,
+            "increase_fraction": -0.16627584428043274
+          },
+          "p99": {
+            "after": 2908813.0,
+            "before": 3349886.0,
+            "flag": false,
+            "increase_fraction": -0.13166806273407516
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 13852.0,
+          "before": 14040.0,
+          "flag": false,
+          "increase_fraction": -0.01339031339031338
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 8,
+        "latency": {
+          "p50": {
+            "after": 2636432.0,
+            "before": 2703452.0,
+            "flag": false,
+            "increase_fraction": -0.024790527074273982
+          },
+          "p95": {
+            "after": 3207134.0,
+            "before": 3314805.0,
+            "flag": false,
+            "increase_fraction": -0.032481850365255305
+          },
+          "p99": {
+            "after": 3441285.0,
+            "before": 3349886.0,
+            "flag": false,
+            "increase_fraction": 0.02728421205975362
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 13748.0,
+          "before": 14040.0,
+          "flag": false,
+          "increase_fraction": -0.020797720797720798
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 32,
+        "latency": {
+          "p50": {
+            "after": 8131827.0,
+            "before": 8449399.0,
+            "flag": false,
+            "increase_fraction": -0.03758515842369381
+          },
+          "p95": {
+            "after": 8600379.0,
+            "before": 8842571.0,
+            "flag": false,
+            "increase_fraction": -0.027389319237583698
+          },
+          "p99": {
+            "after": 8879060.0,
+            "before": 9027951.0,
+            "flag": false,
+            "increase_fraction": -0.016492225090721013
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "default",
+        "rss": {
+          "after": 16526.0,
+          "before": 16326.0,
+          "flag": false,
+          "increase_fraction": 0.012250398137939378
+        }
+      },
+      {
+        "case": "docfloat",
+        "edits": 32,
+        "latency": {
+          "p50": {
+            "after": 8328318.0,
+            "before": 8449399.0,
+            "flag": false,
+            "increase_fraction": -0.014330131646049571
+          },
+          "p95": {
+            "after": 8880240.0,
+            "before": 8842571.0,
+            "flag": false,
+            "increase_fraction": 0.004259960140551966
+          },
+          "p99": {
+            "after": 9173692.0,
+            "before": 9027951.0,
+            "flag": false,
+            "increase_fraction": 0.01614330870869818
+          }
+        },
+        "peak_live": {
+          "available": false,
+          "reason": "native lane has no allocator instrumentation"
+        },
+        "route": "release",
+        "rss": {
+          "after": 16246.0,
+          "before": 16326.0,
+          "flag": false,
+          "increase_fraction": -0.00490015925517584
+        }
+      }
+    ],
+    "schema": "litchi.performance.0917.native-reduction.v1"
+  },
+  "protocol": {
+    "bytes": 4727,
+    "path": "docs/performance/results/change-0917/native-protocol.json",
+    "sha256": "7a0a89a58db007d3eb8e4ed52a50f95f945d09e2b5350e05ec2989496a331945"
+  },
+  "schema": "litchi.performance.0917.reduction.v1"
+}

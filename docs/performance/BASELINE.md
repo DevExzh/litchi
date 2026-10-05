@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0917 — current real-DOC repeated-edit retention matrix
+
+[0917](0917-doc-repeated-edit-retention.md) retains 144 native children/4,320
+samples and 48 allocator children for two real DOC fixtures, 1/2/8/32 edits
+and zero/default/explicit-release policies. Default NoHeadFoot paired benefit
+narrows from 1.1256 to 1.0123; FloatingPictures is noisier and its two-edit
+default/release tails cross the 5% review flag. All allocator repetitions match;
+peak live is equal across policies at each count but grows with edit count.
+One allocator whole-child RSS flag remains visible. The standalone probe and
+48-case qualification passed; a documented one-line postcapture analysis repair
+preserves frozen inputs and raw results. No production optimization is adopted.
+
 ## 0916 — DOCX commit target reuse adopted
 
 [0916](0916-docx-section-commit-target-reuse.md) compares eight fresh matched

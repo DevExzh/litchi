@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0917 — real-DOC repeated-object scaling evidence
+
+[0917](0917-doc-repeated-edit-retention.md) closes the narrow current-source
+1/2/8/32-edit retention evidence gap for NoHeadFoot and FloatingPictures. All
+192 measured children and 48 functional qualification children pass preservation,
+patch, no-op, refusal and retention gates. Source/build custody and separate
+native/allocation boundaries are retained; the analysis-only tuple repair is
+explicit. This is an existing-policy comparison, not a new optimization or
+bulk-distinct-object capability. Broader CRUD, producers, cold/range behavior,
+hardware attribution and concurrency remain open; iWork is excluded.
+
 ## 0916 — measured commit-only target reuse adopted
 
 [0916](0916-docx-section-commit-target-reuse.md) connects a scoped duplicate-

@@ -1,0 +1,11 @@
+{
+  "recorded_utc": "2026-10-05T17:56:21.143783+00:00",
+  "source_unchanged": true,
+  "regular_files": 9268,
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0917/source/source-tree-after-capture.sha256",
+    "bytes": 1108086,
+    "sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49"
+  },
+  "regeneration": "See exact Python manifest command in 0917-doc-repeated-edit-retention.md; sort relative POSIX strings, not Path objects."
+}

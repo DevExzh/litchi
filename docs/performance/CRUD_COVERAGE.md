@@ -1,5 +1,13 @@
 # Performance CRUD coverage
 
+## 0917 — real-DOC repeated-object retention scaling
+
+[0917](0917-doc-repeated-edit-retention.md) adds a two-fixture 1/2/8/32-edit
+matrix to existing DOC paragraph replacement, with no-op, reversible-patch,
+source-refusal and preservation controls. It repeats one paragraph and does
+not promote distinct-object bulk editing, new selectors, producer support or
+native Office certification. Production APIs and scenario counts are unchanged.
+
 ## 0845 — retain indexed entry IDs through OPC publication
 
 [0845](0845-opc-indexed-entry-iteration.md) adopts direct entry iteration in two OPC scans. Across four synthetic 4,096-Part shapes, publication p50 improves 7.24–11.17% and lifecycle 2.31–4.18%, with unchanged owner allocation counts/bytes. All 512 main reports / 211,328 samples validate; no frozen latency, tail, RSS, allocation or spread flag fires. The separate instruction population and additive Callgrind reader repair preserve original captures and failure evidence. Candidate quality gates include 6,935 passing affected-owner tests. Current semantic DOCX/XLSX/PPTX mixed-catalog publication and durability diagnosis is next; the broader goal remains open.

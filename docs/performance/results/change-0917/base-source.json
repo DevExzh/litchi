@@ -1,0 +1,33 @@
+{
+  "schema": "litchi.performance.0917.base-source.v1",
+  "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "start_utc": "2026-10-05T17:05:20.872353+00:00",
+  "finish_utc": "2026-10-05T17:05:22.120859+00:00",
+  "regeneration_argv": [
+    "git",
+    "archive",
+    "--format=tar",
+    "--prefix=tree/",
+    "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "--",
+    ".cargo",
+    "Cargo.toml",
+    "clippy.toml",
+    "deny.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml",
+    "crates",
+    "test-data/poi/test-data/spreadsheet/54016.xls",
+    "test-data/rtf/watermark.rtf",
+    "test-data/ole/doc/NoHeadFoot.doc",
+    "test-data/ole/doc/FloatingPictures.doc"
+  ],
+  "archive": {
+    "path": "/home/zhuhe/litchi-performance-0917/source-base.tar",
+    "bytes": 164352000,
+    "sha256": "61df35b45519c95b43fb4194b0f679c69ce17aa8b39e5c112c0aea9b02f95863"
+  },
+  "regular_files": 9260,
+  "extracted_root": "/home/zhuhe/litchi-performance-0917/source/tree",
+  "scope": "Tracked production/source/config and four compile/runtime fixture inputs only; no untracked user files or executable."
+}

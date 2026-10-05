@@ -1,0 +1,10 @@
+{
+  "expected": "validator rejects corrupted report",
+  "negative_control": {
+    "bytes": 619,
+    "path": "/home/zhuhe/litchi-performance-0917/qualification/negative-control.json",
+    "sha256": "7344cc23bf4e670103c9791127ee0f5b84cd8e3518556df39c0fc2ad79a58335"
+  },
+  "schema": "litchi.performance.0917.negative-control-packet-receipt.v1",
+  "status": "passed"
+}

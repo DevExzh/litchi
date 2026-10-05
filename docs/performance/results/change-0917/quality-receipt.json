@@ -1,0 +1,66 @@
+{
+  "schema": "litchi.performance.0917.doc-retention.quality.v1",
+  "recorded_utc": "2026-10-05T17:45:00Z",
+  "status": "passed",
+  "scope": "Standalone DOC retention probe only; immutable exported source, locked/offline dependencies, no whole-workspace certification.",
+  "source_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "candidate_tree": "/home/zhuhe/litchi-performance-0917/source/tree",
+  "target": "/home/zhuhe/litchi-performance-0917/target",
+  "cpu_affinity": [14, 15],
+  "checks": [
+    {
+      "name": "fmt",
+      "command": "taskset -c 14,15 env CARGO_TERM_COLOR=never cargo fmt --manifest-path /home/zhuhe/litchi-performance-0917/source/tree/docs/performance/results/change-0917/probe/Cargo.toml -- --check",
+      "start_utc": "2026-10-05T17:43:59.353950360Z",
+      "end_utc": "2026-10-05T17:43:59.412848396Z",
+      "elapsed_ns": 54663826,
+      "exit_code": 0,
+      "logs": {
+        "stdout": {"path": "docs/performance/results/change-0917/quality/fmt.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        "stderr": {"path": "docs/performance/results/change-0917/quality/fmt.stderr", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        "exit": {"path": "docs/performance/results/change-0917/quality/fmt.exit", "bytes": 2, "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"}
+      }
+    },
+    {
+      "name": "unit-tests",
+      "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0917/target CARGO_TERM_COLOR=never cargo test --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0917/source/tree/docs/performance/results/change-0917/probe/Cargo.toml --all-targets",
+      "start_utc": "2026-10-05T17:43:59.414776365Z",
+      "end_utc": "2026-10-05T17:44:18.006126928Z",
+      "elapsed_ns": 18586751353,
+      "exit_code": 0,
+      "test_counts": {"passed": 3, "failed": 0, "ignored": 0},
+      "logs": {
+        "stdout": {"path": "docs/performance/results/change-0917/quality/unit-tests.stdout", "bytes": 552, "sha256": "88d70875685a63ba1154395c772107b4321758a25247408ec0de0cc31102421c"},
+        "stderr": {"path": "docs/performance/results/change-0917/quality/unit-tests.stderr", "bytes": 1540, "sha256": "bc182a49fa210e78e57e3bca0c2d773028bcc626fd16145615ab46c8bee4f9dc"},
+        "exit": {"path": "docs/performance/results/change-0917/quality/unit-tests.exit", "bytes": 2, "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"}
+      }
+    },
+    {
+      "name": "clippy",
+      "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0917/target CARGO_TERM_COLOR=never cargo clippy --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0917/source/tree/docs/performance/results/change-0917/probe/Cargo.toml --all-targets -- -D warnings",
+      "start_utc": "2026-10-05T17:44:18.008477779Z",
+      "end_utc": "2026-10-05T17:44:26.783864725Z",
+      "elapsed_ns": 8770561284,
+      "exit_code": 0,
+      "logs": {
+        "stdout": {"path": "docs/performance/results/change-0917/quality/clippy.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        "stderr": {"path": "docs/performance/results/change-0917/quality/clippy.stderr", "bytes": 1139, "sha256": "f8afcf7bbc5dcced9bc80efd566f76455cbda5700435280dd8958e2d4f271193"},
+        "exit": {"path": "docs/performance/results/change-0917/quality/clippy.exit", "bytes": 2, "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"}
+      }
+    },
+    {
+      "name": "rustdoc",
+      "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0917/target CARGO_TERM_COLOR=never RUSTDOCFLAGS=-D warnings cargo doc --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0917/source/tree/docs/performance/results/change-0917/probe/Cargo.toml --no-deps",
+      "start_utc": "2026-10-05T17:44:26.785639843Z",
+      "end_utc": "2026-10-05T17:44:27.863733022Z",
+      "elapsed_ns": 1073412157,
+      "exit_code": 0,
+      "logs": {
+        "stdout": {"path": "docs/performance/results/change-0917/quality/rustdoc.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        "stderr": {"path": "docs/performance/results/change-0917/quality/rustdoc.stderr", "bytes": 462, "sha256": "28780d009c6f718fcd6705250e3926ac774af3898e1c67244126157802274df8"},
+        "exit": {"path": "docs/performance/results/change-0917/quality/rustdoc.exit", "bytes": 2, "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"}
+      }
+    }
+  ],
+  "reproduction": "Use the exact commands recorded in this receipt from the exported candidate_tree with CARGO_TARGET_DIR set to target and --locked --offline; all checks were run on CPUs 14,15 with no source mutation."
+}

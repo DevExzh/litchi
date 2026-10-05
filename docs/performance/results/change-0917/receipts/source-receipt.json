@@ -1,0 +1,72 @@
+{
+  "schema": "litchi.performance.0917.doc-retention.source.v1",
+  "created_utc": "2026-10-05T17:45:00Z",
+  "source_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "base_archive": {
+    "path": "/home/zhuhe/litchi-performance-0917/source-base.tar",
+    "bytes": 164352000,
+    "sha256": "61df35b45519c95b43fb4194b0f679c69ce17aa8b39e5c112c0aea9b02f95863",
+    "regeneration": "git archive --format=tar --prefix=tree/ bb19ca74bd52044fbd2c1c7cc9875e975bb334c0 -- .cargo Cargo.toml clippy.toml deny.toml rust-toolchain.toml rustfmt.toml crates test-data/poi/test-data/spreadsheet/54016.xls test-data/rtf/watermark.rtf test-data/ole/doc/NoHeadFoot.doc test-data/ole/doc/FloatingPictures.doc"
+  },
+  "base_archive_content_check": {
+    "regular_files": 9260,
+    "directories": 1428,
+    "symlinks": 0,
+    "mismatches": 0
+  },
+  "export": {
+    "root": "/home/zhuhe/litchi-performance-0917/source/tree",
+    "regular_files": 9268,
+    "manifest_before": {
+      "path": "/home/zhuhe/litchi-performance-0917/source/source-tree-before.sha256",
+      "bytes": 1108086,
+      "sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49"
+    },
+    "manifest_after_build": {
+      "path": "/home/zhuhe/litchi-performance-0917/source/source-tree-after-build.sha256",
+      "bytes": 1108086,
+      "sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49"
+    },
+    "manifest_after_quality": {
+      "path": "/home/zhuhe/litchi-performance-0917/source/source-tree-after-quality.sha256",
+      "bytes": 1108086,
+      "sha256": "6be84856c37c4729c79968c3616c7a07aa040a136971dba26301d6589e1b3c49"
+    },
+    "manifest_unchanged": true,
+    "probe_manifest_before": {
+      "path": "/home/zhuhe/litchi-performance-0917/source/probe-files-before.sha256",
+      "bytes": 640,
+      "sha256": "3cead3259ac9c163ec55850fd2b2dc02e86bc66dc0d147689b6cadf70f9220d5"
+    },
+    "probe_manifest_after_build": {
+      "path": "/home/zhuhe/litchi-performance-0917/source/probe-files-after-build.sha256",
+      "bytes": 640,
+      "sha256": "3cead3259ac9c163ec55850fd2b2dc02e86bc66dc0d147689b6cadf70f9220d5"
+    },
+    "probe_manifest_after_quality": {
+      "path": "/home/zhuhe/litchi-performance-0917/source/probe-files-after-quality.sha256",
+      "bytes": 640,
+      "sha256": "3cead3259ac9c163ec55850fd2b2dc02e86bc66dc0d147689b6cadf70f9220d5"
+    },
+    "probe_manifest_unchanged": true
+  },
+  "probe": {
+    "relative_root": "docs/performance/results/change-0917/probe",
+    "files": [
+      {"path": "Cargo.lock", "bytes": 33633, "sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"},
+      {"path": "Cargo.toml", "bytes": 541, "sha256": "0e6f34cc57d56b2725034d4ed067e06a9a28d571f59348d0412c3c6966ea157d"},
+      {"path": "README.md", "bytes": 2932, "sha256": "fe5630cb4f41da2b79f1ed83c336ca908171d20fb00277df121891b80b72d2b4"},
+      {"path": "src/alloc_metrics.rs", "bytes": 4912, "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"},
+      {"path": "src/bin/alloc.rs", "bytes": 1797, "sha256": "11a1b9d765399ad0917c657108f4a5ea81011a20d7b6ebd5385f95bbc702e320"},
+      {"path": "src/lib.rs", "bytes": 34827, "sha256": "b932992f10ecee244eaa3bd14833a07dcd2456f0bfc2de0dce3bf64403737dc3"},
+      {"path": "src/main.rs", "bytes": 105, "sha256": "496530a1954a6e014c59e5e82e9a7ba2a6b4e3e5077758f1c6a12b85d5cc439c"},
+      {"path": "src/oracle_0730.rs", "bytes": 58805, "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"}
+    ]
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "regeneration": "Extract source-base.tar into a fresh external directory, copy the exact eight files under docs/performance/results/change-0917/probe including Cargo.lock, then run the recorded locked/offline build command from build-receipt.json. The source-tree manifest is generated with sorted relative file names and SHA-256 hashes.",
+  "repository_scope": "Only the standalone probe was added to the repository packet; no production source or compiled executable is included."
+}

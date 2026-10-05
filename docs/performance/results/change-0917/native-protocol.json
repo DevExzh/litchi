@@ -1,0 +1,118 @@
+{
+  "schema": "litchi.performance.0917.protocol.v1",
+  "frozen_utc": "2026-10-05T17:04:13.877057+00:00",
+  "source_head": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "purpose": "Qualify current public DOC repeated-edit latency and allocation/peak-live scaling under existing bounded render-retention controls; same-build route comparison, no production optimization or new adoption claim.",
+  "fixtures": [
+    {
+      "case": "docnohf",
+      "path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "case": "docfloat",
+      "path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "edits": [
+    1,
+    2,
+    8,
+    32
+  ],
+  "operation": "Fresh public snapshot/edit; repeat replace_paragraph(Position(0)) alternating the retained0730 FIRST_TEXT and SECOND_TEXT; commit and materialize output. Same-object repeated edits, not bulk distinct-paragraph editing.",
+  "retention_routes": [
+    "zero",
+    "default",
+    "release"
+  ],
+  "retention_ceiling_bytes": 8388608,
+  "native": {
+    "cpu": 12,
+    "rounds": 6,
+    "route_orders": [
+      [
+        "zero",
+        "default",
+        "release"
+      ],
+      [
+        "zero",
+        "release",
+        "default"
+      ],
+      [
+        "default",
+        "zero",
+        "release"
+      ],
+      [
+        "default",
+        "release",
+        "zero"
+      ],
+      [
+        "release",
+        "zero",
+        "default"
+      ],
+      [
+        "release",
+        "default",
+        "zero"
+      ]
+    ],
+    "case_and_edit_order": "odd numbered rounds use fixture and edit order above; even rounds reverse both",
+    "warmups_per_child": 3,
+    "samples_per_child": 30,
+    "children": 144,
+    "timer": "Complete public in-memory lifecycle, including input clone/open, edit construction, all mutations, optional release, commit, output copy and local owner destruction. File I/O, preparation, correctness checks and JSON serialization excluded. No per-stage timing or diagnostic callbacks."
+  },
+  "allocator": {
+    "repetitions": 2,
+    "children": 48,
+    "samples_per_child": 1,
+    "warmups_per_child": 0,
+    "schedule": "repetition1 fixtures/edits/routes in listed order; repetition2 reverse all three",
+    "scope": "Separate System allocator instrumented binary; region starts before input clone/open and ends with only output allocation retained. Stage observations use fixed stack storage. Report requested allocated/deallocated bytes, successful allocation calls, relative peak-live and retained bytes. No instrumented latency claim."
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "seed": 917,
+    "unit": "matched round within fixed fixture/edit count",
+    "statistic": "median of per-round zero-p50/route-p50 ratios for default and release",
+    "interval": "nearest-rank2.5th/97.5th percentiles"
+  },
+  "review_flags": {
+    "latency_increase_fraction": 0.05,
+    "peak_live_increase_fraction": 0.05,
+    "rss_increase_fraction": 0.05,
+    "meaning": "Report flags per fixture/count/route; flags are review triggers, not sample exclusion or adoption gates. Allocation repeat differences remain visible."
+  },
+  "mandatory_gates": [
+    "fixture hash and byte length",
+    "all requested stages are distinct changes",
+    "exact cross-route output equality",
+    "public semantic readback",
+    "exact no-op source equality",
+    "forward patch equality and exact inverse source restoration",
+    "stale or foreign source refusals as defined by current API",
+    "untouched stream bytes and directory metadata preservation",
+    "retained capacities within ceiling",
+    "zero route retains no render and release route clears every stage",
+    "allocator retained bytes match only output allocation capacity",
+    "source and fixture files unchanged through build and capture"
+  ],
+  "capture_rules": [
+    "Freeze exact source/build/binary/probe/runner identities before measured children.",
+    "Functional qualification before capture is separate and not part of performance statistics.",
+    "No overwriting, selective reruns, dropped samples or adverse-row replacement.",
+    "Root starts native schedule only after coordinated profiling/build/quality work is idle; unrelated shared-host activity is uncontrolled.",
+    "Record command/environment, start/end times, exit status and host load for each child.",
+    "Separate native clocks, allocation region metrics and whole-child RSS.",
+    "All files >=1MiB and all compiled executables stay outside Git; retain reduced descriptors and regeneration commands."
+  ]
+}

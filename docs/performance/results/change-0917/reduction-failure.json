@@ -1,0 +1,19 @@
+{
+  "recorded_utc": "2026-10-05T17:55:51.468236+00:00",
+  "stage": "postcapture reduction before any reduced.json was created",
+  "attempts": [
+    {
+      "command": "LITCHI_PERF_0917_ROOT=/home/zhuhe/litchi-performance-0917/capture python3 -B docs/performance/results/change-0917/capture.py reduce",
+      "exit": 1,
+      "error": "TypeError: tuple indices must be integers or slices, not str",
+      "location": "capture.py reduction_for_lane line1236 base_alloc = base_item[\"report\"].get(\"allocation\")"
+    },
+    {
+      "command": "LITCHI_PERF_0917_ROOT=/home/zhuhe/litchi-performance-0917/capture python3 -B docs/performance/results/change-0917/replay.py",
+      "exit": 1,
+      "error": "0917 replay failed: tuple indices must be integers or slices, not str"
+    }
+  ],
+  "capture_script_sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894",
+  "policy": "Keep all frozen inputs and raw captures unchanged; correct only analysis tuple unpacking with explicit adapter."
+}

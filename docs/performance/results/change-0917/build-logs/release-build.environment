@@ -1,0 +1,11 @@
+cwd=/home/zhuhe/litchi-performance-0917/source/tree
+target=/home/zhuhe/litchi-performance-0917/target
+affinity=pid 3633099's current affinity list: 0-31
+cargo=/home/zhuhe/.cargo/bin/cargo
+rustc=/home/zhuhe/.cargo/bin/rustc
+CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0917/target
+CARGO_TERM_COLOR=never
+RUSTFLAGS=<absent>
+RUSTC_WRAPPER=<absent>
+CARGO_HOME=<absent>
+RUSTUP_TOOLCHAIN=<absent>

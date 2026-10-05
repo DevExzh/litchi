@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0917 — evidence for existing bounded DOC retention
+
+[0917](0917-doc-repeated-edit-retention.md) changes only the standalone harness
+and evidence. ADR 0003 source-bound snapshots, exact no-ops, reversible patches
+and atomic refusals are executable qualification gates. ADR 0005 retention
+ceilings/releases and native versus allocator measurement boundaries remain
+explicit. ADR 0006 stream/directory/semantic preservation and mandatory final
+validation are checked; the DOC-only 0730 oracle extraction was reviewed.
+ADR 0002/0024 production ownership and dependency direction are unchanged.
+The counting System allocator is test instrumentation, not a new production
+unsafe path. No ADR exception or support promotion is claimed.
+
 ## 0916 — reuse of an already validated immutable commit target
 
 [0916](0916-docx-section-commit-target-reuse.md) preserves exact byte,
