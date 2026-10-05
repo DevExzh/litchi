@@ -29,12 +29,12 @@ use litchi_core::{FileSource, Metadata, OwnedSource};
 use sha2::{Digest, Sha256};
 
 use super::{
-    DOCX_FILE_CORPUS_GENERATOR, PPTX_FILE_CORPUS_GENERATOR, PPTX_FILE_SELECTED_POSITION,
-    SourceReplay, XLSX_FILE_SELECTED_CELL_TARGET, XlsxRootSemanticProjection,
-    XlsxSelectedCellEvidence, assert_pinned_xlsx_corpus, assert_source_sha256,
-    docx_archive_signature, docx_package_signature, mixed_ascii_case, verify_docx_timed_full_text,
-    xlsx_selected_cell_evidence_digest, xlsx_semantic_projection_sha256,
-    xlsx_typed_semantic_oracle,
+    DOCX_FILE_CORPUS_GENERATOR, DOCX_PARAGRAPH_SEPARATOR, PPTX_FILE_CORPUS_GENERATOR,
+    PPTX_FILE_SELECTED_POSITION, SourceReplay, XLSX_FILE_SELECTED_CELL_TARGET,
+    XlsxRootSemanticProjection, XlsxSelectedCellEvidence, assert_pinned_xlsx_corpus,
+    assert_source_sha256, docx_archive_signature, docx_package_signature, mixed_ascii_case,
+    verify_docx_timed_full_text, xlsx_selected_cell_evidence_digest,
+    xlsx_semantic_projection_sha256, xlsx_typed_semantic_oracle,
 };
 use crate::unified_ops::{
     LeafXlsx, RouteSummary, eager_options, leaf_docx_eager, leaf_xlsx_names, leaf_xlsx_open,
@@ -781,13 +781,13 @@ impl Route {
                     "Package::document()?.paragraphs() on a package prepared outside the timer"
                 },
                 DocxQuery::FullText => {
-                    "Package::document()?.text() on a package prepared outside the timer"
+                    "Package::document()?.text_with_paragraph_separator(\"\\n\") on a package prepared outside the timer"
                 },
                 DocxQuery::OpenParagraphCountLifecycle => {
                     "leaf eager open (as for open) + Package::document()?.paragraph_count()"
                 },
                 DocxQuery::OpenFullTextLifecycle => {
-                    "leaf eager open (as for open) + Package::document()?.text()"
+                    "leaf eager open (as for open) + Package::document()?.text_with_paragraph_separator(\"\\n\")"
                 },
             },
             Self::Docx {
@@ -803,13 +803,13 @@ impl Route {
                     "source_backed::Package::document()?.paragraphs() on a package prepared outside the timer"
                 },
                 DocxQuery::FullText => {
-                    "source_backed::Package::document()?.extract_text() on a package prepared outside the timer"
+                    "source_backed::Package::document()?.extract_text_with_paragraph_separator(\"\\n\") on a package prepared outside the timer"
                 },
                 DocxQuery::OpenParagraphCountLifecycle => {
                     "source_backed::Package::from_path + document()?.paragraph_count()"
                 },
                 DocxQuery::OpenFullTextLifecycle => {
-                    "source_backed::Package::from_path + document()?.extract_text()"
+                    "source_backed::Package::from_path + document()?.extract_text_with_paragraph_separator(\"\\n\")"
                 },
             },
             Self::Pptx {
@@ -1263,11 +1263,18 @@ fn docx_paragraph_count(root: &Prepared) -> Result<usize, Box<dyn Error>> {
     })
 }
 
+/// The full text of a DOCX root. The leaf legs ask for the paragraph
+/// separator `File::text()` writes since M0a step S8a, so both legs of a pair
+/// build the same text with the same validating pass.
 fn docx_text(root: &Prepared) -> Result<String, Box<dyn Error>> {
     Ok(match root {
         Prepared::Unified(file) => file.text()?,
-        Prepared::DocxEager(package) => package.document()?.text()?,
-        Prepared::DocxSource(package) => package.document()?.extract_text()?,
+        Prepared::DocxEager(package) => package
+            .document()?
+            .text_with_paragraph_separator(DOCX_PARAGRAPH_SEPARATOR)?,
+        Prepared::DocxSource(package) => package
+            .document()?
+            .extract_text_with_paragraph_separator(DOCX_PARAGRAPH_SEPARATOR)?,
         _ => return Err("DOCX query reached a non-DOCX root".into()),
     })
 }

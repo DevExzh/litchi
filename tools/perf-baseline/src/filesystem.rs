@@ -67,6 +67,11 @@ const DOCX_FILE_SOURCE_SHA256: &str =
 /// sampled.
 const DOCX_TIMED_FULL_TEXT_TIMING_SCOPE_V2: &str =
     "v2:open_plus_full_text;document_drop_inside_timer;text_digest_after_timer";
+/// The paragraph separator of `litchi::File::text()` for DOCX since M0a step
+/// S8a (oracle drift B3): one line per paragraph. The paired leaf legs, the
+/// leaf signature and the full-text oracle use the same separator, so a pair
+/// times and verifies the same text (M0a step S10).
+pub(super) const DOCX_PARAGRAPH_SEPARATOR: &str = "\n";
 // The unified XLSX file selectors use one fixed, media-rich cell-CRUD input.
 // Keep these literals independent of the builder's computed manifest so a
 // generator or archive-shape drift cannot silently redefine the evidence.
@@ -5648,14 +5653,15 @@ fn run_opc_source_open(
 }
 
 /// Returns the fixed full-text projection implied by the deterministic DOCX
-/// corpus inputs. This oracle does not reopen the measured source or invoke
-/// the timed facade; it is built from the pinned paragraph payloads.
+/// corpus inputs: the pinned paragraph payloads joined by
+/// [`DOCX_PARAGRAPH_SEPARATOR`], the `File::text()` contract since M0a step
+/// S8a. This oracle does not reopen the measured source or invoke the timed
+/// code; it is built from the pinned paragraph payloads.
 fn expected_docx_full_text() -> String {
-    let mut text = String::new();
-    for index in 0..super::SemanticShape::Medium.docx_paragraphs() {
-        text.push_str(&super::semantic_docx_text(index, false));
-    }
-    text
+    (0..super::SemanticShape::Medium.docx_paragraphs())
+        .map(|index| super::semantic_docx_text(index, false))
+        .collect::<Vec<_>>()
+        .join(DOCX_PARAGRAPH_SEPARATOR)
 }
 
 fn docx_timed_full_text_digest(text: &str) -> Result<(String, u64), Box<dyn Error>> {
@@ -6392,7 +6398,7 @@ fn docx_package_signature(
     )?;
     Ok(super::sha256_hex(&serde_json::to_vec(&(
         document.paragraph_count()?,
-        document.text()?,
+        document.text_with_paragraph_separator(DOCX_PARAGRAPH_SEPARATOR)?,
         paragraphs,
         tables,
         elements,

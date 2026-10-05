@@ -3402,7 +3402,15 @@ outcomes that differ fail the run. The filesystem pairs keep their
 predecessors' per-sample evidence:
 
 - the source and semantic SHA-256 and the selected-cell evidence for XLSX;
-- the timed full-text digest for the DOCX full-text lifecycles;
+- the timed full-text digest for the DOCX full-text lifecycles. Since M0a
+  step S8a, `File::text()` writes `\n` between DOCX paragraphs, so the DOCX
+  leaf full-text legs ask the leaf for the same text
+  (`text_with_paragraph_separator("\n")` on the eager owner,
+  `extract_text_with_paragraph_separator("\n")` on the source-backed one),
+  and the leaf signature and the fixed oracle join the paragraphs the same
+  way. Before step S10 the leaf legs timed the unseparated text, and every
+  DOCX filesystem route failed its untimed verification with "DOCX unified
+  and leaf semantic signatures differ";
 - for source-backed DOCX and PPTX routes on both legs, the untimed replay of
   the leaf owner over the same file. That replay has the predecessor's shape
   and does not include the unified route's detection reads.
