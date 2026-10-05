@@ -339,3 +339,34 @@
   - F1-semantic: no-ops through a different serializer are refused rather than treated as no-ops.
   - Unrelated: shape classification and design elements read one shape on its own, so they fail on producer slides that declare `p:` on the root.
 - Verified on the merged `uo/m0a`: lib clippy on pptx, ooxml-common, docx, xlsx and ops; pptx `package_signature_policy` (10); ooxml-common (454); litchi-ops (452).
+
+## S9 — format-family types and `__migration` deleted (`59bc8f8772`, `27e35692bf`; record `docs/unified-ops/s9-deletion.md`)
+- Deleted from the facade (24 files, 18,495 lines):
+  - `Document`, `Presentation` and `sheet::Workbook`, with their element types;
+  - the 30 sheet openers (the plan's "42" was wrong);
+  - `map_ooxml_error` (114 call lines);
+  - the old Markdown adapter and `markdown_file_parity`;
+  - the facade's `base64`, `chrono` and `memchr` dependencies.
+- Also deleted:
+  - in ops, `__migration` and the detectors only it exported (`detected.rs` 4,261 → 882 lines); no `#[doc(hidden)]` remains;
+  - in the harness, `facade_ole2.rs` and 47 predecessor selectors (registry 652 → 605, CRUD index and policy tests re-bound).
+- In all, 76 files changed: +1,803 and −27,382 lines.
+- Close-out fixes:
+  - XLSX coordinates and ranges from the caller are `invalid_argument` or `out_of_range`; references read from the file stay `corrupt_file`.
+  - A CryptoAPI `.ppt` opens as `File::Locked` in builds without `encryption`.
+  - The S4 iWork doc comments are fixed.
+  - `ZipTail`, the `_with_tail` functions and the probe counter have public documented paths.
+  - `litchi::SlideDescriptor` is the ops type.
+  - `Display` was already facade-level.
+- Kept:
+  - `litchi::common::Error` (= `litchi_core::Error`, the typed `Source::Core` leaf);
+  - `sheet::text`, `iwork`, the leaf modules, and the re-exports the tests use;
+  - 15 predecessor selectors that never timed the deleted types, plus the ODS selected-cell/media routes (no successor until M1).
+- Gates: clippy and rustdoc clean; 30 facade targets (180 tests); ops 388 + 57; Python 132; harness 632; policy tests 28/50/517; boundaries; non-iWork 47.
+  - The failures that remain match the base exactly: workspace fmt (iwa-archive, soapberry-zip), 18 facade feature-subset sets with the same errors, the `keynote_chart_title` fuzz target, and rustdoc without features.
+- Merged into `uo/m0a` after 0014a/b:
+  - no conflicts;
+  - clippy (litchi, ops, litchi-py, all features); ops 445 tests;
+  - facade targets: unified open, Markdown golden, tolerance, unexpected format, read limits, xlsb, eval, sheet selectors, encryption, pages; lib 56;
+  - Python 132;
+  - the boundary and non-iWork gates and their tests, and the perf policy and CRUD index tests.
