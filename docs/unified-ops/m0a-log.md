@@ -129,3 +129,12 @@
   - Flat ODF, password-protected `.doc` and Word 6 stay `ValueError`, including once a protected `.doc` becomes `File::Locked`.
   - Wrong-opener messages keep naming the detected format.
   - Exact messages and `repr` snapshots may change on purpose, and the S8a record lists each change.
+
+## 0012 — litchi-opc `SourceBackedPackage: Clone` (0009 stage S0; `0cf1f43403`, merged here)
+- The archive index, the admitted catalog (8 fields grouped into `AdmittedCatalog`) and the cache are behind `Arc`. `Clone` is hand-written and lists every field, and a compile-time check keeps the type `Clone + Send + Sync`.
+- A clone is the same opened package: same lineage, version, cache, read-ahead window and budget. A clone costs 6 reference counts (11–12 for a package opened with an execution budget) and no allocation. Publisher signatures are unchanged; each publication consumes a clone.
+- Two behaviour changes:
+  - `into_opc_package` now copies the non-part member list, so it can fail with the same `Allocation` error as `to_opc_package`.
+  - The splice-fragment and read-session identity checks compare the opened package instead of the instance address.
+- 18 new litchi-opc tests: 0009's T1–T3 and T5–T8 at the OPC level, budget accounting, concurrent compression waves, and a lineage proof across clones. Leaf suites: opc 1,042, docx 2,010, pptx 1,305, xlsx 2,133, xlsb 1,030 passed.
+- Quick ABBA loop (release build, pinned CPU, shared host): open and full-text ratios 0.977–1.003, so no slowdown. Each open makes exactly 3 more allocations; clones and reads make none. Clone plus drop takes 72–77 ns (122–130 ns with a budget), against an 80 µs open. Evidence and the benchmark source are in `docs/unified-ops/results/0012/`; binaries are not committed.
