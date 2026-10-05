@@ -18,6 +18,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | 0009 | Design: editing a shared snapshot (R4) — M2 prerequisite | done (`9b3cab60f6`); staged leaf plan S0–S5 |
 | 0010 | M1 unified-read plan (node view, path resolution, query, view modes, capabilities) | in progress |
 | 0011 | DOCX MCE admission, stages 1–3 of 0008 (lands on `uo/m0a`) | in progress |
+| 0012 | litchi-opc: cheap `Clone` for `SourceBackedPackage` (0009 stage S0; lands on `uo/m0a`) | in progress |
 
 ## Awaiting owner confirmation
 
