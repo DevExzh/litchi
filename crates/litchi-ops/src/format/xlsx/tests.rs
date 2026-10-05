@@ -402,14 +402,77 @@ fn selector_matches_names_case_insensitively_on_both_owner_states() {
             cells[..5]
         );
 
+        // A coordinate or range the caller passed is the caller's error
+        // (M0a S9), with the XLSX coordinate error as the typed leaf: a
+        // reference or bounds that name no cells are an invalid argument,
+        // indices or bounds outside the grid are out of range.
         let coordinate = selected.cell("A0").unwrap_err();
         assert!(matches!(
             xlsx_leaf(&coordinate),
             litchi_xlsx::Error::Coordinate(_)
         ));
+        assert_eq!(coordinate.code(), Code::InvalidArgument);
+        assert_eq!(coordinate.format(), Some(litchi_core::FileFormat::Xlsx));
         let range = selected.cells((1_u32, 1_u32, 1_u32, 2_u32)).unwrap_err();
         assert!(matches!(xlsx_leaf(&range), litchi_xlsx::Error::Range(_)));
+        assert_eq!(range.code(), Code::InvalidArgument);
+        assert_eq!(
+            selected.cells("A1:Z").unwrap_err().code(),
+            Code::InvalidArgument
+        );
+        let outside = selected.cell((1_048_576_u32, 0_u32)).unwrap_err();
+        assert!(matches!(
+            xlsx_leaf(&outside),
+            litchi_xlsx::Error::Coordinate(_)
+        ));
+        assert_eq!(outside.code(), Code::OutOfRange);
+        let outside = selected
+            .cells((0_u32, 0_u32, 1_048_577_u32, 1_u32))
+            .unwrap_err();
+        assert!(matches!(xlsx_leaf(&outside), litchi_xlsx::Error::Range(_)));
+        assert_eq!(outside.code(), Code::OutOfRange);
     }
+}
+
+/// The generic sheet traits classify a caller's coordinate the same way,
+/// while a coordinate read from a malformed worksheet stays a corrupt file.
+#[test]
+fn sheet_trait_coordinates_are_argument_errors_and_payload_coordinates_corruption() {
+    let handle = open_bytes(selector_workbook("7", VALID_SECOND), &OpenOptions::new());
+    let sheet = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
+    let code = |error: Box<dyn std::error::Error + Send + Sync>| {
+        error
+            .downcast_ref::<Error>()
+            .expect("a unified error")
+            .code()
+    };
+    assert_eq!(
+        code(sheet.cell_by_coordinate("A0").map(drop).unwrap_err()),
+        Code::InvalidArgument
+    );
+    assert_eq!(
+        code(sheet.cell(1_048_577, 1).map(drop).unwrap_err()),
+        Code::OutOfRange
+    );
+    assert_eq!(
+        code(sheet.cell_value(1, 16_385).map(drop).unwrap_err()),
+        Code::OutOfRange
+    );
+    assert_eq!(
+        code(sheet.row(1_048_576).map(drop).unwrap_err()),
+        Code::OutOfRange
+    );
+    assert_eq!(
+        code(sheet.row(usize::MAX).map(drop).unwrap_err()),
+        Code::OutOfRange
+    );
+
+    // A cell reference the worksheet payload itself names out of the grid.
+    let malformed = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A0"><v>1</v></c></row></sheetData></worksheet>"#;
+    let handle = open_bytes(selector_workbook("7", malformed), &OpenOptions::new());
+    let broken = handle.sheet("Broken").unwrap().unwrap();
+    let error = broken.cell("A1").unwrap_err();
+    assert_eq!(error.code(), Code::CorruptFile, "{error:?}");
 }
 
 #[test]

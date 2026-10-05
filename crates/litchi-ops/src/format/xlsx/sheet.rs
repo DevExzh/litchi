@@ -116,13 +116,16 @@ impl Sheet {
         }
     }
 
+    /// The value at a zero-based coordinate the caller passed; one outside
+    /// the grid is [`Code::OutOfRange`].
     fn value_at(&self, row: u32, column: u32) -> Result<CellValue> {
+        let address = super::selection::resolve_cell((row, column).into())?;
         match &self.model {
-            SheetModel::Owned(worksheet) => match worksheet.cell((row, column))? {
+            SheetModel::Owned(worksheet) => match worksheet.cell(address)? {
                 xlsx::cell::View::Stored(cell) => Ok(convert_cell(cell)),
                 _ => Ok(CellValue::Empty),
             },
-            SheetModel::Source(worksheet) => match worksheet.cell((row, column))? {
+            SheetModel::Source(worksheet) => match worksheet.cell(address)? {
                 xlsx::SourceCellView::Stored(cell) => Ok(convert_cell(&cell)),
                 _ => Ok(CellValue::Empty),
             },
@@ -146,11 +149,12 @@ impl Sheet {
     }
 
     /// The values of one zero-based row, from column 0 to the last stored
-    /// column of the sheet.
+    /// column of the sheet. A row outside the grid is [`Code::OutOfRange`].
     pub(super) fn row_values(&self, row: u32) -> Result<Vec<CellValue>> {
         let Some((_, _, _, end_column)) = self.dimensions_typed()? else {
             return Ok(Vec::new());
         };
+        super::selection::resolve_cell((row, 0).into())?;
         match &self.model {
             SheetModel::Owned(_) => (0..=end_column)
                 .map(|column| self.value_at(row, column))
@@ -255,8 +259,7 @@ impl CoreWorksheet for Sheet {
     }
 
     fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn CoreCell + '_>> {
-        let address = Address::from_a1(coordinate)
-            .map_err(|error| boxed(Error::from(xlsx::Error::from(error))))?;
+        let address = super::selection::resolve_cell(coordinate.into()).map_err(boxed)?;
         self.cell(address.row().get() + 1, address.column().get() + 1)
     }
 
@@ -281,7 +284,16 @@ impl CoreWorksheet for Sheet {
     }
 
     fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
-        Ok(Cow::Owned(self.row_values(row_idx as u32).map_err(boxed)?))
+        let row = u32::try_from(row_idx).map_err(|_| {
+            boxed(
+                Error::new(
+                    Code::OutOfRange,
+                    format!("row index {row_idx} is outside the worksheet grid"),
+                )
+                .with_format(litchi_core::FileFormat::Xlsx),
+            )
+        })?;
+        Ok(Cow::Owned(self.row_values(row).map_err(boxed)?))
     }
 
     fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {

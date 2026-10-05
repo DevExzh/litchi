@@ -68,6 +68,24 @@ const _: () = {
     assert!(size_of::<Ppt>() == size_of::<usize>());
 };
 
+/// Whether the PowerPoint reader refused an encrypted presentation for want
+/// of a password, which makes the input a [`Locked`](crate::Locked) file.
+///
+/// PowerPoint's only password-to-open scheme is RC4 `CryptoAPI` ([MS-PPT]
+/// 2.3.7). A reader built without its `encryption` feature cannot decrypt,
+/// and reports that scheme as an unsupported encryption rather than asking
+/// for a password; in a build without this crate's `encryption` feature that
+/// refusal also means "encrypted". With the feature, the reader asks for the
+/// password, and an unsupported encryption is a scheme it cannot decrypt.
+pub(crate) fn password_required(error: &litchi_ppt::Error) -> bool {
+    match error {
+        litchi_ppt::Error::PasswordRequired => true,
+        #[cfg(not(feature = "encryption"))]
+        litchi_ppt::Error::UnsupportedEncryption(litchi_ppt::EncryptionKind::CryptoApi) => true,
+        _ => false,
+    }
+}
+
 impl Ppt {
     /// Opens the presentation over the positional package filesystem
     /// detection opened (the facade's `from_native_ppt_package`).
@@ -140,7 +158,7 @@ impl Ppt {
         };
         let presentation = match opened {
             Ok(presentation) => presentation,
-            Err(litchi_ppt::Error::PasswordRequired) => {
+            Err(error) if password_required(&error) => {
                 return Ok(LegacyOpen::PasswordRequired(Box::new(
                     package.into_ole_file(),
                 )));

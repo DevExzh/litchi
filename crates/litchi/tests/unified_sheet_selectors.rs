@@ -174,13 +174,20 @@ fn public_selector_preserves_exact_owned_cell_semantics() {
         cells[..5]
     );
 
+    // A coordinate or range the caller passed is the caller's error, not a
+    // corrupt file (M0a S9); the typed leaf is unchanged.
     let coordinate_error = selected.cell("A0").unwrap_err();
     assert!(matches!(
         xlsx_error(&coordinate_error),
         XlsxError::Coordinate(_)
     ));
+    assert_eq!(coordinate_error.code(), Code::InvalidArgument);
     let range_error = selected.cells((1_u32, 1_u32, 1_u32, 2_u32)).unwrap_err();
     assert!(matches!(xlsx_error(&range_error), XlsxError::Range(_)));
+    assert_eq!(range_error.code(), Code::InvalidArgument);
+    let outside = selected.cell((1_048_576_u32, 0_u32)).unwrap_err();
+    assert!(matches!(xlsx_error(&outside), XlsxError::Coordinate(_)));
+    assert_eq!(outside.code(), Code::OutOfRange);
 }
 
 #[test]

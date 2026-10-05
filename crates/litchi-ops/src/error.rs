@@ -28,8 +28,8 @@
 //! | Password, signature or edit protection | [`Code::DocumentProtected`], with a suggestion |
 //! | Allocation failure, durability after commit, internal invariant | [`Code::InternalError`] |
 //! | Cooperative cancellation | [`Code::Cancelled`] |
-//! | An invalid configured limit or execution policy, or a wrong password | [`Code::InvalidArgument`] |
-//! | An index outside its collection | [`Code::OutOfRange`] |
+//! | An invalid configured limit or execution policy, a wrong password, or a caller's cell reference or range that names no grid cells | [`Code::InvalidArgument`] |
+//! | An index outside its collection, among them a caller's cell indices outside the worksheet grid | [`Code::OutOfRange`] |
 //! | A named slide, sheet, tag or font that does not exist | [`Code::NotFound`] |
 //! | A sheet that is not a worksheet | [`Code::UnsupportedType`] |
 //!
@@ -547,6 +547,20 @@ impl Error {
         self
     }
 
+    /// Reclassifies a leaf error that the caller's own argument caused,
+    /// keeping its typed leaf and message: [`Code::InvalidArgument`] for
+    /// input that does not parse, [`Code::OutOfRange`] for a position outside
+    /// its collection. A leaf crate reports such input with the same error it
+    /// reports for malformed file content, so only the call site that
+    /// received the argument can tell the two apart.
+    #[cfg(feature = "xlsx")]
+    pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {
+        debug_assert!(matches!(code, Code::InvalidArgument | Code::OutOfRange));
+        self.0.code = code;
+        self.0.suggestion = None;
+        self
+    }
+
     /// The stable error code.
     #[must_use]
     pub fn code(&self) -> Code {
@@ -899,6 +913,10 @@ impl Classify for litchi_xlsx::Error {
             },
             Self::NotWorksheet { .. } => Class::of(Code::UnsupportedType),
             Self::Allocation { .. } => Class::of(Code::InternalError),
+            // A coordinate or range the leaf read from the file. One the
+            // caller passed is reclassified where it was received
+            // (`Error::caused_by_argument`).
+            Self::Coordinate(_) | Self::Range(_) => Class::of(Code::CorruptFile),
             _ => Class::of(Code::CorruptFile),
         }
     }

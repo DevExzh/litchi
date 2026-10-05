@@ -198,11 +198,15 @@ class RaisedErrorTests(unittest.TestCase):
             "unsupported_format",
             "open it with Document.open",
         )
-        # Legacy encryption of the other formats opens as File::Locked too.
+        # Legacy encryption of the other formats opens as File::Locked too,
+        # among them PowerPoint's RC4 CryptoAPI, which a build without the
+        # `encryption` feature cannot decrypt (M0a S9; before, it was an
+        # UnsupportedError).
         for opener, relative, name in (
             (L.Workbook, "ole/xls/password.xls", "Xls"),
             (L.Workbook, "poi/test-data/spreadsheet/xor-encryption-abc.xls", "Xls"),
             (L.Document, "poi/test-data/document/password_password_cryptoapi.doc", "Doc"),
+            (L.Presentation, "poi/test-data/slideshow/Password_Protected-hello.ppt", "Ppt"),
         ):
             with self.subTest(fixture=relative):
                 error = raised(opener, fixture(relative))

@@ -5,7 +5,7 @@ use std::fmt;
 
 use litchi_xlsx as xlsx;
 
-use crate::error::{Error, Result};
+use crate::error::{Code, Error, Result};
 
 /// A worksheet selector accepted by [`super::Xlsx::sheet`].
 ///
@@ -98,14 +98,14 @@ impl SelectedWorksheet {
     ///
     /// # Errors
     ///
-    /// Returns the XLSX error as the typed source: a malformed coordinate or
-    /// worksheet payload, a non-grid sheet ([`Code::UnsupportedType`]), or a
-    /// changed source ([`Code::IoError`]).
-    ///
-    /// [`Code::UnsupportedType`]: crate::Code::UnsupportedType
-    /// [`Code::IoError`]: crate::Code::IoError
+    /// Returns [`Code::InvalidArgument`] for an A1 reference that names no
+    /// cell of the grid and [`Code::OutOfRange`] for indices outside it, with
+    /// the XLSX coordinate error as the typed source. Reading the cell
+    /// returns the XLSX error as the typed source: a malformed worksheet
+    /// payload ([`Code::CorruptFile`]), a non-grid sheet
+    /// ([`Code::UnsupportedType`]), or a changed source ([`Code::IoError`]).
     pub fn cell<'a>(&self, at: impl Into<xlsx::At<'a>>) -> Result<SelectedCellView> {
-        let at = at.into();
+        let at = resolve_cell(at.into())?;
         match &self.inner {
             SelectedWorksheetInner::Owned(worksheet) => match worksheet.cell(at)? {
                 xlsx::cell::View::Missing => Ok(SelectedCellView::Missing),
@@ -127,9 +127,11 @@ impl SelectedWorksheet {
     ///
     /// # Errors
     ///
-    /// As for [`Self::cell`], plus an allocation failure for the result.
+    /// As for [`Self::cell`], plus [`Code::InvalidArgument`] for bounds inside
+    /// the grid that enclose no cells, and an allocation failure for the
+    /// result.
     pub fn cells<'a>(&self, area: impl Into<xlsx::Area<'a>>) -> Result<Vec<SelectedCell>> {
-        let area = area.into();
+        let area = resolve_area(area.into())?;
         match &self.inner {
             SelectedWorksheetInner::Owned(worksheet) => {
                 let cells = worksheet.cells(area)?;
@@ -152,6 +154,49 @@ impl SelectedWorksheet {
             SelectedWorksheetInner::Source(worksheet) => Ok(worksheet.cells(area)?),
         }
     }
+}
+
+/// Resolve the caller's cell input to a checked address.
+///
+/// The XLSX leaf reports a coordinate the caller passed with the error it
+/// reports for one read from a malformed worksheet, so the input is resolved
+/// here, where it is known to be the caller's: an A1 reference that names no
+/// grid cell is [`Code::InvalidArgument`], raw indices outside the grid are
+/// [`Code::OutOfRange`]. The XLSX coordinate error stays the typed source.
+pub(super) fn resolve_cell(at: xlsx::At<'_>) -> Result<xlsx::Address> {
+    let code = match &at {
+        xlsx::At::A1(_) => Code::InvalidArgument,
+        _ => Code::OutOfRange,
+    };
+    at.resolve()
+        .map_err(|error| Error::from(xlsx::Error::from(error)).caused_by_argument(code))
+}
+
+/// Resolve the caller's range input to a checked rectangle, classifying a
+/// failure as [`resolve_cell`] does. Raw bounds inside the grid that enclose
+/// no cells (an empty or inverted range) are [`Code::InvalidArgument`];
+/// bounds that leave the grid are [`Code::OutOfRange`].
+fn resolve_area(area: xlsx::Area<'_>) -> Result<xlsx::Rect> {
+    let code = match &area {
+        xlsx::Area::Bounds {
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+        } => {
+            let in_grid = xlsx::Address::at(*start_row, *start_column).is_ok()
+                && xlsx::Address::at(end_row.saturating_sub(1), end_column.saturating_sub(1))
+                    .is_ok();
+            if in_grid {
+                Code::InvalidArgument
+            } else {
+                Code::OutOfRange
+            }
+        },
+        _ => Code::InvalidArgument,
+    };
+    area.resolve()
+        .map_err(|error| Error::from(xlsx::Error::from(error)).caused_by_argument(code))
 }
 
 fn cells_allocation(source: std::collections::TryReserveError) -> Error {

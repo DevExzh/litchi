@@ -439,7 +439,7 @@ fn ppt_source(
             Err(error)
                 if matches!(
                     error.leaf(),
-                    crate::error::Source::Ppt(litchi_ppt::Error::PasswordRequired)
+                    crate::error::Source::Ppt(leaf) if crate::format::ppt::password_required(leaf)
                 ) =>
             {
                 Ok(File::Locked(Locked::new(
