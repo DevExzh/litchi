@@ -1,15 +1,38 @@
-//! The flat `File` enum, including not-yet-editable `Locked` and `Signed`
-//! states (design section 4; record 0003 §2.1 and §2.6).
-//!
-//! This module currently holds the pieces of that shape that do not depend on
-//! any per-format handle: [`Family`], and the [`Locked`] and [`Signed`]
-//! shells. The `File` enum itself, `Locked::unlock`, and the `Signed`
-//! consuming transitions arrive in M0a steps S6 and S6b.
+//! The flat [`File`] enum and its format-neutral read surface (design
+//! section 4; record 0003 §2.1, §2.2 and §2.4).
 
-use std::fmt;
-use std::sync::Arc;
+#[cfg(feature = "doc")]
+use crate::format::doc::Doc;
+#[cfg(feature = "docx")]
+use crate::format::docx::Docx;
+#[cfg(feature = "odp")]
+use crate::format::odp::Odp;
+#[cfg(feature = "ods")]
+use crate::format::ods::Ods;
+#[cfg(feature = "odt")]
+use crate::format::odt::Odt;
+#[cfg(feature = "ppt")]
+use crate::format::ppt::Ppt;
+#[cfg(feature = "pptx")]
+use crate::format::pptx::Pptx;
+#[cfg(feature = "rtf")]
+use crate::format::rtf::Rtf;
+#[cfg(feature = "xls")]
+use crate::format::xls::Xls;
+#[cfg(feature = "xlsb")]
+use crate::format::xlsb::Xlsb;
+#[cfg(feature = "xlsx")]
+use crate::format::xlsx::Xlsx;
+use litchi_core::{FileFormat, Metadata};
 
-use litchi_core::FileFormat;
+use crate::error::{Error, Result};
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
+use crate::view::DocumentView;
+#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
+use crate::view::PresentationView;
+#[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+use crate::view::WorkbookView;
+use crate::{Locked, Signed, ToleranceReport};
 
 /// The broad family of a format, reported as data rather than as an enum
 /// layer around the per-format variants (record 0003 §2.1, decision D1).
@@ -69,191 +92,441 @@ impl Family {
     }
 }
 
-/// The encryption scheme of a [`Locked`] input, as classified without a
-/// password.
+/// One opened input: a flat enum with one variant per format, plus the
+/// not-yet-editable [`Locked`] and [`Signed`] states (ADR 0033 §4, record
+/// 0003 §2.1).
 ///
-/// OOXML kinds come from `litchi_crypto::ooxml::inspect` when the
-/// `encryption` feature is on; legacy kinds come from the leaf's
-/// password-required report. [`Self::Unknown`] means the input was
-/// recognized as encrypted (for example from stream presence) but its scheme
-/// was not classified.
+/// Every variant is one `Arc`-backed handle, so a `File` is a tag and one
+/// pointer, is `Send + Sync`, and clones with one reference-count increment.
+/// [`open`](crate::open), [`open_bytes`](crate::open_bytes) and their
+/// variants produce it; detection decides the variant from the content. A
+/// file name never selects a variant: an OOXML name only refuses content
+/// that is not an OOXML package, and names the format of an encrypted one,
+/// which its content hides until it is unlocked.
 ///
+/// Tier 1 and tier 2 variants (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT) retain
+/// the leaf's editable owner; RTF, ODT, ODS and ODP are read-only for now.
+/// The enum is `#[non_exhaustive]`: further formats join as variants. Each
+/// variant exists only when its cargo feature is enabled.
+///
+/// The format-neutral reads are methods on `File` itself; family-specific
+/// reads go through [`File::document`], [`File::presentation`] and
+/// [`File::workbook`], and format-specific ones through the handle a variant
+/// carries.
+///
+/// ```no_run
+/// use litchi_ops::File;
+///
+/// # fn main() -> litchi_ops::Result<()> {
+/// let file = litchi_ops::open("report.docx")?;
+/// println!("{:?}: {}", file.format(), file.text()?);
+/// match &file {
+///     File::Docx(docx) => println!("{} sections", docx.section_inventory()?.sections().len()),
+///     File::Locked(locked) => println!("encrypted with {:?}", locked.encryption()),
+///     _ => {},
+/// }
+/// # Ok(())
+/// # }
 /// ```
-/// use litchi_ops::EncryptionKind;
-///
-/// assert_ne!(EncryptionKind::Agile, EncryptionKind::Standard);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum EncryptionKind {
-    /// OOXML Agile Encryption (`EncryptionInfo` version 4.4).
-    Agile,
-    /// OOXML Standard Encryption (`EncryptionInfo` versions 2.2 to 4.2).
-    Standard,
-    /// Legacy Office binary RC4 encryption (not `CryptoAPI`).
-    BinaryRc4,
-    /// Legacy RC4 `CryptoAPI` encryption.
-    CryptoApi,
-    /// Legacy XOR obfuscation.
-    XorObfuscation,
-    /// Encrypted, scheme not classified.
-    Unknown,
-}
-
-/// An encrypted input: recognized, but neither readable nor editable until it
-/// is unlocked with a password (ADR 0006 `Locked<T>`).
-///
-/// `Locked` is a cheap-to-clone handle. Its [`Debug`] output names the inner
-/// format and encryption kind only; it never prints source bytes or key
-/// material.
-///
-/// `Locked` values are produced by `open`. The consuming
-/// `Locked::unlock(self, password)` transition is added in M0a step S6.
 #[derive(Clone)]
-pub struct Locked(Arc<LockedState>);
-
-/// Shared state behind a [`Locked`] handle. Step S6 adds the retained source
-/// the `unlock` transition decrypts from.
-struct LockedState {
-    format: FileFormat,
-    encryption: EncryptionKind,
-}
-
-impl Locked {
-    /// Build the handle from the open-time classification.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "constructed by open() classification in M0a step S6"
-        )
-    )]
-    pub(crate) fn new(format: FileFormat, encryption: EncryptionKind) -> Self {
-        Self(Arc::new(LockedState { format, encryption }))
-    }
-
-    /// The format of the encrypted content, as detected from the container.
-    #[must_use]
-    pub fn format(&self) -> FileFormat {
-        self.0.format
-    }
-
-    /// The family of [`Self::format`].
-    #[must_use]
-    pub fn family(&self) -> Family {
-        Family::of(self.0.format)
-    }
-
-    /// The encryption scheme, classified without a password.
-    #[must_use]
-    pub fn encryption(&self) -> EncryptionKind {
-        self.0.encryption
-    }
-}
-
-impl fmt::Debug for Locked {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Locked")
-            .field("format", &self.0.format)
-            .field("encryption", &self.0.encryption)
-            .finish_non_exhaustive()
-    }
-}
-
-/// Where a [`Signed`] input's signature was found. Detection is
-/// metadata-only; nothing is verified at open.
-///
-/// ```
-/// use litchi_ops::SignatureOrigin;
-///
-/// assert_ne!(SignatureOrigin::Opc, SignatureOrigin::Cfb);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SignatureOrigin {
-    /// OPC digital-signature origin part and its signature parts.
-    Opc,
-    /// Compound-file `_signatures` or `_xmlsignatures` streams.
-    Cfb,
+pub enum File {
+    /// A WordprocessingML (`.docx`) document.
+    #[cfg(feature = "docx")]
+    Docx(Docx),
+    /// A SpreadsheetML (`.xlsx`) workbook.
+    #[cfg(feature = "xlsx")]
+    Xlsx(Xlsx),
+    /// A PresentationML (`.pptx`) presentation.
+    #[cfg(feature = "pptx")]
+    Pptx(Pptx),
+    /// A binary SpreadsheetML (`.xlsb`) workbook.
+    #[cfg(feature = "xlsb")]
+    Xlsb(Xlsb),
+    /// A legacy Word (`.doc`) document.
+    #[cfg(feature = "doc")]
+    Doc(Doc),
+    /// A legacy Excel (`.xls`) workbook.
+    #[cfg(feature = "xls")]
+    Xls(Xls),
+    /// A legacy PowerPoint (`.ppt`) presentation.
+    #[cfg(feature = "ppt")]
+    Ppt(Ppt),
+    /// A Rich Text Format (`.rtf`) document; read-only.
+    #[cfg(feature = "rtf")]
+    Rtf(Rtf),
+    /// An OpenDocument Text (`.odt`) document; read-only.
+    #[cfg(feature = "odt")]
+    Odt(Odt),
+    /// An OpenDocument Spreadsheet (`.ods`) workbook; read-only.
+    #[cfg(feature = "ods")]
+    Ods(Ods),
+    /// An OpenDocument Presentation (`.odp`) presentation; read-only.
+    #[cfg(feature = "odp")]
+    Odp(Odp),
+    /// An encrypted input: neither readable nor editable until it is
+    /// unlocked with its password.
+    Locked(Locked),
+    /// A signed input: readable through the file it wraps; editing must
+    /// consume the signature explicitly.
+    Signed(Signed),
 }
 
-/// A signed input: readable, but every edit verb refuses until the signature
-/// is consumed explicitly (ADR 0006 `Signed<T>`; record 0007 Q4: every signed
-/// input is wrapped).
-///
-/// `Signed` is a cheap-to-clone handle. Its [`Debug`] output names the inner
-/// format and signature origin only; it never prints document content or
-/// signature material.
-///
-/// `Signed` values are produced by `open`. Step S6 makes the wrapped `File`
-/// reachable through `Signed::file`, and step S6b adds the consuming
-/// `unsign` transition.
-#[derive(Clone)]
-pub struct Signed(Arc<SignedState>);
+const _: () = {
+    const fn assert_handle<T: Send + Sync + Clone>() {}
+    assert_handle::<File>();
+    assert_handle::<Locked>();
+    assert_handle::<Signed>();
+    assert_handle::<Error>();
+    // A tag plus one pointer (record 0003 decision D2).
+    assert!(size_of::<File>() == 2 * size_of::<usize>());
+};
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<File>() == 16);
 
-/// Shared state behind a [`Signed`] handle. Step S6 replaces `format` with
-/// the wrapped `File`, whose format `Signed::format` then reports.
-struct SignedState {
-    format: FileFormat,
-    origin: SignatureOrigin,
+impl File {
+    /// The format of the content.
+    ///
+    /// A [`File::Signed`] reports the format of the file it wraps. Only a
+    /// [`File::Locked`] OOXML package whose format cannot be known before it
+    /// is unlocked returns `None`: OOXML encryption covers the whole package,
+    /// so only the file name can name its format, and an in-memory input has
+    /// none.
+    ///
+    /// ```
+    /// # #[cfg(feature = "rtf")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    ///
+    /// let file = litchi_ops::open_bytes(br"{\rtf1 Hello}".to_vec()).unwrap();
+    /// assert_eq!(file.format(), Some(FileFormat::Rtf));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn format(&self) -> Option<FileFormat> {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(_) => Some(FileFormat::Docx),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(_) => Some(FileFormat::Xlsx),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(_) => Some(FileFormat::Pptx),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(_) => Some(FileFormat::Xlsb),
+            #[cfg(feature = "doc")]
+            Self::Doc(_) => Some(FileFormat::Doc),
+            #[cfg(feature = "xls")]
+            Self::Xls(_) => Some(FileFormat::Xls),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(_) => Some(FileFormat::Ppt),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(_) => Some(FileFormat::Rtf),
+            #[cfg(feature = "odt")]
+            Self::Odt(_) => Some(FileFormat::Odt),
+            #[cfg(feature = "ods")]
+            Self::Ods(_) => Some(FileFormat::Ods),
+            #[cfg(feature = "odp")]
+            Self::Odp(_) => Some(FileFormat::Odp),
+            Self::Locked(locked) => locked.format(),
+            Self::Signed(signed) => Some(signed.format()),
+        }
+    }
+
+    /// The family of [`Self::format`]; `None` exactly when the format is.
+    ///
+    /// ```
+    /// # #[cfg(feature = "rtf")]
+    /// # {
+    /// use litchi_ops::Family;
+    ///
+    /// let file = litchi_ops::open_bytes(br"{\rtf1 Hello}".to_vec()).unwrap();
+    /// assert_eq!(file.family(), Some(Family::Document));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn family(&self) -> Option<Family> {
+        self.format().map(Family::of)
+    }
+
+    /// The plain text of the content, in the format's reading order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// for a [`File::Locked`], [`Code::IoError`](crate::Code::IoError) when a
+    /// source-backed file changed after open, and the format's typed error
+    /// when its content cannot be decoded.
+    ///
+    /// ```
+    /// # #[cfg(feature = "rtf")]
+    /// # {
+    /// let file = litchi_ops::open_bytes(br"{\rtf1 Hello}".to_vec()).unwrap();
+    /// assert_eq!(file.text().unwrap().trim(), "Hello");
+    /// # }
+    /// ```
+    pub fn text(&self) -> Result<String> {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => handle.text(),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => handle.text(),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => handle.text(),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle.text(),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle.text(),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle.text(),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle.text(),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle.text(),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle.text(),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle.text(),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle.text(),
+            Self::Locked(locked) => Err(locked.read_error()),
+            Self::Signed(signed) => signed.file().text(),
+        }
+    }
+
+    /// The document properties: core properties for OOXML, OLE property
+    /// sets for the legacy binary formats, `meta.xml` for OpenDocument and
+    /// the `\info` group for RTF.
+    ///
+    /// `None` means the format reports no metadata at all; PPTX and PPT do so
+    /// when the package carries no core properties with data. The other
+    /// formats report empty metadata instead, as their facade readers did.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// for a [`File::Locked`], [`Code::IoError`](crate::Code::IoError) when a
+    /// source-backed file changed after open, and the format's typed error
+    /// when a properties part is present but cannot be read.
+    pub fn metadata(&self) -> Result<Option<Metadata>> {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => handle.metadata(),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => handle.metadata(),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => handle.metadata(),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle.metadata(),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle.metadata(),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle.metadata(),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle.metadata(),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle.metadata(),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle.metadata(),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle.metadata(),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle.metadata(),
+            Self::Locked(locked) => Err(locked.read_error()),
+            Self::Signed(signed) => signed.file().metadata(),
+        }
+    }
+
+    /// Everything the reader repaired so far, as the owning format crate
+    /// recorded it. See [`ToleranceReport`] and each handle's
+    /// `tolerance_report` for what a format covers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// for a [`File::Locked`], [`Code::IoError`](crate::Code::IoError) when a
+    /// source-backed file changed after open, and the format's typed error
+    /// when the parts this report reads cannot be parsed.
+    pub fn tolerance_report(&self) -> Result<ToleranceReport> {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => handle.tolerance_report().map(ToleranceReport::Docx),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => handle.tolerance_report().map(ToleranceReport::Xlsx),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => handle.tolerance_report().map(ToleranceReport::Pptx),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle.tolerance_report().map(ToleranceReport::Xlsb),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle.tolerance_report().map(ToleranceReport::Doc),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle.tolerance_report().map(ToleranceReport::Xls),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle.tolerance_report().map(ToleranceReport::Ppt),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle.tolerance_report().map(ToleranceReport::Rtf),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle.tolerance_report().map(ToleranceReport::Odt),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle.tolerance_report().map(ToleranceReport::Ods),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle.tolerance_report().map(ToleranceReport::Odp),
+            Self::Locked(locked) => Err(locked.read_error()),
+            Self::Signed(signed) => signed.file().tolerance_report(),
+        }
+    }
+
+    /// The word-processing view: paragraphs, tables and elements. Available
+    /// when a document format (`doc`, `docx`, `rtf`, `odt`) is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat)
+    /// naming the format ([`Error::detected`]) when the file is not a
+    /// document, and [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// for a [`File::Locked`] that is, or may be, one.
+    ///
+    /// ```no_run
+    /// # fn main() -> litchi_ops::Result<()> {
+    /// let file = litchi_ops::open("report.docx")?;
+    /// for paragraph in file.document()?.paragraphs()? {
+    ///     println!("{}", paragraph.text()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
+    pub fn document(&self) -> Result<DocumentView<'_>> {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => Ok(DocumentView::docx(handle)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => Ok(DocumentView::doc(handle)),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => Ok(DocumentView::rtf(handle)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => Ok(DocumentView::odt(handle)),
+            Self::Locked(locked) => Err(locked.view_error(Family::Document)),
+            Self::Signed(signed) => signed.file().document(),
+            #[allow(
+                unreachable_patterns,
+                reason = "every variant is a document in builds with only document formats"
+            )]
+            other => Err(Error::unsupported_format(other.format())),
+        }
+    }
+
+    /// The presentation view: slides and slide count. Available when a
+    /// presentation format (`ppt`, `pptx`, `odp`) is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat)
+    /// naming the format ([`Error::detected`]) when the file is not a
+    /// presentation, and
+    /// [`Code::DocumentProtected`](crate::Code::DocumentProtected) for a
+    /// [`File::Locked`] that is, or may be, one.
+    ///
+    /// ```no_run
+    /// # fn main() -> litchi_ops::Result<()> {
+    /// let file = litchi_ops::open("deck.pptx")?;
+    /// let presentation = file.presentation()?;
+    /// println!("{} slides", presentation.slide_count()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]
+    pub fn presentation(&self) -> Result<PresentationView<'_>> {
+        match self {
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => Ok(PresentationView::pptx(handle)),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => Ok(PresentationView::ppt(handle)),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => Ok(PresentationView::odp(handle)),
+            Self::Locked(locked) => Err(locked.view_error(Family::Presentation)),
+            Self::Signed(signed) => signed.file().presentation(),
+            #[allow(
+                unreachable_patterns,
+                reason = "every variant is a presentation in builds with only presentation formats"
+            )]
+            other => Err(Error::unsupported_format(other.format())),
+        }
+    }
+
+    /// The workbook view: worksheet names and count, and the generic
+    /// [`litchi_core::sheet::WorkbookTrait`]. Available when a workbook
+    /// format (`xls`, `xlsx`, `xlsb`, `ods`) is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat)
+    /// naming the format ([`Error::detected`]) when the file is not a
+    /// workbook, and [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// for a [`File::Locked`] that is, or may be, one.
+    ///
+    /// ```no_run
+    /// # fn main() -> litchi_ops::Result<()> {
+    /// let file = litchi_ops::open("budget.xlsx")?;
+    /// println!("{:?}", file.workbook()?.worksheet_names()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+    pub fn workbook(&self) -> Result<WorkbookView<'_>> {
+        match self {
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => Ok(WorkbookView::xlsx(handle)),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => Ok(WorkbookView::xlsb(handle)),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => Ok(WorkbookView::xls(handle)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => Ok(WorkbookView::ods(handle)),
+            Self::Locked(locked) => Err(locked.view_error(Family::Workbook)),
+            Self::Signed(signed) => signed.file().workbook(),
+            #[allow(
+                unreachable_patterns,
+                reason = "every variant is a workbook in builds with only workbook formats"
+            )]
+            other => Err(Error::unsupported_format(other.format())),
+        }
+    }
 }
 
-impl Signed {
-    /// Build the handle from the open-time classification.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "constructed by open() classification in M0a step S6"
-        )
-    )]
-    pub(crate) fn new(format: FileFormat, origin: SignatureOrigin) -> Self {
-        Self(Arc::new(SignedState { format, origin }))
-    }
-
-    /// The format of the signed content.
-    #[must_use]
-    pub fn format(&self) -> FileFormat {
-        self.0.format
-    }
-
-    /// The family of [`Self::format`].
-    #[must_use]
-    pub fn family(&self) -> Family {
-        Family::of(self.0.format)
-    }
-
-    /// Where the signature was found.
-    #[must_use]
-    pub fn origin(&self) -> SignatureOrigin {
-        self.0.origin
-    }
-}
-
-impl fmt::Debug for Signed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Signed")
-            .field("format", &self.0.format)
-            .field("origin", &self.0.origin)
-            .finish_non_exhaustive()
+impl std::fmt::Debug for File {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => handle.fmt(formatter),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => handle.fmt(formatter),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => handle.fmt(formatter),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle.fmt(formatter),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle.fmt(formatter),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle.fmt(formatter),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle.fmt(formatter),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle.fmt(formatter),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle.fmt(formatter),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle.fmt(formatter),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle.fmt(formatter),
+            Self::Locked(locked) => locked.fmt(formatter),
+            Self::Signed(signed) => signed.fmt(formatter),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const fn assert_traits<T: Send + Sync + Clone + fmt::Debug>() {}
-    const _: () = {
-        assert_traits::<Family>();
-        assert_traits::<EncryptionKind>();
-        assert_traits::<SignatureOrigin>();
-        assert_traits::<Locked>();
-        assert_traits::<Signed>();
-    };
-    // One pointer each, so `File` can stay a tag plus one pointer (D2).
-    const _: () = assert!(size_of::<Locked>() == size_of::<usize>());
-    const _: () = assert!(size_of::<Signed>() == size_of::<usize>());
 
     #[test]
     fn family_covers_every_detected_format() {
@@ -284,43 +557,5 @@ mod tests {
         for (format, family) in cases {
             assert_eq!(Family::of(format), family, "{format:?}");
         }
-    }
-
-    #[test]
-    fn locked_reports_format_and_kind() {
-        let locked = Locked::new(FileFormat::Docx, EncryptionKind::Agile);
-        assert_eq!(locked.format(), FileFormat::Docx);
-        assert_eq!(locked.family(), Family::Document);
-        assert_eq!(locked.encryption(), EncryptionKind::Agile);
-        let clone = locked.clone();
-        assert!(Arc::ptr_eq(&locked.0, &clone.0), "clone shares the state");
-    }
-
-    #[test]
-    fn locked_debug_is_redacted() {
-        let locked = Locked::new(FileFormat::Xls, EncryptionKind::BinaryRc4);
-        assert_eq!(
-            format!("{locked:?}"),
-            "Locked { format: Xls, encryption: BinaryRc4, .. }"
-        );
-    }
-
-    #[test]
-    fn signed_reports_format_and_origin() {
-        let signed = Signed::new(FileFormat::Pptx, SignatureOrigin::Opc);
-        assert_eq!(signed.format(), FileFormat::Pptx);
-        assert_eq!(signed.family(), Family::Presentation);
-        assert_eq!(signed.origin(), SignatureOrigin::Opc);
-        let clone = signed.clone();
-        assert!(Arc::ptr_eq(&signed.0, &clone.0), "clone shares the state");
-    }
-
-    #[test]
-    fn signed_debug_is_redacted() {
-        let signed = Signed::new(FileFormat::Doc, SignatureOrigin::Cfb);
-        assert_eq!(
-            format!("{signed:?}"),
-            "Signed { format: Doc, origin: Cfb, .. }"
-        );
     }
 }

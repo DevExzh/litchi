@@ -11,16 +11,15 @@
 //! The constructors take what detection already produced, so an open does
 //! one detection pass and one container index:
 //!
-//! | Facade route today | Detection result | Constructor |
+//! | Open route | Detection result | Constructor |
 //! |---|---|---|
-//! | `Workbook::open` on `unix`/`windows` | `WorkbookSourcePathDetection::Xlsx` | `Xlsx::from_source_workbook` |
-//! | `Workbook::from_bytes` | `WorkbookSourceBytesDetection::Xlsx` | `Xlsx::from_source_package` |
-//! | `Workbook::from_bytes` fallback (`detect_format_smart`) | `DetectedFormat::Xlsx` | `Xlsx::from_opc_package` |
-//! | `Workbook::from_prepared` | `PreparedOoxmlSource` | `Xlsx::from_prepared` |
+//! | `open` (path) on `unix`/`windows`, `open_bytes`, `open_prepared` | source-backed OPC package | `Xlsx::from_source_package` |
+//! | [`SourceMode::Eager`], and paths elsewhere | eager `OpcPackage` | `Xlsx::from_opc_package` |
+//! | `Locked::unlock` | decrypted package | `Xlsx::from_package` |
 //!
-//! The facade has no reader route for workbooks; the `sheet::open_workbook*`
-//! functions are path and byte routes onto the same two owners. On other
-//! targets the path route reads the bytes and takes the byte route.
+//! The facade's filesystem route read the core properties while it built the
+//! catalog; the unified route reads them from the same package in
+//! `Xlsx::from_source_package`, so the work is the same.
 //!
 //! # Source freshness
 //!
@@ -45,19 +44,14 @@ use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
 };
 use litchi_core::{FileFormat, Metadata};
-use litchi_opc::{OpcPackage, PreparedOoxmlSource, SourceBackedPackage};
+use litchi_opc::{OpcPackage, SourceBackedPackage};
 use litchi_xlsx as xlsx;
 
+use super::cell_text;
 use crate::detect::workbook_metadata::{MetadataRepairs, read_source_backed_metadata};
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
 
-#[allow(
-    clippy::duplicate_mod,
-    reason = "shared with the sibling workbook handle until S6 can declare it once in `format/mod.rs`"
-)]
-#[path = "cell_text.rs"]
-mod cell_text;
 mod selection;
 mod sheet;
 
@@ -183,31 +177,14 @@ impl XlsxOwner {
 }
 
 impl Xlsx {
-    /// Adopt the source-backed catalog the filesystem detector built, with
-    /// the metadata it read. No worksheet payload is read.
+    /// Adopt the source-backed package detection validated: read its core
+    /// properties, then build the deferred catalog over it. No worksheet
+    /// payload is read.
     ///
-    /// Under [`SourceMode::Eager`] the catalog's package is materialized into
-    /// the owning snapshot instead.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by the `File` openers from S6")
-    )]
-    pub(crate) fn from_source_workbook(
-        workbook: xlsx::SourceBackedWorkbook,
-        metadata: Metadata,
-        metadata_repairs: MetadataRepairs,
-        options: &OpenOptions,
-    ) -> Result<Self> {
-        let owner = if options.source_mode == SourceMode::Eager {
-            XlsxOwner::Eager(materialize(workbook.source_backed_package())?)
-        } else {
-            XlsxOwner::Source(workbook)
-        };
-        Ok(Self::with_owner(owner, metadata, metadata_repairs, options))
-    }
-
-    /// Adopt the source-backed package the byte detector validated: read its
-    /// core properties, then build the deferred catalog over it.
+    /// Under [`SourceMode::Eager`] the package is materialized into the
+    /// owning snapshot instead; the openers reach that only from
+    /// `open_prepared`, because their other eager routes call
+    /// [`Self::from_opc_package`].
     pub(crate) fn from_source_package(
         package: SourceBackedPackage,
         options: &OpenOptions,
@@ -224,35 +201,8 @@ impl Xlsx {
         Ok(Self::with_owner(owner, metadata, metadata_repairs, options))
     }
 
-    /// Adopt a package prepared by `detect_and_prepare` without indexing the
-    /// container again.
-    ///
-    /// Returns [`Code::UnsupportedFormat`] naming the detected format when
-    /// the prepared package is another OOXML family, and [`Code::IoError`]
-    /// when the file changed after it was prepared.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by the `File` openers from S6")
-    )]
-    pub(crate) fn from_prepared(
-        prepared: PreparedOoxmlSource,
-        options: &OpenOptions,
-    ) -> Result<Self> {
-        let detected =
-            crate::detect::ooxml::format_for_main_content_type(prepared.main_part_content_type())
-                .ok_or(litchi_core::Error::NotOfficeFile)?;
-        if detected != FileFormat::Xlsx {
-            return Err(litchi_core::Error::UnexpectedFormat { detected }.into());
-        }
-        Self::from_source_package(prepared.into_package()?, options)
-    }
-
     /// Build the owning snapshot from the OPC package the byte detector
     /// already parsed (`DetectedFormat::Xlsx`).
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by the `File` openers from S6")
-    )]
     pub(crate) fn from_opc_package(package: OpcPackage, options: &OpenOptions) -> Result<Self> {
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata =
@@ -263,6 +213,24 @@ impl Xlsx {
         let workbook = xlsx::Package::from_opc(package)?.into_workbook()?;
         Ok(Self::with_owner(
             XlsxOwner::Eager(workbook),
+            metadata,
+            metadata_repairs,
+            options,
+        ))
+    }
+
+    /// Adopt an owning package another route built, reading its core
+    /// properties now. [`crate::Locked::unlock`] uses this for a package the
+    /// leaf decrypted: the snapshot keeps its encryption provenance.
+    #[cfg(feature = "encryption")]
+    pub(crate) fn from_package(package: xlsx::Package, options: &OpenOptions) -> Result<Self> {
+        let mut metadata_repairs = MetadataRepairs::default();
+        let metadata = package
+            .core_properties_with_report(&mut metadata_repairs)?
+            .map(Metadata::from)
+            .unwrap_or_default();
+        Ok(Self::with_owner(
+            XlsxOwner::Eager(package.into_workbook()?),
             metadata,
             metadata_repairs,
             options,
@@ -284,19 +252,17 @@ impl Xlsx {
         }))
     }
 
-    /// The two-state owner, for the `File` dispatch of S6.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read by the `File` dispatch from S6")
-    )]
-    pub(crate) fn owner(&self) -> &XlsxOwner {
-        &self.0.owner
-    }
-
     /// The format of this handle.
     #[must_use]
     pub const fn format(&self) -> FileFormat {
         FileFormat::Xlsx
+    }
+
+    /// Whether the owner defers worksheet payloads to the retained source,
+    /// for the tests that pin each route's owner.
+    #[cfg(test)]
+    pub(crate) fn is_source_backed(&self) -> bool {
+        matches!(self.0.owner, XlsxOwner::Source(_))
     }
 
     /// Worksheet names in workbook order, every sheet kind included.
@@ -342,14 +308,16 @@ impl Xlsx {
         })
     }
 
-    /// The core document properties read at open.
+    /// The core document properties read at open. Always `Some` when it
+    /// succeeds; a package without core properties reads as empty metadata,
+    /// as the facade reports it.
     ///
     /// # Errors
     ///
     /// Returns [`Code::IoError`] when a source-backed workbook's file changed.
-    pub fn metadata(&self) -> Result<Metadata> {
+    pub fn metadata(&self) -> Result<Option<Metadata>> {
         self.0.owner.ensure_current()?;
-        Ok(self.0.metadata.clone())
+        Ok(Some(self.0.metadata.clone()))
     }
 
     /// Everything the reader repaired so far: the open (package, workbook

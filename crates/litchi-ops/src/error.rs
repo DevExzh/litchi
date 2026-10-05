@@ -40,6 +40,7 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::io;
+use std::sync::Arc;
 
 use litchi_core::{ExecutionError, FileFormat};
 
@@ -229,6 +230,54 @@ impl Code {
     }
 }
 
+impl Code {
+    /// A short, format-neutral description of the code, used where the
+    /// error's own message comes from a leaf error.
+    const fn summary(self) -> &'static str {
+        match self {
+            Self::NotFound => "a requested element does not exist",
+            Self::PathNotFound => "a path resolved to nothing",
+            Self::ZeroMatches => "a query matched no element",
+            Self::OutOfRange => "an index is outside its collection",
+            Self::RangeTargetNotFound => "the target of a range operation does not exist",
+            Self::DuplicateName => "a name is already in use",
+            Self::InvalidValue => "a property value is invalid",
+            Self::InvalidInput => "an input document or payload is invalid",
+            Self::InvalidArgument => "an argument is invalid",
+            Self::InvalidJson => "a JSON payload is malformed",
+            Self::InvalidXpath => "an XPath expression is malformed",
+            Self::InvalidPath => "a path is malformed",
+            Self::InvalidSelector => "a selector is malformed",
+            Self::UnsupportedProperty => "the property is not supported on this element",
+            Self::UnsupportedPath => "the path form is not supported here",
+            Self::UnsupportedElement => "the element kind is not supported here",
+            Self::UnsupportedType => "the value or element type is not supported here",
+            Self::UnsupportedFormat => "the file format is not supported here",
+            Self::UnsupportedCommand => "the command is not supported",
+            Self::MissingProperty => "a required property is missing",
+            Self::MissingArgument => "a required argument is missing",
+            Self::FileNotFound => "the file does not exist",
+            Self::FileLocked => "the file is locked by another process",
+            Self::FileExists => "the destination file already exists",
+            Self::FileRequired => "the operation requires a file",
+            Self::IoError => "reading or writing failed, or the source changed",
+            Self::CorruptFile => "the file is malformed",
+            Self::CorruptBatch => "a batch payload is malformed",
+            Self::DocumentProtected => "the document is encrypted, signed, or edit-protected",
+            Self::ValidationError => "the result failed validation",
+            Self::OutputTooLarge => "the output would exceed its size ceiling",
+            Self::MaxDepthExceeded => "nesting exceeded its depth ceiling",
+            Self::MergeNotExact => "a merge could not be applied exactly",
+            Self::RefreshFailed => "a refresh of derived content failed",
+            Self::BareSelectorRejected => "a bare selector was rejected",
+            Self::InternalError => "an internal failure occurred",
+            Self::UnsupportedCapability => "the format cannot perform the requested operation",
+            Self::LimitExceeded => "a resource limit was exceeded",
+            Self::Cancelled => "the operation was cancelled",
+        }
+    }
+}
+
 impl fmt::Display for Code {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
@@ -255,7 +304,12 @@ pub enum Source {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     Opc(litchi_opc::OpcError),
     /// A Compound File Binary error.
-    #[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+    #[cfg(any(
+        feature = "doc",
+        feature = "xls",
+        feature = "ppt",
+        feature = "encryption"
+    ))]
     Cfb(litchi_cfb::OleError),
     /// A `WordprocessingML` error.
     #[cfg(feature = "docx")]
@@ -290,6 +344,9 @@ pub enum Source {
     /// A Rich Text Format error.
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Error),
+    /// An OOXML package-encryption error.
+    #[cfg(feature = "encryption")]
+    Crypto(litchi_crypto::ooxml::Error),
 }
 
 impl Source {
@@ -302,7 +359,12 @@ impl Source {
             Self::Execution(error) => Some(error),
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             Self::Opc(error) => Some(error),
-            #[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+            #[cfg(any(
+                feature = "doc",
+                feature = "xls",
+                feature = "ppt",
+                feature = "encryption"
+            ))]
             Self::Cfb(error) => Some(error),
             #[cfg(feature = "docx")]
             Self::Docx(error) => Some(error),
@@ -326,6 +388,8 @@ impl Source {
             Self::Ppt(error) => Some(error),
             #[cfg(feature = "rtf")]
             Self::Rtf(error) => Some(error),
+            #[cfg(feature = "encryption")]
+            Self::Crypto(error) => Some(error),
         }
     }
 }
@@ -333,17 +397,26 @@ impl Source {
 /// The error of every unified operation.
 ///
 /// The error is one pointer wide, so `Result<T>` stays small on the success
-/// path. Its [`Display`](fmt::Display) form is `code: message`, followed by
-/// the suggestion in parentheses when there is one.
+/// path, and cloning it shares the typed leaf error instead of copying it.
+///
+/// Its [`Display`](fmt::Display) form is facade-level: the code and its
+/// summary for an error converted from a leaf error, or the code and the
+/// message for an error the unified layer raised itself, followed by the
+/// format and the suggestion when there are any. The leaf error's own text is
+/// [`Error::message`], and the leaf error is [`std::error::Error::source`], so
+/// an error-chain printer shows it once, as the cause.
+#[derive(Clone)]
 pub struct Error(Box<Inner>);
 
+#[derive(Clone)]
 struct Inner {
     code: Code,
     message: Cow<'static, str>,
     suggestion: Option<Cow<'static, str>>,
     format: Option<FileFormat>,
     detected: Option<FileFormat>,
-    source: Source,
+    /// Shared so that cloning an error never copies or loses its leaf error.
+    source: Arc<Source>,
 }
 
 const _: () = assert!(size_of::<Error>() == size_of::<usize>());
@@ -359,7 +432,7 @@ impl Error {
             suggestion: None,
             format: None,
             detected: None,
-            source: Source::None,
+            source: Arc::new(Source::None),
         }))
     }
 
@@ -387,13 +460,18 @@ impl Error {
     }
 
     /// Reports a read or edit attempt on an encrypted document that has not
-    /// been unlocked.
+    /// been unlocked. `format` is the format of the encrypted content, or
+    /// `None` when it cannot be known before the document is unlocked.
     #[must_use]
-    pub fn locked(format: FileFormat) -> Self {
+    pub fn locked(format: Option<FileFormat>) -> Self {
+        let message: Cow<'static, str> = match format {
+            Some(format) => format!("the {format:?} document is encrypted").into(),
+            None => "the document is encrypted".into(),
+        };
         Self::from_class(
-            Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION),
-            format!("the {format:?} document is encrypted"),
-            Some(format),
+            Class::suggest(Code::DocumentProtected, LOCKED_SUGGESTION),
+            message,
+            format,
             Source::None,
         )
     }
@@ -408,6 +486,29 @@ impl Error {
             Some(format),
             Source::None,
         )
+    }
+
+    /// Reports a recognized format whose cargo feature is not enabled in this
+    /// build.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "rtf",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "pages",
+        feature = "keynote",
+        feature = "numbers"
+    ))]
+    pub(crate) fn feature_disabled(detected: FileFormat, feature: &'static str) -> Self {
+        Self::unsupported_format(Some(detected))
+            .with_suggestion(format!("enable the `{feature}` cargo feature"))
     }
 
     /// Sets the suggestion that tells the caller how to recover.
@@ -430,7 +531,8 @@ impl Error {
         self.0.code
     }
 
-    /// The human-readable message.
+    /// The human-readable message: the leaf error's own text for an error
+    /// converted from one, otherwise the unified layer's message.
     #[must_use]
     pub fn message(&self) -> &str {
         &self.0.message
@@ -455,16 +557,11 @@ impl Error {
         self.0.detected
     }
 
-    /// The typed leaf error this error was converted from.
+    /// The typed leaf error this error was converted from. Clones of an error
+    /// share it.
     #[must_use]
     pub fn leaf(&self) -> &Source {
         &self.0.source
-    }
-
-    /// Consumes the error and returns its typed leaf error.
-    #[must_use]
-    pub fn into_leaf(self) -> Source {
-        self.0.source
     }
 
     fn from_class(
@@ -479,7 +576,7 @@ impl Error {
             suggestion: class.suggestion,
             format,
             detected: class.detected,
-            source,
+            source: Arc::new(source),
         }))
     }
 }
@@ -498,9 +595,21 @@ impl fmt::Debug for Error {
     }
 }
 
+/// The facade-level rendering: a leaf error's text is not repeated here,
+/// because [`std::error::Error::source`] returns the leaf error and
+/// error-chain printers show it as the cause.
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}: {}", self.0.code, self.0.message)?;
+        formatter.write_str(self.0.code.as_str())?;
+        formatter.write_str(": ")?;
+        if matches!(*self.0.source, Source::None) {
+            formatter.write_str(&self.0.message)?;
+        } else {
+            formatter.write_str(self.0.code.summary())?;
+            if let Some(format) = self.0.format.or(self.0.detected) {
+                write!(formatter, " [{format:?}]")?;
+            }
+        }
         if let Some(suggestion) = &self.0.suggestion {
             write!(formatter, " (suggestion: {suggestion})")?;
         }
@@ -516,8 +625,19 @@ impl std::error::Error for Error {
 
 const LIMIT_SUGGESTION: &str =
     "raise the matching limit in the open options if the input is trusted";
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt", feature = "xlsb"))]
 const PASSWORD_SUGGESTION: &str = "unlock the document with its password";
-#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+#[cfg(feature = "encryption")]
+const LOCKED_SUGGESTION: &str = "unlock it with `Locked::unlock` and its password";
+#[cfg(not(feature = "encryption"))]
+const LOCKED_SUGGESTION: &str =
+    "build `litchi-ops` with the `encryption` feature, then unlock it with `Locked::unlock`";
+#[cfg(any(
+    feature = "doc",
+    feature = "xls",
+    feature = "ppt",
+    feature = "encryption"
+))]
 const WRONG_PASSWORD_SUGGESTION: &str = "check the password and try again";
 const SIGNED_SUGGESTION: &str =
     "remove the signature explicitly before editing, or re-sign the edited document";
@@ -658,7 +778,12 @@ impl Classify for litchi_opc::OpcError {
     }
 }
 
-#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "xls",
+    feature = "ppt",
+    feature = "encryption"
+))]
 impl Classify for litchi_cfb::OleError {
     fn classify(&self) -> Class {
         match self {
@@ -913,6 +1038,21 @@ impl Classify for litchi_rtf::Error {
     }
 }
 
+#[cfg(feature = "encryption")]
+impl Classify for litchi_crypto::ooxml::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Io(error) => error.classify(),
+            Self::Password => Class::suggest(Code::InvalidArgument, WRONG_PASSWORD_SUGGESTION),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit(_) | Self::PasswordRequired => Class::of(Code::InvalidArgument),
+            Self::Unsupported(_) => Class::of(Code::UnsupportedCapability),
+            Self::Allocation(_) | Self::Random(_) => Class::of(Code::InternalError),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
 /// Implements `From<leaf>` for [`Error`]: classify, keep the leaf's message,
 /// record the leaf's format, and keep the leaf as the typed source.
 macro_rules! from_leaf {
@@ -944,7 +1084,7 @@ from_leaf!(
     litchi_opc::OpcError => Opc, None
 );
 from_leaf!(
-    #[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+    #[cfg(any(feature = "doc", feature = "xls", feature = "ppt", feature = "encryption"))]
     litchi_cfb::OleError => Cfb, None
 );
 from_leaf!(#[cfg(feature = "docx")] litchi_docx::Error => Docx, Some(FileFormat::Docx));
@@ -967,6 +1107,10 @@ from_leaf!(
 );
 from_leaf!(#[cfg(feature = "ppt")] litchi_ppt::Error => Ppt, Some(FileFormat::Ppt));
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
+from_leaf!(
+    #[cfg(feature = "encryption")]
+    litchi_crypto::ooxml::Error => Crypto, None
+);
 
 #[cfg(test)]
 mod tests;

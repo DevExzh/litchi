@@ -36,10 +36,6 @@ impl Rtf {
     /// Every facade route (path, bytes, reader) reaches RTF through these
     /// detected bytes, so this is the only constructor. RTF has no open
     /// sub-options; the input ceiling was applied by detection.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     pub(crate) fn from_bytes(bytes: Vec<u8>, _options: &OpenOptions) -> Result<Self> {
         let document = RtfDocument::from_owned_bytes(bytes)?;
         Ok(Self(Arc::new(RtfState { document })))
@@ -85,7 +81,6 @@ impl Rtf {
     }
 
     /// The retained leaf owner, for the crate's family views.
-    #[allow(dead_code, reason = "consumed by the `File` family views (M0a S6)")]
     pub(crate) fn document(&self) -> &RtfDocument<'static> {
         &self.0.document
     }

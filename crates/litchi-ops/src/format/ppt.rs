@@ -24,6 +24,7 @@ use litchi_ole_common::property_set::PropertySetReader;
 use litchi_ppt::text_edit::{self, SourceSnapshot};
 use litchi_ppt::{RecordLimits, SourceBackedPackage};
 
+use super::LegacyOpen;
 use crate::{OpenOptions, Result};
 
 /// An opened legacy PowerPoint (`.ppt`) presentation.
@@ -72,10 +73,6 @@ impl Ppt {
     ///
     /// The metadata is projected through the package's shared CFB view, the
     /// reader is built, and the package is kept as the source state.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "S6 wires the handle into `File`")
-    )]
     pub(crate) fn from_source_package(
         package: SourceBackedPackage,
         options: &OpenOptions,
@@ -109,18 +106,21 @@ impl Ppt {
     /// (the facade's `DetectedFormat::Ppt` arm).
     ///
     /// The PPT package adopts the parse, the metadata streams are projected,
-    /// and the reader is built. Then the parse moves into the retained
-    /// source; no byte is copied and the container is not indexed again.
-    /// This keeps the input alive for as long as the handle (risk R5);
+    /// and the reader is built (with `password` when [`Locked::unlock`]
+    /// supplies one). Then the parse moves into the retained source; no byte
+    /// is copied and the container is not indexed again. This keeps the
+    /// input alive for as long as the handle (risk R5);
     /// [`OpenOptions::retain_source`]`(false)` releases it instead.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "S6 wires the handle into `File`")
-    )]
+    ///
+    /// An encrypted presentation opened without a password comes back as
+    /// [`LegacyOpen::PasswordRequired`] with the container unchanged.
+    ///
+    /// [`Locked::unlock`]: crate::Locked
     pub(crate) fn from_ole_file(
         ole: OleFile<Cursor<Vec<u8>>>,
         options: &OpenOptions,
-    ) -> Result<Self> {
+        password: Option<&str>,
+    ) -> Result<LegacyOpen<Self>> {
         let mut package = match options.ppt_limits {
             None => litchi_ppt::Package::from_ole_file(ole)?,
             Some(limits) => litchi_ppt::Package::from_ole_file_with_limits(ole, limits)?,
@@ -131,7 +131,21 @@ impl Ppt {
             .ok()
             .map(Metadata::from)
             .filter(Metadata::has_data);
-        let presentation = package.presentation()?;
+        let opened = match password {
+            None => package.presentation(),
+            Some(password) => package.presentation_with_options(
+                litchi_ppt::OpenOptions::default().with_password(password),
+            ),
+        };
+        let presentation = match opened {
+            Ok(presentation) => presentation,
+            Err(litchi_ppt::Error::PasswordRequired) => {
+                return Ok(LegacyOpen::PasswordRequired(Box::new(
+                    package.into_ole_file(),
+                )));
+            },
+            Err(error) => return Err(error.into()),
+        };
         let record_limits = package.record_limits();
         let owner = if options.retain_source {
             let shared = SharedOleFile::from_owned_ole_file(
@@ -143,12 +157,12 @@ impl Ppt {
         } else {
             PptOwner::Released
         };
-        Ok(Self(Arc::new(PptState {
+        Ok(LegacyOpen::Opened(Self(Arc::new(PptState {
             presentation,
             metadata,
             record_limits,
             owner,
-        })))
+        }))))
     }
 
     /// All text of the presentation, as the facade's `Presentation::text`
@@ -192,7 +206,6 @@ impl Ppt {
     }
 
     /// The reader the family views read slides from.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by the family views (S6)"))]
     pub(crate) fn reader(&self) -> &litchi_ppt::Presentation {
         &self.0.presentation
     }
@@ -232,6 +245,20 @@ impl Ppt {
     }
 }
 
+impl std::fmt::Debug for Ppt {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let owner = match &self.0.owner {
+            PptOwner::Source(_) => "source",
+            PptOwner::Eager(_) => "eager",
+            PptOwner::Released => "released",
+        };
+        formatter
+            .debug_struct("Ppt")
+            .field("owner", &owner)
+            .finish_non_exhaustive()
+    }
+}
+
 /// A process-unique identity for a sealed in-memory source, minted by the
 /// same counter as every other [`OwnedSource`].
 fn sealed_version() -> Result<SourceVersion> {
@@ -263,9 +290,14 @@ mod tests {
     }
 
     /// The facade's byte route: detect, then hand the parse to the handle.
+    /// A password-protected presentation reports the leaf's refusal, as the
+    /// facade did; the unified opener turns it into `File::Locked`.
     fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Ppt> {
         match detect_format_smart(bytes) {
-            Some(DetectedFormat::Ppt(ole)) => Ppt::from_ole_file(ole, options),
+            Some(DetectedFormat::Ppt(ole)) => match Ppt::from_ole_file(ole, options, None)? {
+                LegacyOpen::Opened(ppt) => Ok(ppt),
+                LegacyOpen::PasswordRequired(_) => Err(litchi_ppt::Error::PasswordRequired.into()),
+            },
             other => panic!("detected {other:?}, not PPT"),
         }
     }

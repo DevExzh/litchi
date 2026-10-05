@@ -10,7 +10,9 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionError, FileFormat, Resource, ResourceLimit, SourceVersion};
 
-use super::{Code, Error, LIMIT_SUGGESTION, PASSWORD_SUGGESTION, SIGNED_SUGGESTION, Source};
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt", feature = "xlsb"))]
+use super::PASSWORD_SUGGESTION;
+use super::{Code, Error, LIMIT_SUGGESTION, SIGNED_SUGGESTION, Source};
 
 fn allocation_failure() -> TryReserveError {
     Vec::<u8>::new()
@@ -120,7 +122,56 @@ fn source_returns_the_typed_leaf_error() {
     };
     assert_eq!((limit.observed, limit.limit), (11, 10));
     assert_eq!(error.message(), leaf.to_string());
-    assert!(matches!(error.into_leaf(), Source::Core(_)));
+    assert!(matches!(error.leaf(), Source::Core(_)));
+}
+
+// S2 follow-up: `Display` is facade-level, so an error-chain printer that
+// walks `source()` shows the leaf's text once, as the cause.
+#[test]
+fn display_does_not_repeat_the_leaf_text() {
+    let error = Error::from(litchi_core::Error::ResourceLimit(resource_limit()));
+    let leaf = std::error::Error::source(&error)
+        .expect("leaf source")
+        .to_string();
+    let rendered = error.to_string();
+    assert_eq!(
+        rendered,
+        "limit_exceeded: a resource limit was exceeded (suggestion: raise the matching limit in the open options if the input is trusted)"
+    );
+    assert!(!rendered.contains(&leaf), "{rendered:?} repeats {leaf:?}");
+    assert_eq!(error.message(), leaf);
+
+    #[cfg(feature = "docx")]
+    {
+        let error = Error::from(litchi_docx::Error::InvalidFormat("bad body".into()));
+        assert_eq!(
+            error.to_string(),
+            "corrupt_file: the file is malformed [Docx]"
+        );
+        assert!(error.message().contains("bad body"));
+    }
+}
+
+#[test]
+fn every_code_has_a_summary() {
+    let summaries: HashSet<&str> = Code::ALL.iter().map(|code| code.summary()).collect();
+    assert_eq!(summaries.len(), Code::ALL.len(), "summaries are distinct");
+    for code in Code::ALL {
+        assert!(!code.summary().is_empty(), "{code}");
+    }
+}
+
+#[test]
+fn clones_share_the_leaf_error() {
+    let error = Error::from(io::Error::other("disk on fire"));
+    let clone = error.clone().with_suggestion("try another disk");
+    assert_eq!(clone.code(), Code::IoError);
+    assert_eq!(clone.suggestion(), Some("try another disk"));
+    assert_eq!(error.suggestion(), None, "the original is unchanged");
+    assert!(
+        std::ptr::eq(error.leaf(), clone.leaf()),
+        "the leaf is shared"
+    );
 }
 
 // Row: `io::ErrorKind::NotFound` -> `file_not_found`.
@@ -455,10 +506,13 @@ fn row_unsupported_operations_are_unsupported_capability() {
 // `document_protected` plus a suggestion.
 #[test]
 fn row_protection_is_document_protected_with_suggestion() {
-    let error = Error::locked(FileFormat::Docx);
+    let error = Error::locked(Some(FileFormat::Docx));
     assert_eq!(error.code(), Code::DocumentProtected);
-    assert_eq!(error.suggestion(), Some(PASSWORD_SUGGESTION));
+    assert_eq!(error.suggestion(), Some(super::LOCKED_SUGGESTION));
     assert_eq!(error.format(), Some(FileFormat::Docx));
+    let error = Error::locked(None);
+    assert_eq!(error.code(), Code::DocumentProtected);
+    assert_eq!(error.format(), None);
     let error = Error::signed(FileFormat::Xlsx);
     assert_eq!(error.code(), Code::DocumentProtected);
     assert_eq!(error.suggestion(), Some(SIGNED_SUGGESTION));

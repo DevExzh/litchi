@@ -1,9 +1,6 @@
 //! Tab-separated text projection of worksheet rows, moved verbatim from the
-//! facade's `sheet::workbook::append_cell_text`.
-//!
-//! The workbook handles include this file as a private submodule each
-//! (`#[path]`), because `format/mod.rs` is shared by the parallel S5 steps.
-//! S6 can promote it to one `format` module.
+//! facade's `sheet::workbook::append_cell_text`, shared by the XLSX and XLSB
+//! handles.
 
 use litchi_core::sheet::CellValue;
 

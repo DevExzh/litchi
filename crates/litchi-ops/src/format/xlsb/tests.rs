@@ -10,7 +10,7 @@ use std::sync::{Arc, Barrier};
 
 use litchi_core::sheet::{CellValue, WorkbookTrait};
 use litchi_core::{Metadata, ReadAt, SourceVersion};
-use litchi_opc::{OpcPackage, PackURI, PreparedOoxmlSource, SourceBackedPackage};
+use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
 use litchi_xlsb as xlsb;
 
 use super::{SourceWorkbook, Xlsb, XlsbEditor, XlsbOwner};
@@ -30,18 +30,13 @@ fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(fixture_path(name)).expect("read fixture")
 }
 
-/// The path route: the filesystem workbook detector, then the handle.
+/// The path route, through the unified opener.
 #[cfg(any(unix, windows))]
 fn open_path(path: &std::path::Path, options: &OpenOptions) -> Xlsb {
-    let crate::detect::detected::WorkbookSourcePathDetection::Xlsb {
-        workbook,
-        metadata,
-        metadata_repairs,
-    } = crate::detect::detected::detect_workbook_source_path(path).expect("detect path")
-    else {
-        panic!("path detection did not find an XLSB owner");
-    };
-    Xlsb::from_source_workbook(workbook, metadata, metadata_repairs, options).expect("path open")
+    match crate::open_with(path, options).expect("path open") {
+        crate::File::Xlsb(xlsb) => xlsb,
+        other => panic!("{} opened as {other:?}", path.display()),
+    }
 }
 
 /// The byte route: the source-backed workbook byte probe, then the handle.
@@ -64,13 +59,14 @@ fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Xlsb {
     Xlsb::from_opc_package(package, options).expect("eager open")
 }
 
-/// The prepared route: `detect_and_prepare`, then the handle.
+/// The prepared route: `detect_and_prepare`, then the unified opener.
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &std::path::Path, options: &OpenOptions) -> Xlsb {
-    let prepared = crate::detect::detect_and_prepare(path)
-        .and_then(crate::detect::PreparedDetection::into_prepared)
-        .expect("prepared OOXML source");
-    Xlsb::from_prepared(prepared, options).expect("prepared open")
+    let detection = crate::detect::detect_and_prepare(path).expect("prepared OOXML source");
+    match crate::open_prepared_with(detection, options).expect("prepared open") {
+        crate::File::Xlsb(xlsb) => xlsb,
+        other => panic!("{} opened as {other:?}", path.display()),
+    }
 }
 
 fn fnv(text: &str) -> u64 {
@@ -136,7 +132,10 @@ fn assert_facade_parity(handle: &Xlsb, expected: &Expected) {
     assert_eq!(fnv(&text), hash, "{name}: text digest");
     assert_eq!(handle.worksheet_names().unwrap(), names, "{name}: names");
     assert_eq!(handle.worksheet_count().unwrap(), names.len());
-    let metadata = handle.metadata().unwrap();
+    let metadata = handle
+        .metadata()
+        .unwrap()
+        .expect("XLSB metadata is always reported");
     assert_eq!(metadata.title.as_deref(), title, "{name}: title");
     assert_eq!(metadata.author.as_deref(), Some(author), "{name}: author");
     assert!(handle.tolerance_report().unwrap().is_clean(), "{name}");
@@ -183,22 +182,8 @@ fn metadata_matches_the_leaf_core_properties_read() {
     let handle = open_bytes(bytes, &OpenOptions::new());
     assert_eq!(
         format!("{:?}", handle.metadata().unwrap()),
-        format!("{leaf:?}")
+        format!("{:?}", Some(leaf))
     );
-}
-
-#[test]
-fn prepared_route_refuses_another_ooxml_family() {
-    let package = SourceBackedPackage::from_vec(fixture("xlsx/InlineStrings.xlsx")).unwrap();
-    let content_type = package
-        .main_document_part()
-        .unwrap()
-        .content_type()
-        .to_owned();
-    let prepared = PreparedOoxmlSource::new(package, &content_type).unwrap();
-    let error = Xlsb::from_prepared(prepared, &OpenOptions::new()).unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedFormat);
-    assert_eq!(error.detected(), Some(litchi_core::FileFormat::Xlsx));
 }
 
 #[test]

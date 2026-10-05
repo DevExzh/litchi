@@ -22,6 +22,7 @@ use litchi_core::{Metadata, OwnedSource, ReadAt, SourceVersion};
 use litchi_doc::body_text::source::{self as body_source, SourceSnapshot};
 use litchi_ole_common::property_set::PropertySetReader;
 
+use super::LegacyOpen;
 use crate::{OpenOptions, Result};
 
 /// An opened legacy Word (`.doc`) document.
@@ -66,26 +67,44 @@ impl Doc {
     ///
     /// This is the facade's `DetectedFormat::Doc` arm: the DOC package adopts
     /// the parse, the reader is built (with the caller's [`DocOptions`] when
-    /// they are set), and the metadata streams are projected, with an
-    /// unreadable projection reported as empty metadata. Then the parse
-    /// moves into the retained source; no byte is copied and the container
-    /// is not indexed again.
+    /// they are set, and with `password` when [`Locked::unlock`] supplies
+    /// one), and the metadata streams are projected, with an unreadable
+    /// projection reported as empty metadata. Then the parse moves into the
+    /// retained source; no byte is copied and the container is not indexed
+    /// again.
+    ///
+    /// An encrypted document opened without a password comes back as
+    /// [`LegacyOpen::PasswordRequired`] with the container unchanged.
     ///
     /// [`DocOptions`]: crate::DocOptions
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "S6 wires the handle into `File`")
-    )]
+    /// [`Locked::unlock`]: crate::Locked
     pub(crate) fn from_ole_file(
         ole: OleFile<Cursor<Vec<u8>>>,
         options: &OpenOptions,
-    ) -> Result<Self> {
+        password: Option<&str>,
+    ) -> Result<LegacyOpen<Self>> {
         let mut package = litchi_doc::Package::from_ole_file(ole)?;
-        let reader = match options.doc {
-            None => package.document()?,
-            Some(doc) => package.document_with_options(
-                litchi_doc::OpenOptions::default().with_leniency(doc.leniency),
-            )?,
+        let opened = if options.doc.is_none() && password.is_none() {
+            package.document()
+        } else {
+            let mut leaf_options = litchi_doc::OpenOptions::default();
+            if let Some(doc) = options.doc {
+                leaf_options = leaf_options.with_leniency(doc.leniency);
+            }
+            if let Some(password) = password {
+                leaf_options =
+                    leaf_options.with_password(litchi_doc::Password::new(password.to_owned()));
+            }
+            package.document_with_options(leaf_options)
+        };
+        let reader = match opened {
+            Ok(reader) => reader,
+            Err(litchi_doc::Error::PasswordRequired) => {
+                return Ok(LegacyOpen::PasswordRequired(Box::new(
+                    package.into_ole_file(),
+                )));
+            },
+            Err(error) => return Err(error.into()),
         };
         let metadata = package
             .ole_file()
@@ -97,11 +116,11 @@ impl Doc {
         } else {
             DocSource::Released
         };
-        Ok(Self(Arc::new(DocState {
+        Ok(LegacyOpen::Opened(Self(Arc::new(DocState {
             reader,
             metadata,
             source,
-        })))
+        }))))
     }
 
     /// All text of the document, as the facade's `Document::text` returns it.
@@ -113,13 +132,15 @@ impl Doc {
         Ok(self.0.reader.text()?)
     }
 
-    /// The document's OLE property-set metadata, read at open.
+    /// The document's OLE property-set metadata, read at open. Always
+    /// `Some`; absent or unreadable property streams read as empty metadata,
+    /// as the facade reports them.
     ///
     /// # Errors
     ///
     /// Never fails today; the `Result` matches the unified read surface.
-    pub fn metadata(&self) -> Result<Metadata> {
-        Ok(self.0.metadata.clone())
+    pub fn metadata(&self) -> Result<Option<Metadata>> {
+        Ok(Some(self.0.metadata.clone()))
     }
 
     /// Everything the reader repaired while the document was opened.
@@ -133,7 +154,6 @@ impl Doc {
 
     /// The reader the family views read paragraphs, tables and elements
     /// from.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by the family views (S6)"))]
     pub(crate) fn reader(&self) -> &litchi_doc::Document {
         &self.0.reader
     }
@@ -163,6 +183,18 @@ impl Doc {
             DocSource::Retained(shared) => Some(shared.file_size()),
             DocSource::Released => None,
         }
+    }
+}
+
+impl std::fmt::Debug for Doc {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Doc")
+            .field(
+                "source_retained",
+                &matches!(self.0.source, DocSource::Retained(_)),
+            )
+            .finish_non_exhaustive()
     }
 }
 
@@ -204,9 +236,14 @@ mod tests {
     }
 
     /// The facade's byte route: detect, then hand the parse to the handle.
+    /// A password-protected document reports the leaf's refusal, as the
+    /// facade did; the unified opener turns it into `File::Locked`.
     fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Doc> {
         match detect_format_smart(bytes) {
-            Some(DetectedFormat::Doc(ole)) => Doc::from_ole_file(ole, options),
+            Some(DetectedFormat::Doc(ole)) => match Doc::from_ole_file(ole, options, None)? {
+                LegacyOpen::Opened(doc) => Ok(doc),
+                LegacyOpen::PasswordRequired(_) => Err(litchi_doc::Error::PasswordRequired.into()),
+            },
             other => panic!("detected {other:?}, not DOC"),
         }
     }
@@ -284,7 +321,7 @@ mod tests {
                 assert_same(doc.text(), document.text(), &name);
                 assert_eq!(
                     format!("{:?}", doc.metadata().unwrap()),
-                    format!("{metadata:?}"),
+                    format!("{:?}", Some(&metadata)),
                     "{name}"
                 );
                 assert_eq!(
@@ -305,7 +342,10 @@ mod tests {
     #[test]
     fn known_metadata_survives_the_handle() {
         let doc = open_path("documentProperties.doc", &OpenOptions::default()).unwrap();
-        let metadata = doc.metadata().unwrap();
+        let metadata = doc
+            .metadata()
+            .unwrap()
+            .expect("DOC metadata is always reported");
         assert!(metadata.has_data());
     }
 

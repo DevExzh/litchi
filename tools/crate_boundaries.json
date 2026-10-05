@@ -242,6 +242,7 @@
     "litchi-ops": [
       "litchi-cfb",
       "litchi-core",
+      "litchi-crypto",
       "litchi-doc",
       "litchi-docx",
       "litchi-odf-common",

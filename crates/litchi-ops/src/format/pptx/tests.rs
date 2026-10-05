@@ -29,7 +29,6 @@ fn options() -> OpenOptions {
 fn open_path(path: &Path, options: &OpenOptions) -> Pptx {
     use crate::detect::detected::{PptxSourcePathDetection, detect_pptx_source_path_with_limits};
     match detect_pptx_source_path_with_limits(path, opc::ReadLimits::default())
-        .map_err(Pptx::path_detection_error)
         .expect("path detection")
         .expect("a PPTX is recognized")
     {
@@ -58,11 +57,11 @@ fn open_source_package(bytes: Vec<u8>) -> Pptx {
 
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &Path) -> Pptx {
-    let prepared = crate::detect::detect_and_prepare(path)
-        .expect("detected")
-        .into_prepared()
-        .expect("an OOXML input is prepared");
-    Pptx::from_prepared(prepared, &options()).expect("prepared route")
+    let detection = crate::detect::detect_and_prepare(path).expect("detected");
+    match crate::open_prepared_with(detection, &options()).expect("prepared route") {
+        crate::File::Pptx(pptx) => pptx,
+        other => panic!("{} opened as {other:?}", path.display()),
+    }
 }
 
 fn open_eager(bytes: Vec<u8>) -> Pptx {
@@ -273,21 +272,6 @@ fn source_metadata_is_lazy_and_cached() {
     assert!(loaded > opened, "the first call reads the core properties");
     assert!(handle.metadata().unwrap().is_some());
     assert_eq!(presentation.cache_diagnostics().cold_loads, loaded);
-}
-
-#[cfg(feature = "docx")]
-#[cfg(any(unix, windows))]
-#[test]
-fn prepared_route_refuses_another_ooxml_family() {
-    let path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ooxml/docx/Headers.docx");
-    let prepared = crate::detect::detect_and_prepare(&path)
-        .expect("detected")
-        .into_prepared()
-        .expect("prepared");
-    let error = Pptx::from_prepared(prepared, &options()).expect_err("a DOCX is not a PPTX");
-    assert_eq!(error.code(), Code::UnsupportedFormat);
-    assert_eq!(error.detected(), Some(FileFormat::Docx));
 }
 
 #[test]

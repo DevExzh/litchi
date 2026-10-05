@@ -51,35 +51,18 @@ fn core_error(error: litchi_core::Error) -> Error {
 }
 
 impl Odp {
-    /// Adopts the package detection prepared (`detect_prepared_odp*`) without
-    /// a second ZIP index. This is the facade's first byte-route arm.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
+    /// Adopts the package detection prepared without a second ZIP index.
+    /// Every in-memory route uses this, including the one the facade served
+    /// by turning a prepared package back into bytes and parsing them again
+    /// (`DetectedFormat::Odp`).
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
         let presentation =
             litchi_odp::Presentation::from_prepared_package(prepared).map_err(core_error)?;
         Ok(Self::from_owner(OdpOwner::Eager(presentation)))
     }
 
-    /// Parses the bytes smart detection retained (`DetectedFormat::Odp`).
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
-    pub(crate) fn from_bytes(bytes: Vec<u8>, _options: &OpenOptions) -> Result<Self> {
-        let presentation = litchi_odp::Presentation::from_bytes(bytes).map_err(core_error)?;
-        Ok(Self::from_owner(OdpOwner::Eager(presentation)))
-    }
-
-    /// Adopts the source-backed owner a presentation path probe built
-    /// (`PptxSourcePathDetection::Odp` or `PresentationSourcePathDetection::Odp`).
+    /// Adopts the source-backed owner the path route built over the file.
     #[cfg(any(unix, windows))]
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     pub(crate) fn from_source(
         presentation: litchi_odp::SourceBackedPresentation,
         _options: &OpenOptions,
@@ -87,10 +70,6 @@ impl Odp {
         Ok(Self::from_owner(OdpOwner::Source(presentation)))
     }
 
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     fn from_owner(owner: OdpOwner) -> Self {
         Self(Arc::new(OdpState { owner }))
     }
@@ -155,7 +134,6 @@ impl Odp {
     }
 
     /// The retained leaf owner, for the crate's family views.
-    #[allow(dead_code, reason = "consumed by the `File` family views (M0a S6)")]
     pub(crate) fn owner(&self) -> &OdpOwner {
         &self.0.owner
     }

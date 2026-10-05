@@ -575,7 +575,7 @@ fn reclaim_docx_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
 }
 
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-fn hard_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
+pub(crate) fn hard_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
     matches!(
         error,
         crate::opc::OpcError::InvalidReadLimit { .. }
@@ -1223,7 +1223,7 @@ fn xls_source_recoverable_probe_error(error: &crate::xls::SourceBackedError) -> 
     dead_code,
     reason = "shared positional source helpers serve feature-gated facades"
 )]
-fn ensure_path_source_current(
+pub(crate) fn ensure_path_source_current(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,
 ) -> litchi_core::Result<()> {
@@ -1240,7 +1240,7 @@ fn ensure_path_source_current(
     dead_code,
     reason = "shared positional source helpers serve feature-gated facades"
 )]
-fn read_path_source_bytes(
+pub(crate) fn read_path_source_bytes(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,
     max_input_bytes: u64,
@@ -2541,6 +2541,18 @@ pub struct OdtSourcePathCandidate {
 
 #[cfg(all(feature = "odt", any(unix, windows)))]
 impl OdtSourcePathCandidate {
+    /// A candidate over a source the caller already classified as an ODT
+    /// package, pinned to the revision `source_version`.
+    pub(crate) fn new(
+        source: std::sync::Arc<dyn litchi_core::ReadAt>,
+        source_version: litchi_core::SourceVersion,
+    ) -> Self {
+        Self {
+            source,
+            source_version,
+        }
+    }
+
     pub fn ooxml_catalog_state(&self) -> litchi_core::Result<Option<bool>> {
         let state = match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(
             self.source.as_ref(),
@@ -2690,8 +2702,6 @@ fn odt_source_ooxml_probe_wins(
     expected: litchi_core::SourceVersion,
     limits: crate::opc::ReadLimits,
 ) -> std::result::Result<bool, crate::opc::OpcError> {
-    use litchi_core::ReadAt;
-
     #[cfg(any(test, feature = "test-support"))]
     super::record_opc_probe();
     let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(

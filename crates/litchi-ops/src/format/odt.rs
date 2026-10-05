@@ -53,10 +53,6 @@ impl Odt {
     /// Adopts the package detection prepared (`DetectedFormat::Odt`) without
     /// a second ZIP index. The ODF limits were applied when the package was
     /// prepared.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
         let document = litchi_odt::Document::from_prepared_package(prepared).map_err(core_error)?;
         Ok(Self::from_owner(OdtOwner::Eager(document)))
@@ -69,10 +65,6 @@ impl Odt {
     /// ODT-versus-OOXML polyglot arbitration stays with detection: the caller
     /// passes a candidate only once ODT owns the input.
     #[cfg(any(unix, windows))]
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     pub(crate) fn from_source_candidate(
         candidate: crate::detect::detected::OdtSourcePathCandidate,
         _options: &OpenOptions,
@@ -81,10 +73,6 @@ impl Odt {
         Ok(Self::from_owner(OdtOwner::Source(document)))
     }
 
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     fn from_owner(owner: OdtOwner) -> Self {
         Self(Arc::new(OdtState { owner }))
     }
@@ -146,7 +134,6 @@ impl Odt {
     }
 
     /// The retained leaf owner, for the crate's family views.
-    #[allow(dead_code, reason = "consumed by the `File` family views (M0a S6)")]
     pub(crate) fn owner(&self) -> &OdtOwner {
         &self.0.owner
     }

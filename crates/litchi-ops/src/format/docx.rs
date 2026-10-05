@@ -10,15 +10,17 @@
 //! The constructors take what detection already produced, so an open does
 //! one detection pass and one container index:
 //!
-//! | Facade route today | Detection result | Constructor |
+//! | Open route | Detection result | Constructor |
 //! |---|---|---|
-//! | `Document::open` on `unix`/`windows` | `DocxSourcePathDetection::Docx` | `Docx::from_source` |
-//! | `Document::from_bytes` | `DocxSourceBytesDetection::Docx` | `Docx::from_source` |
-//! | `Document::open` elsewhere, and `from_detected` | `DetectedFormat::Docx` | `Docx::from_opc_package` |
-//! | `Document::from_prepared` | `PreparedOoxmlSource` | `Docx::from_prepared` |
+//! | `open` (path) on `unix`/`windows`, `open_bytes`, `open_prepared` | source-backed OPC package | `Docx::from_source` |
+//! | [`SourceMode::Eager`], and paths elsewhere | eager `OpcPackage` | `Docx::from_opc_package` |
+//! | `Locked::unlock` | decrypted package | `Docx::from_owned_package` |
 //!
-//! The facade has no reader route for documents; a caller with a `Read`
-//! detects it into bytes first.
+//! `SourceMode::Eager` reaches this handle through the eager detection
+//! route, so the owning package keeps the input's ZIP layout. Only
+//! `open_prepared` under `SourceMode::Eager` still converts a source-backed
+//! package with `to_owned_package()` (record 0008 A5), because its package
+//! is already indexed.
 //!
 //! # Source freshness
 //!
@@ -32,9 +34,8 @@
 //!
 //! The facade also keeps a lazily materialized owning package for its
 //! Markdown adapter (`DocxSourceCache`). `litchi-ops` has no `markdown`
-//! feature, so that cache is not ported here; S6/S7 add it next to
-//! `impl ToMarkdown for File`, as a further `OnceLock` in `DocxState`,
-//! bound to the same freshness guard.
+//! feature, so that cache is not ported here; S7 adds it next to
+//! `impl ToMarkdown for File`, bound to the same freshness guard.
 
 use std::fmt;
 use std::sync::{Arc, OnceLock};
@@ -42,7 +43,7 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::{FileFormat, Metadata};
 use litchi_docx::section::{Inventory, Limits as SectionLimits};
 use litchi_docx::{ToleranceReport, source_backed};
-use litchi_opc::{OpcPackage, PreparedOoxmlSource};
+use litchi_opc::OpcPackage;
 
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
@@ -75,10 +76,6 @@ pub(crate) struct DocxState {
 #[allow(
     clippy::large_enum_variant,
     reason = "one owner per handle, inside its `Arc`; boxing the source owner would add an indirection to every read"
-)]
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "constructed by the `File` openers from S6")
 )]
 pub(crate) enum DocxOwner {
     /// Deferred part payloads over the retained positional source.
@@ -123,11 +120,9 @@ impl Docx {
     /// byte buffer. No part payload is read.
     ///
     /// Under [`SourceMode::Eager`] the package is materialized into the
-    /// owning form instead, with the eager route's validation pass.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the `File` openers from S6")
-    )]
+    /// owning form instead, with the eager route's validation pass. The
+    /// openers reach this only from `open_prepared`; their other eager
+    /// routes call [`Self::from_opc_package`].
     pub(crate) fn from_source(
         package: source_backed::Package,
         options: &OpenOptions,
@@ -144,40 +139,17 @@ impl Docx {
     ///
     /// As on the facade's eager route, the main story is validated by one
     /// text pass now, and that pass's repairs become the tolerance report.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the `File` openers from S6")
-    )]
     pub(crate) fn from_opc_package(package: OpcPackage, options: &OpenOptions) -> Result<Self> {
         Self::from_owned_package(litchi_docx::Package::from_opc_package(package)?, options)
     }
 
-    /// Adopt a package prepared by `detect_and_prepare` without indexing the
-    /// container again.
-    ///
-    /// Returns [`Code::UnsupportedFormat`] naming the detected format when
-    /// the prepared package is another OOXML family, and [`Code::IoError`]
-    /// when the file changed after it was prepared.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the `File` openers from S6")
-    )]
-    pub(crate) fn from_prepared(
-        prepared: PreparedOoxmlSource,
+    /// Adopt an owning package, validating its main story with one text pass
+    /// as the eager route does. [`crate::Locked::unlock`] uses this for a
+    /// package the leaf decrypted, which keeps its encryption profile.
+    pub(crate) fn from_owned_package(
+        package: litchi_docx::Package,
         options: &OpenOptions,
     ) -> Result<Self> {
-        let detected =
-            crate::detect::ooxml::format_for_main_content_type(prepared.main_part_content_type())
-                .ok_or(litchi_core::Error::NotOfficeFile)?;
-        if detected != FileFormat::Docx {
-            return Err(litchi_core::Error::UnexpectedFormat { detected }.into());
-        }
-        let package = prepared.into_package()?;
-        let package = source_backed::Package::from_source_backed_package(package)?;
-        Self::from_source(package, options)
-    }
-
-    fn from_owned_package(package: litchi_docx::Package, options: &OpenOptions) -> Result<Self> {
         let package = Box::new(package);
         // `document()` pins the main payload but defers XML traversal; the
         // eager route keeps its historical validation boundary with one
@@ -209,10 +181,6 @@ impl Docx {
 
     /// The owner, for the family views and write handlers built on this
     /// handle. Reads through it must end with [`DocxOwner::finish`].
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by the family views from S6")
-    )]
     pub(crate) fn owner(&self) -> &DocxOwner {
         &self.0.owner
     }
@@ -251,7 +219,9 @@ impl Docx {
         }
     }
 
-    /// The document's core properties; empty when the package has none.
+    /// The document's core properties. Always `Some` when it succeeds;
+    /// a package without core properties reads as empty metadata, as the
+    /// facade reports it.
     ///
     /// # Errors
     ///
@@ -261,13 +231,17 @@ impl Docx {
     ///
     /// ```no_run
     /// # fn demo(docx: &litchi_ops::format::docx::Docx) -> litchi_ops::Result<()> {
-    /// if let Some(title) = docx.metadata()?.title {
+    /// if let Some(title) = docx.metadata()?.and_then(|metadata| metadata.title) {
     ///     println!("{title}");
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub fn metadata(&self) -> Result<Metadata> {
+    pub fn metadata(&self) -> Result<Option<Metadata>> {
+        self.read_metadata().map(Some)
+    }
+
+    fn read_metadata(&self) -> Result<Metadata> {
         if let Some(metadata) = self.0.metadata.get() {
             return self.0.owner.finish(Ok(metadata.clone()));
         }
@@ -314,7 +288,7 @@ impl Docx {
                 // Core-properties repairs join the source report when the
                 // metadata is first read; read it so they are part of this
                 // report whether or not the caller asked for it.
-                let result = self.metadata().map(|_| package.tolerance_report());
+                let result = self.read_metadata().map(|_| package.tolerance_report());
                 self.0.owner.finish(result)
             },
         }

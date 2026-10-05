@@ -22,13 +22,16 @@ fn open_prepared(bytes: Vec<u8>) -> Odp {
     Odp::from_prepared(prepared, &OpenOptions::default()).expect("open prepared ODP")
 }
 
-/// The facade's `from_detected` arm: smart detection retains the bytes.
+/// The facade's `from_detected` arm, which re-parsed the bytes detection
+/// retained: the unified byte route adopts the prepared package instead.
 fn open_detected(bytes: Vec<u8>) -> Odp {
-    match detect_format_smart(bytes) {
-        Some(DetectedFormat::Odp(bytes)) => {
-            Odp::from_bytes(bytes, &OpenOptions::default()).expect("open detected ODP")
-        },
-        other => panic!("expected ODP detection, got {other:?}"),
+    assert!(matches!(
+        detect_format_smart(bytes.clone()),
+        Some(DetectedFormat::Odp(_))
+    ));
+    match crate::open_bytes(bytes).expect("open detected ODP") {
+        crate::File::Odp(handle) => handle,
+        other => panic!("expected ODP, got {other:?}"),
     }
 }
 
@@ -168,16 +171,38 @@ fn source_route_reports_a_changed_source_as_io_error() {
 
 #[test]
 fn malformed_package_is_a_typed_core_error() {
-    let bytes = b"PK\x03\x04 not a zip".to_vec();
+    let bytes = broken_package(litchi_odf_common::constants::ODF_PRESENTATION);
     let Err(leaf_error) = litchi_odp::Presentation::from_bytes(bytes.clone()) else {
-        panic!("broken package must not open in the leaf");
+        panic!("a broken package must not open in the leaf");
     };
-    let error =
-        Odp::from_bytes(bytes, &OpenOptions::default()).expect_err("broken package must not open");
+    let error = crate::open_bytes(bytes).expect_err("a broken package must not open");
     assert!(
         matches!(error.leaf(), crate::error::Source::Core(_)),
         "{error:?}"
     );
     assert_eq!(error.format(), Some(FileFormat::Odp));
     assert_eq!(error.message(), leaf_error.to_string());
+}
+
+/// A package with a valid `mimetype` and manifest and an unparsable body.
+fn broken_package(mimetype: &str) -> Vec<u8> {
+    use std::io::Write as _;
+
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    writer.start_file("mimetype", options).unwrap();
+    writer.write_all(mimetype.as_bytes()).unwrap();
+    writer.start_file("META-INF/manifest.xml", options).unwrap();
+    writer
+        .write_all(
+            format!(
+                r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="{mimetype}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    writer.start_file("content.xml", options).unwrap();
+    writer.write_all(b"<office:document-content>").unwrap();
+    writer.finish().unwrap().into_inner()
 }

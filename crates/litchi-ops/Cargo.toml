@@ -22,6 +22,10 @@ default = []
 # The iWork features carry no dependency: `litchi-ops` must stay iWork-free
 # (`tools/non_iwork_gate.py`), so they only shape `detect::DetectedFormat` and
 # the facade-supplied lowest-precedence ZIP tail.
+# `encryption` (step S6) adds `Locked::unlock`: OOXML package decryption
+# through `litchi-crypto`, the OOXML leaves' decrypted-package constructors,
+# and legacy PowerPoint decryption. It also lets an OOXML-only build parse the
+# compound file an encrypted OOXML package arrives in.
 doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common"]
 docx    = ["dep:litchi-docx", "opc"]
 ppt     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt"]
@@ -37,6 +41,16 @@ pages   = []
 keynote = []
 numbers = []
 
+encryption = [
+    "dep:litchi-cfb",
+    "dep:litchi-crypto",
+    "litchi-docx?/encryption",
+    "litchi-ooxml-common?/encryption",
+    "litchi-ppt?/encryption",
+    "litchi-pptx?/encryption",
+    "litchi-xlsx?/encryption",
+]
+
 # Mirrors the facade's `opc` capability, which detection consults on its own
 # (an XLS-only build with OPC enabled bounds its workbook path probe).
 opc = ["dep:litchi-opc"]
@@ -50,6 +64,7 @@ test-support = []
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps
 litchi-cfb          = { workspace = true, optional = true }
 litchi-core         = { workspace = true }
+litchi-crypto       = { workspace = true, optional = true, features = ["ooxml"] }
 litchi-doc          = { workspace = true, optional = true }
 litchi-docx         = { workspace = true, optional = true }
 litchi-odf-common   = { workspace = true, optional = true }

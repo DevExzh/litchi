@@ -7,7 +7,7 @@ use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
 use litchi_core::sheet::{CellValue, WorkbookTrait};
-use litchi_opc::{PreparedOoxmlSource, SourceBackedPackage};
+use litchi_opc::SourceBackedPackage;
 use litchi_xlsx::{Cell, Value};
 
 use super::{SelectedCellView, Xlsx, XlsxEditor, XlsxOwner};
@@ -26,18 +26,13 @@ fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(fixture_path(name)).expect("read fixture")
 }
 
-/// The path route: the filesystem workbook detector, then the handle.
+/// The path route, through the unified opener.
 #[cfg(any(unix, windows))]
 fn open_path(path: &std::path::Path, options: &OpenOptions) -> Xlsx {
-    let crate::detect::detected::WorkbookSourcePathDetection::Xlsx {
-        workbook,
-        metadata,
-        metadata_repairs,
-    } = crate::detect::detected::detect_workbook_source_path(path).expect("detect path")
-    else {
-        panic!("path detection did not find an XLSX owner");
-    };
-    Xlsx::from_source_workbook(workbook, metadata, metadata_repairs, options).expect("path open")
+    match crate::open_with(path, options).expect("path open") {
+        crate::File::Xlsx(xlsx) => xlsx,
+        other => panic!("{} opened as {other:?}", path.display()),
+    }
 }
 
 /// The byte route: the source-backed workbook byte probe, then the handle.
@@ -60,17 +55,18 @@ fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Xlsx {
     Xlsx::from_opc_package(package, options).expect("eager open")
 }
 
-/// The prepared route: `detect_and_prepare`, then the handle.
+/// The prepared route: `detect_and_prepare`, then the unified opener.
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &std::path::Path, options: &OpenOptions) -> Xlsx {
-    let prepared = crate::detect::detect_and_prepare(path)
-        .and_then(crate::detect::PreparedDetection::into_prepared)
-        .expect("prepared OOXML source");
-    Xlsx::from_prepared(prepared, options).expect("prepared open")
+    let detection = crate::detect::detect_and_prepare(path).expect("prepared OOXML source");
+    match crate::open_prepared_with(detection, options).expect("prepared open") {
+        crate::File::Xlsx(xlsx) => xlsx,
+        other => panic!("{} opened as {other:?}", path.display()),
+    }
 }
 
 fn is_source(handle: &Xlsx) -> bool {
-    matches!(handle.owner(), XlsxOwner::Source(_))
+    matches!(handle.0.owner, XlsxOwner::Source(_))
 }
 
 fn fnv(text: &str) -> u64 {
@@ -117,7 +113,10 @@ fn assert_facade_parity(handle: &Xlsx, expected: &(&str, usize, u64, &[&str], &s
     assert_eq!(fnv(&text), hash, "{name}: text digest");
     assert_eq!(handle.worksheet_names().unwrap(), names, "{name}: names");
     assert_eq!(handle.worksheet_count().unwrap(), names.len());
-    let metadata = handle.metadata().unwrap();
+    let metadata = handle
+        .metadata()
+        .unwrap()
+        .expect("XLSX metadata is always reported");
     assert_eq!(metadata.author.as_deref(), Some(author), "{name}: author");
     assert_eq!(metadata.title, None);
     assert!(handle.tolerance_report().unwrap().is_clean(), "{name}");
@@ -164,28 +163,8 @@ fn metadata_matches_the_leaf_core_properties_read() {
     let handle = open_bytes(bytes, &OpenOptions::new());
     assert_eq!(
         format!("{:?}", handle.metadata().unwrap()),
-        format!("{leaf:?}")
+        format!("{:?}", Some(leaf))
     );
-}
-
-#[cfg(any(unix, windows))]
-#[test]
-fn prepared_route_refuses_another_ooxml_family() {
-    let bytes = std::fs::read(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx"
-    ))
-    .unwrap();
-    let package = SourceBackedPackage::from_vec(bytes).unwrap();
-    let content_type = package
-        .main_document_part()
-        .unwrap()
-        .content_type()
-        .to_owned();
-    let prepared = PreparedOoxmlSource::new(package, &content_type).unwrap();
-    let error = Xlsx::from_prepared(prepared, &OpenOptions::new()).unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedFormat);
-    assert_eq!(error.detected(), Some(litchi_core::FileFormat::Docx));
 }
 
 // --- Synthetic two-sheet fixture from the facade adapter's tests ---------
@@ -519,7 +498,7 @@ fn sole_owner_editor_reuses_the_package_indexed_at_open() {
         &fixture_path("xlsx/DateFormatTests.xlsx"),
         &OpenOptions::new(),
     );
-    let XlsxOwner::Source(workbook) = handle.owner() else {
+    let XlsxOwner::Source(workbook) = &handle.0.owner else {
         panic!("path route is source-backed");
     };
     let lineage = workbook.source_backed_package().source_lineage();

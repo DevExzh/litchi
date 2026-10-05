@@ -32,6 +32,7 @@ use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
 use litchi_ole_common::property_set::{PropertySetReader, SharedPropertySetReader};
 use litchi_xls::{SourceBackedError, SourceBackedWorkbook, cell_values};
 
+use super::LegacyOpen;
 use crate::{OpenOptions, Result};
 
 /// An opened legacy Excel (`.xls`) workbook.
@@ -60,10 +61,15 @@ struct XlsSource {
     cfb: Arc<SharedOleFile>,
     /// Metadata, read on first use and kept once it has been read.
     metadata: OnceLock<Metadata>,
+    /// The eager reader the generic sheet traits read through, materialized
+    /// from the retained source on their first use, never at open.
+    eager: OnceLock<std::result::Result<Box<EagerWorkbook>, crate::Error>>,
 }
 
+type EagerWorkbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
+
 struct EagerXls {
-    workbook: litchi_xls::Workbook<Cursor<Vec<u8>>>,
+    workbook: EagerWorkbook,
     /// Metadata, read at open as the facade reads it.
     metadata: Metadata,
 }
@@ -80,10 +86,6 @@ impl Xls {
     ///
     /// The owner already retains `cfb`, so [`OpenOptions::retain_source`]
     /// changes nothing on this route.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "S6 wires the handle into `File`")
-    )]
     pub(crate) fn from_source(
         workbook: SourceBackedWorkbook,
         cfb: Arc<SharedOleFile>,
@@ -94,31 +96,43 @@ impl Xls {
             workbook,
             cfb,
             metadata: OnceLock::new(),
+            eager: OnceLock::new(),
         })))
     }
 
     /// Opens the workbook from the OLE file byte detection already parsed
     /// (the facade's `DetectedFormat::Xls` arm): the metadata streams are
     /// projected, with an unreadable projection reported as empty metadata,
-    /// and the eager reader adopts the parse.
+    /// and the eager reader adopts the parse (with `password` when
+    /// [`Locked::unlock`] supplies one).
     ///
     /// The eager reader owns the input bytes for its lifetime, so
     /// [`OpenOptions::retain_source`] changes nothing on this route either.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "S6 wires the handle into `File`")
-    )]
+    /// An encrypted workbook opened without a password comes back as
+    /// [`LegacyOpen::PasswordRequired`] with the container unchanged.
+    ///
+    /// [`Locked::unlock`]: crate::Locked
     pub(crate) fn from_ole_file(
         mut ole: OleFile<Cursor<Vec<u8>>>,
         options: &OpenOptions,
-    ) -> Result<Self> {
+        password: Option<&str>,
+    ) -> Result<LegacyOpen<Self>> {
         let _ = options;
         let metadata = ole.get_metadata().map(Metadata::from).unwrap_or_default();
-        let workbook = litchi_xls::Workbook::from_ole_file(ole)?;
-        Ok(Self(Arc::new(XlsOwner::Eager(Box::new(EagerXls {
-            workbook,
-            metadata,
-        })))))
+        let leaf_options = litchi_xls::OpenOptions::new().with_password(password);
+        match litchi_xls::Workbook::from_ole_file_or_password_required(ole, leaf_options)? {
+            Ok(workbook) => Ok(LegacyOpen::Opened(Self(Arc::new(XlsOwner::Eager(
+                Box::new(EagerXls { workbook, metadata }),
+            ))))),
+            Err(ole) => Ok(LegacyOpen::PasswordRequired(Box::new(ole))),
+        }
+    }
+
+    /// Whether the owner is the positional source-backed workbook, for the
+    /// tests that pin each route's owner.
+    #[cfg(test)]
+    pub(crate) fn is_source_backed(&self) -> bool {
+        matches!(*self.0, XlsOwner::Source(_))
     }
 
     /// The names of the ordinary worksheets, in tab order.
@@ -167,15 +181,17 @@ impl Xls {
     /// first use, keeps it, and fences every call against a source change;
     /// absent or malformed metadata streams read as empty metadata.
     ///
+    /// Always `Some` when it succeeds.
+    ///
     /// # Errors
     ///
     /// On the filesystem route, returns a typed error when the source changed
     /// or a metadata stream cannot be read for a reason other than its
     /// content.
-    pub fn metadata(&self) -> Result<Metadata> {
+    pub fn metadata(&self) -> Result<Option<Metadata>> {
         match self.0.as_ref() {
-            XlsOwner::Source(source) => source.metadata(),
-            XlsOwner::Eager(eager) => Ok(eager.metadata.clone()),
+            XlsOwner::Source(source) => source.metadata().map(Some),
+            XlsOwner::Eager(eager) => Ok(Some(eager.metadata.clone())),
         }
     }
 
@@ -317,6 +333,107 @@ fn append_cell_text(out: &mut String, cell: &CellValue) {
     }
 }
 
+impl Xls {
+    /// The eager reader behind the generic sheet traits: the byte route's
+    /// own, or one materialized once from the filesystem route's retained
+    /// source. The facade's `open_xls_workbook_dyn` read paths through the
+    /// same eager reader, so trait reads keep its semantics on both routes.
+    fn trait_workbook(&self) -> Result<&EagerWorkbook> {
+        match self.0.as_ref() {
+            XlsOwner::Eager(eager) => Ok(&eager.workbook),
+            XlsOwner::Source(source) => source
+                .eager
+                .get_or_init(|| {
+                    source
+                        .workbook
+                        .materialize_eager()
+                        .map(Box::new)
+                        .map_err(crate::Error::from)
+                })
+                .as_deref()
+                .map_err(Clone::clone),
+        }
+    }
+}
+
+type SheetBox<'a> = Box<dyn litchi_core::sheet::Worksheet + 'a>;
+
+fn boxed(error: crate::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    Box::new(error)
+}
+
+/// The generic sheet traits over the eager reader.
+///
+/// On the filesystem route the first trait call reads the whole workbook
+/// once. When that read fails, the fallible methods return its error and the
+/// infallible ones report an empty workbook.
+impl WorkbookTrait for Xls {
+    fn active_sheet_index(&self) -> usize {
+        self.trait_workbook()
+            .map_or(0, WorkbookTrait::active_sheet_index)
+    }
+
+    fn active_worksheet(&self) -> litchi_core::sheet::Result<SheetBox<'_>> {
+        self.trait_workbook().map_err(boxed)?.active_worksheet()
+    }
+
+    fn is_1904_date_system(&self) -> bool {
+        self.trait_workbook()
+            .is_ok_and(WorkbookTrait::is_1904_date_system)
+    }
+
+    fn worksheet_by_index(&self, index: usize) -> litchi_core::sheet::Result<SheetBox<'_>> {
+        self.trait_workbook()
+            .map_err(boxed)?
+            .worksheet_by_index(index)
+    }
+
+    fn worksheet_by_name(&self, name: &str) -> litchi_core::sheet::Result<SheetBox<'_>> {
+        self.trait_workbook()
+            .map_err(boxed)?
+            .worksheet_by_name(name)
+    }
+
+    fn worksheet_count(&self) -> usize {
+        self.trait_workbook()
+            .map_or(0, WorkbookTrait::worksheet_count)
+    }
+
+    fn worksheet_names(&self) -> &[String] {
+        self.trait_workbook()
+            .map_or(&[], WorkbookTrait::worksheet_names)
+    }
+
+    fn worksheets(&self) -> Box<dyn litchi_core::sheet::WorksheetIterator<'_> + '_> {
+        match self.trait_workbook() {
+            Ok(workbook) => workbook.worksheets(),
+            Err(error) => Box::new(Failed(Some(error))),
+        }
+    }
+}
+
+impl std::fmt::Debug for Xls {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let owner = match self.0.as_ref() {
+            XlsOwner::Source(_) => "source",
+            XlsOwner::Eager(_) => "eager",
+        };
+        formatter
+            .debug_struct("Xls")
+            .field("owner", &owner)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A worksheet iterator that yields one error: the failed materialization.
+struct Failed(Option<crate::Error>);
+
+impl<'a> litchi_core::sheet::WorksheetIterator<'a> for Failed {
+    fn next(&mut self) -> Option<litchi_core::sheet::Result<SheetBox<'a>>> {
+        self.0.take().map(|error| Err(boxed(error)))
+    }
+}
+
 /// Metadata stream failures that mean "no usable metadata" rather than an
 /// I/O, limit or source-change failure (the facade's
 /// `xls_metadata_error_is_soft`).
@@ -356,9 +473,18 @@ mod tests {
     }
 
     /// The facade's byte route: detect, then hand the parse to the handle.
+    /// A password-protected workbook reports the leaf's refusal, as the
+    /// facade did; the unified opener turns it into `File::Locked`.
     fn open_bytes(bytes: Vec<u8>) -> Result<Xls> {
         match detect_format_smart(bytes) {
-            Some(DetectedFormat::Xls(ole)) => Xls::from_ole_file(ole, &OpenOptions::default()),
+            Some(DetectedFormat::Xls(ole)) => {
+                match Xls::from_ole_file(ole, &OpenOptions::default(), None)? {
+                    LegacyOpen::Opened(xls) => Ok(xls),
+                    LegacyOpen::PasswordRequired(_) => {
+                        Err(litchi_xls::Error::PasswordRequired.into())
+                    },
+                }
+            },
             other => panic!("detected {other:?}, not XLS"),
         }
     }
@@ -465,7 +591,7 @@ mod tests {
             assert_eq!(xls.text().unwrap(), trait_text(&name), "{name}");
             assert_eq!(
                 format!("{:?}", xls.metadata().unwrap()),
-                format!("{metadata:?}"),
+                format!("{:?}", Some(metadata)),
                 "{name}"
             );
         }
@@ -509,11 +635,14 @@ mod tests {
             assert_same(xls.text(), owner.text(), &name);
             assert_same(xls.worksheet_names(), owner.worksheet_names(), &name);
             assert_same(xls.worksheet_count(), owner.worksheet_count(), &name);
-            let source = xls.metadata().unwrap();
+            let source = xls
+                .metadata()
+                .unwrap()
+                .expect("XLS metadata is always reported");
             // Read twice: the second read comes from the kept projection.
             assert_eq!(
                 format!("{:?}", xls.metadata().unwrap()),
-                format!("{source:?}")
+                format!("{:?}", Some(&source))
             );
             assert!(xls.tolerance_report().is_ok());
 
@@ -522,7 +651,10 @@ mod tests {
             let (Ok(text), Ok(bytes)) = (xls.text(), open_bytes(fixture(&name))) else {
                 continue;
             };
-            let eager = bytes.metadata().unwrap();
+            let eager = bytes
+                .metadata()
+                .unwrap()
+                .expect("XLS metadata is always reported");
             assert_eq!(source.application, eager.application, "{name}");
             assert_eq!(source.author, eager.author, "{name}");
             assert_eq!(source.title, eager.title, "{name}");

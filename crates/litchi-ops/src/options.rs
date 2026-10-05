@@ -125,8 +125,15 @@ impl OpenOptions {
         self
     }
 
-    /// Run open-time work under a caller-owned ADR 0031 execution context:
-    /// its budget, cancellation token and worker limits.
+    /// Run open-time work under a caller-owned ADR 0031 execution context.
+    ///
+    /// In this release an open checks the context's cancellation token
+    /// before and after detection and returns
+    /// [`Code::Cancelled`](crate::Code::Cancelled) when it is set. The leaf
+    /// parsers do not yet charge the context's budget: the source-backed DOCX
+    /// owner refuses markup-compatibility content under a context (record
+    /// 0008, finding A1), so no opener builds a context-managed owner until
+    /// that is fixed.
     ///
     /// ```
     /// use std::num::{NonZeroU64, NonZeroUsize};

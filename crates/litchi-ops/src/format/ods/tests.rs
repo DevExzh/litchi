@@ -22,13 +22,16 @@ fn open_prepared(bytes: Vec<u8>) -> Ods {
     Ods::from_prepared(prepared, &OpenOptions::default()).expect("open prepared ODS")
 }
 
-/// The facade's `from_detected` arm: smart detection retains the bytes.
+/// The facade's `from_detected` arm, which re-parsed the bytes detection
+/// retained: the unified byte route adopts the prepared package instead.
 fn open_detected(bytes: Vec<u8>) -> Ods {
-    match detect_format_smart(bytes) {
-        Some(DetectedFormat::Ods(bytes)) => {
-            Ods::from_bytes(bytes, &OpenOptions::default()).expect("open detected ODS")
-        },
-        other => panic!("expected ODS detection, got {other:?}"),
+    assert!(matches!(
+        detect_format_smart(bytes.clone()),
+        Some(DetectedFormat::Ods(_))
+    ));
+    match crate::open_bytes(bytes).expect("open detected ODS") {
+        crate::File::Ods(handle) => handle,
+        other => panic!("expected ODS, got {other:?}"),
     }
 }
 
@@ -92,7 +95,7 @@ fn byte_routes_match_the_leaf_reader() {
         let leaf = litchi_ods::Spreadsheet::from_bytes(bytes.clone()).expect("leaf ODS");
         assert!(leaf.sheet_count() > 0, "{name}");
         for ods in [open_prepared(bytes.clone()), open_detected(bytes)] {
-            assert!(matches!(ods.owner(), OdsOwner::Eager(_)));
+            assert!(matches!(ods.0.owner, OdsOwner::Eager(_)));
             assert_matches_leaf(&ods, &leaf, name);
         }
     }
@@ -106,7 +109,7 @@ fn source_route_matches_the_leaf_reader() {
         let leaf = litchi_ods::Spreadsheet::from_bytes(std::fs::read(&path).expect("read"))
             .expect("leaf ODS");
         let ods = open_source(&path);
-        assert!(matches!(ods.owner(), OdsOwner::Source(_)));
+        assert!(matches!(ods.0.owner, OdsOwner::Source(_)));
         assert_eq!(format!("{ods:?}"), r#"Ods { owner: "source", .. }"#);
         assert_matches_leaf(&ods, &leaf, name);
     }
@@ -142,16 +145,38 @@ fn source_route_reports_a_changed_source_as_io_error() {
 
 #[test]
 fn malformed_body_is_a_typed_core_error() {
-    let Err(leaf_error) = litchi_ods::Spreadsheet::from_bytes(b"PK\x03\x04 not a zip".to_vec())
-    else {
-        panic!("broken package must not open in the leaf");
+    let bytes = broken_package(litchi_odf_common::constants::ODF_SPREADSHEET);
+    let Err(leaf_error) = litchi_ods::Spreadsheet::from_bytes(bytes.clone()) else {
+        panic!("a broken body must not open in the leaf");
     };
-    let error = Ods::from_bytes(b"PK\x03\x04 not a zip".to_vec(), &OpenOptions::default())
-        .expect_err("broken package must not open");
+    let error = crate::open_bytes(bytes).expect_err("a broken body must not open");
     assert!(
         matches!(error.leaf(), crate::error::Source::Core(_)),
         "{error:?}"
     );
     assert_eq!(error.format(), Some(FileFormat::Ods));
     assert_eq!(error.message(), leaf_error.to_string());
+}
+
+/// A package with a valid `mimetype` and manifest and an unparsable body.
+fn broken_package(mimetype: &str) -> Vec<u8> {
+    use std::io::Write as _;
+
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    writer.start_file("mimetype", options).unwrap();
+    writer.write_all(mimetype.as_bytes()).unwrap();
+    writer.start_file("META-INF/manifest.xml", options).unwrap();
+    writer
+        .write_all(
+            format!(
+                r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="{mimetype}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    writer.start_file("content.xml", options).unwrap();
+    writer.write_all(b"<office:document-content>").unwrap();
+    writer.finish().unwrap().into_inner()
 }

@@ -11,15 +11,13 @@
 //! The constructors take what detection already produced, so an open does
 //! one detection pass and one container index:
 //!
-//! | Facade route today | Detection result | Constructor |
+//! | Open route | Detection result | Constructor |
 //! |---|---|---|
-//! | `Workbook::open` on `unix`/`windows` | `WorkbookSourcePathDetection::Xlsb` | `Xlsb::from_source_workbook` |
-//! | `Workbook::from_bytes` | `WorkbookSourceBytesDetection::Xlsb` | `Xlsb::from_source_package` |
-//! | `Workbook::from_bytes` fallback (`detect_format_smart`) | `DetectedFormat::Xlsb` | `Xlsb::from_opc_package` |
-//! | `Workbook::from_prepared` | `PreparedOoxmlSource` | `Xlsb::from_prepared` |
+//! | `open` (path) on `unix`/`windows`, `open_bytes`, `open_prepared` | source-backed OPC package | `Xlsb::from_source_package` |
+//! | [`SourceMode::Eager`], and paths elsewhere | eager `OpcPackage` | `Xlsb::from_opc_package` |
 //!
-//! The facade has no reader route for workbooks. The `sheet::open_xlsb_*`
-//! functions are path and byte routes onto the same two owners.
+//! XLSB has no decryption support, so `Locked::unlock` does not reach this
+//! handle.
 //!
 //! # Sheet names
 //!
@@ -40,19 +38,14 @@ use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
 };
 use litchi_core::{FileFormat, Metadata};
-use litchi_opc::{OpcPackage, PreparedOoxmlSource, SourceBackedPackage};
+use litchi_opc::{OpcPackage, SourceBackedPackage};
 use litchi_xlsb as xlsb;
 
+use super::cell_text;
 use crate::detect::workbook_metadata::{MetadataRepairs, read_source_backed_metadata};
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
 
-#[allow(
-    clippy::duplicate_mod,
-    reason = "shared with the sibling workbook handle until S6 can declare it once in `format/mod.rs`"
-)]
-#[path = "cell_text.rs"]
-mod cell_text;
 mod source;
 
 use source::{SourceWorkbook, SourceWorksheets, internal};
@@ -138,31 +131,14 @@ impl XlsbOwner {
 }
 
 impl Xlsb {
-    /// Adopt the source-backed catalog the filesystem detector built, with
-    /// the metadata it read. Only the workbook catalog is read.
+    /// Adopt the source-backed package detection validated: read its core
+    /// properties, then build the deferred catalog over it. Only the
+    /// workbook catalog is read.
     ///
     /// Under [`SourceMode::Eager`] the catalog is materialized into the
-    /// owning workbook instead.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by the `File` openers from S6")
-    )]
-    pub(crate) fn from_source_workbook(
-        workbook: xlsb::SourceBackedWorkbook,
-        metadata: Metadata,
-        metadata_repairs: MetadataRepairs,
-        options: &OpenOptions,
-    ) -> Result<Self> {
-        Ok(Self::with_owner(
-            Self::source_owner(workbook, options)?,
-            metadata,
-            metadata_repairs,
-            options,
-        ))
-    }
-
-    /// Adopt the source-backed package the byte detector validated: read its
-    /// core properties, then build the deferred catalog over it.
+    /// owning workbook instead; the openers reach that only from
+    /// `open_prepared`, because their other eager routes call
+    /// [`Self::from_opc_package`].
     pub(crate) fn from_source_package(
         package: SourceBackedPackage,
         options: &OpenOptions,
@@ -178,35 +154,8 @@ impl Xlsb {
         ))
     }
 
-    /// Adopt a package prepared by `detect_and_prepare` without indexing the
-    /// container again.
-    ///
-    /// Returns [`Code::UnsupportedFormat`] naming the detected format when
-    /// the prepared package is another OOXML family, and [`Code::IoError`]
-    /// when the file changed after it was prepared.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by the `File` openers from S6")
-    )]
-    pub(crate) fn from_prepared(
-        prepared: PreparedOoxmlSource,
-        options: &OpenOptions,
-    ) -> Result<Self> {
-        let detected =
-            crate::detect::ooxml::format_for_main_content_type(prepared.main_part_content_type())
-                .ok_or(litchi_core::Error::NotOfficeFile)?;
-        if detected != FileFormat::Xlsb {
-            return Err(litchi_core::Error::UnexpectedFormat { detected }.into());
-        }
-        Self::from_source_package(prepared.into_package()?, options)
-    }
-
     /// Build the owning workbook from the OPC package the byte detector
     /// already parsed (`DetectedFormat::Xlsb`).
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by the `File` openers from S6")
-    )]
     pub(crate) fn from_opc_package(package: OpcPackage, options: &OpenOptions) -> Result<Self> {
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata =
@@ -309,14 +258,16 @@ impl Xlsb {
         }
     }
 
-    /// The core document properties read at open.
+    /// The core document properties read at open. Always `Some` when it
+    /// succeeds; a package without core properties reads as empty metadata,
+    /// as the facade reports it.
     ///
     /// # Errors
     ///
     /// Returns [`Code::IoError`] when a source-backed workbook's file changed.
-    pub fn metadata(&self) -> Result<Metadata> {
+    pub fn metadata(&self) -> Result<Option<Metadata>> {
         self.0.owner.ensure_current()?;
-        Ok(self.0.metadata.clone())
+        Ok(Some(self.0.metadata.clone()))
     }
 
     /// Everything the reader repaired, as the XLSB leaf records it, followed

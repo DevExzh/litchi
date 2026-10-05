@@ -94,13 +94,15 @@ fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Result<Docx, Error> {
     }
 }
 
-/// The facade's `Document::from_prepared` route.
+/// The facade's `Document::from_prepared` route, through the unified
+/// `open_prepared_with`.
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &std::path::Path, options: &OpenOptions) -> Result<Docx, Error> {
-    let prepared = crate::detect::detect_and_prepare(path)
-        .and_then(crate::detect::PreparedDetection::into_prepared)
-        .expect("a DOCX path is prepared");
-    Docx::from_prepared(prepared, options)
+    let detection = crate::detect::detect_and_prepare(path).expect("a DOCX path is prepared");
+    match crate::open_prepared_with(detection, options)? {
+        crate::File::Docx(docx) => Ok(docx),
+        other => panic!("{} opened as {other:?}", path.display()),
+    }
 }
 
 fn cold_loads(docx: &Docx) -> u64 {
@@ -155,9 +157,14 @@ fn source_oracle(bytes: &[u8]) -> Oracle {
 #[track_caller]
 fn assert_matches(docx: &Docx, oracle: &Oracle) {
     assert_eq!(docx.text().unwrap(), oracle.text);
-    assert_eq!(format!("{:?}", docx.metadata().unwrap()), oracle.metadata);
+    let metadata = || {
+        docx.metadata()
+            .unwrap()
+            .expect("DOCX metadata is always reported")
+    };
+    assert_eq!(format!("{:?}", metadata()), oracle.metadata);
     // A second call reads the sidecar and must agree.
-    assert_eq!(format!("{:?}", docx.metadata().unwrap()), oracle.metadata);
+    assert_eq!(format!("{:?}", metadata()), oracle.metadata);
     assert_eq!(docx.tolerance_report().unwrap(), oracle.tolerance);
 }
 
@@ -226,25 +233,6 @@ fn prepared_route_adopts_the_prepared_package_and_matches_the_facade() {
         assert_eq!(cold_loads(&docx), 0, "{name}: open reads no part payload");
         assert_matches(&docx, &source_oracle(&bytes));
     }
-}
-
-#[test]
-fn prepared_route_refuses_another_ooxml_family() {
-    let bytes = minimal_ooxml(
-        "xl/workbook.xml",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
-        b"<workbook/>",
-    );
-    let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
-    let package = litchi_opc::SourceBackedPackage::from_read_at(source).unwrap();
-    let prepared = litchi_opc::PreparedOoxmlSource::new(
-        package,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
-    )
-    .unwrap();
-    let error = Docx::from_prepared(prepared, &OpenOptions::new()).unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedFormat);
-    assert_eq!(error.detected(), Some(FileFormat::Xlsx));
 }
 
 #[test]

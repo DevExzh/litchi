@@ -19,16 +19,11 @@
 //! The constructors take what detection already produced, so an open does
 //! one detection pass and one container index:
 //!
-//! | Facade route today | Detection result | Constructor |
+//! | Open route | Detection result | Constructor |
 //! |---|---|---|
-//! | `Presentation::open` on `unix`/`windows` | `PptxSourcePathDetection::Pptx` | `Pptx::from_source` |
-//! | `Presentation::from_bytes` | `PresentationSourceBytesDetection::Pptx` | `Pptx::from_source` |
-//! | `Presentation::from_prepared` | `PreparedOoxmlSource` | `Pptx::from_prepared` |
-//! | `from_detected` (eager detector) | `DetectedFormat::Pptx` | `Pptx::from_opc_package` |
-//! | unified detector (record 0003 §2.7) | `SourceBackedPackage` | `Pptx::from_source_package` |
-//!
-//! The facade has no reader route for presentations. `Pptx::path_detection_error`
-//! maps the path detector's failure without flattening it.
+//! | `open` (path) on `unix`/`windows`, `open_bytes`, `open_prepared` | source-backed OPC package | `Pptx::from_source_package` |
+//! | [`SourceMode::Eager`](crate::SourceMode::Eager), and paths elsewhere | eager `OpcPackage` | `Pptx::from_opc_package` |
+//! | `Locked::unlock` | decrypted package | `Pptx::from_package` |
 //!
 //! # Source freshness
 //!
@@ -143,6 +138,11 @@ impl PptxSlide {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    /// The slide's text and name, moved out without a copy.
+    pub(crate) fn into_parts(self) -> (String, String) {
+        (self.text, self.name)
+    }
 }
 
 /// The editor [`Pptx::into_editor`] builds from the retained owner.
@@ -171,13 +171,6 @@ pub(crate) struct EditorRefused {
     pub(crate) error: Option<Error>,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the unified opener (M0a step S6) is the first caller of the constructors"
-    )
-)]
 impl Pptx {
     fn new(owner: PptxOwner, metadata: OnceLock<Option<Metadata>>, options: &OpenOptions) -> Self {
         Self(Arc::new(PptxState {
@@ -208,29 +201,6 @@ impl Pptx {
         Ok(Self::from_source(presentation, options))
     }
 
-    /// Adopts a package prepared by `detect_and_prepare`: no ZIP central
-    /// directory is read and no OPC catalog is parsed a second time.
-    ///
-    /// A prepared package of another OOXML family is refused with
-    /// [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat) naming
-    /// the detected format. A source changed between preparation and this
-    /// call is a typed source-change error.
-    pub(crate) fn from_prepared(
-        prepared: opc::PreparedOoxmlSource,
-        options: &OpenOptions,
-    ) -> Result<Self> {
-        let detected =
-            crate::detect::ooxml::format_for_main_content_type(prepared.main_part_content_type())
-                .ok_or_else(|| Error::unsupported_format(None))?;
-        if detected != FileFormat::Pptx {
-            return Err(Error::unsupported_format(Some(detected)));
-        }
-        let package = prepared
-            .into_package()
-            .map_err(|error| Error::from(error).with_format(FileFormat::Pptx))?;
-        Self::from_source_package(package, options)
-    }
-
     /// Adopts the OPC package the eager detector already parsed
     /// (`DetectedFormat::Pptx`). The core properties are read now, as the
     /// facade does, and a properties part the reader rejects fails the open.
@@ -256,19 +226,24 @@ impl Pptx {
         ))
     }
 
-    /// Maps the path route's detection failure to the unified error, keeping
-    /// the typed leaf error.
-    #[cfg(any(unix, windows))]
-    pub(crate) fn path_detection_error(
-        error: crate::detect::detected::PptxSourcePathError,
-    ) -> Error {
-        use crate::detect::detected::PptxSourcePathError;
-        match error {
-            PptxSourcePathError::Opc(error) => error.into(),
-            PptxSourcePathError::Pptx(error) => error.into(),
-            #[cfg(any(feature = "odp", feature = "ppt"))]
-            PptxSourcePathError::Source(error) => error.into(),
-        }
+    /// Adopts an owning package another route built, reading its core
+    /// properties now as [`Self::from_opc_package`] does.
+    /// [`crate::Locked::unlock`] uses this for a package the leaf decrypted,
+    /// which keeps its encryption mode.
+    #[cfg(feature = "encryption")]
+    pub(crate) fn from_package(package: pptx::Package, options: &OpenOptions) -> Result<Self> {
+        let metadata = litchi_ooxml_common::properties::read_with_report(
+            package.opc()?,
+            &mut litchi_ooxml_common::leniency::ToleranceReport::default(),
+        )
+        .map_err(pptx::Error::from)?
+        .map(Metadata::from)
+        .filter(Metadata::has_data);
+        Ok(Self::new(
+            PptxOwner::Eager(Box::new(package)),
+            OnceLock::from(metadata),
+            options,
+        ))
     }
 }
 
@@ -278,6 +253,16 @@ impl Pptx {
     #[must_use]
     pub fn is_source_backed(&self) -> bool {
         matches!(self.0.owner, PptxOwner::Source(_))
+    }
+
+    /// The source owner's cold payload loads so far, for the tests that
+    /// prove a read stays catalog-only; `None` for the eager owner.
+    #[cfg(test)]
+    pub(crate) fn cold_loads(&self) -> Option<u64> {
+        match &self.0.owner {
+            PptxOwner::Source(presentation) => Some(presentation.cache_diagnostics().cold_loads),
+            PptxOwner::Eager(_) => None,
+        }
     }
 
     /// All slide text, slides in presentation order, separated by a blank

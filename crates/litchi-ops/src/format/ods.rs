@@ -14,7 +14,7 @@
 //! projection they parsed, and [`Ods::metadata`] reads it on demand.
 
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
@@ -29,6 +29,9 @@ pub struct Ods(Arc<OdsState>);
 
 struct OdsState {
     owner: OdsOwner,
+    /// Worksheet names for the generic sheet traits, which borrow them;
+    /// built on their first use.
+    names: OnceLock<Box<[String]>>,
 }
 
 /// The ODS read owner, in the state today's route builds.
@@ -36,7 +39,7 @@ struct OdsState {
     clippy::large_enum_variant,
     reason = "the owner lives once behind the handle's `Arc`; boxing a variant would add an allocation to that open route"
 )]
-pub(crate) enum OdsOwner {
+enum OdsOwner {
     /// Parsed in full at open (byte and reader routes, and the path fallback
     /// on other targets).
     Eager(litchi_ods::Spreadsheet),
@@ -56,41 +59,23 @@ fn core_error(error: litchi_core::Error) -> Error {
 }
 
 impl Ods {
-    /// Adopts the package detection prepared (`detect_prepared_ods*`) without
-    /// a second ZIP index. This is the facade's first byte-route arm.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
+    /// Adopts the package detection prepared without a second ZIP index.
+    /// Every in-memory route uses this, including the one the facade served
+    /// by turning a prepared package back into bytes and parsing them again
+    /// (`DetectedFormat::Ods`).
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
         let spreadsheet =
             litchi_ods::Spreadsheet::from_prepared_package(prepared).map_err(core_error)?;
         Ok(Self::from_owner(OdsOwner::Eager(spreadsheet)))
     }
 
-    /// Parses the bytes smart detection retained (`DetectedFormat::Ods`).
-    /// The leaf adopts its own prepared index when the bytes carry one.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
-    pub(crate) fn from_bytes(bytes: Vec<u8>, _options: &OpenOptions) -> Result<Self> {
-        let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes).map_err(core_error)?;
-        Ok(Self::from_owner(OdsOwner::Eager(spreadsheet)))
-    }
-
-    /// Adopts the source-backed owner the workbook path probe built
-    /// (`WorkbookSourcePathDetection::Ods`).
+    /// Adopts the source-backed owner the path route built over the file.
     ///
     /// # Errors
     ///
     /// Returns `io_error` when the source changed since detection, as the
     /// facade's open did through its metadata read.
     #[cfg(any(unix, windows))]
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     pub(crate) fn from_source(
         spreadsheet: Box<litchi_ods::SourceBackedSpreadsheet>,
         _options: &OpenOptions,
@@ -99,12 +84,22 @@ impl Ods {
         Ok(Self::from_owner(OdsOwner::Source(*spreadsheet)))
     }
 
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "called by the single-pass `open` (M0a S6)")
-    )]
     fn from_owner(owner: OdsOwner) -> Self {
-        Self(Arc::new(OdsState { owner }))
+        Self(Arc::new(OdsState {
+            owner,
+            names: OnceLock::new(),
+        }))
+    }
+
+    /// Whether the owner defers package-member reads to the file, for the
+    /// tests that pin each route's owner.
+    #[cfg(test)]
+    pub(crate) fn is_source_backed(&self) -> bool {
+        match &self.0.owner {
+            OdsOwner::Eager(_) => false,
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source(_) => true,
+        }
     }
 
     /// Worksheet names in document order.
@@ -136,16 +131,26 @@ impl Ods {
     /// The typed worksheets in document order, borrowed from the owner.
     ///
     /// The facade has no ODS sheet adapter to port (its `sheet::adapters`
-    /// covers XLSX and XLSB only), so this is the static base a workbook
-    /// family view can build one on. Both owners hold their parsed
-    /// worksheets, so nothing is decoded here.
-    #[allow(dead_code, reason = "consumed by the `File` family views (M0a S6)")]
+    /// covers XLSX and XLSB only); the workbook family view reads the
+    /// worksheet names and count through this, and an ODS adapter can build
+    /// on it in M1. Both owners hold their parsed worksheets, so nothing is
+    /// decoded here.
     pub(crate) fn worksheets(&self) -> Result<&[litchi_ods::Sheet]> {
         match &self.0.owner {
             OdsOwner::Eager(spreadsheet) => Ok(spreadsheet.sheets()),
             #[cfg(any(unix, windows))]
             OdsOwner::Source(spreadsheet) => spreadsheet.sheets().map_err(core_error),
         }
+    }
+
+    /// Worksheet names the generic sheet traits borrow: read once through
+    /// [`Self::worksheets`], and empty when that read fails.
+    pub(crate) fn trait_names(&self) -> &[String] {
+        self.0.names.get_or_init(|| {
+            self.worksheets()
+                .map(|sheets| sheets.iter().map(|sheet| sheet.name.clone()).collect())
+                .unwrap_or_default()
+        })
     }
 
     /// Displayed worksheet text: tab-separated cells, newline-separated rows,
@@ -192,12 +197,6 @@ impl Ods {
             #[cfg(any(unix, windows))]
             OdsOwner::Source(spreadsheet) => spreadsheet.tolerance_report().clone(),
         })
-    }
-
-    /// The retained leaf owner, for the crate's family views.
-    #[allow(dead_code, reason = "consumed by the `File` family views (M0a S6)")]
-    pub(crate) fn owner(&self) -> &OdsOwner {
-        &self.0.owner
     }
 }
 

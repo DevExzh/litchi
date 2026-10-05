@@ -4810,3 +4810,27 @@ Together with the S2, S3 and S4 amendments above, the current inventory is 66
 workspace packages, 263 internal dependency declarations, 251 canonical edges,
 12 development-only edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-10-05 amendment: `litchi-ops` encryption edge (M0a step S6)
+
+Unified-ops M0a step S6 opens every input as a `File`, classifies encrypted
+inputs as `File::Locked` at open, and adds the consuming `Locked::unlock`
+behind a new `encryption` feature of `litchi-ops` (record
+[0003](../unified-ops/0003-m0a-migration-plan.md) §2.6). Unlocking an
+encrypted OOXML package decrypts it once through the OOXML codec of
+`litchi-crypto` and hands the clear package to the leaf owners'
+decrypted-package constructors, which keep its encryption profile. That adds
+one optional normal edge, `litchi-ops -> litchi-crypto`, owned by the
+`encryption` feature alone. The feature also turns on the `encryption`
+features of the OOXML leaves and `litchi-ppt` that a build compiles in, and
+`litchi-cfb`, so that an OOXML-only build recognizes the compound file an
+encrypted package arrives in; those are existing edges. Classification
+without the feature reads only clear container headers and needs no new edge.
+`litchi-crypto` is a bulk package, so `litchi-ops` stays runtime-neutral and
+iWork-free and the non-iWork release gate is unchanged. Credentials never
+pass through `OpenOptions`: `unlock` takes the password itself.
+
+Together with the S2 through S5d amendments above, the current inventory is
+66 workspace packages, 264 internal dependency declarations, 252 canonical
+edges, 12 development-only edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
