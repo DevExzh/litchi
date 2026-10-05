@@ -102,3 +102,6 @@
   - litchi-ops clippy passes with all features and with each of doc, ppt, xls, pptx, doc+ppt+xls and docx+doc.
   - 173 unit tests and 29 doctests pass, and `cargo check -p litchi --all-features` passes.
   - The boundary checker (263 declarations), the non-iWork gate and the gate unit tests pass.
+
+## Coordinator check — S5c's fixture-dependent xlsx tests
+- On `uo/m0a` (S5c merged), with the evidence directory `docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/` added to the sparse checkout and `3rdparty` temporarily symlinked from the main checkout, `cargo test -p litchi-xlsx --all-features` passes the four targets S5c could not compile: `form_control_properties` (15), `form_control_scalar_lifecycle` (39), `form_control_owner_read` (18) and `drawing_svg_read` (32). This closes S5c's open item.
