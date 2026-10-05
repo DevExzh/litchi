@@ -16,6 +16,8 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | M0a | Steps S1–S10 on `uo/m0a` (plan 0003 §4) | in progress |
 | 0008 | Diagnosis: source-backed DOCX edits refuse every Word-authored fixture (MCE) — M2 blocker | merged (`e9c3868109`); fix staged as 0011 |
 | 0009 | Design: editing a shared snapshot (R4; leaf publishers consume their package) — M2 prerequisite | in progress |
+| 0010 | M1 unified-read plan (node view, path resolution, query, view modes, capabilities) | in progress |
+| 0011 | DOCX MCE admission, stages 1–3 of 0008 (lands on `uo/m0a`) | in progress |
 
 ## Awaiting owner confirmation
 
