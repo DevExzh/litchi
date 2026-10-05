@@ -302,7 +302,8 @@ The README gives details.
   of 2 or more.
 - **Raw data.** Pruned bundles (every field the analysis reads) are
   committed. The full raw set (8.8 MB tar, SHA-256 `70e44835…c0eb9676b6`)
-  stays in the scratchpad.
+  is kept outside the repository, with the probes, scripts and logs, at
+  `/home/zhuhe/code/litchi-worktrees/uo-evidence/m0a-s10/s10-capture-raw.tar`.
 - **No allocator binary.** It would not have reported these routes, so the
   allocation probe replaced it.
 
