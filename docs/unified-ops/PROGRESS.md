@@ -13,7 +13,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | 0005 | M0b path/selector grammar in `litchi-core::selector` | merged (`9f8e49b181`) |
 | 0006 | Owner accepts ADR 0033 | done |
 | 0007 | Coordinator defaults for 0003's open questions | adopted, awaiting owner |
-| M0a | Steps S1–S10 on `uo/m0a` (plan 0003 §4) | in progress |
+| M0a | Steps S1–S10 on `uo/m0a` (plan 0003 §4) | merged (`1927763795`); S10 gate passes with E1/E2 awaiting owner (F1, F2) |
 | 0008 | Diagnosis: source-backed DOCX edits refuse every Word-authored fixture (MCE) — M2 blocker | merged (`e9c3868109`); fix staged as 0011 |
 | 0009 | Design: editing a shared snapshot (R4) — M2 prerequisite | done (`9b3cab60f6`); staged leaf plan S0–S5 |
 | 0010 | M1 unified-read plan (node view, path resolution, query, view modes, capabilities) | done (`31bd660497`); steps R1–R11 with leaf waves L1/L2 |
@@ -26,6 +26,10 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | 0012 | litchi-opc: cheap `Clone` for `SourceBackedPackage` (0009 stage S0) | merged into `uo/m0a` (`0cf1f43403`); clone 6 reference counts, no allocation; open unchanged |
 
 ## Awaiting owner confirmation
+
+- M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
+  - F1: accept E1. Seven rows over their trigger time one call in a fresh child process, so they measure the harness executable. Standalone probes give the same first-call time at both revisions (XLSX open 187.6 vs 187.9 µs); Callgrind shows +0.75% instructions. Alternatives: an untimed warm-up call in the child (new route names), or standalone binaries for first calls.
+  - F2: accept E2. The RTF open row depends on the allocator state the untimed projection leaves; with malloc trimming off, the unified open is 0.98× the pre-M0a one. Alternatives: fixed malloc tunables for RTF children, or bare-loop variants.
 
 - Record 0015 decisions D1–D19 and open questions Q1–Q14 (provisional defaults). Highlights:
   - Write verbs take `&self` and return a new `File`; `edit` returns a `Commit`.
@@ -96,6 +100,30 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   - `/body/p[N]` is OfficeCLI's direct-body paragraph, counted on the MCE-visible view. M2 maps it to the edit transaction's numbering under 0011's admission check.
 - The default source-backed owners answer little today: DOCX exposes only the main story, PPTX only slide text, XLSX only cells. About 35 core leaf read requests plus 4 correctness fixes are listed in §4.11 (L1 tier 1, L2 tier 2).
 - Steps R1–R11. R1–R3 and L1 start before M0a lands, on `uo/m1`; R5 waits for S6, R8 for S9. M1 merges into trunk after M0a. 17 code findings (F-1…F-17) and 21 OfficeCLI deltas.
+
+## M0a — log
+
+- Landed as one merge of `uo/m0a` (`1927763795`). Step detail: `docs/unified-ops/m0a-log.md`.
+- `litchi::open`, `open_bytes`, `open_with` and `open_prepared` return the flat, non-exhaustive `File`: 16 bytes, one `Arc` handle per format, plus `Locked` and `Signed`. Detection lives in `litchi_ops::detect`.
+- One pointer-sized `Error` with an OfficeCLI-aligned `Code` and a typed `Source`.
+- Deleted (S9, −27k lines):
+  - the facade's `Document`, `Presentation`, `sheet::Workbook` and sheet openers;
+  - the old Markdown adapter;
+  - the `__migration` seam.
+- The facade, examples, tests, Python bindings and perf harness all use `File` (S7, S8a–d).
+- Breaking changes:
+  - Changed commits that silently stripped a signature now refuse until `Signed::unsign` (0013, 0014a/b).
+  - The eager DOCX owner refuses what the source-backed one refuses (0011); 19/19 Word fixtures are editable source-backed.
+- `SourceBackedPackage` clones cheaply (0012).
+- S10 gate: passes on the plan's terms.
+  - 91/99 facade rows and all 47 kept predecessors pass the raw rule; the other 8 are E1/E2 (above).
+  - R5: DOC and the PPT byte route keep about one input size alive after open, and `retain_source(false)` removes it.
+  - Follow-ups F3 (drop the whole-child RSS tripwire, which measures the harness's `git` child) and F6 (captures off the shared tmpfs).
+- Known failures inherited from the base, unchanged:
+  - workspace fmt (iwa-archive, soapberry-zip);
+  - 18 facade feature-subset sets;
+  - the `keynote_chart_title` fuzz target;
+  - rustdoc without features.
 
 ## 0015 — log
 
