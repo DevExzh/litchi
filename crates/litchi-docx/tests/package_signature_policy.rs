@@ -466,3 +466,81 @@ mod ribbon_family {
         assert!(!carries_signature(&bytes(&mut package)));
     }
 }
+
+/// The shared core- and custom-properties owners of `litchi-ooxml-common`
+/// refuse a change to a signed document at a managed save, keeping this
+/// crate's typed signed error, instead of removing the signature (unified-ops
+/// record 0014a, F1b). The edit stays pending, so the save succeeds once the
+/// signature is removed explicitly.
+mod shared_properties {
+    use super::*;
+
+    #[track_caller]
+    fn assert_save_refused(package: &mut Package) {
+        let mut sink = Cursor::new(Vec::new());
+        assert_signed(package.to_stream(&mut sink));
+        assert!(package.is_signed());
+    }
+
+    #[test]
+    fn edited_properties_refuse_a_signed_document_at_save() {
+        for name in SIGNED {
+            let original = fixture(name);
+
+            // Values equal to the stored ones publish nothing.
+            let mut package = open(&original);
+            let props = package.props().cloned().expect("core properties");
+            package.put_props(props);
+            let _ = package.custom_props_mut();
+            assert_eq!(bytes(&mut package), original, "{name}: exact no-ops");
+
+            // A changed title and a new custom property are refused at save.
+            let mut package = open(&original);
+            package.props_mut().expect("core properties").title = Some("Signed".into());
+            assert_save_refused(&mut package);
+            package.unsign();
+            let output = bytes(&mut package);
+            assert!(!carries_signature(&output), "{name}");
+            assert_eq!(
+                open(&output).props().and_then(|props| props.title.clone()),
+                Some("Signed".into())
+            );
+
+            let mut package = open(&original);
+            package
+                .custom_props_mut()
+                .insert("Project", "Litchi")
+                .unwrap();
+            assert_save_refused(&mut package);
+            package.unsign();
+            let output = bytes(&mut package);
+            assert!(!carries_signature(&output), "{name}");
+            assert!(open(&output).custom_props().get("Project").is_some());
+        }
+    }
+
+    #[test]
+    fn removing_properties_refuses_a_signed_document_at_save() {
+        let signed = signed_with(|plain| {
+            plain
+                .custom_props_mut()
+                .insert("Project", "Litchi")
+                .unwrap();
+        });
+        let mut package = open(&signed);
+        let _ = package.custom_props_mut();
+        assert_eq!(bytes(&mut package), signed, "an unchanged custom set");
+
+        let mut package = open(&signed);
+        assert!(package.custom_props_mut().remove("Project").is_some());
+        assert_save_refused(&mut package);
+        let mut package = open(&signed);
+        assert!(package.clear_props().is_some());
+        assert_save_refused(&mut package);
+
+        package.unsign();
+        let output = bytes(&mut package);
+        assert!(!carries_signature(&output));
+        assert!(open(&output).props().is_none());
+    }
+}

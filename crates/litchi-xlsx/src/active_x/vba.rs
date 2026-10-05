@@ -114,16 +114,40 @@ pub fn discover(package: &OpcPackage, source: &dyn Part) -> Result<Option<Projec
     }))
 }
 
+/// Store a VBA project for the workbook part `source`, replacing any present
+/// graph.
+///
+/// Storing always republishes the graph, so a signed package is refused with
+/// [`crate::Error::Signed`] before it is changed (ADR 0006): remove the
+/// signature explicitly first, with [`crate::Package::unsign`] or
+/// [`OpcPackage::unsign`].
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Signed`] for a signed package, and an error when the
+/// graph is invalid or the package cannot be changed.
 pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Payload) -> Result<Project> {
     let payload = Arc::new(payload.into_bytes());
-    store_project_graph(package, source, Host::Excel, payload, None)?;
+    store_project_graph(package, source, Host::Excel, payload, None)
+        .map_err(crate::signature_policy::from_shared)?;
     let source = package.get_part(source)?;
     discover(package, source)?
         .ok_or_else(|| Error::Invalid("stored Excel VBA project was not discoverable".to_string()))
 }
 
+/// Remove the workbook part `source`'s VBA project graph.
+///
+/// An absent graph returns `Ok(false)` and keeps a signed package's
+/// signature; removing a present graph from a signed package is refused with
+/// [`crate::Error::Signed`] (ADR 0006): remove the signature explicitly first,
+/// with [`crate::Package::unsign`] or [`OpcPackage::unsign`].
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Signed`] for a change to a signed package, and an
+/// error when the graph is invalid or the package cannot be changed.
 pub fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
-    Ok(remove_project_graph(package, source, Host::Excel)?)
+    remove_project_graph(package, source, Host::Excel).map_err(crate::signature_policy::from_shared)
 }
 
 #[cfg(test)]

@@ -876,6 +876,13 @@ impl Package {
 
     /// Mutably borrows existing core properties.
     ///
+    /// A managed save of a signed package whose core properties were edited
+    /// is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package and the edit as they were: call
+    /// [`Self::unsign`] first. An edit that writes the stored bytes publishes
+    /// nothing.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -893,11 +900,25 @@ impl Package {
     }
 
     /// Moves a present core-properties value into the package facade.
+    ///
+    /// A managed save of a signed package whose core properties were edited
+    /// is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package and the edit as they were: call
+    /// [`Self::unsign`] first. An edit that writes the stored bytes publishes
+    /// nothing.
     pub fn put_props(&mut self, props: Props) -> Option<Props> {
         self.properties.put(props)
     }
 
     /// Marks core properties absent and moves out the previous value.
+    ///
+    /// A managed save of a signed package whose core properties were edited
+    /// is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package and the edit as they were: call
+    /// [`Self::unsign`] first. An edit that writes the stored bytes publishes
+    /// nothing.
     pub fn clear_props(&mut self) -> Option<Props> {
         self.properties.clear()
     }
@@ -925,6 +946,13 @@ impl Package {
     }
 
     /// Get a mutable reference to the custom document properties.
+    ///
+    /// A managed save of a signed package whose custom properties were
+    /// changed is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package and the edit as they were: call
+    /// [`Self::unsign`] first. Properties that serialize to the stored bytes
+    /// publish nothing.
     ///
     /// # Examples
     ///

@@ -1130,3 +1130,98 @@ fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
         assert_eq!(unsigned.to_bytes().unwrap(), output, "{name}");
     }
 }
+
+/// The shared custom-properties and VBA owners of `litchi-ooxml-common`
+/// refuse a change to a signed package with this crate's typed
+/// [`Error::Signed`] instead of removing the signature (unified-ops record
+/// 0014a, F1b).
+mod shared_owners {
+    use super::*;
+    use litchi_xlsx::custom::{Host, Props};
+
+    fn props() -> Props {
+        let mut props = Props::new();
+        props.insert("Project", "Litchi").unwrap();
+        props
+    }
+
+    #[test]
+    fn custom_properties_refuse_a_signed_fixture_and_keep_exact_noops() {
+        for name in SIGNED {
+            let original = signed_fixture(name);
+            let mut package = litchi_xlsx::Package::from_bytes(original.clone()).unwrap();
+            package.remove_custom_props().unwrap();
+            package.put_custom_props(Props::new()).unwrap();
+            assert_eq!(package.to_bytes().unwrap(), original, "{name}: no-ops");
+
+            assert_signed(package.put_custom_props(props()));
+            assert!(package.is_signed());
+            assert_eq!(package.to_bytes().unwrap(), original, "{name}: refusal");
+
+            package.unsign().unwrap();
+            package.put_custom_props(props()).unwrap();
+            let output = package.to_bytes().unwrap();
+            assert!(!carries_signature(&output), "{name}");
+            let reopened = litchi_xlsx::Package::from_bytes(output).unwrap();
+            assert!(reopened.custom_props().unwrap().get("Project").is_some());
+        }
+    }
+
+    #[test]
+    fn a_signed_package_keeps_equal_custom_properties_and_refuses_their_removal() {
+        let mut plain = unsigned_fixture(SIGNED[0]);
+        props().write_for(&mut plain, Host::Excel).unwrap();
+        let signed = sign(&plain);
+        let mut package = litchi_xlsx::Package::from_bytes(signed.clone()).unwrap();
+
+        package.put_custom_props(props()).unwrap();
+        assert_eq!(package.to_bytes().unwrap(), signed, "an equal store");
+        assert_signed(package.remove_custom_props());
+        assert_eq!(package.to_bytes().unwrap(), signed, "the refusal");
+
+        package.unsign().unwrap();
+        package.remove_custom_props().unwrap();
+        assert!(package.custom_props().unwrap().is_empty());
+    }
+
+    #[cfg(feature = "vba-inspection")]
+    #[test]
+    fn vba_projects_refuse_a_signed_package() {
+        use litchi_vba::{Limits, build};
+        use litchi_xlsx::active_x::vba;
+
+        let payload = || {
+            build::Project::new("ExcelProject")
+                .module(build::Module::standard(
+                    "Module1",
+                    "Public Sub Hello()\r\nEnd Sub\r\n",
+                ))
+                .finish(&Limits::default())
+                .unwrap()
+        };
+        for name in SIGNED {
+            let original = signed_fixture(name);
+            let mut package = open(&original);
+            let workbook = package.main_document_part().unwrap().partname().clone();
+            assert!(!vba::remove(&mut package, &workbook).unwrap());
+            assert_eq!(publish(&package), original, "{name}: no-op");
+
+            assert_signed(vba::store(&mut package, &workbook, payload()));
+            assert_eq!(publish(&package), original, "{name}: refusal");
+
+            package.unsign();
+            vba::store(&mut package, &workbook, payload()).unwrap();
+            assert!(!carries_signature(&publish(&package)), "{name}");
+        }
+
+        let mut plain = unsigned_fixture(SIGNED[0]);
+        let workbook = plain.main_document_part().unwrap().partname().clone();
+        vba::store(&mut plain, &workbook, payload()).unwrap();
+        let signed = sign(&plain);
+        let mut package = open(&signed);
+        assert_signed(vba::remove(&mut package, &workbook));
+        assert_eq!(publish(&package), signed, "the refusal");
+        package.unsign();
+        assert!(vba::remove(&mut package, &workbook).unwrap());
+    }
+}

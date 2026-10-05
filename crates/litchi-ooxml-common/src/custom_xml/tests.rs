@@ -67,23 +67,32 @@ fn package_writer_round_trips_without_interpreting_payload() {
         litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
     );
     assert!(package.is_signed());
-    add(
-        &mut package,
-        NewItem {
-            source: PackURI::new("/word/document.xml").unwrap(),
-            rel_id: "rIdData".into(),
-            part: PackURI::new("/customXml/item1.xml").unwrap(),
-            content_type: "application/xml".into(),
-            xml: b"<customer xmlns=\"urn:customer\" id=\"7\"/>".to_vec(),
-            props: Some(NewProps {
-                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
-                rel_id: "rIdProps".into(),
-                value: sample_props(),
-            }),
-            conformance: Conformance::Transitional,
-        },
-    )
-    .unwrap();
+    let item = || NewItem {
+        source: PackURI::new("/word/document.xml").unwrap(),
+        rel_id: "rIdData".into(),
+        part: PackURI::new("/customXml/item1.xml").unwrap(),
+        content_type: "application/xml".into(),
+        xml: b"<customer xmlns=\"urn:customer\" id=\"7\"/>".to_vec(),
+        props: Some(NewProps {
+            part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+            rel_id: "rIdProps".into(),
+            value: sample_props(),
+        }),
+        conformance: Conformance::Transitional,
+    };
+    // Adding an item changes the signed package, so it is refused before any
+    // part is inserted until the signature is removed explicitly (ADR 0006).
+    let parts = package.part_count();
+    assert!(matches!(
+        add(&mut package, item()),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert_eq!(package.part_count(), parts);
+    package.unsign();
+    add(&mut package, item()).unwrap();
     assert!(!package.is_signed());
     let items = discover(&package).unwrap();
     assert_eq!(items.len(), 1);
@@ -424,4 +433,65 @@ fn sample_props() -> Props {
         id: "{11111111-1111-1111-1111-111111111111}".into(),
         schemas: vec!["urn:customer".into()],
     }
+}
+
+#[test]
+fn changed_transactions_and_patches_refuse_a_signed_package() {
+    let source = PackURI::new("/word/document.xml").unwrap();
+    let item = || NewItem {
+        source: source.clone(),
+        rel_id: "rIdData".into(),
+        part: PackURI::new("/customXml/item1.xml").unwrap(),
+        content_type: "application/xml".into(),
+        xml: b"<root/>".to_vec(),
+        props: None,
+        conformance: Conformance::Transitional,
+    };
+    let mut package = package_with_source();
+    package.relate_to(
+        "_xmlsignatures/origin.sigs",
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    assert!(package.is_signed());
+    let patch = {
+        let mut unsigned = package.clone();
+        unsigned.unsign();
+        let mut edit = Transaction::new(&mut unsigned).unwrap();
+        edit.insert(item()).unwrap();
+        edit.commit().unwrap().patch().clone()
+    };
+    let parts = package.part_count();
+
+    // An unchanged transaction publishes nothing and keeps the signature.
+    let unchanged = Transaction::new(&mut package).unwrap().commit().unwrap();
+    assert!(!unchanged.changed());
+    assert!(
+        unchanged
+            .patch()
+            .inverse()
+            .apply(&mut package)
+            .is_ok_and(|changed| !changed)
+    );
+
+    // A changed transaction and a changed patch are refused (ADR 0006).
+    let mut edit = Transaction::new(&mut package).unwrap();
+    edit.insert(item()).unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(matches!(
+        patch.apply(&mut package),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert_eq!(package.part_count(), parts);
+
+    package.unsign();
+    assert!(patch.apply(&mut package).unwrap());
+    assert_eq!(discover(&package).unwrap().len(), 1);
 }

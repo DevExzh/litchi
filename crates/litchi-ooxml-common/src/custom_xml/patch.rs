@@ -1,6 +1,7 @@
 //! Reversible source-checked Custom XML package patches.
 
 use crate::Result;
+use crate::signature::refuse_signed_change;
 use litchi_opc::OpcPackage;
 
 use super::package;
@@ -52,10 +53,18 @@ impl Patch {
     }
 
     /// Apply atomically after checking the complete captured source graph.
+    ///
+    /// An empty patch publishes nothing, so a signed package keeps its
+    /// signature; a changed patch is refused for a signed package before it
+    /// is applied (ADR 0006): remove the signature explicitly first, with
+    /// [`OpcPackage::unsign`] or the format facade's `unsign`.
     /// # Errors
     ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
+    /// Returns [`crate::Error::Opc`] with
+    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// for a change to a signed package, and an error when input violates
+    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
+    /// package operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<bool> {
         let current = Snapshot::load_scoped(target, &self.before.scope_names())?;
         if !self.before.same_source(&current) {
@@ -64,6 +73,7 @@ impl Patch {
         if self.is_empty() {
             return Ok(false);
         }
+        refuse_signed_change(target)?;
 
         let mut candidate = target.clone();
         package::apply_items(&mut candidate, &self.before, self.after.items())?;

@@ -4,6 +4,7 @@
 //! only validates and mutates the OPC relationship graph shared by DOCX,
 //! PPTX, XLSX, and XLSB hosts.
 
+use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
@@ -114,10 +115,17 @@ pub fn read_project_part(
 }
 
 /// Replace or attach the one VBA graph allowed for an OOXML main part.
+///
+/// Storing always republishes the graph, so a signed package is refused
+/// before it is changed (ADR 0006): remove the signature explicitly first,
+/// with [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a signed package, and an error when input violates OOXML constraints,
+/// exceeds a configured bound, or an underlying XML or package operation
+/// fails.
 pub fn store_project_graph(
     package: &mut OpcPackage,
     source_part: &PackURI,
@@ -178,6 +186,7 @@ fn store_project_graph_in_place(
         }
     }
 
+    refuse_signed_change(package)?;
     if let Some(graph) = existing {
         package
             .get_part_mut(source_part)?
@@ -208,15 +217,23 @@ fn store_project_graph_in_place(
     let source = package.get_part_mut(source_part)?;
     source.relate_to(host.project_target(), rt::VBA_PROJECT);
     source.set_content_type(macro_content_type.to_string())?;
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
 /// Remove the complete VBA graph and restore the corresponding non-macro main type.
+///
+/// An absent graph returns `Ok(false)` and keeps a signed package's
+/// signature; removing a present graph from a signed package is refused
+/// before it is changed (ADR 0006): remove the signature explicitly first,
+/// with [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a change to a signed package, and an error when input violates OOXML
+/// constraints, exceeds a configured bound, or an underlying XML or package
+/// operation fails.
 pub fn remove_project_graph(
     package: &mut OpcPackage,
     source_part: &PackURI,
@@ -245,6 +262,7 @@ pub fn remove_project_graph(
         )?;
     }
 
+    refuse_signed_change(package)?;
     let mut staged = package.clone();
     remove_project_graph_in_place(&mut staged, source_part, graph, non_macro_content_type)?;
     *package = staged;
@@ -264,7 +282,7 @@ fn remove_project_graph_in_place(
     if let Some((supplemental, _)) = graph.supplemental {
         package.remove_part(&supplemental);
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
@@ -625,6 +643,62 @@ mod tests {
             );
             assert!(package.get_part(&PackURI::new(canonical).unwrap()).is_err());
         }
+    }
+
+    #[test]
+    fn signed_store_and_remove_are_refused_until_unsigned() {
+        let source_name = PackURI::new("/xl/workbook.xml").unwrap();
+        let project_name = PackURI::new(EXCEL_PROJECT_PART).unwrap();
+        let refused = |result: Result<_>| {
+            matches!(
+                result,
+                Err(Error::Opc(
+                    litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+                ))
+            )
+        };
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                source_name.clone(),
+                ct::SML_SHEET_MAIN.to_string(),
+                b"workbook".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let parts = package.part_count();
+
+        // Removing an absent graph publishes nothing and keeps the signature.
+        assert!(!remove_project_graph(&mut package, &source_name, Host::Excel).unwrap());
+        assert!(package.is_signed());
+        // Storing changes the signed package, so it is refused (ADR 0006).
+        let store = |package: &mut OpcPackage| {
+            store_project_graph(
+                package,
+                &source_name,
+                Host::Excel,
+                Arc::new(b"project".to_vec()),
+                None,
+            )
+        };
+        assert!(refused(store(&mut package)));
+        assert!(package.is_signed());
+        assert_eq!(package.part_count(), parts);
+        assert_eq!(
+            package.get_part(&source_name).unwrap().content_type(),
+            ct::SML_SHEET_MAIN
+        );
+
+        package.unsign();
+        store(&mut package).unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        assert!(refused(
+            remove_project_graph(&mut package, &source_name, Host::Excel).map(|_| ())
+        ));
+        assert!(package.get_part(&project_name).is_ok());
+        package.unsign();
+        assert!(remove_project_graph(&mut package, &source_name, Host::Excel).unwrap());
+        assert!(package.get_part(&project_name).is_err());
     }
 
     #[test]

@@ -35,6 +35,7 @@
 
 mod binding_tracker;
 mod error;
+mod signature;
 
 pub mod custom;
 pub mod custom_data;

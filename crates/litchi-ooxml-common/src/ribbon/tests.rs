@@ -101,13 +101,25 @@ fn identical_put_is_a_signature_and_allocation_preserving_noop() {
     let after = package.get_part(&part).unwrap().blob_arc();
     assert!(Arc::ptr_eq(&before, &after));
 
-    put(
-        &mut package,
-        Version::V2007,
+    // A changed Ribbon refuses the signed package and leaves it untouched
+    // until the signature is removed explicitly (ADR 0006).
+    let changed = || {
         br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#
-            .to_vec(),
-    )
-    .unwrap();
+            .to_vec()
+    };
+    assert!(matches!(
+        put(&mut package, Version::V2007, changed()),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &before,
+        &package.get_part(&part).unwrap().blob_arc()
+    ));
+    package.unsign();
+    put(&mut package, Version::V2007, changed()).unwrap();
     assert!(!package.is_signed());
 }
 
@@ -375,6 +387,18 @@ fn remove_collects_unreferenced_ribbon_and_image_parts() {
         .relate_to("image.png", rt::IMAGE);
     sign_marker(&mut package);
 
+    // Removing a present family refuses the signed package before any part
+    // is removed, until the signature is removed explicitly (ADR 0006).
+    assert!(matches!(
+        remove(&mut package, Family::Legacy),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert!(package.get_part(&ribbon).is_ok());
+    assert!(package.get_part(&image).is_ok());
+    package.unsign();
     assert!(remove(&mut package, Family::Legacy).unwrap());
     assert!(package.get_part(&ribbon).is_err());
     assert!(package.get_part(&image).is_err());

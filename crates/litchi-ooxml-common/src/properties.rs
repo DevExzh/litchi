@@ -431,11 +431,16 @@ impl Slot {
     /// Applies a staged write or clear only when this slot was edited.
     ///
     /// A failed flush leaves the slot dirty so the caller can repair the value
-    /// and retry. A byte-identical write is a true no-op.
+    /// and retry. A byte-identical write is a true no-op, which keeps a signed
+    /// package's signature; a change to a signed package is refused (see
+    /// [`write`] and [`clear`]).
     /// # Errors
     ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
+    /// Returns [`crate::Error::Opc`] with
+    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// for a change to a signed package, and an error when input violates
+    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
+    /// package operation fails.
     pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();
@@ -448,11 +453,14 @@ impl Slot {
     /// Hosts use this before a fallible publication step and call
     /// [`Stage::commit`] only after publication succeeds. The returned guard
     /// is tied to this exact slot, so another slot cannot be committed by
-    /// mistake.
+    /// mistake. A change to a signed package is refused, as in [`Self::flush`].
     /// # Errors
     ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
+    /// Returns [`crate::Error::Opc`] with
+    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// for a change to a signed package, and an error when input violates
+    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
+    /// package operation fails.
     pub fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
             return Ok(Stage {

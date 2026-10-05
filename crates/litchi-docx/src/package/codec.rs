@@ -1302,9 +1302,12 @@ impl Package {
             // Preserve the original custom XML unless its facade was edited.
             // Keep edit intent dirty until the complete publication succeeds,
             // so validation or sink failures remain retryable.
+            // The shared owners refuse a change to a signed package (ADR
+            // 0006); the refusal keeps this crate's typed signed error.
             if self.custom_props_dirty {
                 self.custom_props
-                    .write_for(&mut self.opc, CustomPropsHost::Word)?;
+                    .write_for(&mut self.opc, CustomPropsHost::Word)
+                    .map_err(crate::signature_policy::from_shared)?;
             }
 
             // Embed fonts if feature enabled and requested in options
@@ -1320,7 +1323,10 @@ impl Package {
             // Stage only an explicitly edited core-properties slot. The guard
             // keeps edit intent dirty until the output sink accepts the complete
             // package, so a failed stream remains retryable.
-            let staged_properties = self.properties.stage(&mut self.opc)?;
+            let staged_properties = self
+                .properties
+                .stage(&mut self.opc)
+                .map_err(crate::signature_policy::from_shared)?;
 
             self.opc.to_stream(writer).map_err(|e| {
                 Error::Io(std::io::Error::other(format!(

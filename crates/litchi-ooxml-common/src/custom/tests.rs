@@ -276,6 +276,17 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
     props.insert("Project", "Litchi").expect("insert");
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.is_signed());
+    // Creating the graph changes the signed package, so it is refused until
+    // the signature is removed explicitly (ADR 0006).
+    assert!(matches!(
+        props.write(&mut package),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert!(package.get_part(&custom_part_name().expect("URI")).is_err());
+    package.unsign();
     props.write(&mut package).expect("write");
     assert!(!package.is_signed());
     let first_blob = package
@@ -305,6 +316,15 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
         1
     );
 
+    assert!(matches!(
+        Props::new().write(&mut package),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert!(package.get_part(&custom_part_name().expect("URI")).is_ok());
+    package.unsign();
     Props::new().write(&mut package).expect("clear graph");
     assert!(!package.is_signed());
     assert!(package.get_part(&custom_part_name().expect("URI")).is_err());

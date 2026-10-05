@@ -19,9 +19,12 @@ use litchi_pptx::chart::{self, Chart, Series, Type as ChartType};
 use litchi_pptx::comments::{
     Author as LegacyAuthor, Comment as LegacyComment, Conformance as LegacyConformance,
 };
+use litchi_pptx::custom::Props as CustomProps;
 use litchi_pptx::font::{Data as FontData, Face, Font, Fonts, Style as FontStyle};
 use litchi_pptx::modern_comments::{self, Author as ModernAuthor, Comment as ModernComment};
 use litchi_pptx::presentation::embedded::ole::{self, Frame, Kind as OleKind};
+#[cfg(feature = "vba-inspection")]
+use litchi_pptx::presentation::embedded::vba;
 use litchi_pptx::presentation_properties::math::{BinaryBreak, Properties as MathProperties};
 use litchi_pptx::presentation_properties::metadata::changes::{self, Info, Part as ChangesPart};
 use litchi_pptx::presentation_properties::metadata::custom_show::{self, List as CustomShows};
@@ -61,6 +64,17 @@ fn test_data(path: &str) -> Vec<u8> {
 
 fn slide() -> PackURI {
     PackURI::new(SLIDE).unwrap()
+}
+
+#[cfg(feature = "vba-inspection")]
+fn presentation() -> PackURI {
+    PackURI::new("/ppt/presentation.xml").unwrap()
+}
+
+fn custom_props() -> CustomProps {
+    let mut props = CustomProps::new();
+    props.insert("Project", "Litchi").unwrap();
+    props
 }
 
 /// Whether `bytes` still carries any OPC signature infrastructure.
@@ -329,7 +343,7 @@ fn modern_comment(id: &str, author_id: &str, title: &str) -> ModernComment {
     reason = "one table row per package-level family keeps the families comparable"
 )]
 fn families() -> Vec<Family> {
-    vec![
+    let mut families = vec![
         Family {
             name: "legacy comments",
             prepare: None,
@@ -808,7 +822,39 @@ fn families() -> Vec<Family> {
                 package.apply_opened_presentation_commit(commit).map(drop)
             }),
         },
-    ]
+    ];
+    // Shared litchi-ooxml-common owners reached through this crate (F1b).
+    families.push(Family {
+        name: "custom properties (shared owner)",
+        prepare: None,
+        change: Some(Change {
+            edit: |package| package.put_custom_props(custom_props()),
+            shows: |package| Ok(package.custom_props()?.get("Project").is_some()),
+        }),
+        no_op: Some(|package| package.remove_custom_props()),
+    });
+    #[cfg(feature = "vba-inspection")]
+    families.push(Family {
+        name: "VBA project (shared owner)",
+        prepare: None,
+        change: Some(Change {
+            edit: |package| {
+                package.edit_opc(|opc| {
+                    vba::store(opc, &presentation(), b"inert project".to_vec()).map(drop)
+                })
+            },
+            shows: |package| {
+                package.with_opc(|opc| Ok(vba::discover(opc, &presentation())?.is_some()))
+            },
+        }),
+        no_op: Some(|package| {
+            package.edit_opc(|opc| {
+                assert!(!vba::remove(opc, &presentation())?);
+                Ok(())
+            })
+        }),
+    });
+    families
 }
 
 /// For every producer-signed fixture and every family: the changed edit is

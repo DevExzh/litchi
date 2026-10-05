@@ -657,11 +657,16 @@ impl Package {
     /// An empty collection removes the custom-properties graph. The change is
     /// clone-staged and only replaces this facade's OPC package after the
     /// shared OOXML owner has validated and serialized the complete graph.
-    /// Changed metadata invalidates existing package signatures.
+    /// Properties that serialize to the stored bytes publish nothing, so a
+    /// signed package keeps its signature; changed metadata on a signed
+    /// package is refused with [`crate::Error::Signed`] and leaves the package
+    /// unchanged (ADR 0006): call [`Self::unsign`] first.
     pub fn put_custom_props(&mut self, props: Props) -> Result<()> {
         self.ensure_mutation_allowed("put_custom_props")?;
         self.stage(|package| {
-            props.write_for(package, Host::Excel)?;
+            props
+                .write_for(package, Host::Excel)
+                .map_err(crate::signature_policy::from_shared)?;
             Ok(())
         })
     }
@@ -670,12 +675,17 @@ impl Package {
     ///
     /// This idempotent operation rejects corrupt, external, or duplicate
     /// graphs instead of treating them as absent. The custom-properties graph
-    /// is defined by MS-OI29500 section 3.11.
+    /// is defined by MS-OI29500 section 3.11. Removing an absent graph keeps a
+    /// signed package's signature; removing a present one from a signed
+    /// package is refused with [`crate::Error::Signed`] (ADR 0006): call
+    /// [`Self::unsign`] first.
     pub fn remove_custom_props(&mut self) -> Result<()> {
         self.ensure_mutation_allowed("remove_custom_props")?;
         self.stage(|package| {
             Props::read_for(package, Host::Excel)?;
-            Props::new().write_for(package, Host::Excel)?;
+            Props::new()
+                .write_for(package, Host::Excel)
+                .map_err(crate::signature_policy::from_shared)?;
             Ok(())
         })
     }

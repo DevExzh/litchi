@@ -78,25 +78,39 @@ impl Package {
     /// Replace the package's inert custom document properties transactionally.
     ///
     /// Empty properties remove the package-level relationship and target part.
-    /// The shared OOXML owner validates and stages the graph before publication,
-    /// preserving no-op and signature-invalidation behavior. See MS-OI29500
-    /// 3.11, "Reserved Custom File Properties".
+    /// The shared OOXML owner validates and stages the graph before publication.
+    /// Properties that serialize to the stored bytes publish nothing, so a
+    /// signed package keeps its signature. See MS-OI29500 3.11, "Reserved
+    /// Custom File Properties".
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) and leaves the package unchanged: remove the signature
+    /// explicitly first with [`Self::unsign`].
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
+    /// Returns [`Error::Opc`] for a change to a signed package, and an error
+    /// if the operation fails.
     pub fn put_custom_props(&mut self, props: Props) -> Result<()> {
-        self.edit_typed(move |opc| Ok(props.write_for(opc, Host::PowerPoint)?))
+        self.edit_typed(move |opc| {
+            props
+                .write_for(opc, Host::PowerPoint)
+                .map_err(crate::package::signature::from_shared_custom_props)
+        })
     }
 
     /// Remove every inert custom document property transactionally.
     ///
     /// This is idempotent. See MS-OI29500 3.11, "Reserved Custom File
-    /// Properties".
+    /// Properties". Removing absent properties keeps a signed package's
+    /// signature; removing present ones from a signed package is refused as
+    /// in [`Self::put_custom_props`].
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
+    /// Returns [`Error::Opc`] for a change to a signed package, and an error
+    /// if the operation fails.
     pub fn remove_custom_props(&mut self) -> Result<()> {
         self.put_custom_props(Props::new())
     }

@@ -1,26 +1,39 @@
-# 0014a — litchi-pptx: no implicit `unsign()` (F1 of 0013)
+# 0014a — no implicit `unsign()`: litchi-pptx and the shared OOXML owners
 
 - Status: implemented on `uo/0014a-pptx-unsign`, based on `uo/m0a` at
-  `0b79b2f61a` (record 0013, S6b, merged). Follow-up F1 of record
-  [0013](0013-signature-policy.md) §6, for `crates/litchi-pptx` only; the
-  DOCX and XLSX parts of F1 are separate records.
+  `0b79b2f61a` (record 0013, S6b, merged). Two parts:
+  - **F1, litchi-pptx**: follow-up F1 of record
+    [0013](0013-signature-policy.md) §6 for `crates/litchi-pptx` (commit
+    `88729fa29f`); record [0014b](0014b-xlsx-docx-implicit-unsign.md) did
+    the DOCX and XLSX parts.
+  - **F1b, the shared owners**: record 0014b §7's follow-up F1b, the
+    signature strippers in `crates/litchi-ooxml-common` that DOCX, XLSX,
+    PPTX and XLSB reach, assigned to this record by the coordinator after
+    0014b merged. `uo/m0a` at `18f4497188` (0014b) was merged in first
+    (`3b88673e6d`).
 - Date: 2026-10-05
-- Scope: `crates/litchi-pptx` (library, its unit tests, two integration test
-  files). No other crate changed; no public signature changed.
+- Scope: `crates/litchi-pptx` (F1, plus the F1b error mapping),
+  `crates/litchi-ooxml-common` (F1b), and the F1b error mapping and tests in
+  `crates/litchi-docx` and `crates/litchi-xlsx`. No public signature
+  changed.
 - Governing records: ADR 0006 ("Signed input is `Signed<T>`. Editing requires
   consuming it through explicit signature stripping or edit-and-resign"), ADR
   0003 (exact no-ops stay exact), record 0013 §2.1 (the XLSB classification
-  this one follows) and §2.2 (the pptx families), UNIFIED_OPS_GOAL
-  constraint 1 (typed refusals, exact no-ops).
+  this one follows) and §2.2 (the pptx families), record 0014b (its DOCX,
+  XLSX and XLSB patterns and §7 F1b), UNIFIED_OPS_GOAL constraint 1 (typed
+  refusals, exact no-ops).
 - `performance_claim: none`. Nothing was timed.
 
-Path prefix: `P/` = `crates/litchi-pptx/src/`. "Base" line numbers are at
-`0b79b2f61a`; every other line number is at this record's commit.
+Path prefixes: `P/` = `crates/litchi-pptx/src/`, `C/` =
+`crates/litchi-ooxml-common/src/`, `D/` = `crates/litchi-docx/src/`, `X/` =
+`crates/litchi-xlsx/src/`. "Base" line numbers are at `0b79b2f61a` (the
+shared owners did not change between that commit and `18f4497188`); every
+other line number is at this record's final commit.
 
 ## 1. The policy as applied
 
 A changed edit invalidates every package signature, and only the caller may
-remove one: `Package::unsign` (`P/package/model.rs:2104`, added by S6b),
+remove one: `Package::unsign` (`P/package/model.rs:2118`, added by S6b),
 `OpcPackage::unsign` on a raw package, or the existing explicit
 `PlaceholderSignaturePolicy::Invalidate`. Every package-level edit family of
 litchi-pptx now checks, in this order:
@@ -135,7 +148,7 @@ edit; one (b) site is test-only (#44).
 | 60 | `P/presentation/embedded/controls/slide/package.rs:102` | `controls::slide::apply_patch` / `apply_commit` / `Patch::apply` | b | refuse `:109`, settle `:111` |
 | 61 | `P/presentation/embedded/ole/authoring.rs:95` | `ole::add` | b | refuse `:81`, settle `:104` |
 | 62 | `P/font/package.rs:252` | `put_raw` (`font::put`, `font::remove`, `Package::put_fonts`, `remove_fonts`) | b | refuse `:252`, settle `:254` |
-| 63 | `P/package/model.rs:1915` | `Package::edit_opc`: a signed source whose closure changed the published bytes was unsigned | b | refused instead (`:2138`, check `:2153`); see §3 item 4 |
+| 63 | `P/package/model.rs:1915` | `Package::edit_opc`: a signed source whose closure changed the published bytes was unsigned | b | refused instead (`:2152`, check `:2167`); see §3 item 4 |
 
 The no-op of every (b) site was already exact, except the shape-span puts and
 removes (#46, #47, #55, #57, #58): their no-op returned without `unsign()`
@@ -145,17 +158,63 @@ it). The no-op check now precedes the mutable borrow (pinned by
 `shape_put_no_ops_keep_a_signed_package_exact`; with the borrow moved back
 in front of the check, that test fails with the writer's refusal).
 
-### 2.1 Found while classifying, not changed here
+### 2.1 F1b: the shared litchi-ooxml-common owners
 
-- **Strippers outside litchi-pptx reached through its API.**
-  `Package::put_custom_props` / `remove_custom_props` call
-  `litchi_ooxml_common::custom::Props::write_for`, which unsigns a changed
-  package (`crates/litchi-ooxml-common/src/custom/package.rs:97`, `:121`,
-  `:126`); `presentation::embedded::vba::{store, remove}` call
-  `store_project_graph` / `remove_project_graph`
-  (`crates/litchi-ooxml-common/src/vba.rs:211`, `:267`). The same crate has
-  further sites (ribbon, custom XML, core properties). They are shared with
-  DOCX and XLSX and belong to a litchi-ooxml-common record (F1-common, §6).
+The custom-properties, core-properties, Custom XML, VBA and Ribbon owners of
+`litchi-ooxml-common` removed the signature themselves on a changed edit, so
+every format that calls them stripped silently: `litchi_pptx::Package::
+put_custom_props` and `presentation::embedded::vba` (found while classifying
+F1), `litchi_xlsx::Package::{put_custom_props, remove_custom_props}` and
+`active_x::vba`, and the DOCX managed save of edited core or custom
+properties; DOCX's and XLSB's Ribbon facades and DOCX's VBA facade already
+refused before reaching them (records 0013 and 0014b). The owners now follow
+§1's three steps with their own helpers (`C/signature.rs`:
+`requires_disposition` `:27`, `refuse_signed_change` `:37`,
+`settle_unsigned_change` `:58`), refusing with
+`litchi_ooxml_common::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)`.
+
+Counts: 15 `unsign()` calls; **13 (b)** below, every one of whose no-ops
+already returned before the call, and **2 (a)**, explicit removals in tests
+(`C/web/tests.rs:631`, `:714`), kept. No (c).
+
+| # | Base site | Function (reached from) | Class | Action (this commit) |
+|---|---|---|---|---|
+| C1 | `C/custom/package.rs:97` | `custom::Props::write` / `write_for`, empty properties over a present graph (pptx and xlsx `remove_custom_props`, DOCX save) | b | settle before the removal, where the call was `:109` (it refuses) |
+| C2 | `C/custom/package.rs:121` | same, an existing part with other bytes | b | refuse `:132`, settle `:134`; equal bytes returned before (unchanged) |
+| C3 | `C/custom/package.rs:126` | same, a new part | b | settle before the insertion `:139` |
+| C4 | `C/properties/write.rs:68` | `properties::clear`, `Slot::flush` / `stage` of a cleared slot (DOCX save) | b | refuse `:75`, settle `:83`; absence returned before |
+| C5 | `C/properties/write.rs:95` | `properties::write`, `Slot::flush` / `stage`, an existing part with another value | b | refuse `:109`, settle `:111`; an equal value or equal bytes returned before |
+| C6 | `C/properties/write.rs:115` | same, a new graph | b | refuse `:129`, settle `:132` |
+| C7 | `C/custom_xml/package.rs:184` | `custom_xml::add` (DOCX data stores refuse before it, 0014b) | b | refuse `:154`, settle `:192` |
+| C8 | `C/custom_xml/package.rs:492` | `apply_items` ← `custom_xml::Patch::apply`, `Transaction::commit` (empty patches and unchanged transactions return before) | b | refuse `:483`, and before cloning in `Patch::apply` (`C/custom_xml/patch.rs:76`) and `commit` (`C/custom_xml/transaction.rs:307`); settle `:501` |
+| C9 | `C/vba.rs:211` | `store_project_graph` (pptx `vba::store`, xlsx `active_x::vba::store`) | b | refuse `:189`, settle `:220` |
+| C10 | `C/vba.rs:267` | `remove_project_graph`, a present graph (pptx `vba::remove`, xlsx `active_x::vba::remove`); an absent one returns before | b | refuse before cloning `:265`, settle `:285` |
+| C11 | `C/ribbon/package.rs:113` | `ribbon::put` / `put_with`, an unshared existing part (identical XML returns before) | b | refuse `:123`, settle `:125` |
+| C12 | `C/ribbon/package.rs:148` | same, a new or forked part | b | refuse `:145`, settle `:161` |
+| C13 | `C/ribbon/package.rs:191` | `ribbon::remove`, a present family | b | refuse `:199`, settle `:211` |
+
+Each caller keeps its crate's typed signed error:
+
+- **pptx**: `Package::put_custom_props` (and `remove_custom_props`) maps the
+  refusal to `Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)`
+  (`from_shared_custom_props`, `P/package/signature.rs:66`, used at
+  `P/package/model.rs:99`); every other shared error stays
+  `Error::CustomProperties`. The VBA functions' existing `map_common` already
+  maps `Opc` to `Error::Opc`.
+- **docx**: the managed save maps the core- and custom-properties refusal to
+  `Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)` (`from_shared`,
+  `D/signature_policy.rs:43`, used at `D/package/codec.rs:1310`, `:1329`); the
+  save rolls back and the edit stays pending.
+- **xlsx**: `Package::put_custom_props`, `remove_custom_props`
+  (`X/package.rs:669`, `:688`) and `active_x::vba::{store, remove}`
+  (`X/active_x/vba.rs:132`, `:150`) map it to `Error::Signed` (`from_shared`,
+  `X/signature_policy.rs:34`).
+- **xlsb**: nothing to map. Its Ribbon facade refuses before the shared
+  owner (0014b), and its task panes go through the shared web owner's patch,
+  which already refused.
+
+### 2.2 Found while classifying, not changed here
+
 - **Late refusals.** Some pptx mutators change a signed package in place
   without `unsign()` and without a refusal, so the package refuses only when
   it is saved: `store_presentation_comments`, `store_modern_comment`,
@@ -233,6 +292,49 @@ in front of the check, that test fails with the writer's refusal).
    revokes the exact-source authorization or resets the OPC signature-policy
    flags.
 
+F1b (§2.1):
+
+9. **Shared owners.** A change to a signed package through
+   `litchi_ooxml_common`'s custom properties (`custom::Props::write`,
+   `write_for`), core properties (`properties::write`, `clear`,
+   `Slot::flush`, `Slot::stage`), Custom XML (`custom_xml::add`,
+   `Patch::apply`, `Transaction::commit`), VBA (`vba::store_project_graph`,
+   `remove_project_graph`) or Ribbon (`ribbon::put`, `put_with`, `remove`) is
+   refused with `Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)`
+   before the package is mutated; before, the owner removed every signature
+   and succeeded (pinned by the six tests rewritten in §4). Remove the
+   signature first with `OpcPackage::unsign` or the facade's `unsign`.
+10. **Callers.** The same refusal, typed per crate (§2.1), from
+    `litchi_pptx::Package::{put_custom_props, remove_custom_props}`,
+    `litchi_pptx::presentation::embedded::vba::{store, remove}`,
+    `litchi_xlsx::Package::{put_custom_props, remove_custom_props}` and
+    `litchi_xlsx::active_x::vba::{store, remove}` (each succeeded and
+    unsigned the package before), and from a DOCX managed save (`save`,
+    `to_stream` and their variants) of a signed document whose core or
+    custom properties were edited, which used to publish the document
+    without its signature and now rolls back with the edit pending.
+11. **Exact no-ops unchanged**: equal properties, equal Ribbon XML, removing
+    an absent graph, an empty Custom XML patch or unchanged transaction keep
+    a signed package byte for byte. Storing the VBA project a package already
+    holds was never a no-op (the owner republishes the graph; DOCX's facade
+    returns early for an identical project, the pptx and xlsx functions do
+    not), so it is refused on a signed package.
+12. **Unsigned packages: unchanged.** The owners run `OpcPackage::unsign`
+    where they did; only the refusal before it is new, and it never fires
+    for an unsigned package. Read from the code; no byte probe was run for
+    F1b, and every unsigned test of the five crates passes unchanged.
+13. **Documentation.** 26 more public items state the refusal: 14 in
+    `litchi-ooxml-common` (`Props::write`, `write_for`, `properties::write`,
+    `clear`, `Slot::flush`, `stage`, `custom_xml::add`, `Patch::apply`,
+    `Transaction::commit`, `store_project_graph`, `remove_project_graph`,
+    `ribbon::put`, `put_with`, `remove`), 4 in litchi-pptx
+    (`put_custom_props`, `remove_custom_props`, `vba::store`, `remove`), 4 in
+    litchi-docx (`props_mut`, `put_props`, `clear_props`, `custom_props_mut`;
+    `Package::unsign` lists the properties) and 4 in litchi-xlsx
+    (`put_custom_props`, `remove_custom_props`, `active_x::vba::store`,
+    `remove`). The xlsx custom-properties text that said "changed metadata
+    invalidates existing package signatures" is replaced.
+
 ## 4. Tests
 
 New, `crates/litchi-pptx/tests/package_signature_policy.rs` (10 tests):
@@ -291,18 +393,69 @@ S6b's `tests/opened_signature_policy.rs` and
 `opened::tests::changed_commit_refuses_a_signed_package_until_it_is_unsigned`
 pass unchanged.
 
+F1b, per crate:
+
+- **litchi-ooxml-common**, new:
+  `signature::tests::settling_refuses_a_signed_package_and_never_removes_its_signature`,
+  `vba::tests::signed_store_and_remove_are_refused_until_unsigned` (an absent
+  removal is exact; a store and a present removal are refused, then succeed
+  after `unsign`),
+  `custom_xml::tests::changed_transactions_and_patches_refuse_a_signed_package`
+  (an unchanged transaction and an empty patch publish nothing; a changed
+  transaction and patch are refused).
+- **litchi-pptx**: two more rows in the family table, "custom properties
+  (shared owner)" (`Package::put_custom_props`, no-op `remove_custom_props`)
+  and "VBA project (shared owner)" (`vba::store`, no-op `vba::remove`).
+- **litchi-docx**, new module `shared_properties` in
+  `tests/package_signature_policy.rs`:
+  `edited_properties_refuse_a_signed_document_at_save` (all three signed DOCX
+  fixtures: equal core properties and an untouched custom set save the
+  source byte for byte; a changed title or a new custom property refuses the
+  save, which succeeds after `Package::unsign`) and
+  `removing_properties_refuses_a_signed_document_at_save` (a document signed
+  in-test with a custom property: the unchanged set is exact; removing it,
+  or clearing the core properties, refuses the save).
+- **litchi-xlsx**, new module `shared_owners` in
+  `tests/package_signature_policy.rs`:
+  `custom_properties_refuse_a_signed_fixture_and_keep_exact_noops`,
+  `a_signed_package_keeps_equal_custom_properties_and_refuses_their_removal`,
+  `vba_projects_refuse_a_signed_package` (feature `vba-inspection`).
+- **litchi-xlsb**: none; it reaches no shared stripper (§2.1), and record
+  0014b's Ribbon and task-pane tests pass unchanged.
+
+Rewritten for F1b, because they pinned the shared owners' strip; each now
+asserts the refusal, the unchanged and still signed package, and the change
+after an explicit `unsign`:
+
+| Test | Was | Now |
+|---|---|---|
+| `litchi-ooxml-common` `custom::tests::package_write_read_and_clear_remove_the_complete_graph` | a new graph and its clearing unsigned the package | both refused (graph unchanged), then succeed |
+| `custom_xml::tests::package_writer_round_trips_without_interpreting_payload` | `add` unsigned the package | refused with no part inserted, then succeeds |
+| `properties::write::tests::equal_put_through_slot_preserves_exact_bytes_and_signature` | a changed `Slot::flush` unsigned the package | refused, slot still dirty, part unchanged; flushes after `unsign` |
+| `properties::write::tests::unknown_payload_blocks_write_but_graph_safe_clear_sanitizes_it` | `clear` unsigned the package | refused (part unchanged), then clears |
+| `ribbon::tests::identical_put_is_a_signature_and_allocation_preserving_noop` | a changed put unsigned the package | refused (payload allocation unchanged), then succeeds |
+| `ribbon::tests::remove_collects_unreferenced_ribbon_and_image_parts` | `remove` unsigned the package | refused (Ribbon and image parts kept), then removes |
+| `litchi-pptx` `package::tests::custom_property_no_ops_preserve_signatures_and_changes_invalidate_them` | `put_custom_props` unsigned the package | renamed `…_changes_require_explicit_unsign`: refused with `Error::Opc`, then succeeds after `Package::unsign` |
+| `litchi-xlsx` `tests/xlsx_custom_properties.rs::custom_property_noops_preserve_and_changes_invalidate_signatures` | `put_custom_props` unsigned the package | renamed `…_changes_require_explicit_unsign`: refused with `Error::Signed`, properties unchanged, then succeeds after `Package::unsign` |
+
 ## 5. Gates
 
 On this branch, with `CARGO_TARGET_DIR=<worktree>/target CARGO_INCREMENTAL=0
 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0` and `3rdparty`
 symlinked from the main checkout for the test runs (removed afterwards):
 
-- `cargo fmt --check -p litchi-pptx`: clean.
-- `cargo clippy -p litchi-pptx --all-targets --all-features -- -D warnings`:
+- `cargo fmt --check -p litchi-pptx -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx`:
   clean.
-- `cargo test -p litchi-pptx --all-features --no-fail-fast`: 1,325 passed,
-  3 ignored, 0 failed (base: 1,314 passed, 3 ignored).
-- `RUSTDOCFLAGS=-Dwarnings cargo doc -p litchi-pptx --no-deps --all-features`:
+- `cargo clippy -p <crate> --all-targets --all-features -- -D warnings` for
+  `litchi-pptx`, `litchi-ooxml-common`, `litchi-docx`, `litchi-xlsx` and
+  `litchi-xlsb`: clean.
+- `cargo test -p <crate> --all-features --no-fail-fast`, 0 failed:
+  `litchi-pptx` 1,325 passed, 3 ignored (base 1,314); `litchi-ooxml-common`
+  454 (3 new); `litchi-docx` 2,037, 32 ignored (2 new); `litchi-xlsx` 2,159
+  (3 new; record 0014b: 2,156); `litchi-xlsb` 1,041, 12 ignored (record
+  0014b: 1,041).
+- `RUSTDOCFLAGS=-Dwarnings cargo doc -p <crate> --no-deps --all-features`
+  for `litchi-pptx`, `litchi-ooxml-common`, `litchi-docx` and `litchi-xlsx`:
   clean.
 - `cargo test -p litchi-ops --all-features signature`: 26 passed, including
   `tests::signature::every_signed_input_follows_the_explicit_signature_policy`
@@ -311,16 +464,12 @@ symlinked from the main checkout for the test runs (removed afterwards):
 
 ## 6. Follow-ups
 
-- **F1-common**: classify and refuse the litchi-ooxml-common strippers
-  (custom properties, VBA, ribbon, custom XML, core properties; §2.1), which
-  litchi-pptx reaches through `Package::put_custom_props`,
-  `remove_custom_props` and `presentation::embedded::vba::{store, remove}`
-  and which DOCX and XLSX share.
-- **F1-late**: refuse up front in the late-refusal mutators of §2.1 (the pptx
+- **F1-late**: refuse up front in the late-refusal mutators of §2.2 (the pptx
   counterpart of record 0013 F2).
 - **F1-semantic**: let a semantic no-op whose serialization differs from the
   stored bytes publish nothing (§3 item 2), where the family's model is
-  lossless enough to prove it.
+  lossless enough to prove it; with record 0014b's F1c. Storing the VBA
+  project a package already holds is the shared-owner case (§3 item 11).
 - The private refusal helpers that predate `P/package/signature.rs`
   (collaboration, read-only-recommended, content parts, InkAction,
   placeholders, opened transaction) can call it; behaviour is the same.
@@ -334,4 +483,7 @@ symlinked from the main checkout for the test runs (removed afterwards):
   outputs and method are in `results/0014a/`. Their conclusions are pinned by
   the tests of §4, except item 8 (unsigned identity), which rests on the
   probe and on the unchanged unsigned tests of the suite.
-- §2.1 is read from code; its late-refusal list is not exhaustive.
+- F1b's "before" is read from the code and from the tests that pinned the
+  strip (§4); no probe was run for it, and none for its unsigned identity
+  (§3 item 12).
+- §2.2 is read from code; its late-refusal list is not exhaustive.

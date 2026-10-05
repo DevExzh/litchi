@@ -2,6 +2,7 @@ use super::{
     Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, Props, graph,
     keyword::Item,
 };
+use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -23,10 +24,17 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 ///
 /// Existing nonstandard target paths, relationship IDs, and Strict versus
 /// Transitional dialects are retained. Returns whether package bytes changed.
+/// An equal value publishes nothing, so a signed package keeps its signature;
+/// a change to a signed package is refused before it mutates anything (ADR
+/// 0006): remove the signature explicitly first, with
+/// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a change to a signed package, and an error when input violates OOXML
+/// constraints, exceeds a configured bound, or an underlying XML or package
+/// operation fails.
 pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
     let result = sync(package, &props);
     drop(props);
@@ -35,12 +43,18 @@ pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
 
 /// Removes the validated core-properties graph.
 ///
-/// Absence is a successful no-op. Shared or ambiguous parts are rejected before
-/// mutation. Signatures are removed only after a real package mutation.
+/// Absence is a successful no-op, which keeps a signed package's signature.
+/// Shared or ambiguous parts are rejected before mutation. Removing a present
+/// graph from a signed package is refused before it mutates anything (ADR
+/// 0006): remove the signature explicitly first, with
+/// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a change to a signed package, and an error when input violates OOXML
+/// constraints, exceeds a configured bound, or an underlying XML or package
+/// operation fails.
 pub fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
@@ -58,6 +72,7 @@ pub fn clear(package: &mut OpcPackage) -> Result<bool> {
         )));
     }
 
+    refuse_signed_change(package)?;
     if !package.remove_part(&part_name) {
         return Err(Error::Missing(format!(
             "core-properties part '{}' disappeared during removal",
@@ -65,7 +80,7 @@ pub fn clear(package: &mut OpcPackage) -> Result<bool> {
         )));
     }
     *package.rels_mut() = relationships;
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
 }
 
@@ -91,8 +106,9 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
             if current.blob() == xml.as_slice() {
                 return Ok(false);
             }
+            refuse_signed_change(package)?;
             package.get_part_mut(&part_name)?.set_blob(xml);
-            package.unsign();
+            settle_unsigned_change(package)?;
             Ok(true)
         },
         (None, None) => {
@@ -110,9 +126,10 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Props) -> Result<bool> {
             package.validate_new_part_name(&part_name)?;
             let part = BlobPart::new(part_name, ct::OPC_CORE_PROPERTIES.to_owned(), xml);
 
+            refuse_signed_change(package)?;
             package.add_part(Box::new(part));
             *package.rels_mut() = relationships;
-            package.unsign();
+            settle_unsigned_change(package)?;
             Ok(true)
         },
         _ => Err(Error::Relationship(
@@ -684,7 +701,25 @@ mod tests {
             original
         );
 
+        // A changed value refuses the signed package and leaves the slot dirty
+        // until the signature is removed explicitly (ADR 0006).
         slot.get_mut().unwrap().title = Some("Changed".to_owned());
+        assert!(matches!(
+            slot.flush(&mut package),
+            Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+            ))
+        ));
+        assert!(slot.is_dirty());
+        assert!(package.is_signed());
+        assert_eq!(
+            package
+                .get_part(&PackURI::new("/metadata/core.xml").unwrap())
+                .unwrap()
+                .blob(),
+            original
+        );
+        package.unsign();
         assert!(slot.flush(&mut package).unwrap());
         assert!(!package.is_signed());
     }
@@ -830,6 +865,21 @@ mod tests {
             unknown
         );
 
+        assert!(matches!(
+            clear(&mut package),
+            Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+            ))
+        ));
+        assert!(package.is_signed());
+        assert_eq!(
+            package
+                .get_part(&PackURI::new("/docProps/core.xml").unwrap())
+                .unwrap()
+                .blob(),
+            unknown
+        );
+        package.unsign();
         assert!(clear(&mut package).unwrap());
         assert!(!package.is_signed());
         assert!(read_props(&package).unwrap().is_none());

@@ -1,5 +1,6 @@
 //! OPC package graph discovery and mutation for shared Ribbon customizations.
 
+use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI, Part, XmlPart};
 use std::cmp::Ordering;
@@ -67,20 +68,30 @@ pub fn load_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>
 /// Create or replace one Ribbon family using safe default limits.
 ///
 /// The XML allocation is moved into the OPC part. A byte-identical update is
-/// a true no-op and preserves package signatures. Input must be UTF-8 XML.
+/// a true no-op and preserves package signatures; any other change to a
+/// signed package is refused before it mutates anything (ADR 0006): remove
+/// the signature explicitly first, with [`OpcPackage::unsign`] or the format
+/// facade's `unsign`. Input must be UTF-8 XML.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a change to a signed package, and an error when input violates OOXML
+/// constraints, exceeds a configured bound, or an underlying XML or package
+/// operation fails.
 pub fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>) -> Result<()> {
     put_with(package, version, xml, &Limits::standard())
 }
 
-/// Create or replace one Ribbon family using explicit resource limits.
+/// Create or replace one Ribbon family using explicit resource limits, under
+/// the signature policy of [`put`].
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a change to a signed package, and an error when input violates OOXML
+/// constraints, exceeds a configured bound, or an underlying XML or package
+/// operation fails.
 pub fn put_with(
     package: &mut OpcPackage,
     version: Version,
@@ -109,8 +120,9 @@ pub fn put_with(
     };
 
     if let Some((part, _, false)) = existing.as_ref() {
+        refuse_signed_change(package)?;
         package.get_part_mut(part)?.set_blob(xml);
-        package.unsign();
+        settle_unsigned_change(package)?;
         return Ok(());
     }
 
@@ -130,6 +142,7 @@ pub fn put_with(
         }
     }
     let relationship_id = existing.map(|(_, id, _)| id);
+    refuse_signed_change(package)?;
     if let Some(id) = relationship_id.as_deref()
         && package.rels_mut().remove(id).is_none()
     {
@@ -145,7 +158,7 @@ pub fn put_with(
     } else {
         package.relate_to(&target, version.relationship());
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
@@ -153,11 +166,17 @@ pub fn put_with(
 ///
 /// The complete deletion plan is resolved before mutation. Shared Ribbon or
 /// image parts remain in the package. An absent family returns `Ok(false)` and
-/// preserves signatures.
+/// preserves signatures; removing a present family from a signed package is
+/// refused before it mutates anything (ADR 0006): remove the signature
+/// explicitly first, with [`OpcPackage::unsign`] or the format facade's
+/// `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a change to a signed package, and an error when input violates OOXML
+/// constraints, exceeds a configured bound, or an underlying XML or package
+/// operation fails.
 pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
     let (relationship_id, ribbon_part, images) = {
         let ribbons = load(package)?;
@@ -177,6 +196,7 @@ pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
         (relationship_id, remove_part.then_some(ribbon_part), images)
     };
 
+    refuse_signed_change(package)?;
     if package.rels_mut().remove(&relationship_id).is_none() {
         return Err(Error::Relationship(format!(
             "Ribbon relationship '{relationship_id}' disappeared before commit"
@@ -188,7 +208,7 @@ pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
             let _ = package.remove_part(&image);
         }
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
 }
 

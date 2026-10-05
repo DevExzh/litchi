@@ -60,6 +60,18 @@ pub(crate) fn settle_unsigned_change(package: &mut OpcPackage) -> Result<()> {
     Ok(())
 }
 
+/// Map an error of the shared custom-properties owner to this crate's error,
+/// keeping its signature refusal typed as [`Error::Opc`] with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`] (record 0014a, F1b).
+pub(crate) fn from_shared_custom_props(error: litchi_ooxml_common::Error) -> Error {
+    match error {
+        litchi_ooxml_common::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy) => {
+            Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
+        },
+        error => Error::CustomProperties(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use litchi_opc::constants::relationship_type as rt;

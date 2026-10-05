@@ -1,5 +1,6 @@
 //! Source-checked Custom XML package transactions.
 
+use crate::signature::refuse_signed_change;
 use crate::{Error, Result};
 use litchi_opc::{OpcError, OpcPackage, PackURI, TargetMode};
 use std::sync::Arc;
@@ -281,10 +282,18 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate and atomically publish the transaction.
+    ///
+    /// An unchanged transaction publishes nothing, so a signed package keeps
+    /// its signature; a changed one is refused for a signed package before
+    /// it is published (ADR 0006): remove the signature explicitly first, with
+    /// [`OpcPackage::unsign`] or the format facade's `unsign`.
     /// # Errors
     ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
+    /// Returns [`Error::Opc`] with
+    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// for a change to a signed package, and an error when input violates
+    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
+    /// package operation fails.
     pub fn commit(self) -> Result<Commit> {
         let current = Snapshot::load_scoped(self.target, &self.before.scope_names())?;
         if !self.before.same_source(&current) {
@@ -295,6 +304,7 @@ impl<'a> Transaction<'a> {
             return Ok(Commit::new(self.before, patch, false));
         }
         validation::items(&self.draft)?;
+        refuse_signed_change(self.target)?;
 
         let mut candidate = self.target.clone();
         package::apply_items(&mut candidate, &self.before, &self.draft)?;

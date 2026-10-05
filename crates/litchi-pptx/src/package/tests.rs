@@ -138,7 +138,7 @@ fn failed_typed_edit_restores_pending_presentation_state() {
 }
 
 #[test]
-fn custom_property_no_ops_preserve_signatures_and_changes_invalidate_them() {
+fn custom_property_no_ops_preserve_signatures_and_changes_require_explicit_unsign() {
     let mut package = Package::new().expect("new package");
     package
         .opc
@@ -150,10 +150,25 @@ fn custom_property_no_ops_preserve_signatures_and_changes_invalidate_them() {
         .expect("empty custom properties are a no-op");
     assert!(package.opc.is_signed());
 
-    let mut props = Props::new();
-    props.insert("Owner", "Alice").expect("property");
+    // A change is refused with the crate's typed signed error and leaves the
+    // package unchanged until the signature is removed explicitly (ADR 0006;
+    // the shared owner used to remove it).
+    let owner = || {
+        let mut props = Props::new();
+        props.insert("Owner", "Alice").expect("property");
+        props
+    };
+    assert!(matches!(
+        package.put_custom_props(owner()),
+        Err(crate::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.opc.is_signed());
+    assert!(package.custom_props().expect("read").is_empty());
+    package.unsign().expect("explicit unsign");
     package
-        .put_custom_props(props)
+        .put_custom_props(owner())
         .expect("write custom properties");
     assert!(!package.opc.is_signed());
 

@@ -27,3 +27,15 @@ pub(crate) fn ensure_unsigned(package: &OpcPackage) -> Result<()> {
     }
     Ok(())
 }
+
+/// Map an error of a shared `litchi-ooxml-common` owner (custom properties,
+/// VBA) to this crate's error, keeping a signature refusal typed as
+/// [`Error::Signed`] (unified-ops record 0014a, F1b).
+pub(crate) fn from_shared(error: litchi_ooxml_common::Error) -> Error {
+    match error {
+        litchi_ooxml_common::Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+        ) => Error::Signed,
+        error => Error::Common(error),
+    }
+}

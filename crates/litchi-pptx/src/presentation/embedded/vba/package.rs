@@ -52,9 +52,16 @@ pub fn discover(package: &OpcPackage, source: &PackURI) -> Result<Option<Project
 
 /// Store an opaque VBA payload through the shared transactional graph service.
 ///
+/// Storing always republishes the graph, so a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before it is changed: remove the signature explicitly first,
+/// with [`Package::unsign`](crate::Package::unsign) or, on a raw package,
+/// [`OpcPackage::unsign`].
+///
 /// # Errors
 ///
-/// Returns an error if the output cannot be encoded or written.
+/// Returns [`Error::Opc`] for a signed package, and an error if the output
+/// cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Vec<u8>) -> Result<Project> {
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
         return Err(Error::Limit {
@@ -70,9 +77,17 @@ pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Vec<u8>) -> Re
 
 /// Remove the complete VBA relationship graph and restore the non-macro main type.
 ///
+/// An absent graph returns `Ok(false)` and keeps a signed package's
+/// signature; removing a present graph from a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006): remove the signature explicitly first, with
+/// [`Package::unsign`](crate::Package::unsign) or, on a raw package,
+/// [`OpcPackage::unsign`].
+///
 /// # Errors
 ///
-/// Returns an error if the operation fails.
+/// Returns [`Error::Opc`] for a change to a signed package, and an error if
+/// the operation fails.
 pub fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
     remove_project_graph(package, source, Host::PowerPoint).map_err(map_common)
 }

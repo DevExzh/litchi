@@ -171,14 +171,27 @@ fn malformed_external_and_duplicate_custom_property_graphs_map_to_common_errors(
 }
 
 #[test]
-fn custom_property_noops_preserve_and_changes_invalidate_signatures() {
+fn custom_property_noops_preserve_and_changes_require_explicit_unsign() {
     let mut package = signed_package();
     assert!(package.custom_props().unwrap().is_empty());
     package.put_custom_props(Props::new()).unwrap();
     assert!(package.clone().into_plain_opc().is_signed());
 
-    let mut props = Props::new();
-    props.insert("Project", "Litchi").unwrap();
-    package.put_custom_props(props).unwrap();
+    // A change refuses the signed package and leaves it unchanged until the
+    // signature is removed explicitly (ADR 0006; the shared owner used to
+    // remove it).
+    let project = || {
+        let mut props = Props::new();
+        props.insert("Project", "Litchi").unwrap();
+        props
+    };
+    assert!(matches!(
+        package.put_custom_props(project()),
+        Err(Error::Signed)
+    ));
+    assert!(package.custom_props().unwrap().is_empty());
+    assert!(package.clone().into_plain_opc().is_signed());
+    package.unsign().unwrap();
+    package.put_custom_props(project()).unwrap();
     assert!(!package.into_plain_opc().is_signed());
 }

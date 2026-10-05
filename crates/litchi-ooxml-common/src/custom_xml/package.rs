@@ -1,6 +1,7 @@
 //! OPC package graph discovery and mutation for Custom XML Data Storage.
 
 use crate::mce::Name;
+use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::part::XmlPart;
 use litchi_opc::{OpcError, OpcPackage, PackURI, Part, TargetMode};
@@ -62,11 +63,17 @@ pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
 ///
 /// All fallible graph and XML work happens before package mutation. Defensive
 /// rollback also covers an unexpected insertion or relationship failure, so an
-/// error never exposes a partially-created Custom XML item.
+/// error never exposes a partially-created Custom XML item. Adding to a signed
+/// package is refused before it mutates anything (ADR 0006): remove the
+/// signature explicitly first, with [`OpcPackage::unsign`] or the format
+/// facade's `unsign`.
 /// # Errors
 ///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
+/// Returns [`Error::Opc`] with
+/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// for a signed package, and an error when input violates OOXML constraints,
+/// exceeds a configured bound, or an underlying XML or package operation
+/// fails.
 pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
     validate_content_type(&item.content_type)?;
     validate_payload(&item.xml)?;
@@ -144,6 +151,7 @@ pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
         )?;
     }
 
+    refuse_signed_change(package)?;
     let inserted_props = if let Some((props_part, _, props_xml)) = prepared_props {
         package.try_add_part(Box::new(XmlPart::new(
             props_part.clone(),
@@ -181,7 +189,7 @@ pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
         rollback_parts(package, &part, inserted_props.as_ref());
         return Err(error);
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
@@ -472,6 +480,7 @@ pub(crate) fn apply_items(
         .map(|part| part.name.clone())
         .collect::<Vec<_>>();
 
+    refuse_signed_change(package)?;
     for part in parts {
         package.add_part(Box::new(part));
     }
@@ -489,7 +498,7 @@ pub(crate) fn apply_items(
             package.remove_part(&name);
         }
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(())
 }
 
