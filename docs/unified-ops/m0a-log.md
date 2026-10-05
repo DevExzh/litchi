@@ -74,3 +74,31 @@
   - docx has the same publish-time constraint.
 - ADR 0003 and design §3/§8 require the old snapshot to stay readable after a write. M2 therefore needs one of: a non-consuming publish (or cheap package clone) in the leaves or litchi-opc; a retained reader for a cheap re-open; or consuming Rust verbs plus a documented clone-then-edit fallback. Record 0009 will decide this before M2.
 - Merged tree after S5a/b/c/e: litchi-ops clippy passes with all features and with each of pptx, xlsx, xlsb, xlsx+xlsb and pptx+xlsx; 153 unit tests and 29 doctests pass; `cargo check -p litchi --all-features` passes.
+
+## S5d — legacy OLE handles `Doc`/`Xls`/`Ppt`, L-DOC-1, L-PPT-1, L-XLS-1 (`2bec864ec1`, after the rewrite)
+- One-pointer `Send + Sync` handles. Each retains its source without a copy or a second parse:
+  - The doc and ppt byte routes move detection's in-memory CFB parse into a `SharedOleFile` (`SharedOleFile::from_owned_ole_file`).
+  - The ppt path route keeps the `SourceBackedPackage` that the facade used to drop.
+  - `retain_source(false)` releases the source.
+- `Xls` has two states: `Source` (source-backed workbook plus `SharedOleFile`) and `Eager`. `XlsFile` and `Other` (F12) are not carried over.
+- Metadata keeps the facade's return shapes; S6 unifies them. The editor builders return leaf-typed errors until M2.
+- Leaf changes:
+  - `litchi-cfb`: `SharedOleFile::from_owned_ole_file` and `is_owned_immutable`.
+  - `litchi-ole-common`: `SourceBackedOverlayPublisher::from_shared`.
+  - L-DOC-1: `body_text::source::SourceSnapshot::from_shared`, plus `Package::into_ole_file`.
+  - L-PPT-1: `text_edit::SourceSnapshot::from_shared`, `SourceBackedPackage::text_edit_snapshot[_with_limits]`, and `Package::into_ole_file`.
+  - L-XLS-1 uses the plan's fallback: `cell_values::Snapshot::from_shared_ole_file` copies the source once and indexes it at the first edit. The editor captures streams through the cursor-based reader, so it cannot avoid the re-index. The copy cost is about 23 µs vs 21 µs from caller bytes on `Simple.xls`.
+  - R3 `Send + Sync` assertions in the leaves.
+- New edge `litchi-ops -> litchi-ole-common` (doc/ppt/xls features). Inventory: 263 declarations, 251 canonical edges.
+- **Deviation, provisional default: the `.xls` byte route stays eager.** Over the 54 corpus workbooks:
+  - the source-backed owner refuses BIFF5 and older files;
+  - it fails text extraction on 4 files the eager reader reads;
+  - the eager reader omits worksheets in 8 files the source owner reads in full.
+
+  The facade's two routes already disagree on those 8 files today, and a test pins the list. Keeping today's routing means no regression in M0a. Reconciling the two readers is a correctness item for the xls write stream (M2b), because a byte-opened and a path-opened `.xls` currently show different sheets.
+- Quick open check (release, 200 iterations; not the S10 protocol): `SampleShow.ppt` 31.8 → 31.7 µs, `testPictures.doc` 48.5–49.5 → 48.8–49.0 µs. Retention (R5) keeps exactly the input bytes alive; S10 measures RSS.
+- Already failing before this step, not touched: `cargo doc -p litchi-doc` fails on private intra-doc links in `parts/{bookmarks,comments,rsids,sections/codec}.rs`.
+- Merged tree after all S5 steps:
+  - litchi-ops clippy passes with all features and with each of doc, ppt, xls, pptx, doc+ppt+xls and docx+doc.
+  - 173 unit tests and 29 doctests pass, and `cargo check -p litchi --all-features` passes.
+  - The boundary checker (263 declarations), the non-iWork gate and the gate unit tests pass.
