@@ -37,3 +37,14 @@
   - `--corpus-manifest` fails on the detection group.
   - The plan's `docx_source_selected_paragraph` is a non-timing binary; `docx_semantic_one_paragraph` and `docx_producer_source_selected_paragraph` were measured instead.
 - Disk: free space on `/` briefly reached 9.1 GB during the capture. The unified-ops worktrees were 2–3 GB each at the time, so most of that usage came from outside this program.
+
+## S5e — tier-3 read handles Rtf/Odt/Ods/Odp (`ea0c856e3f`, after the rewrite)
+- One-pointer `Send + Sync` handles over the facade's current payloads. Odt/Ods/Odp each have an `Eager`/`Source` owner; the `RefCell` around Ods is gone because every read API it uses takes `&self`. Constructors are `pub(crate)`, one per route. Errors are typed (`Source::Core` tagged with the format; `Source::Rtf`). `metadata()` returns `Option<Metadata>`, and `tolerance_report()` returns the leaf report type, which S6/S7 wraps. `chrono` is a new optional dependency on `rtf`. No leaf changes: all seven tier-3 leaf owners are `Send + Sync`.
+- For S6:
+  - The facade has no ODS sheet adapter and its `Workbook` does not implement `WorkbookTrait`; the `open_*_workbook_dyn*` openers refuse ODS. Default for S6: give `WorkbookView` the facade's existing ODS reads through `Ods::worksheets()`, and have the static `WorkbookTrait` path refuse ODS with `unsupported_capability`, as today. A real ODS adapter is new work for M1.
+  - Use `Odp::from_prepared` instead of the facade's route, which turns a prepared ODP back into bytes and re-parses it.
+  - ODF limits stay with detection.
+- Observations:
+  - `test-data/odf/corpus/impress-*.odp` never gets the source-backed owner from `detect_pptx_source_path_with_limits`: the path probe returns `Bytes`, so these files take the eager parse. The facade behaves the same today. It may affect the S10 ODP open timings.
+  - ODP `metadata()` is `Some(Metadata::default())`, as in the facade, although the leaf can read `meta.xml`. This is an M1 fidelity item.
+- 20 tests; clippy (all features and each single feature), docs, and the boundary/non-iWork gates pass. On the merged tree: litchi-ops clippy passes, and 115 unit tests plus 26 doctests pass.
