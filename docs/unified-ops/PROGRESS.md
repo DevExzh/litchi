@@ -15,6 +15,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | 0007 | Coordinator defaults for 0003's open questions | adopted, awaiting owner |
 | M0a | Steps S1–S10 on `uo/m0a` (plan 0003 §4) | in progress |
 | 0008 | Diagnosis: source-backed DOCX edits refuse every Word-authored fixture (MCE) — M2 blocker | in progress |
+| 0009 | Design: editing a shared snapshot (R4; leaf publishers consume their package) — M2 prerequisite | in progress |
 
 ## Awaiting owner confirmation
 
