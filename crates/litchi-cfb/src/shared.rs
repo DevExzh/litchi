@@ -657,6 +657,74 @@ impl SharedOleFile {
         Self::open_sealed(SealedBytes::Vec(source), version)
     }
 
+    /// Adopts an in-memory [`OleFile`] that is already parsed, without parsing
+    /// the container a second time.
+    ///
+    /// The reader's vector becomes the sealed owned source of the returned
+    /// view, exactly as [`Self::open_owned_vec`] seals it, and the validated
+    /// directory/FAT index moves across unchanged. No byte is copied. Only
+    /// the cursor's validation and read scratch state is dropped; a mini
+    /// stream the cursor reader had loaded is read again lazily on first use.
+    ///
+    /// `limits` must be no wider than the limits `ole` was parsed under. This
+    /// call checks the input length against them, but it cannot re-run the
+    /// directory and allocation-table checks the parse already ran.
+    /// [`OleFile::open`] parses under defaults equal to
+    /// [`SharedOleFileLimits::default`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::LimitExceeded`] when the input is longer than
+    /// `limits` admits, and [`OleError::InvalidData`] when the reader's length
+    /// differs from the length the parse captured.
+    pub fn from_owned_ole_file(
+        ole: OleFile<io::Cursor<Vec<u8>>>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        let (cursor, index) = ole.into_reader_and_parsed_index();
+        let bytes = cursor.into_inner();
+        let length = u64::try_from(bytes.len())
+            .map_err(|_error| OleError::InvalidData("owned CFB length exceeds u64".into()))?;
+        if length != index.file_size {
+            return Err(OleError::InvalidData(format!(
+                "owned CFB length {length} differs from parsed length {}",
+                index.file_size
+            )));
+        }
+        if length > limits.max_input_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: length,
+                maximum: limits.max_input_bytes(),
+            });
+        }
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
+            bytes: SealedBytes::Vec(Arc::new(bytes)),
+            version,
+            #[cfg(test)]
+            read_count: None,
+        });
+        Ok(Self {
+            source,
+            expected_version: version,
+            source_is_owned_immutable: true,
+            limits,
+            index: Arc::new(index),
+            ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_singleflight: MiniFATSingleFlight::new(),
+        })
+    }
+
+    /// Whether this view reads sealed bytes it owns ([`Self::open_owned`],
+    /// [`Self::open_owned_vec`], [`Self::from_owned_ole_file`]) rather than a
+    /// caller-supplied positional source whose bytes could change.
+    #[must_use]
+    pub const fn is_owned_immutable(&self) -> bool {
+        self.source_is_owned_immutable
+    }
+
     fn open_sealed(bytes: SealedBytes, version: SourceVersion) -> Result<Self, OleError> {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
             bytes,
@@ -3995,6 +4063,56 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn owned_ole_file_adoption_matches_a_fresh_owned_open() {
+        let bytes = multi_mini_bytes();
+        let version = SourceVersion::new(0x0A0D_0E1F, 0);
+        let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        // A cursor read that loads the mini stream must not leak into the
+        // adopted view's state.
+        assert_eq!(ole.open_stream(&["Mini"]).unwrap().len(), 200);
+        let adopted =
+            SharedOleFile::from_owned_ole_file(ole, version, SharedOleFileLimits::default())
+                .unwrap();
+        let reopened = SharedOleFile::open_owned_vec(Arc::new(bytes.clone()), version).unwrap();
+
+        assert!(adopted.is_owned_immutable());
+        assert!(reopened.is_owned_immutable());
+        assert_eq!(adopted.file_size(), reopened.file_size());
+        assert_eq!(adopted.source_version().unwrap(), version);
+        assert_eq!(
+            adopted.open_stream(&["Mini"]).unwrap(),
+            reopened.open_stream(&["Mini"]).unwrap()
+        );
+        let names = |file: &SharedOleFile| {
+            file.directory_entries()
+                .map(|entry| entry.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(&adopted), names(&reopened));
+        // The adopted source is the moved vector itself.
+        let mut first = [0_u8; 8];
+        assert_eq!(adopted.source_arc().read_at(0, &mut first).unwrap(), 8);
+        assert_eq!(&first, &bytes[..8]);
+
+        let positional = SharedOleFile::open(Arc::new(TestSource::new(bytes))).unwrap();
+        assert!(!positional.is_owned_immutable());
+    }
+
+    #[test]
+    fn owned_ole_file_adoption_enforces_the_input_ceiling() {
+        let bytes = multi_mini_bytes();
+        let length = u64::try_from(bytes.len()).unwrap();
+        let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let limits = SharedOleFileLimits::new(length - 1).unwrap();
+        let error =
+            SharedOleFile::from_owned_ole_file(ole, SourceVersion::new(1, 0), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            OleError::LimitExceeded { observed, .. } if observed == length
+        ));
     }
 
     fn two_mini_bytes(length: usize) -> (Vec<u8>, Vec<u8>) {

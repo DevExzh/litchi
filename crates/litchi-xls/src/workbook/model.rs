@@ -191,6 +191,15 @@ impl<R: Read + Seek> Workbook<R> {
         &self.tolerance
     }
 
+    /// Borrows the reader the workbook's compound file was parsed from.
+    ///
+    /// For an in-memory workbook this is the cursor over the exact source
+    /// bytes, which an editor such as [`crate::cell_values::Snapshot`] can be
+    /// opened from without reading the source again.
+    pub fn get_ref(&self) -> &R {
+        self.ole_file.get_ref()
+    }
+
     /// Optional `ExtSST` shared-string lookup index.
     ///
     /// A malformed optional index is reported here without preventing workbook content parsing.

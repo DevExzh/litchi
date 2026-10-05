@@ -591,6 +591,67 @@ impl Snapshot {
         Self::from_package_editor(package)
     }
 
+    /// Opens the editable snapshot over a positional CFB owner that is
+    /// already open, such as the one a source-backed workbook or a format
+    /// detector holds.
+    ///
+    /// This is the re-index fallback of unified-ops record 0003 (risk R2):
+    /// the package editor captures its streams through the cursor-based CFB
+    /// reader, so this constructor copies the source once, under the CFB
+    /// owner's version fence, and the editor indexes that copy again. Both
+    /// costs fall when an edit begins, never when the workbook is opened. The
+    /// copy is bounded by `cfb_limits`, which also govern the editor's index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Cfb`] when the source changed or exceeds
+    /// `cfb_limits`, [`Error::Allocation`] when the copy cannot be reserved,
+    /// and otherwise the errors of [`Self::from_bytes_with_limits_and_cfb`].
+    pub fn from_shared_ole_file(
+        cfb: &litchi_cfb::SharedOleFile,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Self> {
+        let expected = cfb.source_version()?;
+        let length = cfb.file_size();
+        if length > cfb_limits.max_input_bytes() {
+            return Err(Error::Cfb(litchi_cfb::OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: length,
+                maximum: cfb_limits.max_input_bytes(),
+            }));
+        }
+        let length = usize::try_from(length)
+            .map_err(|_error| Error::Allocation("XLS editor source exceeds this platform"))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_error| Error::Allocation("XLS editor source copy"))?;
+        bytes.resize(length, 0);
+        let source = cfb.source_arc();
+        let mut filled = 0_usize;
+        while filled < length {
+            let offset = u64::try_from(filled)
+                .map_err(|_error| Error::InvalidData("XLS editor offset exceeds u64".into()))?;
+            let read = source.read_at(offset, &mut bytes[filled..])?;
+            if read == 0 {
+                cfb.source_version()?;
+                return Err(Error::InvalidData(
+                    "XLS source ended while the editor copied it".into(),
+                ));
+            }
+            filled += read;
+        }
+        let observed = cfb.source_version()?;
+        if observed != expected {
+            return Err(Error::Cfb(litchi_cfb::OleError::SourceChanged {
+                expected,
+                observed,
+            }));
+        }
+        Self::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits)
+    }
+
     fn from_package_editor(package: PackageEditor) -> Result<Self> {
         Self::open_package(package, None, None)
     }

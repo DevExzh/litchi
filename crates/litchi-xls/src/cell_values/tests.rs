@@ -2814,3 +2814,40 @@ fn rename_refuses_every_worksheet_name_the_reader_refuses() {
     let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
     assert_eq!(reopened.sheets()[0].name(), astral);
 }
+
+#[test]
+fn shared_ole_file_editor_matches_an_owned_byte_open() {
+    let bytes = package();
+    let owned = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let shared =
+        SharedOleFile::open(Arc::new(litchi_core::OwnedSource::new(bytes.clone()))).unwrap();
+    let adopted =
+        Snapshot::from_shared_ole_file(&shared, Limits::default(), OleFileLimits::default())
+            .unwrap();
+    assert_eq!(adopted.bytes(), owned.bytes());
+    assert_eq!(adopted.worksheet_count(), owned.worksheet_count());
+    assert_eq!(adopted.workbook_stream(), owned.workbook_stream());
+
+    let length = u64::try_from(bytes.len()).unwrap();
+    let tight = OleFileLimits::new(length - 1).unwrap();
+    assert!(matches!(
+        Snapshot::from_shared_ole_file(&shared, Limits::default(), tight),
+        Err(Error::Cfb(litchi_cfb::OleError::LimitExceeded { observed, .. })) if observed == length
+    ));
+}
+
+#[test]
+fn eager_workbook_exposes_its_exact_source_bytes() {
+    let bytes = package();
+    let workbook = Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    assert_eq!(workbook.get_ref().get_ref(), &bytes);
+}
+
+const fn assert_send_sync<T: Send + Sync>() {}
+// Risk R3 of unified-ops record 0003: the unified `Xls` handle retains these
+// owners behind an `Arc`, so they must stay thread-safe.
+const _: () = {
+    assert_send_sync::<Snapshot>();
+    assert_send_sync::<crate::SourceBackedWorkbook>();
+    assert_send_sync::<Workbook<Cursor<Vec<u8>>>>();
+};

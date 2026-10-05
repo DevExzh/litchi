@@ -67,6 +67,19 @@ impl SourceBackedOverlayPublisher {
         Ok(Self { cfb: Arc::new(cfb) })
     }
 
+    /// Adopts a positional CFB owner that is already open and validated, then
+    /// applies the common signed/encrypted/DRM mutation guard.
+    ///
+    /// No container index is built: the publisher shares `cfb`'s parsed
+    /// directory/FAT index, source-version capture and ownership provenance.
+    /// Sealed owned bytes keep the planning and publication specializations
+    /// described on [`Self::open_owned`]; any other source keeps the generic
+    /// fences.
+    pub fn from_shared(cfb: Arc<SharedOleFile>) -> Result<Self, OverlayError> {
+        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        Ok(Self { cfb })
+    }
+
     /// Returns the validated positional CFB owner for repeated semantic reads.
     ///
     /// The returned handle retains the parsed directory/FAT index and shares
@@ -237,6 +250,49 @@ mod tests {
                 ),
                 Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
             ));
+            let shared = SharedOleFile::open_owned_vec(
+                Arc::new(bytes_for_shared(marker)),
+                SourceVersion::new(0x0182, 0),
+            )
+            .unwrap();
+            assert!(matches!(
+                SourceBackedOverlayPublisher::from_shared(Arc::new(shared)),
+                Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
+            ));
         }
+    }
+
+    fn bytes_for_shared(marker: &str) -> Vec<u8> {
+        write_cfb(|writer| {
+            writer.create_storage(&[marker]).unwrap();
+            writer.create_stream(&["Ordinary"], b"bytes").unwrap();
+        })
+    }
+
+    #[test]
+    fn adopted_shared_owner_publishes_without_a_second_index() {
+        let bytes = write_cfb(|writer| {
+            writer.create_stream(&["Target"], b"before").unwrap();
+        });
+        let shared = Arc::new(
+            SharedOleFile::open_owned_vec(Arc::new(bytes), SourceVersion::new(0x0183, 0)).unwrap(),
+        );
+        let publisher = SourceBackedOverlayPublisher::from_shared(Arc::clone(&shared)).unwrap();
+        assert!(Arc::ptr_eq(&publisher.shared(), &shared));
+        let plan = publisher
+            .plan_splices(
+                vec![SameLengthStreamSplice::new(
+                    vec!["Target".to_string()],
+                    0,
+                    Arc::from(b"be".as_slice()),
+                    Arc::from(b"BE".as_slice()),
+                )],
+                StreamSpliceLimits::default(),
+            )
+            .unwrap();
+        let mut output = Vec::new();
+        plan.write_to(&mut output).unwrap();
+        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"BEfore");
     }
 }

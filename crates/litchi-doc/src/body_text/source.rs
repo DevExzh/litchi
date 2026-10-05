@@ -571,6 +571,117 @@ impl SourceSnapshot {
             Arc::clone(&source),
             shared_limits,
         )?);
+        Self::open_from_first_index(
+            source,
+            version,
+            length,
+            &first_shared,
+            shared_limits,
+            limits,
+            protection_policy,
+        )
+    }
+
+    /// Builds the snapshot over a CFB owner that is already open, such as the
+    /// one a format detector produced, with the default options.
+    ///
+    /// See [`Self::from_shared_with_options_and_policy`].
+    pub fn from_shared(shared: Arc<SharedOleFile>) -> Result<Self> {
+        Self::from_shared_with_options_and_policy(
+            shared,
+            SourceBackedOptions::default(),
+            ProtectionPolicy::default(),
+        )
+    }
+
+    /// Builds the snapshot over a CFB owner that is already open, with
+    /// explicit options and protected-edit policy.
+    ///
+    /// A sealed owned source ([`SharedOleFile::is_owned_immutable`]) is used
+    /// as is: like [`Self::from_bytes`], the open takes no second CFB index,
+    /// because those bytes cannot change. Any other source takes the same
+    /// second index after the opening fingerprint that
+    /// [`Self::open_with_options`] takes, with `shared` standing in for that
+    /// path's first index, so an adapter whose version token is stable while
+    /// its bytes change is still refused.
+    ///
+    /// `options.limits` bounds the input length and every semantic read. The
+    /// adopted index keeps the directory and allocation-table ceilings it was
+    /// opened under.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors [`Self::open_with_options_and_policy`] returns.
+    pub fn from_shared_with_options_and_policy(
+        shared: Arc<SharedOleFile>,
+        options: SourceBackedOptions,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
+        let limits = options.limits;
+        limits.validate()?;
+        let source = shared.source_arc();
+        let length = source.len()?;
+        if length > limits.max_input_bytes {
+            return Err(Error::Limit(format!(
+                "source length {length} exceeds {}",
+                limits.max_input_bytes
+            )));
+        }
+        if length != shared.file_size() {
+            return Err(Error::Overlay(OverlayError::Unavailable {
+                reason: format!(
+                    "source length {length} differs from the CFB index length {}",
+                    shared.file_size()
+                ),
+            }));
+        }
+        let version = shared.captured_source_version();
+        if !shared.is_owned_immutable() {
+            let shared_limits = SharedOleFileLimits::new(limits.max_input_bytes)?;
+            return Self::open_from_first_index(
+                source,
+                version,
+                length,
+                &shared,
+                shared_limits,
+                limits,
+                protection_policy,
+            );
+        }
+        ensure_source_identity(&source, version, length)?;
+        if shared.source_version()? != version {
+            return Err(Error::Overlay(OverlayError::SourceChanged {
+                expected: version,
+                observed: shared.source_version()?,
+            }));
+        }
+        // The single-index capture of `open_owned_source_with_policy`, on the
+        // same rule: the sealed bytes cannot change, and this fingerprint's
+        // partner is `finish_open`'s `final_fingerprint`.
+        let opening_fingerprint = shared.caller_bracketed_identity_fingerprint()?;
+        ensure_source_identity(&source, version, length)?;
+        Self::finish_open(
+            source,
+            version,
+            length,
+            opening_fingerprint,
+            shared,
+            limits,
+            protection_policy,
+        )
+    }
+
+    /// The generic positional open after its first CFB index exists: capture
+    /// the opening identity, then bind a second index to it.
+    fn open_from_first_index(
+        source: Arc<dyn ReadAt>,
+        version: SourceVersion,
+        length: u64,
+        first_shared: &SharedOleFile,
+        shared_limits: SharedOleFileLimits,
+        limits: SourceLimits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         ensure_source_identity(&source, version, length)?;
         if first_shared.source_version()? != version {
             return Err(Error::Overlay(OverlayError::SourceChanged {
@@ -599,7 +710,7 @@ impl SourceSnapshot {
             Ok(index) => Arc::new(index),
             Err(error) => {
                 return Err(relocate_structural_cfb_error(
-                    &first_shared,
+                    first_shared,
                     opening_fingerprint,
                     error,
                 ));
@@ -2705,6 +2816,60 @@ mod tests {
         let paragraph = source.paragraph(Position::new(0)).expect("first paragraph");
         assert!(!paragraph.text().is_empty());
     }
+
+    #[test]
+    fn adopted_shared_owner_matches_an_owned_byte_open() {
+        let bytes = fixture("documentProperties.doc");
+        let opened = SourceSnapshot::from_bytes(bytes.clone()).expect("owned DOC open");
+        let ole = litchi_cfb::OleFile::open(io::Cursor::new(bytes.clone())).unwrap();
+        let shared = Arc::new(
+            SharedOleFile::from_owned_ole_file(
+                ole,
+                SourceVersion::new(0x0D0C_0001, 0),
+                SharedOleFileLimits::default(),
+            )
+            .unwrap(),
+        );
+        let adopted = SourceSnapshot::from_shared(Arc::clone(&shared)).expect("adopted DOC open");
+        assert!(Arc::ptr_eq(&adopted.inner.shared, &shared));
+        assert_eq!(adopted.fingerprint(), opened.fingerprint());
+        assert_eq!(adopted.len(), opened.len());
+        assert_eq!(
+            adopted.paragraph(Position::new(0)).unwrap().text(),
+            opened.paragraph(Position::new(0)).unwrap().text()
+        );
+
+        // A caller-supplied positional source still takes the second index.
+        let counter = Arc::new(CountingSource::new(&bytes));
+        let counted: Arc<dyn ReadAt> = counter.clone();
+        let first = Arc::new(SharedOleFile::open(counted).unwrap());
+        assert!(!first.is_owned_immutable());
+        let generic = SourceSnapshot::from_shared(Arc::clone(&first)).expect("generic DOC adopt");
+        assert!(!Arc::ptr_eq(&generic.inner.shared, &first));
+        assert_eq!(generic.fingerprint(), opened.fingerprint());
+
+        let limited = SourceBackedOptions::new(SourceLimits {
+            max_input_bytes: 1,
+            ..SourceLimits::default()
+        });
+        assert!(matches!(
+            SourceSnapshot::from_shared_with_options_and_policy(
+                shared,
+                limited,
+                ProtectionPolicy::default()
+            ),
+            Err(Error::Limit(_))
+        ));
+    }
+
+    const fn assert_send_sync<T: Send + Sync>() {}
+    // Risk R3 of unified-ops record 0003: the unified `Doc` handle retains
+    // these owners behind an `Arc`, so they must stay thread-safe.
+    const _: () = {
+        assert_send_sync::<SourceSnapshot>();
+        assert_send_sync::<crate::body_text::Snapshot>();
+        assert_send_sync::<crate::Document>();
+    };
 
     #[test]
     fn owned_bytes_open_reuses_the_validated_cfb_index() {

@@ -908,7 +908,13 @@ impl<R: Read + Seek> OleFile<R> {
     /// Discard the cursor and validation-only state, retaining the parsed CFB
     /// index for the crate's immutable positional reader.
     pub(crate) fn into_parsed_index(self) -> ParsedOleIndex {
-        ParsedOleIndex {
+        self.into_reader_and_parsed_index().1
+    }
+
+    /// Splits this parsed view into its reader and the cursor-independent
+    /// index, discarding only validation and read scratch state.
+    pub(crate) fn into_reader_and_parsed_index(self) -> (R, ParsedOleIndex) {
+        let index = ParsedOleIndex {
             file_size: self.file_size,
             sector_size: self.sector_size,
             mini_sector_size: self.mini_sector_size,
@@ -921,7 +927,8 @@ impl<R: Read + Seek> OleFile<R> {
             dir_name_data: self.dir_name_data,
             tolerance: self.tolerance,
             misordered_siblings: self.misordered_siblings,
-        }
+        };
+        (self.reader, index)
     }
 
     /// Open and parse an OLE file from a reader

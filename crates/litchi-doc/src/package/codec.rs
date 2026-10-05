@@ -236,6 +236,17 @@ impl<R: Read + Seek> Package<R> {
         &mut self.ole
     }
 
+    /// Consumes the package and returns its parsed OLE file.
+    ///
+    /// The parsed container index is kept, so a caller that has finished
+    /// reading the document can hand the same parse to another owner (for
+    /// example `litchi_cfb::SharedOleFile::from_owned_ole_file`) instead of
+    /// parsing the container again.
+    #[must_use]
+    pub fn into_ole_file(self) -> OleFile<R> {
+        self.ole
+    }
+
     /// Discover the optional MS-DOC `Macros` project storage without opening streams.
     ///
     /// This inspects CFB directory names only. It never opens, decompresses,

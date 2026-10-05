@@ -413,6 +413,47 @@ impl SourceSnapshot {
         let publisher =
             SourceBackedOverlayPublisher::open_with_limits(Arc::clone(&source), shared_limits)
                 .map_err(Error::Source)?;
+        Self::from_publisher(source, length, &publisher, options)
+    }
+
+    /// Builds the snapshot over a positional CFB owner that is already open,
+    /// such as the one a [`crate::SourceBackedPackage`] or a format detector
+    /// holds, without indexing the container again.
+    ///
+    /// The checks are the ones [`Self::open_with_options`] runs after its own
+    /// index: the protected-container refusal, the source version, and the
+    /// complete-artifact fingerprint of an empty splice plan. The CFB index
+    /// is the adopted one, so `options.record_limits` bounds the input length
+    /// here but cannot re-run the index's directory and allocation-table
+    /// ceilings; those are the ones `shared` was opened under.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source exceeds `options`, is protected, has
+    /// changed since `shared` was opened, or cannot be fingerprinted.
+    pub fn from_shared(shared: Arc<SharedOleFile>, options: SourceBackedOptions) -> Result<Self> {
+        let shared_limits = shared_limits(options.record_limits)?;
+        let source = shared.source_arc();
+        let length = shared.file_size();
+        if length > shared_limits.max_input_bytes() {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT source length {length} exceeds limit {}",
+                shared_limits.max_input_bytes()
+            ))
+            .into());
+        }
+        let publisher = SourceBackedOverlayPublisher::from_shared(shared).map_err(Error::Source)?;
+        Self::from_publisher(source, length, &publisher, options)
+    }
+
+    /// The common tail of the two constructors: everything after the CFB
+    /// owner exists and has passed the protected-container refusal.
+    fn from_publisher(
+        source: Arc<dyn ReadAt>,
+        length: u64,
+        publisher: &SourceBackedOverlayPublisher,
+        options: SourceBackedOptions,
+    ) -> Result<Self> {
         let version = publisher.source_version().map_err(Error::Source)?;
 
         // An empty splice still runs the common full-artifact fingerprint and
@@ -3350,7 +3391,10 @@ mod tests {
     use super::{Error, Position, Refusal, Snapshot, Target};
     use crate::Package;
     use crate::writer::Writer;
-    use litchi_cfb::{OleFile, OutputProgress, OverlayError, SharedOleFile, StreamSpliceLimits};
+    use litchi_cfb::{
+        OleFile, OutputProgress, OverlayError, SharedOleFile, SharedOleFileLimits,
+        StreamSpliceLimits,
+    };
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
     use std::io::{self, Cursor, Write};
     use std::sync::{
@@ -4183,6 +4227,66 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn adopted_shared_owner_matches_a_fresh_positional_open() {
+        let bytes = generated_fixture(6, 4);
+        let opened =
+            super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let shared = Arc::new(
+            SharedOleFile::from_owned_ole_file(
+                ole,
+                SourceVersion::new(0x5050_5431, 0),
+                SharedOleFileLimits::default(),
+            )
+            .unwrap(),
+        );
+        let adopted = super::SourceSnapshot::from_shared(
+            Arc::clone(&shared),
+            super::SourceBackedOptions::default(),
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(&adopted.inner.shared, &shared));
+        assert_eq!(adopted.fingerprint(), opened.fingerprint());
+        assert_eq!(adopted.len(), opened.len());
+        let target = Target::new(Position::new(5), Position::new(3));
+        assert_eq!(
+            adopted.read_text(target).unwrap(),
+            opened.read_text(target).unwrap()
+        );
+
+        let package =
+            crate::SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let from_package = package.text_edit_snapshot().unwrap();
+        assert_eq!(from_package.fingerprint(), opened.fingerprint());
+        assert_eq!(
+            from_package.read_text(target).unwrap(),
+            opened.read_text(target).unwrap()
+        );
+
+        let limited = super::SourceBackedOptions {
+            record_limits: crate::RecordLimits {
+                max_package_bytes: 1,
+                ..crate::RecordLimits::default()
+            },
+            ..super::SourceBackedOptions::default()
+        };
+        assert!(matches!(
+            super::SourceSnapshot::from_shared(shared, limited),
+            Err(Error::Package(crate::package::Error::ResourceLimit(_)))
+        ));
+    }
+
+    const fn assert_send_sync<T: Send + Sync>() {}
+    // Risk R3 of unified-ops record 0003: the unified `Ppt` handle retains
+    // these owners behind an `Arc`, so they must stay thread-safe.
+    const _: () = {
+        assert_send_sync::<super::SourceSnapshot>();
+        assert_send_sync::<Snapshot>();
+        assert_send_sync::<crate::SourceBackedPackage>();
+        assert_send_sync::<crate::presentation::Presentation>();
+    };
 
     #[test]
     fn repeated_source_reads_reuse_validated_cfb_index_and_reject_mutation() {

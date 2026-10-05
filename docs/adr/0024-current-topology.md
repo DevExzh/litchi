@@ -4794,3 +4794,19 @@ workspace packages, 262 internal dependency declarations, 250 canonical edges,
 12 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.
+
+## 2026-10-04 amendment: `litchi-ops` legacy-handle edge (M0a step S5d)
+
+Unified-ops M0a step S5d gives `litchi-ops` its `Doc`, `Xls` and `Ppt`
+handles (record [0003](../unified-ops/0003-m0a-migration-plan.md) §2.3). Like
+the facade code they port, the handles project OLE property-set metadata and
+fold the property-set repairs into the XLS tolerance report, both of which
+live in `litchi-ole-common`. That adds one optional normal edge,
+`litchi-ops -> litchi-ole-common`, owned by the `doc`, `ppt` and `xls`
+features. `litchi-ole-common` is a bulk package, so `litchi-ops` stays
+runtime-neutral and iWork-free and the non-iWork release gate is unchanged.
+
+Together with the S2, S3 and S4 amendments above, the current inventory is 66
+workspace packages, 263 internal dependency declarations, 251 canonical edges,
+12 development-only edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

@@ -16,15 +16,17 @@ default = []
 # entry, in the change that first uses it (ADR 0033, record 0004). The error
 # module (M0a step S2) wires the leaf errors of the tier 1-2 formats and RTF;
 # the `OpenOptions` sub-options (step S3) name OOXML, DOC, PPT and ODF limit
-# types; detection (step S4) needs the OLE, OPC, ODF and RTF probes and owners.
+# types; detection (step S4) needs the OLE, OPC, ODF and RTF probes and owners;
+# the legacy handles (step S5d) read OLE property sets through
+# `litchi-ole-common`.
 # The iWork features carry no dependency: `litchi-ops` must stay iWork-free
 # (`tools/non_iwork_gate.py`), so they only shape `detect::DetectedFormat` and
 # the facade-supplied lowest-precedence ZIP tail.
-doc     = ["dep:litchi-cfb", "dep:litchi-doc"]
+doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common"]
 docx    = ["dep:litchi-docx", "opc"]
-ppt     = ["dep:litchi-cfb", "dep:litchi-ppt"]
+ppt     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt"]
 pptx    = ["dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
-xls     = ["dep:litchi-cfb", "dep:litchi-xls"]
+xls     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-xls"]
 xlsx    = ["dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
 xlsb    = ["dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
 rtf     = ["dep:litchi-rtf", "dep:chrono"]
@@ -54,6 +56,7 @@ litchi-odf-common   = { workspace = true, optional = true }
 litchi-odp          = { workspace = true, optional = true }
 litchi-ods          = { workspace = true, optional = true }
 litchi-odt          = { workspace = true, optional = true }
+litchi-ole-common   = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true, optional = true }
 litchi-opc          = { workspace = true, optional = true }
 litchi-ppt          = { workspace = true, optional = true }

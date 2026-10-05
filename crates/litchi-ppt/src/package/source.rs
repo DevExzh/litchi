@@ -209,6 +209,47 @@ impl SourceBackedPackage {
     }
 }
 
+impl SourceBackedPackage {
+    /// Builds the source-backed text editor over this package's validated CFB
+    /// owner, without indexing the container again.
+    ///
+    /// The editor inherits this package's record limits. It runs the checks
+    /// [`crate::text_edit::SourceSnapshot::open_with_options`] runs after its
+    /// own index (the protected-container refusal and the empty splice plan
+    /// that fingerprints the complete artifact), so building it costs that
+    /// open minus the index, paid here rather than when the package was
+    /// opened.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is signed, encrypted or DRM
+    /// protected, when its source changed, or when it exceeds the limits.
+    pub fn text_edit_snapshot(&self) -> crate::text_edit::Result<crate::text_edit::SourceSnapshot> {
+        self.text_edit_snapshot_with_limits(self.record_limits)
+    }
+
+    /// Builds the source-backed text editor under stricter record limits.
+    ///
+    /// `limits` is constrained by this package's own limits, as
+    /// [`Self::presentation_with_limits`] constrains them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::text_edit_snapshot`].
+    pub fn text_edit_snapshot_with_limits(
+        &self,
+        limits: RecordLimits,
+    ) -> crate::text_edit::Result<crate::text_edit::SourceSnapshot> {
+        crate::text_edit::SourceSnapshot::from_shared(
+            Arc::clone(&self.shared),
+            crate::text_edit::SourceBackedOptions {
+                record_limits: limits.constrained_by(self.record_limits),
+                ..crate::text_edit::SourceBackedOptions::default()
+            },
+        )
+    }
+}
+
 fn shared_is_powerpoint(shared: &SharedOleFile) -> bool {
     shared.exists(&["PowerPoint Document"]) || shared.exists(&["Current User"])
 }
