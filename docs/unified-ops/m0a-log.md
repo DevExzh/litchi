@@ -165,3 +165,27 @@
   - 360 unit tests and 52 doctests pass, and `cargo check -p litchi --all-features` passes.
   - The boundary checker (264 declarations), the non-iWork gate and the gate unit tests pass.
 - Left for S7: the Markdown adapter and its tests; the facade reads slide size and catalog from the `Pptx` handle.
+
+## 0011 — DOCX MCE admission, stages 1–3 of 0008 (`53f938e83c`, merged here)
+- A shared single-pass check in `litchi_ooxml_common::mce::admission` decides, without building the processed copy, whether MCE processing could hide anything a reader sees. It reuses the codec's name resolution and limits, and admits a part only when the codec would also accept it (a generated test checks 680 inputs). When the check cannot admit a part, the old code path runs, so refused documents keep today's errors.
+- Escaped namespace URIs are now decided on their decoded value in the codec, its fast path and `active_offsets`. About 20 xlsx/pptx/DrawingML/docx scanners that read raw namespace values now refuse such parts; regression tests were added.
+- Fixtures now accepted, out of 19:
+
+  | Route | Before | After |
+  |---|---|---|
+  | Source-backed `edit_document` | 0 | 19 |
+  | Source-backed changed publish | 0 | 16 (the 3 protected files stay refused) |
+  | Managed read and snapshot | 0 | 19 |
+  | Document variables | 15 | 19 |
+
+  Over the 63-file corpus, source-backed edits went from 1 to 59. The M0a S5a refusal test now expects success, and an `AlternateContent` refusal test replaces it.
+- Breaking changes to the eager owner:
+  - It applies the same admission rule.
+  - Changed publication refuses enforced protection and tracked revisions, with the source-backed route's exact error. That covers the 3 protected fixtures and `redline-range-comment.docx`.
+  - Paragraph transfer refuses donors whose MCE processing drops markup (`TransferRefusal::MarkupCompatibilityScope`).
+  - A nested `mc:Ignorable` listing only understood namespaces is admitted, because Litchi's own revision writer emits `w16du`.
+- Indicative performance: the check costs 0.26–0.41× of a full MCE pass. Source-backed open plus `edit_document` costs 0.57–0.91× of the old refusal. The no-MCE path is unchanged (0.96–1.00×). Eager open plus edit is 1.07–1.84× slower, because it now runs the admission and protection checks it never ran.
+- Verified on the merged `uo/m0a`:
+  - fmt and clippy `-D warnings` on ops, docx, ooxml-common and DrawingML;
+  - litchi-ops: 361 unit tests and 52 doctests;
+  - full suites (with `3rdparty` symlinked temporarily): docx 2,022, ooxml-common 451, DrawingML 369, pptx 1,309, xlsx 2,137, all passing.
