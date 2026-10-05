@@ -20,11 +20,19 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | M1 | Steps on `uo/m1` (plan 0010 §10); merges after M0a | in progress |
 | 0011 | DOCX MCE admission, stages 1–3 of 0008 | merged into `uo/m0a` (`53f938e83c`); 19/19 Word fixtures editable source-backed; eager owner gains the same refusals (breaking) |
 | 0013 | Signature policy: `Signed::unsign`, builder refusals, pptx/xlsb silent-strip fixes (M0a S6b) | merged into `uo/m0a` (`f30c521c90`) |
-| 0015 | M2 write-kernel plan (verbs, registry, per-format handlers, batch executor, leaf prerequisites, save/create) | in progress |
+| 0015 | M2 write-kernel plan (verbs, registry, per-format handlers, batch executor, leaf prerequisites, save/create) | done (`de8d557c56`); steps W1–W10 and leaf prerequisites L-*-W* |
+| M2 | Steps on `uo/m2` (plan 0015 §11); merges after M0a and M1 | in progress |
 | 0014 | Implicit `unsign()` sites: pptx and shared ooxml-common (0014a), xlsx/docx and XLSB task panes/Ribbon (0014b); 0013 F1, F1b, F2 | merged into `uo/m0a`; silent strips now refuse until explicit `unsign` (breaking) |
 | 0012 | litchi-opc: cheap `Clone` for `SourceBackedPackage` (0009 stage S0) | merged into `uo/m0a` (`0cf1f43403`); clone 6 reference counts, no allocation; open unchanged |
 
 ## Awaiting owner confirmation
+
+- Record 0015 decisions D1–D19 and open questions Q1–Q14 (provisional defaults). Highlights:
+  - Write verbs take `&self` and return a new `File`; `edit` returns a `Commit`.
+  - Batches run sequentially, grouped into same-family runs, and the batch result must equal its items applied one at a time.
+  - Writes refuse invalid values and unknown keys, with suggestions. OfficeCLI's apply-the-rest-and-warn behaviour is only a command-channel option.
+  - After `Signed::unsign`, a save writes the unsigned copy. Decrypted files save re-encrypted when given the password, or refuse; plaintext needs `into_plaintext()`.
+  - XLSX moves to the eager engine on its first write; PPTX text-only runs stay on the source-backed editor.
 
 - Record 0010 open questions (§11.3), the two that most need the owner:
   - Q3: regex values (`~= r"…"`) are refused with `unsupported_capability` until the owner approves adding the `regex` crate.
@@ -88,6 +96,20 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   - `/body/p[N]` is OfficeCLI's direct-body paragraph, counted on the MCE-visible view. M2 maps it to the edit transaction's numbering under 0011's admission check.
 - The default source-backed owners answer little today: DOCX exposes only the main story, PPTX only slide text, XLSX only cells. About 35 core leaf read requests plus 4 correctness fixes are listed in §4.11 (L1 tier 1, L2 tier 2).
 - Steps R1–R11. R1–R3 and L1 start before M0a lands, on `uo/m1`; R5 waits for S6, R8 for S9. M1 merges into trunk after M0a. 17 code findings (F-1…F-17) and 21 OfficeCLI deltas.
+
+## 0015 — log
+
+- M2 plan:
+  - Verbs take `&self`: the sugar verbs return a `File`, `edit` returns a `Commit`, and `batch` is atomic or best-effort with per-item results.
+  - The registry grows from M1's `PropSpec` and refuses rather than repairs.
+  - Batches run sequentially, in runs, with barriers and fusion, and rebase only at family boundaries.
+- Critical path: no tier-1 leaf can format existing content today, so the parity engines come first: L-DOCX-W5 (DOCX formatting), L-XLSX-W2 (style allocation) and L-PPTX-W3/W5. They follow 0009 S1–S3 (sharing) and the DOCX run, cell and story addressing.
+- Leaf measurements (leaf APIs only):
+  - Coalescing is essential: 1k chained XLSX commits took 0.18–12.6 s, against 0.5–7.8 ms in one transaction.
+  - The XLSX source-backed cell editor admits 45 of 137 corpus workbooks; the eager route admits 132.
+  - PPTX source-backed text edits are 7–18× cheaper than the eager transaction.
+  - A DOCX reopen between runs costs 9.4 ms on 10k paragraphs.
+  - An XLSX commit rewrites the whole sheet: 53.5 ms for one cell on a 75k-cell sheet.
 
 ## Awaiting owner decision
 
