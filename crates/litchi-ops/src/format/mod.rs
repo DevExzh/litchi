@@ -5,6 +5,11 @@
 //! source an editor can later be built from (§2.3). [`crate::open`] builds
 //! them; the read methods here are the per-format surface, including the
 //! format-specific reads the generic family views do not cover.
+//!
+//! The tier 1 and tier 2 handles also carry a signature disposition (record
+//! 0013): their state sits behind `signature::Opened`, so a signed file and
+//! the file [`Signed::unsign`](crate::Signed::unsign) returns share one
+//! state and differ only in what their editor builders may do.
 
 #[cfg(any(feature = "xlsx", feature = "xlsb"))]
 mod cell_text;
@@ -24,6 +29,16 @@ pub mod ppt;
 pub mod pptx;
 #[cfg(feature = "rtf")]
 pub mod rtf;
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb"
+))]
+pub(crate) mod signature;
 #[cfg(feature = "xls")]
 pub mod xls;
 #[cfg(feature = "xlsb")]

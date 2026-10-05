@@ -262,7 +262,6 @@ impl Transaction {
         let snapshot = if changed {
             let mut candidate = self.before_package.as_ref().clone();
             store(&mut candidate, &self.scope, &self.content)?;
-            candidate.unsign();
             let snapshot = Snapshot::read_at(&candidate, self.scope.clone())?;
             if snapshot.content != self.content {
                 return Err(Error::InvalidFormat(

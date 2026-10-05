@@ -1851,6 +1851,41 @@ impl Package {
         })
     }
 
+    /// Remove every package signature explicitly (ADR 0006).
+    ///
+    /// Every signature relationship and signature part is removed, and the
+    /// resulting unsigned graph is authorized for publication
+    /// ([`OpcPackage::unsign`]). A changed opened-presentation commit refuses
+    /// a signed package ([`crate::opened::Transaction::commit`]), because the
+    /// change invalidates every signature: call this before starting the
+    /// transaction to edit one. A signed package that is saved unchanged keeps
+    /// its signature byte for byte without it. A package that carries no
+    /// signature, and no signature-policy requirement, is left untouched.
+    ///
+    /// ```
+    /// use litchi_pptx::Package;
+    ///
+    /// let mut package = Package::from_vec(Package::new()?.to_bytes()?)?;
+    /// package.unsign()?;
+    /// assert!(!package.opc()?.is_signed());
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package opened with a
+    /// password, whose typed mutations are refused, and an error when pending
+    /// authoring state cannot be published first.
+    pub fn unsign(&mut self) -> Result<&mut Self> {
+        if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
+            self.edit_typed(|opc| {
+                opc.unsign();
+                Ok(())
+            })?;
+        }
+        Ok(self)
+    }
+
     /// Run one transactional low-level clear-OPC edit.
     ///
     /// The closure receives the current graph only after pending authoring

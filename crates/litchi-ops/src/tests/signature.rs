@@ -1,0 +1,702 @@
+//! The signature policy audit (record 0013): every signed input a `File`
+//! opens follows ADR 0006's explicit policy, on every open route.
+//!
+//! For each signed fixture and each route:
+//!
+//! 1. opening yields [`File::Signed`];
+//! 2. the editor builder of the wrapped file refuses with
+//!    `document_protected` and a suggestion naming `Signed::unsign`;
+//! 3. after [`Signed::unsign`](crate::Signed::unsign), a changed commit
+//!    through the editor the builder returns publishes the edit, the output
+//!    carries no signature part, and the clone that was not unsigned still
+//!    refuses;
+//! 4. an exact no-op through the leaf entry the builder reaches keeps the
+//!    signed input byte for byte (the OOXML leaves); the compound-file leaves
+//!    refuse a signed container outright, so they have no signed no-op path,
+//!    and the test pins that refusal instead.
+//!
+//! The DOCX, PPTX and XLSX fixtures are producer-signed (Apache POI's
+//! `xmldsign` corpus). No signed XLSB or compound-file fixture exists, so
+//! those inputs are signed here: an OPC signature origin, signature part and
+//! relationships for XLSB, as `litchi-xlsb`'s own tests build them, and both
+//! a legacy `_signatures` stream and an `_xmlsignatures` storage for DOC, PPT
+//! and XLS, as S6's security tests mark them.
+
+use std::io::Cursor;
+use std::sync::Arc;
+
+#[cfg(any(feature = "doc", feature = "docx", feature = "ppt"))]
+use litchi_core::Position;
+use litchi_core::{FileFormat, OwnedSource, ReadAt};
+
+use super::test_data;
+use crate::{Code, Error, File, OpenOptions, SignatureOrigin, SourceMode};
+
+/// The text a changed OOXML commit writes, so the reopened output can be
+/// checked. The compound-file editors only replace text of the same width.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+const MARKER: &str = "EditedAfterUnsign";
+
+/// One signed input.
+struct Input {
+    label: String,
+    format: FileFormat,
+    origin: SignatureOrigin,
+    bytes: Vec<u8>,
+    /// The file-name suffix of the path routes.
+    suffix: &'static str,
+}
+
+fn read(relative: &str) -> Vec<u8> {
+    std::fs::read(test_data(relative)).unwrap_or_else(|error| panic!("{relative}: {error}"))
+}
+
+/// Every signed input a `File` can open in this build.
+fn inputs() -> Vec<Input> {
+    let mut inputs = Vec::new();
+    let xmldsign = |format: FileFormat, name: &str, suffix: &'static str| Input {
+        label: name.to_owned(),
+        format,
+        origin: SignatureOrigin::Opc,
+        bytes: read(&format!("poi/test-data/xmldsign/{name}")),
+        suffix,
+    };
+    #[cfg(feature = "docx")]
+    for name in [
+        "hello-world-signed.docx",
+        "hello-world-signed-twice.docx",
+        "ms-office-2010-signed.docx",
+    ] {
+        inputs.push(xmldsign(FileFormat::Docx, name, ".docx"));
+    }
+    #[cfg(feature = "pptx")]
+    for name in ["hello-world-signed.pptx", "ms-office-2010-signed.pptx"] {
+        inputs.push(xmldsign(FileFormat::Pptx, name, ".pptx"));
+    }
+    #[cfg(feature = "xlsx")]
+    for name in ["hello-world-signed.xlsx", "ms-office-2010-signed.xlsx"] {
+        inputs.push(xmldsign(FileFormat::Xlsx, name, ".xlsx"));
+    }
+    #[cfg(feature = "xlsb")]
+    inputs.push(Input {
+        label: "Simple.xlsb, signed in-test".to_owned(),
+        format: FileFormat::Xlsb,
+        origin: SignatureOrigin::Opc,
+        bytes: signed_opc(&read("ooxml/xlsb/Simple.xlsb")),
+        suffix: ".xlsb",
+    });
+    let _ = xmldsign;
+    // The compound-file inputs are fixtures the narrow source-backed editors
+    // admit; most corpus files carry records they refuse whether or not
+    // they are signed.
+    #[cfg(feature = "doc")]
+    inputs.push(Input {
+        label: "documentProperties.doc, signed in-test".to_owned(),
+        format: FileFormat::Doc,
+        origin: SignatureOrigin::Cfb,
+        bytes: signed_compound_file(read("ole/doc/documentProperties.doc")),
+        suffix: "",
+    });
+    #[cfg(feature = "ppt")]
+    inputs.push(Input {
+        label: "authored text boxes, signed in-test".to_owned(),
+        format: FileFormat::Ppt,
+        origin: SignatureOrigin::Cfb,
+        bytes: signed_compound_file(editable_presentation()),
+        suffix: "",
+    });
+    #[cfg(feature = "xls")]
+    inputs.push(Input {
+        label: "FormulaSheetRange.xls, signed in-test".to_owned(),
+        format: FileFormat::Xls,
+        origin: SignatureOrigin::Cfb,
+        bytes: signed_compound_file(read("ole/xls/FormulaSheetRange.xls")),
+        suffix: "",
+    });
+    inputs
+}
+
+/// A presentation whose text boxes the source-backed text editor admits, as
+/// the `Ppt` handle's own tests author it.
+#[cfg(feature = "ppt")]
+fn editable_presentation() -> Vec<u8> {
+    let mut writer = litchi_ppt::writer::Writer::new();
+    for slide_index in 0..2 {
+        let slide = writer.add_slide().unwrap();
+        for shape_index in 0..3 {
+            let x = 10 + shape_index * 260;
+            let text = format!("slide-{slide_index}-shape-{shape_index}");
+            writer.add_textbox(slide, x, 10, 240, 40, &text).unwrap();
+        }
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+/// `plain` with an OPC signature graph (an origin part, one XML signature
+/// part and their relationships), written out so that the signature is an
+/// ingressed source signature, as in a file a producer signed.
+#[cfg(feature = "xlsb")]
+fn signed_opc(plain: &[u8]) -> Vec<u8> {
+    use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
+
+    let source = OpcPackage::from_bytes(plain).unwrap();
+    let mut package = OpcPackage::new();
+    for relationship in source.rels().iter() {
+        package
+            .rels_mut()
+            .try_add_relationship(
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.r_id().to_owned(),
+                relationship.target_mode(),
+            )
+            .unwrap();
+    }
+    let names: Vec<_> = source
+        .iter_parts()
+        .map(|part| part.partname().clone())
+        .collect();
+    for name in names {
+        let part = source.get_part(&name).unwrap();
+        let mut copy = BlobPart::new(
+            name.clone(),
+            part.content_type().to_owned(),
+            part.blob().to_vec(),
+        );
+        for relationship in part.rels().iter() {
+            copy.rels_mut()
+                .try_add_relationship(
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.r_id().to_owned(),
+                    relationship.target_mode(),
+                )
+                .unwrap();
+        }
+        package.try_add_part(Box::new(copy)).unwrap();
+    }
+    let origin = PackURI::new("/_xmlsignatures/origin.sigs").unwrap();
+    let signature = PackURI::new("/_xmlsignatures/sig1.xml").unwrap();
+    let mut origin_part = BlobPart::new(
+        origin.clone(),
+        litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+        Vec::new(),
+    );
+    origin_part
+        .rels_mut()
+        .try_add_relationship(
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
+                .to_owned(),
+            signature.relative_ref(origin.base_uri()),
+            "rIdSignature".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    package.try_add_part(Box::new(origin_part)).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            signature,
+            litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE.to_owned(),
+            b"<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"/>".to_vec(),
+        )))
+        .unwrap();
+    package
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
+            "rIdSignatureOrigin".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+/// `plain` rewritten with a legacy `_signatures` stream and an
+/// `_xmlsignatures` storage holding one XML signature stream.
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+fn signed_compound_file(plain: Vec<u8>) -> Vec<u8> {
+    use litchi_cfb::{OleFile, OleWriter};
+
+    let mut source = OleFile::open(Cursor::new(plain)).unwrap();
+    let mut writer = OleWriter::new();
+    for path in source.list_streams() {
+        let path = path.iter().map(String::as_str).collect::<Vec<_>>();
+        for depth in 1..path.len() {
+            writer.create_storage(&path[..depth]).unwrap();
+        }
+        let data = source.open_stream(&path).unwrap();
+        writer.create_stream(&path, &data).unwrap();
+    }
+    writer
+        .create_stream(&["_signatures"], b"legacy signature")
+        .unwrap();
+    writer.create_storage(&["_xmlsignatures"]).unwrap();
+    writer
+        .create_stream(&["_xmlsignatures", "1"], b"<Signature/>")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+/// The file every route opens `input` as, with the temporary files the path
+/// routes read kept alive alongside.
+#[allow(
+    clippy::type_complexity,
+    reason = "a test helper returning labelled files and their backing files"
+)]
+fn routes(input: &Input) -> (Vec<(&'static str, File)>, Vec<tempfile::NamedTempFile>) {
+    let eager = OpenOptions::new().source_mode(SourceMode::Eager);
+    let mut files = vec![
+        ("bytes", crate::open_bytes(input.bytes.clone()).unwrap()),
+        (
+            "bytes, eager",
+            crate::open_bytes_with(input.bytes.clone(), &eager).unwrap(),
+        ),
+    ];
+    let mut temporaries = Vec::new();
+    #[cfg(any(unix, windows))]
+    {
+        let temporary = super::temporary_with(&input.bytes, input.suffix);
+        files.push(("path", crate::open(temporary.path()).unwrap()));
+        files.push((
+            "path, eager",
+            crate::open_with(temporary.path(), &eager).unwrap(),
+        ));
+        temporaries.push(temporary);
+    }
+    (files, temporaries)
+}
+
+/// The refusal of the editor builder of a tier 1 or tier 2 `file`.
+fn builder_refusal(file: &File) -> Error {
+    fn refused<T>(result: crate::Result<T>, format: &str) -> Error {
+        match result {
+            Ok(_) => panic!("a signed {format} built an editor"),
+            Err(error) => error,
+        }
+    }
+    match file {
+        #[cfg(feature = "docx")]
+        File::Docx(handle) => refused(handle.edit_document(), "DOCX"),
+        #[cfg(feature = "pptx")]
+        File::Pptx(handle) => refused(
+            handle
+                .clone()
+                .into_editor()
+                .map_err(|refused| refused.error.expect("a typed PPTX refusal")),
+            "PPTX",
+        ),
+        #[cfg(feature = "xlsx")]
+        File::Xlsx(handle) => refused(handle.clone().into_editor(), "XLSX"),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => refused(handle.editor(), "XLSB"),
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => refused(handle.body_text_editor(), "DOC"),
+        #[cfg(feature = "xls")]
+        File::Xls(handle) => refused(handle.cell_values_editor(), "XLS"),
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => refused(handle.text_editor(), "PPT"),
+        other => panic!("{other:?} has no tier 1 or tier 2 editor"),
+    }
+}
+
+#[track_caller]
+fn assert_signed_refusal(error: &Error, format: FileFormat, what: &str) {
+    assert_eq!(error.code(), Code::DocumentProtected, "{what}: {error:?}");
+    assert_eq!(error.format(), Some(format), "{what}: {error:?}");
+    let suggestion = error
+        .suggestion()
+        .expect("a signed refusal suggests a way out");
+    assert!(
+        suggestion.contains("Signed::unsign()"),
+        "{what}: {suggestion}"
+    );
+}
+
+/// `text` with every ASCII letter and digit changed, keeping its UTF-16
+/// width and encoded length; `None` when nothing would change.
+#[cfg(any(feature = "doc", feature = "ppt"))]
+fn same_width(text: &str) -> Option<String> {
+    let replacement: String = text
+        .chars()
+        .map(|character| match character {
+            'x' => 'y',
+            character if character.is_ascii_alphanumeric() => 'x',
+            character => character,
+        })
+        .collect();
+    (replacement != text).then_some(replacement)
+}
+
+/// Drive one changed commit through the editor the builder of the unsigned
+/// `file` returns. Returns the published bytes and a text the reopened
+/// output must contain.
+fn changed_commit(file: &File) -> (Vec<u8>, String) {
+    match file {
+        #[cfg(feature = "docx")]
+        File::Docx(handle) => {
+            let Ok(crate::format::docx::DocxEditor::Unsigned(mut package)) = handle.edit_document()
+            else {
+                panic!("an unsigned DOCX builds an owning unsigned copy");
+            };
+            // Append a paragraph: Office's signed fixture keeps its only
+            // paragraph in structure the text transaction does not rewrite.
+            let mut edit = package.edit_document().unwrap();
+            let count = edit.source().paragraph_count();
+            edit.insert_paragraph(Position::new(count), MARKER).unwrap();
+            let commit = edit.commit().unwrap();
+            package.apply_document_patch(commit.patch()).unwrap();
+            let mut output = Vec::new();
+            package.to_stream(&mut output).unwrap();
+            (output, MARKER.to_owned())
+        },
+        #[cfg(feature = "pptx")]
+        File::Pptx(handle) => {
+            let Ok(crate::format::pptx::PptxEditor::Unsigned(mut package)) =
+                handle.clone().into_editor()
+            else {
+                panic!("an unsigned PPTX builds an owning unsigned copy");
+            };
+            let mut transaction = package.opened_presentation_transaction().unwrap();
+            transaction
+                .add_text_box(0_usize, MARKER, (0, 0, 914_400, 914_400))
+                .unwrap();
+            let commit = transaction.commit().unwrap();
+            package.apply_opened_presentation_commit(commit).unwrap();
+            (package.to_bytes().unwrap(), MARKER.to_owned())
+        },
+        #[cfg(feature = "xlsx")]
+        File::Xlsx(handle) => {
+            let Ok(crate::format::xlsx::XlsxEditor::Eager(workbook)) = handle.clone().into_editor()
+            else {
+                panic!("an unsigned XLSX builds an owning unsigned copy");
+            };
+            let mut edit = workbook.edit().unwrap();
+            edit.sheet(0_usize)
+                .unwrap()
+                .expect("a first worksheet")
+                .set("A1", MARKER)
+                .unwrap();
+            let output = edit.commit().unwrap().workbook().to_bytes().unwrap();
+            (output, MARKER.to_owned())
+        },
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => {
+            use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
+
+            let Ok(crate::format::xlsb::XlsbEditor::Materialized(mut workbook)) = handle.editor()
+            else {
+                panic!("an unsigned XLSB builds an owning unsigned copy");
+            };
+            let mut edit = workbook.edit_cell_values(0).unwrap();
+            edit.insert(
+                Reference::new(100, 0).unwrap(),
+                StyleIndex::new(0).unwrap(),
+                Value::InlineString(MARKER.to_owned()),
+            )
+            .unwrap();
+            let commit = edit.commit().unwrap();
+            workbook.apply_cell_values(0, &commit).unwrap();
+            let mut output = Cursor::new(Vec::new());
+            workbook.save(&mut output).unwrap();
+            (output.into_inner(), MARKER.to_owned())
+        },
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            let snapshot = handle
+                .body_text_editor()
+                .unwrap()
+                .expect("a retained DOC source");
+            let (commit, text) = (0..256)
+                .find_map(|index| {
+                    let position = Position::new(index);
+                    let text = same_width(snapshot.paragraph(position).ok()?.text())?;
+                    let mut transaction = snapshot.edit(position).ok()?;
+                    transaction.set_text(text.clone()).ok()?;
+                    Some((transaction.commit().ok()?, text))
+                })
+                .expect("an editable DOC paragraph");
+            let mut output = Vec::new();
+            commit.write_to(&mut output).unwrap();
+            (output, text.trim().to_owned())
+        },
+        #[cfg(feature = "xls")]
+        File::Xls(handle) => {
+            use litchi_xls::cell_values::{Selector, Value};
+
+            let snapshot = handle.cell_values_editor().unwrap();
+            let (sheet, reference) = snapshot
+                .worksheets()
+                .find_map(|sheet| {
+                    sheet
+                        .cells()
+                        .find(|cell| matches!(cell.value(), Value::Number(_)))
+                        .map(|cell| (sheet.position(), cell.reference()))
+                })
+                .expect("a numeric XLS cell");
+            let mut edit = snapshot.edit();
+            edit.set_value(Selector::Position(sheet), reference, Value::Number(4242.0))
+                .unwrap();
+            let commit = edit.commit().unwrap();
+            (commit.snapshot().bytes().to_vec(), "4242".to_owned())
+        },
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => {
+            use litchi_ppt::text_edit::Target;
+
+            let snapshot = handle
+                .text_editor()
+                .unwrap()
+                .expect("a retained PPT source");
+            for slide in 0..16 {
+                for shape in 0..16 {
+                    let target = Target::new(Position::new(slide), Position::new(shape));
+                    let Some(text) = snapshot
+                        .read_text(target)
+                        .ok()
+                        .and_then(|text| same_width(&text))
+                    else {
+                        continue;
+                    };
+                    let Ok(mut transaction) = snapshot.edit_text(target) else {
+                        continue;
+                    };
+                    if transaction.set_text(text.clone()).is_err() {
+                        continue;
+                    }
+                    let Ok(commit) = transaction.commit() else {
+                        continue;
+                    };
+                    let mut output = Vec::new();
+                    commit.write_to(&mut output).unwrap();
+                    return (output, text.trim().to_owned());
+                }
+            }
+            panic!("no editable PPT text atom");
+        },
+        other => panic!("{other:?} has no tier 1 or tier 2 editor"),
+    }
+}
+
+/// The published output carries no signature part, opens unsigned, and
+/// shows the edit.
+#[track_caller]
+fn assert_unsigned_output(format: FileFormat, output: &[u8], expected: &str, what: &str) {
+    match format {
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        FileFormat::Docx | FileFormat::Pptx | FileFormat::Xlsx | FileFormat::Xlsb => {
+            let archive = zip::ZipArchive::new(Cursor::new(output)).unwrap();
+            let stale: Vec<_> = archive
+                .file_names()
+                .filter(|name| name.to_ascii_lowercase().starts_with("_xmlsignatures"))
+                .collect();
+            assert!(
+                stale.is_empty(),
+                "{what}: stale signature members {stale:?}"
+            );
+            let package = litchi_opc::OpcPackage::from_bytes(output).unwrap();
+            assert!(!package.is_signed(), "{what}: the output graph is signed");
+        },
+        #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+        FileFormat::Doc | FileFormat::Ppt | FileFormat::Xls => {
+            let ole = litchi_cfb::OleFile::open(Cursor::new(output)).unwrap();
+            assert!(!ole.exists(&["_signatures"]), "{what}: legacy signature");
+            assert!(
+                !ole.directory_exists(&["_xmlsignatures"]),
+                "{what}: XML signature storage"
+            );
+        },
+        other => panic!("{what}: {other:?} is not signed by this test"),
+    }
+    let reopened = crate::open_bytes(output.to_vec()).unwrap();
+    assert!(!reopened.is_signed(), "{what}: reopened as signed");
+    assert_eq!(reopened.format(), Some(format), "{what}");
+    let text = reopened.text().unwrap();
+    assert!(
+        text.contains(expected),
+        "{what}: {expected:?} not in {text:?}"
+    );
+}
+
+/// An exact no-op through the leaf entry the editor builder reaches, on the
+/// signed input, keeps it byte for byte; a compound-file leaf refuses the
+/// signed container instead of editing it.
+#[track_caller]
+fn assert_exact_noop(input: &Input) {
+    let label = &input.label;
+    let bytes = &input.bytes;
+    let source = || -> Arc<dyn ReadAt> { Arc::new(OwnedSource::new(bytes.clone())) };
+    let _ = &source;
+    match input.format {
+        #[cfg(feature = "docx")]
+        FileFormat::Docx => {
+            let package = litchi_docx::source_backed::Package::from_read_at(source()).unwrap();
+            let commit = package.edit_document().unwrap().commit().unwrap();
+            let mut output = Vec::new();
+            package
+                .publish_document_commit_to_stream(&mut output, &commit)
+                .unwrap();
+            assert_eq!(&output, bytes, "{label}: source-backed no-op");
+
+            let mut package = litchi_docx::Package::from_reader(Cursor::new(bytes)).unwrap();
+            let commit = package.edit_document().unwrap().commit().unwrap();
+            package.apply_document_patch(commit.patch()).unwrap();
+            let mut output = Vec::new();
+            package.to_stream(&mut output).unwrap();
+            assert_eq!(&output, bytes, "{label}: eager no-op");
+        },
+        #[cfg(feature = "pptx")]
+        FileFormat::Pptx => {
+            let Ok(presentation) = litchi_pptx::SourceBackedPresentation::from_read_at(source())
+                .unwrap()
+                .try_into_editor()
+            else {
+                panic!("{label}: a sole source-backed presentation builds its editor");
+            };
+            let commit = presentation.edit_slide(0).unwrap().commit();
+            let mut output = Vec::new();
+            presentation
+                .publish_slide_commit_to_stream(&mut output, &commit)
+                .unwrap();
+            assert_eq!(&output, bytes, "{label}: source-backed no-op");
+
+            let mut package = litchi_pptx::Package::from_vec(bytes.clone()).unwrap();
+            let commit = package
+                .opened_presentation_transaction()
+                .unwrap()
+                .commit()
+                .unwrap();
+            assert!(!commit.is_changed(), "{label}");
+            package.apply_opened_presentation_commit(commit).unwrap();
+            assert_eq!(&package.to_bytes().unwrap(), bytes, "{label}: eager no-op");
+        },
+        #[cfg(feature = "xlsx")]
+        FileFormat::Xlsx => {
+            // Every source-backed XLSX editor publishes through the same OPC
+            // overlay; the workbook-level defined-names editor reaches it on
+            // any workbook.
+            let editor =
+                litchi_xlsx::defined_names::SourceBackedEditor::from_read_at(source()).unwrap();
+            let commit = editor.edit().commit().unwrap();
+            let mut output = Vec::new();
+            editor
+                .publish_commit_to_stream(&mut output, &commit)
+                .unwrap();
+            assert_eq!(&output, bytes, "{label}: source-backed no-op");
+
+            // The eager semantic transaction refuses a signed workbook, even
+            // for an exact no-op: it never strips the signature.
+            let workbook = litchi_xlsx::Package::from_bytes(bytes.clone())
+                .unwrap()
+                .into_workbook()
+                .unwrap();
+            let refused = workbook.edit().and_then(litchi_xlsx::Edit::commit);
+            assert!(
+                matches!(refused, Err(litchi_xlsx::Error::Signed)),
+                "{label}: eager XLSX edit"
+            );
+        },
+        #[cfg(feature = "xlsb")]
+        FileFormat::Xlsb => {
+            let mut workbook = litchi_xlsb::Package::from_bytes(bytes.clone())
+                .unwrap()
+                .into_workbook()
+                .unwrap();
+            let commit = workbook.edit_cell_values(0).unwrap().commit().unwrap();
+            workbook.apply_cell_values(0, &commit).unwrap();
+            let mut output = Cursor::new(Vec::new());
+            workbook.save(&mut output).unwrap();
+            assert_eq!(&output.into_inner(), bytes, "{label}: eager no-op");
+        },
+        #[cfg(feature = "doc")]
+        FileFormat::Doc => assert!(
+            litchi_doc::body_text::source::SourceSnapshot::from_bytes(bytes.clone()).is_err(),
+            "{label}: the DOC editor admitted a signed container"
+        ),
+        #[cfg(feature = "xls")]
+        FileFormat::Xls => assert!(
+            litchi_xls::cell_values::Snapshot::from_bytes(bytes.clone()).is_err(),
+            "{label}: the XLS editor admitted a signed container"
+        ),
+        #[cfg(feature = "ppt")]
+        FileFormat::Ppt => assert!(
+            litchi_ppt::text_edit::SourceSnapshot::open(source()).is_err(),
+            "{label}: the PPT editor admitted a signed container"
+        ),
+        other => panic!("{label}: {other:?} is not signed by this test"),
+    }
+}
+
+#[test]
+fn every_signed_input_follows_the_explicit_signature_policy() {
+    let inputs = inputs();
+    assert!(!inputs.is_empty());
+    for input in &inputs {
+        let (files, _temporaries) = routes(input);
+        for (route, file) in files {
+            let what = format!("{} ({route})", input.label);
+
+            // 1. Opening yields `Signed`, and every read works.
+            let File::Signed(signed) = &file else {
+                panic!("{what}: expected a signed file, got {file:?}");
+            };
+            assert!(file.is_signed(), "{what}");
+            assert_eq!(signed.format(), input.format, "{what}");
+            assert_eq!(signed.origin(), input.origin, "{what}");
+            let text = file.text().unwrap();
+
+            // 2. The editor builder refuses while the file is signed, and the
+            // wrapped file reports it.
+            assert!(signed.file().is_signed(), "{what}");
+            assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
+
+            // 3. `unsign` authorizes a changed commit for the returned file
+            // only; its output carries no signature part.
+            let unsigned = signed.clone().unsign();
+            assert!(!unsigned.is_signed(), "{what}");
+            assert_eq!(unsigned.format(), Some(input.format), "{what}");
+            assert_eq!(
+                unsigned.text().unwrap(),
+                text,
+                "{what}: unsign rewrote nothing"
+            );
+            assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
+            let (output, expected) = changed_commit(&unsigned);
+            assert_unsigned_output(input.format, &output, &expected, &what);
+        }
+
+        // 4. An exact no-op keeps the signed input, signature included.
+        assert_exact_noop(input);
+    }
+}
+
+/// Encrypted packages keep their encryption profile through `unsign`: the
+/// unsigned copy would publish them in the clear, so the builder refuses, as
+/// every edit of an unlocked encrypted package is refused.
+#[cfg(all(feature = "encryption", feature = "docx"))]
+#[test]
+fn an_unlocked_signed_package_is_not_unsigned_into_the_clear() {
+    let plain = read("poi/test-data/xmldsign/hello-world-signed.docx");
+    let encrypted =
+        litchi_crypto::ooxml::encrypt(plain, "signed", litchi_crypto::ooxml::Mode::Agile).unwrap();
+    let File::Locked(locked) = crate::open_bytes(encrypted).unwrap() else {
+        panic!("an encrypted package opens locked");
+    };
+    let file = locked
+        .unlock(crate::Password::new("signed".to_owned()))
+        .unwrap();
+    let File::Signed(signed) = file else {
+        panic!("the unlocked package is signed");
+    };
+    assert_signed_refusal(
+        &builder_refusal(signed.file()),
+        FileFormat::Docx,
+        "unlocked",
+    );
+    let error = builder_refusal(&signed.unsign());
+    assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
+}

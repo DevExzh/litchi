@@ -332,6 +332,9 @@ pub enum Source {
     /// A legacy Word binary error.
     #[cfg(feature = "doc")]
     Doc(litchi_doc::Error),
+    /// A source-backed legacy Word main-story edit error.
+    #[cfg(feature = "doc")]
+    DocBodyText(litchi_doc::body_text::source::Error),
     /// A legacy Excel BIFF error.
     #[cfg(feature = "xls")]
     Xls(litchi_xls::Error),
@@ -341,6 +344,13 @@ pub enum Source {
     /// A legacy PowerPoint binary error.
     #[cfg(feature = "ppt")]
     Ppt(litchi_ppt::Error),
+    /// A source-backed legacy PowerPoint text-edit error.
+    #[cfg(feature = "ppt")]
+    PptTextEdit(litchi_ppt::text_edit::Error),
+    /// A compound-file signature error, raised while a legacy binary
+    /// document's signature is removed after `Signed::unsign`.
+    #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+    Sign(litchi_sign::Error),
     /// A Rich Text Format error.
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Error),
@@ -384,12 +394,18 @@ impl Source {
             Self::XlsbRaw(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::Doc(error) => Some(error),
+            #[cfg(feature = "doc")]
+            Self::DocBodyText(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::Xls(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::XlsSource(error) => Some(error),
             #[cfg(feature = "ppt")]
             Self::Ppt(error) => Some(error),
+            #[cfg(feature = "ppt")]
+            Self::PptTextEdit(error) => Some(error),
+            #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+            Self::Sign(error) => Some(error),
             #[cfg(feature = "rtf")]
             Self::Rtf(error) => Some(error),
             #[cfg(feature = "encryption")]
@@ -645,8 +661,7 @@ const LOCKED_SUGGESTION: &str =
     feature = "encryption"
 ))]
 const WRONG_PASSWORD_SUGGESTION: &str = "check the password and try again";
-const SIGNED_SUGGESTION: &str =
-    "remove the signature explicitly before editing, or re-sign the edited document";
+const SIGNED_SUGGESTION: &str = "remove the signature explicitly with `Signed::unsign()` before editing; the first write then publishes the document without it";
 const IWORK_SUGGESTION: &str =
     "open Pages, Keynote and Numbers files with `litchi::iwork::Document::open`";
 
@@ -1073,6 +1088,93 @@ impl Classify for litchi_formula::FormulaError {
     }
 }
 
+#[cfg(any(feature = "doc", feature = "ppt"))]
+impl Classify for litchi_cfb::OverlayError {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Ole(error) => error.classify(),
+            Self::Io(error) => error.classify(),
+            Self::Unavailable { .. } => Class::of(Code::UnsupportedCapability),
+            // The source no longer holds the bytes the edit was planned on.
+            Self::SourceChanged { .. }
+            | Self::SourceFingerprintChanged { .. }
+            | Self::PreconditionFailed { .. }
+            | Self::IncompleteOutput { .. } => Class::of(Code::IoError),
+            Self::TargetFingerprintChanged { .. }
+            | Self::Allocation { .. }
+            | Self::Committed { .. } => Class::of(Code::InternalError),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
+impl Classify for litchi_doc::body_text::source::Error {
+    fn classify(&self) -> Class {
+        use litchi_doc::body_text::source::Refusal;
+
+        match self {
+            Self::Ole(error) => error.classify(),
+            Self::Overlay(error) => error.classify(),
+            Self::Io(error) => error.classify(),
+            Self::Refused(Refusal::Signed) => {
+                Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
+            },
+            Self::Refused(Refusal::Encrypted) => {
+                Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION)
+            },
+            Self::Refused(Refusal::Protected | Refusal::UnknownProtection) => Class::suggest(
+                Code::DocumentProtected,
+                "authorize the protected edit explicitly",
+            ),
+            Self::Refused(Refusal::ParagraphNotFound) => Class::of(Code::OutOfRange),
+            Self::Refused(_) => Class::of(Code::UnsupportedCapability),
+            Self::InvalidData(_) => Class::of(Code::CorruptFile),
+            Self::Limit(_) => Class::of(Code::LimitExceeded),
+            Self::Allocation { .. } => Class::of(Code::InternalError),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "ppt")]
+impl Classify for litchi_ppt::text_edit::Error {
+    fn classify(&self) -> Class {
+        use litchi_ppt::text_edit::Refusal;
+
+        match self {
+            Self::Package(error) => error.classify(),
+            Self::Source(error) => error.classify(),
+            Self::Refused(Refusal::SlideNotFound { .. } | Refusal::ShapeNotFound) => {
+                Class::of(Code::NotFound)
+            },
+            // Includes `UnsupportedSource`, the leaf's one refusal for
+            // signed, encrypted and otherwise unsupported containers: a
+            // signed handle is refused before it reaches the leaf.
+            Self::Refused(_) => Class::of(Code::UnsupportedCapability),
+        }
+    }
+}
+
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+impl Classify for litchi_sign::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Cfb(error) => error.classify(),
+            Self::Limit(_) => Class::of(Code::LimitExceeded),
+            Self::Xml(_) | Self::Container(_) => Class::of(Code::CorruptFile),
+            // Encrypted or rights-managed storage, an unsupported legacy
+            // signature form, or an algorithm the policy refuses.
+            Self::Encrypted | Self::Legacy | Self::Unsupported(_) | Self::Sha1 => {
+                Class::of(Code::UnsupportedCapability)
+            },
+            Self::Key(_) => Class::of(Code::InvalidArgument),
+            Self::Sign(_) => Class::of(Code::InternalError),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
 /// Implements `From<leaf>` for [`Error`]: classify, keep the leaf's message,
 /// record the leaf's format, and keep the leaf as the typed source.
 macro_rules! from_leaf {
@@ -1120,12 +1222,24 @@ from_leaf!(
 );
 from_leaf!(#[cfg(feature = "xlsb")] litchi_xlsb::Error => XlsbRaw, Some(FileFormat::Xlsb));
 from_leaf!(#[cfg(feature = "doc")] litchi_doc::Error => Doc, Some(FileFormat::Doc));
+from_leaf!(
+    #[cfg(feature = "doc")]
+    litchi_doc::body_text::source::Error => DocBodyText, Some(FileFormat::Doc)
+);
 from_leaf!(#[cfg(feature = "xls")] litchi_xls::Error => Xls, Some(FileFormat::Xls));
 from_leaf!(
     #[cfg(feature = "xls")]
     litchi_xls::SourceBackedError => XlsSource, Some(FileFormat::Xls)
 );
 from_leaf!(#[cfg(feature = "ppt")] litchi_ppt::Error => Ppt, Some(FileFormat::Ppt));
+from_leaf!(
+    #[cfg(feature = "ppt")]
+    litchi_ppt::text_edit::Error => PptTextEdit, Some(FileFormat::Ppt)
+);
+from_leaf!(
+    #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+    litchi_sign::Error => Sign, None
+);
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
 from_leaf!(
     #[cfg(feature = "encryption")]

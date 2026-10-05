@@ -647,6 +647,18 @@ impl Package {
         Self::with_execution(package, execution)
     }
 
+    /// Borrow the validated deferred OPC package this document reads from.
+    ///
+    /// This is the package indexed when the document was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::source_artifact`], read through the same
+    /// positional source and observe the same source-version fence.
+    #[must_use]
+    pub fn source_backed_package(&self) -> &SourceBackedPackage {
+        &self.package
+    }
+
     /// Materialize this source-backed DOCX into the established owning
     /// package facade without reparsing the source catalog.
     ///

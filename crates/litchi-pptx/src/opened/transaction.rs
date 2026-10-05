@@ -1234,10 +1234,20 @@ impl Transaction {
 
     /// Validate and consume all staged edits into one atomic commit.
     ///
+    /// A changed commit invalidates every package signature, so a changed
+    /// commit over a signed package is refused (ADR 0006): the signature must
+    /// be removed explicitly first, with
+    /// [`Package::unsign`](crate::Package::unsign) before the transaction
+    /// starts. An exact no-op commits the unchanged source, signature
+    /// included.
+    ///
     /// # Errors
     ///
-    /// Returns an error if a dependency changed, the patch exceeds bounds, or
-    /// the complete staged package cannot be captured as a coherent snapshot.
+    /// Returns [`Error::Opc`] with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// for a changed commit over a signed package, and an error if a
+    /// dependency changed, the patch exceeds bounds, or the complete staged
+    /// package cannot be captured as a coherent snapshot.
     pub fn commit(self) -> Result<Commit> {
         let mut working = self.working;
         compact_changed_slides(
@@ -1249,25 +1259,10 @@ impl Transaction {
         // The staged package shares every untouched payload allocation with
         // the source snapshot, so the source memo answers every part the
         // transaction did not rewrite; the rewritten ones miss and are hashed.
-        let (mut revision, mut digests) =
+        let (revision, digests) =
             super::model::package_fingerprint_with_memo(&working, Some(&self.source.part_digests))?;
         if revision != self.source.revision {
-            // `unsign` rewrites fingerprint inputs only when signature
-            // infrastructure is present: it strips signature parts and the
-            // relationships that reach them, and leaves every other resource
-            // exactly as staged. A package that carries none is re-hashed to
-            // the same revision, so the one just computed still binds the
-            // complete staged package and the recapture below reuses it.
-            let signed = working.is_signed();
-            working.unsign();
-            if signed {
-                let recomputed = super::model::package_fingerprint_with_memo(
-                    &working,
-                    Some(&self.source.part_digests),
-                )?;
-                revision = recomputed.0;
-                digests = recomputed.1;
-            }
+            refuse_signed_change(self.source.package.as_ref(), &working)?;
         }
         let patch = Patch::capture(
             self.source.package.as_ref(),
@@ -1349,6 +1344,23 @@ impl Transaction {
             crate::slide::Key::Name(name) => self.slide_name_index.resolve(&self.slides, name),
         }
     }
+}
+
+/// Refuse a changed commit over a signed package (ADR 0006).
+///
+/// The change invalidates every package signature, and removing one is an
+/// explicit operation ([`crate::Package::unsign`]), never a side effect of an
+/// edit. The source's OPC policy requirement covers a graph whose signature
+/// parts were removed by generic part removal, which does not count as an
+/// explicit removal; `working` is checked as well, so a staged edit cannot
+/// introduce signature infrastructure.
+fn refuse_signed_change(source: &OpcPackage, working: &OpcPackage) -> Result<()> {
+    if source.is_signed() || source.requires_signature_edit_policy() || working.is_signed() {
+        return Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+        ));
+    }
+    Ok(())
 }
 
 fn compact_changed_slides(

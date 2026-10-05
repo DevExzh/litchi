@@ -134,6 +134,7 @@ pub mod raw;
 pub mod shapes;
 pub mod shared_workbook;
 pub mod sheet;
+pub(crate) mod signature_policy;
 pub mod slicer;
 pub mod sparkline;
 pub mod styles;

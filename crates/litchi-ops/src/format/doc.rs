@@ -18,11 +18,12 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_cfb::{OleFile, SharedOleFile, SharedOleFileLimits};
-use litchi_core::{Metadata, OwnedSource, ReadAt, SourceVersion};
-use litchi_doc::body_text::source::{self as body_source, SourceSnapshot};
+use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt, SourceVersion};
+use litchi_doc::body_text::source::SourceSnapshot;
 use litchi_ole_common::property_set::PropertySetReader;
 
 use super::LegacyOpen;
+use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 /// An opened legacy Word (`.doc`) document.
@@ -32,7 +33,7 @@ use crate::{OpenOptions, Result};
 /// retains the input (unless [`OpenOptions::retain_source`] was `false`), so
 /// a later edit needs no second open.
 #[derive(Clone)]
-pub struct Doc(Arc<DocState>);
+pub struct Doc(Arc<Opened<DocState>>);
 
 struct DocState {
     /// The reader every M0a read goes through, built at open exactly as the
@@ -116,11 +117,21 @@ impl Doc {
         } else {
             DocSource::Released
         };
-        Ok(LegacyOpen::Opened(Self(Arc::new(DocState {
+        Ok(LegacyOpen::Opened(Self(Opened::new(DocState {
             reader,
             metadata,
             source,
         }))))
+    }
+
+    /// The same document under another signature disposition (record 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
     }
 
     /// All text of the document, as the facade's `Document::text` returns it.
@@ -163,17 +174,32 @@ impl Doc {
     ///
     /// Returns `Ok(None)` when the source was released at open. The editor's
     /// open runs its FIB, CLX and fingerprint checks here, at the first
-    /// edit. M2 maps the leaf error into the unified one.
+    /// edit. After [`Signed::unsign`](crate::Signed::unsign) the editor is
+    /// built over a copy of the input whose signature storages the signature
+    /// leaf removed (`litchi_sign::cfb::Editor::clear`, record 0013), so a
+    /// commit from it carries no signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// while the document is still signed, with a suggestion naming
+    /// `Signed::unsign`, and the leaf's typed refusal otherwise.
     #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
-    pub(crate) fn body_text_editor(
-        &self,
-    ) -> std::result::Result<Option<SourceSnapshot>, body_source::Error> {
-        match &self.0.source {
-            DocSource::Retained(shared) => {
-                SourceSnapshot::from_shared(Arc::clone(shared)).map(Some)
-            },
-            DocSource::Released => Ok(None),
+    pub(crate) fn body_text_editor(&self) -> Result<Option<SourceSnapshot>> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Doc));
         }
+        let DocSource::Retained(shared) = &self.0.source else {
+            return Ok(None);
+        };
+        if self.0.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                signature::compound_file_bytes(shared)?,
+                litchi_sign::cfb::Format::Doc,
+            )?;
+            return Ok(Some(SourceSnapshot::from_bytes(bytes)?));
+        }
+        Ok(Some(SourceSnapshot::from_shared(Arc::clone(shared))?))
     }
 
     /// The length of the retained input, or `None` when it was released.

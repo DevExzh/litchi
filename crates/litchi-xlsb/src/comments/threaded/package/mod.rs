@@ -215,12 +215,12 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI)
     else {
         return Ok(false);
     };
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(worksheet_part)?
         .rels_mut()
         .remove(&relationship_id);
     remove_if_unreferenced(package, &part_name);
-    package.unsign();
     Ok(true)
 }
 
@@ -457,6 +457,10 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
 }
 
 fn remove_graph_inner(package: &mut OpcPackage) -> Result<bool> {
+    // Callers hand in a clone and drop it on error, so refusing after the
+    // removals leaves their package untouched; the decision is taken on the
+    // signature state before any removal.
+    let signed = crate::signature_policy::ensure_unsigned(package);
     let mut changed = false;
     let mut removals = Vec::new();
     // Keep removal bound to the same resolved workbook URI used by graph
@@ -493,11 +497,11 @@ fn remove_graph_inner(package: &mut OpcPackage) -> Result<bool> {
             changed = true;
         }
     }
+    if changed {
+        signed?;
+    }
     for target in removals {
         remove_if_unreferenced(package, &target);
-    }
-    if changed {
-        package.unsign();
     }
     Ok(changed)
 }
@@ -512,6 +516,7 @@ fn replace_part_and_relationship(
     relationship_type: &str,
     payload: Vec<u8>,
 ) -> Result<()> {
+    crate::signature_policy::ensure_unsigned(package)?;
     if let Some(old_part) = old_part
         && old_part != part_name
     {
@@ -566,7 +571,6 @@ fn replace_part_and_relationship(
                 TargetMode::Internal,
             )?;
     }
-    package.unsign();
     Ok(())
 }
 

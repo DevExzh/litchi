@@ -853,3 +853,114 @@ fn formula_conversion_errors_keep_their_typed_source() {
         Code::CorruptFile,
     );
 }
+
+// The source-backed legacy editors and the compound-file signature editor
+// (record 0013). Their classifiers name every current variant of
+// `litchi_doc::body_text::source::Error`, `litchi_cfb::OverlayError` and
+// `litchi_sign::Error`, so those wildcard arms only catch variants added
+// later; the refusal wildcards below are reachable.
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_body_text_errors_are_classified() {
+    use litchi_cfb::OverlayError;
+    use litchi_doc::body_text::source::{Error as BodyError, Refusal};
+
+    let error = assert_code(BodyError::Refused(Refusal::Signed), Code::DocumentProtected);
+    assert_eq!(error.suggestion(), Some(SIGNED_SUGGESTION));
+    assert_eq!(error.format(), Some(FileFormat::Doc));
+    assert!(matches!(error.leaf(), Source::DocBodyText(_)));
+    assert_suggested(
+        BodyError::Refused(Refusal::Encrypted),
+        Code::DocumentProtected,
+        PASSWORD_SUGGESTION,
+    );
+    assert_code(
+        BodyError::Refused(Refusal::Protected),
+        Code::DocumentProtected,
+    );
+    assert_code(
+        BodyError::Refused(Refusal::ParagraphNotFound),
+        Code::OutOfRange,
+    );
+    // Wildcard refusal arm.
+    assert_code(
+        BodyError::Refused(Refusal::LengthChange),
+        Code::UnsupportedCapability,
+    );
+    assert_code(BodyError::InvalidData("bad".into()), Code::CorruptFile);
+    assert_code(BodyError::Limit("big".into()), Code::LimitExceeded);
+    assert_code(
+        BodyError::Allocation {
+            resource: "test",
+            source: allocation_failure(),
+        },
+        Code::InternalError,
+    );
+    assert_code(BodyError::Io(io::Error::other("sink")), Code::IoError);
+    assert_code(
+        BodyError::Overlay(OverlayError::Unavailable {
+            reason: "test".into(),
+        }),
+        Code::UnsupportedCapability,
+    );
+    let (expected, observed) = changed();
+    assert_code(
+        BodyError::Overlay(OverlayError::SourceChanged { expected, observed }),
+        Code::IoError,
+    );
+}
+
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_text_edit_errors_are_classified() {
+    use litchi_cfb::OverlayError;
+    use litchi_ppt::text_edit::{Error as TextError, Refusal};
+
+    assert_code(
+        TextError::Refused(Refusal::SlideNotFound {
+            position: litchi_core::Position::new(3),
+        }),
+        Code::NotFound,
+    );
+    assert_code(TextError::Refused(Refusal::ShapeNotFound), Code::NotFound);
+    // Wildcard refusal arm, the leaf's protected-container refusal included.
+    assert_code(
+        TextError::Refused(Refusal::UnsupportedSource),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        TextError::Package(litchi_ppt::Error::PasswordRequired),
+        Code::DocumentProtected,
+    );
+    let error = assert_code(
+        TextError::Source(OverlayError::Allocation {
+            resource: "test",
+            source: allocation_failure(),
+        }),
+        Code::InternalError,
+    );
+    assert_eq!(error.format(), Some(FileFormat::Ppt));
+    assert!(matches!(error.leaf(), Source::PptTextEdit(_)));
+}
+
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+#[test]
+fn compound_file_signature_errors_are_classified() {
+    let error = assert_code(litchi_sign::Error::Xml("bad".into()), Code::CorruptFile);
+    assert_eq!(error.format(), None);
+    assert!(matches!(error.leaf(), Source::Sign(_)));
+    assert_code(
+        litchi_sign::Error::Container("bad".into()),
+        Code::CorruptFile,
+    );
+    assert_code(litchi_sign::Error::Limit("big".into()), Code::LimitExceeded);
+    assert_code(litchi_sign::Error::Encrypted, Code::UnsupportedCapability);
+    assert_code(litchi_sign::Error::Legacy, Code::UnsupportedCapability);
+    assert_code(litchi_sign::Error::Key("bad".into()), Code::InvalidArgument);
+    assert_code(litchi_sign::Error::Sign("bad".into()), Code::InternalError);
+    assert_code(
+        litchi_sign::Error::Cfb(litchi_cfb::OleError::NotOleFile),
+        Code::UnsupportedFormat,
+    );
+}

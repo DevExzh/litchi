@@ -1,12 +1,22 @@
 //! The [`Signed`] state of [`File`]: a readable input whose signature must
 //! be consumed explicitly before it is edited (ADR 0006 `Signed<T>`; record
-//! 0003 §2.6; record 0007 Q4).
+//! 0003 §2.6; record 0007 Q4; record 0013, the signature policy).
 
 use std::fmt;
 use std::sync::Arc;
 
 use litchi_core::FileFormat;
 
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb"
+))]
+use crate::format::signature::Signature;
 use crate::{Family, File};
 
 /// Where a [`Signed`] input's signature was found. Detection is
@@ -33,10 +43,18 @@ pub enum SignatureOrigin {
 /// [`Signed::file`] returns it for format-specific reads. Opening verifies
 /// nothing; the signature is only detected, from package metadata.
 ///
-/// `Signed` adds no way to edit the file it wraps. The consuming transitions
-/// that remove or renew the signature, and the refusal of edit verbs on a
-/// signed input, are added by the signature policy step (M0a S6b), so an edit
-/// can never strip a signature silently.
+/// Editing must consume the signature explicitly (ADR 0006), so that no edit
+/// can strip a signature silently:
+///
+/// - While the file is signed, every edit refuses with
+///   [`Code::DocumentProtected`](crate::Code::DocumentProtected) and a
+///   suggestion naming [`Signed::unsign`]. That holds for the wrapped file
+///   too: [`Signed::file`] returns a file that reads but does not edit.
+/// - [`Signed::unsign`] consumes the signature and returns the file. Its
+///   first write removes the signature parts, through the format's own
+///   explicit removal, and publishes the document without them.
+/// - Re-signing with caller keys (`resign`) is deferred: see
+///   [`Signed::unsign`].
 ///
 /// `Signed` is a cheap-to-clone handle. Its [`Debug`] output names the inner
 /// format and the signature origin only.
@@ -48,6 +66,9 @@ pub enum SignatureOrigin {
 /// if let File::Signed(signed) = litchi_ops::open("contract.docx")? {
 ///     println!("{:?} signed in its {:?} container", signed.format(), signed.origin());
 ///     println!("{}", signed.file().text()?);
+///     // Editing requires removing the signature explicitly.
+///     let unsigned: File = signed.unsign();
+///     assert!(!unsigned.is_signed());
 /// }
 /// # Ok(())
 /// # }
@@ -65,26 +86,22 @@ struct SignedState {
 
 impl Signed {
     /// Wrap the readable `file` of `format` whose signature was found in
-    /// `origin`. The openers never wrap a [`File::Locked`] or a nested
+    /// `origin`, marking its handle signed so that its editor builders
+    /// refuse. The openers never wrap a [`File::Locked`] or a nested
     /// [`File::Signed`].
-    #[cfg_attr(
-        not(any(
-            feature = "doc",
-            feature = "docx",
-            feature = "ppt",
-            feature = "pptx",
-            feature = "xls",
-            feature = "xlsx",
-            feature = "xlsb"
-        )),
-        expect(
-            dead_code,
-            reason = "only OPC and compound-file formats carry detectable signatures"
-        )
-    )]
+    /// Only OPC and compound-file formats carry detectable signatures.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
     pub(crate) fn new(file: File, format: FileFormat, origin: SignatureOrigin) -> Self {
         Self(Arc::new(SignedState {
-            file,
+            file: file.with_signature(Signature::Signed),
             format,
             origin,
         }))
@@ -108,10 +125,67 @@ impl Signed {
         self.0.origin
     }
 
-    /// The readable file the signature covers.
+    /// The readable file the signature covers. It reads like any file of
+    /// its format; its edits refuse until [`Self::unsign`] consumes the
+    /// signature.
     #[must_use]
     pub fn file(&self) -> &File {
         &self.0.file
+    }
+
+    /// Consume the signature explicitly (ADR 0006) and return the file.
+    ///
+    /// Nothing is read or rewritten here. The returned file reads the same
+    /// content, and [`File::is_signed`] is `false` for it. Its first write
+    /// removes the signature through the format's own explicit removal (the
+    /// OOXML owner's `unsign`, or the compound-file signature editor's
+    /// `clear`) and publishes the document without any signature part; an
+    /// edit is then allowed although it invalidates what was signed. Other
+    /// clones of this `Signed` stay signed: the authorization belongs to the
+    /// returned file only.
+    ///
+    /// Re-signing with caller keys (`resign`) is deferred until the signing
+    /// providers have an explicit, credential-safe input in the unified layer
+    /// (record 0013); the format crates keep their own signing APIs.
+    ///
+    /// ```no_run
+    /// use litchi_ops::File;
+    ///
+    /// # fn main() -> litchi_ops::Result<()> {
+    /// let file = match litchi_ops::open("contract.docx")? {
+    ///     File::Signed(signed) => signed.unsign(),
+    ///     file => file,
+    /// };
+    /// assert!(!file.is_signed());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use = "the unsigned file is the only handle the signature removal authorizes"]
+    pub fn unsign(self) -> File {
+        #[cfg(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "xls",
+            feature = "xlsx",
+            feature = "xlsb"
+        ))]
+        {
+            self.0.file.with_signature(Signature::RemovalAuthorized)
+        }
+        #[cfg(not(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "xls",
+            feature = "xlsx",
+            feature = "xlsb"
+        )))]
+        {
+            self.0.file.clone()
+        }
     }
 }
 

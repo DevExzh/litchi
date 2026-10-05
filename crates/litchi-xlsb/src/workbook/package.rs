@@ -677,13 +677,14 @@ impl Workbook {
     /// Get mutable OPC access for XLSB-internal package adapters.
     ///
     /// Public callers must use [`Self::edit_opc`], which stages a structural
-    /// candidate and reparses the complete XLSB host before publication.
+    /// candidate and reparses the complete XLSB host before publication. The
+    /// signature state is left as it is: a changed signed package is refused
+    /// when it is published.
     #[allow(
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
     pub(crate) fn opc_package_mut(&mut self) -> &mut OpcPackage {
-        self.package.unsign();
         &mut self.package
     }
 
@@ -691,15 +692,27 @@ impl Workbook {
     ///
     /// The closure receives a cloned candidate package. Returning an error,
     /// producing a package whose main relationship or XLSB graph is invalid,
-    /// or unwinding leaves this workbook unchanged. A successful edit drops
-    /// package signatures, reparses workbook-owned state, and revalidates the
-    /// inert VBA and External Data Connections relationship graphs before
-    /// publication. A drawing-skipped projection remains drawing-skipped after
-    /// this reparse.
+    /// or unwinding leaves this workbook unchanged. A successful edit
+    /// reparses workbook-owned state and revalidates the inert VBA and
+    /// External Data Connections relationship graphs before publication. A
+    /// drawing-skipped projection remains drawing-skipped after this reparse.
+    ///
+    /// Signature state is preserved (ADR 0006). A closure that changes a
+    /// signed package must remove the signature explicitly with
+    /// [`OpcPackage::unsign`] (or call [`Self::unsign`] before the edit);
+    /// deleting signature parts alone does not authorize publication. A
+    /// closure that changes nothing keeps the signature byte for byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns the closure's error, [`crate::package::PackageError::Opc`] with
+    /// `SignedSourceRequiresExplicitPolicy` for a changed signed candidate
+    /// without an explicit signature disposition, and the candidate's
+    /// validation or reparse error.
     pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let mut candidate = self.package.clone();
-        candidate.unsign();
         let value = edit(&mut candidate)?;
+        candidate.validate_signature_edit_from(&self.package)?;
 
         Self::validate_edit_candidate(&candidate)?;
         let validated = self.reparse_candidate(candidate)?;

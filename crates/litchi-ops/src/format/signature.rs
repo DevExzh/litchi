@@ -1,0 +1,176 @@
+//! The signature disposition of the tier 1 and tier 2 handles (ADR 0006;
+//! unified-ops record 0013).
+//!
+//! An open that finds a signature wraps the file in [`crate::Signed`] and
+//! marks its handle [`Signature::Signed`]: reads work, and every editor
+//! builder refuses with `document_protected` and a suggestion naming
+//! [`crate::Signed::unsign`]. That consuming transition is the only way out.
+//! It marks the same file [`Signature::RemovalAuthorized`] without reading or
+//! rewriting anything. The first editor built from such a handle works on a
+//! copy of the input whose signature the leaf removed explicitly
+//! (`unsign` on the OOXML leaf owner, `litchi_sign::cfb::Editor::clear` on a
+//! compound file), so every write from that editor publishes without the
+//! signature parts. Nothing else in the unified layer removes a signature.
+
+use std::ops::Deref;
+use std::sync::Arc;
+
+use litchi_core::FileFormat;
+
+use crate::error::{Error, Result};
+
+/// What a handle may do with the signature of the input it was opened from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Signature {
+    /// The opener found no signature.
+    Unsigned,
+    /// The input is signed: this is the file a [`crate::Signed`] wraps. Reads
+    /// work; every editor builder refuses.
+    Signed,
+    /// [`crate::Signed::unsign`] consumed the signature. Editors work on a
+    /// copy whose signature the leaf removed explicitly.
+    RemovalAuthorized,
+}
+
+/// One handle over the state of one open: that state, which every clone and
+/// every signature disposition of the open shares, and this handle's
+/// disposition.
+///
+/// [`crate::Signed::unsign`] re-marks a file without copying its state: the
+/// unsigned handle shares the owner, the caches and the retained source of
+/// the signed one. [`Deref`] reaches the state.
+pub(crate) struct Opened<S> {
+    signature: Signature,
+    state: Arc<S>,
+}
+
+impl<S> Opened<S> {
+    /// The handle of a fresh open, which found no signature yet: the opener
+    /// re-marks it when the container turns out to be signed.
+    pub(crate) fn new(state: S) -> Arc<Self> {
+        Self::from_parts(Signature::Unsigned, Arc::new(state))
+    }
+
+    fn from_parts(signature: Signature, state: Arc<S>) -> Arc<Self> {
+        Arc::new(Self { signature, state })
+    }
+
+    /// This handle's signature disposition.
+    pub(crate) fn signature(&self) -> Signature {
+        self.signature
+    }
+
+    /// A handle over the same state with another disposition.
+    pub(crate) fn with_signature(&self, signature: Signature) -> Arc<Self> {
+        Self::from_parts(signature, Arc::clone(&self.state))
+    }
+
+    /// Move the state out of a handle that nothing else shares: no clone of
+    /// the handle and no other disposition of the same open. Otherwise the
+    /// handle comes back unchanged.
+    #[cfg(any(feature = "pptx", feature = "xlsx"))]
+    pub(crate) fn try_unwrap(this: Arc<Self>) -> std::result::Result<(Signature, S), Arc<Self>> {
+        let opened = Arc::try_unwrap(this)?;
+        match Arc::try_unwrap(opened.state) {
+            Ok(state) => Ok((opened.signature, state)),
+            Err(state) => Err(Self::from_parts(opened.signature, state)),
+        }
+    }
+
+    /// A handle over state moved out with [`Self::try_unwrap`].
+    #[cfg(feature = "pptx")]
+    pub(crate) fn rebuild(signature: Signature, state: S) -> Arc<Self> {
+        Self::from_parts(signature, Arc::new(state))
+    }
+}
+
+impl<S> Deref for Opened<S> {
+    type Target = S;
+
+    fn deref(&self) -> &S {
+        &self.state
+    }
+}
+
+/// The refusal of an editor builder on a handle that is still signed.
+pub(crate) fn refusal(format: FileFormat) -> Error {
+    Error::signed(format)
+}
+
+/// The exact bytes a source-backed OPC package was opened from.
+///
+/// An editor that removes the signature starts from an owning package opened
+/// over these bytes (record 0009 D4: promote through the exact source), so
+/// every ZIP member the edit and the signature removal do not touch is
+/// published byte for byte.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn exact_source(package: &litchi_opc::SourceBackedPackage) -> Result<Vec<u8>> {
+    let artifact = package.source_artifact();
+    let mut bytes = Vec::new();
+    reserve(
+        &mut bytes,
+        artifact.len(),
+        "the exact OPC source of an unsigned copy",
+    )?;
+    artifact.write_to_stream(&mut bytes)?;
+    Ok(bytes)
+}
+
+/// The whole compound file `shared` reads, checked against the source
+/// revision captured at open before and after the read.
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+pub(crate) fn compound_file_bytes(shared: &litchi_cfb::SharedOleFile) -> Result<Vec<u8>> {
+    let source = shared.source_arc();
+    let expected = shared.captured_source_version();
+    let current = || -> Result<()> {
+        let observed = source.version()?;
+        if observed == expected {
+            Ok(())
+        } else {
+            Err(litchi_core::Error::SourceChanged { expected, observed }.into())
+        }
+    };
+    current()?;
+    let mut bytes = Vec::new();
+    let length = reserve(
+        &mut bytes,
+        source.len()?,
+        "the compound file of an unsigned copy",
+    )?;
+    bytes.resize(length, 0);
+    source.read_exact_at(0, &mut bytes)?;
+    current()?;
+    Ok(bytes)
+}
+
+/// `bytes` with every legacy (`_signatures`) and XML (`_xmlsignatures`)
+/// signature removed by the compound-file signature leaf.
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+pub(crate) fn unsign_compound_file(
+    bytes: Vec<u8>,
+    format: litchi_sign::cfb::Format,
+) -> Result<Vec<u8>> {
+    let mut editor = litchi_sign::cfb::Editor::open(bytes, format)?;
+    editor.clear()?;
+    Ok(editor.finish()?)
+}
+
+/// Reserve exactly `length` bytes and return the length, or fail with a
+/// typed limit or allocation error.
+fn reserve(bytes: &mut Vec<u8>, length: u64, resource: &'static str) -> Result<usize> {
+    let Ok(length) = usize::try_from(length) else {
+        return Err(
+            litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed: length,
+                limit: u64::try_from(usize::MAX).unwrap_or(u64::MAX),
+                scope: Arc::from(resource),
+            })
+            .into(),
+        );
+    };
+    bytes
+        .try_reserve_exact(length)
+        .map_err(|source| Error::from(litchi_core::Error::Allocation { resource, source }))?;
+    Ok(length)
+}

@@ -10,7 +10,7 @@ use litchi_core::{FileFormat, OwnedSource, ReadAt};
 use litchi_docx::section::Ownership;
 use litchi_opc::{OpcPackage, ReadLimits};
 
-use super::{Docx, DocxOwner};
+use super::{Docx, DocxEditor, DocxOwner};
 use crate::detect::{DetectedFormat, detect_format_smart};
 use crate::error::{Code, Error, Source};
 use crate::options::{OpenOptions, SourceMode};
@@ -76,6 +76,15 @@ fn open_path(path: &std::path::Path, options: &OpenOptions) -> Docx {
 }
 
 /// The facade's `Document::from_bytes` route.
+/// The main-document edit an unsigned handle's editor builder returns.
+#[track_caller]
+fn retained_edit(docx: &Docx) -> litchi_docx::document::Edit {
+    match docx.edit_document() {
+        Ok(DocxEditor::Edit(edit)) => *edit,
+        other => panic!("expected a main-document edit, got {other:?}"),
+    }
+}
+
 fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Docx, Error> {
     use crate::detect::detected::{DocxSourceBytesDetection, detect_docx_source_bytes};
     match detect_docx_source_bytes(bytes, ReadLimits::default()) {
@@ -370,8 +379,8 @@ fn editor_is_built_from_either_owner_without_reindexing() {
     let source = open_bytes(bytes.clone(), &OpenOptions::new()).unwrap();
     let eager = open_eager(bytes, &OpenOptions::new()).unwrap();
 
-    let source_edit = source.edit_document().unwrap();
-    let eager_edit = eager.edit_document().unwrap();
+    let source_edit = retained_edit(&source);
+    let eager_edit = retained_edit(&eager);
     assert_eq!(source_edit.source().paragraph_count(), 2);
     assert_eq!(
         source_edit.source().paragraph_count(),
@@ -394,10 +403,11 @@ fn editor_admits_word_markup_compatibility_on_both_owners() {
         let bytes = std::fs::read(fixture(name)).unwrap();
         let eager = open_eager(bytes.clone(), &OpenOptions::new()).unwrap();
         let source = open_bytes(bytes, &OpenOptions::new()).unwrap();
-        let eager_edit = eager.edit_document().unwrap();
-        let source_edit = source
-            .edit_document()
-            .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        let eager_edit = retained_edit(&eager);
+        let source_edit = match source.edit_document() {
+            Ok(DocxEditor::Edit(edit)) => *edit,
+            other => panic!("{name}: {other:?}"),
+        };
         assert!(source_edit.source().paragraph_count() > 0, "{name}");
         assert_eq!(
             source_edit.source().paragraph_count(),

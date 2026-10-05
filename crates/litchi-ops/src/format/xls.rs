@@ -27,12 +27,13 @@ use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
 
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SharedOleFile};
-use litchi_core::Metadata;
 use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
+use litchi_core::{FileFormat, Metadata};
 use litchi_ole_common::property_set::{PropertySetReader, SharedPropertySetReader};
 use litchi_xls::{SourceBackedError, SourceBackedWorkbook, cell_values};
 
 use super::LegacyOpen;
+use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 /// An opened legacy Excel (`.xls`) workbook.
@@ -40,7 +41,7 @@ use crate::{OpenOptions, Result};
 /// One `Arc` wide: cloning is one atomic increment, and the handle is
 /// `Send + Sync`.
 #[derive(Clone)]
-pub struct Xls(Arc<XlsOwner>);
+pub struct Xls(Arc<Opened<XlsOwner>>);
 
 /// The two states of [`Xls`] (record 0003 §2.3).
 #[allow(
@@ -92,7 +93,7 @@ impl Xls {
         options: &OpenOptions,
     ) -> Self {
         let _ = options;
-        Self(Arc::new(XlsOwner::Source(XlsSource {
+        Self(Opened::new(XlsOwner::Source(XlsSource {
             workbook,
             cfb,
             metadata: OnceLock::new(),
@@ -121,18 +122,33 @@ impl Xls {
         let metadata = ole.get_metadata().map(Metadata::from).unwrap_or_default();
         let leaf_options = litchi_xls::OpenOptions::new().with_password(password);
         match litchi_xls::Workbook::from_ole_file_or_password_required(ole, leaf_options)? {
-            Ok(workbook) => Ok(LegacyOpen::Opened(Self(Arc::new(XlsOwner::Eager(
+            Ok(workbook) => Ok(LegacyOpen::Opened(Self(Opened::new(XlsOwner::Eager(
                 Box::new(EagerXls { workbook, metadata }),
             ))))),
             Err(ole) => Ok(LegacyOpen::PasswordRequired(Box::new(ole))),
         }
     }
 
+    /// The same workbook under another signature disposition (record 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
+    }
+
+    /// The owner every read goes through.
+    fn owner(&self) -> &XlsOwner {
+        &self.0
+    }
+
     /// Whether the owner is the positional source-backed workbook, for the
     /// tests that pin each route's owner.
     #[cfg(test)]
     pub(crate) fn is_source_backed(&self) -> bool {
-        matches!(*self.0, XlsOwner::Source(_))
+        matches!(self.owner(), XlsOwner::Source(_))
     }
 
     /// The names of the ordinary worksheets, in tab order.
@@ -142,7 +158,7 @@ impl Xls {
     /// On the filesystem route, returns a typed error when the source changed
     /// or the workbook globals cannot be read.
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
-        match self.0.as_ref() {
+        match self.owner() {
             XlsOwner::Source(source) => Ok(source.workbook.worksheet_names()?),
             XlsOwner::Eager(eager) => Ok(eager.workbook.worksheet_names().to_vec()),
         }
@@ -155,7 +171,7 @@ impl Xls {
     /// On the filesystem route, returns a typed error when the source
     /// changed.
     pub fn worksheet_count(&self) -> Result<usize> {
-        match self.0.as_ref() {
+        match self.owner() {
             XlsOwner::Source(source) => Ok(source.workbook.worksheet_count()?),
             XlsOwner::Eager(eager) => Ok(eager.workbook.worksheet_count()),
         }
@@ -169,7 +185,7 @@ impl Xls {
     /// Returns a typed error when a worksheet cannot be read or, on the
     /// filesystem route, when the source changed before or after the read.
     pub fn text(&self) -> Result<String> {
-        match self.0.as_ref() {
+        match self.owner() {
             XlsOwner::Source(source) => source.text(),
             XlsOwner::Eager(eager) => eager.text(),
         }
@@ -189,7 +205,7 @@ impl Xls {
     /// or a metadata stream cannot be read for a reason other than its
     /// content.
     pub fn metadata(&self) -> Result<Option<Metadata>> {
-        match self.0.as_ref() {
+        match self.owner() {
             XlsOwner::Source(source) => source.metadata().map(Some),
             XlsOwner::Eager(eager) => Ok(Some(eager.metadata.clone())),
         }
@@ -203,7 +219,7 @@ impl Xls {
     /// On the filesystem route, returns a typed error when the source
     /// changed.
     pub fn tolerance_report(&self) -> Result<litchi_xls::ToleranceReport> {
-        match self.0.as_ref() {
+        match self.owner() {
             XlsOwner::Source(source) => source.tolerance_report(),
             XlsOwner::Eager(eager) => Ok(eager.workbook.tolerance_report().clone()),
         }
@@ -216,22 +232,44 @@ impl Xls {
     /// the eager reader's own bytes. Both copy the input once and let the
     /// editor index it, because the editor's package capture runs on the
     /// cursor-based reader (the fallback of record 0003, risk R2). Both costs
-    /// fall here, at the first edit, not at open. M2 maps the leaf error
-    /// into the unified one.
+    /// fall here, at the first edit, not at open. After
+    /// [`Signed::unsign`](crate::Signed::unsign) the copy is one whose
+    /// signature storages the signature leaf removed
+    /// (`litchi_sign::cfb::Editor::clear`, record 0013), so a commit from it
+    /// carries no signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// while the workbook is still signed, with a suggestion naming
+    /// `Signed::unsign`, and the leaf's typed refusal otherwise.
     #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
-    pub(crate) fn cell_values_editor(&self) -> litchi_xls::Result<cell_values::Snapshot> {
+    pub(crate) fn cell_values_editor(&self) -> Result<cell_values::Snapshot> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Xls));
+        }
         let limits = litchi_ole_common::object::Limits::default();
-        match self.0.as_ref() {
+        if self.0.signature() == Signature::RemovalAuthorized {
+            let bytes = match self.owner() {
+                XlsOwner::Source(source) => signature::compound_file_bytes(&source.cfb)?,
+                XlsOwner::Eager(eager) => eager.workbook.get_ref().get_ref().clone(),
+            };
+            let bytes = signature::unsign_compound_file(bytes, litchi_sign::cfb::Format::Xls)?;
+            return Ok(cell_values::Snapshot::from_bytes_with_limits(
+                bytes, limits,
+            )?);
+        }
+        Ok(match self.owner() {
             XlsOwner::Source(source) => cell_values::Snapshot::from_shared_ole_file(
                 &source.cfb,
                 limits,
                 OleFileLimits::default(),
-            ),
+            )?,
             XlsOwner::Eager(eager) => cell_values::Snapshot::from_bytes_with_limits(
                 eager.workbook.get_ref().get_ref().clone(),
                 limits,
-            ),
-        }
+            )?,
+        })
     }
 }
 
@@ -339,7 +377,7 @@ impl Xls {
     /// source. The facade's `open_xls_workbook_dyn` read paths through the
     /// same eager reader, so trait reads keep its semantics on both routes.
     fn trait_workbook(&self) -> Result<&EagerWorkbook> {
-        match self.0.as_ref() {
+        match self.owner() {
             XlsOwner::Eager(eager) => Ok(&eager.workbook),
             XlsOwner::Source(source) => source
                 .eager
@@ -414,7 +452,7 @@ impl WorkbookTrait for Xls {
 
 impl std::fmt::Debug for Xls {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let owner = match self.0.as_ref() {
+        let owner = match self.owner() {
             XlsOwner::Source(_) => "source",
             XlsOwner::Eager(_) => "eager",
         };
@@ -587,7 +625,7 @@ mod tests {
                 ),
             };
             opened += 1;
-            assert!(matches!(xls.0.as_ref(), XlsOwner::Eager(_)));
+            assert!(matches!(xls.owner(), XlsOwner::Eager(_)));
             assert_eq!(xls.text().unwrap(), trait_text(&name), "{name}");
             assert_eq!(
                 format!("{:?}", xls.metadata().unwrap()),
@@ -630,7 +668,7 @@ mod tests {
                 continue;
             };
             let xls = Xls::from_source(workbook, cfb, &OpenOptions::default());
-            assert!(matches!(xls.0.as_ref(), XlsOwner::Source(_)));
+            assert!(matches!(xls.owner(), XlsOwner::Source(_)));
             let owner = SourceBackedWorkbook::from_path(&path).unwrap();
             assert_same(xls.text(), owner.text(), &name);
             assert_same(xls.worksheet_names(), owner.worksheet_names(), &name);

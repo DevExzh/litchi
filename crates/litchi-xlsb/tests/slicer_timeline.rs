@@ -594,11 +594,23 @@ fn shared_timeline_targets_are_refused_before_package_mutation() {
     assert_eq!(package_bytes(&package), before);
 }
 
+/// A changed slicer commit over a signed package is refused until the
+/// signature is removed explicitly (ADR 0006); the patch then binds the root
+/// relationships, and its inverse restores the explicitly unsigned source.
 #[test]
-fn patch_binds_root_relationships_and_inverse_restores_signature_state() {
+fn patch_binds_root_relationships_and_needs_an_explicit_unsign() {
     let mut package = authored_package();
     add_signature_marker(&mut package);
-    let signed = package_bytes(&package);
+    let snapshot = package_snapshot(&package).slicer_caches().unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_caches(vec![slicer_cache()]).unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(litchi_xlsb::package::PackageError::Signed)
+    ));
+
+    package.unsign();
+    let unsigned = package_bytes(&package);
     let snapshot = package_snapshot(&package).slicer_caches().unwrap();
     let mut edit = snapshot.edit().unwrap();
     edit.replace_caches(vec![slicer_cache()]).unwrap();
@@ -632,7 +644,7 @@ fn patch_binds_root_relationships_and_inverse_restores_signature_state() {
     let restored = changed
         .apply_slicer_patch(&commit.patch().inverse())
         .unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), signed);
+    assert_eq!(restored.to_bytes().unwrap(), unsigned);
 }
 
 #[test]

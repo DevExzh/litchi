@@ -42,6 +42,7 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
 
+use super::signature::{self, Opened, Signature};
 use crate::error::{Error, Result};
 use crate::options::OpenOptions;
 use crate::{opc, pptx};
@@ -51,7 +52,7 @@ use crate::{opc, pptx};
 /// Cloning is one reference-count increment; clones share the opened source,
 /// its indexed catalog and the cached metadata.
 #[derive(Clone)]
-pub struct Pptx(Arc<PptxState>);
+pub struct Pptx(Arc<Opened<PptxState>>);
 
 const _: () = {
     const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -68,6 +69,9 @@ struct PptxState {
     /// Whether the opened source stays available for an editor
     /// ([`OpenOptions::retain_source`]).
     retain_source: bool,
+    /// The OPC read limits of the open, which an unsigned copy is opened
+    /// under (record 0013).
+    ooxml_limits: opc::ReadLimits,
 }
 
 /// The two states of the PPTX owner (record 0003 §2.3).
@@ -155,6 +159,11 @@ pub(crate) enum PptxEditor {
     Source(Box<pptx::SourceBackedPresentationEditor>),
     /// A detached transaction over the eager package.
     Eager(Box<pptx::opened::Transaction>),
+    /// After [`Signed::unsign`](crate::Signed::unsign): an owning copy of the
+    /// presentation whose signature the leaf removed explicitly
+    /// ([`pptx::Package::unsign`]). Opened transactions start from it and
+    /// publish into it, so the output carries no signature part.
+    Unsigned(Box<pptx::Package>),
 }
 
 /// Why [`Pptx::into_editor`] built no editor. The handle is returned so the
@@ -173,11 +182,23 @@ pub(crate) struct EditorRefused {
 
 impl Pptx {
     fn new(owner: PptxOwner, metadata: OnceLock<Option<Metadata>>, options: &OpenOptions) -> Self {
-        Self(Arc::new(PptxState {
+        Self(Opened::new(PptxState {
             owner,
             metadata,
             retain_source: options.retain_source,
+            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
         }))
+    }
+
+    /// The same presentation under another signature disposition (record
+    /// 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
     }
 
     /// Adopts the source-backed presentation built by the path route
@@ -480,19 +501,41 @@ impl Pptx {
     ///   is built from the package indexed at open, with no re-indexing
     ///   (L-PPTX-1). When another handle still shares the source, the handle
     ///   comes back with no error (record 0003 R4: M2 decides the fallback).
+    /// - After [`Signed::unsign`](crate::Signed::unsign), either owner: an
+    ///   owning copy whose signature the leaf removed explicitly (record
+    ///   0013), opened over the exact input bytes or cloned from the eager
+    ///   owner's package.
     ///
-    /// An open with `retain_source(false)` has no editable owner and is
-    /// refused with [`Code::UnsupportedCapability`](crate::Code::UnsupportedCapability).
+    /// A handle that is still signed is refused with
+    /// [`Code::DocumentProtected`](crate::Code::DocumentProtected) and a
+    /// suggestion naming `Signed::unsign`. An open with `retain_source(false)`
+    /// has no editable owner and is refused with
+    /// [`Code::UnsupportedCapability`](crate::Code::UnsupportedCapability).
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "edit verbs build the editor from M2 on")
     )]
     pub(crate) fn into_editor(self) -> std::result::Result<PptxEditor, EditorRefused> {
+        if self.0.signature() == Signature::Signed {
+            return Err(EditorRefused {
+                handle: self,
+                error: Some(signature::refusal(FileFormat::Pptx)),
+            });
+        }
         if !self.0.retain_source {
             return Err(EditorRefused {
                 handle: self,
                 error: Some(source_not_retained()),
             });
+        }
+        if self.0.signature() == Signature::RemovalAuthorized {
+            return match self.unsigned_package() {
+                Ok(package) => Ok(PptxEditor::Unsigned(Box::new(package))),
+                Err(error) => Err(EditorRefused {
+                    handle: self,
+                    error: Some(error),
+                }),
+            };
         }
         if let PptxOwner::Eager(package) = &self.0.owner {
             return match package.opened_presentation_transaction() {
@@ -503,8 +546,8 @@ impl Pptx {
                 }),
             };
         }
-        let state = match Arc::try_unwrap(self.0) {
-            Ok(state) => state,
+        let (signature, state) = match Opened::try_unwrap(self.0) {
+            Ok(parts) => parts,
             Err(shared) => {
                 return Err(EditorRefused {
                     handle: Self(shared),
@@ -516,6 +559,7 @@ impl Pptx {
             owner,
             metadata,
             retain_source,
+            ooxml_limits,
         } = state;
         let PptxOwner::Source(presentation) = owner else {
             unreachable!("the eager owner returned above");
@@ -526,14 +570,45 @@ impl Pptx {
             .map_err(|refused| {
                 let (presentation, error) = refused.into_parts();
                 EditorRefused {
-                    handle: Self(Arc::new(PptxState {
-                        owner: PptxOwner::Source(presentation),
-                        metadata,
-                        retain_source,
-                    })),
+                    handle: Self(Opened::rebuild(
+                        signature,
+                        PptxState {
+                            owner: PptxOwner::Source(presentation),
+                            metadata,
+                            retain_source,
+                            ooxml_limits,
+                        },
+                    )),
                     error: error.map(Error::from),
                 }
             })
+    }
+
+    /// An owning copy of the presentation whose signature the leaf removed
+    /// explicitly ([`pptx::Package::unsign`]).
+    fn unsigned_package(&self) -> Result<pptx::Package> {
+        let mut package = match &self.0.owner {
+            PptxOwner::Source(presentation) => {
+                let bytes = signature::exact_source(presentation.source_backed_package())?;
+                pptx::Package::from_vec_with_limits(bytes, self.0.ooxml_limits)?
+            },
+            PptxOwner::Eager(package) => {
+                // A copy of the graph would drop the encryption profile the
+                // eager owner keeps, and the leaf refuses to mutate a package
+                // it decrypted; refuse rather than publish it in the clear.
+                #[cfg(feature = "encryption")]
+                if package.encryption().is_some() {
+                    return Err(Error::new(
+                        crate::Code::UnsupportedCapability,
+                        "an unlocked encrypted PPTX presentation cannot be edited, signed or not",
+                    )
+                    .with_format(FileFormat::Pptx));
+                }
+                pptx::Package::from_opc_package(package.opc()?.clone())?
+            },
+        };
+        package.unsign()?;
+        Ok(package)
     }
 }
 

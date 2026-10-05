@@ -555,6 +555,9 @@ impl WorkbookPatch {
         if self.operations.is_empty() && self.before == self.after {
             return Ok(());
         }
+        if self.before != self.after {
+            crate::signature_policy::ensure_unsigned(&workbook.package)?;
+        }
         let candidate = validated_workbook_with_external_link_limits_and_drawing_policy(
             &self.after,
             workbook.external_link_limits(),
@@ -1081,9 +1084,9 @@ fn replay(
 
 fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super::StyleIndex> {
     let plan = super::resources::plan_style(style)?;
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let mut package = workbook.package.clone();
     let index = super::resources::intern_style_plan(&mut package, &plan)?;
-    package.unsign();
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     Ok(index)
@@ -1126,6 +1129,7 @@ fn insert_candidate_cell(
 
 fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<()> {
     require_eager_drawing_projection(workbook)?;
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet_source = workbook.package.get_part(&worksheet_uri)?.blob().to_vec();
     let mut drawing_rel_id = None;
@@ -1254,7 +1258,6 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
     package
         .get_part_mut(&worksheet_uri)?
         .set_blob(worksheet_output);
-    package.unsign();
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
@@ -1328,7 +1331,6 @@ fn append_image(
         &image_rel_id,
     )?;
     drawing_part.set_blob(drawing_xml);
-    package.unsign();
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
@@ -1508,9 +1510,12 @@ fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<()>
     if !replaced {
         return Err(Error::WorksheetNotFound(format!("sheet index {sheet}")));
     }
+    if output == source {
+        return Ok(());
+    }
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let mut package = workbook.package.clone();
     package.get_part_mut(&uri)?.set_blob(output);
-    package.unsign();
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     Ok(())

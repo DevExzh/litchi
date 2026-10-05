@@ -235,6 +235,7 @@ pub(super) fn transfer(
             "drawing transfer requires an eager drawing projection".to_string(),
         ));
     }
+    crate::signature_policy::ensure_unsigned(&target.package)?;
     let source = super::root::validated_workbook_with_external_link_limits(
         source_bytes,
         target.external_link_limits(),
@@ -281,7 +282,6 @@ pub(super) fn transfer(
         target_chart,
         target_relationships,
     )?;
-    package.unsign();
     let validated = target.reparse_candidate(package)?;
     *target = validated;
     validate_readback(

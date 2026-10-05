@@ -137,7 +137,7 @@ pub(crate) fn store_on_workbook(
         ensure_no_inbound_relationship(package, &canonical_part)?;
     }
 
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     if let Some(graph) = existing {
         package
             .get_part_mut(workbook_uri)?
@@ -167,7 +167,7 @@ pub(crate) fn remove_from_workbook(
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(false);
     };
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(workbook_uri)?
         .rels_mut()

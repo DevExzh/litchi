@@ -1315,6 +1315,34 @@ impl Workbook {
         Edit::new(self.clone())
     }
 
+    /// A copy of this snapshot with every package signature removed
+    /// explicitly (ADR 0006).
+    ///
+    /// A transaction over a signed workbook is refused with [`Error::Signed`],
+    /// because any change invalidates every signature; this is the explicit
+    /// removal that authorizes editing. Every signature relationship and part
+    /// is removed from the copy's OPC graph
+    /// ([`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign)), and the copy
+    /// shares every other part payload with this snapshot, which is left
+    /// unchanged. A workbook that carries no signature, and no
+    /// signature-policy requirement, comes back as itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a workbook opened with a
+    /// password, whose mutations are refused, and the copy's validation error
+    /// otherwise.
+    pub fn unsigned(&self) -> Result<Self> {
+        self.ensure_mutation_allowed("unsigned")?;
+        let package = &self.inner.package;
+        if !package.is_signed() && !package.requires_signature_edit_policy() {
+            return Ok(self.clone());
+        }
+        let mut package = package.clone();
+        package.unsign();
+        Self::from_package_with_styles(package, Some(self))
+    }
+
     /// Apply a reversible patch after checking every expected source part.
     pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         self.ensure_mutation_allowed("apply")?;

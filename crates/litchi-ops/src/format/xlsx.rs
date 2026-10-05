@@ -44,10 +44,11 @@ use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
 };
 use litchi_core::{FileFormat, Metadata};
-use litchi_opc::{OpcPackage, SourceBackedPackage};
+use litchi_opc::{OpcPackage, ReadLimits, SourceBackedPackage};
 use litchi_xlsx as xlsx;
 
 use super::cell_text;
+use super::signature::{self, Opened, Signature};
 use crate::detect::workbook_metadata::{MetadataRepairs, read_source_backed_metadata};
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
@@ -75,7 +76,7 @@ use sheet::{Sheet, boxed};
 /// # }
 /// ```
 #[derive(Clone)]
-pub struct Xlsx(Arc<XlsxState>);
+pub struct Xlsx(Arc<Opened<XlsxState>>);
 
 /// Shared state behind an [`Xlsx`] handle.
 struct XlsxState {
@@ -92,6 +93,9 @@ struct XlsxState {
     /// Both owner states already hold everything an edit needs, so this
     /// releases nothing; it only refuses.
     retain_source: bool,
+    /// The OPC read limits of the open, which an unsigned copy is opened
+    /// under (record 0013).
+    ooxml_limits: ReadLimits,
 }
 
 /// The two owner states of an XLSX handle (record 0003 §2.3).
@@ -113,6 +117,9 @@ pub(crate) enum XlsxEditor {
     /// `from_source_backed_package`.
     Source(Box<SourceBackedPackage>),
     /// The owning snapshot; [`xlsx::Workbook::edit`] starts a transaction.
+    /// After [`Signed::unsign`](crate::Signed::unsign) it is an owning copy
+    /// whose signature was removed explicitly (record 0013), so a commit
+    /// from it carries no signature part.
     Eager(xlsx::Workbook),
 }
 
@@ -243,13 +250,24 @@ impl Xlsx {
         metadata_repairs: MetadataRepairs,
         options: &OpenOptions,
     ) -> Self {
-        Self(Arc::new(XlsxState {
+        Self(Opened::new(XlsxState {
             owner,
             names: OnceLock::new(),
             metadata,
             metadata_repairs,
             retain_source: options.retain_source,
+            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
         }))
+    }
+
+    /// The same workbook under another signature disposition (record 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
     }
 
     /// The format of this handle.
@@ -372,24 +390,35 @@ impl Xlsx {
     /// the package indexed at open (L-XLSX-1). While another clone of the
     /// handle, or a [`SelectedWorksheet`], shares the catalog, the package is
     /// instead materialized through the same index into the owning snapshot.
-    /// An eager handle returns its snapshot, which is `Clone`.
+    /// An eager handle returns its snapshot, which is `Clone`. After
+    /// [`Signed::unsign`](crate::Signed::unsign) either owner returns an
+    /// owning copy whose signature was removed explicitly (record 0013):
+    /// opened over the exact input bytes, its OPC graph `unsign`ed.
     ///
     /// # Errors
     ///
-    /// Returns [`Code::UnsupportedCapability`] when the handle was opened with
-    /// [`OpenOptions::retain_source`] `false`, [`Code::IoError`] when the file
-    /// changed, and the XLSX error of a failed materialization.
+    /// Returns [`Code::DocumentProtected`] while the workbook is still
+    /// signed, with a suggestion naming `Signed::unsign`;
+    /// [`Code::UnsupportedCapability`] when the handle was opened with
+    /// [`OpenOptions::retain_source`] `false`; [`Code::IoError`] when the
+    /// file changed; and the XLSX error of a failed materialization.
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "consumed by the M2 write kernel")
     )]
     pub(crate) fn into_editor(self) -> Result<XlsxEditor> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Xlsx));
+        }
         if !self.0.retain_source {
             return Err(source_released());
         }
         self.0.owner.ensure_current()?;
-        let state = match Arc::try_unwrap(self.0) {
-            Ok(state) => state,
+        if self.0.signature() == Signature::RemovalAuthorized {
+            return self.unsigned_workbook().map(XlsxEditor::Eager);
+        }
+        let state = match Opened::try_unwrap(self.0) {
+            Ok((_, state)) => state,
             Err(shared) => {
                 return Ok(match &shared.owner {
                     XlsxOwner::Source(workbook) => {
@@ -408,6 +437,22 @@ impl Xlsx {
             },
             XlsxOwner::Eager(workbook) => Ok(XlsxEditor::Eager(workbook)),
         }
+    }
+
+    /// An owning copy of the workbook whose signature the leaf removed
+    /// explicitly ([`xlsx::Workbook::unsigned`]): opened over the exact input
+    /// bytes for a source-backed owner, copied from the eager snapshot
+    /// otherwise. An unlocked encrypted snapshot refuses, as its edits do.
+    fn unsigned_workbook(&self) -> Result<xlsx::Workbook> {
+        let workbook = match &self.0.owner {
+            XlsxOwner::Source(workbook) => {
+                let bytes = signature::exact_source(workbook.source_backed_package())?;
+                xlsx::Package::from_bytes_with_limits(bytes, self.0.ooxml_limits)?
+                    .into_workbook()?
+            },
+            XlsxOwner::Eager(workbook) => workbook.clone(),
+        };
+        Ok(workbook.unsigned()?)
     }
 
     fn names(&self) -> &[String] {

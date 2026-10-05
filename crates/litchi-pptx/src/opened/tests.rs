@@ -4577,19 +4577,33 @@ fn attach_signature_graph(package: &mut Package) -> Result<PackURI> {
     Ok(origin)
 }
 
+/// A changed commit invalidates every signature, so it refuses a signed
+/// package instead of stripping it (ADR 0006). After an explicit
+/// `Package::unsign` the commit binds the unsigned package it publishes.
 #[test]
-fn commit_rehashes_a_package_whose_unsign_strips_signature_bytes() -> Result<()> {
+fn changed_commit_refuses_a_signed_package_until_it_is_unsigned() -> Result<()> {
     let mut package = opened_two_slide_package()?;
     let origin = attach_signature_graph(&mut package)?;
 
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
     assert!(edit.set_shape_text(0_usize, 0_usize, "Signed edit")?);
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.opc.get_part(&origin).is_ok());
+    assert!(package.opc.is_signed());
+
+    package.unsign()?;
+    assert!(package.opc.get_part(&origin).is_err());
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert!(edit.set_shape_text(0_usize, 0_usize, "Signed edit")?);
     let commit = edit.commit()?;
     let committed = commit.snapshot().revision();
-
-    // The commit must bind the stripped package, never the staged package it
-    // hashed before `unsign` removed the signature graph.
     assert!(!commit.snapshot().package.is_signed());
     assert_eq!(
         committed,
@@ -4598,7 +4612,6 @@ fn commit_rehashes_a_package_whose_unsign_strips_signature_bytes() -> Result<()>
     assert_ne!(committed, source.revision());
 
     let published = package.apply_opened_presentation_commit(commit)?;
-    assert!(package.opc.get_part(&origin).is_err());
     assert!(!package.opc.is_signed());
     assert_eq!(published.revision(), committed);
     assert_eq!(

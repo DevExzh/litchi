@@ -31,12 +31,17 @@ impl crate::Workbook {
     }
 
     /// Atomically publish one reversible XML Maps patch.
+    ///
+    /// A changed patch refuses a signed workbook (ADR 0006): remove the
+    /// signature explicitly with [`Self::unsign`] before planning the edit. An
+    /// empty patch publishes nothing and keeps the signature.
     pub fn apply_xml_maps_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
         let worksheets = self.xml_maps_worksheet_parts()?;
         let current = patch.check_source(&self.package, worksheets.clone())?;
         if patch.is_empty() {
             return Ok(current);
         }
+        crate::signature_policy::ensure_unsigned(&self.package)?;
         self.edit_opc(|candidate| {
             patch.materialize(candidate)?;
             let resulting = Snapshot::read_for_worksheets(candidate, worksheets, patch.limits())?;

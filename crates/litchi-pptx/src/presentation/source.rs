@@ -1188,6 +1188,18 @@ impl SourceBackedPresentation {
         })
     }
 
+    /// Borrow the validated deferred OPC package this presentation reads from.
+    ///
+    /// This is the package indexed when the presentation was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::source_artifact`], read through the same
+    /// positional source and observe the same source-version fence.
+    #[must_use]
+    pub fn source_backed_package(&self) -> &SourceBackedPackage {
+        &self.inner.package
+    }
+
     /// Convert this read-only presentation into a
     /// [`SourceBackedPresentationEditor`] over the same, already indexed
     /// source-backed package.

@@ -454,6 +454,7 @@ fn remove_cache_parts(package: &mut OpcPackage, workbook: &PackURI) -> Result<Ve
 /// Replace workbook slicer caches and their BIFF12 relationship collection.
 pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cache]) -> Result<()> {
     validate_cache_set(caches)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     let _ = load_caches(package, workbook)?;
     let old_refs = load_cache_refs(package, workbook)?;
     let old_block = record_span(
@@ -467,7 +468,6 @@ pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cach
     if caches.is_empty() {
         workbook_blob = rewrite_block(&workbook_blob, old_block, None, kind::END_BOOK)?;
         package.get_part_mut(workbook)?.set_blob(workbook_blob);
-        package.unsign();
         return Ok(());
     }
 
@@ -520,7 +520,6 @@ pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cach
         }
         part.set_blob(workbook_blob);
     }
-    package.unsign();
     Ok(())
 }
 
@@ -585,6 +584,7 @@ pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views)
 
 fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
     validate_views(views)?;
+    crate::signature_policy::ensure_unsigned(package)?;
     if let Some(existing) = load_views(package, worksheet)? {
         let target = PackURI::new(&existing.part_name)?;
         crate::package::owner_transaction::require_exclusive_inbound(
@@ -622,7 +622,6 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
             &worksheet_blob,
         )?;
         package.get_part_mut(worksheet)?.set_blob(worksheet_blob);
-        package.unsign();
         return Ok(());
     }
     let uri = next_part(package, "xl/slicers", "slicer", "bin")?;
@@ -657,6 +656,5 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
         );
         part.set_blob(worksheet_blob);
     }
-    package.unsign();
     Ok(())
 }

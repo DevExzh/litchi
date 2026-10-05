@@ -1,0 +1,301 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction"
+)]
+
+//! Changed publications refuse a signed workbook (ADR 0006; unified-ops
+//! record 0013). Removing a signature is explicit (`Workbook::unsign`, or
+//! `OpcPackage::unsign` inside `edit_opc`); an exact no-op keeps the source
+//! bytes, signature included.
+
+use std::io::Cursor;
+use std::path::PathBuf;
+
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
+use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
+use litchi_xlsb::cell_watches::Watch;
+use litchi_xlsb::merged_cells::MergedCell;
+use litchi_xlsb::package::PackageError;
+use litchi_xlsb::{Package, Workbook};
+
+fn fixture(name: &str) -> Vec<u8> {
+    std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ooxml/xlsb")
+            .join(name),
+    )
+    .expect("XLSB fixture")
+}
+
+/// `plain` with an OPC signature graph (origin part, one XML signature and
+/// their relationships), written out and read back so the signature is an
+/// ingressed source signature, as in a file a producer signed.
+fn signed(plain: &[u8]) -> Vec<u8> {
+    let source = OpcPackage::from_bytes(plain).unwrap();
+    let mut package = OpcPackage::new();
+    for relationship in source.rels().iter() {
+        package
+            .rels_mut()
+            .try_add_relationship(
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.r_id().to_owned(),
+                relationship.target_mode(),
+            )
+            .unwrap();
+    }
+    let names: Vec<_> = source
+        .iter_parts()
+        .map(|part| part.partname().clone())
+        .collect();
+    for name in names {
+        let part = source.get_part(&name).unwrap();
+        let mut copy = BlobPart::new(
+            part.partname().clone(),
+            part.content_type().to_owned(),
+            part.blob().to_vec(),
+        );
+        for relationship in part.rels().iter() {
+            copy.rels_mut()
+                .try_add_relationship(
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.r_id().to_owned(),
+                    relationship.target_mode(),
+                )
+                .unwrap();
+        }
+        package.try_add_part(Box::new(copy)).unwrap();
+    }
+    let origin = PackURI::new("/_xmlsignatures/origin.sigs").unwrap();
+    let signature = PackURI::new("/_xmlsignatures/sig1.xml").unwrap();
+    let mut origin_part = BlobPart::new(
+        origin.clone(),
+        litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+        Vec::new(),
+    );
+    origin_part
+        .rels_mut()
+        .try_add_relationship(
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
+                .to_owned(),
+            signature.relative_ref(origin.base_uri()),
+            "rIdSignature".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    package.try_add_part(Box::new(origin_part)).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            signature,
+            litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE.to_owned(),
+            b"<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"/>".to_vec(),
+        )))
+        .unwrap();
+    package
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
+            "rIdSignatureOrigin".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    assert!(OpcPackage::from_bytes(&bytes).unwrap().is_signed());
+    bytes
+}
+
+fn signed_workbook() -> (Vec<u8>, Workbook) {
+    let bytes = signed(&fixture("Simple.xlsb"));
+    let workbook = Package::from_bytes(bytes.clone())
+        .unwrap()
+        .into_workbook()
+        .unwrap();
+    assert!(workbook.is_signed());
+    (bytes, workbook)
+}
+
+fn save(workbook: &Workbook) -> Vec<u8> {
+    let mut output = Cursor::new(Vec::new());
+    workbook.save(&mut output).unwrap();
+    output.into_inner()
+}
+
+/// Whether `bytes` still carries any OPC signature infrastructure.
+fn carries_signature(bytes: &[u8]) -> bool {
+    let package = OpcPackage::from_bytes(bytes).unwrap();
+    package.is_signed()
+        || package
+            .iter_parts()
+            .any(|part| part.partname().as_str().starts_with("/_xmlsignatures/"))
+}
+
+fn new_cell() -> (Reference, StyleIndex, Value) {
+    (
+        Reference::new(10_000, 100).unwrap(),
+        StyleIndex::new(0).unwrap(),
+        Value::InlineString("edited".to_owned()),
+    )
+}
+
+#[track_caller]
+fn assert_signed_refusal(error: &PackageError) {
+    assert!(
+        matches!(
+            error,
+            PackageError::Signed | PackageError::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
+        ),
+        "expected a signature refusal, got {error:?}"
+    );
+}
+
+#[test]
+fn changed_cell_values_on_a_signed_workbook_are_refused() {
+    let (bytes, mut workbook) = signed_workbook();
+    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let (reference, style, value) = new_cell();
+    edit.insert(reference, style, value).unwrap();
+    let commit = edit.commit().unwrap();
+    let error = workbook.apply_cell_values(0, &commit).unwrap_err();
+    assert!(matches!(error, PackageError::Signed), "{error:?}");
+    // Nothing was published: the workbook still saves its signed source.
+    assert!(workbook.is_signed());
+    assert_eq!(save(&workbook), bytes);
+}
+
+#[test]
+fn exact_noop_cell_values_keep_the_signature_bytes() {
+    let (bytes, mut workbook) = signed_workbook();
+    let commit = workbook.edit_cell_values(0).unwrap().commit().unwrap();
+    workbook.apply_cell_values(0, &commit).unwrap();
+    assert_eq!(save(&workbook), bytes);
+}
+
+#[test]
+fn explicit_unsign_authorizes_a_changed_edit() {
+    let (_, mut workbook) = signed_workbook();
+    workbook.unsign();
+    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let (reference, style, value) = new_cell();
+    edit.insert(reference, style, value).unwrap();
+    let commit = edit.commit().unwrap();
+    workbook.apply_cell_values(0, &commit).unwrap();
+    let output = save(&workbook);
+    assert!(!carries_signature(&output));
+    let reopened = Package::from_bytes(output)
+        .unwrap()
+        .into_workbook()
+        .unwrap();
+    let cell = reopened.cell_values(0).unwrap();
+    assert!(cell.cell(reference).unwrap().is_some());
+}
+
+#[test]
+fn workbook_structure_changes_are_refused_and_noops_kept() {
+    let (bytes, mut workbook) = signed_workbook();
+    let mut edit = workbook.edit_workbook_structure().unwrap();
+    edit.rename_sheet(0, "Renamed".to_owned()).unwrap();
+    let error = edit.commit().unwrap_err();
+    assert!(matches!(error, PackageError::Signed), "{error:?}");
+
+    let commit = workbook
+        .edit_workbook_structure()
+        .unwrap()
+        .commit()
+        .unwrap();
+    workbook.apply_workbook_structure(&commit).unwrap();
+    assert_eq!(save(&workbook), bytes);
+}
+
+#[test]
+fn cell_watch_changes_are_refused() {
+    let (bytes, mut workbook) = signed_workbook();
+    let mut edit = workbook.edit_cell_watches(0).unwrap();
+    edit.add(Watch::new(3, 5).unwrap()).unwrap();
+    let commit = edit.commit().unwrap();
+    let error = workbook.apply_cell_watches(0, &commit).unwrap_err();
+    assert!(matches!(error, PackageError::Signed), "{error:?}");
+    assert_eq!(save(&workbook), bytes);
+}
+
+#[test]
+fn raw_opc_edits_keep_the_signature_policy() {
+    let (bytes, mut workbook) = signed_workbook();
+    // A closure that changes nothing keeps the signature byte for byte;
+    // `edit_opc` used to drop it unconditionally.
+    workbook.edit_opc(|_| Ok(())).unwrap();
+    assert_eq!(save(&workbook), bytes);
+
+    // Typed setters that publish through `edit_opc` refuse a change.
+    let error = workbook
+        .set_merged_cell_ranges(0, &[MergedCell::new(20, 21, 0, 1)])
+        .unwrap_err();
+    assert_signed_refusal(&error);
+    let error = workbook.set_slicer_caches(Vec::new()).unwrap_err();
+    assert_signed_refusal(&error);
+    assert_eq!(save(&workbook), bytes);
+
+    // Removing the signature inside the closure is an explicit disposition.
+    let uri = PackURI::new("/docProps/litchi-probe.xml").unwrap();
+    workbook
+        .edit_opc(|package| {
+            package.unsign();
+            package
+                .try_add_part(Box::new(BlobPart::new(
+                    uri.clone(),
+                    "application/xml".to_owned(),
+                    b"<probe/>".to_vec(),
+                )))
+                .map_err(PackageError::from)
+        })
+        .unwrap();
+    assert!(!carries_signature(&save(&workbook)));
+}
+
+#[test]
+fn connections_refuse_a_signed_workbook() {
+    use litchi_xlsb::package::connections::{
+        CommandType, Connection, Connections, DbProperties, Properties, SourceType,
+    };
+    let (bytes, mut workbook) = signed_workbook();
+    let error = workbook
+        .set_connections(Connections {
+            connections: vec![Connection {
+                connection_id: 42,
+                source_type: SourceType::Odbc,
+                name: "Sales".to_owned(),
+                properties: Properties::Database(DbProperties {
+                    command_type: CommandType::Sql,
+                    connection_string: "Driver={Generated};Server=example.invalid".to_owned(),
+                    command: Some("SELECT 1".to_owned()),
+                    server_command: None,
+                }),
+                ..Connection::default()
+            }],
+        })
+        .unwrap_err();
+    assert!(matches!(error, PackageError::Signed), "{error:?}");
+    assert!(!workbook.remove_connections().unwrap());
+    assert_eq!(save(&workbook), bytes);
+}
+
+#[test]
+fn raw_threaded_comment_stores_refuse_a_signed_package() {
+    let bytes = signed(&fixture("Simple.xlsb"));
+    // Owned ingress retains the exact source, so an unchanged signed package
+    // republishes it.
+    let mut package = OpcPackage::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let error = litchi_xlsb::comments::threaded::store_on_worksheet(
+        &mut package,
+        &worksheet,
+        &litchi_xlsb::comments::threaded::Comments::default(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, PackageError::Signed), "{error:?}");
+    // Removing an absent graph changes nothing and is not refused.
+    assert!(!litchi_xlsb::comments::threaded::remove_graph(&mut package).unwrap());
+    assert_eq!(PackageWriter::to_bytes(&package).unwrap(), bytes);
+}

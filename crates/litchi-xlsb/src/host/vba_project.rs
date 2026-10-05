@@ -252,6 +252,7 @@ fn store_vba_bytes_in_place(
     source: &PackURI,
     payload: Arc<Vec<u8>>,
 ) -> Result<VbaProject> {
+    crate::signature_policy::ensure_unsigned(package)?;
     let existing = {
         let source_part = package.get_part(source)?;
         discover_vba_project(package, source_part)?
@@ -279,7 +280,6 @@ fn store_vba_bytes_in_place(
     package
         .get_part_mut(source)?
         .relate_to(PROJECT_TARGET, relationship_type::VBA_PROJECT);
-    package.unsign();
 
     let source_part = package.get_part(source)?;
     discover_vba_project(package, source_part)?.ok_or_else(|| {
@@ -304,9 +304,8 @@ pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> 
 }
 
 fn remove_vba_project_in_place(package: &mut OpcPackage, project: &VbaProject) -> Result<()> {
-    remove_discovered_graph(package, project)?;
-    package.unsign();
-    Ok(())
+    crate::signature_policy::ensure_unsigned(package)?;
+    remove_discovered_graph(package, project)
 }
 
 fn remove_discovered_graph(package: &mut OpcPackage, project: &VbaProject) -> Result<()> {

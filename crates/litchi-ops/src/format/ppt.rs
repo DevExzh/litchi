@@ -19,12 +19,13 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_cfb::{OleFile, SharedOleFile, SharedOleFileLimits};
-use litchi_core::{Metadata, OwnedSource, ReadAt, SourceVersion};
+use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt, SourceVersion};
 use litchi_ole_common::property_set::PropertySetReader;
 use litchi_ppt::text_edit::{self, SourceSnapshot};
 use litchi_ppt::{RecordLimits, SourceBackedPackage};
 
 use super::LegacyOpen;
+use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 /// An opened legacy PowerPoint (`.ppt`) presentation.
@@ -34,7 +35,7 @@ use crate::{OpenOptions, Result};
 /// handle also retains its source (unless [`OpenOptions::retain_source`] was
 /// `false`), so a later edit needs no second open.
 #[derive(Clone)]
-pub struct Ppt(Arc<PptState>);
+pub struct Ppt(Arc<Opened<PptState>>);
 
 struct PptState {
     /// The reader every M0a read goes through, built at open exactly as the
@@ -94,7 +95,7 @@ impl Ppt {
         } else {
             PptOwner::Released
         };
-        Ok(Self(Arc::new(PptState {
+        Ok(Self(Opened::new(PptState {
             presentation,
             metadata,
             record_limits,
@@ -157,12 +158,23 @@ impl Ppt {
         } else {
             PptOwner::Released
         };
-        Ok(LegacyOpen::Opened(Self(Arc::new(PptState {
+        Ok(LegacyOpen::Opened(Self(Opened::new(PptState {
             presentation,
             metadata,
             record_limits,
             owner,
         }))))
+    }
+
+    /// The same presentation under another signature disposition (record
+    /// 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
     }
 
     /// All text of the presentation, as the facade's `Presentation::text`
@@ -215,23 +227,48 @@ impl Ppt {
     ///
     /// Returns `Ok(None)` when the source was released at open. The editor's
     /// protected-container refusal and complete-artifact fingerprint run
-    /// here, at the first edit. M2 maps the leaf error into the unified one.
+    /// here, at the first edit. After
+    /// [`Signed::unsign`](crate::Signed::unsign) the editor is built over a
+    /// copy of the input whose signature storages the signature leaf removed
+    /// (`litchi_sign::cfb::Editor::clear`, record 0013), so a commit from it
+    /// carries no signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
+    /// while the presentation is still signed, with a suggestion naming
+    /// `Signed::unsign`, and the leaf's typed refusal otherwise.
     #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
-    pub(crate) fn text_editor(&self) -> text_edit::Result<Option<SourceSnapshot>> {
-        match &self.0.owner {
-            PptOwner::Source(package) => package
-                .text_edit_snapshot_with_limits(self.0.record_limits)
-                .map(Some),
-            PptOwner::Eager(shared) => SourceSnapshot::from_shared(
-                Arc::clone(shared),
-                text_edit::SourceBackedOptions {
-                    record_limits: self.0.record_limits,
-                    ..text_edit::SourceBackedOptions::default()
-                },
-            )
-            .map(Some),
-            PptOwner::Released => Ok(None),
+    pub(crate) fn text_editor(&self) -> Result<Option<SourceSnapshot>> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Ppt));
         }
+        let options = text_edit::SourceBackedOptions {
+            record_limits: self.0.record_limits,
+            ..text_edit::SourceBackedOptions::default()
+        };
+        if self.0.signature() == Signature::RemovalAuthorized {
+            let shared = match &self.0.owner {
+                PptOwner::Source(package) => package.shared_ole_file(),
+                PptOwner::Eager(shared) => shared.as_ref(),
+                PptOwner::Released => return Ok(None),
+            };
+            let bytes = signature::unsign_compound_file(
+                signature::compound_file_bytes(shared)?,
+                litchi_sign::cfb::Format::Ppt,
+            )?;
+            let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
+            return Ok(Some(SourceSnapshot::open_with_options(source, options)?));
+        }
+        Ok(match &self.0.owner {
+            PptOwner::Source(package) => {
+                Some(package.text_edit_snapshot_with_limits(self.0.record_limits)?)
+            },
+            PptOwner::Eager(shared) => {
+                Some(SourceSnapshot::from_shared(Arc::clone(shared), options)?)
+            },
+            PptOwner::Released => None,
+        })
     }
 
     /// The length of the retained in-memory input, if the byte route

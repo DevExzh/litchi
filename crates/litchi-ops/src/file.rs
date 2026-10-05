@@ -232,6 +232,87 @@ impl File {
         }
     }
 
+    /// Whether the file is still signed: a [`File::Signed`], or the file one
+    /// wraps ([`Signed::file`]). Editing it is refused until
+    /// [`Signed::unsign`] consumes the signature.
+    ///
+    /// The file [`Signed::unsign`] returns is not signed in this sense,
+    /// although its bytes keep the signature until its first write removes
+    /// it. Nothing is verified: the signature was only detected at open.
+    ///
+    /// ```
+    /// # #[cfg(feature = "rtf")]
+    /// # {
+    /// let file = litchi_ops::open_bytes(br"{\rtf1 Hello}".to_vec()).unwrap();
+    /// assert!(!file.is_signed());
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn is_signed(&self) -> bool {
+        #[cfg(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "xls",
+            feature = "xlsx",
+            feature = "xlsb"
+        ))]
+        use crate::format::signature::Signature;
+
+        match self {
+            Self::Signed(_) => true,
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => handle.signature() == Signature::Signed,
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => handle.signature() == Signature::Signed,
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => handle.signature() == Signature::Signed,
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle.signature() == Signature::Signed,
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle.signature() == Signature::Signed,
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle.signature() == Signature::Signed,
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle.signature() == Signature::Signed,
+            _ => false,
+        }
+    }
+
+    /// This file under another signature disposition (record 0013). Only
+    /// the tier 1 and tier 2 variants carry one; the openers never sign
+    /// another variant.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    pub(crate) fn with_signature(&self, signature: crate::format::signature::Signature) -> Self {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => Self::Docx(handle.with_signature(signature)),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => Self::Xlsx(handle.with_signature(signature)),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => Self::Pptx(handle.with_signature(signature)),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => Self::Xlsb(handle.with_signature(signature)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => Self::Doc(handle.with_signature(signature)),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => Self::Xls(handle.with_signature(signature)),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => Self::Ppt(handle.with_signature(signature)),
+            // `Locked`, `Signed` and the tier 3 variants carry none.
+            other => other.clone(),
+        }
+    }
+
     /// The family of [`Self::format`]; `None` exactly when the format is.
     ///
     /// ```

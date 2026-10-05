@@ -128,8 +128,9 @@ pub(crate) enum Applied {
         /// The published snapshot, identical to the committed one.
         snapshot: Snapshot,
         /// The validated candidate workbook. Its package carries the updated
-        /// worksheet part and no signatures. Boxed because a parsed workbook
-        /// is far larger than a snapshot.
+        /// worksheet part; a signed source is refused before any candidate is
+        /// built. Boxed because a parsed workbook is far larger than a
+        /// snapshot.
         workbook: Box<crate::Workbook>,
     },
 }
@@ -160,11 +161,11 @@ pub(crate) fn apply_retaining_parse(
     if updated.as_slice() == part.blob() {
         return Ok(Applied::Unchanged(commit.snapshot().clone()));
     }
+    crate::signature_policy::ensure_unsigned(package)?;
 
     let mut candidate = package.clone();
     crate::worksheet_index::maintain(&mut candidate, worksheet, part.blob(), &updated)?;
     candidate.get_part_mut(worksheet)?.set_blob(updated);
-    candidate.unsign();
     let parsed = crate::Workbook::reparse_candidate_with_policy(
         candidate,
         external_link_limits,

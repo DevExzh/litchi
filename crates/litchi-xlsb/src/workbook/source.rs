@@ -977,6 +977,18 @@ impl SourceBackedWorkbook {
         Ok(version)
     }
 
+    /// Borrow the validated deferred OPC package this catalog reads from.
+    ///
+    /// This is the package indexed when the workbook was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::source_artifact`], read through the same
+    /// positional source and observe the same source-version fence.
+    #[must_use]
+    pub fn source_backed_package(&self) -> &SourceBackedPackage {
+        &self.inner.package
+    }
+
     /// Materialize the eager, editable [`Workbook`] from this catalog.
     ///
     /// The owning OPC graph is built from the package indexed at open,

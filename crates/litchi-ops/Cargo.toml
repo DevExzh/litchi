@@ -26,11 +26,13 @@ default = []
 # through `litchi-crypto`, the OOXML leaves' decrypted-package constructors,
 # and legacy PowerPoint decryption. It also lets an OOXML-only build parse the
 # compound file an encrypted OOXML package arrives in.
-doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common"]
+# The legacy binary formats remove a compound-file signature after
+# `Signed::unsign` through `litchi-sign` (step S6b, record 0013).
+doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common", "dep:litchi-sign"]
 docx    = ["dep:litchi-docx", "opc"]
-ppt     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt"]
+ppt     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt", "dep:litchi-sign"]
 pptx    = ["dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
-xls     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-xls"]
+xls     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-sign", "dep:litchi-xls"]
 xlsx    = ["dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
 xlsb    = ["dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
 rtf     = ["dep:litchi-rtf", "dep:chrono"]
@@ -90,6 +92,7 @@ litchi-opc          = { workspace = true, optional = true }
 litchi-ppt          = { workspace = true, optional = true }
 litchi-pptx         = { workspace = true, optional = true }
 litchi-rtf          = { workspace = true, optional = true }
+litchi-sign         = { workspace = true, optional = true }
 litchi-xls          = { workspace = true, optional = true }
 litchi-xlsb         = { workspace = true, optional = true }
 litchi-xlsx         = { workspace = true, optional = true }

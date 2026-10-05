@@ -49,8 +49,9 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::{FileFormat, Metadata};
 use litchi_docx::section::{Inventory, Limits as SectionLimits};
 use litchi_docx::{ToleranceReport, source_backed};
-use litchi_opc::OpcPackage;
+use litchi_opc::{OpcPackage, ReadLimits};
 
+use super::signature::{self, Opened, Signature};
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
 
@@ -60,7 +61,7 @@ use crate::options::{OpenOptions, SourceMode};
 /// source-backed document each read checks that the file has not changed
 /// since it was opened and reports [`Code::IoError`] when it has.
 #[derive(Clone)]
-pub struct Docx(Arc<DocxState>);
+pub struct Docx(Arc<Opened<DocxState>>);
 
 /// Shared state behind a [`Docx`] handle.
 pub(crate) struct DocxState {
@@ -80,6 +81,32 @@ pub(crate) struct DocxState {
     /// Markdown adapter, built on the first conversion.
     #[cfg(feature = "markdown")]
     markdown: OnceLock<Box<litchi_docx::Package>>,
+    /// The OPC read limits of the open, which an unsigned copy is opened
+    /// under (record 0013).
+    ooxml_limits: ReadLimits,
+}
+
+/// What a DOCX write starts from (M2).
+#[cfg_attr(not(test), expect(dead_code, reason = "write verbs arrive in M2"))]
+pub(crate) enum DocxEditor {
+    /// An isolated main-document edit over the handle's own owner, whose
+    /// commit publishes through that owner.
+    Edit(Box<litchi_docx::document::Edit>),
+    /// After [`Signed::unsign`](crate::Signed::unsign): an owning copy of the
+    /// document whose signature the leaf removed explicitly
+    /// ([`litchi_docx::Package::unsign`]). Edits start from it
+    /// (`edit_document`) and publish into it, so the output carries no
+    /// signature part.
+    Unsigned(Box<litchi_docx::Package>),
+}
+
+impl fmt::Debug for DocxEditor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Edit(_) => "DocxEditor::Edit",
+            Self::Unsigned(_) => "DocxEditor::Unsigned",
+        })
+    }
 }
 
 /// The two owner states of a DOCX handle (record 0003 §2.3).
@@ -187,8 +214,19 @@ impl Docx {
             retain_source: options.retain_source,
             #[cfg(feature = "markdown")]
             markdown: OnceLock::new(),
+            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
         };
-        Self(Arc::new(state))
+        Self(Opened::new(state))
+    }
+
+    /// The same document under another signature disposition (record 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
     }
 
     /// The owner, for the family views and write handlers built on this
@@ -360,18 +398,28 @@ impl Docx {
         }
     }
 
-    /// Start an isolated main-document edit from the retained owner.
+    /// Build what a write starts from.
     ///
-    /// Both owner states reach the leaf's `edit_document` directly, so no
-    /// container is indexed again. Write verbs (M2) build on this.
+    /// On an unsigned document, both owner states reach the leaf's
+    /// `edit_document` directly, so no container is indexed again. After
+    /// [`Signed::unsign`](crate::Signed::unsign) the editor is an owning copy
+    /// whose signature the leaf removed explicitly (record 0013): it is opened
+    /// over the exact input bytes, or cloned from the eager owner's package,
+    /// and then `unsign`ed. Write verbs (M2) build on this.
     ///
     /// # Errors
     ///
-    /// Returns [`Code::UnsupportedCapability`] when the document was opened
-    /// with `retain_source(false)`, and the leaf's typed snapshot failures
-    /// otherwise.
+    /// Returns [`Code::DocumentProtected`] while the document is still
+    /// signed, with a suggestion naming `Signed::unsign`;
+    /// [`Code::UnsupportedCapability`] when it was opened with
+    /// `retain_source(false)`, or when an unlocked encrypted document would
+    /// lose its encryption profile in the unsigned copy; [`Code::IoError`]
+    /// when the source changed; and the leaf's typed failures otherwise.
     #[cfg_attr(not(test), expect(dead_code, reason = "write verbs arrive in M2"))]
-    pub(crate) fn edit_document(&self) -> Result<litchi_docx::document::Edit> {
+    pub(crate) fn edit_document(&self) -> Result<DocxEditor> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Docx));
+        }
         if !self.0.retain_source {
             return Err(Error::new(
                 Code::UnsupportedCapability,
@@ -380,13 +428,51 @@ impl Docx {
             .with_format(FileFormat::Docx)
             .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
         }
+        if self.0.signature() == Signature::RemovalAuthorized {
+            return self
+                .unsigned_package()
+                .map(|package| DocxEditor::Unsigned(Box::new(package)));
+        }
         match &self.0.owner {
-            DocxOwner::Eager(package) => Ok(package.edit_document()?),
+            DocxOwner::Eager(package) => Ok(DocxEditor::Edit(Box::new(package.edit_document()?))),
             DocxOwner::Source(package) => {
                 let result = package.edit_document().map_err(Error::from);
-                self.0.owner.finish(result)
+                self.0
+                    .owner
+                    .finish(result)
+                    .map(|edit| DocxEditor::Edit(Box::new(edit)))
             },
         }
+    }
+
+    /// An owning copy of the document whose signature the leaf removed
+    /// explicitly ([`litchi_docx::Package::unsign`]).
+    fn unsigned_package(&self) -> Result<litchi_docx::Package> {
+        let mut package = match &self.0.owner {
+            DocxOwner::Eager(package) => {
+                // A copy of the graph would drop the encryption profile the
+                // eager owner keeps, and the leaf refuses to edit a package
+                // it decrypted; refuse rather than publish it in the clear.
+                #[cfg(feature = "encryption")]
+                if package.encryption().is_some() {
+                    return Err(Error::new(
+                        Code::UnsupportedCapability,
+                        "an unlocked encrypted DOCX document cannot be edited, signed or not",
+                    )
+                    .with_format(FileFormat::Docx));
+                }
+                litchi_docx::Package::from_opc_package(package.opc_package().clone())?
+            },
+            DocxOwner::Source(package) => {
+                let bytes = signature::exact_source(package.source_backed_package())?;
+                litchi_docx::Package::from_opc_package(OpcPackage::from_vec_with_limits(
+                    bytes,
+                    self.0.ooxml_limits,
+                )?)?
+            },
+        };
+        package.unsign();
+        Ok(package)
     }
 }
 

@@ -746,8 +746,11 @@ fn patch_is_stale_checked_retryable_apply_once_and_exactly_invertible() {
     assert_eq!(physical_state(&workbook), before);
 }
 
+/// A real change to a signed workbook is refused until the signature is
+/// removed explicitly (ADR 0006); the change then preserves every untouched
+/// binary part.
 #[test]
-fn a_real_change_unsigns_but_preserves_untouched_binary_parts() {
+fn a_real_change_needs_an_explicit_unsign_and_preserves_untouched_binary_parts() {
     let mut shape = Shape::default();
     shape.signed = true;
     let mut workbook = open(package_with(
@@ -775,7 +778,14 @@ fn a_real_change_unsigns_but_preserves_untouched_binary_parts() {
     transaction.set_map_name(7, "Changed").unwrap();
     let commit = transaction.commit().unwrap();
 
-    workbook.apply_xml_maps(&commit).unwrap();
+    assert_signature_refusal(workbook.apply_xml_maps(&commit).unwrap_err());
+    assert!(workbook.is_signed());
+    workbook.unsign();
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    transaction.set_map_name(7, "Changed").unwrap();
+    workbook
+        .apply_xml_maps(&transaction.commit().unwrap())
+        .unwrap();
 
     assert!(!workbook.is_signed());
     assert!(
@@ -1584,8 +1594,10 @@ fn single_cell_first_binding_rejects_dangling_case_equivalent_root_alias_atomica
     assert_eq!(physical_state(&workbook), before);
 }
 
+/// Removing the last single-cell binding of a signed workbook needs an
+/// explicit unsign; the inverse restores the payloads but never the signature.
 #[test]
-fn signed_single_cell_last_remove_unsigns_and_inverse_restores_payloads_only() {
+fn signed_single_cell_last_remove_needs_unsign_and_inverse_restores_payloads_only() {
     let mut shape = Shape::default();
     shape.signed = true;
     let mut workbook = open(package_with(
@@ -1603,17 +1615,27 @@ fn signed_single_cell_last_remove_unsigns_and_inverse_restores_payloads_only() {
     ));
     let original_single = part_bytes(&workbook, SINGLE_CELLS_PART);
     let original_table = part_bytes(&workbook, TABLE_PART);
-    let mut transaction = workbook.xml_maps().unwrap().edit();
-    assert!(
-        transaction
-            .remove_single_cell_binding(0, 1)
-            .unwrap()
-            .is_some()
-    );
-    let commit = transaction.commit().unwrap();
-    let inverse = commit.patch().inverse();
+    let remove_last = |workbook: &Workbook| {
+        let mut transaction = workbook.xml_maps().unwrap().edit();
+        assert!(
+            transaction
+                .remove_single_cell_binding(0, 1)
+                .unwrap()
+                .is_some()
+        );
+        transaction.commit().unwrap()
+    };
 
     assert!(workbook.is_signed());
+    assert_signature_refusal(
+        workbook
+            .apply_xml_maps(&remove_last(&workbook))
+            .unwrap_err(),
+    );
+    assert!(workbook.is_signed());
+    workbook.unsign();
+    let commit = remove_last(&workbook);
+    let inverse = commit.patch().inverse();
     workbook.apply_xml_maps(&commit).unwrap();
     assert!(!workbook.is_signed());
     assert!(
@@ -2132,9 +2154,14 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
         ),
         shape,
     ));
-    let mut rename = signed.xml_maps().unwrap().edit();
-    rename.set_map_name(7, "Unsigned").unwrap();
-    let rename = rename.commit().unwrap();
+    let rename_map = |workbook: &Workbook| {
+        let mut rename = workbook.xml_maps().unwrap().edit();
+        rename.set_map_name(7, "Unsigned").unwrap();
+        rename.commit().unwrap()
+    };
+    assert_signature_refusal(signed.apply_xml_maps(&rename_map(&signed)).unwrap_err());
+    signed.unsign();
+    let rename = rename_map(&signed);
     let inverse = rename.patch().inverse();
     signed.apply_xml_maps(&rename).unwrap();
     assert!(!signed.is_signed());
@@ -2968,6 +2995,21 @@ fn assert_base_open_error(label: &str, package: OpcPackage, context: &str) {
         Err(error) => error,
     };
     assert_error_contains(error, context, label);
+}
+
+/// A changed publication over a signed workbook is refused (ADR 0006).
+#[track_caller]
+fn assert_signature_refusal(error: litchi_xlsb::package::PackageError) {
+    assert!(
+        matches!(
+            error,
+            litchi_xlsb::package::PackageError::Signed
+                | litchi_xlsb::package::PackageError::Opc(
+                    litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+                )
+        ),
+        "expected a signature refusal, got {error:?}"
+    );
 }
 
 fn assert_error_contains(error: impl std::fmt::Display, context: &str, label: &str) {

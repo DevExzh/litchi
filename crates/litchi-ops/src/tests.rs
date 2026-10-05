@@ -16,6 +16,16 @@ mod open;
 #[cfg(any(feature = "ppt", feature = "pptx"))]
 mod presentation;
 mod security;
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb"
+))]
+mod signature;
 #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
 mod workbook;
 

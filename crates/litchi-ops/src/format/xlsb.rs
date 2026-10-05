@@ -38,10 +38,11 @@ use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
 };
 use litchi_core::{FileFormat, Metadata};
-use litchi_opc::{OpcPackage, SourceBackedPackage};
+use litchi_opc::{OpcPackage, ReadLimits, SourceBackedPackage};
 use litchi_xlsb as xlsb;
 
 use super::cell_text;
+use super::signature::{self, Opened, Signature};
 use crate::detect::workbook_metadata::{MetadataRepairs, read_source_backed_metadata};
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
@@ -69,7 +70,7 @@ use source::{SourceWorkbook, SourceWorksheets, internal};
 /// # }
 /// ```
 #[derive(Clone)]
-pub struct Xlsb(Arc<XlsbState>);
+pub struct Xlsb(Arc<Opened<XlsbState>>);
 
 /// Shared state behind an [`Xlsb`] handle.
 struct XlsbState {
@@ -83,6 +84,9 @@ struct XlsbState {
     /// Both owner states already hold everything an edit needs, so this
     /// releases nothing; it only refuses.
     retain_source: bool,
+    /// The OPC read limits of the open, which an unsigned copy is opened
+    /// under (record 0013).
+    ooxml_limits: ReadLimits,
 }
 
 /// The two owner states of an XLSB handle (record 0003 §2.3).
@@ -98,7 +102,10 @@ enum XlsbOwner {
 pub(crate) enum XlsbEditor<'a> {
     /// The handle's own eager owner.
     Eager(&'a xlsb::Workbook),
-    /// Materialized from the source-backed catalog (L-XLSB-1).
+    /// Materialized from the source-backed catalog (L-XLSB-1). After
+    /// [`Signed::unsign`](crate::Signed::unsign), either owner yields an
+    /// owning copy whose signature the leaf removed explicitly
+    /// ([`xlsb::Workbook::unsign`], record 0013).
     Materialized(Box<xlsb::Workbook>),
 }
 
@@ -189,12 +196,23 @@ impl Xlsb {
         metadata_repairs: MetadataRepairs,
         options: &OpenOptions,
     ) -> Self {
-        Self(Arc::new(XlsbState {
+        Self(Opened::new(XlsbState {
             owner,
             metadata,
             metadata_repairs,
             retain_source: options.retain_source,
+            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
         }))
+    }
+
+    /// The same workbook under another signature disposition (record 0013).
+    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
+        Self(self.0.with_signature(signature))
+    }
+
+    /// This handle's signature disposition (record 0013).
+    pub(crate) fn signature(&self) -> Signature {
+        self.0.signature()
     }
 
     /// The format of this handle.
@@ -307,18 +325,27 @@ impl Xlsb {
     ///
     /// An eager handle lends its own workbook. A source-backed handle
     /// materializes one from the package indexed at open through the same
-    /// positional source (L-XLSB-1); the handle stays usable.
+    /// positional source (L-XLSB-1); the handle stays usable. After
+    /// [`Signed::unsign`](crate::Signed::unsign) either owner yields an owning
+    /// copy whose signature the leaf removed explicitly (record 0013): opened
+    /// over the exact input bytes, or copied from the eager owner's package,
+    /// then `unsign`ed.
     ///
     /// # Errors
     ///
-    /// Returns [`Code::UnsupportedCapability`] when the handle was opened with
-    /// [`OpenOptions::retain_source`] `false`, [`Code::IoError`] when the file
-    /// changed, and the XLSB error of a failed materialization.
+    /// Returns [`Code::DocumentProtected`] while the workbook is still
+    /// signed, with a suggestion naming `Signed::unsign`;
+    /// [`Code::UnsupportedCapability`] when the handle was opened with
+    /// [`OpenOptions::retain_source`] `false`; [`Code::IoError`] when the
+    /// file changed; and the XLSB error of a failed materialization.
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "consumed by the M2 write kernel")
     )]
     pub(crate) fn editor(&self) -> Result<XlsbEditor<'_>> {
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Xlsb));
+        }
         if !self.0.retain_source {
             return Err(Error::new(
                 Code::UnsupportedCapability,
@@ -327,12 +354,34 @@ impl Xlsb {
             .with_format(FileFormat::Xlsb)
             .with_suggestion("reopen with `OpenOptions::retain_source(true)` to edit"));
         }
+        if self.0.signature() == Signature::RemovalAuthorized {
+            return self
+                .unsigned_workbook()
+                .map(|workbook| XlsbEditor::Materialized(Box::new(workbook)));
+        }
         match &self.0.owner {
             XlsbOwner::Source(workbook) => Ok(XlsbEditor::Materialized(Box::new(
                 workbook.workbook().to_workbook()?,
             ))),
             XlsbOwner::Eager(workbook) => Ok(XlsbEditor::Eager(workbook)),
         }
+    }
+
+    /// An owning copy of the workbook whose signature the leaf removed
+    /// explicitly ([`xlsb::Workbook::unsign`]).
+    fn unsigned_workbook(&self) -> Result<xlsb::Workbook> {
+        let mut workbook = match &self.0.owner {
+            XlsbOwner::Source(workbook) => {
+                let bytes = signature::exact_source(workbook.workbook().source_backed_package())?;
+                xlsb::Package::from_bytes_with_limits(bytes, self.0.ooxml_limits)?
+                    .into_workbook()?
+            },
+            XlsbOwner::Eager(workbook) => {
+                xlsb::Workbook::from_opc_package(workbook.opc_package().clone())?
+            },
+        };
+        workbook.unsign();
+        Ok(workbook)
     }
 }
 

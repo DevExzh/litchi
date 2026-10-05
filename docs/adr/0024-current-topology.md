@@ -4854,7 +4854,28 @@ feature now also turns on `litchi-ops/encryption`, an existing edge.
 stays runtime-neutral and iWork-free and the non-iWork release gate is
 unchanged.
 
-Together with the S2 through S6 amendments above, the current inventory is
-66 workspace packages, 266 internal dependency declarations, 254 canonical
-edges, 12 development-only edges, 11 ordered migration debts with IDs
+Together with the S2 through S6 amendments above, the inventory at this point
+was 66 workspace packages, 266 internal dependency declarations and 254
+canonical edges.
+
+## 2026-10-05 amendment: `litchi-ops` signature edge (M0a step S6b)
+
+Unified-ops M0a step S6b adds the explicit signature policy of ADR 0006 to
+the unified layer (unified-ops record
+[0013](../unified-ops/0013-signature-policy.md)). `Signed::unsign` consumes a
+signature, and the first edit of the returned file removes it through the
+owning format's explicit removal. A legacy binary document (DOC, PPT, XLS)
+carries its signature in compound-file storage, and its removal belongs to the
+compound-file signature editor of `litchi-sign`
+(`litchi_sign::cfb::Editor::clear`); `litchi-doc` and `litchi-xls` already
+depend on that crate, and `litchi-ppt` does under its `sign` feature. That
+adds one optional normal edge, `litchi-ops -> litchi-sign`, owned by the
+`doc`, `ppt` and `xls` features. `litchi-sign` is a runtime-neutral bulk
+package, so `litchi-ops` stays runtime-neutral and iWork-free and the
+non-iWork release gate is unchanged. The OOXML formats need no new edge: their
+removal is the OPC owners' existing `unsign`.
+
+Together with the S2 through S7 amendments above, the current inventory is 66
+workspace packages, 267 internal dependency declarations, 255 canonical edges,
+12 development-only edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

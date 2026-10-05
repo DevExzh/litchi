@@ -400,3 +400,43 @@ fn workbook_api_refuses_structural_formula_without_provable_context() {
     assert!(workbook.apply_sparklines(0, commit).is_err());
     assert_eq!(workbook.sparklines(0).unwrap().source_bytes(), before_bytes);
 }
+
+#[test]
+fn workbook_api_refuses_a_change_to_a_signed_workbook() {
+    use litchi_opc::constants::{content_type, relationship_type};
+    use litchi_opc::{BlobPart, PackURI};
+
+    let mut workbook = crate::Package::create().unwrap().into_workbook().unwrap();
+    let package = workbook.opc_package_mut();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+            content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            Vec::new(),
+        )))
+        .unwrap();
+    package.relate_to(
+        "_xmlsignatures/origin.sigs",
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    assert!(workbook.is_signed());
+
+    // A changed commit would invalidate the signature: refused, not stripped.
+    let mut edit = workbook.edit_sparklines(0).unwrap();
+    edit.set(groups());
+    assert!(matches!(
+        workbook.apply_sparklines(0, edit.commit().unwrap()),
+        Err(crate::package::error::Error::Signed)
+    ));
+    assert!(workbook.is_signed());
+
+    // Removing the signature explicitly authorizes the edit.
+    workbook.unsign();
+    let mut edit = workbook.edit_sparklines(0).unwrap();
+    edit.set(groups());
+    let snapshot = workbook
+        .apply_sparklines(0, edit.commit().unwrap())
+        .unwrap();
+    assert_eq!(snapshot.groups().unwrap(), &groups());
+    assert!(!workbook.is_signed());
+}

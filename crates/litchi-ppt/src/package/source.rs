@@ -228,6 +228,16 @@ impl SourceBackedPackage {
         self.text_edit_snapshot_with_limits(self.record_limits)
     }
 
+    /// Borrow the validated compound-file view this package reads from.
+    ///
+    /// This is the view opened over the positional source: its directory and
+    /// allocation tables are not parsed again, and its reads observe the
+    /// same source-version fence.
+    #[must_use]
+    pub fn shared_ole_file(&self) -> &SharedOleFile {
+        &self.shared
+    }
+
     /// Builds the source-backed text editor under stricter record limits.
     ///
     /// `limits` is constrained by this package's own limits, as
