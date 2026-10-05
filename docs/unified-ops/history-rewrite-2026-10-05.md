@@ -27,6 +27,6 @@ unchanged.
 | `5f7c0523f4` | `d209c85d17` | M0a S5a: `Docx` handle |
 | `6c96efff21` | `abf6e22e00` | M0a S1: pre-migration baseline |
 
-Only the S1 entry and the stubs commit are on `uo/m0a` rather than on
-`feat/unified-ops-api`; every hash in the "New" column exists in
-`uo/m0a`'s history.
+The M0a step commits (S1–S5a and the stubs commit) are on `uo/m0a` and reach
+`feat/unified-ops-api` only with the single M0a merge; every hash in the "New"
+column exists in `uo/m0a`'s history.
