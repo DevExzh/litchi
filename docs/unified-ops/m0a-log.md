@@ -138,3 +138,30 @@
   - The splice-fragment and read-session identity checks compare the opened package instead of the instance address.
 - 18 new litchi-opc tests: 0009's T1–T3 and T5–T8 at the OPC level, budget accounting, concurrent compression waves, and a lineage proof across clones. Leaf suites: opc 1,042, docx 2,010, pptx 1,305, xlsx 2,133, xlsb 1,030 passed.
 - Quick ABBA loop (release build, pinned CPU, shared host): open and full-text ratios 0.977–1.003, so no slowdown. Each open makes exactly 3 more allocations; clones and reads make none. Clone plus drop takes 72–77 ns (122–130 ns with a budget), against an 80 µs open. Evidence and the benchmark source are in `docs/unified-ops/results/0012/`; binaries are not committed.
+
+## S6 — `File`, single-pass open, family views, Locked/Signed (`a8d3ce9772`, `eca894f849`)
+- `File` is flat, `#[non_exhaustive]` and 16 bytes, with one variant per format plus `Locked`/`Signed`.
+- `open`, `open_with`, `open_bytes`, `open_bytes_with` and `open_prepared[_with]` each build one OPC index per open, proven by the probe counter. `#[doc(hidden)] open_with_tail` / `open_bytes_with_tail` let S7 plug in the iWork tail.
+- `File::{format, family, text, metadata, tolerance_report, document, presentation, workbook}`. `ToleranceReport` moved into ops (with `Untracked(FileFormat)`), and the compat wrappers moved to `compat::{word, slide}`. `WorkbookView: WorkbookTrait`; ODS reports names and count but refuses worksheet access through the trait.
+- Locked/Signed:
+  - `Locked(EncryptionKind)` for encrypted DOC, XLS and PPT and for OOXML in a compound file.
+  - `unlock(Password)` under the new `encryption` feature (edge `litchi-ops -> litchi-crypto`; 264 declarations). Every legacy fixture round-trips by path and by bytes; encrypted DOCX/XLSX/PPTX are built in-test and unlock to the plain text.
+  - `Signed(Opc|Cfb)` wraps the readable inner file and delegates reads; it stays read-only until S6b.
+- Record 0008 findings:
+  - A1: an execution context is only checked for cancellation around detection. No open builds the managed DOCX owner, and all 19 Word fixtures read under a context.
+  - A5: `SourceMode::Eager` uses the eager OPC route, keeping the ZIP layout, except `open_prepared` under Eager.
+- Deviations:
+  - `File::format()` and `Locked::format()` return `Option`: an encrypted OOXML package opened from bytes has no knowable format.
+  - `Error` is `Clone`, so `into_leaf` is gone; use `leaf()`.
+  - The compat enums gained `#[non_exhaustive]` and lost their Pages/Keynote variants, since ops is iWork-free.
+  - The S5 `from_prepared` constructors are removed.
+  - XLS reads through `WorkbookTrait` come from an eager reader, loaded on first trait use.
+  - Disabled-feature hosts are reported with their format and a feature suggestion; the facade silently fell back to XLS. S7 keeps the new behaviour.
+- Open cost (release, 300 interleaved rounds, median, facade → ops):
+  - Within noise for docx, doc, pptx, xls and xlsx on both routes, and for ppt by path.
+  - PPT bytes: 50.9 → 53.7 µs (+2.8 µs). That is S5d's default source retention; with `retain_source(false)` it is 50.9 µs. It is within the goal's "5% or 20 µs" budget.
+- Verified on the merged `uo/m0a` (S6 + 0012):
+  - litchi-ops clippy passes with all features, with no default features, and across 16 single and combined feature sets.
+  - 360 unit tests and 52 doctests pass, and `cargo check -p litchi --all-features` passes.
+  - The boundary checker (264 declarations), the non-iWork gate and the gate unit tests pass.
+- Left for S7: the Markdown adapter and its tests; the facade reads slide size and catalog from the `Pptx` handle.
