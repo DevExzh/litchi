@@ -2,8 +2,9 @@
 
 This diagnostic profiles the suspected redundant target `Snapshot` parse in
 `docx_source_backed_existing_section_layout_edit_save`. The measured
-publication calls `Patch::apply` after it has already authorized the source;
-for a changed section patch, that method constructs a fresh target snapshot
+publication captures a fresh current-source snapshot and calls `Patch::apply`
+to authorize the patch against it. For a changed section patch, that method
+then constructs a fresh target snapshot
 with `Snapshot::from_shared_xml`. `Edit::commit` has already parsed and retained
 the same target snapshot in its `Commit`. The public `Patch::apply` contract is
 broader and still needs to reconstruct a target for callers that hold only a

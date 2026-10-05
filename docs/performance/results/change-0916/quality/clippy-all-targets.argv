@@ -1,0 +1,16 @@
+taskset
+-c
+14,15
+env
+CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target
+cargo
+clippy
+-p
+litchi-docx
+--all-targets
+--locked
+--offline
+-j2
+--
+-D
+warnings

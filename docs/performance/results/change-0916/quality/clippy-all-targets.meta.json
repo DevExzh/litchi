@@ -1,0 +1,21 @@
+{
+  "start_utc": "2026-10-05T16:37:35.156279155Z",
+  "end_utc": "2026-10-05T16:38:11.584636665Z",
+  "start_epoch_ns": 1791218255157713782,
+  "end_epoch_ns": 1791218291581610161,
+  "exit_code": 0,
+  "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target cargo clippy -p litchi-docx --all-targets --locked --offline -j2 -- -D warnings",
+  "cwd": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0916/candidate/target",
+    "cargo_jobs": 2,
+    "cpu_affinity": [14, 15],
+    "cargo_locked": true,
+    "cargo_offline": true,
+    "clippy_deny_warnings": true
+  },
+  "stdout_bytes": 0,
+  "stderr_bytes": 3538,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "60b2b9e3527d8326b0a8e4c225e08c96ef285e7c63d7404b3a6ba35d919dd8f1"
+}

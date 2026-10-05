@@ -1,0 +1,2 @@
+checker=e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9  tools/check_crate_boundaries.py
+policy=715e27ba51b9d60163bf2f51f0d21893ad223df3e61f8ebc768a46c4f7deea36  tools/crate_boundaries.json

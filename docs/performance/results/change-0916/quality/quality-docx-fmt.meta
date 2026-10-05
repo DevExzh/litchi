@@ -1,0 +1,12 @@
+{
+  "start_utc": "2026-10-05T16:23:02.054847Z",
+  "end_utc": "2026-10-05T16:23:03.464799Z",
+  "start_epoch_ns": 1791217382054845655,
+  "end_epoch_ns": 1791217383464792658,
+  "elapsed_ns": 1409947003,
+  "exit_code": 0,
+  "command": "cargo fmt -p litchi-docx -- --check",
+  "cwd": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "stdout_bytes": 0,
+  "stderr_bytes": 0
+}

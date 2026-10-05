@@ -1,0 +1,9 @@
+Linux 7.0.0-1013-aws (ip-172-31-39-190) 	10/05/26 	_x86_64_	(32 CPU)
+
+16:29:40     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
+16:29:41      16    0.99    0.00    0.99    0.00    0.00    0.00    0.00    0.00    0.00   98.02
+16:29:41      17    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00
+
+Average:     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
+Average:      16    0.99    0.00    0.99    0.00    0.00    0.00    0.00    0.00    0.00   98.02
+Average:      17    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00

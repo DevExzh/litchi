@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0916 — duplicate commit target parsing removed
+
+[0916](0916-docx-section-commit-target-reuse.md) profiles the target parse
+already validated and retained by a section-layout commit. Reusing that target
+after unchanged current-source authorization is adopted after passing the
+native gate: paired
+ratio 1.074136, with publication p50 changing from 3.017034 to 2.686882 ms.
+Full-artifact fingerprinting, freshness fences, both cache trim points and
+standalone patch parsing remain intact. Source reads and output bytes stay
+identical. Guest instructions establish the duplicate-work mechanism, not
+native SHA cost. Broader producer/input coverage and attribution of the
+remaining current-source capture work are still open.
+
 ## 0915 — section guard allocations identified, narrow candidate not admitted
 
 [0915](0915-docx-section-resolver-borrow.md) attributes 3,676 allocation calls

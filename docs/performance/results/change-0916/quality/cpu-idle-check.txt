@@ -1,0 +1,4 @@
+cpu_idle_sample_seconds=1
+cpu_total_delta=3202
+cpu_idle_delta=2485
+cpu_idle_fraction=0.776077

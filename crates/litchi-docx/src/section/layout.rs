@@ -120,6 +120,17 @@ impl Snapshot {
             limits: self.limits.clone(),
         }
     }
+
+    fn with_source_identity(&self, source: &Self) -> Self {
+        Self {
+            xml: Arc::clone(&self.xml),
+            inventory: self.inventory.clone(),
+            source_version: source.source_version,
+            lineage: source.lineage.clone(),
+            artifact_fingerprint: source.artifact_fingerprint,
+            limits: source.limits.clone(),
+        }
+    }
 }
 
 /// An isolated edit over one existing section's local page-layout properties.
@@ -408,6 +419,15 @@ impl Commit {
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
+
+    pub(crate) fn apply_to_current(&self, current: &Snapshot) -> Result<Snapshot> {
+        self.patch.authorize_source(current)?;
+        if self.patch.is_noop() {
+            Ok(current.clone())
+        } else {
+            Ok(self.snapshot.with_source_identity(current))
+        }
+    }
 }
 
 /// An exact-source-checked, reversible section-layout patch.
@@ -545,6 +565,20 @@ impl Patch {
     /// retained by a [`Publication`] is the explicit fingerprint-only
     /// reauthorization mode for the emitted artifact.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        self.authorize_source(source)?;
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        Snapshot::from_shared_xml(
+            Arc::clone(&self.after),
+            source.source_version,
+            source.lineage.clone(),
+            source.artifact_fingerprint,
+            self.limits.clone(),
+        )
+    }
+
+    fn authorize_source(&self, source: &Snapshot) -> Result<()> {
         if source.xml.as_slice() != self.before.as_slice() {
             return Err(Error::SectionLayoutStaleSource);
         }
@@ -583,16 +617,7 @@ impl Patch {
         if source.limits != self.limits {
             return Err(Error::SectionLayoutPolicyConflict);
         }
-        if self.is_noop() {
-            return Ok(source.clone());
-        }
-        Snapshot::from_shared_xml(
-            Arc::clone(&self.after),
-            source.source_version,
-            source.lineage.clone(),
-            source.artifact_fingerprint,
-            self.limits.clone(),
-        )
+        Ok(())
     }
 
     pub(crate) fn limits(&self) -> &Limits {
@@ -2217,4 +2242,43 @@ fn ensure_semantic_readback(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PageSize, Snapshot};
+    use crate::section::{Emu, Orientation};
+
+    const DOCUMENT: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#;
+
+    #[test]
+    fn commit_apply_to_current_reuses_target_and_noop_current_allocations() {
+        let base = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let mut edit = base.edit(0).unwrap();
+        edit.set_page_size(Some(PageSize {
+            width: Some(Emu::from_twips(11906)),
+            height: Some(Emu::from_twips(16838)),
+            orientation: Orientation::Landscape,
+        }))
+        .unwrap();
+        let changed = edit.commit().unwrap();
+        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let target = changed.apply_to_current(&current).unwrap();
+        let target_xml = target.shared_xml();
+        let commit_xml = changed.snapshot.shared_xml();
+        assert!(std::sync::Arc::ptr_eq(&target_xml, &commit_xml));
+        assert!(
+            target
+                .inventory
+                .shares_allocation_with(&changed.snapshot.inventory)
+        );
+
+        let noop = base.edit(0).unwrap().commit().unwrap();
+        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let target = noop.apply_to_current(&current).unwrap();
+        let target_xml = target.shared_xml();
+        let current_xml = current.shared_xml();
+        assert!(std::sync::Arc::ptr_eq(&target_xml, &current_xml));
+        assert!(target.inventory.shares_allocation_with(&current.inventory));
+    }
 }

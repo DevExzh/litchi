@@ -1,0 +1,107 @@
+{
+  "adoption": "Timing eligibility alone does not adopt the candidate; source/ADR review and applicable correctness/quality gates must pass.",
+  "baseline_binary_bytes": 69940744,
+  "baseline_binary_sha256": "fe56e5192c1198e831583e870beb5e1ba4731fb2077faaffdfc46044bb0ed2db",
+  "baseline_source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "protocol_revision": 2,
+  "premeasurement_correction": {
+    "status": "corrected_before_any_capture",
+    "reason": "The initial host-isolation wording implied whole-machine quiescence, which cannot be established on this shared host.",
+    "supersedes": {
+      "path": "native-protocol-initial.json",
+      "sha256": "3471c6bd92a4211977660fab275f73df30705669e9509094b3ab48582ee2d855"
+    }
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "interval": "nearest-rank 2.5th/97.5th percentiles",
+    "seed": 916,
+    "statistic": "median of per-pair baseline_p50/candidate_p50 ratios",
+    "unit": "matched process pair"
+  },
+  "candidate_scope": "Only commit-only DOCX target-snapshot reuse after unchanged source authorization; resolver borrowing and every other production path are excluded. Any test-only changes must be identified separately.",
+  "capture_rules": [
+    "Use fresh baseline controls, not historical timings.",
+    "Do not modify frozen protocol or binary/source receipts after the first child.",
+    "Preserve failures and all captured samples; do not rerun adverse rows.",
+    "Finish profiler and candidate builds before native captures.",
+    "The root coordinator must explicitly start native capture only after all coordinated 0916 quality, build, and profiler CPU work is idle; shared-host services, other users, and unrelated iWork activity are uncontrolled. Record host-load observations before and after each child and make no quiescent-machine claim; this runner starts no autonomous background work during the native schedule.",
+    "Freeze with both --source-receipt and --build-receipt before the first child so source and build custody is bound in the manifest.",
+    "Native clocks and setup-inclusive process RSS are distinct; no allocation-count benefit inferred from RSS."
+  ],
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "correctness": "All 0914 corpus, source/output identity, phase-sum, cache/source/sink and preservation/refusal gates must pass for every child; one-part materializations and logical reads must remain identical.",
+  "mandatory_controls": {
+    "source": [
+      "source_immutability_verified",
+      "source_read_calls",
+      "source_read_bytes",
+      "ordinary_payload_read_calls",
+      "ordinary_payload_read_bytes",
+      "max_in_flight_reads",
+      "ordinary_payload_materializations"
+    ],
+    "output": [
+      "output_sha256",
+      "semantic_reopen_all_sections_verified",
+      "table_cell_sectpr_excluded_verified",
+      "raw_untouched_members_verified",
+      "raw_member_order_and_comment_verified",
+      "header_footer_relationships_verified",
+      "patch_forward_inverse_verified",
+      "publication_inverse_exact_source_verified"
+    ],
+    "read": [
+      "phase_sum_verified",
+      "source_read_calls",
+      "source_read_bytes",
+      "ordinary_payload_materializations"
+    ],
+    "cache": [
+      "cache_counters_verified",
+      "source_cache_before_publication_after_commit_hits",
+      "source_cache_before_publication_after_commit_cold_loads",
+      "source_cache_before_publication_after_commit_successful_loads",
+      "source_cache_before_publication_after_commit_retained_entries",
+      "source_cache_before_publication_after_commit_retained_bytes"
+    ],
+    "sink": [
+      "sink_counters_verified",
+      "stale_foreign_signed_noop_limits_partial_sink_verified",
+      "accepted_bytes",
+      "write_calls",
+      "largest_write",
+      "write_size_buckets"
+    ]
+  },
+  "cpu": 12,
+  "frozen_utc": "2026-10-05T16:01:26.582257+00:00",
+  "hypothesis": "After unchanged source authorization succeeds, reuse the immutable target snapshot in the commit-only path instead of reconstructing equivalent snapshot state, while preserving validation, source checks, publication, and output bytes.",
+  "pair_orders": [
+    "baseline,candidate",
+    "candidate,baseline",
+    "baseline,candidate",
+    "candidate,baseline",
+    "baseline,candidate",
+    "candidate,baseline",
+    "baseline,candidate",
+    "candidate,baseline"
+  ],
+  "pairs": 8,
+  "review_flags": {
+    "latency_statistics": [
+      "p50",
+      "p95",
+      "p99"
+    ],
+    "pooled_latency_increase_fraction": 0.05,
+    "whole_process_max_rss_median_increase_fraction": 0.05
+  },
+  "samples_per_child": 200,
+  "schema": "litchi.performance.0916.native-protocol.v1",
+  "timing_gate": {
+    "lower_95_percent_bound_must_exceed": 1.0,
+    "minimum_median_ratio": 1.05
+  },
+  "warmups": 30
+}

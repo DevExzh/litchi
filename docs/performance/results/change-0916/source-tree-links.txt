@@ -1,0 +1,13 @@
+test-data/images -> ../fixtures/test-data/images
+test-data/iwork -> ../fixtures/test-data/iwork
+test-data/libreoffice-core -> ../fixtures/test-data/libreoffice-core
+test-data/office-interop -> ../fixtures/test-data/office-interop
+test-data/ole -> ../fixtures/test-data/ole
+test-data/ooxml -> ../fixtures/test-data/ooxml
+test-data/poi/test-data/document -> ../../../fixtures/test-data/poi/test-data/document
+test-data/poi/test-data/hpsf -> ../../../fixtures/test-data/poi/test-data/hpsf
+test-data/poi/test-data/integration -> ../../../fixtures/test-data/poi/test-data/integration
+test-data/poi/test-data/openxml4j -> ../../../fixtures/test-data/poi/test-data/openxml4j
+test-data/poi/test-data/poifs -> ../../../fixtures/test-data/poi/test-data/poifs
+test-data/poi/test-data/slideshow -> ../../../fixtures/test-data/poi/test-data/slideshow
+test-data/poi/test-data/xmldsign -> ../../../fixtures/test-data/poi/test-data/xmldsign

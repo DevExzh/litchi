@@ -1,0 +1,208 @@
+{
+  "label": "pair-07-leg-2-candidate",
+  "leg": 2,
+  "pair": 7,
+  "report_gzip": {
+    "bytes": 10672,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/reports/pair-07-leg-2-candidate.report.json.gz",
+    "sha256": "dd59190b296f9c91e8db07623bbb1613fd5996b6fb3462ac769c0452f2fa3a50"
+  },
+  "report_raw": {
+    "bytes": 151281,
+    "sha256": "28c8b43086387c753ec91ca0da2ea70902695adbc950606de7144a66ebe18031"
+  },
+  "schema": "litchi.performance.0916.child-summary.v1",
+  "validation": {
+    "cache_before_publication_after_commit": {
+      "cold_loads": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      },
+      "hits": {
+        "max": 0,
+        "mean": 0.0,
+        "min": 0,
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "samples": 200
+      },
+      "retained_bytes": {
+        "max": 18855,
+        "mean": 18855.0,
+        "min": 18855,
+        "p50": 18855,
+        "p95": 18855,
+        "p99": 18855,
+        "samples": 200
+      },
+      "retained_entries": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      },
+      "successful_loads": {
+        "max": 1,
+        "mean": 1.0,
+        "min": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "samples": 200
+      }
+    },
+    "elapsed_ns": {
+      "max": 4834333,
+      "mean": 4540404.415,
+      "min": 4490420,
+      "p50": 4525516,
+      "p95": 4620762,
+      "p99": 4711842,
+      "samples": 200
+    },
+    "gates": {
+      "cache_counters_verified": true,
+      "header_footer_relationships_verified": true,
+      "patch_forward_inverse_verified": true,
+      "phase_sum_verified": true,
+      "publication_inverse_exact_source_verified": true,
+      "raw_member_order_and_comment_verified": true,
+      "raw_untouched_members_verified": true,
+      "semantic_reopen_all_sections_verified": true,
+      "sink_counters_verified": true,
+      "source_immutability_verified": true,
+      "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+      "table_cell_sectpr_excluded_verified": true
+    },
+    "label": "pair-07-leg-2-candidate",
+    "max_in_flight_reads": {
+      "max": 1,
+      "mean": 1.0,
+      "min": 1,
+      "p50": 1,
+      "p95": 1,
+      "p99": 1,
+      "samples": 200
+    },
+    "ordinary_payload_materializations": 1,
+    "ordinary_payload_read_bytes": {
+      "max": 8397632,
+      "mean": 8397632.0,
+      "min": 8397632,
+      "p50": 8397632,
+      "p95": 8397632,
+      "p99": 8397632,
+      "samples": 200
+    },
+    "ordinary_payload_read_calls": {
+      "max": 138,
+      "mean": 138.0,
+      "min": 138,
+      "p50": 138,
+      "p95": 138,
+      "p99": 138,
+      "samples": 200
+    },
+    "output_bytes": 2101446,
+    "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "phase_ns": {
+      "commit_ns": {
+        "max": 386011,
+        "mean": 354013.51,
+        "min": 342711,
+        "p50": 352756,
+        "p95": 365592,
+        "p99": 380132,
+        "samples": 200
+      },
+      "edit_ns": {
+        "max": 71120,
+        "mean": 56937.7,
+        "min": 50881,
+        "p50": 55760,
+        "p95": 64530,
+        "p99": 67450,
+        "samples": 200
+      },
+      "open_ns": {
+        "max": 80631,
+        "mean": 48149.925,
+        "min": 43941,
+        "p50": 46090,
+        "p95": 59601,
+        "p99": 72111,
+        "samples": 200
+      },
+      "preparation_ns": {
+        "max": 58761,
+        "mean": 35613.845,
+        "min": 33391,
+        "p50": 34485,
+        "p95": 42220,
+        "p99": 44350,
+        "samples": 200
+      },
+      "publication_ns": {
+        "max": 2885844,
+        "mean": 2701750.045,
+        "min": 2670932,
+        "p50": 2693532,
+        "p95": 2740463,
+        "p99": 2799863,
+        "samples": 200
+      },
+      "query_ns": {
+        "max": 1394746,
+        "mean": 1343939.39,
+        "min": 1329086,
+        "p50": 1341531,
+        "p95": 1364887,
+        "p99": 1388246,
+        "samples": 200
+      }
+    },
+    "sink": {
+      "accepted_bytes": 2101446,
+      "largest_write": 65536,
+      "write_calls": 75,
+      "write_size_buckets": {
+        "bytes_0": 0,
+        "bytes_16385_to_65536": 32,
+        "bytes_1_to_512": 42,
+        "bytes_4097_to_16384": 0,
+        "bytes_513_to_4096": 1,
+        "bytes_over_65536": 0
+      }
+    },
+    "sink_largest_write": 65536,
+    "source_read_bytes": {
+      "max": 8409488,
+      "mean": 8409488.0,
+      "min": 8409488,
+      "p50": 8409488,
+      "p95": 8409488,
+      "p99": 8409488,
+      "samples": 200
+    },
+    "source_read_calls": {
+      "max": 202,
+      "mean": 202.0,
+      "min": 202,
+      "p50": 202,
+      "p95": 202,
+      "p99": 202,
+      "samples": 200
+    }
+  },
+  "validation_error": null,
+  "variant": "candidate"
+}

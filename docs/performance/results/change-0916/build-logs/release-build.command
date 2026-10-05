@@ -1,0 +1,1 @@
+taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target CARGO_TERM_COLOR=never cargo build --locked --offline -j2 --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline

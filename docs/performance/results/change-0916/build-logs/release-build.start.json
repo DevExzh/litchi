@@ -1,0 +1,19 @@
+{
+  "start_utc": "2026-10-05T16:24:52.806377Z",
+  "start_epoch_ns": 1791217492806374144,
+  "cwd": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target CARGO_TERM_COLOR=never cargo build --locked --offline -j2 --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0916/candidate/target",
+    "CARGO_TERM_COLOR": "never",
+    "cargo_jobs": 2,
+    "cpu_affinity": [
+      14,
+      15
+    ],
+    "cargo_locked": true,
+    "cargo_offline": true
+  },
+  "prebuild_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.prebuild.json",
+  "source_manifest_sha256": "1265151d60ccdf64a4aa0dd6adc4126eaf41ca894c97214c5895fa4ab715e8be"
+}

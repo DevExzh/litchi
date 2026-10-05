@@ -1,0 +1,1 @@
+taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target cargo test --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0916/candidate/source/tree/crates/litchi-docx/Cargo.toml --all-targets --no-fail-fast

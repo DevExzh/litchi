@@ -1,0 +1,49 @@
+{
+  "captured_utc": "2026-10-05T16:26:38.357141Z",
+  "process_pid": 3345236,
+  "process_cmdline": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo build --locked --offline -j2 --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+  "selected_environment": {
+    "RUSTFLAGS": {
+      "present": false,
+      "value": null
+    },
+    "RUSTC_WRAPPER": {
+      "present": false,
+      "value": null
+    },
+    "CARGO_ENCODED_RUSTFLAGS": {
+      "present": false,
+      "value": null
+    },
+    "CARGO_TARGET_DIR": {
+      "present": true,
+      "value": "/home/zhuhe/litchi-performance-0916/candidate/target"
+    },
+    "CARGO_TERM_COLOR": {
+      "present": true,
+      "value": "never"
+    },
+    "CARGO_BUILD_JOBS": {
+      "present": false,
+      "value": null
+    },
+    "CARGO_HOME": {
+      "present": true,
+      "value": "/home/zhuhe/.cargo"
+    },
+    "RUSTUP_TOOLCHAIN": {
+      "present": true,
+      "value": "1.95.0-x86_64-unknown-linux-gnu"
+    },
+    "RUSTC": {
+      "present": false,
+      "value": null
+    },
+    "RUSTDOC": {
+      "present": false,
+      "value": null
+    }
+  },
+  "profile_environment": {},
+  "note": "Captured from the live cargo process after the immutable prebuild/start receipts were sealed; records effective values and explicit absence for requested override keys."
+}

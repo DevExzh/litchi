@@ -1,0 +1,14 @@
+{
+  "end_utc": "2026-10-05T16:34:09.766828Z",
+  "end_epoch_ns": 1791218049766822500,
+  "elapsed_ns": 556960448356,
+  "exit_code": 0,
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/target/release/litchi-perf-baseline",
+    "exists": true,
+    "bytes": 69973984,
+    "sha256": "5857a0e06296634328e3d9f29fafbd3a60baf8faeb7bf148f99d8cd444a7297c"
+  },
+  "stdout_bytes": 0,
+  "stderr_bytes": 9055
+}

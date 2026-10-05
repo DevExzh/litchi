@@ -1,0 +1,58 @@
+{
+  "schema": "litchi.performance.0916.candidate.source.v1",
+  "created_utc": "2026-10-05T16:39:10.161851+00:00",
+  "source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "archive": {
+    "path": "/home/zhuhe/litchi-performance-0914/source-HEAD-code.tar",
+    "bytes": 171120640,
+    "sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+  },
+  "archive_regular_files_compared": 9357,
+  "changed_files": {
+    "crates/litchi-docx/src/section/layout.rs": {
+      "candidate_sha256": "58e18108683698877d6a89a6818cc6ddcfaaaeb7faaeeebbd871688020d55efb",
+      "root_before_sha256": "dcbd516f03a35047d0bf5b28e557c32882f5a4d1624d6dd08c265142d239aa21"
+    },
+    "crates/litchi-docx/src/source_backed.rs": {
+      "candidate_sha256": "ebcf3af27a60bccc71a4a4e9eee30e4d4d7d4cf88633e25f1d143be15229ce73",
+      "root_before_sha256": "f12638008f7742a9e0af7295414d0acd54b79823bebdd459d9e1f2a5cf6e127e"
+    },
+    "crates/litchi-docx/tests/source_backed_sections.rs": {
+      "candidate_sha256": "db53f3083902e2eac3a28a1bbaae3fa8e20f8efb5eb50a4aaefd581202073b36",
+      "root_before_sha256": "a0018a5d3a2d42f9faae2d56e848a4ef5bf4ebce49bcbd570bb01b257f7a60ea"
+    }
+  },
+  "patch": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/candidate.patch",
+    "bytes": 10187,
+    "sha256": "71f633cbe26caae0c46ba8d60d58e73e0f4bc350e7226d9cb2d568751ca6d268"
+  },
+  "independent_audit": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/source-audit.json",
+    "bytes": 1659,
+    "sha256": "9520d3d989b200e158ad3fb7530e71dba48b89413d243e194d318dc809a842fe"
+  },
+  "source_tree_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/receipts/source-tree-files.sha256",
+    "bytes": 1311966,
+    "sha256": "1265151d60ccdf64a4aa0dd6adc4126eaf41ca894c97214c5895fa4ab715e8be"
+  },
+  "source_tree_links": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/source-tree-links.txt",
+    "bytes": 925,
+    "sha256": "8a2947a354b20171d32f76c2b370d78f3310498289874cface0683f89ded1ea4"
+  },
+  "manifest_regeneration": "From the reproduced candidate tree: python3 -c 'from pathlib import Path; import hashlib; r=Path(\".\"); pairs=sorted((p.relative_to(r).as_posix(),p) for p in r.rglob(\"*\") if p.is_file() and not p.is_symlink()); print(\"\".join(hashlib.sha256(p.read_bytes()).hexdigest()+\"  \"+n+\"\\n\" for n,p in pairs),end=\"\")' > /new/external/source-tree-files.sha256",
+  "quality_extras": "Full fixture archive extracted under fixtures/ with retained relative symlinks; root quality Cargo.lock, two SVG fixtures, checker/policy and ADR0008/0028. These do not change the release harness source or its lock.",
+  "harness_lock": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/source/tree/tools/perf-baseline/Cargo.lock",
+    "bytes": 56289,
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "custody": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.custody.json",
+    "bytes": 6499,
+    "sha256": "249e7e0c4e081368dc1a3fd53de34b27bb8903f9d9054cd2ec6522c0bd645e55"
+  },
+  "regeneration": "Extract retained source-HEAD-code.tar (prefix litchi/) into a new external directory and apply candidate.patch with patch -p1. Run the exact build command from that directory. Quality extras are described in quality-receipt.json and README.md."
+}

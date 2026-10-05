@@ -1,0 +1,120 @@
+{
+  "baseline": {
+    "bytes": 69940744,
+    "path": "/home/zhuhe/litchi-performance-0914/target/release/litchi-perf-baseline",
+    "sha256": "fe56e5192c1198e831583e870beb5e1ba4731fb2077faaffdfc46044bb0ed2db"
+  },
+  "candidate": {
+    "bytes": 69973984,
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/target/release/litchi-perf-baseline",
+    "sha256": "5857a0e06296634328e3d9f29fafbd3a60baf8faeb7bf148f99d8cd444a7297c"
+  },
+  "child_labels": [
+    "pair-01-leg-1-baseline",
+    "pair-01-leg-2-candidate",
+    "pair-02-leg-1-candidate",
+    "pair-02-leg-2-baseline",
+    "pair-03-leg-1-baseline",
+    "pair-03-leg-2-candidate",
+    "pair-04-leg-1-candidate",
+    "pair-04-leg-2-baseline",
+    "pair-05-leg-1-baseline",
+    "pair-05-leg-2-candidate",
+    "pair-06-leg-1-candidate",
+    "pair-06-leg-2-baseline",
+    "pair-07-leg-1-baseline",
+    "pair-07-leg-2-candidate",
+    "pair-08-leg-1-candidate",
+    "pair-08-leg-2-baseline"
+  ],
+  "comparison_root": "/home/zhuhe/litchi-performance-0916/comparison",
+  "created_utc": "2026-10-05T16:39:49.110788+00:00",
+  "external_root": "/home/zhuhe/litchi-performance-0916",
+  "git_head_at_freeze": "46a1dbc015785074c4f10531b03ebec813ecdd8a",
+  "optional_receipts": [
+    {
+      "descriptor": {
+        "bytes": 3442,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/receipts/source-receipt.json",
+        "sha256": "23bdc32d6e5babad675f384f767c67207ed1e4963c6d627c0aa99f2695911f21"
+      },
+      "input": {
+        "bytes": 3442,
+        "path": "/home/zhuhe/litchi-performance-0916/candidate/receipts/source-receipt.json",
+        "sha256": "23bdc32d6e5babad675f384f767c67207ed1e4963c6d627c0aa99f2695911f21"
+      },
+      "kind": "source"
+    },
+    {
+      "descriptor": {
+        "bytes": 6020,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/receipts/build-receipt.json",
+        "sha256": "196b5cace493c07e0215c7b96f069639ac3040655ac29853ff41ca8e0bff4ea8"
+      },
+      "input": {
+        "bytes": 6020,
+        "path": "/home/zhuhe/litchi-performance-0916/candidate/receipts/build-receipt.json",
+        "sha256": "196b5cace493c07e0215c7b96f069639ac3040655ac29853ff41ca8e0bff4ea8"
+      },
+      "kind": "build"
+    }
+  ],
+  "protocol": {
+    "bytes": 4819,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/native-protocol.json",
+    "sha256": "a2bf571af683795eb9bf15704e77a393097ce7d27cbae3bf4ce5ca215e825050"
+  },
+  "protocol_fields": {
+    "adoption": "Timing eligibility alone does not adopt the candidate; source/ADR review and applicable correctness/quality gates must pass.",
+    "baseline_source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+    "bootstrap": {
+      "draws": 10000,
+      "interval": "nearest-rank 2.5th/97.5th percentiles",
+      "seed": 916,
+      "statistic": "median of per-pair baseline_p50/candidate_p50 ratios",
+      "unit": "matched process pair"
+    },
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "cpu": 12,
+    "pair_orders": [
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline"
+    ],
+    "pairs": 8,
+    "review_flags": {
+      "latency_statistics": [
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "pooled_latency_increase_fraction": 0.05,
+      "whole_process_max_rss_median_increase_fraction": 0.05
+    },
+    "samples_per_child": 200,
+    "schema": "litchi.performance.0916.native-protocol.v1",
+    "timing_gate": {
+      "lower_95_percent_bound_must_exceed": 1.0,
+      "minimum_median_ratio": 1.05
+    },
+    "warmups": 30
+  },
+  "repository": "/home/zhuhe/code/litchi",
+  "schema": "litchi.performance.0916.native-compare-freeze.v1",
+  "script": {
+    "bytes": 38444,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/native-compare.py",
+    "sha256": "a914f1a9664f9f7159c840dc9ed8e1dc81d8863d88c6db253096013fa87b0839"
+  },
+  "validator": {
+    "bytes": 43150,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0914/capture.py",
+    "sha256": "865827fa4898fb664e463759472bad2f83f9a11c446595d3852bcb6ea4793efb"
+  },
+  "worktree_status_at_freeze": "M docs/performance/results/change-0916/profile-README.md\n M tools/check_iwork_leaf_public_api.py\n?? crates/litchi/examples/bench_word_parse.rs\n?? docs/UNIFIED_OPS_API_DESIGN.md\n?? docs/performance/0916-docx-section-commit-target-reuse.md\n?? docs/performance/results/change-0916/.gitattributes\n?? docs/performance/results/change-0916/build-logs/\n?? docs/performance/results/change-0916/candidate.patch\n?? docs/performance/results/change-0916/capture-barrier.json\n?? docs/performance/results/change-0916/design-review.md\n?? docs/performance/results/change-0916/native-compare.py\n?? docs/performance/results/change-0916/native-protocol-initial.json\n?? docs/performance/results/change-0916/native-protocol.json\n?? docs/performance/results/change-0916/quality/\n?? docs/performance/results/change-0916/receipts/\n?? docs/performance/results/change-0916/source-audit.json\n?? docs/performance/results/change-0916/source-tree-links.txt"
+}

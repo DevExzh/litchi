@@ -1,0 +1,1 @@
+taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-docx --no-deps --locked --offline -j2

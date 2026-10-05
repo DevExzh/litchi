@@ -1,0 +1,21 @@
+{
+  "start_utc": "2026-10-05T16:38:23.201528503Z",
+  "end_utc": "2026-10-05T16:38:34.407609230Z",
+  "start_epoch_ns": 1791218303203259991,
+  "end_epoch_ns": 1791218314405627881,
+  "exit_code": 0,
+  "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-docx --no-deps --locked --offline -j2",
+  "cwd": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0916/candidate/target",
+    "RUSTDOCFLAGS": "-D warnings",
+    "cargo_jobs": 2,
+    "cpu_affinity": [14, 15],
+    "cargo_locked": true,
+    "cargo_offline": true
+  },
+  "stdout_bytes": 0,
+  "stderr_bytes": 1100,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "7f59e20279d1be70b72bb9f1581a2840e54927e1f9cced57b5f8174ec0edefab"
+}

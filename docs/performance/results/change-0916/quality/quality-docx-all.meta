@@ -1,0 +1,22 @@
+{
+  "start_utc": "2026-10-05T16:20:54.923693834Z",
+  "end_utc": "2026-10-05T16:21:24.233728284Z",
+  "start_epoch_ns": 1791217254926180666,
+  "end_epoch_ns": 1791217284231171852,
+  "elapsed_ns": 29304991186,
+  "exit_code": 0,
+  "command": "taskset -c 14,15 env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target cargo test --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0916/candidate/source/tree/crates/litchi-docx/Cargo.toml --all-targets --no-fail-fast",
+  "cwd": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0916/candidate/target",
+    "cargo_jobs": 2,
+    "cpu_affinity": [
+      14,
+      15
+    ],
+    "cargo_locked": true,
+    "cargo_offline": true
+  },
+  "stdout_bytes": 168746,
+  "stderr_bytes": 10774
+}

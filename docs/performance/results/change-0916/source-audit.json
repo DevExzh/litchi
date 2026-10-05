@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.performance.0916.source-audit.v1",
+  "checked_utc": "2026-10-05T16:34:15.020406+00:00",
+  "archive": {
+    "path": "/home/zhuhe/litchi-performance-0914/source-HEAD-code.tar",
+    "bytes": 171120640,
+    "sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+  },
+  "candidate_tree": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "archive_regular_files_compared": 9357,
+  "changed_files": [
+    {
+      "path": "crates/litchi-docx/src/section/layout.rs",
+      "baseline_bytes": 78342,
+      "baseline_sha256": "dcbd516f03a35047d0bf5b28e557c32882f5a4d1624d6dd08c265142d239aa21",
+      "candidate_bytes": 80841,
+      "candidate_sha256": "58e18108683698877d6a89a6818cc6ddcfaaaeb7faaeeebbd871688020d55efb"
+    },
+    {
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "baseline_bytes": 145276,
+      "baseline_sha256": "f12638008f7742a9e0af7295414d0acd54b79823bebdd459d9e1f2a5cf6e127e",
+      "candidate_bytes": 146011,
+      "candidate_sha256": "ebcf3af27a60bccc71a4a4e9eee30e4d4d7d4cf88633e25f1d143be15229ce73"
+    },
+    {
+      "path": "crates/litchi-docx/tests/source_backed_sections.rs",
+      "baseline_bytes": 51738,
+      "baseline_sha256": "a0018a5d3a2d42f9faae2d56e848a4ef5bf4ebce49bcbd570bb01b257f7a60ea",
+      "candidate_bytes": 55117,
+      "candidate_sha256": "db53f3083902e2eac3a28a1bbaae3fa8e20f8efb5eb50a4aaefd581202073b36"
+    }
+  ],
+  "mode_changes": [],
+  "scope": "Every regular source-archive member compared bytewise and by permission bits. Quality-only extra files and symlinks are outside this archive comparison; prebuild manifest records them separately."
+}

@@ -1,0 +1,169 @@
+{
+  "schema": "litchi.performance.0916.candidate.build.v1",
+  "created_utc": "2026-10-05T16:39:10.163047+00:00",
+  "status": "passed",
+  "argv": [
+    "taskset",
+    "-c",
+    "14,15",
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0916/candidate/target",
+    "CARGO_TERM_COLOR=never",
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0916/candidate/target",
+    "CARGO_TERM_COLOR": "never",
+    "cargo_jobs": 2,
+    "cpu_affinity": [
+      14,
+      15
+    ],
+    "cargo_locked": true,
+    "cargo_offline": true
+  },
+  "effective_environment": {
+    "captured_utc": "2026-10-05T16:26:38.357141Z",
+    "process_pid": 3345236,
+    "process_cmdline": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo build --locked --offline -j2 --release --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+    "selected_environment": {
+      "RUSTFLAGS": {
+        "present": false,
+        "value": null
+      },
+      "RUSTC_WRAPPER": {
+        "present": false,
+        "value": null
+      },
+      "CARGO_ENCODED_RUSTFLAGS": {
+        "present": false,
+        "value": null
+      },
+      "CARGO_TARGET_DIR": {
+        "present": true,
+        "value": "/home/zhuhe/litchi-performance-0916/candidate/target"
+      },
+      "CARGO_TERM_COLOR": {
+        "present": true,
+        "value": "never"
+      },
+      "CARGO_BUILD_JOBS": {
+        "present": false,
+        "value": null
+      },
+      "CARGO_HOME": {
+        "present": true,
+        "value": "/home/zhuhe/.cargo"
+      },
+      "RUSTUP_TOOLCHAIN": {
+        "present": true,
+        "value": "1.95.0-x86_64-unknown-linux-gnu"
+      },
+      "RUSTC": {
+        "present": false,
+        "value": null
+      },
+      "RUSTDOC": {
+        "present": false,
+        "value": null
+      }
+    },
+    "profile_environment": {},
+    "note": "Captured from the live cargo process after the immutable prebuild/start receipts were sealed; records effective values and explicit absence for requested override keys."
+  },
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "source_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.custody.json",
+    "bytes": 6499,
+    "sha256": "249e7e0c4e081368dc1a3fd53de34b27bb8903f9d9054cd2ec6522c0bd645e55"
+  },
+  "patch": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/candidate.patch",
+    "bytes": 10187,
+    "sha256": "71f633cbe26caae0c46ba8d60d58e73e0f4bc350e7226d9cb2d568751ca6d268"
+  },
+  "harness_lock": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/source/tree/tools/perf-baseline/Cargo.lock",
+    "bytes": 56289,
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/target/release/litchi-perf-baseline",
+    "bytes": 69973984,
+    "sha256": "5857a0e06296634328e3d9f29fafbd3a60baf8faeb7bf148f99d8cd444a7297c"
+  },
+  "start_utc": "2026-10-05T16:24:52.806377Z",
+  "end_utc": "2026-10-05T16:34:09.766828Z",
+  "elapsed_ns": 556960448356,
+  "exit_code": 0,
+  "logs": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.command",
+      "bytes": 233,
+      "sha256": "fa81e54acb313f6bc3b5f8db3d14c32b12ddc3f7de993958d6031e5cc77be1e7"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.cpu-idle-final.json",
+      "bytes": 1116,
+      "sha256": "7c68858e3455761159a57256703187d8c9eeea1eca3f12662a83f50bb3b8d41a"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.cpu-idle.json",
+      "bytes": 2420,
+      "sha256": "baed85dbde64342f697c155dba7b8cfc816ce24294c3cf769bf340ae11db56c2"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.custody.json",
+      "bytes": 6499,
+      "sha256": "249e7e0c4e081368dc1a3fd53de34b27bb8903f9d9054cd2ec6522c0bd645e55"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.effective-env.json",
+      "bytes": 1366,
+      "sha256": "e1e26fd0cb127701e081f995f5d864d7607bf656627d47adb9484c40f93143eb"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.finish.json",
+      "bytes": 419,
+      "sha256": "66666a1a73a0658138f6fc6ed1a82fde34be76e207bcb155b71fa6526f0be902"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.prebuild.json",
+      "bytes": 3760,
+      "sha256": "59d861fc8a643eb4c45c13dd0f47592331e98d6cf1bf0a4c6d1fd78ea4969fa6"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.start.json",
+      "bytes": 871,
+      "sha256": "b25be4fc4472516462ecdbfe1c7b29bf53ef5d983fd9b9580c4e5f5f88d3b173"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.stderr",
+      "bytes": 9055,
+      "sha256": "93fbf0c9122402997ce22d6152e6071886cae4d59aa56958688f8af9c3d724d7"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0916/build-logs/release-build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

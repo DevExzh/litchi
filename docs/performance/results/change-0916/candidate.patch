@@ -1,0 +1,292 @@
+--- a/crates/litchi-docx/src/section/layout.rs
++++ b/crates/litchi-docx/src/section/layout.rs
+@@ -118,6 +118,17 @@
+             lineage: None,
+             artifact_fingerprint: Some(artifact_fingerprint),
+             limits: self.limits.clone(),
++        }
++    }
++
++    fn with_source_identity(&self, source: &Self) -> Self {
++        Self {
++            xml: Arc::clone(&self.xml),
++            inventory: self.inventory.clone(),
++            source_version: source.source_version,
++            lineage: source.lineage.clone(),
++            artifact_fingerprint: source.artifact_fingerprint,
++            limits: source.limits.clone(),
+         }
+     }
+ }
+@@ -408,6 +419,15 @@
+     pub fn into_snapshot(self) -> Snapshot {
+         self.snapshot
+     }
++
++    pub(crate) fn apply_to_current(&self, current: &Snapshot) -> Result<Snapshot> {
++        self.patch.authorize_source(current)?;
++        if self.patch.is_noop() {
++            Ok(current.clone())
++        } else {
++            Ok(self.snapshot.with_source_identity(current))
++        }
++    }
+ }
+ 
+ /// An exact-source-checked, reversible section-layout patch.
+@@ -545,6 +565,20 @@
+     /// retained by a [`Publication`] is the explicit fingerprint-only
+     /// reauthorization mode for the emitted artifact.
+     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
++        self.authorize_source(source)?;
++        if self.is_noop() {
++            return Ok(source.clone());
++        }
++        Snapshot::from_shared_xml(
++            Arc::clone(&self.after),
++            source.source_version,
++            source.lineage.clone(),
++            source.artifact_fingerprint,
++            self.limits.clone(),
++        )
++    }
++
++    fn authorize_source(&self, source: &Snapshot) -> Result<()> {
+         if source.xml.as_slice() != self.before.as_slice() {
+             return Err(Error::SectionLayoutStaleSource);
+         }
+@@ -583,16 +617,7 @@
+         if source.limits != self.limits {
+             return Err(Error::SectionLayoutPolicyConflict);
+         }
+-        if self.is_noop() {
+-            return Ok(source.clone());
+-        }
+-        Snapshot::from_shared_xml(
+-            Arc::clone(&self.after),
+-            source.source_version,
+-            source.lineage.clone(),
+-            source.artifact_fingerprint,
+-            self.limits.clone(),
+-        )
++        Ok(())
+     }
+ 
+     pub(crate) fn limits(&self) -> &Limits {
+@@ -2218,3 +2243,42 @@
+     }
+     Ok(())
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::{PageSize, Snapshot};
++    use crate::section::{Emu, Orientation};
++
++    const DOCUMENT: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#;
++
++    #[test]
++    fn commit_apply_to_current_reuses_target_and_noop_current_allocations() {
++        let base = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
++        let mut edit = base.edit(0).unwrap();
++        edit.set_page_size(Some(PageSize {
++            width: Some(Emu::from_twips(11906)),
++            height: Some(Emu::from_twips(16838)),
++            orientation: Orientation::Landscape,
++        }))
++        .unwrap();
++        let changed = edit.commit().unwrap();
++        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
++        let target = changed.apply_to_current(&current).unwrap();
++        let target_xml = target.shared_xml();
++        let commit_xml = changed.snapshot.shared_xml();
++        assert!(std::sync::Arc::ptr_eq(&target_xml, &commit_xml));
++        assert!(
++            target
++                .inventory
++                .shares_allocation_with(&changed.snapshot.inventory)
++        );
++
++        let noop = base.edit(0).unwrap().commit().unwrap();
++        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
++        let target = noop.apply_to_current(&current).unwrap();
++        let target_xml = target.shared_xml();
++        let current_xml = current.shared_xml();
++        assert!(std::sync::Arc::ptr_eq(&target_xml, &current_xml));
++        assert!(target.inventory.shares_allocation_with(&current.inventory));
++    }
++}
+--- a/crates/litchi-docx/src/source_backed.rs
++++ b/crates/litchi-docx/src/source_backed.rs
+@@ -1274,7 +1274,14 @@
+         commit: &layout::Commit,
+     ) -> Result<layout::Publication> {
+         self.trim_clean_paragraph_index_for_operation();
+-        self.publish_section_layout_patch_to_stream(writer, commit.patch())
++        // Preserve the second trim performed by the delegated patch route.
++        self.trim_clean_paragraph_index_for_operation();
++        let (main, current) = self.main_section_layout_snapshot(
++            "publish_section_layout_patch_to_stream",
++            commit.patch().limits(),
++        )?;
++        let target = commit.apply_to_current(&current)?;
++        self.publish_section_layout_target_to_stream(writer, &main, commit.patch(), current, target)
+     }
+ 
+     /// Publish an exact-source-checked section-layout patch to a sequential
+@@ -1291,6 +1298,17 @@
+             patch.limits(),
+         )?;
+         let target = patch.apply(&current)?;
++        self.publish_section_layout_target_to_stream(writer, &main, patch, current, target)
++    }
++
++    fn publish_section_layout_target_to_stream<W: Write>(
++        self,
++        writer: W,
++        main: &PackURI,
++        patch: &layout::Patch,
++        current: layout::Snapshot,
++        target: layout::Snapshot,
++    ) -> Result<layout::Publication> {
+         let original_artifact = self.package.source_artifact();
+         let mut output = FingerprintingWriter {
+             inner: writer,
+@@ -1301,7 +1319,7 @@
+         } else {
+             self.package.write_part_overlay_shared_to_stream(
+                 &mut output,
+-                &main,
++                main,
+                 target.shared_xml(),
+             )?;
+         }
+--- a/crates/litchi-docx/tests/source_backed_sections.rs
++++ b/crates/litchi-docx/tests/source_backed_sections.rs
+@@ -1,6 +1,7 @@
+ use std::io::{self, Write};
+ use std::num::{NonZeroU64, NonZeroUsize};
+ use std::sync::Arc;
++use std::sync::Mutex;
+ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+ 
+ use litchi_core::{
+@@ -203,6 +204,48 @@
+             8085,
+             self.revision.load(Ordering::SeqCst),
+         ))
++    }
++}
++
++struct StableMutableSource {
++    bytes: Mutex<Vec<u8>>,
++    unused: std::ops::Range<usize>,
++}
++
++impl StableMutableSource {
++    fn new(bytes: Vec<u8>) -> Self {
++        let unused = payload_range(&bytes, UNUSED);
++        Self {
++            bytes: Mutex::new(bytes),
++            unused,
++        }
++    }
++
++    fn mutate_unused(&self) {
++        let mut bytes = self.bytes.lock().unwrap();
++        bytes[self.unused.start] ^= 1;
++    }
++}
++
++impl ReadAt for StableMutableSource {
++    fn len(&self) -> io::Result<u64> {
++        Ok(self.bytes.lock().unwrap().len() as u64)
++    }
++
++    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
++        let offset = usize::try_from(offset)
++            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
++        let bytes = self.bytes.lock().unwrap();
++        if offset >= bytes.len() {
++            return Ok(0);
++        }
++        let end = offset.saturating_add(output.len()).min(bytes.len());
++        output[..end - offset].copy_from_slice(&bytes[offset..end]);
++        Ok(end - offset)
++    }
++
++    fn version(&self) -> io::Result<SourceVersion> {
++        Ok(SourceVersion::new(8085, 0))
+     }
+ }
+ 
+@@ -660,6 +703,12 @@
+         .publish_section_layout_commit_to_stream(&mut output, &commit)
+         .unwrap();
+     assert!(
++        commit
++            .snapshot()
++            .inventory()
++            .shares_allocation_with(publication.snapshot().inventory())
++    );
++    assert!(
+         publication
+             .inverse_patch()
+             .apply(publication.snapshot())
+@@ -770,6 +819,56 @@
+         }),
+         Err(Error::SectionInventoryLimit { .. })
+     ));
++}
++
++#[test]
++fn section_layout_commit_rechecks_complete_artifact_before_target_reuse() {
++    let document = format!(
++        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
++    );
++    let source = Arc::new(StableMutableSource::new(fixture(document.as_bytes())));
++    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
++    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
++    edit.set_page_size(Some(PageSize {
++        width: Some(Emu::from_twips(11906)),
++        height: Some(Emu::from_twips(16838)),
++        orientation: Orientation::Landscape,
++    }))
++    .unwrap();
++    let commit = edit.commit().unwrap();
++
++    source.mutate_unused();
++    let mut output = Vec::new();
++    assert!(matches!(
++        package.publish_section_layout_commit_to_stream(&mut output, &commit),
++        Err(Error::SectionLayoutFingerprintConflict)
++    ));
++    assert!(output.is_empty());
++}
++
++#[test]
++fn section_layout_commit_rejects_revision_change_before_output() {
++    let document = format!(
++        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
++    );
++    let source = Arc::new(ObservedSource::new(fixture(document.as_bytes()), false));
++    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
++    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
++    edit.set_page_size(Some(PageSize {
++        width: Some(Emu::from_twips(11906)),
++        height: Some(Emu::from_twips(16838)),
++        orientation: Orientation::Landscape,
++    }))
++    .unwrap();
++    let commit = edit.commit().unwrap();
++
++    source.arm_change();
++    let mut output = Vec::new();
++    assert!(matches!(
++        package.publish_section_layout_commit_to_stream(&mut output, &commit),
++        Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
++    ));
++    assert!(output.is_empty());
+ }
+ 
+ #[test]

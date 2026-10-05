@@ -1,0 +1,15 @@
+{
+  "captured_start_utc": "2026-10-05T16:34:48.587421Z",
+  "captured_end_utc": "2026-10-05T16:34:49.592888Z",
+  "mpstat_command": "mpstat -P 14,15 1 1",
+  "mpstat_exit_code": 0,
+  "mpstat_stdout": "Linux 7.0.0-1013-aws (ip-172-31-39-190) \t10/05/26 \t_x86_64_\t(32 CPU)\n\n16:34:48     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle\n16:34:49      14    3.03    0.00    3.03    0.00    0.00    0.00    0.00    0.00    0.00   93.94\n16:34:49      15    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00\n\nAverage:     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle\nAverage:      14    3.03    0.00    3.03    0.00    0.00    0.00    0.00    0.00    0.00   93.94\nAverage:      15    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00\n",
+  "mpstat_stderr": "",
+  "candidate_processes_after_build": [
+    {
+      "pid": 3381138,
+      "cmdline": "/bin/bash -c python3 - <<'PY'\nfrom datetime import datetime, timezone\nfrom pathlib import Path\nimport json, subprocess\nout = Path('/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.cpu-idle.json')\nif out.exists(): raise SystemExit(f'existing {out}')\nstart = datetime.now(timezone.utc).isoformat().replace('+00:00','Z')\nmp = subprocess.run(['mpstat','-P','14,15','1','1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)\nprocs = []\nfor p in Path('/proc').iterdir():\n    if not p.name.isdigit(): continue\n    try:\n        cmd = (p / 'cmdline').read_bytes().replace(b'\\0', b' ').decode(errors='replace').strip()\n    except (FileNotFoundError, PermissionError):\n        continue\n    if '/home/zhuhe/litchi-performance-0916/candidate' in cmd or 'cargo build' in cmd:\n        procs.append({'pid': int(p.name), 'cmdline': cmd})\nend = datetime.now(timezone.utc).isoformat().replace('+00:00','Z')\ndata = {\n    'captured_start_utc': start,\n    'captured_end_utc': end,\n    'mpstat_command': 'mpstat -P 14,15 1 1',\n    'mpstat_exit_code': mp.returncode,\n    'mpstat_stdout': mp.stdout,\n    'mpstat_stderr': mp.stderr,\n    'candidate_processes_after_build': procs,\n    'idle_assertion': mp.returncode == 0 and not procs,\n}\nwith out.open('x', encoding='utf-8') as f:\n    json.dump(data, f, indent=2)\n    f.write('\\n')\nprint(json.dumps(data, indent=2))\nPY"
+    }
+  ],
+  "idle_assertion": false
+}

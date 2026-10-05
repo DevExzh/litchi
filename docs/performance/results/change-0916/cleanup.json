@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0916.cleanup.v1",
+  "completed_utc": "2026-10-05T16:55:02.414434+00:00",
+  "removed": [
+    "/home/zhuhe/litchi-performance-0916/candidate/source",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/debug",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/.fingerprint",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/litchi-perf-baseline.d",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/deps",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/examples",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/.cargo-lock",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/build",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/release/incremental",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/.rustdoc_fingerprint.json",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/CACHEDIR.TAG",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/doc",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/tmp",
+    "/home/zhuhe/litchi-performance-0916/candidate/target/.rustc_info.json"
+  ],
+  "source_allocated_bytes_before": 301002752,
+  "target_allocated_bytes_before": 16569032704,
+  "target_allocated_bytes_after": 69926912,
+  "retained_binary": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/target/release/litchi-perf-baseline",
+    "bytes": 69973984,
+    "sha256": "5857a0e06296634328e3d9f29fafbd3a60baf8faeb7bf148f99d8cd444a7297c"
+  },
+  "retained_external": [
+    "/home/zhuhe/litchi-performance-0914/source-HEAD-code.tar",
+    "/home/zhuhe/litchi-performance-0915-candidate/frozen/test-data-a4.tar",
+    "/home/zhuhe/litchi-performance-0915-candidate/frozen/quality",
+    "/home/zhuhe/litchi-performance-0916/candidate/receipts",
+    "/home/zhuhe/litchi-performance-0916/quality",
+    "/home/zhuhe/litchi-performance-0916/boundary",
+    "/home/zhuhe/litchi-performance-0916/profile",
+    "/home/zhuhe/litchi-performance-0916/comparison"
+  ],
+  "notes": "Only owned extracted candidate source and build caches/docs/test executables were removed. Retained evidence, final executable and original shared input archives remain. Root adopted source hashes match the tested candidate."
+}

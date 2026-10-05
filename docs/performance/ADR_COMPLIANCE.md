@@ -1,5 +1,20 @@
 # Performance optimization ADR-compliance matrix
 
+## 0916 — reuse of an already validated immutable commit target
+
+[0916](0916-docx-section-commit-target-reuse.md) preserves exact byte,
+lineage, revision, artifact and policy authorization in its original order
+before reusing the commit's immutable target (ADR 0003). The exact reviewed
+and tested implementation is adopted. Full-artifact
+fingerprints, current-source parsing, execution/freshness fences, limits,
+signature behavior, preservation and inverse authorization remain intact
+(ADRs 0005/0006). No-op publication shares the current snapshot. Standalone
+patch application still parses its target. No memo, new retention policy,
+public API, unsafe code, dependency or ownership change is introduced
+(ADRs 0010/0011/0024/0032). Source/build custody, scoped quality checks,
+shared-host limitations and replayable native evidence implement ADR 0008's
+verification discipline; no whole-workspace certification is inferred.
+
 ## 0915 — source-local borrowing experiment, no adopted implementation
 
 [0915](0915-docx-section-resolver-borrow.md) tests a borrowed namespace resolver

@@ -1274,7 +1274,14 @@ impl Package {
         commit: &layout::Commit,
     ) -> Result<layout::Publication> {
         self.trim_clean_paragraph_index_for_operation();
-        self.publish_section_layout_patch_to_stream(writer, commit.patch())
+        // Preserve the second trim performed by the delegated patch route.
+        self.trim_clean_paragraph_index_for_operation();
+        let (main, current) = self.main_section_layout_snapshot(
+            "publish_section_layout_patch_to_stream",
+            commit.patch().limits(),
+        )?;
+        let target = commit.apply_to_current(&current)?;
+        self.publish_section_layout_target_to_stream(writer, &main, commit.patch(), current, target)
     }
 
     /// Publish an exact-source-checked section-layout patch to a sequential
@@ -1291,6 +1298,17 @@ impl Package {
             patch.limits(),
         )?;
         let target = patch.apply(&current)?;
+        self.publish_section_layout_target_to_stream(writer, &main, patch, current, target)
+    }
+
+    fn publish_section_layout_target_to_stream<W: Write>(
+        self,
+        writer: W,
+        main: &PackURI,
+        patch: &layout::Patch,
+        current: layout::Snapshot,
+        target: layout::Snapshot,
+    ) -> Result<layout::Publication> {
         let original_artifact = self.package.source_artifact();
         let mut output = FingerprintingWriter {
             inner: writer,
@@ -1301,7 +1319,7 @@ impl Package {
         } else {
             self.package.write_part_overlay_shared_to_stream(
                 &mut output,
-                &main,
+                main,
                 target.shared_xml(),
             )?;
         }

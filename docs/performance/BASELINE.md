@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0916 — DOCX commit target reuse adopted
+
+[0916](0916-docx-section-commit-target-reuse.md) compares eight fresh matched
+pairs (3,200 measured samples). The median paired ratio is 1.074136 with a
+95% interval of [1.059449, 1.086657], passing the frozen 1.05 threshold. Pooled
+p50/p95/p99 change from 4.840903/5.001463/5.104194 ms to
+4.517335/4.607341/4.717232 ms. Whole-child median maximum RSS rises 0.324%;
+no tail or RSS review flag is raised. All preservation and logical I/O gates
+pass. Coordinated build/test/profile work ended before capture; other shared-
+host activity remains uncontrolled. The exact tested patch is adopted after
+independent review. This is one generated warm DOCX fixture.
+
 ## 0915 — DOCX section resolver candidate rejected
 
 [0915](0915-docx-section-resolver-borrow.md) retains eight fresh matched pairs

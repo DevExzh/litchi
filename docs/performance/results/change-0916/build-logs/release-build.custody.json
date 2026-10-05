@@ -1,0 +1,103 @@
+{
+  "created_utc": "2026-10-05T16:37:37.322807Z",
+  "candidate_root": "/home/zhuhe/litchi-performance-0916/candidate",
+  "source_root": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+  "base_source_archive": {
+    "path": "/home/zhuhe/litchi-performance-0914/source-HEAD-code.tar",
+    "bytes": 171120640,
+    "sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+  },
+  "base_source_archive_regular_file_count": 9357,
+  "fixture_archive": {
+    "path": "/home/zhuhe/litchi-performance-0915-candidate/frozen/test-data-a4.tar",
+    "bytes": 98938880,
+    "sha256": "35f13d340a30132e917bd02bbdf78983f7ecc18e81a970dafc0db47c36544a0a"
+  },
+  "fixture_archive_regular_file_count": 1426,
+  "cargo_lock": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/source/tree/Cargo.lock",
+    "sha256": "00ef62deed9b94a8b4ed0b3e2497923ae6e1a092975c2311b654407738881684"
+  },
+  "source_tree_before": {
+    "root": "/home/zhuhe/litchi-performance-0916/candidate/source/tree",
+    "regular_file_count": 10794,
+    "symlink_count": 13,
+    "manifest": "/home/zhuhe/litchi-performance-0916/candidate/receipts/source-tree-files.sha256",
+    "manifest_sha256": "1265151d60ccdf64a4aa0dd6adc4126eaf41ca894c97214c5895fa4ab715e8be",
+    "links_manifest": "/home/zhuhe/litchi-performance-0916/candidate/receipts/source-tree-links.txt",
+    "links_manifest_sha256": "8a2947a354b20171d32f76c2b370d78f3310498289874cface0683f89ded1ea4"
+  },
+  "source_tree_after": {
+    "manifest": "/home/zhuhe/litchi-performance-0916/candidate/receipts/source-tree-files.sha256",
+    "manifest_sha256": "1265151d60ccdf64a4aa0dd6adc4126eaf41ca894c97214c5895fa4ab715e8be",
+    "links_manifest": "/home/zhuhe/litchi-performance-0916/candidate/receipts/source-tree-links.txt",
+    "links_manifest_sha256": "8a2947a354b20171d32f76c2b370d78f3310498289874cface0683f89ded1ea4",
+    "manifest_unchanged": true
+  },
+  "changed_files": {
+    "crates/litchi-docx/src/section/layout.rs": {
+      "candidate_sha256": "58e18108683698877d6a89a6818cc6ddcfaaaeb7faaeeebbd871688020d55efb",
+      "root_before_sha256": "dcbd516f03a35047d0bf5b28e557c32882f5a4d1624d6dd08c265142d239aa21"
+    },
+    "crates/litchi-docx/src/source_backed.rs": {
+      "candidate_sha256": "ebcf3af27a60bccc71a4a4e9eee30e4d4d7d4cf88633e25f1d143be15229ce73",
+      "root_before_sha256": "f12638008f7742a9e0af7295414d0acd54b79823bebdd459d9e1f2a5cf6e127e"
+    },
+    "crates/litchi-docx/tests/source_backed_sections.rs": {
+      "candidate_sha256": "db53f3083902e2eac3a28a1bbaae3fa8e20f8efb5eb50a4aaefd581202073b36",
+      "root_before_sha256": "a0018a5d3a2d42f9faae2d56e848a4ef5bf4ebce49bcbd570bb01b257f7a60ea"
+    }
+  },
+  "candidate_cargo_lock_sha256": "00ef62deed9b94a8b4ed0b3e2497923ae6e1a092975c2311b654407738881684",
+  "patch": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/receipts/candidate.patch",
+    "sha256": "71f633cbe26caae0c46ba8d60d58e73e0f4bc350e7226d9cb2d568751ca6d268",
+    "bytes": 10187
+  },
+  "quality_receipts_sha256": {
+    "quality-docx-all.command": "c327196415124c53ba48e35b908b34d5054a5c3cf0cc850a2513ae7c26f89add",
+    "quality-docx-all.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "quality-docx-all.meta": "9ec1fd6257d25670fc99fe8213f693f642d3ac142f5f802b582615d6dafcf268",
+    "quality-docx-all.stderr": "4b26ee97abe60b6175f01fb24db70303c102e5bf44ad2daa308e26499f75327c",
+    "quality-docx-all.stdout": "f8885b6c7ed6d2999224934213d1f2e3f459549b786e30351e360d3e254bb461",
+    "quality-docx-fmt.command": "4267ea0d2fc8dd8993308ed4b9cb95c12beb2c68079eb249e99a6fcd34a5aaa9",
+    "quality-docx-fmt.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "quality-docx-fmt.meta": "0bc73d619f9be03f61c99fad300a789ea8997468e5639bf78c960ce82317104e",
+    "quality-docx-fmt.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-docx-fmt.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "build": {
+    "command_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.command",
+    "prebuild_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.prebuild.json",
+    "start_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.start.json",
+    "finish_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.finish.json",
+    "exit_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.exit",
+    "effective_environment_receipt": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.effective-env.json",
+    "exit_code": 0,
+    "start_utc": "2026-10-05T16:24:52.806377Z",
+    "end_utc": "2026-10-05T16:34:09.766828Z",
+    "elapsed_ns": 556960448356,
+    "binary_path": "/home/zhuhe/litchi-performance-0916/candidate/target/release/litchi-perf-baseline",
+    "binary_bytes": 69973984,
+    "binary_sha256": "5857a0e06296634328e3d9f29fafbd3a60baf8faeb7bf148f99d8cd444a7297c"
+  },
+  "cpu_idle_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.cpu-idle-final.json",
+    "sha256": "7c68858e3455761159a57256703187d8c9eeea1eca3f12662a83f50bb3b8d41a",
+    "idle_assertion": true
+  },
+  "receipt_sha256": {
+    "release-build.command": "fa81e54acb313f6bc3b5f8db3d14c32b12ddc3f7de993958d6031e5cc77be1e7",
+    "release-build.prebuild.json": "59d861fc8a643eb4c45c13dd0f47592331e98d6cf1bf0a4c6d1fd78ea4969fa6",
+    "release-build.start.json": "b25be4fc4472516462ecdbfe1c7b29bf53ef5d983fd9b9580c4e5f5f88d3b173",
+    "release-build.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "release-build.stderr": "93fbf0c9122402997ce22d6152e6071886cae4d59aa56958688f8af9c3d724d7",
+    "release-build.finish.json": "66666a1a73a0658138f6fc6ed1a82fde34be76e207bcb155b71fa6526f0be902",
+    "release-build.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "release-build.effective-env.json": "e1e26fd0cb127701e081f995f5d864d7607bf656627d47adb9484c40f93143eb",
+    "release-build.cpu-idle-final.json": "7c68858e3455761159a57256703187d8c9eeea1eca3f12662a83f50bb3b8d41a",
+    "source-tree-files.sha256": "1265151d60ccdf64a4aa0dd6adc4126eaf41ca894c97214c5895fa4ab715e8be",
+    "source-tree-links.txt": "8a2947a354b20171d32f76c2b370d78f3310498289874cface0683f89ded1ea4",
+    "candidate.patch": "71f633cbe26caae0c46ba8d60d58e73e0f4bc350e7226d9cb2d568751ca6d268"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema": "litchi.performance.0916.adoption.v1",
+  "adopted_utc": "2026-10-05T16:53:54.755421+00:00",
+  "decision": "Adopt exact tested candidate after source/ADR review, all scoped quality checks, timing gate and independent evidence review passed.",
+  "precommit_head": "46a1dbc015785074c4f10531b03ebec813ecdd8a",
+  "files": [
+    {
+      "path": "crates/litchi-docx/src/section/layout.rs",
+      "bytes": 80841,
+      "sha256": "58e18108683698877d6a89a6818cc6ddcfaaaeb7faaeeebbd871688020d55efb"
+    },
+    {
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "bytes": 146011,
+      "sha256": "ebcf3af27a60bccc71a4a4e9eee30e4d4d7d4cf88633e25f1d143be15229ce73"
+    },
+    {
+      "path": "crates/litchi-docx/tests/source_backed_sections.rs",
+      "bytes": 55117,
+      "sha256": "db53f3083902e2eac3a28a1bbaae3fa8e20f8efb5eb50a4aaefd581202073b36"
+    }
+  ],
+  "candidate_patch": {
+    "path": "docs/performance/results/change-0916/candidate.patch",
+    "bytes": 10187,
+    "sha256": "71f633cbe26caae0c46ba8d60d58e73e0f4bc350e7226d9cb2d568751ca6d268"
+  },
+  "native_reduction": {
+    "path": "docs/performance/results/change-0916/reduced.json",
+    "bytes": 117407,
+    "sha256": "2f585aa115ca4270851d79d11f20ae1c921ba3fd036c137533ea374f81263b39"
+  },
+  "review": {
+    "path": "docs/performance/results/change-0916/review.md",
+    "bytes": 5255,
+    "sha256": "8bb1cc55f96370848b286f91366ce0523e6b9ce930b9c6914104b18cdaa2189d"
+  },
+  "quality_receipt": {
+    "path": "docs/performance/results/change-0916/quality-receipt.json",
+    "bytes": 27487,
+    "sha256": "0179c12a119d3921263558556e2c6e75e211d9c83b7124802cc06b0ee0b8cd5b"
+  },
+  "root_matches_tested_candidate": true,
+  "additional_changes_to_candidate": false
+}

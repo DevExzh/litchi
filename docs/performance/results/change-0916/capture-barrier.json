@@ -1,0 +1,19 @@
+{
+  "schema": "litchi.performance.0916.capture-barrier.v1",
+  "checked_utc": "2026-10-05T16:39:42.019869+00:00",
+  "coordinated_heavy_processes": [],
+  "host_load": [
+    5.341796875,
+    5.1494140625,
+    4.86328125
+  ],
+  "agent_status": {
+    "candidate": "release completed; source custody retained; interrupted after build to hand off final packaging; no process left",
+    "quality": "all checks finished; explicitly idle",
+    "boundary": "completed exit 0",
+    "profile": "completed",
+    "design": "completed and explicitly idle",
+    "capture": "completed protocol only"
+  },
+  "limitation": "This asserts only coordinated batch idleness, not whole-machine quiescence. Unrelated shared-host work is uncontrolled."
+}

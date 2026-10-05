@@ -1,0 +1,11 @@
+{
+  "captured_start_utc": "2026-10-05T16:35:13.768937Z",
+  "captured_end_utc": "2026-10-05T16:35:14.774836Z",
+  "mpstat_command": "mpstat -P 14,15 1 1",
+  "mpstat_exit_code": 0,
+  "mpstat_stdout": "Linux 7.0.0-1013-aws (ip-172-31-39-190) \t10/05/26 \t_x86_64_\t(32 CPU)\n\n16:35:13     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle\n16:35:14      14    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00\n16:35:14      15    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00\n\nAverage:     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle\nAverage:      14    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00\nAverage:      15    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00    0.00  100.00\n",
+  "mpstat_stderr": "",
+  "candidate_build_processes_after_build": [],
+  "idle_assertion": true,
+  "supersedes": "/home/zhuhe/litchi-performance-0916/candidate/receipts/release-build.cpu-idle.json (its detector included its own shell command text)"
+}

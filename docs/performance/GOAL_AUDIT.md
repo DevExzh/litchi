@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0916 — measured commit-only target reuse adopted
+
+[0916](0916-docx-section-commit-target-reuse.md) connects a scoped duplicate-
+parse profile to a minimal candidate, 1,914 passing DOCX tests, 78 passing
+doctests, quality/boundary checks and a frozen eight-pair native comparison.
+The exact tested candidate is adopted after independent review; pooled p50
+falls 6.684% on
+one generated warm edit/save fixture. Every source/output/preservation guard
+passes, with all samples retained. This does not close broad CRUD, real-
+producer, cold/range input, allocation, hardware-counter or scaling gaps.
+The full non-iWork goal remains open; iWork is excluded.
+
 ## 0915 — scoped resolver hypothesis tested without production adoption
 
 [0915](0915-docx-section-resolver-borrow.md) supplies replayable snapshot

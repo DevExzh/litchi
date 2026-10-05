@@ -1,0 +1,79 @@
+{
+  "schema": "litchi.performance.0916.quality-layout.v1",
+  "purpose": "Exact extra files needed to reproduce the external prebuild manifest. All are outside the production release archive comparison. The duplicate fixtures are staging copies, not a different corpus.",
+  "tracked_extra_revision": "46a1dbc015785074c4f10531b03ebec813ecdd8a",
+  "extras": [
+    {
+      "path": "docs/performance/ADR_COMPLIANCE.md",
+      "bytes": 599104,
+      "sha256": "41aab184c1f0f09083355089d5615302b4a851933e2bdcdadb809f6ec45a23a6",
+      "regeneration_argv": [
+        "git",
+        "show",
+        "46a1dbc015785074c4f10531b03ebec813ecdd8a:docs/performance/ADR_COMPLIANCE.md"
+      ]
+    },
+    {
+      "path": "docs/performance/perf-regression-policy-v1.json",
+      "bytes": 5485,
+      "sha256": "75da0e9d563b979bde2d687eb81bb67dca3a6b63ed5022db10983906a8e4fc05",
+      "regeneration_argv": [
+        "git",
+        "show",
+        "46a1dbc015785074c4f10531b03ebec813ecdd8a:docs/performance/perf-regression-policy-v1.json"
+      ]
+    },
+    {
+      "path": "tools/crate_boundaries.json",
+      "bytes": 13436,
+      "sha256": "715e27ba51b9d60163bf2f51f0d21893ad223df3e61f8ebc768a46c4f7deea36",
+      "regeneration_argv": [
+        "git",
+        "show",
+        "46a1dbc015785074c4f10531b03ebec813ecdd8a:tools/crate_boundaries.json"
+      ]
+    },
+    {
+      "path": "tools/check_crate_boundaries.py",
+      "bytes": 3173576,
+      "sha256": "e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9",
+      "regeneration_argv": [
+        "git",
+        "show",
+        "46a1dbc015785074c4f10531b03ebec813ecdd8a:tools/check_crate_boundaries.py"
+      ]
+    },
+    {
+      "path": "docs/adr/0008-migration-and-verification.md",
+      "bytes": 1145334,
+      "sha256": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2",
+      "regeneration_argv": [
+        "git",
+        "show",
+        "46a1dbc015785074c4f10531b03ebec813ecdd8a:docs/adr/0008-migration-and-verification.md"
+      ]
+    },
+    {
+      "path": "docs/adr/0028-iwa-monolith-exit.md",
+      "bytes": 771812,
+      "sha256": "d746f84441a6623c8a6e3731701e614c39544467433615ad83af001da4e52023",
+      "regeneration_argv": [
+        "git",
+        "show",
+        "46a1dbc015785074c4f10531b03ebec813ecdd8a:docs/adr/0028-iwa-monolith-exit.md"
+      ]
+    },
+    {
+      "path": "fixtures/svg.docx",
+      "bytes": 74104,
+      "sha256": "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d",
+      "regeneration": "copy retained quality fixture /home/zhuhe/litchi-performance-0915-candidate/frozen/quality/svg.docx"
+    },
+    {
+      "path": "fixtures/floating.docx",
+      "bytes": 302210,
+      "sha256": "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283",
+      "regeneration": "copy retained quality fixture /home/zhuhe/litchi-performance-0915-candidate/frozen/quality/tdf164835_nonDummyLineHeight.docx"
+    }
+  ]
+}

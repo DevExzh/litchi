@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{
@@ -203,6 +204,48 @@ impl ReadAt for ObservedSource {
             8085,
             self.revision.load(Ordering::SeqCst),
         ))
+    }
+}
+
+struct StableMutableSource {
+    bytes: Mutex<Vec<u8>>,
+    unused: std::ops::Range<usize>,
+}
+
+impl StableMutableSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        let unused = payload_range(&bytes, UNUSED);
+        Self {
+            bytes: Mutex::new(bytes),
+            unused,
+        }
+    }
+
+    fn mutate_unused(&self) {
+        let mut bytes = self.bytes.lock().unwrap();
+        bytes[self.unused.start] ^= 1;
+    }
+}
+
+impl ReadAt for StableMutableSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.lock().unwrap().len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+        let bytes = self.bytes.lock().unwrap();
+        if offset >= bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(bytes.len());
+        output[..end - offset].copy_from_slice(&bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(8085, 0))
     }
 }
 
@@ -660,6 +703,12 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
         .publish_section_layout_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert!(
+        commit
+            .snapshot()
+            .inventory()
+            .shares_allocation_with(publication.snapshot().inventory())
+    );
+    assert!(
         publication
             .inverse_patch()
             .apply(publication.snapshot())
@@ -770,6 +819,56 @@ fn source_backed_section_layout_noop_mce_strict_and_limits_are_typed() {
         }),
         Err(Error::SectionInventoryLimit { .. })
     ));
+}
+
+#[test]
+fn section_layout_commit_rechecks_complete_artifact_before_target_reuse() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+    );
+    let source = Arc::new(StableMutableSource::new(fixture(document.as_bytes())));
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
+    edit.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Landscape,
+    }))
+    .unwrap();
+    let commit = edit.commit().unwrap();
+
+    source.mutate_unused();
+    let mut output = Vec::new();
+    assert!(matches!(
+        package.publish_section_layout_commit_to_stream(&mut output, &commit),
+        Err(Error::SectionLayoutFingerprintConflict)
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn section_layout_commit_rejects_revision_change_before_output() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+    );
+    let source = Arc::new(ObservedSource::new(fixture(document.as_bytes()), false));
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
+    edit.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Landscape,
+    }))
+    .unwrap();
+    let commit = edit.commit().unwrap();
+
+    source.arm_change();
+    let mut output = Vec::new();
+    assert!(matches!(
+        package.publish_section_layout_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
 }
 
 #[test]
