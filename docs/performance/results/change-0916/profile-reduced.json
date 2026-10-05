@@ -1,0 +1,162 @@
+{
+  "schema": "litchi.performance.0916.callgrind-profile.v1",
+  "claim": "descriptive operation-local Callgrind guest-instruction attribution; no native-cycle, allocation-byte, or end-to-end speedup claim",
+  "scenario": "docx_source_backed_existing_section_layout_edit_save",
+  "source_revision": "a4ca85e28cdea151176534b7f8dc912253a1ca1e",
+  "repository_head_when_packet_written": "f4946ec9dc05886a1d04a08795ee635acc17926c",
+  "identity_verification": {
+    "performed_before_capture": true,
+    "method": "stat and sha256sum were run for the retained binary and source archive before the first Callgrind command; the values are preserved below",
+    "packet_manifest_written": "after_capture",
+    "qualification": "The manifest was not backdated. The pre-capture check is evidenced by the capture transcript; this file is the post-capture hash manifest."
+  },
+  "frozen_inputs": {
+    "binary": {
+      "path": "/home/zhuhe/litchi-performance-0914/target/release/litchi-perf-baseline",
+      "bytes": 69940744,
+      "sha256": "fe56e5192c1198e831583e870beb5e1ba4731fb2077faaffdfc46044bb0ed2db",
+      "mode_bits": 509,
+      "executable": true
+    },
+    "source_archive": {
+      "path": "/home/zhuhe/litchi-performance-0914/source-HEAD-code.tar",
+      "bytes": 171120640,
+      "sha256": "7b77f1875adcdc3c822351b11dcf621f4ebff501fe501cab80fd4fb3f9a59571"
+    },
+    "source_member_line_proof": {
+      "archive_member": "litchi/crates/litchi-docx/src/section/layout.rs",
+      "bytes": 78342,
+      "sha256": "dcbd516f03a35047d0bf5b28e557c32882f5a4d1624d6dd08c265142d239aa21",
+      "apply_line": 547,
+      "apply_line_text": "pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {",
+      "target_parse_line": 589,
+      "target_parse_line_text": "Snapshot::from_shared_xml("
+    }
+  },
+  "capture": {
+    "tool": "valgrind 3.26.0 callgrind",
+    "events": "Ir",
+    "cpu_affinity": 12,
+    "cpu_model": "AMD EPYC 9R45",
+    "warmup_iterations": 0,
+    "samples": 1,
+    "perf_event_paranoid": 4,
+    "target_trigger": "litchi_docx::section::layout::Patch::apply",
+    "publication_trigger": "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream",
+    "target_started": "2026-10-05T15:59:53Z",
+    "target_finished": "2026-10-05T16:00:00Z",
+    "publication_started": "2026-10-05T16:02:14Z",
+    "publication_finished": "2026-10-05T16:02:21Z",
+    "target_command": "taskset -c 12 setarch x86_64 -R valgrind --tool=callgrind --quiet --callgrind-out-file=/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out --separate-callers=4 --collect-jumps=yes --zero-before='litchi_docx::section::layout::Patch::apply' --dump-after='litchi_docx::section::layout::Patch::apply' /home/zhuhe/litchi-performance-0914/target/release/litchi-perf-baseline --warmup 0 --samples 1 --case docx_source_backed_existing_section_layout_edit_save --json /home/zhuhe/litchi-performance-0916/profile/raw/patch-apply.json",
+    "publication_command": "taskset -c 12 setarch x86_64 -R valgrind --tool=callgrind --quiet --callgrind-out-file=/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out --separate-callers=4 --collect-jumps=yes --zero-before='litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream' --dump-after='litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream' /home/zhuhe/litchi-performance-0914/target/release/litchi-perf-baseline --warmup 0 --samples 1 --case docx_source_backed_existing_section_layout_edit_save --json /home/zhuhe/litchi-performance-0916/profile/raw/publication.json",
+    "scope": "The target interval selects one Patch::apply reached from the measured publish_section_layout_commit_to_stream call. The publication interval selects that whole measured publication call. Setup/control publications, direct patch replay, inverse publication, correctness checks, and teardown are excluded from the selected owner values."
+  },
+  "corpus": {
+    "generator": "litchi-docx-section-layout-source-v1",
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "target_entry": "word/document.xml",
+    "target_payload_bytes": 18855,
+    "target_payload_sha256": "67cb9066f112bfee6905a23f3eabdc76b65c86cd0c6613dd60a5a18895ceac81",
+    "sections": 3,
+    "main_story_paragraphs": 257,
+    "selected_paragraph": 64,
+    "columns": "2 -> 3",
+    "media_members": 4,
+    "media_bytes_each": 524288
+  },
+  "owner_proof": {
+    "target_patch_apply": {
+      "dump": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.8",
+      "part": 8,
+      "summary_ir": 6384252,
+      "caller_chain": "litchi_docx::section::layout::Patch::apply -> litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream -> litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save",
+      "patch_apply_ir": 6384252,
+      "snapshot_from_shared_xml_ir": 6381596,
+      "ensure_source_section_inventory_xml_ir": 2144436,
+      "parse_inventory_ir": 4237085,
+      "snapshot_call_count": 1,
+      "ensure_call_count": 1,
+      "parse_call_count": 1
+    },
+    "whole_publication": {
+      "dump": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.7",
+      "part": 7,
+      "summary_ir": 240572558,
+      "caller_chain": "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream -> litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save",
+      "patch_apply_ir": 6394087,
+      "snapshot_from_shared_xml_ir": 6391431,
+      "ensure_source_section_inventory_xml_ir": 2145331,
+      "parse_inventory_ir": 4246025,
+      "patch_apply_call_count": 1,
+      "snapshot_call_count": 1,
+      "ensure_call_count": 1,
+      "parse_call_count": 1
+    }
+  },
+  "derived": {
+    "target_parse_share_of_whole_publication_percent": 2.656758,
+    "target_patch_apply_share_of_whole_publication_percent": 2.657862,
+    "target_parse_share_of_target_patch_apply_percent": 99.958398,
+    "interpretation": "The changed target is parsed into a fresh section Snapshot after Patch::apply authorization. Edit::commit already parsed and retained the commit target. This makes the target parse a concrete source-local optimization hypothesis for the commit-only publication route; the profile does not authorize changing the public Patch::apply contract."
+  },
+  "excluded_parts": {
+    "target_capture": {
+      "selected_part": 8,
+      "outside_timed_owner": [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13],
+      "reason": "Parts 1 and 6-7 are setup/control publications; parts 9-10 and 12 are direct post-timer patch applications; part 13 is inverse publication; the tiny parts are refusal/control calls."
+    },
+    "publication_capture": {
+      "selected_part": 7,
+      "outside_timed_owner": [1, 2, 3, 4, 5, 6],
+      "reason": "Parts 1 and 2-6 are expected-output and preservation/refusal controls before the one measured loop iteration."
+    }
+  },
+  "external_artifacts": [
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.8", "bytes": 446844, "sha256": "b8ff40290592b8d5c3ae991bccb905cc3cbc40127d0b2b46d101f87b4cca1dc0"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.7", "bytes": 835673, "sha256": "6aaf90abf6d1dda7dddf3e15046791009911924cae72993ba005132909bf168d"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/raw/patch-apply.json", "bytes": 18483, "sha256": "738c152dcd9cf2d3fa9f367661c2da1d38d6847cbd2c0b8691ddd5f483792ee3"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/raw/publication.json", "bytes": 18483, "sha256": "0861bd52fb5eadf38a9d69e819ae3d704c7eac8462c8095bbd6567d4307b57b9"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out", "bytes": 750163, "sha256": "3beebf00391d595c1c34625aa9eaf1c562f8d437f255f837477164d148f1fec4"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.1", "bytes": 450755, "sha256": "ed1f829458fd0b661eede3fa8ebc806c614d37b3ca260b3d9bf1813b3bf26c23"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.2", "bytes": 4735, "sha256": "85bed72643c31479a1c1dc80d28b03fa3d18fd670d3ee78fb1e31f592c934b7f"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.3", "bytes": 4264, "sha256": "fe1fb92fe8b21f04f4b6308682e57f89e14364f632b232c3aa8676c058909703"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.4", "bytes": 3348, "sha256": "b8a0afa77cdad9c4e8207999c9eb8b1c3acebb5d57517d53fd051374be1cd2bf"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.5", "bytes": 4735, "sha256": "3660bf9b39837efb4c599a743a843161272361ad116e451b029baa3d4e49fa45"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.6", "bytes": 449782, "sha256": "48b4d96ed902f121dc0be273351cfe6bf0f69b184fd9979e78cd9c4f658379a0"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.7", "bytes": 449397, "sha256": "86335e2fa6853be2230e32be09474fbbc8e9fe43e9dd1fa489b7739d1f585ce3"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.9", "bytes": 450653, "sha256": "233c5cacd521752963e4ec986fc9454f42eb11dc884fa569aa55c4a380781199"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.10", "bytes": 450167, "sha256": "a381d1169c5e02e49d0a723571ee16d3a190fca266c2eeca66694f994cf37fc7"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.11", "bytes": 2702, "sha256": "09b93ae12d21e4f982c4cb63179415794bcc6437e440b4308fe0d6f863f0d0cb"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.12", "bytes": 449447, "sha256": "cdbf7c9c3fcbdfd0619ade7dd313f844440a71932dde1c70036b51da265f1d3e"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/patch-apply.out.13", "bytes": 447327, "sha256": "bbeff840498fe6819dc381531a27c176d6ab2e0892431c6057f05847c04751f8"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out", "bytes": 2475342, "sha256": "462774ec969815f98167e5ae73fd87c7ba54c75f5b26c9eefd2a591c869a9e4e"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.1", "bytes": 833648, "sha256": "37430e5ddab9e588af95dcce8f3cb8124b2f01322589c609b96770e9acb20808"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.2", "bytes": 541513, "sha256": "4a6abb86b6dc00e212238e4d64099cc94cfb4ea6fde9d7d5367da254e29edb26"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.3", "bytes": 595362, "sha256": "9fe5e2f5a0f995d4c7c7d56d74e232345e3d95da7dff6d08daae6e5a804eeeb6"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.4", "bytes": 539427, "sha256": "713df70c649b0c94440e5eada3c6ed95a8219ded21be4aefe2229ed123e6a4fa"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.5", "bytes": 615079, "sha256": "7e8e3354167914b65831509ea1e74bbecb90f4c4a441b93ac2510230f72ae714"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/callgrind/publication.out.6", "bytes": 827124, "sha256": "50c4405a2825677dac16c4e7c8cde0617cdebfbe3690f45fe2c60558641fa27e"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/raw/patch-apply.stderr", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/raw/patch-apply.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/raw/publication.stderr", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/raw/publication.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/receipts/patch-apply-start.txt", "bytes": 21, "sha256": "c07954a9064f72b3dd0b2a6ccfff20ee5e0b252d690e39e25e0033a5e1fe24e9"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/receipts/patch-apply-finish.txt", "bytes": 21, "sha256": "9452b1c8bd919eb1fb00e9bac1ac23ce67da1a570c98bfd7c8d81d182f1c98ea"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/receipts/publication-start.txt", "bytes": 21, "sha256": "f45b32899a04cb4c1dd49c47a97544a4c3f8016eb2a9428258a53f94dd5a3592"},
+    {"path": "/home/zhuhe/litchi-performance-0916/profile/receipts/publication-finish.txt", "bytes": 21, "sha256": "31009df46f277df03b0dcded3454af295e065b86581763b10c31d674c9085afa"}
+  ],
+  "limitations": [
+    "perf hardware counters were unavailable because perf_event_paranoid=4",
+    "Callgrind Ir is Valgrind guest instruction simulation; the software SHA owner must not be translated into native SHA cost",
+    "one zero-warmup, one-sample process was used for each bounded diagnostic capture; values are attribution evidence, not confidence intervals",
+    "no allocation-byte, peak-live, native-cycle, cold-filesystem, or end-to-end speedup claim is made",
+    "all raw Callgrind and process report artifacts remain external under /home/zhuhe/litchi-performance-0916/profile; only this small descriptor and replay tool are tracked"
+  ],
+  "regeneration": {
+    "verification": "python3 -B docs/performance/results/change-0916/profile-replay.py",
+    "command": "Create a new external root, update the two absolute output paths in capture.target_command and capture.publication_command, then run each command once with --warmup 0 --samples 1 on CPU 12. Do not overwrite this packet's external files or use a candidate build.",
+    "no_production_change": true,
+    "no_candidate_build": true
+  }
+}
