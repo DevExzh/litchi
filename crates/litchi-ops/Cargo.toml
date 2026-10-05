@@ -27,7 +27,7 @@ pptx    = ["dep:litchi-pptx", "opc"]
 xls     = ["dep:litchi-cfb", "dep:litchi-xls"]
 xlsx    = ["dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
 xlsb    = ["dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
-rtf     = ["dep:litchi-rtf"]
+rtf     = ["dep:litchi-rtf", "dep:chrono"]
 odt     = ["dep:litchi-odf-common", "dep:litchi-odt"]
 ods     = ["dep:litchi-odf-common", "dep:litchi-ods"]
 odp     = ["dep:litchi-odf-common", "dep:litchi-odp"]
@@ -45,6 +45,7 @@ opc = ["dep:litchi-opc"]
 test-support = []
 
 [dependencies]
+chrono              = { workspace = true, optional = true } # RTF metadata timestamps
 litchi-cfb          = { workspace = true, optional = true }
 litchi-core         = { workspace = true }
 litchi-doc          = { workspace = true, optional = true }
