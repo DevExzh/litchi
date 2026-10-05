@@ -280,3 +280,25 @@
 - Gates: fmt, clippy `-D warnings`, `cargo test` (643 passed, 1 ignored), the Python policy suites (28 + 50) and the CI Python list (517 tests). One release build ran all 118 routes once, with no measurement kept.
 - Observation: unified errors print only the code summary; the specific cause is reachable only through `Error::leaf()`. So legs refusing the same file record differently worded messages (`duplicate-style-names.doc`).
 - The coordinator merged this into `uo/m0a` without a separate harness re-run: the harness is a standalone workspace, and S8b's own gates ran on this base.
+
+## S8a — Python bindings on `litchi::File` (`e248da4eac`)
+- Python `Document`, `Presentation` and `Workbook` open through `litchi::open` and read through the family views and `compat` wrappers.
+- iWork reads go through `litchi::{pages,keynote,numbers}::semantic::Document`. The `litchi::iwork` snapshot lacks Numbers sheet names, number and boolean cells in Numbers text, and the Keynote show title, all of which the oracle pins (R6). Output equals the old facade on all 123 iWork fixtures, and iWork package directories now open.
+- New exception hierarchy (names provisional for M3): `LitchiError` with `PathError` (also `LookupError`), `PropertyError`, `UnsupportedError`, `CorruptFileError` and `ProtectedError` (also `ValueError`), and `IoError` (also `OSError`). Each carries `code`, `message` and `suggestion`. The oracle contract holds.
+- Fixed:
+  - B1: `.ppt` and `.xls` now open (the features were enabled).
+  - B2: `repr` cuts at character boundaries.
+  - B3: DOCX text has one line per paragraph, via a new validating paragraph mode in the litchi-docx text scanner (`text_with_paragraph_separator`). This changes `File::text()` for DOCX in Rust too. It costs +1.8% instructions on that path; the plain path is unchanged.
+  - B4: `underline()` returns real values (new `compat::word::Run::underline`).
+  - B5: handles are thread-safe.
+  - D1–D5 (`FileFormat.Odb` = 20, stub and README) and F10.
+- Oracle: 121 tests with 14 expected failures became 132 tests, all passing, in dev and release. The fixed expected failures became ordinary tests, their "today" twins were deleted, and 24 tests were added.
+- For S9/S10:
+  - Python iWork opens are 4–6% slower (+65–73 µs), because `litchi::open` scans before refusing iWork and then the iWork reader detects again. This lasts until M6, or until the facade hands over the scanned source.
+  - DOCX full-text timings taken before B3 are not comparable. The S8b leaf leg must also use `text_with_paragraph_separator` for a fair pair.
+  - Not fixed: a CryptoAPI-encrypted `.ppt` classifies as `unsupported_capability` instead of `document_protected`.
+- Verified on the merged `uo/m0a`:
+  - clippy on litchi-py, ops, litchi and docx with all features;
+  - litchi-ops: 452 tests;
+  - facade targets: `unified_open_facade`, the Markdown goldens and parity, tolerance, unexpected-format, semantic, and the Pages/Keynote/Numbers suites;
+  - Python oracle: 132 OK.
