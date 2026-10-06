@@ -1,0 +1,3281 @@
+{
+  "analysis_runs": {
+    "final_successful_attempt": {
+      "exit_code": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0939/analyze-v2.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 484,
+        "path": "/home/zhuhe/litchi-performance-0939/analyze-v2.stdout",
+        "sha256": "7ad2996f6ee2746f30d822b6a3a1cd9eeba8f72e096cdb3c62eff8fb0d71d3b9"
+      },
+      "terminal": {
+        "bytes": 1049,
+        "path": "/home/zhuhe/litchi-performance-0939/analysis-terminal-v2.json",
+        "sha256": "56e44f61fc7e2dcfa851fbd8bee3500a09f5be1dd8134bc6b45d2d05bac915dd"
+      }
+    },
+    "initial_failed_attempt": {
+      "exit_code": 1,
+      "observed_error": "The initial implementation incorrectly assumed each phase vector was independently rank-sorted; the retained source shows phase vectors are reordered into elapsed-rank alignment. The packet was not changed.",
+      "terminal": {
+        "bytes": 1043,
+        "path": "/home/zhuhe/litchi-performance-0939/analysis-terminal-v1.json",
+        "sha256": "ef31063c73b891d405e2fb4fa4de11abfb3b4e7fe425bcb4d37dcdeec84ad312"
+      }
+    }
+  },
+  "chronology_validation": {
+    "children": 96,
+    "inverse_mapping": "chronological[original_index] = ranked_vector[rank] where sample_order[rank] = original_index",
+    "nonidentity_sample_orders": 96,
+    "phase_sum_verified_in_ranked_and_chronological_orders": true,
+    "samples_per_child": 50
+  },
+  "command_contract": {
+    "compact_output": "/home/zhuhe/code/litchi/docs/performance/results/change-0939/docx-chronology-summary-v3.json",
+    "cwd": "/home/zhuhe/code/litchi",
+    "output": {
+      "bytes": 1301641,
+      "path": "/home/zhuhe/litchi-performance-0939/chronology-analysis-v2.json",
+      "sha256": "44e9f43df08641cd5a5ba4a2c5a7bfb060aeac508b1fd9a0b3fd5afd7bc04c8c"
+    },
+    "packet": "/home/zhuhe/litchi-performance-0938/formal-packet-v1",
+    "postprocessed_from": "/home/zhuhe/litchi-performance-0939/docx-chronology-summary-v2.json",
+    "script": {
+      "bytes": 33483,
+      "path": "/home/zhuhe/litchi-performance-0939/analyze-0938-chronology.py",
+      "sha256": "b27a527f62a410eb88b4bffccc082d5c455e5031d52c9cccc60186b2f8b8112b"
+    }
+  },
+  "created_utc": "2026-10-06T20:38:22.694434Z",
+  "flagged_owned_reader_pairs": [
+    {
+      "block": 3,
+      "flags_gt_1_05": {
+        "p50_A_over_B": true,
+        "p50_B_over_A": false
+      },
+      "label_order": "A_then_B",
+      "pair_id": "block-03-owned_reader",
+      "paired_sample_mean_delta": {
+        "phase_contribution": {
+          "commit_ns": {
+            "A_p50_ns": 293081.5,
+            "B_p50_ns": 287291.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 12770,
+              "mean": -4716.16,
+              "min": -41060,
+              "p10": -12051.0,
+              "p50": -4995.0,
+              "p90": 4200.0,
+              "p95": 10030.0,
+              "p99": 12770.0,
+              "spread": 53830
+            },
+            "mean_delta_ns_B_minus_A": -4716.16,
+            "mean_delta_share_of_total_mean": 0.021308367063659343,
+            "p50_ratio_B_over_A": 0.9802426969972516
+          },
+          "edit_ns": {
+            "A_p50_ns": 53045.0,
+            "B_p50_ns": 53140.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 9389,
+              "mean": 489.78,
+              "min": -5320,
+              "p10": -1440.0,
+              "p50": 149.5,
+              "p90": 1590.0,
+              "p95": 8381.0,
+              "p99": 9389.0,
+              "spread": 14709
+            },
+            "mean_delta_ns_B_minus_A": 489.78,
+            "mean_delta_share_of_total_mean": -0.0022129045707607615,
+            "p50_ratio_B_over_A": 1.0018003581864454
+          },
+          "open_ns": {
+            "A_p50_ns": 377902.0,
+            "B_p50_ns": 378611.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 15049,
+              "mean": 1703.56,
+              "min": -12929,
+              "p10": -6481.0,
+              "p50": 1704.0,
+              "p90": 11530.0,
+              "p95": 14279.0,
+              "p99": 15049.0,
+              "spread": 27978
+            },
+            "mean_delta_ns_B_minus_A": 1703.56,
+            "mean_delta_share_of_total_mean": -0.007696957226847162,
+            "p50_ratio_B_over_A": 1.0018774708786935
+          },
+          "preparation_ns": {
+            "A_p50_ns": 247080.5,
+            "B_p50_ns": 33985.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": -16540,
+              "mean": -207716.16,
+              "min": -218911,
+              "p10": -216960.0,
+              "p50": -212941.0,
+              "p90": -203980.0,
+              "p95": -203281.0,
+              "p99": -16540.0,
+              "spread": 202371
+            },
+            "mean_delta_ns_B_minus_A": -207716.16,
+            "mean_delta_share_of_total_mean": 0.9384949158497156,
+            "p50_ratio_B_over_A": 0.1375482889179842
+          },
+          "publication_ns": {
+            "A_p50_ns": 1365365.0,
+            "B_p50_ns": 1353630.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 15399,
+              "mean": -12223.48,
+              "min": -33050,
+              "p10": -22920.0,
+              "p50": -11800.0,
+              "p90": -4960.0,
+              "p95": -2359.0,
+              "p99": 15399.0,
+              "spread": 48449
+            },
+            "mean_delta_ns_B_minus_A": -12223.48,
+            "mean_delta_share_of_total_mean": 0.05522764253869646,
+            "p50_ratio_B_over_A": 0.9914052286384959
+          },
+          "query_ns": {
+            "A_p50_ns": 1276975.0,
+            "B_p50_ns": 1278760.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 36980,
+              "mean": 1133.44,
+              "min": -31610,
+              "p10": -11060.0,
+              "p50": 1040.5,
+              "p90": 12800.0,
+              "p95": 16600.0,
+              "p99": 36980.0,
+              "spread": 68590
+            },
+            "mean_delta_ns_B_minus_A": 1133.44,
+            "mean_delta_share_of_total_mean": -0.0051210636544633875,
+            "p50_ratio_B_over_A": 1.0013978347266
+          }
+        },
+        "phase_mean_deltas_sum_exact": true,
+        "total_mean_delta_ns_B_minus_A": -221329.02
+      },
+      "position": 3,
+      "route": "owned_reader",
+      "rss_bytes": {
+        "A": 41246720,
+        "B": 39227392,
+        "B_over_A": 0.9510427010923536
+      },
+      "time_metrics": {
+        "A": {
+          "involuntary_context_switches": 23,
+          "major_page_faults": 0,
+          "minor_page_faults": 150079,
+          "rss_bytes": 41246720,
+          "system_cpu_seconds": 0.08,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B": {
+          "involuntary_context_switches": 24,
+          "major_page_faults": 0,
+          "minor_page_faults": 113972,
+          "rss_bytes": 39227392,
+          "system_cpu_seconds": 0.06,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B_minus_A": {
+          "involuntary_context_switches": 1,
+          "major_page_faults": 0,
+          "minor_page_faults": -36107,
+          "rss_bytes": -2019328,
+          "system_cpu_seconds": -0.020000000000000004,
+          "user_cpu_seconds": 0.0,
+          "voluntary_context_switches": 0
+        }
+      },
+      "total_p50_ns": {
+        "A": 3614404.0,
+        "A_over_B": 1.0663835096647536,
+        "B": 3389403.5,
+        "B_over_A": 0.9377489345407984
+      }
+    },
+    {
+      "block": 6,
+      "flags_gt_1_05": {
+        "p50_A_over_B": true,
+        "p50_B_over_A": false
+      },
+      "label_order": "B_then_A",
+      "pair_id": "block-06-owned_reader",
+      "paired_sample_mean_delta": {
+        "phase_contribution": {
+          "commit_ns": {
+            "A_p50_ns": 289321.0,
+            "B_p50_ns": 288766.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 20910,
+              "mean": -1738.44,
+              "min": -23620,
+              "p10": -11330.0,
+              "p50": -1850.0,
+              "p90": 6690.0,
+              "p95": 9570.0,
+              "p99": 20910.0,
+              "spread": 44530
+            },
+            "mean_delta_ns_B_minus_A": -1738.44,
+            "mean_delta_share_of_total_mean": 0.00790263005514167,
+            "p50_ratio_B_over_A": 0.9980834436490956
+          },
+          "edit_ns": {
+            "A_p50_ns": 54181.0,
+            "B_p50_ns": 54870.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 9310,
+              "mean": 859.96,
+              "min": -5090,
+              "p10": -581.0,
+              "p50": 840.0,
+              "p90": 2080.0,
+              "p95": 2750.0,
+              "p99": 9310.0,
+              "spread": 14400
+            },
+            "mean_delta_ns_B_minus_A": 859.96,
+            "mean_delta_share_of_total_mean": -0.003909220762418968,
+            "p50_ratio_B_over_A": 1.0127258633100165
+          },
+          "open_ns": {
+            "A_p50_ns": 379666.0,
+            "B_p50_ns": 382451.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 28740,
+              "mean": -8792.6,
+              "min": -228422,
+              "p10": -16069.0,
+              "p50": -670.0,
+              "p90": 8640.0,
+              "p95": 19690.0,
+              "p99": 28740.0,
+              "spread": 257162
+            },
+            "mean_delta_ns_B_minus_A": -8792.6,
+            "mean_delta_share_of_total_mean": 0.03996955029960116,
+            "p50_ratio_B_over_A": 1.007335394794372
+          },
+          "preparation_ns": {
+            "A_p50_ns": 242320.5,
+            "B_p50_ns": 34030.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": -1670,
+              "mean": -198460.58,
+              "min": -236232,
+              "p10": -219611.0,
+              "p50": -208336.0,
+              "p90": -205391.0,
+              "p95": -5640.0,
+              "p99": -1670.0,
+              "spread": 234562
+            },
+            "mean_delta_ns_B_minus_A": -198460.58,
+            "mean_delta_share_of_total_mean": 0.9021654726472284,
+            "p50_ratio_B_over_A": 0.14043591029236074
+          },
+          "publication_ns": {
+            "A_p50_ns": 1367685.0,
+            "B_p50_ns": 1352960.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 203371,
+              "mean": -10019.8,
+              "min": -32159,
+              "p10": -26381.0,
+              "p50": -15455.0,
+              "p90": -2011.0,
+              "p95": 1551.0,
+              "p99": 203371.0,
+              "spread": 235530
+            },
+            "mean_delta_ns_B_minus_A": -10019.8,
+            "mean_delta_share_of_total_mean": 0.04554817688646631,
+            "p50_ratio_B_over_A": 0.9892336320132195
+          },
+          "query_ns": {
+            "A_p50_ns": 1274580.0,
+            "B_p50_ns": 1270795.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 21390,
+              "mean": -1831.0,
+              "min": -17550,
+              "p10": -13230.0,
+              "p50": -2020.5,
+              "p90": 9620.0,
+              "p95": 12220.0,
+              "p99": 21390.0,
+              "spread": 38940
+            },
+            "mean_delta_ns_B_minus_A": -1831.0,
+            "mean_delta_share_of_total_mean": 0.008323390873981498,
+            "p50_ratio_B_over_A": 0.9970303943259741
+          }
+        },
+        "phase_mean_deltas_sum_exact": true,
+        "total_mean_delta_ns_B_minus_A": -219982.46
+      },
+      "position": 2,
+      "route": "owned_reader",
+      "rss_bytes": {
+        "A": 39235584,
+        "B": 38625280,
+        "B_over_A": 0.9844451404113164
+      },
+      "time_metrics": {
+        "A": {
+          "involuntary_context_switches": 22,
+          "major_page_faults": 0,
+          "minor_page_faults": 152587,
+          "rss_bytes": 39235584,
+          "system_cpu_seconds": 0.08,
+          "user_cpu_seconds": 0.75,
+          "voluntary_context_switches": 24
+        },
+        "B": {
+          "involuntary_context_switches": 21,
+          "major_page_faults": 0,
+          "minor_page_faults": 112461,
+          "rss_bytes": 38625280,
+          "system_cpu_seconds": 0.06,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B_minus_A": {
+          "involuntary_context_switches": -1,
+          "major_page_faults": 0,
+          "minor_page_faults": -40126,
+          "rss_bytes": -610304,
+          "system_cpu_seconds": -0.020000000000000004,
+          "user_cpu_seconds": -0.010000000000000009,
+          "voluntary_context_switches": 0
+        }
+      },
+      "total_p50_ns": {
+        "A": 3610754.5,
+        "A_over_B": 1.0670382592174983,
+        "B": 3383903.5,
+        "B_over_A": 0.9371735187202563
+      }
+    },
+    {
+      "block": 9,
+      "flags_gt_1_05": {
+        "p50_A_over_B": true,
+        "p50_B_over_A": false
+      },
+      "label_order": "A_then_B",
+      "pair_id": "block-09-owned_reader",
+      "paired_sample_mean_delta": {
+        "phase_contribution": {
+          "commit_ns": {
+            "A_p50_ns": 285976.0,
+            "B_p50_ns": 290221.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 23400,
+              "mean": 4038.44,
+              "min": -14451,
+              "p10": -1120.0,
+              "p50": 3000.0,
+              "p90": 10461.0,
+              "p95": 15000.0,
+              "p99": 23400.0,
+              "spread": 37851
+            },
+            "mean_delta_ns_B_minus_A": 4038.44,
+            "mean_delta_share_of_total_mean": -0.02068974915669512,
+            "p50_ratio_B_over_A": 1.014843902984866
+          },
+          "edit_ns": {
+            "A_p50_ns": 53715.0,
+            "B_p50_ns": 52530.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 9550,
+              "mean": -793.08,
+              "min": -3989,
+              "p10": -2600.0,
+              "p50": -1200.0,
+              "p90": 690.0,
+              "p95": 2350.0,
+              "p99": 9550.0,
+              "spread": 13539
+            },
+            "mean_delta_ns_B_minus_A": -793.08,
+            "mean_delta_share_of_total_mean": 0.004063110077453612,
+            "p50_ratio_B_over_A": 0.9779391231499581
+          },
+          "open_ns": {
+            "A_p50_ns": 379251.0,
+            "B_p50_ns": 376742.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 43400,
+              "mean": -1368.12,
+              "min": -28320,
+              "p10": -16510.0,
+              "p50": -2630.0,
+              "p90": 11750.0,
+              "p95": 28171.0,
+              "p99": 43400.0,
+              "spread": 71720
+            },
+            "mean_delta_ns_B_minus_A": -1368.12,
+            "mean_delta_share_of_total_mean": 0.007009156906195889,
+            "p50_ratio_B_over_A": 0.9933843285844994
+          },
+          "preparation_ns": {
+            "A_p50_ns": 239761.0,
+            "B_p50_ns": 33975.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 12389,
+              "mean": -172678.12,
+              "min": -212601,
+              "p10": -208621.0,
+              "p50": -205451.0,
+              "p90": -170.0,
+              "p95": 490.0,
+              "p99": 12389.0,
+              "spread": 224990
+            },
+            "mean_delta_ns_B_minus_A": -172678.12,
+            "mean_delta_share_of_total_mean": 0.8846651151557776,
+            "p50_ratio_B_over_A": 0.14170361318145988
+          },
+          "publication_ns": {
+            "A_p50_ns": 1367610.5,
+            "B_p50_ns": 1346020.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 210561,
+              "mean": -15416.8,
+              "min": -38149,
+              "p10": -33900.0,
+              "p50": -20120.0,
+              "p90": -8141.0,
+              "p95": -3369.0,
+              "p99": 210561.0,
+              "spread": 248710
+            },
+            "mean_delta_ns_B_minus_A": -15416.8,
+            "mean_delta_share_of_total_mean": 0.07898340071882641,
+            "p50_ratio_B_over_A": 0.9842133414448047
+          },
+          "query_ns": {
+            "A_p50_ns": 1280410.0,
+            "B_p50_ns": 1270220.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 17000,
+              "mean": -8972.7,
+              "min": -28390,
+              "p10": -20440.0,
+              "p50": -9745.0,
+              "p90": 4190.0,
+              "p95": 7550.0,
+              "p99": 17000.0,
+              "spread": 45390
+            },
+            "mean_delta_ns_B_minus_A": -8972.7,
+            "mean_delta_share_of_total_mean": 0.045968966298441556,
+            "p50_ratio_B_over_A": 0.9920416116712616
+          }
+        },
+        "phase_mean_deltas_sum_exact": true,
+        "total_mean_delta_ns_B_minus_A": -195190.38
+      },
+      "position": 3,
+      "route": "owned_reader",
+      "rss_bytes": {
+        "A": 41148416,
+        "B": 37744640,
+        "B_over_A": 0.9172805096555843
+      },
+      "time_metrics": {
+        "A": {
+          "involuntary_context_switches": 25,
+          "major_page_faults": 0,
+          "minor_page_faults": 149242,
+          "rss_bytes": 41148416,
+          "system_cpu_seconds": 0.09,
+          "user_cpu_seconds": 0.72,
+          "voluntary_context_switches": 24
+        },
+        "B": {
+          "involuntary_context_switches": 21,
+          "major_page_faults": 0,
+          "minor_page_faults": 112175,
+          "rss_bytes": 37744640,
+          "system_cpu_seconds": 0.06,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B_minus_A": {
+          "involuntary_context_switches": -4,
+          "major_page_faults": 0,
+          "minor_page_faults": -37067,
+          "rss_bytes": -3403776,
+          "system_cpu_seconds": -0.03,
+          "user_cpu_seconds": 0.020000000000000018,
+          "voluntary_context_switches": 0
+        }
+      },
+      "total_p50_ns": {
+        "A": 3606064.5,
+        "A_over_B": 1.0684638721374435,
+        "B": 3374999.0,
+        "B_over_A": 0.9359230817973444
+      }
+    },
+    {
+      "block": 10,
+      "flags_gt_1_05": {
+        "p50_A_over_B": false,
+        "p50_B_over_A": true
+      },
+      "label_order": "B_then_A",
+      "pair_id": "block-10-owned_reader",
+      "paired_sample_mean_delta": {
+        "phase_contribution": {
+          "commit_ns": {
+            "A_p50_ns": 288171.5,
+            "B_p50_ns": 293361.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 36571,
+              "mean": 2816.24,
+              "min": -16430,
+              "p10": -9650.0,
+              "p50": 2300.5,
+              "p90": 10870.0,
+              "p95": 13929.0,
+              "p99": 36571.0,
+              "spread": 53001
+            },
+            "mean_delta_ns_B_minus_A": 2816.24,
+            "mean_delta_share_of_total_mean": 0.012740869452233638,
+            "p50_ratio_B_over_A": 1.018010108563824
+          },
+          "edit_ns": {
+            "A_p50_ns": 51800.0,
+            "B_p50_ns": 52920.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 22011,
+              "mean": 2767.0,
+              "min": -7069,
+              "p10": -1860.0,
+              "p50": 979.5,
+              "p90": 9891.0,
+              "p95": 16210.0,
+              "p99": 22011.0,
+              "spread": 29080
+            },
+            "mean_delta_ns_B_minus_A": 2767.0,
+            "mean_delta_share_of_total_mean": 0.012518104200753657,
+            "p50_ratio_B_over_A": 1.0216216216216216
+          },
+          "open_ns": {
+            "A_p50_ns": 378936.5,
+            "B_p50_ns": 380296.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 114190,
+              "mean": 1688.72,
+              "min": -31681,
+              "p10": -12090.0,
+              "p50": -1084.5,
+              "p90": 10161.0,
+              "p95": 33490.0,
+              "p99": 114190.0,
+              "spread": 145871
+            },
+            "mean_delta_ns_B_minus_A": 1688.72,
+            "mean_delta_share_of_total_mean": 0.007639889022731014,
+            "p50_ratio_B_over_A": 1.0035889918231682
+          },
+          "preparation_ns": {
+            "A_p50_ns": 34450.5,
+            "B_p50_ns": 238561.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 242091,
+              "mean": 192482.98,
+              "min": -850,
+              "p10": 192651.0,
+              "p50": 203781.0,
+              "p90": 218941.0,
+              "p95": 226931.0,
+              "p99": 242091.0,
+              "spread": 242941
+            },
+            "mean_delta_ns_B_minus_A": 192482.98,
+            "mean_delta_share_of_total_mean": 0.8708066499861157,
+            "p50_ratio_B_over_A": 6.924747100912904
+          },
+          "publication_ns": {
+            "A_p50_ns": 1350755.0,
+            "B_p50_ns": 1366845.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 188412,
+              "mean": 22598.26,
+              "min": -10000,
+              "p10": 660.0,
+              "p50": 15285.0,
+              "p90": 29750.0,
+              "p95": 85210.0,
+              "p99": 188412.0,
+              "spread": 198412
+            },
+            "mean_delta_ns_B_minus_A": 22598.26,
+            "mean_delta_share_of_total_mean": 0.10223613062368027,
+            "p50_ratio_B_over_A": 1.011912226865716
+          },
+          "query_ns": {
+            "A_p50_ns": 1277985.0,
+            "B_p50_ns": 1275285.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 60059,
+              "mean": -1313.34,
+              "min": -27160,
+              "p10": -19570.0,
+              "p50": -2840.0,
+              "p90": 10740.0,
+              "p95": 27940.0,
+              "p99": 60059.0,
+              "spread": 87219
+            },
+            "mean_delta_ns_B_minus_A": -1313.34,
+            "mean_delta_share_of_total_mean": -0.005941643285514205,
+            "p50_ratio_B_over_A": 0.9978872991467036
+          }
+        },
+        "phase_mean_deltas_sum_exact": true,
+        "total_mean_delta_ns_B_minus_A": 221039.86
+      },
+      "position": 2,
+      "route": "owned_reader",
+      "rss_bytes": {
+        "A": 37842944,
+        "B": 39071744,
+        "B_over_A": 1.0324710466500704
+      },
+      "time_metrics": {
+        "A": {
+          "involuntary_context_switches": 24,
+          "major_page_faults": 0,
+          "minor_page_faults": 137718,
+          "rss_bytes": 37842944,
+          "system_cpu_seconds": 0.07,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B": {
+          "involuntary_context_switches": 24,
+          "major_page_faults": 0,
+          "minor_page_faults": 146614,
+          "rss_bytes": 39071744,
+          "system_cpu_seconds": 0.06,
+          "user_cpu_seconds": 0.75,
+          "voluntary_context_switches": 24
+        },
+        "B_minus_A": {
+          "involuntary_context_switches": 0,
+          "major_page_faults": 0,
+          "minor_page_faults": 8896,
+          "rss_bytes": 1228800,
+          "system_cpu_seconds": -0.010000000000000009,
+          "user_cpu_seconds": 0.010000000000000009,
+          "voluntary_context_switches": 0
+        }
+      },
+      "total_p50_ns": {
+        "A": 3385553.5,
+        "A_over_B": 0.9394595785554639,
+        "B": 3603724.5,
+        "B_over_A": 1.0644417522865905
+      }
+    },
+    {
+      "block": 11,
+      "flags_gt_1_05": {
+        "p50_A_over_B": false,
+        "p50_B_over_A": true
+      },
+      "label_order": "A_then_B",
+      "pair_id": "block-11-owned_reader",
+      "paired_sample_mean_delta": {
+        "phase_contribution": {
+          "commit_ns": {
+            "A_p50_ns": 282711.0,
+            "B_p50_ns": 289561.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 21160,
+              "mean": 6967.4,
+              "min": -7270,
+              "p10": -3270.0,
+              "p50": 6404.5,
+              "p90": 16290.0,
+              "p95": 18980.0,
+              "p99": 21160.0,
+              "spread": 28430
+            },
+            "mean_delta_ns_B_minus_A": 6967.4,
+            "mean_delta_share_of_total_mean": 0.03734144196898528,
+            "p50_ratio_B_over_A": 1.0242314589810797
+          },
+          "edit_ns": {
+            "A_p50_ns": 53305.0,
+            "B_p50_ns": 53300.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 8410,
+              "mean": -1275.68,
+              "min": -16280,
+              "p10": -8740.0,
+              "p50": 89.5,
+              "p90": 1701.0,
+              "p95": 2910.0,
+              "p99": 8410.0,
+              "spread": 24690
+            },
+            "mean_delta_ns_B_minus_A": -1275.68,
+            "mean_delta_share_of_total_mean": -0.006836945014064808,
+            "p50_ratio_B_over_A": 0.9999062001688397
+          },
+          "open_ns": {
+            "A_p50_ns": 391827.0,
+            "B_p50_ns": 383417.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 10690,
+              "mean": -12726.36,
+              "min": -116451,
+              "p10": -30179.0,
+              "p50": -8570.5,
+              "p90": 6270.0,
+              "p95": 8711.0,
+              "p99": 10690.0,
+              "spread": 127141
+            },
+            "mean_delta_ns_B_minus_A": -12726.36,
+            "mean_delta_share_of_total_mean": -0.06820630843878858,
+            "p50_ratio_B_over_A": 0.9785364459314952
+          },
+          "preparation_ns": {
+            "A_p50_ns": 34590.5,
+            "B_p50_ns": 238966.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 215701,
+              "mean": 197056.32,
+              "min": -940,
+              "p10": 200101.0,
+              "p50": 204286.0,
+              "p90": 210620.0,
+              "p95": 212591.0,
+              "p99": 215701.0,
+              "spread": 216641
+            },
+            "mean_delta_ns_B_minus_A": 197056.32,
+            "mean_delta_share_of_total_mean": 1.0561137781527965,
+            "p50_ratio_B_over_A": 6.908428614793079
+          },
+          "publication_ns": {
+            "A_p50_ns": 1358235.5,
+            "B_p50_ns": 1369841.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 32299,
+              "mean": 5463.16,
+              "min": -133761,
+              "p10": -13230.0,
+              "p50": 12071.0,
+              "p90": 26290.0,
+              "p95": 29461.0,
+              "p99": 32299.0,
+              "spread": 166060
+            },
+            "mean_delta_ns_B_minus_A": 5463.16,
+            "mean_delta_share_of_total_mean": 0.029279540733599566,
+            "p50_ratio_B_over_A": 1.0085445417970595
+          },
+          "query_ns": {
+            "A_p50_ns": 1276380.0,
+            "B_p50_ns": 1271335.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 11200,
+              "mean": -8898.58,
+              "min": -67540,
+              "p10": -20190.0,
+              "p50": -6660.0,
+              "p90": 4719.0,
+              "p95": 8590.0,
+              "p99": 11200.0,
+              "spread": 78740
+            },
+            "mean_delta_ns_B_minus_A": -8898.58,
+            "mean_delta_share_of_total_mean": -0.04769150740252792,
+            "p50_ratio_B_over_A": 0.9960474153465269
+          }
+        },
+        "phase_mean_deltas_sum_exact": true,
+        "total_mean_delta_ns_B_minus_A": 186586.26
+      },
+      "position": 3,
+      "route": "owned_reader",
+      "rss_bytes": {
+        "A": 37367808,
+        "B": 39215104,
+        "B_over_A": 1.0494354927107312
+      },
+      "time_metrics": {
+        "A": {
+          "involuntary_context_switches": 22,
+          "major_page_faults": 0,
+          "minor_page_faults": 137778,
+          "rss_bytes": 37367808,
+          "system_cpu_seconds": 0.07,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B": {
+          "involuntary_context_switches": 22,
+          "major_page_faults": 0,
+          "minor_page_faults": 148414,
+          "rss_bytes": 39215104,
+          "system_cpu_seconds": 0.07,
+          "user_cpu_seconds": 0.75,
+          "voluntary_context_switches": 24
+        },
+        "B_minus_A": {
+          "involuntary_context_switches": 0,
+          "major_page_faults": 0,
+          "minor_page_faults": 10636,
+          "rss_bytes": 1847296,
+          "system_cpu_seconds": 0.0,
+          "user_cpu_seconds": 0.010000000000000009,
+          "voluntary_context_switches": 0
+        }
+      },
+      "total_p50_ns": {
+        "A": 3400078.5,
+        "A_over_B": 0.9422520884604635,
+        "B": 3608459.5,
+        "B_over_A": 1.061287114400447
+      }
+    },
+    {
+      "block": 12,
+      "flags_gt_1_05": {
+        "p50_A_over_B": true,
+        "p50_B_over_A": false
+      },
+      "label_order": "B_then_A",
+      "pair_id": "block-12-owned_reader",
+      "paired_sample_mean_delta": {
+        "phase_contribution": {
+          "commit_ns": {
+            "A_p50_ns": 288156.0,
+            "B_p50_ns": 281841.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 23821,
+              "mean": -4554.18,
+              "min": -32260,
+              "p10": -13650.0,
+              "p50": -4995.0,
+              "p90": 4221.0,
+              "p95": 9560.0,
+              "p99": 23821.0,
+              "spread": 56081
+            },
+            "mean_delta_ns_B_minus_A": -4554.18,
+            "mean_delta_share_of_total_mean": 0.016700499058956375,
+            "p50_ratio_B_over_A": 0.9780847874068213
+          },
+          "edit_ns": {
+            "A_p50_ns": 52380.5,
+            "B_p50_ns": 51655.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 8400,
+              "mean": -935.6,
+              "min": -8620,
+              "p10": -4681.0,
+              "p50": -985.0,
+              "p90": 230.0,
+              "p95": 5551.0,
+              "p99": 8400.0,
+              "spread": 17020
+            },
+            "mean_delta_ns_B_minus_A": -935.6,
+            "mean_delta_share_of_total_mean": 0.0034309111452686504,
+            "p50_ratio_B_over_A": 0.9861589713729346
+          },
+          "open_ns": {
+            "A_p50_ns": 377926.0,
+            "B_p50_ns": 337186.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": -4729,
+              "mean": -41197.56,
+              "min": -74960,
+              "p10": -54501.0,
+              "p50": -42020.5,
+              "p90": -28659.0,
+              "p95": -26200.0,
+              "p99": -4729.0,
+              "spread": 70231
+            },
+            "mean_delta_ns_B_minus_A": -41197.56,
+            "mean_delta_share_of_total_mean": 0.15107435630811664,
+            "p50_ratio_B_over_A": 0.8922011187375306
+          },
+          "preparation_ns": {
+            "A_p50_ns": 34245.0,
+            "B_p50_ns": 32450.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 7810,
+              "mean": -11184.96,
+              "min": -218711,
+              "p10": -11381.0,
+              "p50": -1810.0,
+              "p90": -950.0,
+              "p95": -590.0,
+              "p99": 7810.0,
+              "spread": 226521
+            },
+            "mean_delta_ns_B_minus_A": -11184.96,
+            "mean_delta_share_of_total_mean": 0.04101603668595986,
+            "p50_ratio_B_over_A": 0.9475981895167178
+          },
+          "publication_ns": {
+            "A_p50_ns": 1352570.5,
+            "B_p50_ns": 1137824.5,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": -200921,
+              "mean": -214676.74,
+              "min": -247731,
+              "p10": -224370.0,
+              "p50": -215066.0,
+              "p90": -204310.0,
+              "p95": -203171.0,
+              "p99": -200921.0,
+              "spread": 46810
+            },
+            "mean_delta_ns_B_minus_A": -214676.74,
+            "mean_delta_share_of_total_mean": 0.7872347369559003,
+            "p50_ratio_B_over_A": 0.8412311964514974
+          },
+          "query_ns": {
+            "A_p50_ns": 1277820.0,
+            "B_p50_ns": 1278905.0,
+            "delta_quantiles_ns": {
+              "count": 50,
+              "max": 23740,
+              "mean": -148.2,
+              "min": -26040,
+              "p10": -12230.0,
+              "p50": -800.0,
+              "p90": 11879.0,
+              "p95": 17120.0,
+              "p99": 23740.0,
+              "spread": 49780
+            },
+            "mean_delta_ns_B_minus_A": -148.2,
+            "mean_delta_share_of_total_mean": 0.0005434598457982193,
+            "p50_ratio_B_over_A": 1.0008491023774866
+          }
+        },
+        "phase_mean_deltas_sum_exact": true,
+        "total_mean_delta_ns_B_minus_A": -272697.24
+      },
+      "position": 2,
+      "route": "owned_reader",
+      "rss_bytes": {
+        "A": 37756928,
+        "B": 37756928,
+        "B_over_A": 1.0
+      },
+      "time_metrics": {
+        "A": {
+          "involuntary_context_switches": 27,
+          "major_page_faults": 0,
+          "minor_page_faults": 114762,
+          "rss_bytes": 37756928,
+          "system_cpu_seconds": 0.06,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B": {
+          "involuntary_context_switches": 24,
+          "major_page_faults": 0,
+          "minor_page_faults": 137666,
+          "rss_bytes": 37756928,
+          "system_cpu_seconds": 0.07,
+          "user_cpu_seconds": 0.74,
+          "voluntary_context_switches": 24
+        },
+        "B_minus_A": {
+          "involuntary_context_switches": -3,
+          "major_page_faults": 0,
+          "minor_page_faults": 22904,
+          "rss_bytes": 0,
+          "system_cpu_seconds": 0.010000000000000009,
+          "user_cpu_seconds": 0.0,
+          "voluntary_context_switches": 0
+        }
+      },
+      "total_p50_ns": {
+        "A": 3383958.0,
+        "A_over_B": 1.0840711798950995,
+        "B": 3121527.5,
+        "B_over_A": 0.9224486533225295
+      }
+    }
+  ],
+  "independent_boundary_check": {
+    "checks": [
+      "96 reports",
+      "96*50 ranked phase sums",
+      "96*50 chronological inverse phase sums",
+      "96 analysis child vectors exact match",
+      "nonidentity sample orders 96/96",
+      "six owned_reader flagged pair IDs exact match"
+    ],
+    "result": {
+      "bytes": 1192,
+      "path": "/home/zhuhe/litchi-performance-0939/independent-boundary-check-v1.json",
+      "sha256": "e9eb7aa81895f5c0250967f50e3acba980eaa699df4c6737a8f69c630288891e"
+    },
+    "script": {
+      "bytes": 5050,
+      "path": "/home/zhuhe/litchi-performance-0939/independent-boundary-check-v1.py",
+      "sha256": "255ce7f134eaaae9c38bb365e59ea4b002fd2440be8f7c689d76eea2a353f0c2"
+    },
+    "status": "passed",
+    "terminal": {
+      "bytes": 1152,
+      "path": "/home/zhuhe/litchi-performance-0939/independent-boundary-terminal-v1.json",
+      "sha256": "d846f7a6a7eb449937e9070a61512646008a46f865d5d4f58dcbbf783018d7c1"
+    }
+  },
+  "limitations": [
+    "The packet is a finite same-binary A/A variability observation; it does not establish population probabilities, causality, or candidate regression.",
+    "The runner's original validator state is failed for its documented output_sha256 contract defect; this analysis reads and rehashes the retained raw reports and does not convert that capture state to passed.",
+    "Whole-child /usr/bin/time -v RSS includes warmups, correctness checks, and report serialization; it is not phase-local RSS.",
+    "Phase quantile ratios and phase p50 values are descriptive; only paired chronological sample means are decomposed additively here.",
+    "sample indices are the 50 measured iterations after the five warmups; warmup timings were discarded by the harness and are not reconstructed.",
+    "A and B measured_index values are ordinal positions in separate child sequences, not the same physical event; the phase mean-delta decomposition is algebraic over those ordinal vectors and is not a sample-level causal pairing.",
+    "The independent boundary check confirms the inversion and phase sums but does not make A/B measured_index values shared physical events; the two children remain separate ordinal sequences."
+  ],
+  "next_experiment": {
+    "bounded_follow_up": [
+      "Run an owned_reader-focused diagnostic under the same case, CPU, warmups, samples, and A/A pairing, adding per-sample preparation/open subevent and allocation markers that distinguish source cloning and adapter/sink setup in preparation from reader construction and Package::from_reader in open.",
+      "Retain sample_order or emit native chronological vectors, classify children continuously by preparation p50/IQR and window deltas, and report regime-conditioned results instead of pooling the two preparation modes.",
+      "Preserve alternating label/order and add explicit block-time/order metadata or a randomized block schedule in the diagnostic so capture-order drift can be separated from route/label position; do not treat the exploratory split as a production gate.",
+      "Keep terminal RSS, faults, CPU time, and context switches as descriptive whole-child covariates; do not attribute phase behavior to them without a dedicated control."
+    ],
+    "decision_basis": [
+      "owned_reader preparation is visibly bimodal by child: the exploratory 100us split has a large observed p50 gap and majority-high/low children, while labels and alternating label order do not isolate the regime",
+      "six owned_reader paired child p50s exceed the symmetric 1.05 directional flag; five are dominated by the paired-sample preparation mean decomposition and one is dominated by open/publication timing",
+      "phase p50 summaries are useful for location, but their medians are nonadditive; the retained chronological vectors permit exact mean-delta phase decomposition within each descriptive pair"
+    ]
+  },
+  "reader_preparation_regimes": {
+    "children": 24,
+    "classification": "exploratory descriptive split, not a prospective gate",
+    "majority_high_child_p50": {
+      "count": 9,
+      "max": 247080.5,
+      "mean": 240482.55555555556,
+      "min": 235891.0,
+      "p10": 235891.0,
+      "p50": 239761.0,
+      "p90": 247080.5,
+      "p95": 247080.5,
+      "p99": 247080.5,
+      "spread": 11189.5
+    },
+    "majority_high_children": 9,
+    "majority_low_child_p50": {
+      "count": 15,
+      "max": 39600.0,
+      "mean": 34582.2,
+      "min": 32450.5,
+      "p10": 33975.0,
+      "p50": 34450.5,
+      "p90": 34830.0,
+      "p95": 39600.0,
+      "p99": 39600.0,
+      "spread": 7149.5
+    },
+    "majority_low_children": 15,
+    "majority_rule": "high regime iff at least 25 of 50 chronological preparation samples are >= threshold",
+    "records": [
+      {
+        "block": 1,
+        "first10_mean_ns": 36743.2,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-01-03-owned_reader-A",
+        "iqr_proxy_ns": 5880.0,
+        "label": "A",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 34770.1,
+        "last_high_index": null,
+        "p50_ns": 34660.0,
+        "p95_ns": 44101.0,
+        "p99_ns": 46720.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 1,
+        "first10_mean_ns": 39863.1,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-01-03-owned_reader-B",
+        "iqr_proxy_ns": 4020.0,
+        "label": "B",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 34341.2,
+        "last_high_index": null,
+        "p50_ns": 34500.0,
+        "p95_ns": 41010.0,
+        "p99_ns": 63290.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 2,
+        "first10_mean_ns": 34644.1,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-02-02-owned_reader-A",
+        "iqr_proxy_ns": 1250.0,
+        "label": "A",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 36100.1,
+        "last_high_index": null,
+        "p50_ns": 34615.0,
+        "p95_ns": 43150.0,
+        "p99_ns": 44270.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 2,
+        "first10_mean_ns": 35438.1,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-02-02-owned_reader-B",
+        "iqr_proxy_ns": 3500.0,
+        "label": "B",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 34941.1,
+        "last_high_index": null,
+        "p50_ns": 34475.0,
+        "p95_ns": 40230.0,
+        "p99_ns": 43970.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 3,
+        "first10_mean_ns": 249919.0,
+        "first_high_index": 0,
+        "high_fraction": 1.0,
+        "high_runs": 1,
+        "high_sample_count": 50,
+        "id": "block-03-03-owned_reader-A",
+        "iqr_proxy_ns": 12620.0,
+        "label": "A",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 248721.0,
+        "last_high_index": 49,
+        "p50_ns": 247080.5,
+        "p95_ns": 252291.0,
+        "p99_ns": 252581.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 3,
+        "first10_mean_ns": 54370.3,
+        "first_high_index": 0,
+        "high_fraction": 0.02,
+        "high_runs": 1,
+        "high_sample_count": 1,
+        "id": "block-03-03-owned_reader-B",
+        "iqr_proxy_ns": 1140.0,
+        "label": "B",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 34871.1,
+        "last_high_index": 0,
+        "p50_ns": 33985.5,
+        "p95_ns": 39780.0,
+        "p99_ns": 235751.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 4,
+        "first10_mean_ns": 54639.0,
+        "first_high_index": 0,
+        "high_fraction": 0.02,
+        "high_runs": 1,
+        "high_sample_count": 1,
+        "id": "block-04-02-owned_reader-A",
+        "iqr_proxy_ns": 3230.0,
+        "label": "A",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 34770.0,
+        "last_high_index": 0,
+        "p50_ns": 34110.5,
+        "p95_ns": 39480.0,
+        "p99_ns": 239900.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 4,
+        "first10_mean_ns": 34680.0,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-04-02-owned_reader-B",
+        "iqr_proxy_ns": 1280.0,
+        "label": "B",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 34221.0,
+        "last_high_index": null,
+        "p50_ns": 34215.0,
+        "p95_ns": 39350.0,
+        "p99_ns": 46130.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 5,
+        "first10_mean_ns": 37158.3,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-05-03-owned_reader-A",
+        "iqr_proxy_ns": 6981.0,
+        "label": "A",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 38804.2,
+        "last_high_index": null,
+        "p50_ns": 39600.0,
+        "p95_ns": 41841.0,
+        "p99_ns": 43820.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 5,
+        "first10_mean_ns": 35558.2,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-05-03-owned_reader-B",
+        "iqr_proxy_ns": 2590.0,
+        "label": "B",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 35564.0,
+        "last_high_index": null,
+        "p50_ns": 34830.0,
+        "p95_ns": 43960.0,
+        "p99_ns": 45251.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 6,
+        "first10_mean_ns": 185968.8,
+        "first_high_index": 0,
+        "high_fraction": 0.94,
+        "high_runs": 3,
+        "high_sample_count": 47,
+        "id": "block-06-02-owned_reader-A",
+        "iqr_proxy_ns": 12600.0,
+        "label": "A",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 244541.9,
+        "last_high_index": 49,
+        "p50_ns": 242320.5,
+        "p95_ns": 254101.0,
+        "p99_ns": 269872.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 6,
+        "first10_mean_ns": 35054.3,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-06-02-owned_reader-B",
+        "iqr_proxy_ns": 1250.0,
+        "label": "B",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 34320.0,
+        "last_high_index": null,
+        "p50_ns": 34030.5,
+        "p95_ns": 36740.0,
+        "p99_ns": 41491.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 7,
+        "first10_mean_ns": 244125.9,
+        "first_high_index": 0,
+        "high_fraction": 1.0,
+        "high_runs": 1,
+        "high_sample_count": 50,
+        "id": "block-07-03-owned_reader-A",
+        "iqr_proxy_ns": 10230.0,
+        "label": "A",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 241986.0,
+        "last_high_index": 49,
+        "p50_ns": 242171.0,
+        "p95_ns": 252371.0,
+        "p99_ns": 252581.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 7,
+        "first10_mean_ns": 201891.8,
+        "first_high_index": 0,
+        "high_fraction": 0.86,
+        "high_runs": 3,
+        "high_sample_count": 43,
+        "id": "block-07-03-owned_reader-B",
+        "iqr_proxy_ns": 202591.0,
+        "label": "B",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 235543.0,
+        "last_high_index": 49,
+        "p50_ns": 235891.0,
+        "p95_ns": 244281.0,
+        "p99_ns": 272291.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 8,
+        "first10_mean_ns": 203365.9,
+        "first_high_index": 1,
+        "high_fraction": 0.96,
+        "high_runs": 2,
+        "high_sample_count": 48,
+        "id": "block-08-02-owned_reader-A",
+        "iqr_proxy_ns": 12650.0,
+        "label": "A",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 242533.0,
+        "last_high_index": 49,
+        "p50_ns": 239196.0,
+        "p95_ns": 250521.0,
+        "p99_ns": 256541.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 8,
+        "first10_mean_ns": 239067.0,
+        "first_high_index": 0,
+        "high_fraction": 1.0,
+        "high_runs": 1,
+        "high_sample_count": 50,
+        "id": "block-08-02-owned_reader-B",
+        "iqr_proxy_ns": 12440.0,
+        "label": "B",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 242120.0,
+        "last_high_index": 49,
+        "p50_ns": 240396.0,
+        "p95_ns": 250921.0,
+        "p99_ns": 276991.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 9,
+        "first10_mean_ns": 117909.5,
+        "first_high_index": 2,
+        "high_fraction": 0.84,
+        "high_runs": 5,
+        "high_sample_count": 42,
+        "id": "block-09-03-owned_reader-A",
+        "iqr_proxy_ns": 208201.0,
+        "label": "A",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 239718.9,
+        "last_high_index": 49,
+        "p50_ns": 239761.0,
+        "p95_ns": 244381.0,
+        "p99_ns": 246441.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 9,
+        "first10_mean_ns": 35184.0,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-09-03-owned_reader-B",
+        "iqr_proxy_ns": 1251.0,
+        "label": "B",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 35060.1,
+        "last_high_index": null,
+        "p50_ns": 33975.0,
+        "p95_ns": 43851.0,
+        "p99_ns": 46720.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 10,
+        "first10_mean_ns": 34291.1,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-10-02-owned_reader-A",
+        "iqr_proxy_ns": 1050.0,
+        "label": "A",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 34951.3,
+        "last_high_index": null,
+        "p50_ns": 34450.5,
+        "p95_ns": 37140.0,
+        "p99_ns": 44240.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 10,
+        "first10_mean_ns": 222121.9,
+        "first_high_index": 0,
+        "high_fraction": 0.94,
+        "high_runs": 4,
+        "high_sample_count": 47,
+        "id": "block-10-02-owned_reader-B",
+        "iqr_proxy_ns": 24220.0,
+        "label": "B",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 231713.0,
+        "last_high_index": 49,
+        "p50_ns": 238561.0,
+        "p95_ns": 261461.0,
+        "p99_ns": 276311.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 11,
+        "first10_mean_ns": 35916.0,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-11-03-owned_reader-A",
+        "iqr_proxy_ns": 3350.0,
+        "label": "A",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 35200.1,
+        "last_high_index": null,
+        "p50_ns": 34590.5,
+        "p95_ns": 38891.0,
+        "p99_ns": 44330.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 11,
+        "first10_mean_ns": 198875.7,
+        "first_high_index": 2,
+        "high_fraction": 0.96,
+        "high_runs": 1,
+        "high_sample_count": 48,
+        "id": "block-11-03-owned_reader-B",
+        "iqr_proxy_ns": 9880.0,
+        "label": "B",
+        "label_order": "A_then_B",
+        "last10_mean_ns": 239275.9,
+        "last_high_index": 49,
+        "p50_ns": 238966.0,
+        "p95_ns": 247201.0,
+        "p99_ns": 249961.0,
+        "position": 3,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 12,
+        "first10_mean_ns": 78427.2,
+        "first_high_index": 0,
+        "high_fraction": 0.04,
+        "high_runs": 1,
+        "high_sample_count": 2,
+        "id": "block-12-02-owned_reader-A",
+        "iqr_proxy_ns": 9520.0,
+        "label": "A",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 35570.1,
+        "last_high_index": 1,
+        "p50_ns": 34245.0,
+        "p95_ns": 61800.0,
+        "p99_ns": 250941.0,
+        "position": 2,
+        "threshold_ns": 100000
+      },
+      {
+        "block": 12,
+        "first10_mean_ns": 33343.1,
+        "first_high_index": null,
+        "high_fraction": 0.0,
+        "high_runs": 0,
+        "high_sample_count": 0,
+        "id": "block-12-02-owned_reader-B",
+        "iqr_proxy_ns": 890.0,
+        "label": "B",
+        "label_order": "B_then_A",
+        "last10_mean_ns": 32802.2,
+        "last_high_index": null,
+        "p50_ns": 32450.5,
+        "p95_ns": 33960.0,
+        "p99_ns": 41880.0,
+        "position": 2,
+        "threshold_ns": 100000
+      }
+    ],
+    "sample_counts": {
+      "all_high_samples": 429,
+      "total_samples": 1200
+    },
+    "schedule_counts": {
+      "block": {
+        "1": 0,
+        "10": 1,
+        "11": 1,
+        "12": 0,
+        "2": 0,
+        "3": 1,
+        "4": 0,
+        "5": 0,
+        "6": 1,
+        "7": 2,
+        "8": 2,
+        "9": 1
+      },
+      "label": {
+        "A": 5,
+        "B": 4
+      },
+      "label_order": {
+        "A_then_B": 5,
+        "B_then_A": 4
+      }
+    },
+    "threshold_evidence": {
+      "gap_ns": 196291.0,
+      "max_child_p50_below_threshold_ns": 39600.0,
+      "min_child_p50_at_or_above_threshold_ns": 235891.0
+    },
+    "threshold_ns": 100000
+  },
+  "route_phase_summary": {
+    "generic_read_at": {
+      "open_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 45310.0,
+            "mean": 44216.083333333336,
+            "min": 43170.5,
+            "p10": 43625.5,
+            "p50": 44090.0,
+            "p90": 45000.0,
+            "p95": 45310.0,
+            "p99": 45310.0,
+            "spread": 2139.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 1132.0,
+            "mean": -639.7999999999993,
+            "min": -1790.0,
+            "p10": -1726.0999999999985,
+            "p50": -526.4500000000007,
+            "p90": -49.10000000000582,
+            "p95": 1132.0,
+            "p99": 1132.0,
+            "spread": 2922.0
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 73280,
+            "mean": 44601.613333333335,
+            "min": 41530,
+            "p10": 43051.0,
+            "p50": 44141.0,
+            "p90": 45970.0,
+            "p95": 47251.0,
+            "p99": 55150.0,
+            "spread": 31750
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 45165.0,
+            "mean": 44105.375,
+            "min": 43550.0,
+            "p10": 43805.5,
+            "p50": 43967.75,
+            "p90": 44600.0,
+            "p95": 45165.0,
+            "p99": 45165.0,
+            "spread": 1615.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 127.20000000000437,
+            "mean": -792.4583333333321,
+            "min": -2728.9000000000015,
+            "p10": -2089.0999999999985,
+            "p50": -588.9500000000007,
+            "p90": 102.79999999999563,
+            "p95": 127.20000000000437,
+            "p99": 127.20000000000437,
+            "spread": 2856.100000000006
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 77651,
+            "mean": 44778.78666666667,
+            "min": 41650,
+            "p10": 43100.0,
+            "p50": 44101.0,
+            "p90": 46331.0,
+            "p95": 50480.0,
+            "p99": 54080.0,
+            "spread": 36001
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 45310.0,
+            "mean": 44160.729166666664,
+            "min": 43170.5,
+            "p10": 43625.5,
+            "p50": 44022.5,
+            "p90": 45000.0,
+            "p95": 45165.0,
+            "p99": 45310.0,
+            "spread": 2139.5
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 1132.0,
+            "mean": -716.1291666666657,
+            "min": -2728.9000000000015,
+            "p10": -1790.0,
+            "p50": -574.5,
+            "p90": 102.79999999999563,
+            "p95": 127.20000000000437,
+            "p99": 1132.0,
+            "spread": 3860.9000000000015
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 77651,
+            "mean": 44690.2,
+            "min": 41530,
+            "p10": 43070.0,
+            "p50": 44120.0,
+            "p90": 46201.0,
+            "p95": 48510.0,
+            "p99": 55150.0,
+            "spread": 36121
+          },
+          "samples": 1200
+        }
+      },
+      "preparation_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 39551.0,
+            "mean": 36293.916666666664,
+            "min": 31385.0,
+            "p10": 33295.0,
+            "p50": 36415.0,
+            "p90": 39430.0,
+            "p95": 39551.0,
+            "p99": 39551.0,
+            "spread": 8166.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 5693.0,
+            "mean": 232.79999999999927,
+            "min": -2081.0999999999985,
+            "p10": -1974.0,
+            "p50": 167.39999999999782,
+            "p90": 2575.0,
+            "p95": 5693.0,
+            "p99": 5693.0,
+            "spread": 7774.0999999999985
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 68311,
+            "mean": 36777.17166666667,
+            "min": 31050,
+            "p10": 33120.0,
+            "p50": 36910.0,
+            "p90": 39960.0,
+            "p95": 41800.0,
+            "p99": 47510.0,
+            "spread": 37261
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 39920.0,
+            "mean": 36508.5,
+            "min": 33435.0,
+            "p10": 33440.0,
+            "p50": 36135.0,
+            "p90": 39885.5,
+            "p95": 39920.0,
+            "p99": 39920.0,
+            "spread": 6485.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 2171.0,
+            "mean": 275.20833333333394,
+            "min": -3036.0,
+            "p10": -950.9000000000015,
+            "p50": 410.65000000000146,
+            "p90": 1884.800000000003,
+            "p95": 2171.0,
+            "p99": 2171.0,
+            "spread": 5207.0
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 56340,
+            "mean": 36765.568333333336,
+            "min": 32921,
+            "p10": 33290.0,
+            "p50": 35765.0,
+            "p90": 40480.0,
+            "p95": 41351.0,
+            "p99": 45841.0,
+            "spread": 23419
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 39920.0,
+            "mean": 36401.208333333336,
+            "min": 31385.0,
+            "p10": 33435.0,
+            "p50": 36180.0,
+            "p90": 39665.5,
+            "p95": 39885.5,
+            "p99": 39920.0,
+            "spread": 8535.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 5693.0,
+            "mean": 254.0041666666666,
+            "min": -3036.0,
+            "p10": -1974.0,
+            "p50": 383.5499999999993,
+            "p90": 2171.0,
+            "p95": 2575.0,
+            "p99": 5693.0,
+            "spread": 8729.0
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 68311,
+            "mean": 36771.37,
+            "min": 31050,
+            "p10": 33220.0,
+            "p50": 36115.0,
+            "p90": 40340.0,
+            "p95": 41540.0,
+            "p99": 46820.0,
+            "spread": 37261
+          },
+          "samples": 1200
+        }
+      },
+      "publication_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 2340819.5,
+            "mean": 2319462.0416666665,
+            "min": 2125253.5,
+            "p10": 2333659.5,
+            "p50": 2336934.0,
+            "p90": 2340284.0,
+            "p95": 2340819.5,
+            "p99": 2340819.5,
+            "spread": 215566.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 9193.69999999972,
+            "mean": -47.45833333344975,
+            "min": -8939.100000000093,
+            "p10": -7158.899999999907,
+            "p50": 1408.3499999998603,
+            "p90": 5869.0,
+            "p95": 9193.69999999972,
+            "p99": 9193.69999999972,
+            "spread": 18132.799999999814
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 2497740,
+            "mean": 2321011.6933333334,
+            "min": 2119128,
+            "p10": 2324269.0,
+            "p50": 2336045.0,
+            "p90": 2347920.0,
+            "p95": 2354979.0,
+            "p99": 2374420.0,
+            "spread": 378612
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 2341015.0,
+            "mean": 2337680.0,
+            "min": 2334939.0,
+            "p10": 2335479.0,
+            "p50": 2337436.5,
+            "p90": 2340324.5,
+            "p95": 2341015.0,
+            "p99": 2341015.0,
+            "spread": 6076.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 14979.5,
+            "mean": -355.9666666666744,
+            "min": -20095.100000000093,
+            "p10": -3430.899999999907,
+            "p50": 496.89999999990687,
+            "p90": 4392.300000000279,
+            "p95": 14979.5,
+            "p99": 14979.5,
+            "spread": 35074.60000000009
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 2437709,
+            "mean": 2339759.408333333,
+            "min": 2319830,
+            "p10": 2330009.0,
+            "p50": 2337740.0,
+            "p90": 2349569.0,
+            "p95": 2360360.0,
+            "p99": 2382799.0,
+            "spread": 117879
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 2341015.0,
+            "mean": 2328571.0208333335,
+            "min": 2125253.5,
+            "p10": 2334319.0,
+            "p50": 2337099.0,
+            "p90": 2340324.5,
+            "p95": 2340819.5,
+            "p99": 2341015.0,
+            "spread": 215761.5
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 14979.5,
+            "mean": -201.71250000006208,
+            "min": -20095.100000000093,
+            "p10": -7158.899999999907,
+            "p50": 890.75,
+            "p90": 5869.0,
+            "p95": 9193.69999999972,
+            "p99": 14979.5,
+            "spread": 35074.60000000009
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 2497740,
+            "mean": 2330385.5508333333,
+            "min": 2119128,
+            "p10": 2327859.0,
+            "p50": 2336779.5,
+            "p90": 2348649.0,
+            "p95": 2357560.0,
+            "p99": 2382140.0,
+            "spread": 378612
+          },
+          "samples": 1200
+        }
+      }
+    },
+    "owned_reader": {
+      "open_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 391827.0,
+            "mean": 381193.125,
+            "min": 376591.5,
+            "p10": 377902.0,
+            "p50": 379458.5,
+            "p90": 386291.5,
+            "p95": 391827.0,
+            "p99": 391827.0,
+            "spread": 15235.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 6149.900000000023,
+            "mean": 51.6916666666657,
+            "min": -8832.0,
+            "p10": -3781.2000000000116,
+            "p50": 644.0499999999884,
+            "p90": 3645.0,
+            "p95": 6149.900000000023,
+            "p99": 6149.900000000023,
+            "spread": 14981.900000000023
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 490612,
+            "mean": 382430.58666666667,
+            "min": 340652,
+            "p10": 373072.0,
+            "p50": 380831.5,
+            "p90": 392921.0,
+            "p95": 398572.0,
+            "p99": 418441.0,
+            "spread": 149960
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 387392.0,
+            "mean": 377981.9583333333,
+            "min": 337186.0,
+            "p10": 374346.5,
+            "p50": 382541.0,
+            "p90": 385496.5,
+            "p95": 387392.0,
+            "p99": 387392.0,
+            "spread": 50206.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 47516.5,
+            "mean": 1046.3416666666697,
+            "min": -36220.100000000035,
+            "p10": -7789.0,
+            "p50": -531.5,
+            "p90": 7718.799999999988,
+            "p95": 47516.5,
+            "p99": 47516.5,
+            "spread": 83736.60000000003
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 531762,
+            "mean": 379009.37,
+            "min": 120750,
+            "p10": 369452.0,
+            "p50": 380856.5,
+            "p90": 392982.0,
+            "p95": 397512.0,
+            "p99": 423632.0,
+            "spread": 411012
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 391827.0,
+            "mean": 379587.5416666667,
+            "min": 337186.0,
+            "p10": 376591.5,
+            "p50": 380119.0,
+            "p90": 386291.5,
+            "p95": 387392.0,
+            "p99": 391827.0,
+            "spread": 54641.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 47516.5,
+            "mean": 549.0166666666677,
+            "min": -36220.100000000035,
+            "p10": -7789.0,
+            "p50": 60.40000000002328,
+            "p90": 6355.0,
+            "p95": 7718.799999999988,
+            "p99": 47516.5,
+            "spread": 83736.60000000003
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 531762,
+            "mean": 380719.97833333333,
+            "min": 120750,
+            "p10": 371772.0,
+            "p50": 380832.0,
+            "p90": 392982.0,
+            "p95": 398402.0,
+            "p99": 421522.0,
+            "spread": 411012
+          },
+          "samples": 1200
+        }
+      },
+      "preparation_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 247080.5,
+            "mean": 121400.04166666667,
+            "min": 34110.5,
+            "p10": 34245.0,
+            "p50": 37130.0,
+            "p90": 242320.5,
+            "p95": 247080.5,
+            "p99": 247080.5,
+            "spread": 212970.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 121809.4,
+            "mean": 12879.891666666668,
+            "min": -42857.1,
+            "p10": -19869.0,
+            "p50": -27.849999999998545,
+            "p90": 58573.100000000006,
+            "p95": 121809.4,
+            "p99": 121809.4,
+            "spread": 164666.5
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 269872,
+            "mean": 118793.22833333333,
+            "min": 32040,
+            "p10": 34040.0,
+            "p50": 38170.0,
+            "p90": 246981.0,
+            "p95": 250151.0,
+            "p99": 253201.0,
+            "spread": 237832
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 240396.0,
+            "mean": 102189.625,
+            "min": 32450.5,
+            "p10": 33975.0,
+            "p50": 34487.5,
+            "p90": 238966.0,
+            "p95": 240396.0,
+            "p99": 240396.0,
+            "spread": 207945.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 40400.19999999998,
+            "mean": 4943.758333333332,
+            "min": -19499.200000000004,
+            "p10": -5521.9000000000015,
+            "p50": -291.4500000000007,
+            "p90": 33651.20000000001,
+            "p95": 40400.19999999998,
+            "p99": 40400.19999999998,
+            "spread": 59899.39999999999
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 276991,
+            "mean": 99467.135,
+            "min": 31880,
+            "p10": 33590.0,
+            "p50": 34595.5,
+            "p90": 241151.0,
+            "p95": 244201.0,
+            "p99": 255201.0,
+            "spread": 245111
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 247080.5,
+            "mean": 111794.83333333333,
+            "min": 32450.5,
+            "p10": 33985.5,
+            "p50": 34637.5,
+            "p90": 242171.0,
+            "p95": 242320.5,
+            "p99": 247080.5,
+            "spread": 214630.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 121809.4,
+            "mean": 8911.824999999999,
+            "min": -42857.1,
+            "p10": -19499.200000000004,
+            "p50": -291.4500000000007,
+            "p90": 40400.19999999998,
+            "p95": 58573.100000000006,
+            "p99": 121809.4,
+            "spread": 164666.5
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 276991,
+            "mean": 109130.18166666667,
+            "min": 31880,
+            "p10": 33800.0,
+            "p50": 35035.0,
+            "p90": 243841.0,
+            "p95": 248381.0,
+            "p99": 254061.0,
+            "spread": 245111
+          },
+          "samples": 1200
+        }
+      },
+      "publication_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 1376740.0,
+            "mean": 1359682.7916666667,
+            "min": 1349550.0,
+            "p10": 1350216.0,
+            "p50": 1355403.0,
+            "p90": 1374290.0,
+            "p95": 1376740.0,
+            "p99": 1376740.0,
+            "spread": 27190.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 27986.90000000014,
+            "mean": 5122.933333333349,
+            "min": -3912.1999999999534,
+            "p10": -3882.0999999998603,
+            "p50": 1188.9000000000233,
+            "p90": 27475.09999999986,
+            "p95": 27986.90000000014,
+            "p99": 27986.90000000014,
+            "spread": 31899.100000000093
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 1497626,
+            "mean": 1360195.8466666667,
+            "min": 1140455,
+            "p10": 1345445.0,
+            "p50": 1358255.5,
+            "p90": 1376805.0,
+            "p95": 1382226.0,
+            "p99": 1395226.0,
+            "spread": 357171
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 1380015.0,
+            "mean": 1340777.7916666667,
+            "min": 1137824.5,
+            "p10": 1346020.5,
+            "p50": 1354122.5,
+            "p90": 1370950.5,
+            "p95": 1380015.0,
+            "p99": 1380015.0,
+            "spread": 242190.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 14785.90000000014,
+            "mean": 249.50833333334108,
+            "min": -38909.0,
+            "p10": -7821.09999999986,
+            "p50": 1563.5999999999767,
+            "p90": 12754.699999999953,
+            "p95": 14785.90000000014,
+            "p99": 14785.90000000014,
+            "spread": 53694.90000000014
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 1536017,
+            "mean": 1342886.0516666668,
+            "min": 1132414,
+            "p10": 1340696.0,
+            "p50": 1355385.0,
+            "p90": 1378195.0,
+            "p95": 1384776.0,
+            "p99": 1419635.0,
+            "spread": 403603
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 1380015.0,
+            "mean": 1350230.2916666667,
+            "min": 1137824.5,
+            "p10": 1349240.5,
+            "p50": 1354122.5,
+            "p90": 1374290.0,
+            "p95": 1376740.0,
+            "p99": 1380015.0,
+            "spread": 242190.5
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 27986.90000000014,
+            "mean": 2686.220833333345,
+            "min": -38909.0,
+            "p10": -3912.1999999999534,
+            "p50": 1443.5500000000466,
+            "p90": 14785.90000000014,
+            "p95": 27475.09999999986,
+            "p99": 27986.90000000014,
+            "spread": 66895.90000000014
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 1536017,
+            "mean": 1351540.9491666667,
+            "min": 1132414,
+            "p10": 1344285.0,
+            "p50": 1357055.5,
+            "p90": 1377546.0,
+            "p95": 1383345.0,
+            "p99": 1416115.0,
+            "spread": 403603
+          },
+          "samples": 1200
+        }
+      }
+    },
+    "owned_vec": {
+      "open_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 45340.5,
+            "mean": 44393.625,
+            "min": 43650.5,
+            "p10": 43870.5,
+            "p50": 44392.5,
+            "p90": 45100.5,
+            "p95": 45340.5,
+            "p99": 45340.5,
+            "spread": 1690.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 1136.9000000000015,
+            "mean": -807.7583333333326,
+            "min": -3122.100000000006,
+            "p10": -1273.1000000000058,
+            "p50": -883.8499999999949,
+            "p90": 65.09999999999854,
+            "p95": 1136.9000000000015,
+            "p99": 1136.9000000000015,
+            "spread": 4259.000000000007
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 74431,
+            "mean": 44808.78833333333,
+            "min": 42191,
+            "p10": 43290.0,
+            "p50": 44370.0,
+            "p90": 46140.0,
+            "p95": 47690.0,
+            "p99": 52750.0,
+            "spread": 32240
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 45380.5,
+            "mean": 44581.541666666664,
+            "min": 43740.5,
+            "p10": 44290.0,
+            "p50": 44500.0,
+            "p90": 44950.0,
+            "p95": 45380.5,
+            "p99": 45380.5,
+            "spread": 1640.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 2015.7999999999956,
+            "mean": -352.6666666666679,
+            "min": -1901.0,
+            "p10": -1007.0999999999985,
+            "p50": -446.4500000000007,
+            "p90": 197.89999999999418,
+            "p95": 2015.7999999999956,
+            "p99": 2015.7999999999956,
+            "spread": 3916.7999999999956
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 54981,
+            "mean": 44999.386666666665,
+            "min": 42230,
+            "p10": 43510.0,
+            "p50": 44550.5,
+            "p90": 46400.0,
+            "p95": 49980.0,
+            "p99": 52280.0,
+            "spread": 12751
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 45380.5,
+            "mean": 44487.583333333336,
+            "min": 43650.5,
+            "p10": 43870.5,
+            "p50": 44445.75,
+            "p90": 45100.5,
+            "p95": 45340.5,
+            "p99": 45380.5,
+            "spread": 1730.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 2015.7999999999956,
+            "mean": -580.2125000000002,
+            "min": -3122.100000000006,
+            "p10": -1273.1000000000058,
+            "p50": -730.8999999999978,
+            "p90": 197.89999999999418,
+            "p95": 1136.9000000000015,
+            "p99": 2015.7999999999956,
+            "spread": 5137.9000000000015
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 74431,
+            "mean": 44904.0875,
+            "min": 42191,
+            "p10": 43400.0,
+            "p50": 44470.0,
+            "p90": 46290.0,
+            "p95": 48740.0,
+            "p99": 52530.0,
+            "spread": 32240
+          },
+          "samples": 1200
+        }
+      },
+      "preparation_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 240641.0,
+            "mean": 238020.58333333334,
+            "min": 234036.0,
+            "p10": 236341.0,
+            "p50": 237976.0,
+            "p90": 240556.0,
+            "p95": 240641.0,
+            "p99": 240641.0,
+            "spread": 6605.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 3476.100000000006,
+            "mean": -179.25,
+            "min": -2313.100000000006,
+            "p10": -1999.0,
+            "p50": -465.9499999999971,
+            "p90": 1490.1000000000058,
+            "p95": 3476.100000000006,
+            "p99": 3476.100000000006,
+            "spread": 5789.200000000012
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 263812,
+            "mean": 239305.495,
+            "min": 230871,
+            "p10": 234461.0,
+            "p50": 238550.5,
+            "p90": 244961.0,
+            "p95": 246311.0,
+            "p99": 248291.0,
+            "spread": 32941
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 239791.0,
+            "mean": 237560.04166666666,
+            "min": 234951.0,
+            "p10": 236006.0,
+            "p50": 237463.25,
+            "p90": 239760.5,
+            "p95": 239791.0,
+            "p99": 239791.0,
+            "spread": 4840.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 1499.0,
+            "mean": -478.07499999999953,
+            "min": -2905.899999999994,
+            "p10": -2183.0,
+            "p50": -264.0,
+            "p90": 1227.0,
+            "p95": 1499.0,
+            "p99": 1499.0,
+            "spread": 4404.899999999994
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 282651,
+            "mean": 238983.445,
+            "min": 231611,
+            "p10": 234591.0,
+            "p50": 237801.0,
+            "p90": 244511.0,
+            "p95": 245941.0,
+            "p99": 252051.0,
+            "spread": 51040
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 240641.0,
+            "mean": 237790.3125,
+            "min": 234036.0,
+            "p10": 236006.0,
+            "p50": 237843.5,
+            "p90": 239791.0,
+            "p95": 240556.0,
+            "p99": 240641.0,
+            "spread": 6605.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 3476.100000000006,
+            "mean": -328.66249999999974,
+            "min": -2905.899999999994,
+            "p10": -2183.0,
+            "p50": -301.4499999999971,
+            "p90": 1490.1000000000058,
+            "p95": 1499.0,
+            "p99": 3476.100000000006,
+            "spread": 6382.0
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 282651,
+            "mean": 239144.47,
+            "min": 230871,
+            "p10": 234561.0,
+            "p50": 238226.0,
+            "p90": 244821.0,
+            "p95": 246081.0,
+            "p99": 249711.0,
+            "spread": 51780
+          },
+          "samples": 1200
+        }
+      },
+      "publication_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 1368135.5,
+            "mean": 1363249.625,
+            "min": 1360150.0,
+            "p10": 1360790.0,
+            "p50": 1362410.25,
+            "p90": 1367356.0,
+            "p95": 1368135.5,
+            "p99": 1368135.5,
+            "spread": 7985.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 7133.0,
+            "mean": -303.7416666666589,
+            "min": -4677.799999999814,
+            "p10": -4307.0,
+            "p50": -41.95000000006985,
+            "p90": 4517.100000000093,
+            "p95": 7133.0,
+            "p99": 7133.0,
+            "spread": 11810.799999999814
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 1425196,
+            "mean": 1364179.765,
+            "min": 1346975,
+            "p10": 1355455.0,
+            "p50": 1363250.0,
+            "p90": 1372445.0,
+            "p95": 1375675.0,
+            "p99": 1392476.0,
+            "spread": 78221
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 1369170.5,
+            "mean": 1362848.75,
+            "min": 1358050.5,
+            "p10": 1358550.0,
+            "p50": 1362652.75,
+            "p90": 1367651.0,
+            "p95": 1369170.5,
+            "p99": 1369170.5,
+            "spread": 11120.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 3695.6999999999534,
+            "mean": -1463.1500000000233,
+            "min": -5688.200000000186,
+            "p10": -4850.300000000047,
+            "p50": -1669.1999999999534,
+            "p90": 3243.5,
+            "p95": 3695.6999999999534,
+            "p99": 3695.6999999999534,
+            "spread": 9383.90000000014
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 1407266,
+            "mean": 1364000.7966666666,
+            "min": 1346835,
+            "p10": 1354915.0,
+            "p50": 1362975.0,
+            "p90": 1373316.0,
+            "p95": 1378175.0,
+            "p99": 1392246.0,
+            "spread": 60431
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 1369170.5,
+            "mean": 1363049.1875,
+            "min": 1358050.5,
+            "p10": 1359725.5,
+            "p50": 1362410.25,
+            "p90": 1367651.0,
+            "p95": 1368135.5,
+            "p99": 1369170.5,
+            "spread": 11120.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 7133.0,
+            "mean": -883.445833333341,
+            "min": -5688.200000000186,
+            "p10": -4677.799999999814,
+            "p50": -1280.4000000000233,
+            "p90": 3695.6999999999534,
+            "p95": 4517.100000000093,
+            "p99": 7133.0,
+            "spread": 12821.200000000186
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 1425196,
+            "mean": 1364090.2808333333,
+            "min": 1346835,
+            "p10": 1355185.0,
+            "p50": 1363060.5,
+            "p90": 1372856.0,
+            "p95": 1377945.0,
+            "p99": 1392476.0,
+            "spread": 78361
+          },
+          "samples": 1200
+        }
+      }
+    },
+    "range_short": {
+      "open_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 46890.0,
+            "mean": 45019.416666666664,
+            "min": 44265.0,
+            "p10": 44375.5,
+            "p50": 44725.25,
+            "p90": 45931.0,
+            "p95": 46890.0,
+            "p99": 46890.0,
+            "spread": 2625.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 6173.0,
+            "mean": -80.66666666666606,
+            "min": -2618.5999999999985,
+            "p10": -1771.699999999997,
+            "p50": -436.59999999999854,
+            "p90": 1378.0,
+            "p95": 6173.0,
+            "p99": 6173.0,
+            "spread": 8791.599999999999
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 73590,
+            "mean": 45623.471666666665,
+            "min": 42530,
+            "p10": 43880.0,
+            "p50": 44975.0,
+            "p90": 47220.0,
+            "p95": 50160.0,
+            "p99": 55780.0,
+            "spread": 31060
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 46005.0,
+            "mean": 45056.375,
+            "min": 43000.0,
+            "p10": 44435.0,
+            "p50": 45265.0,
+            "p90": 45950.0,
+            "p95": 46005.0,
+            "p99": 46005.0,
+            "spread": 3005.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 1431.1000000000058,
+            "mean": -778.3416666666653,
+            "min": -3122.199999999997,
+            "p10": -2736.9000000000015,
+            "p50": -681.0499999999993,
+            "p90": 439.6999999999971,
+            "p95": 1431.1000000000058,
+            "p99": 1431.1000000000058,
+            "spread": 4553.300000000003
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 75531,
+            "mean": 45840.71333333333,
+            "min": 41380,
+            "p10": 43720.0,
+            "p50": 45150.5,
+            "p90": 48020.0,
+            "p95": 53090.0,
+            "p99": 57681.0,
+            "spread": 34151
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 46890.0,
+            "mean": 45037.895833333336,
+            "min": 43000.0,
+            "p10": 44375.5,
+            "p50": 44900.0,
+            "p90": 45950.0,
+            "p95": 46005.0,
+            "p99": 46890.0,
+            "spread": 3890.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 6173.0,
+            "mean": -429.5041666666657,
+            "min": -3122.199999999997,
+            "p10": -2618.5999999999985,
+            "p50": -565.6500000000015,
+            "p90": 1378.0,
+            "p95": 1431.1000000000058,
+            "p99": 6173.0,
+            "spread": 9295.199999999997
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 75531,
+            "mean": 45732.0925,
+            "min": 41380,
+            "p10": 43830.0,
+            "p50": 45040.5,
+            "p90": 47510.0,
+            "p95": 52150.0,
+            "p99": 56630.0,
+            "spread": 34151
+          },
+          "samples": 1200
+        }
+      },
+      "preparation_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 39580.0,
+            "mean": 35754.291666666664,
+            "min": 33140.5,
+            "p10": 33170.0,
+            "p50": 33460.25,
+            "p90": 39245.0,
+            "p95": 39580.0,
+            "p99": 39580.0,
+            "spread": 6439.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 1671.1000000000058,
+            "mean": 155.01666666666765,
+            "min": -1110.0999999999985,
+            "p10": -555.9000000000015,
+            "p50": -36.04999999999927,
+            "p90": 811.9000000000015,
+            "p95": 1671.1000000000058,
+            "p99": 1671.1000000000058,
+            "spread": 2781.2000000000044
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 58630,
+            "mean": 36187.24833333334,
+            "min": 32750,
+            "p10": 33081.0,
+            "p50": 33785.0,
+            "p90": 39590.0,
+            "p95": 40220.0,
+            "p99": 47630.0,
+            "spread": 25880
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 39185.0,
+            "mean": 35295.125,
+            "min": 33260.5,
+            "p10": 33265.0,
+            "p50": 33485.0,
+            "p90": 38985.0,
+            "p95": 39185.0,
+            "p99": 39185.0,
+            "spread": 5924.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 5745.0999999999985,
+            "mean": 856.8000000000005,
+            "min": -3051.0,
+            "p10": -1070.199999999997,
+            "p50": 967.6500000000015,
+            "p90": 2398.2000000000044,
+            "p95": 5745.0999999999985,
+            "p99": 5745.0999999999985,
+            "spread": 8796.099999999999
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 50860,
+            "mean": 35769.93666666667,
+            "min": 32770,
+            "p10": 33100.0,
+            "p50": 33615.0,
+            "p90": 39460.0,
+            "p95": 40330.0,
+            "p99": 47380.0,
+            "spread": 18090
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 39580.0,
+            "mean": 35524.708333333336,
+            "min": 33140.5,
+            "p10": 33255.0,
+            "p50": 33485.0,
+            "p90": 39240.0,
+            "p95": 39245.0,
+            "p99": 39580.0,
+            "spread": 6439.5
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 5745.0999999999985,
+            "mean": 505.90833333333404,
+            "min": -3051.0,
+            "p10": -1070.199999999997,
+            "p50": 290.1000000000022,
+            "p90": 2304.0999999999985,
+            "p95": 2398.2000000000044,
+            "p99": 5745.0999999999985,
+            "spread": 8796.099999999999
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 58630,
+            "mean": 35978.5925,
+            "min": 32750,
+            "p10": 33091.0,
+            "p50": 33715.0,
+            "p90": 39550.0,
+            "p95": 40330.0,
+            "p99": 47630.0,
+            "spread": 25880
+          },
+          "samples": 1200
+        }
+      },
+      "publication_ns": {
+        "A": {
+          "child_p50": {
+            "count": 12,
+            "max": 2368554.5,
+            "mean": 2363318.125,
+            "min": 2360669.0,
+            "p10": 2361194.0,
+            "p50": 2363051.75,
+            "p90": 2364669.5,
+            "p95": 2368554.5,
+            "p99": 2368554.5,
+            "spread": 7885.5
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 20257.0,
+            "mean": 2644.5166666666823,
+            "min": -4296.0,
+            "p10": -1446.1999999997206,
+            "p50": 1941.5,
+            "p90": 4289.0999999996275,
+            "p95": 20257.0,
+            "p99": 20257.0,
+            "spread": 24553.0
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 2480850,
+            "mean": 2364659.7283333335,
+            "min": 2349649,
+            "p10": 2355839.0,
+            "p50": 2363209.5,
+            "p90": 2372459.0,
+            "p95": 2378189.0,
+            "p99": 2394779.0,
+            "spread": 131201
+          },
+          "samples": 600
+        },
+        "B": {
+          "child_p50": {
+            "count": 12,
+            "max": 2370970.0,
+            "mean": 2347116.9166666665,
+            "min": 2157599.0,
+            "p10": 2358930.0,
+            "p50": 2363717.0,
+            "p90": 2366684.0,
+            "p95": 2370970.0,
+            "p99": 2370970.0,
+            "spread": 213371.0
+          },
+          "children": 12,
+          "last10_minus_first10_mean": {
+            "count": 12,
+            "max": 3948.0,
+            "mean": -2660.6166666667364,
+            "min": -25108.0,
+            "p10": -5779.899999999907,
+            "p50": -733.6999999999534,
+            "p90": 3104.0,
+            "p95": 3948.0,
+            "p99": 3948.0,
+            "spread": 29056.0
+          },
+          "pooled_samples": {
+            "count": 600,
+            "max": 2400379,
+            "mean": 2348433.1466666665,
+            "min": 2148938,
+            "p10": 2350799.0,
+            "p50": 2363519.5,
+            "p90": 2375079.0,
+            "p95": 2379309.0,
+            "p99": 2391529.0,
+            "spread": 251441
+          },
+          "samples": 600
+        },
+        "all_labels": {
+          "child_p50": {
+            "count": 24,
+            "max": 2370970.0,
+            "mean": 2355217.5208333335,
+            "min": 2157599.0,
+            "p10": 2360669.0,
+            "p50": 2363319.5,
+            "p90": 2366684.0,
+            "p95": 2368554.5,
+            "p99": 2370970.0,
+            "spread": 213371.0
+          },
+          "children": 24,
+          "last10_minus_first10_mean": {
+            "count": 24,
+            "max": 20257.0,
+            "mean": -8.050000000027163,
+            "min": -25108.0,
+            "p10": -4296.0,
+            "p50": 554.5999999998603,
+            "p90": 3948.0,
+            "p95": 4289.0999999996275,
+            "p99": 20257.0,
+            "spread": 45365.0
+          },
+          "pooled_samples": {
+            "count": 1200,
+            "max": 2480850,
+            "mean": 2356546.4375,
+            "min": 2148938,
+            "p10": 2354150.0,
+            "p50": 2363354.5,
+            "p90": 2374170.0,
+            "p95": 2379309.0,
+            "p99": 2393260.0,
+            "spread": 331912
+          },
+          "samples": 1200
+        }
+      }
+    }
+  },
+  "sample_order_semantics": {
+    "comparison_checks": {
+      "validator_requires_phase_sums": true,
+      "validator_requires_sample_order_permutation": true,
+      "validator_requires_section_order_match": true
+    },
+    "comparison_validator": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1/scripts/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "interpretation": "sample_order[rank] is the original chronological index for the elapsed-rank vector; chronological[original_index] = ranked[rank].",
+    "nonidentity_fixture": {
+      "input_chronological": [
+        5,
+        1,
+        4,
+        2,
+        3
+      ],
+      "inverse_roundtrip": [
+        5,
+        1,
+        4,
+        2,
+        3
+      ],
+      "stored_elapsed_rank": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "stored_sample_order": [
+        1,
+        3,
+        4,
+        2,
+        0
+      ],
+      "wrong_permutation_negative": true
+    },
+    "runner": {
+      "bytes": 40484,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0938/comparison-runner.py",
+      "sha256": "1b660ffbc21b2e45e9748b076583c215ce36197c0eb5a94d8224fcbc227acc41"
+    },
+    "runner_checks": {
+      "p50_is_median_of_child_p50": true,
+      "p95_p99_are_pooled_raw_samples": true,
+      "process_metrics_are_child_level": true
+    },
+    "source_checks": {
+      "sample_order_is_original_indices": true,
+      "samples_are_elapsed_rank_order": true,
+      "sorts_value_then_original_index": true,
+      "unit_fixture_order": true
+    },
+    "source_statistics": {
+      "bytes": 3076470,
+      "path": "/home/zhuhe/litchi-performance-0937/baseline-source/tools/perf-baseline/src/lib.rs",
+      "sha256": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c"
+    }
+  },
+  "schema": "litchi.performance.0939.docx-chronology-summary.v2",
+  "scope": "0938 frozen DOCX identical-binary A/A packet; iWork excluded; no workload/build/capture started; measured indices 0..49 are post-warmup samples; no warmup timing is present in reports.",
+  "source_bindings": {
+    "binary": {
+      "bytes": 69934624,
+      "sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66"
+    },
+    "capture_state": {
+      "bytes": 84664,
+      "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1/capture-state.json",
+      "sha256": "79bc7d7acc8396b284b1d9c1c23d8f970d7e28cecbfa79288713bee659c147db"
+    },
+    "capture_state_sha256": "79bc7d7acc8396b284b1d9c1c23d8f970d7e28cecbfa79288713bee659c147db",
+    "corpus": {
+      "archive_bytes": 2101427,
+      "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+    },
+    "intermediate_summary_external": {
+      "bytes": 96711,
+      "path": "/home/zhuhe/litchi-performance-0939/docx-chronology-summary-v2.json",
+      "sha256": "5f1626d2e738021de12cc917e5be4c645f17fbecc7841447d0c0461604bf1cb9",
+      "status": "superseded intermediate retained outside repository"
+    },
+    "manifest_sha256": "4d6572febfff39c4611f8e745cb9ebb8b90038f8e864c66ef350fd02e91ed81a",
+    "moved_packet_rehash": "0938 final audit independently found the moved packet had identical 678 relative file records; this analysis reads original only.",
+    "packet": "/home/zhuhe/litchi-performance-0938/formal-packet-v1",
+    "packet_bytes": 11554110,
+    "packet_files": 678,
+    "packet_manifest": {
+      "bytes": 50277,
+      "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1/manifest.json",
+      "sha256": "4d6572febfff39c4611f8e745cb9ebb8b90038f8e864c66ef350fd02e91ed81a"
+    },
+    "packet_tree_algorithm": "sorted relative path + NUL + byte count + NUL + file SHA-256 + LF",
+    "packet_tree_independent_rehash_algorithm": "sorted relative path + NUL + byte count + NUL + file SHA-256 + LF",
+    "packet_tree_recorded_by_0938": "46d163d8b4b7dbb977cfb4a830c0cace69371abecedb8b3b8b112b33cd9376e6",
+    "packet_tree_sha256": "016dc55f45922bb03c3d9e7af8c89b6302313042743e61eaa91858768d5584ed",
+    "prior_0938_audit_receipt": {
+      "bytes": 672666,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0938/independent-normal-aa-audit-v2.json",
+      "sha256": "9000bccdcbd3cf8e7a6978d61cdd43de74cb83c972a0608b263b5d67e14d21dc"
+    },
+    "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541"
+  },
+  "status": "completed_read_only_analysis",
+  "time_metric_relation": {
+    "interpretation": "descriptive association only; no causal attribution and no phase-local RSS claim",
+    "majority_regime_medians": {
+      "high": {
+        "involuntary_context_switches": 23,
+        "major_page_faults": 0,
+        "minor_page_faults": 150079,
+        "rss_bytes": 40747008,
+        "system_cpu_seconds": 0.08,
+        "user_cpu_seconds": 0.75,
+        "voluntary_context_switches": 24
+      },
+      "low": {
+        "involuntary_context_switches": 24,
+        "major_page_faults": 0,
+        "minor_page_faults": 114762,
+        "rss_bytes": 37941248,
+        "system_cpu_seconds": 0.07,
+        "user_cpu_seconds": 0.74,
+        "voluntary_context_switches": 24
+      }
+    },
+    "pearson": {
+      "involuntary_context_switches": -0.05642372020503305,
+      "major_page_faults": null,
+      "minor_page_faults": 0.7723103284917201,
+      "rss_bytes": 0.8617350666979999,
+      "system_cpu_seconds": 0.6210115793637118,
+      "user_cpu_seconds": 0.28285801027778107,
+      "voluntary_context_switches": null
+    },
+    "scope": "owned_reader children only; one whole-child terminal metric per child",
+    "spearman": {
+      "involuntary_context_switches": 0.0831505399746758,
+      "major_page_faults": null,
+      "minor_page_faults": 0.8165217391304348,
+      "rss_bytes": 0.7105892753326288,
+      "system_cpu_seconds": 0.6037580935446851,
+      "user_cpu_seconds": 0.4533914643619505,
+      "voluntary_context_switches": null
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "adr_readthrough": {
+    "bytes": 3153393,
+    "command": "cat docs/adr/README.md and every docs/adr/0001-*.md..0032-*.md into external scratch",
+    "path": "/tmp/litchi-performance-0939/adr-readthrough.txt",
+    "records": 32,
+    "sha256": "f9951a9f2218523c2fa78e7bd52d180aae04855926088d344fb79b839d5ef87a"
+  },
+  "created_utc": "2026-10-06T20:46:22.790527Z",
+  "historical_validator": {
+    "bytes": 39792,
+    "path": "docs/performance/results/change-0937/comparison.py",
+    "result_contract_observation": "validate_report result omits output_sha256; adapter adds verified nested report digest",
+    "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+  },
+  "implementation": {
+    "fixture": {
+      "bytes": 53440,
+      "path": "tools/testdata/perf_child_validation_0937_report.json",
+      "sha256": "8ac4cc2a0227b99f8442c505e61bf64a56378b9d81e59b0863d62645db94aa65"
+    },
+    "module": {
+      "bytes": 21876,
+      "path": "tools/perf_child_validation.py",
+      "sha256": "e7a0987a402dfc4dd7c70b26824028d11cad15af4107807423d94339e7e4385b"
+    },
+    "tests": {
+      "bytes": 11497,
+      "path": "tools/test_perf_child_validation.py",
+      "sha256": "6fe690ebc36c3054cc9f0821a233337aa989abcac028db6e9599e344df23d41c"
+    }
+  },
+  "invariants": {
+    "nested_output_digest_required_and_expected_identity_checked": true,
+    "no_child_retry": true,
+    "normal_exit_group_cleanup_cannot_turn_orphaned_descendant_green": true,
+    "oversized_report_is_described_without_unbounded_read_before_failure": true,
+    "terminal_receipt_is_exclusive_and_persisted_before_report_parse_or_validator": true,
+    "validation_receipt_is_exclusive": true
+  },
+  "schema": "litchi.performance.0939.child-validation-receipt.v1",
+  "scope": {
+    "benchmark_build": false,
+    "frozen_0938_files_modified": false,
+    "iwork": "excluded",
+    "purpose": "future capture child terminal-to-report-validation integration",
+    "workload_capture": false
+  },
+  "status": "passed",
+  "test_run": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tools.test_perf_child_validation",
+    "exit_code": 0,
+    "historical_0937_validator_path": true,
+    "negative_cases": [
+      "missing_nested_output_sha256",
+      "mutated_nested_output_sha256",
+      "duplicate_output_paths",
+      "oversized_report",
+      "orphaned_descendant"
+    ],
+    "positive_child_terminal_validation_result": true,
+    "tests_run": 7
+  }
+}

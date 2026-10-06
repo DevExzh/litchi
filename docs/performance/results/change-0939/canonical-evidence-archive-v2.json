@@ -1,0 +1,97 @@
+{
+  "archive_snapshot": {
+    "allowlist": {
+      "bytes": 2970,
+      "path": "/home/zhuhe/litchi-performance-0939/archive-allowlist-v2.json",
+      "sha256": "87d6d16a59953427cbdde6468e5c472ca8e5458dcb9705176d99bdbd52f4629e"
+    },
+    "archive": {
+      "bytes": 198077,
+      "path": "/home/zhuhe/litchi-performance-0939/archives/canonical-evidence-v2.tar.zst",
+      "sha256": "0e7f958b9c71c9c274625f282ee221af0377ba67ea747e94cb18a0a1de88b6a7"
+    },
+    "archive_receipt": {
+      "bytes": 1903,
+      "path": "/home/zhuhe/litchi-performance-0939/receipts/canonical-evidence-archive-v2.json",
+      "sha256": "819d9b24f39b665ae7116381be7f22127fd7c6ec0c3e55675d04d4b0ef0abddf"
+    },
+    "file_count": 31,
+    "helper": {
+      "bytes": 12874,
+      "path": "/home/zhuhe/litchi-performance-0939/archive-0939-v2.py",
+      "sha256": "e94c8e71c6e19304fa47435c3976b2f25f8745e6e2da1730eec1247faeec06fd"
+    },
+    "input_manifest": {
+      "bytes": 8027,
+      "path": "/home/zhuhe/litchi-performance-0939/archives/inputs-v2.jsonl",
+      "sha256": "89bcab4585e3e720a999ce1f6fb5716f5e5b733ca724d8b4933fa1f214c63792"
+    },
+    "logical_input_bytes": 1701992,
+    "member_list": {
+      "bytes": 1302,
+      "path": "/home/zhuhe/litchi-performance-0939/archives/members-v2.nul",
+      "sha256": "d42323eff47825dc952f5254b47754ed431d4186d5d11b0b59fa4a195578ad11"
+    },
+    "verify_receipt": {
+      "bytes": 748,
+      "path": "/home/zhuhe/litchi-performance-0939/receipts/canonical-evidence-verify-v2.json",
+      "sha256": "1cc5b5d697cb669127aaffa5ad5195e3447b2af38baa15895b65d8613be0a145"
+    },
+    "verify_terminal": {
+      "bytes": 416,
+      "path": "/home/zhuhe/litchi-performance-0939/archives/verify-terminal-v2.json",
+      "sha256": "bd69e13a9362a3d21cf85a92edf06ac809e108eb466fe0d2b8c4c3542551c916"
+    },
+    "zstd_test_exit_code": 0
+  },
+  "created_utc": "2026-10-06T20:58:12.471077Z",
+  "excluded": [
+    "0938 packets",
+    "binaries",
+    "source trees",
+    "build trees",
+    "target trees",
+    "pycache"
+  ],
+  "regeneration_commands": [
+    "python3 /home/zhuhe/litchi-performance-0939/archive-0939-v2.py plan",
+    "LITCHI_PERF_0939_ARCHIVE_V2_APPROVED=1 python3 /home/zhuhe/litchi-performance-0939/archive-0939-v2.py archive",
+    "LITCHI_PERF_0939_VERIFY_V2_APPROVED=1 python3 /home/zhuhe/litchi-performance-0939/archive-0939-v2.py verify"
+  ],
+  "repository_binding": {
+    "head_at_recheck": "6887be9087c5cd0ad981631fc8f8b367e3193ed2",
+    "members": [
+      "repo/docs/performance/0939-docx-capture-integration-and-sample-order.md",
+      "repo/docs/performance/results/change-0939/attribution-experiment-plan-v1.json",
+      "repo/docs/performance/results/change-0939/comparison-child-validation-v1.json",
+      "repo/docs/performance/results/change-0939/docx-chronology-summary-v3.json",
+      "repo/docs/performance/results/change-0939/independent-review-v1.json",
+      "repo/tools/perf_child_validation.py",
+      "repo/tools/test_perf_child_validation.py",
+      "repo/tools/testdata/perf_child_validation_0937_report.json"
+    ],
+    "repo_files_match_archive_snapshot": true,
+    "repo_files_rehashed": 8,
+    "snapshot_timing": "The eight frozen repository members were archived before these two receipt files were added; their hashes remain unchanged."
+  },
+  "schema": "litchi.performance.0939.repo-archive-receipt.v2",
+  "v1_failed_attempt": {
+    "archive_receipt": {
+      "bytes": 1903,
+      "path": "/home/zhuhe/litchi-performance-0939/receipts/canonical-evidence-archive-v1.json",
+      "sha256": "b5fa70c46c16edc34b0ccf3b6e81ac9ca11600b25110109b215741fc0e57badf"
+    },
+    "compressed_archive": {
+      "bytes": 196067,
+      "path": "/home/zhuhe/litchi-performance-0939/archives/canonical-evidence-v1.tar.zst",
+      "sha256": "c693cde4f6e7e7a9996d3994e24ed950e418fad8cbca986d53c2bad5cc5bf9ee"
+    },
+    "failure_record": {
+      "bytes": 1742,
+      "path": "/home/zhuhe/litchi-performance-0939/archive-failure-v1.json",
+      "sha256": "13edf5ab98cfb0736989f8d51bf4ee32b32ca67f2e35856675a55f92d6fb0906"
+    },
+    "reason": "v1 input manifest recorded staging paths as origin_path; v2 corrected the manifest and passed verification.",
+    "verification_exit_code": 1
+  }
+}

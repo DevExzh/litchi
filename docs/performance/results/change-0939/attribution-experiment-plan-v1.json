@@ -1,0 +1,113 @@
+{
+  "schema": "litchi.performance.0939.owned-reader-attribution-experiment-plan.v1",
+  "status": "design_only_no_capture",
+  "created_utc": "2026-10-06T20:41:47Z",
+  "scope": {
+    "purpose": "Separate owned-reader preparation/setup effects from its sequential-ingress allocation and process-resource effects while retaining the existing DOCX section-layout workload.",
+    "routes": ["owned_vec", "owned_reader"],
+    "cohort": "12 fresh-process matched owned_vec-versus-owned_reader pairs per binary arm (24 children per arm; 48 workload children across the normal and allocator-metrics arms), five warmups and 50 measured samples per child, CPU 12, alternating route order; descriptive attribution only.",
+    "calibration_count": "To be frozen by implementation preflight; no calibration children or final capture count are authorized by this design receipt.",
+    "prospective_validity_claim": false,
+    "unchanged_workload": [
+      "same corpus, source/output digests, section selector, edit, commit and bounded sink",
+      "same semantic reopen, forward/inverse publication, preservation, source-freshness and limit/security checks",
+      "same per-sample route ownership: cloned archive input is prepared before open"
+    ],
+    "no_capture_authorized": true,
+    "no_production_source_change": true
+  },
+  "source_identity": {
+    "head": "6887be9087c5cd0ad981631fc8f8b367e3193ed2",
+    "historical_binary_source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "inspected_route_files_match_historical_revision": true,
+    "files": [
+      {
+        "path": "tools/perf-baseline/src/lib.rs",
+        "current_sha256": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+        "historical_sha256": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c"
+      },
+      {
+        "path": "crates/litchi-opc/src/source_backed.rs",
+        "current_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+        "historical_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2"
+      },
+      {
+        "path": "crates/litchi-opc/src/phys_pkg.rs",
+        "current_sha256": "3dfa9ec92c0d090b0bc753ecacc63f263975a470c267b79b03ae1c5898ac3ab8",
+        "historical_sha256": "3dfa9ec92c0d090b0bc753ecacc63f263975a470c267b79b03ae1c5898ac3ab8"
+      }
+    ]
+  },
+  "observed_boundaries": [
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "lines": "50850-50970",
+      "finding": "Preparation clones the 2,101,427-byte archive for both owned routes, then creates route observers and reserves the bounded sink before preparation timing ends."
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "lines": "50946-50970",
+      "finding": "Owned-reader preparation additionally allocates two Arc<AtomicU64> read observers; sink reserve is shared route setup, not reader-specific."
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "lines": "50972-51007",
+      "finding": "Open timing contains owned-vector from_vec and owned-reader from_reader; query/edit/commit/publication remain separate."
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "lines": "50718-50740",
+      "finding": "OwnedIngressReader retains the cloned Vec in Cursor and counts read calls and bytes."
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "lines": "6776-6817",
+      "finding": "from_reader consumes the reader through read_limited and then moves the resulting Vec into OwnedSource; from_vec moves the supplied Vec directly."
+    },
+    {
+      "path": "crates/litchi-opc/src/phys_pkg.rs",
+      "lines": "1775-1836",
+      "finding": "read_limited reserves an initial chunk and then try_reserve_exact(read) for each successful read, so reader open has a distinct ingest/growth interval."
+    },
+    {
+      "path": "tools/perf-baseline/src/allocation_metrics.rs",
+      "lines": "153-185,295-376",
+      "finding": "The existing allocator Sample exposes call/byte/live/peak fields; Region::split publishes a non-overlapping segment while retaining the combined region."
+    },
+    {
+      "path": "tools/perf-baseline/src/process_metrics.rs",
+      "lines": "21-143",
+      "finding": "Existing process snapshots expose minor/major faults, CPU ticks, context switches, I/O counters and RSS deltas, with documented procfs probe overhead."
+    }
+  ],
+  "experiment": {
+    "builds": "Build a normal reference and an allocator-metrics diagnostic binary from identical source, compiler, profile, corpus and environment; bind both binary hashes. Do not use diagnostic elapsed values as production latency evidence.",
+    "region_1": "Begin the existing allocation Region immediately before the owned-input clone at preparation start; split immediately after sink.reserve_budget and the existing preparation endpoint.",
+    "region_2": "Keep the same Region active through the existing open operation and finish_split at the existing open endpoint. Preserve the combined sample as a consistency check.",
+    "process_observation": "Take process_metrics snapshots immediately outside each segment boundary and report deltas for minor/major faults, user/system CPU, context switches, rchar/syscr, read_bytes and RSS. Keep procfs snapshot time and region-boundary overhead out of the route phase timer where the harness permits, and report probe overhead explicitly.",
+    "existing_route_counters": "Retain owned-reader read_calls/read_bytes and the existing phase vectors; do not add a replacement reader or bypass read_limited.",
+    "calibration": "Run the same boundary and process-snapshot sequence around a black_box-only calibration body and report its boundary/observer cost. Also retain matched normal-versus-diagnostic binary identity; never subtract either calibration from production phase values.",
+    "output": [
+      "per-sample prep and open allocation Samples including status, calls, bytes, live and peak fields",
+      "per-segment process deltas and existing reader read-call/read-byte counters",
+      "existing total and six phase timings, phase sums, child/pair/order metadata and sample_order",
+      "instrumentation identity, calibration cost and unavailable/overflow statuses"
+    ]
+  },
+  "interpretation": {
+    "reader_open_copy_signal": "Reader-open allocation/reallocation bytes and calls near the input length, together with its existing read_bytes, would support the bounded statement that sequential ingestion performs additional materialization/growth relative to from_vec.",
+    "prep_outlier_signal": "If reader and vector preparation allocation samples are similar but reader elapsed outliers coincide with process fault or CPU deltas, the result is consistent with page-touch or host-resource effects; if allocation/CPU differs without fault differences, it is consistent with setup/copy work.",
+    "limits": [
+      "Allocator callbacks and boundary observers can perturb scheduling and allocation; diagnostic timings are descriptive only.",
+      "Procfs fault, CPU, I/O and RSS deltas include probe effects and are not phase-local physical-cause measurements.",
+      "The existing read-byte counter measures reader transfer volume, not memcpy cycles; this plan cannot prove a memcpy-only cause.",
+      "No result may be attributed to glibc, allocator arenas, ASLR, page faults, scheduler or frequency without separate evidence.",
+      "Use sample_order to reconstruct chronology; elapsed-rank vectors alone do not preserve execution order.",
+      "No production gate, adoption decision, threshold relaxation or population claim follows from this diagnostic cohort."
+    ]
+  },
+  "evidence_basis": [
+    "docs/performance/0939-docx-capture-integration-and-sample-order.md",
+    "docs/performance/results/change-0939/docx-chronology-summary-v3.json"
+  ]
+}

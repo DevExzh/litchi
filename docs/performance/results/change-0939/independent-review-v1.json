@@ -1,0 +1,119 @@
+{
+  "schema": "litchi.performance.0939.independent-review.v1",
+  "status": "approved_read_only",
+  "created_utc": "2026-10-06T20:47:16Z",
+  "scope": {
+    "purpose": "Independent audit of retained 0938 sample-order reconstruction and future child-validation integration controls",
+    "benchmark_build": false,
+    "workload_capture": false,
+    "frozen_0938_files_modified": false,
+    "iwork": "excluded"
+  },
+  "chronology": {
+    "summary": {
+      "path": "docs/performance/results/change-0939/docx-chronology-summary-v3.json",
+      "bytes": 100690,
+      "sha256": "736395bf9e488b5a2890d98ba4e51f4567d668d8baf13ee98b015884f44eb320"
+    },
+    "packet": {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1",
+      "files": 678,
+      "bytes": 11554110,
+      "manifest_sha256": "4d6572febfff39c4611f8e745cb9ebb8b90038f8e864c66ef350fd02e91ed81a",
+      "capture_state_sha256": "79bc7d7acc8396b284b1d9c1c23d8f970d7e28cecbfa79288713bee659c147db",
+      "independent_tree_sha256": "016dc55f45922bb03c3d9e7af8c89b6302313042743e61eaa91858768d5584ed",
+      "moved_tree_equal": true,
+      "recorded_0938_tree_sha256": "46d163d8b4b7dbb977cfb4a830c0cace69371abecedb8b3b8b112b33cd9376e6"
+    },
+    "source": {
+      "revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+      "statistics_source_sha256": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+      "analysis_script_sha256": "b27a527f62a410eb88b4bffccc082d5c455e5031d52c9cccc60186b2f8b8112b",
+      "comparison_validator_sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "independent_check": {
+      "script": {
+        "path": "/home/zhuhe/litchi-performance-0939/independent-boundary-check-v1.py",
+        "bytes": 5050,
+        "sha256": "255ce7f134eaaae9c38bb365e59ea4b002fd2440be8f7c689d76eea2a353f0c2"
+      },
+      "result": {
+        "path": "/home/zhuhe/litchi-performance-0939/independent-boundary-check-v1.json",
+        "bytes": 1192,
+        "sha256": "e9eb7aa81895f5c0250967f50e3acba980eaa699df4c6737a8f69c630288891e"
+      },
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0939/independent-boundary-terminal-v1.json",
+        "bytes": 1152,
+        "sha256": "d846f7a6a7eb449937e9070a61512646008a46f865d5d4f58dcbbf783018d7c1"
+      },
+      "children": 96,
+      "samples_per_child": 50,
+      "nonidentity_orders": 96,
+      "ranked_phase_sums": 4800,
+      "chronological_phase_sums": 4800,
+      "flagged_owned_reader_pairs": 6,
+      "status": "passed"
+    },
+    "interpretation": {
+      "inverse": "chronological[original_index] = ranked[rank] where sample_order[rank] = original_index",
+      "warmups": "five warmups are discarded; indices 0..49 are measured samples",
+      "pairing": "A/B measured indices are ordinal bookkeeping across separate child processes, not matched physical events",
+      "phase_means": "paired chronological means decompose additively; phase medians do not",
+      "capture_state": "0938 terminal custody is valid, but original formal validation remained failed on KeyError: output_sha256"
+    }
+  },
+  "child_validation": {
+    "receipt": {
+      "path": "docs/performance/results/change-0939/comparison-child-validation-v1.json",
+      "bytes": 2460,
+      "sha256": "234e284d17b89e80729299a0e1c685a14695bf11e9ef45c8958137ad71ea05e4"
+    },
+    "module": {
+      "path": "tools/perf_child_validation.py",
+      "bytes": 21876,
+      "sha256": "e7a0987a402dfc4dd7c70b26824028d11cad15af4107807423d94339e7e4385b"
+    },
+    "tests": {
+      "path": "tools/test_perf_child_validation.py",
+      "bytes": 11497,
+      "sha256": "6fe690ebc36c3054cc9f0821a233337aa989abcac028db6e9599e344df23d41c"
+    },
+    "fixture": {
+      "path": "tools/testdata/perf_child_validation_0937_report.json",
+      "bytes": 53440,
+      "sha256": "8ac4cc2a0227b99f8442c505e61bf64a56378b9d81e59b0863d62645db94aa65"
+    },
+    "test_run": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tools.test_perf_child_validation",
+      "exit_code": 0,
+      "tests_run": 7,
+      "tests_passed": 7,
+      "tests_failed": 0,
+      "coverage": [
+        "real historical 0937 validator result omission and adapter completion",
+        "terminal-first CLI success",
+        "missing nested output digest",
+        "mutated nested output digest",
+        "oversized report bounded rejection",
+        "duplicate output paths",
+        "orphaned descendant forced cleanup remains failed"
+      ]
+    },
+    "controls": {
+      "terminal_before_report_parse": true,
+      "terminal_before_validator": true,
+      "exclusive_terminal_and_validation_receipts": true,
+      "no_child_retry": true,
+      "historical_runner_bug_demonstrated": true,
+      "oversized_report_hash_not_read": true,
+      "orphan_cleanup_cannot_turn_green": true
+    }
+  },
+  "limits": [
+    "The reusable helper/CLI is future capture infrastructure; the immutable 0938 runner was not edited or rerun.",
+    "The retained first chronology analyzer failure has a terminal stderr record, while its pre-fix script bytes were not separately hashed; the corrected run is bound to the final script hash.",
+    "The independent packet tree hash is listed separately from the 0938 recorded tree hash; they are not interchangeable.",
+    "No production speedup, causal phase attribution, or formal 0938 qualification follows from this review."
+  ]
+}

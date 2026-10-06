@@ -1,0 +1,433 @@
+{
+  "created_utc": "2026-10-06T20:58:12.471667Z",
+  "inventory": {
+    "bytes": 15568,
+    "path": "/home/zhuhe/litchi-performance-0939/cleanup-inventory-v2.json",
+    "sha256": "bc5c4c9fcd1bcfc0be7b8e4ba93e3f09e866315ed833cef89b5b69ff3e5f0f82"
+  },
+  "removed_groups": [
+    [
+      "uncompressed-v1-tar",
+      {
+        "files": 1,
+        "logical_bytes": 1689600,
+        "members": [
+          {
+            "bytes": 1689600,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/canonical-evidence-v1.tar",
+            "sha256": "7e4d48c63191d1a9fdee97504b96a9de0e4fbf7425931dc3019f991171eb1e7c"
+          }
+        ]
+      }
+    ],
+    [
+      "uncompressed-v2-tar",
+      {
+        "files": 1,
+        "logical_bytes": 1730560,
+        "members": [
+          {
+            "bytes": 1730560,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/canonical-evidence-v2.tar",
+            "sha256": "4c9f3b9de60c7e4482fae8a8a4cb6901df17e7ce258e50734bd5fc78351fd54a"
+          }
+        ]
+      }
+    ],
+    [
+      "staging-v1",
+      {
+        "files": 23,
+        "logical_bytes": 1668683,
+        "members": [
+          {
+            "bytes": 1043,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analysis-terminal-v1.json",
+            "sha256": "ef31063c73b891d405e2fb4fa4de11abfb3b4e7fe425bcb4d37dcdeec84ad312"
+          },
+          {
+            "bytes": 1049,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analysis-terminal-v2.json",
+            "sha256": "56e44f61fc7e2dcfa851fbd8bee3500a09f5be1dd8134bc6b45d2d05bac915dd"
+          },
+          {
+            "bytes": 33483,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analyze-0938-chronology.py",
+            "sha256": "b27a527f62a410eb88b4bffccc082d5c455e5031d52c9cccc60186b2f8b8112b"
+          },
+          {
+            "bytes": 0,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analyze-v2.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 484,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analyze-v2.stdout",
+            "sha256": "7ad2996f6ee2746f30d822b6a3a1cd9eeba8f72e096cdb3c62eff8fb0d71d3b9"
+          },
+          {
+            "bytes": 667,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analyze.stderr",
+            "sha256": "ea9e82ec9a5f8ece6d5cadce68cfaaabab5728365f71fa1ff1ec35b8d53c00b7"
+          },
+          {
+            "bytes": 0,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/analyze.stdout",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 12769,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/archive-0939-v1.py",
+            "sha256": "0923aac738d0f68aec0bf764ac81b5d33a57ccfc7eb70fc63ae9613cd2c6140d"
+          },
+          {
+            "bytes": 0,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/boundary-check.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 114,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/boundary-check.stdout",
+            "sha256": "19a63ccb96ce0b13622a15a3a4c8f0f0e1af1116afb762d8de3dec149aca92c5"
+          },
+          {
+            "bytes": 1301641,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/chronology-analysis-v2.json",
+            "sha256": "44e9f43df08641cd5a5ba4a2c5a7bfb060aeac508b1fd9a0b3fd5afd7bc04c8c"
+          },
+          {
+            "bytes": 96711,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/docx-chronology-summary-v2.json",
+            "sha256": "5f1626d2e738021de12cc917e5be4c645f17fbecc7841447d0c0461604bf1cb9"
+          },
+          {
+            "bytes": 1192,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/independent-boundary-check-v1.json",
+            "sha256": "e9eb7aa81895f5c0250967f50e3acba980eaa699df4c6737a8f69c630288891e"
+          },
+          {
+            "bytes": 5050,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/independent-boundary-check-v1.py",
+            "sha256": "255ce7f134eaaae9c38bb365e59ea4b002fd2440be8f7c689d76eea2a353f0c2"
+          },
+          {
+            "bytes": 1152,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/external/independent-boundary-terminal-v1.json",
+            "sha256": "d846f7a6a7eb449937e9070a61512646008a46f865d5d4f58dcbbf783018d7c1"
+          },
+          {
+            "bytes": 10106,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/docs/performance/0939-docx-capture-integration-and-sample-order.md",
+            "sha256": "d1e9f9a8baacf1c13a522208808fcdcb2d7cd3d420f23dcc31034003d8e8a672"
+          },
+          {
+            "bytes": 7847,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/docs/performance/results/change-0939/attribution-experiment-plan-v1.json",
+            "sha256": "9779e895c209f6cc42a184276efd277531bf137d013b2f3110f2c7aa86ff9295"
+          },
+          {
+            "bytes": 2460,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/docs/performance/results/change-0939/comparison-child-validation-v1.json",
+            "sha256": "234e284d17b89e80729299a0e1c685a14695bf11e9ef45c8958137ad71ea05e4"
+          },
+          {
+            "bytes": 100690,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/docs/performance/results/change-0939/docx-chronology-summary-v3.json",
+            "sha256": "736395bf9e488b5a2890d98ba4e51f4567d668d8baf13ee98b015884f44eb320"
+          },
+          {
+            "bytes": 5412,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/docs/performance/results/change-0939/independent-review-v1.json",
+            "sha256": "9f2e922228a62ba7598cef2d8656ec90e58ce06dd1246c9dbb787bad231b97aa"
+          },
+          {
+            "bytes": 21876,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/tools/perf_child_validation.py",
+            "sha256": "e7a0987a402dfc4dd7c70b26824028d11cad15af4107807423d94339e7e4385b"
+          },
+          {
+            "bytes": 11497,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/tools/test_perf_child_validation.py",
+            "sha256": "6fe690ebc36c3054cc9f0821a233337aa989abcac028db6e9599e344df23d41c"
+          },
+          {
+            "bytes": 53440,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v1/repo/tools/testdata/perf_child_validation_0937_report.json",
+            "sha256": "8ac4cc2a0227b99f8442c505e61bf64a56378b9d81e59b0863d62645db94aa65"
+          }
+        ]
+      }
+    ],
+    [
+      "staging-v2",
+      {
+        "files": 31,
+        "logical_bytes": 1701992,
+        "members": [
+          {
+            "bytes": 1043,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analysis-terminal-v1.json",
+            "sha256": "ef31063c73b891d405e2fb4fa4de11abfb3b4e7fe425bcb4d37dcdeec84ad312"
+          },
+          {
+            "bytes": 1049,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analysis-terminal-v2.json",
+            "sha256": "56e44f61fc7e2dcfa851fbd8bee3500a09f5be1dd8134bc6b45d2d05bac915dd"
+          },
+          {
+            "bytes": 33483,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analyze-0938-chronology.py",
+            "sha256": "b27a527f62a410eb88b4bffccc082d5c455e5031d52c9cccc60186b2f8b8112b"
+          },
+          {
+            "bytes": 0,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analyze-v2.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 484,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analyze-v2.stdout",
+            "sha256": "7ad2996f6ee2746f30d822b6a3a1cd9eeba8f72e096cdb3c62eff8fb0d71d3b9"
+          },
+          {
+            "bytes": 667,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analyze.stderr",
+            "sha256": "ea9e82ec9a5f8ece6d5cadce68cfaaabab5728365f71fa1ff1ec35b8d53c00b7"
+          },
+          {
+            "bytes": 0,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/analyze.stdout",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 12769,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-0939-v1.py",
+            "sha256": "0923aac738d0f68aec0bf764ac81b5d33a57ccfc7eb70fc63ae9613cd2c6140d"
+          },
+          {
+            "bytes": 12874,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-0939-v2.py",
+            "sha256": "e94c8e71c6e19304fa47435c3976b2f25f8745e6e2da1730eec1247faeec06fd"
+          },
+          {
+            "bytes": 2261,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-allowlist-v1.json",
+            "sha256": "10125cbc297181abb0aea77be41bacd372925aea3bd7b0c0272a5ce727619a85"
+          },
+          {
+            "bytes": 2970,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-allowlist-v2.json",
+            "sha256": "87d6d16a59953427cbdde6468e5c472ca8e5458dcb9705176d99bdbd52f4629e"
+          },
+          {
+            "bytes": 1742,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-failure-v1.json",
+            "sha256": "13edf5ab98cfb0736989f8d51bf4ee32b32ca67f2e35856675a55f92d6fb0906"
+          },
+          {
+            "bytes": 4243,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-plan-count-v1.json",
+            "sha256": "29a762d3358633afce4c50e8e0d7bab38d627e34845667605a3452462f1ce1be"
+          },
+          {
+            "bytes": 1717,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-plan-v1.json",
+            "sha256": "766963d0f97095e5fe728d7ac817993f3ff8966eaa0e22b8a79b435ef28194c4"
+          },
+          {
+            "bytes": 5599,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/archive-plan-v2-count.json",
+            "sha256": "86709fb4708ebf57e9880eea442a74d1f7fcab18f8b2521cbb6fbf3ceb4b4c56"
+          },
+          {
+            "bytes": 0,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/boundary-check.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 114,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/boundary-check.stdout",
+            "sha256": "19a63ccb96ce0b13622a15a3a4c8f0f0e1af1116afb762d8de3dec149aca92c5"
+          },
+          {
+            "bytes": 1301641,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/chronology-analysis-v2.json",
+            "sha256": "44e9f43df08641cd5a5ba4a2c5a7bfb060aeac508b1fd9a0b3fd5afd7bc04c8c"
+          },
+          {
+            "bytes": 96711,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/docx-chronology-summary-v2.json",
+            "sha256": "5f1626d2e738021de12cc917e5be4c645f17fbecc7841447d0c0461604bf1cb9"
+          },
+          {
+            "bytes": 1192,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/independent-boundary-check-v1.json",
+            "sha256": "e9eb7aa81895f5c0250967f50e3acba980eaa699df4c6737a8f69c630288891e"
+          },
+          {
+            "bytes": 5050,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/independent-boundary-check-v1.py",
+            "sha256": "255ce7f134eaaae9c38bb365e59ea4b002fd2440be8f7c689d76eea2a353f0c2"
+          },
+          {
+            "bytes": 1152,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/independent-boundary-terminal-v1.json",
+            "sha256": "d846f7a6a7eb449937e9070a61512646008a46f865d5d4f58dcbbf783018d7c1"
+          },
+          {
+            "bytes": 1903,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/external/receipts/canonical-evidence-archive-v1.json",
+            "sha256": "b5fa70c46c16edc34b0ccf3b6e81ac9ca11600b25110109b215741fc0e57badf"
+          },
+          {
+            "bytes": 10106,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/docs/performance/0939-docx-capture-integration-and-sample-order.md",
+            "sha256": "d1e9f9a8baacf1c13a522208808fcdcb2d7cd3d420f23dcc31034003d8e8a672"
+          },
+          {
+            "bytes": 7847,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/docs/performance/results/change-0939/attribution-experiment-plan-v1.json",
+            "sha256": "9779e895c209f6cc42a184276efd277531bf137d013b2f3110f2c7aa86ff9295"
+          },
+          {
+            "bytes": 2460,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/docs/performance/results/change-0939/comparison-child-validation-v1.json",
+            "sha256": "234e284d17b89e80729299a0e1c685a14695bf11e9ef45c8958137ad71ea05e4"
+          },
+          {
+            "bytes": 100690,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/docs/performance/results/change-0939/docx-chronology-summary-v3.json",
+            "sha256": "736395bf9e488b5a2890d98ba4e51f4567d668d8baf13ee98b015884f44eb320"
+          },
+          {
+            "bytes": 5412,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/docs/performance/results/change-0939/independent-review-v1.json",
+            "sha256": "9f2e922228a62ba7598cef2d8656ec90e58ce06dd1246c9dbb787bad231b97aa"
+          },
+          {
+            "bytes": 21876,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/tools/perf_child_validation.py",
+            "sha256": "e7a0987a402dfc4dd7c70b26824028d11cad15af4107807423d94339e7e4385b"
+          },
+          {
+            "bytes": 11497,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/tools/test_perf_child_validation.py",
+            "sha256": "6fe690ebc36c3054cc9f0821a233337aa989abcac028db6e9599e344df23d41c"
+          },
+          {
+            "bytes": 53440,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/archives/staging-v2/repo/tools/testdata/perf_child_validation_0937_report.json",
+            "sha256": "8ac4cc2a0227b99f8442c505e61bf64a56378b9d81e59b0863d62645db94aa65"
+          }
+        ]
+      }
+    ],
+    [
+      "owned-pycache",
+      {
+        "files": 2,
+        "logical_bytes": 37228,
+        "members": [
+          {
+            "bytes": 25228,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/__pycache__/archive-0939-v2.cpython-314.pyc",
+            "sha256": "47aba785408a56a107fbbe2b6145b8a8d1ecb85bd19c37d05f596027778f6693"
+          },
+          {
+            "bytes": 12000,
+            "kind": "file",
+            "path": "/home/zhuhe/litchi-performance-0939/__pycache__/independent-boundary-check-v1.cpython-314.pyc",
+            "sha256": "2c02b21688824585a91b4a55d8989cc2028b72fb84c8e6425da91cf9772b8fc2"
+          }
+        ]
+      }
+    ],
+    [
+      "adr-readthrough",
+      {
+        "files": 1,
+        "logical_bytes": 3153393,
+        "members": [
+          {
+            "bytes": 3153393,
+            "kind": "file",
+            "path": "/tmp/litchi-performance-0939/adr-readthrough.txt",
+            "sha256": "f9951a9f2218523c2fa78e7bd52d180aae04855926088d344fb79b839d5ef87a"
+          }
+        ]
+      }
+    ]
+  ],
+  "removed_logical_bytes": 9981456,
+  "removed_regular_files": 59,
+  "retained": [
+    "/home/zhuhe/litchi-performance-0939/archives/canonical-evidence-v1.tar.zst",
+    "/home/zhuhe/litchi-performance-0939/archives/canonical-evidence-v2.tar.zst",
+    "all raw 0939 analysis, scripts, terminals, manifests and receipts under /home/zhuhe/litchi-performance-0939"
+  ],
+  "schema": "litchi.performance.0939.repo-cleanup-receipt.v2",
+  "verification": {
+    "all_inventory_paths_absent_after_cleanup": true,
+    "archive_v2_zstd_retained_and_verified": true,
+    "raw_0939_analysis_retained": true,
+    "repo_archive_receipt_written_after_source_recheck": true,
+    "v1_failed_attempt_retained": true
+  }
+}
