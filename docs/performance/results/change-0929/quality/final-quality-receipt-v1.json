@@ -1,0 +1,237 @@
+{
+  "schema": "litchi.performance.0929.generic-read-at-final-quality-receipt.v1",
+  "written_at_utc": "2026-10-06T12:59:09.795518+00:00",
+  "reviewer": "/root/shared_owner_tests",
+  "scope": "read-only report, terminal receipt, and raw perf export validation; no build, source edit, or recapture",
+  "status": "report correctness/source/output verified; descriptive diagnostic profile only",
+  "source_binding": {
+    "source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "source_v4_receipt": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "bytes": 356812,
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    },
+    "source_v4_listing": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "bytes": 940213,
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    },
+    "workspace_cargo_lock_sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "perf_cargo_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "perf_manifest_sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "rustfmt_toml_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "toolchain": {
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+    },
+    "build_argv": "cargo +1.95.0 build --offline --locked -j2 --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0929/target-fp",
+    "build_environment": "env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS=\"-C force-frame-pointers=yes -C debuginfo=1\"",
+    "final_relink": "corrected relink with strip=none; terminal receipt and binary identity below are authoritative"
+  },
+  "binary": {
+    "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "bytes": 529059232,
+    "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "debug_line": true,
+    "frame_pointer_flags": "-C force-frame-pointers=yes -C debuginfo=1; strip=none",
+    "build_id": "1fab480cdc3541389487fa4e9fd5d3aebd240e89"
+  },
+  "capture": {
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "route": "generic_read_at",
+    "cpu": 12,
+    "samples": 1000,
+    "warmups": 0,
+    "perf": {
+      "call_graph": "fp",
+      "event": "cycles:u",
+      "frequency_hz": 997
+    },
+    "environment": {
+      "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+    },
+    "terminal_receipt": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/terminal-receipt.json",
+      "bytes": 2537,
+      "sha256": "f503ff5401489ce1f75def5c35a6b5287439f9cb032b7ac3685a0434cb601e38"
+    },
+    "terminal_status": "terminal_success_persisted_before_offline_analysis",
+    "terminal_tool_return": {
+      "exit_code": 0,
+      "same_handle_polled": true,
+      "session_id": 62586
+    },
+    "report": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/generic-read-at-report.json",
+      "bytes": 724998,
+      "sha256": "cd9d3e845523d332a3fefe42dd4d176a8aa9f90d67f9cd57d3193973e2f66b12"
+    },
+    "perf_data": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf.data",
+      "bytes": 2855464,
+      "sha256": "9a4aa1051bfdbad3c148948cd25c5164c07181fa2d45169847c4c3859619c93f"
+    }
+  },
+  "report_findings": {
+    "result_count": 1,
+    "configuration_samples_per_case": 1000,
+    "configuration_warmup_iterations_per_case": 0,
+    "elapsed_sample_array_length": 1000,
+    "elapsed_sample_order_is_permutation_0_to_999": true,
+    "phase_arrays": [
+      "preparation_ns",
+      "open_ns",
+      "query_ns",
+      "edit_ns",
+      "commit_ns",
+      "publication_ns"
+    ],
+    "phase_arrays_each_length": 1000,
+    "phase_sums_equal_elapsed_samples": true,
+    "source_arrays_each_length": 1000,
+    "output_sha256_array_length": 1000,
+    "operation_metrics_sample_count": 1000,
+    "sample_alignment_verified": true,
+    "correctness_flags": {
+      "phase_sum_verified": true,
+      "semantic_reopen_all_sections_verified": true,
+      "table_cell_sectpr_excluded_verified": true,
+      "raw_untouched_members_verified": true,
+      "raw_member_order_and_comment_verified": true,
+      "header_footer_relationships_verified": true,
+      "source_immutability_verified": true,
+      "patch_forward_inverse_verified": true,
+      "publication_inverse_exact_source_verified": true,
+      "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+      "cache_counters_verified": true,
+      "sink_counters_verified": true
+    }
+  },
+  "source_findings": {
+    "corpus_archive_bytes": 2101427,
+    "corpus_archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "layout_source_bytes": 2101427,
+    "layout_source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "source_archive_and_layout_hash_match": true,
+    "source_read_calls_per_sample": 202,
+    "source_read_bytes_per_sample": 8409488,
+    "ordinary_payload_read_calls_per_sample": 138,
+    "ordinary_payload_read_bytes_per_sample": 8397632,
+    "operation_end_source_read_calls_per_sample": 169,
+    "operation_end_source_read_bytes_per_sample": 6308061,
+    "ordinary_payload_materializations_per_sample": 1,
+    "generic_owned_ingress_arrays_empty": true,
+    "source_immutability_verified": true
+  },
+  "output_findings": {
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "top_level_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "all_1000_sample_output_hashes_match": true,
+    "publication_inverse_exact_source_verified": true,
+    "sink_accepted_bytes_per_sample": 2101446,
+    "sink_write_calls_per_sample": 75,
+    "sink_largest_write": 65536
+  },
+  "raw_perf_findings": {
+    "report": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-report-stdio.txt",
+      "bytes": 2378204,
+      "sha256": "1a888c798efd1f7cad2da14d932b02651d46e19121fad7ae2e3e6feb0f15b4c1"
+    },
+    "self_symbol_report": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-report-self-symbol.txt",
+      "bytes": 85842,
+      "sha256": "c0f4d53b94262c5e9a31c9683bebd20e9474ee49c1ed48a3ef1c56671883e488"
+    },
+    "stack_period_export": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-stack-period.txt",
+      "bytes": 53184632,
+      "sha256": "a92a6d3f3db812ce473ae5c50cab90b50d0e1788ea64bd1c6ff02698dcfb9b3f"
+    },
+    "leaf_period_export": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-leaf-period.txt",
+      "bytes": 3056460,
+      "sha256": "5c3845ec4039c29a7d45fe2c7aedd61331ff685208a593b8783356c41cb89b47"
+    },
+    "perf_report_total_lost_samples": 0,
+    "stack_export_header_count": 15966,
+    "stack_export_target_process_headers": 15954,
+    "stack_export_other_process_headers": {
+      "rustc": 12
+    },
+    "stack_blocks_without_any_frame": 0,
+    "explicit_truncated_marker_count": 0,
+    "unknown_frame_lines": 2162,
+    "report_addr2line_error_count": 11,
+    "interpretation": "Perf recorded zero lost samples and each exported record had at least one frame line. Unknown kernel/loader frames, 12 concurrent rustc records, and 11 debug-sidecar addr2line diagnostics remain. No claim is made that every physical frame-pointer ancestry is complete; ancestry and phase joins remain decoder-owned."
+  },
+  "cpu_observations": {
+    "claim": "descriptive only; no timing qualification, comparator, speedup, or adoption claim",
+    "self_symbol_report_sha256": "c0f4d53b94262c5e9a31c9683bebd20e9474ee49c1ed48a3ef1c56671883e488",
+    "top_self_overhead_percent": [
+      {
+        "symbol": "sha2::sha256::x86_sha::compress",
+        "percent": 41.75
+      },
+      {
+        "symbol": "litchi_perf_baseline::payload_bytes",
+        "percent": 20.08
+      },
+      {
+        "symbol": "__memcmp_evex_movbe",
+        "percent": 4.71
+      },
+      {
+        "symbol": "__memmove_avx512_unaligned_erms",
+        "percent": 4.64
+      },
+      {
+        "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+        "percent": 2.63
+      },
+      {
+        "symbol": "litchi_docx::section::inventory::Inventory::parse_with_limits",
+        "percent": 2.04
+      },
+      {
+        "symbol": "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+        "percent": 1.36
+      }
+    ],
+    "callgraph_observations_percent": {
+      "run_docx_source_backed_existing_section_layout_edit_save": 97.01,
+      "verify_docx_section_layout_output": 37.26,
+      "publish_section_layout_inverse_to_stream": 13.23,
+      "publish_section_layout_commit_to_stream": 17.86,
+      "publish_section_layout_target_to_stream": 8.69,
+      "fingerprint_nested_observation": 6.86
+    }
+  },
+  "quality_validation": {
+    "validator": {
+      "path": "/tmp/litchi-performance-0929/quality/validate-report-v1.py",
+      "bytes": 11393,
+      "sha256": "93294475b13b7649b50c5bd3cb0f2b1c51f5f61453c1c8400247375d868fa6fb"
+    },
+    "validator_result": {
+      "path": "/tmp/litchi-performance-0929/quality/report-validation-v1.json",
+      "bytes": 5179,
+      "sha256": "0595bad45f0e8de646ab9175a3f3450769882e81cb60c98e25d6af16a32f9d0d"
+    },
+    "validator_argv": "python3 -B /tmp/litchi-performance-0929/quality/validate-report-v1.py",
+    "validator_exit_code": 0,
+    "validation_status": "pass",
+    "hash_command": "sha256sum /tmp/litchi-performance-0929/capture-fp/generic-read-at-report.json /tmp/litchi-performance-0929/capture-fp/terminal-receipt.json /tmp/litchi-performance-0929/capture-fp/perf.data /tmp/litchi-performance-0929/capture-fp/perf-report-stdio.txt /tmp/litchi-performance-0929/capture-fp/perf-script-stack-period.txt /tmp/litchi-performance-0929/quality/identity-audit-v4.json",
+    "hash_command_exit_code": 0
+  },
+  "limitations": [
+    "This is one generic_read_at diagnostic profile, with 1000 samples and zero warmups; it is not a comparator or performance qualification.",
+    "The report excludes correctness and output gates from timed latency, while the recorded correctness flags and output/source oracles were independently checked here.",
+    "Perf output contains 12 rustc records and unresolved kernel/loader addresses; these are retained as evidence and are not treated as application phase attribution.",
+    "No canonical no-inline ancestry or physical-frame completeness claim is made; decoder tooling owns ancestry interpretation."
+  ]
+}

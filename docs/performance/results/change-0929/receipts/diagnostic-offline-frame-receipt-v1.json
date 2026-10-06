@@ -1,0 +1,71 @@
+{
+  "schema": "litchi.performance.0929.offline-frame-and-period-receipt.v1",
+  "recorded_utc": "2026-10-06T12:56:59.443948347Z",
+  "scope": "offline processing of the one retained 0929 perf.data; no workload execution",
+  "profile_binding": {
+    "perf_data": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf.data",
+      "bytes": 2855464,
+      "sha256": "9a4aa1051bfdbad3c148948cd25c5164c07181fa2d45169847c4c3859619c93f"
+    },
+    "binary_sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "terminal_receipt": {
+      "path": "/tmp/litchi-performance-0929/capture-fp/terminal-receipt.json",
+      "bytes": 2537,
+      "sha256": "f503ff5401489ce1f75def5c35a6b5287439f9cb032b7ac3685a0434cb601e38"
+    }
+  },
+  "physical_frame_export": {
+    "command": "perf script --no-inline -F comm,pid,tid,time,event,period,ip,sym,symoff,dso --demangle --input=/tmp/litchi-performance-0929/capture-fp/perf.data",
+    "exit_code": 0,
+    "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-no-inline.txt",
+    "bytes": 31295949,
+    "sha256": "1eb10ce0b86d76b11ce055dcd41511b0b065ee9893bdc3301d829a2824c68f07",
+    "stderr_path": "/tmp/litchi-performance-0929/capture-fp/perf-script-no-inline.stderr",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample_header_lines": 15966,
+    "process_breakdown": {
+      "litchi-perf-bas": 15954,
+      "rustc": 12
+    },
+    "fields": ["comm", "pid", "tid", "time", "event", "period", "ip", "sym", "symoff", "dso"],
+    "help_note": "perf script -h omits --no-inline while listing --inline; the explicit --no-inline command was accepted and returned the complete physical-frame export"
+  },
+  "capability_check": {
+    "command": "perf script -h",
+    "exit_code": 129,
+    "help_path": "/tmp/litchi-performance-0929/capture-fp/perf-script-help.txt",
+    "help_bytes": 8022,
+    "help_sha256": "e8b1d60771a1b8d1824dd60af255c38c6a6750892953089cee89e621264d3070",
+    "observed": "--inline is listed; --no-inline is absent from help even though the explicit export accepted it"
+  },
+  "period_and_loss_evidence": {
+    "header_command": "perf report --header-only --input=/tmp/litchi-performance-0929/capture-fp/perf.data",
+    "header_exit_code": 0,
+    "header_path": "/tmp/litchi-performance-0929/capture-fp/perf-header.txt",
+    "header_bytes": 1763,
+    "header_sha256": "05a53f5efd88086c9d0567b0b77287571c028465da678ee4dccc94bc2b001107",
+    "header_stderr_bytes": 0,
+    "sample_period": 997,
+    "sample_type": "IP|TID|TIME|CALLCHAIN|PERIOD",
+    "read_format": "ID|LOST",
+    "first_sample_time": 156599.382595,
+    "last_sample_time": 156615.509625,
+    "sample_duration_ms": 16127.030,
+    "summary_path": "/tmp/litchi-performance-0929/capture-fp/perf-period-loss-evidence.txt",
+    "summary_bytes": 1051,
+    "summary_sha256": "b49a8bb98ab8e86b77ebb0ee8487281ec952850236760b055ab03f9106550818",
+    "reported_lost_samples": 0,
+    "reported_sample_count": 15966,
+    "reported_event_count_approx": 63813450383
+  },
+  "preserved_prior_stack_export": {
+    "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-stack-period.txt",
+    "bytes": 53184632,
+    "sha256": "a92a6d3f3db812ce473ae5c50cab90b50d0e1788ea64bd1c6ff02698dcfb9b3f",
+    "stderr_bytes": 1309,
+    "stderr_sha256": "08052e4edb69e5244dad480fd871455d2c84a6bbca80782623e4ab70895769c7",
+    "status": "preserved; explicit no-inline export supersedes it for physical-frame classification"
+  }
+}

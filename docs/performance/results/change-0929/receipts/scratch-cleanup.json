@@ -1,0 +1,36 @@
+{
+  "root": "/tmp/litchi-performance-0929/target-fp",
+  "removed_files": 1785,
+  "removed_bytes": 2816098810,
+  "preserved_files": [
+    {
+      "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+      "bytes": 529059232,
+      "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e"
+    },
+    {
+      "path": "/tmp/litchi-performance-0929/target-fp/.rustc_info.json",
+      "bytes": 1040,
+      "sha256": "affcc2ed596aa6418a01a0dee5d42dde9ce75ac80c34bfccc5cf62dee8471913"
+    }
+  ],
+  "root_additional_cleanup": [
+    {
+      "path": "/tmp/litchi-performance-0929/rlib-inspect2",
+      "bytes": 229900024
+    },
+    {
+      "path": "/tmp/litchi-performance-0929/__pycache__",
+      "bytes": 32986
+    },
+    {
+      "path": "/tmp/litchi-performance-0929/debugline-regenerated.txt",
+      "bytes": 10110
+    },
+    {
+      "path": "/tmp/litchi-performance-0929/all-accepted-adr-key-constraints.txt",
+      "bytes": 807969
+    }
+  ],
+  "candidate_review_full_debugline_cleanup_bytes": 1004943992
+}

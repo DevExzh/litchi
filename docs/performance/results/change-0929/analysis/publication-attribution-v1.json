@@ -1,0 +1,114 @@
+{
+  "claim_scope": "publication ancestry and leaf-period description only; inclusive rows are not additive and periods are sample-period weights, not elapsed time",
+  "conservation": {
+    "joined_period": 63813450383,
+    "publication_period_share_of_joined": 0.17855515623451443,
+    "sha_caller_disjoint_period_sum": 8570643406
+  },
+  "inputs": {
+    "binary_sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "leaf_export": {
+      "bytes": 3056460,
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-leaf-period.txt",
+      "sha256": "5c3845ec4039c29a7d45fe2c7aedd61331ff685208a593b8783356c41cb89b47"
+    },
+    "load_bias": "0x5b8705390000",
+    "phase_map": {
+      "bytes": 19326,
+      "path": "/tmp/litchi-performance-0929/phase-map-fp-v1.json",
+      "sha256": "0b2aa67f12291083b5e60676ca79c82c6956b2e51e49f2054646198395ae42e6"
+    },
+    "source_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "stack_export": {
+      "bytes": 31295949,
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-no-inline.txt",
+      "sha256": "1eb10ce0b86d76b11ce055dcd41511b0b065ee9893bdc3301d829a2824c68f07"
+    },
+    "workload_comm": "litchi-perf-bas",
+    "workload_dso": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline"
+  },
+  "inventory_ancestry_inclusive": {
+    "ensure_source_section_inventory_xml": {
+      "period": 493997305,
+      "samples": 122
+    },
+    "inclusive_union": {
+      "period": 1338536419,
+      "samples": 330
+    },
+    "inventory_parse_with_limits": {
+      "period": 844539114,
+      "samples": 208
+    },
+    "overlap_both": {
+      "period": 0,
+      "samples": 0
+    }
+  },
+  "inventory_operation_caller": {
+    "mapped_publication_boundary_only": {
+      "period": 0,
+      "samples": 0
+    },
+    "publication_body_with_publish_method": {
+      "period": 1338536419,
+      "samples": 330
+    }
+  },
+  "join": {
+    "joined_rows": 15966,
+    "leaf_parse_errors": {},
+    "leaf_rows": 15966,
+    "missing_leaf": 0,
+    "missing_stack": 0,
+    "stack_parse_errors": {},
+    "stack_rows": 15966
+  },
+  "limits": [
+    "The Inventory and ensure_source_section_inventory_xml counts are inclusive ancestry unions; nested frames are not summed.",
+    "A SHA row is assigned by exact symbol presence in its retained FP callchain; absent caller symbols remain neither/unresolved.",
+    "The profile includes correctness and publication setup work; these rows do not prove production latency or an optimization benefit."
+  ],
+  "publication": {
+    "period": 11394220603,
+    "samples": 2804
+  },
+  "schema": "litchi.performance.0929.publication-attribution.v1",
+  "sha_leaf_caller_breakdown": {
+    "all_sha_leafs": {
+      "period": 8570643406,
+      "samples": 2111
+    },
+    "both_markers": {
+      "period": 0,
+      "samples": 0
+    },
+    "emitted_fingerprinting_writer_inclusive": {
+      "period": 4356886062,
+      "samples": 1054
+    },
+    "emitted_only": {
+      "period": 4356886062,
+      "samples": 1054
+    },
+    "neither_marker": {
+      "period": 0,
+      "samples": 0
+    },
+    "source_artifact_fingerprint_inclusive": {
+      "period": 4213757344,
+      "samples": 1057
+    },
+    "source_only": {
+      "period": 4213757344,
+      "samples": 1057
+    }
+  },
+  "status": "descriptive_pass",
+  "symbol_presence_notes": {
+    "caller_categories": "Rows can contain both markers; source_only, emit_only, both, and neither are disjoint.",
+    "emitted_write_hash_marker": "litchi_docx::source_backed::FingerprintingWriter<W> as std::io::Write",
+    "sha_leaf_marker": "sha2::sha256::x86_sha::compress",
+    "source_fingerprint_marker": "litchi_opc::source_backed::SourceArtifact::fingerprint"
+  }
+}

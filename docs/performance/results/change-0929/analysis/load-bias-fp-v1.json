@@ -1,0 +1,33 @@
+{
+  "binary": {
+    "build_id": "1fab480cdc3541389487fa4e9fd5d3aebd240e89",
+    "bytes": 529059232,
+    "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e"
+  },
+  "calculation": "0x5b8705f78000 - 0xbe8000 = 0x5b8705390000",
+  "elf_evidence": {
+    "command": "readelf -lW /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "executable_load_p_vaddr": "0xbe8c80",
+    "executable_load_page_vaddr": "0xbe8000",
+    "page_size": "0x1000"
+  },
+  "load_bias": "0x5b8705390000",
+  "mmap_evidence": {
+    "bytes": 952646,
+    "command": "perf script --show-mmap-events --fields comm,pid,tid,time,event --input=/tmp/litchi-performance-0929/capture-fp/perf.data",
+    "file_offset": "0xbe7000",
+    "matching_record": "litchi-perf-bas 1516789/1516789 156599.382543: PERF_RECORD_MMAP2 1516789/1516789: [0x5b8705f78000(0x2adf000) @ 0xbe7000 <1fab480cdc3541389487fa4e9fd5d3aebd240e89>]: r-xp /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "path": "/tmp/litchi-performance-0929/capture-fp/mmap-events-v1.txt",
+    "runtime_mapping_start": "0x5b8705f78000",
+    "sha256": "2894c70d5d49d059ee293f0cea37d0e7e22cd22f3fcc998c727afe2341b214da"
+  },
+  "perf_data": {
+    "bytes": 2855464,
+    "path": "/tmp/litchi-performance-0929/capture-fp/perf.data",
+    "sha256": "9a4aa1051bfdbad3c148948cd25c5164c07181fa2d45169847c4c3859619c93f"
+  },
+  "schema": "litchi.performance.0929.fp-load-bias-receipt.v1",
+  "scope": "capture-specific PIE load-bias proof for offline phase normalization; no workload rerun",
+  "status": "verified"
+}

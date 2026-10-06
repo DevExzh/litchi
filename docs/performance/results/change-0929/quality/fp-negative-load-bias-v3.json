@@ -1,0 +1,310 @@
+{
+  "ancestry_quality": {
+    "inherited_events": 12,
+    "invalid_frame_addresses": 0,
+    "leaf_first_frame_comparable": 15966,
+    "leaf_first_frame_ip_dso_match": 15966,
+    "non_workload_dso_frames": 36828,
+    "nonempty_callchains": 15966,
+    "normalized_workload_frames": 201324,
+    "unknown_frames": 2162
+  },
+  "buckets": {
+    "commit": {
+      "full_profile_period_share": 0.0,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": []
+      },
+      "period": 0,
+      "samples": 0
+    },
+    "edit": {
+      "full_profile_period_share": 0.0,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": []
+      },
+      "period": 0,
+      "samples": 0
+    },
+    "outside_profile": {
+      "full_profile_period_share": 0.0005676024064301221,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": [
+          {
+            "period": 11441726,
+            "samples": 4,
+            "symbol": "toml::de::parser::parse_document [/home/zhuhe/.cargo/bin/rustup]",
+            "within_phase_share": 0.31588942534135483
+          },
+          {
+            "period": 6443189,
+            "samples": 2,
+            "symbol": "__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.17788708369486725
+          },
+          {
+            "period": 3415427,
+            "samples": 1,
+            "symbol": "_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+            "within_phase_share": 0.09429497545434556
+          },
+          {
+            "period": 3080499,
+            "samples": 1,
+            "symbol": "toml_parser::decoder::string::decode_basic_string [/home/zhuhe/.cargo/bin/rustup]",
+            "within_phase_share": 0.08504810016204008
+          },
+          {
+            "period": 3073613,
+            "samples": 1,
+            "symbol": "_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.08485798771022114
+          },
+          {
+            "period": 3000762,
+            "samples": 1,
+            "symbol": "toml::de::parser::document::descend_path [/home/zhuhe/.cargo/bin/rustup]",
+            "within_phase_share": 0.08284667748259088
+          },
+          {
+            "period": 2935742,
+            "samples": 1,
+            "symbol": "__cxa_atexit [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.08105156978330715
+          },
+          {
+            "period": 2829710,
+            "samples": 1,
+            "symbol": "__memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.07812418037127311
+          }
+        ]
+      },
+      "period": 36220668,
+      "samples": 12
+    },
+    "publication": {
+      "full_profile_period_share": 0.0,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": []
+      },
+      "period": 0,
+      "samples": 0
+    },
+    "query": {
+      "full_profile_period_share": 0.0,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": []
+      },
+      "period": 0,
+      "samples": 0
+    },
+    "setup": {
+      "full_profile_period_share": 0.0,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": []
+      },
+      "period": 0,
+      "samples": 0
+    },
+    "unknown": {
+      "full_profile_period_share": 0.9994323975935698,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 7103855134,
+          "samples": 1756,
+          "within_phase_share": 0.11138544533440621
+        },
+        "top": [
+          {
+            "period": 26644253062,
+            "samples": 6646,
+            "symbol": "sha2::sha256::x86_sha::compress [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.4177706241093354
+          },
+          {
+            "period": 12811554249,
+            "samples": 3279,
+            "symbol": "litchi_perf_baseline::payload_bytes [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.2008797545181992
+          },
+          {
+            "period": 3003676954,
+            "samples": 745,
+            "symbol": "__memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.047096384829232465
+          },
+          {
+            "period": 2958846144,
+            "samples": 733,
+            "symbol": "__memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.046393456680732845
+          },
+          {
+            "period": 2631044236,
+            "samples": 676,
+            "symbol": "[unknown] [[unknown]]",
+            "within_phase_share": 0.04125366134210114
+          },
+          {
+            "period": 1679474519,
+            "samples": 413,
+            "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.026333450457240514
+          },
+          {
+            "period": 1301619216,
+            "samples": 320,
+            "symbol": "litchi_docx::section::inventory::Inventory::parse_with_limits [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.020408839045165793
+          },
+          {
+            "period": 1197979321,
+            "samples": 292,
+            "symbol": "crc32fast::specialized::pclmulqdq::calculate [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.01878380930550583
+          },
+          {
+            "period": 947018692,
+            "samples": 233,
+            "symbol": "quick_xml::name::NamespaceResolver::resolve_event [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.01484885273681411
+          },
+          {
+            "period": 870414566,
+            "samples": 214,
+            "symbol": "litchi_docx::source_backed::ensure_source_section_inventory_xml [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.013647732425657304
+          },
+          {
+            "period": 596753431,
+            "samples": 147,
+            "symbol": "quick_xml::reader::Reader<R>::read_event_impl [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.0093568415195627
+          },
+          {
+            "period": 594365856,
+            "samples": 146,
+            "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.00931940535291405
+          },
+          {
+            "period": 531207598,
+            "samples": 131,
+            "symbol": "litchi_docx::section::inventory::NamespaceContext::enter [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.008329110567733916
+          },
+          {
+            "period": 454424727,
+            "samples": 112,
+            "symbol": "cfree@GLIBC_2.2.5 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "within_phase_share": 0.007125187610541857
+          },
+          {
+            "period": 450742010,
+            "samples": 111,
+            "symbol": "quick_xml::events::attributes::IterState::next [/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline]",
+            "within_phase_share": 0.007067444164856667
+          }
+        ]
+      },
+      "period": 63777229715,
+      "samples": 15954
+    },
+    "verification": {
+      "full_profile_period_share": 0.0,
+      "leaf_symbols": {
+        "remainder": {
+          "period": 0,
+          "samples": 0,
+          "within_phase_share": 0.0
+        },
+        "top": []
+      },
+      "period": 0,
+      "samples": 0
+    }
+  },
+  "claim_scope": "whole-process FP ancestry description only; no timing or speedup claim",
+  "classification_reasons": {
+    "inherited_or_non_workload_comm": 12,
+    "invalid_or_unknown_ancestry": 677,
+    "unmapped_ancestry": 15277
+  },
+  "conservation": {
+    "duplicate_keys": 0,
+    "joined_period": 63813450383,
+    "joined_samples": 15966,
+    "leaf_parse_errors": {},
+    "leaf_period": 63813450383,
+    "leaf_samples": 15966,
+    "missing_leaf": 0,
+    "missing_stack": 0,
+    "stack_parse_errors": {},
+    "stack_period": 63813450383,
+    "stack_samples": 15966
+  },
+  "errors": [
+    "load-bias receipt does not match decoder load bias"
+  ],
+  "inputs": {
+    "binary_sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "leaf_export": {
+      "bytes": 3056460,
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-leaf-period.txt",
+      "sha256": "5c3845ec4039c29a7d45fe2c7aedd61331ff685208a593b8783356c41cb89b47"
+    },
+    "load_bias": "0x0",
+    "load_bias_receipt": {
+      "bytes": 1667,
+      "path": "/tmp/litchi-performance-0929/load-bias-fp-v1.json",
+      "sha256": "e4ef0b80c605d54615c067cfdf9c6fb86e47e4240f07d8c443ea18fc8343b5c9"
+    },
+    "mapping": {
+      "bytes": 19326,
+      "path": "/tmp/litchi-performance-0929/phase-map-fp-v1.json",
+      "sha256": "0b2aa67f12291083b5e60676ca79c82c6956b2e51e49f2054646198395ae42e6"
+    },
+    "phase_map_adapter": "raw calls plus publication_internal_snapshot grouped by reviewed scope in memory",
+    "source_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "stack_export": {
+      "bytes": 31295949,
+      "path": "/tmp/litchi-performance-0929/capture-fp/perf-script-no-inline.txt",
+      "sha256": "1eb10ce0b86d76b11ce055dcd41511b0b065ee9893bdc3301d829a2824c68f07"
+    },
+    "workload_comm": "litchi-perf-bas",
+    "workload_dso": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline"
+  },
+  "schema": "litchi.performance.0929.fp-phase-decoder.v2",
+  "status": "failed_closed"
+}

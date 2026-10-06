@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0929 — frame-pointer native phase attribution
+
+[0929](0929-frame-pointer-phase-profile.md) records one 1,000-iteration
+diagnostic run with a separately built FP/debug executable. All 15,966 samples
+and 63,813,450,383 period units reconcile across leaf and physical-stack
+exports. Query and publication ancestry is recovered; 21.08% remains
+unclassified. All report correctness checks pass. This is CPU attribution,
+with no normal-release latency comparison or speedup claim.
+
 ## 0928 — native process-tree profile, with explicit unwind limits
 
 [0928](0928-native-cpu-profile.md) binds one CPU-12 native profile of the

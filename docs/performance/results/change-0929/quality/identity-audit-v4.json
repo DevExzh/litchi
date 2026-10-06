@@ -1,0 +1,96 @@
+{
+  "schema": "litchi.performance.0929.fp-identity-audit.v4",
+  "audited_at_utc": "2026-10-06T12:50:56.049704Z",
+  "scope": "read-only binary/source identity and FP/DWARF mapping audit; no build/profile/capture by reviewer",
+  "source": {
+    "root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "source_v4_lib_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "source_v4_receipt": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+    "source_v4_receipt_sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2",
+    "source_v4_list": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+    "source_v4_list_sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68",
+    "workspace_cargo_lock_sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "perf_cargo_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "perf_manifest_sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "rustfmt_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "toolchain": "cargo 1.95.0 (f2d3ce0bd 2026-03-21); rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "build": {
+    "initial_argv": "cargo +1.95.0 build --offline --locked -j2 --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0929/target-fp",
+    "initial_env": "env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS=\"-C force-frame-pointers=yes -C debuginfo=1\"",
+    "initial_exit": 0,
+    "initial_artifact": "/tmp/litchi-performance-0929/litchi-perf-baseline-fp-strip-debuginfo",
+    "initial_artifact_bytes": 68663464,
+    "initial_artifact_sha256": "f44f00aee5746210d973437b1ce15e29162d9b848eaeba7af9a544233711239c",
+    "initial_artifact_debug_sections": "none (.debug_info/.debug_line absent)",
+    "corrected_relink_start": "/tmp/litchi-performance-0929/relink-fp-nostrip.start.utc",
+    "corrected_relink_end": "/tmp/litchi-performance-0929/relink-fp-nostrip.end.utc",
+    "corrected_relink_exit": "/tmp/litchi-performance-0929/relink-fp-nostrip.exit",
+    "corrected_relink_log": "/tmp/litchi-performance-0929/relink-fp-nostrip.log",
+    "corrected_relink_exit_value": 0,
+    "corrected_artifact": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "corrected_artifact_bytes": 529059232,
+    "corrected_artifact_sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "corrected_build_id": "1fab480cdc3541389487fa4e9fd5d3aebd240e89",
+    "corrected_sections": [
+      ".debug_info",
+      ".debug_ranges",
+      ".debug_str",
+      ".debug_line",
+      ".eh_frame",
+      ".symtab"
+    ]
+  },
+  "mapping": {
+    "route_symbol": "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save",
+    "entry_pc": "0xf46b40",
+    "addr2line_lines": [
+      50742,
+      50750
+    ],
+    "source_path_prefix": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+    "fp_prologue": "push %rbp; mov %rsp,%rbp at 0xf46b40",
+    "candidate_review_mapping_receipt": "direct disassembly/addr2line proof in this receipt; external candidate-review receipt may be joined only if it binds the same binary/source hashes.",
+    "commands": [
+      "addr2line -e /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline -f -C 0xf46b40 0xf46b44 0xf46b7f 0xf46bfc",
+      "objdump -d /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline --start-address=0xf46b40 --stop-address=0xf46b60",
+      "readelf -S /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+      "addr2line -e /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline -f -C -i 0xf49278 0xf49299 0xf49814 0xf49827 0xf498df 0xf49915 0xf49b22 0xf49c62 0xf49c76 0xf49c89 0xf49ca0 0xf49d24 0xf49d61",
+      "readelf --debug-dump=decodedline /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+      "objdump -d /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline --start-address=0xf497e0 --stop-address=0xf49870",
+      "objdump -d /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline --start-address=0xf49c40 --stop-address=0xf49d00",
+      "addr2line -e /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline -f -C -i 0xf49831 0xf49cbd 0xf49cb8 0xf49c76",
+      "cargo +1.95.0 --version",
+      "rustc +1.95.0 --version",
+      "sha256sum (programmatic over source receipt/list/locks/manifest/rustfmt/binaries)",
+      "objdump -d /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline --start-address=0xf497e0 --stop-address=0xf49870",
+      "objdump -d /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline --start-address=0xf49c40 --stop-address=0xf49d00",
+      "addr2line -e /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline -f -C -i 0xf49831 0xf49cb8 0xf49cbd 0xf49c76"
+    ],
+    "phase_boundaries": {
+      "query": {
+        "source_line_pc": "0xf49827",
+        "exact_call_pc": "0xf49831",
+        "return_pc": "0xf49837",
+        "line": 51009,
+        "call": "package.section_layout_snapshot()"
+      },
+      "publication_timer_start": {
+        "source_line_pc": "0xf49c76",
+        "return_pc": "0xf49c7c",
+        "line": 51033,
+        "call": "Instant::now() starting publication timer"
+      },
+      "publication": {
+        "source_line_pc": "0xf49c89",
+        "exact_call_pc": "0xf49cb8",
+        "return_pc": "0xf49cbd",
+        "line": 51034,
+        "call": "package.publish_section_layout_commit_to_stream()"
+      }
+    },
+    "call_site_rule": "For phase joins use exact CALL start and next-instruction return PCs: query 0xf49831\u21920xf49837; publication 0xf49cb8\u21920xf49cbd. Nearby source-line PCs are annotations only. No edit/commit phase claims are made."
+  },
+  "status": "corrected FP/DWARF binary verified; exact query/publication CALL+return PCs independently disassembled and mapped; no edit/commit phase claim; ready for capture/report audit"
+}

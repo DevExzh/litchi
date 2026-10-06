@@ -1,0 +1,48 @@
+0xf47137 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50757 
+0xf4713c litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50757 
+0xf4713d <core::result::Result<T,E> as core::ops::try_trait::Try>::branch /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173 
+0xf4783f litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50775 
+0xf47843 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50775 
+0xf47844 <core::result::Result<T,E> as core::ops::try_trait::Try>::branch /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173 
+0xf49278 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50971 
+0xf4927d litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50971 
+0xf4927e litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:50971 
+0xf497d0 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51006 
+0xf497d5 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51006 
+0xf497d6 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51006 
+0xf49814 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51008 
+0xf49819 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51008 
+0xf4981a litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51008 
+0xf49831 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51009 
+0xf49836 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51009 
+0xf49837 <core::result::Result<T,E> as core::ops::try_trait::Try>::branch /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173 
+0xf49931 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51011 
+0xf49936 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51011 
+0xf49937 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51011 
+0xf49975 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51013 
+0xf4997a litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51013 
+0xf4997b litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51013 
+0xf49ade litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51025 
+0xf49ae3 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51025 
+0xf49ae4 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51025 
+0xf49b22 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51027 
+0xf49b27 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51027 
+0xf49b28 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51027 
+0xf49c1e litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51030 
+0xf49c23 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51030 
+0xf49c24 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51030 
+0xf49c76 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51033 
+0xf49c7b litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51033 
+0xf49c7c litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51033 
+0xf49cb8 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51034 
+0xf49cbc litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51034 
+0xf49cbd <core::result::Result<T,E> as core::ops::try_trait::Try>::branch /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173 
+0xf49d7d litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51036 
+0xf49d82 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51036 
+0xf49d83 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51036 
+0xf4a494 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51123 
+0xf4a498 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51123 
+0xf4a499 <core::result::Result<T,E> as core::ops::try_trait::Try>::branch /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173 
+0xf4a622 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51128 
+0xf4a626 litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs:51128 
+0xf4a627 <core::result::Result<T,E> as core::ops::try_trait::Try>::branch /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173 

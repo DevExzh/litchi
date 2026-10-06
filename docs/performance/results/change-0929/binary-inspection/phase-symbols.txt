@@ -1,0 +1,9 @@
+0000000003093ac0 T litchi_docx::source_backed::Package::section_layout_snapshot
+0000000003094060 T litchi_docx::source_backed::Package::main_section_layout_snapshot
+00000000016bb0d0 t litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream
+00000000016bbce0 t litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream
+00000000016bc8f0 t litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream
+00000000016bd500 t litchi_docx::source_backed::Package::publish_section_layout_inverse_to_stream
+0000000000c4f8a0 t litchi_perf_baseline::sha256_hex
+0000000000e89670 t litchi_perf_baseline::verify_docx_section_layout_output
+0000000000f46b40 t litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save

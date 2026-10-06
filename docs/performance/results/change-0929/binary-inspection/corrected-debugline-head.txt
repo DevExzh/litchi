@@ -1,0 +1,60 @@
+Contents of the .debug_line section:
+
+src/ser/mod.rs:
+File name                        Line number    Starting address    View    Stmt
+src/ser/mod.rs                          1855            0xbe8d70               x
+
+/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/ser.rs:
+src/ser.rs                               626            0xbe8d81               x
+src/ser.rs                               462            0xbe8d84               x
+src/ser.rs                               628            0xbe8d88               x
+src/ser.rs                              2047            0xbe8d9b               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:
+library/alloc/src/vec/mod.rs            1446            0xbe8d9d               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:
+library/alloc/src/raw_vec/mod.rs          765            0xbe8da1               x
+library/alloc/src/raw_vec/mod.rs          671            0xbe8da4               x
+library/alloc/src/raw_vec/mod.rs          612            0xbe8daa               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:
+library/core/src/ptr/mod.rs              547            0xbe8dae               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:
+library/alloc/src/vec/mod.rs            2886            0xbe8db3               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:
+library/alloc/src/raw_vec/mod.rs          617            0xbe8db8               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:
+library/alloc/src/vec/mod.rs            1446            0xbe8dbb               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs:
+library/core/src/num/uint_macros.rs         2494            0xbe8dbf               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:
+library/alloc/src/raw_vec/mod.rs          765            0xbe8dc2               x
+library/alloc/src/raw_vec/mod.rs          671            0xbe8dc6               x
+library/alloc/src/raw_vec/mod.rs          612            0xbe8dcc               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:
+library/core/src/ptr/mod.rs              547            0xbe8dd0               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:
+library/alloc/src/vec/mod.rs            2886            0xbe8dd7               x
+library/alloc/src/vec/mod.rs            2886            0xbe8ddb        
+
+/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/ser.rs:
+src/ser.rs                              2048            0xbe8de3               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:
+library/core/src/cmp.rs                 1916            0xbe8de7               x
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs:
+library/core/src/iter/range.rs           772            0xbe8dea               x
+library/core/src/iter/range.rs             0            0xbe8dec        
+
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:
+library/alloc/src/raw_vec/mod.rs          617            0xbe8e00               x
+

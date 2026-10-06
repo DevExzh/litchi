@@ -1,0 +1,208 @@
+612578-
+612579-src/lib.rs:
+612580:lib.rs                                 50742            0xf46b40               x
+612581-
+612582-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:
+612583-library/alloc/src/string.rs                0            0xf46b57        
+--
+612811-lib.rs                                 50754            0xf470d9               x
+612812-lib.rs                                 50754            0xf4711f        
+612813:lib.rs                                 50757            0xf47137               x
+612814-
+612815-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+612816-library/core/src/result.rs              2173            0xf4713d               x
+--
+612820-
+612821-src/lib.rs:
+612822:lib.rs                                 50757            0xf47194               x
+612823-
+612824-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:
+612825-library/alloc/src/boxed.rs               286            0xf471da               x
+--
+612836-
+612837-src/lib.rs:
+612838:lib.rs                                 50757            0xf472ae               x
+612839:lib.rs                                 50757            0xf472f4        
+612840-lib.rs                                 50758            0xf4730c               x
+612841-
+612842-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+--
+612972-
+612973-src/lib.rs:
+612974:lib.rs                                 50774            0xf47819               x
+612975:lib.rs                                 50775            0xf4783c               x
+612976-
+612977-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+612978-library/core/src/result.rs              2173            0xf47844               x
+--
+612982-
+612983-src/lib.rs:
+612984:lib.rs                                 50775            0xf4789b               x
+612985-
+612986-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:
+612987-library/alloc/src/boxed.rs               286            0xf478e1               x
+--
+612998-
+612999-src/lib.rs:
+613000:lib.rs                                 50774            0xf47956               x
+613001-
+613002-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+613003-library/core/src/result.rs              2174            0xf4795d               x
+613004-
+613005-src/lib.rs:
+613006:lib.rs                                 50774            0xf47968               x
+613007:lib.rs                                 50774            0xf479ae        
+613008-
+613009-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:
+613010-library/alloc/src/raw_vec/mod.rs          612            0xf479b5               x
+--
+613445-
+613446-src/lib.rs:
+613447:lib.rs                                 50969            0xf49219               x
+613448:lib.rs                                 50969            0xf49226        
+613449-
+613450-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/time.rs:
+613451-library/core/src/time.rs                 632            0xf49228               x
+--
+613465-
+613466-src/lib.rs:
+613467:lib.rs                                 50971            0xf49278               x
+613468-lib.rs                                 50972            0xf49299               x
+613469-lib.rs                                 50980            0xf492a2               x
+613470-
+--
+613602-
+613603-src/lib.rs:
+613604:lib.rs                                 51006            0xf497c9               x
+613605:lib.rs                                 51006            0xf497d6        
+613606-
+613607-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/time.rs:
+613608-library/core/src/time.rs                 632            0xf497d8               x
+--
+613618-
+613619-src/lib.rs:
+613620:lib.rs                                 51008            0xf49814               x
+613621:lib.rs                                 51009            0xf49827               x
+613622-
+613623-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+613624-library/core/src/result.rs              2173            0xf49837               x
+--
+613630-
+613631-src/lib.rs:
+613632:lib.rs                                 51009            0xf498df               x
+613633:lib.rs                                 51009            0xf49915        
+613634-
+613635-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:
+613636-library/core/src/hint.rs                 491            0xf4991c               x
+613637-
+613638-src/lib.rs:
+613639:lib.rs                                 51011            0xf4992a               x
+613640:lib.rs                                 51011            0xf49937        
+613641-
+613642-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/time.rs:
+613643-library/core/src/time.rs                 632            0xf49939               x
+--
+613656-
+613657-src/lib.rs:
+613658:lib.rs                                 51013            0xf49975               x
+613659-
+613660-/tmp/litchi-performance-0925/measurement-source-v4/crates/litchi-docx/src/section/inventory.rs:
+613661-src/section/inventory.rs                 152            0xf49988               x
+--
+613685-
+613686-src/lib.rs:
+613687:lib.rs                                 51025            0xf49ad7               x
+613688:lib.rs                                 51025            0xf49ae4        
+613689-
+613690-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/time.rs:
+613691-library/core/src/time.rs                 632            0xf49ae6               x
+--
+613704-
+613705-src/lib.rs:
+613706:lib.rs                                 51027            0xf49b22               x
+613707-lib.rs                                 51028            0xf49b35               x
+613708-lib.rs                                 51028            0xf49b4c        
+613709-
+--
+613723-
+613724-src/lib.rs:
+613725:lib.rs                                 51030            0xf49c17               x
+613726:lib.rs                                 51030            0xf49c24        
+613727-
+613728-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/time.rs:
+613729-library/core/src/time.rs                 632            0xf49c26               x
+--
+613743-src/lib.rs:
+613744-lib.rs                                 51031            0xf49c62               x
+613745:lib.rs                                 51033            0xf49c76               x
+613746:lib.rs                                 51034            0xf49c89               x
+613747:lib.rs                                 51034            0xf49ca0        
+613748-
+613749-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+613750-library/core/src/result.rs              2173            0xf49cbd               x
+--
+613755-
+613756-src/lib.rs:
+613757:lib.rs                                 51034            0xf49d24               x
+613758:lib.rs                                 51034            0xf49d61        
+613759-
+613760-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:
+613761-library/core/src/hint.rs                 491            0xf49d68               x
+613762-
+613763-src/lib.rs:
+613764:lib.rs                                 51036            0xf49d76               x
+613765:lib.rs                                 51036            0xf49d83        
+613766-
+613767-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/time.rs:
+613768-library/core/src/time.rs                 632            0xf49d85               x
+--
+614034-lib.rs                                 51120            0xf4a481               x
+614035-lib.rs                                     0            0xf4a487        
+614036:lib.rs                                 51123            0xf4a48e               x
+614037-
+614038-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+614039-library/core/src/result.rs              2173            0xf4a499               x
+--
+614068-
+614069-src/lib.rs:
+614070:lib.rs                                 51128            0xf4a60a               x
+614071-
+614072-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:
+614073-library/core/src/result.rs              2173            0xf4a627               x
+--
+614079-
+614080-src/lib.rs:
+614081:lib.rs                                 51128            0xf4a6c2               x
+614082:lib.rs                                 51128            0xf4a6ff        
+614083:lib.rs                                 51128            0xf4a706        
+614084-lib.rs                                     0            0xf4a712        
+614085-
+614086-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:
+--
+615075-
+615076-src/lib.rs:
+615077:lib.rs                                 51009            0xf4badc               x
+615078-
+615079-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:
+615080-library/alloc/src/boxed.rs               286            0xf4bb22               x
+--
+615123-lib.rs                                 51130            0xf4bd99               x
+615124-lib.rs                                     0            0xf4bda8        
+615125:lib.rs                                 51034            0xf4bdad               x
+615126-
+615127-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:
+615128-library/alloc/src/boxed.rs               286            0xf4bdf3               x
+--
+615230-
+615231-src/lib.rs:
+615232:lib.rs                                 51128            0xf4c251               x
+615233-
+615234-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:
+615235-library/alloc/src/boxed.rs               286            0xf4c297               x
+--
+617523-
+617524-src/lib.rs:
+617525:lib.rs                                 50742            0xf4f42d               x
+617526-lib.rs                                     0            0xf4f433        
+617527-
+617528-/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:

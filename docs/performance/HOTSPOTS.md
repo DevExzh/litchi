@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0929 — publication parsing is a measured reuse candidate
+
+[0929](0929-frame-pointer-phase-profile.md) recovers native query/publication
+ancestry with frame pointers. SHA-256 is 71.04% of attributed query and 75.22%
+of attributed publication; publication SHA splits between fresh-source and
+output hashing. Preserve both contracts. Repeated inventory parsing and XML
+admission checks cover 11.75% of attributed publication. Test commit-local
+base-snapshot reuse next, with normal-build before/after measurements,
+retained-memory accounting and unchanged freshness/refusal checks. These
+diagnostic fractions do not establish a normal-build speedup bound; no
+production optimization is adopted in this batch.
+
 ## 0928 — native leaf costs recovered; phase ancestry unavailable
 
 [0928](0928-native-cpu-profile.md) records one successful native CPU profile

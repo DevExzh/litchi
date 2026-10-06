@@ -1,0 +1,101 @@
+{
+  "claim_scope": "offline whole-process cycles sample ancestry and leaf-symbol description; no elapsed-time, speedup, or production-adoption claim",
+  "command": "python3 -B /tmp/litchi-performance-0929/decode_fp_phase_ancestry_v1.py --leaf-export /tmp/litchi-performance-0929/capture-fp/perf-script-leaf-period.txt --stack-export /tmp/litchi-performance-0929/capture-fp/perf-script-no-inline.txt --mapping /tmp/litchi-performance-0929/phase-map-fp-v1.json --output /tmp/litchi-performance-0929/fp-phase-decoder-summary-v6.json --binary-sha256 c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e --source-sha256 7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a --load-bias 0x5b8705390000 --load-bias-receipt /tmp/litchi-performance-0929/load-bias-fp-v1.json --workload-comm litchi-perf-bas --workload-dso /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+  "files": {
+    "capture-fp/perf-script-leaf-period.txt": {
+      "bytes": 3056460,
+      "sha256": "5c3845ec4039c29a7d45fe2c7aedd61331ff685208a593b8783356c41cb89b47"
+    },
+    "capture-fp/perf-script-no-inline.txt": {
+      "bytes": 31295949,
+      "sha256": "1eb10ce0b86d76b11ce055dcd41511b0b065ee9893bdc3301d829a2824c68f07"
+    },
+    "decode_fp_phase_ancestry_v1.py": {
+      "bytes": 22302,
+      "sha256": "10e2670a5b5227b1c2a89f27df9b374bd9caae8775890ab9ab1ffc59e7031b71"
+    },
+    "fp-negative-binary-v3.json": {
+      "bytes": 23586,
+      "sha256": "c2f4bffd51270713c3ef971b9bed001194626230e357a3d90a61ea1be73a937a"
+    },
+    "fp-negative-load-bias-v3.json": {
+      "bytes": 10472,
+      "sha256": "4ea2e3c2c5e84f3203b3e4e830f92da4a74fbad588f494963ded9106a3e49a0f"
+    },
+    "fp-phase-decoder-compact-v4.json": {
+      "bytes": 18211,
+      "sha256": "dd759b08bf8836741183c81e0e7e4c8d956189ef82adfc929befa69c58420efd"
+    },
+    "fp-phase-decoder-review-v4.md": {
+      "bytes": 3071,
+      "sha256": "0ca808bf6d405a254fbb03f8e47f65ad3f8af4e7804b4ac9e275aeb547c2f126"
+    },
+    "fp-phase-decoder-summary-v6.json": {
+      "bytes": 23573,
+      "sha256": "7a4d969f629507d16ba00168bad1f67aa413b9e1b25822a51c31e9015d60edc3"
+    },
+    "load-bias-fp-v1.json": {
+      "bytes": 1667,
+      "sha256": "e4ef0b80c605d54615c067cfdf9c6fb86e47e4240f07d8c443ea18fc8343b5c9"
+    },
+    "phase-map-fp-v1.json": {
+      "bytes": 19326,
+      "sha256": "0b2aa67f12291083b5e60676ca79c82c6956b2e51e49f2054646198395ae42e6"
+    },
+    "publication-attribution-review-v2.md": {
+      "bytes": 3159,
+      "sha256": "61f8679faa9bd3f54d93531c5e7305711f46d4bb0cf8e490defc3e02e9003b43"
+    },
+    "publication-attribution-v1.json": {
+      "bytes": 3752,
+      "sha256": "24cc40a134c06566d1d0526c1f79710afc9797acd2a5172cbb9e71c33941995c"
+    },
+    "publication_attribution_v1.py": {
+      "bytes": 7963,
+      "sha256": "e0f0e5a358efab57f2d8ab242e45efe3e68122ec57db76cbb298446bd0c9eda7"
+    },
+    "synthetic-out-v3.json": {
+      "bytes": 4368,
+      "sha256": "811bbe92cea613e1e445c4b299b1b953ee253c211bec6d01ca9bf03530d5756d"
+    }
+  },
+  "identities": {
+    "binary_sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "load_bias": "0x5b8705390000",
+    "phase_map_sha256": "0b2aa67f12291083b5e60676ca79c82c6956b2e51e49f2054646198395ae42e6",
+    "source_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "workload_comm": "litchi-perf-bas",
+    "workload_dso": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline"
+  },
+  "schema": "litchi.performance.0929.fp-phase-decoder-receipt.v3",
+  "status": "descriptive_pass",
+  "validation": {
+    "first_leaf_ip_dso_matches": 15966,
+    "leaf_stack_duplicate_keys": 0,
+    "leaf_stack_join_missing": 0,
+    "leaf_stack_samples": 15966,
+    "lost_samples": "0 per perf-header/perf-period-loss-evidence",
+    "negative_binary_sha_errors": [
+      "mapping binary SHA does not match requested profile binary SHA"
+    ],
+    "negative_binary_sha_exit": 2,
+    "negative_binary_sha_status": "failed_closed",
+    "negative_load_bias_errors": [
+      "load-bias receipt does not match decoder load bias"
+    ],
+    "negative_load_bias_exit": 2,
+    "negative_load_bias_status": "failed_closed",
+    "period_sum": 63813450383,
+    "publication_attribution_status": "descriptive_pass",
+    "publication_inventory_union_period": 1338536419,
+    "publication_samples": 2804,
+    "publication_sha_period": 8570643406,
+    "synthetic_decoder": "descriptive_pass",
+    "timed_callee_gate": {
+      "mapped_without_required_callee_samples": 1,
+      "moved_to_unknown_period": 3996483,
+      "publication_samples": 2804,
+      "query_samples": 1504
+    }
+  }
+}

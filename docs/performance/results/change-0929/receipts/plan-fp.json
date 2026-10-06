@@ -1,0 +1,65 @@
+{
+  "argv": [
+    "timeout",
+    "--foreground",
+    "--signal=TERM",
+    "--kill-after=10s",
+    "120s",
+    "taskset",
+    "-c",
+    "12",
+    "perf",
+    "record",
+    "-o",
+    "/tmp/litchi-performance-0929/capture-fp/perf.data",
+    "-F",
+    "997",
+    "-e",
+    "cycles:u",
+    "--call-graph",
+    "fp",
+    "--",
+    "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "1000",
+    "--warmup",
+    "0",
+    "--json",
+    "/tmp/litchi-performance-0929/capture-fp/generic-read-at-report.json"
+  ],
+  "binary": {
+    "bytes": 529059232,
+    "debug_line": true,
+    "frame_pointer_build": "RUSTFLAGS=-C force-frame-pointers=yes -C debuginfo=1; cargo rustc -- -C strip=none",
+    "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "profile": "release",
+    "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e"
+  },
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "claim_scope": "one source-bound diagnostic profile; no timing qualification, speedup, or adoption claim",
+  "cpu": 12,
+  "deadline_seconds": 120,
+  "environment": {
+    "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+  },
+  "perf": {
+    "call_graph": "fp",
+    "event": "cycles:u",
+    "frequency_hz": 997
+  },
+  "recovery": "single process handle; retain terminal status and never restart or recapture on parser/error",
+  "route": "generic_read_at",
+  "samples": 1000,
+  "schema": "litchi.performance.0929.fixed-profile-plan.v1",
+  "source": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "root": "/tmp/litchi-performance-0925/measurement-source-v4"
+  },
+  "status": "planned_before_execution",
+  "warmups": 0
+}

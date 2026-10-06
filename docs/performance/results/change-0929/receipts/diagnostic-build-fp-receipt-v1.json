@@ -1,0 +1,127 @@
+{
+  "schema": "litchi.performance.0929.frame-pointer-diagnostic-build-receipt.v1",
+  "recorded_utc": "2026-10-06T12:46:44.031933247Z",
+  "status": "corrected_binary_ready_for_profiler_inspection; capture_not_started",
+  "source_binding": {
+    "source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch": {
+      "path": "/tmp/litchi-performance-0925/section-layout-provider-final.patch",
+      "bytes": 41560,
+      "sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+    },
+    "source_receipt": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "bytes": 356812,
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    },
+    "source_file_count": 6276,
+    "source_bytes": 109831506
+  },
+  "lock_binding": {
+    "root_cargo_lock": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/Cargo.lock",
+      "bytes": 138465,
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "tools_perf_baseline_cargo_lock": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.lock",
+      "bytes": 56289,
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "rustfmt_toml": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/rustfmt.toml",
+      "bytes": 79,
+      "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+    }
+  },
+  "build_environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "profile": "release",
+    "rustflags": "-C force-frame-pointers=yes -C debuginfo=1",
+    "CARGO_ENCODED_RUSTFLAGS": "explicitly unset with env -u for both commands"
+  },
+  "initial_build": {
+    "command": "env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS='-C force-frame-pointers=yes -C debuginfo=1' cargo +1.95.0 build --offline --locked -j2 --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0929/target-fp",
+    "start_utc": "2026-10-06T12:34:52.039680579Z",
+    "end_utc": "2026-10-06T12:44:54.783023837Z",
+    "tool_session_id": 39333,
+    "tool_reported_exit_code": 0,
+    "exit_file": {
+      "path": "/tmp/litchi-performance-0929/build-fp.exit",
+      "value": 0
+    },
+    "log": {
+      "path": "/tmp/litchi-performance-0929/build-fp.log",
+      "bytes": 8825,
+      "sha256": "424a9618fce2d62d289ebfbae06f352f601f1ed9cc435c8270f04c58838f409a"
+    },
+    "binary_before_correction": {
+      "path": "/tmp/litchi-performance-0929/litchi-perf-baseline-fp-strip-debuginfo",
+      "bytes": 68663464,
+      "sha256": "f44f00aee5746210d973437b1ce15e29162d9b848eaeba7af9a544233711239c"
+    },
+    "elf_audit": {
+      "sections_path": "/tmp/litchi-performance-0929/initial-elf-sections.txt",
+      "sections_bytes": 5345,
+      "sections_sha256": "b4e151121ddd7230fe15ed551c59d062a94519fb91787a0080cdaa16161b43ec",
+      "debug_line_present": false,
+      "reason_for_supersession": "release profile strip removed debug sections despite debuginfo=1"
+    },
+    "superseded": true
+  },
+  "corrected_relink": {
+    "command": "env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS='-C force-frame-pointers=yes -C debuginfo=1' cargo +1.95.0 rustc --offline --locked -j2 --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0929/target-fp -- -C strip=none",
+    "start_utc": "2026-10-06T12:45:25.017496480Z",
+    "end_utc": "2026-10-06T12:45:27.853818384Z",
+    "tool_session_id": 32797,
+    "tool_reported_exit_code": 0,
+    "exit_file": {
+      "path": "/tmp/litchi-performance-0929/relink-fp-nostrip.exit",
+      "value": 0
+    },
+    "log": {
+      "path": "/tmp/litchi-performance-0929/relink-fp-nostrip.log",
+      "bytes": 176,
+      "sha256": "37d3f348955b4bb6ea706931a37e8c26dcd31ecdc8b6fb4e900450d7033392f9"
+    },
+    "binary": {
+      "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+      "bytes": 529059232,
+      "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+      "file_description": "ELF 64-bit LSB pie executable, x86-64, with debug_info, not stripped"
+    },
+    "rustc_info": {
+      "path": "/tmp/litchi-performance-0929/target-fp/.rustc_info.json",
+      "bytes": 1040,
+      "sha256": "affcc2ed596aa6418a01a0dee5d42dde9ce75ac80c34bfccc5cf62dee8471913"
+    },
+    "elf_audit": {
+      "sections_path": "/tmp/litchi-performance-0929/corrected-elf-sections.txt",
+      "sections_bytes": 6156,
+      "sections_sha256": "61107c5f260f6f13756e7f76bdf26a96cbed409e58b058e1aeedc1a779e165c0",
+      "debugline_excerpt_path": "/tmp/litchi-performance-0929/corrected-debugline-head.txt",
+      "debugline_excerpt_bytes": 3396,
+      "debugline_excerpt_sha256": "95c3841246c0d5f15eed795e98964a685abafa78bcb2868dedee5bf4a58b715d",
+      "required_sections_present": [
+        ".debug_abbrev",
+        ".debug_info",
+        ".debug_ranges",
+        ".debug_str",
+        ".debug_line",
+        ".symtab"
+      ],
+      "debug_line_present": true,
+      "line_records_observed": true
+    }
+  },
+  "capture_policy": {
+    "capture_started": false,
+    "eligible_binary": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "profiling_command_to_follow": "LITCHI_DOCX_INGRESS_ROUTE=generic_read_at timeout --foreground --signal=TERM --kill-after=10s 120s taskset -c 12 perf record -o /tmp/litchi-performance-0929/perf.data -F 997 -e cycles:u --call-graph fp -- <binary> --case docx_source_backed_existing_section_layout_edit_save --samples 1000 --warmup 0 --json /tmp/litchi-performance-0929/generic-read-at-report.json",
+    "claim_scope": "diagnostic profile only; no comparator latency, speedup, or adoption claim"
+  }
+}

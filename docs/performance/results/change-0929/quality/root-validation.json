@@ -1,0 +1,15 @@
+{
+  "schema": "litchi.performance.0929.root-validation.v1",
+  "decoder_replay_exit": 0,
+  "decoder_summary_exactly_equal": true,
+  "report_validator_exit": 0,
+  "artifact_hash_bindings_checked": 76,
+  "artifact_hash_binding_errors": [],
+  "independent_query_samples": 1504,
+  "independent_query_period": 5953322348,
+  "independent_publication_samples": 2804,
+  "independent_publication_period": 11394220603,
+  "independent_leaf_first_frame_ip_mismatches": 0,
+  "checks_scope": "exact retained diagnostic capture, not benchmark latency qualification",
+  "decoder_replay_sha256": "7a4d969f629507d16ba00168bad1f67aa413b9e1b25822a51c31e9015d60edc3"
+}

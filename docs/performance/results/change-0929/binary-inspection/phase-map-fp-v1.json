@@ -1,0 +1,492 @@
+{
+  "schema": "litchi.performance.0929.fp-phase-map.v1",
+  "status": "ready_for_fixed_fp_profile",
+  "semantics": {
+    "address_kind": "static ELF virtual address; runtime PC = PIE load_bias + static address",
+    "return_pc": "instruction immediately after the call; perf callchain may report this address",
+    "return_minus_one": "return_pc - 1; compatibility form for tools that normalize call returns to final call byte",
+    "load_bias": "must be measured from the same capture ELF; this map intentionally does not reuse 0928 load bias",
+    "phase_proof": "call/return PCs are bound by objdump and addr2line debug_line records; ancestry still requires a valid frame-pointer chain"
+  },
+  "binary": {
+    "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e",
+    "bytes": 529059232,
+    "build_id": "1fab480cdc3541389487fa4e9fd5d3aebd240e89",
+    "elf": "PIE x86-64; with .debug_info/.debug_line/.eh_frame/.symtab; force-frame-pointers=yes"
+  },
+  "source": {
+    "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+    "sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f"
+  },
+  "evidence": {
+    "debugline_dump": {
+      "path": "/tmp/litchi-performance-0929/debugline-phase-focused.txt",
+      "sha256": "aab41e9057e0fc50ed848270b1076bf1ed069c64061bc3bc3b887a9794fdba08",
+      "bytes": 10110
+    },
+    "runner_disassembly": {
+      "path": "/tmp/litchi-performance-0929/runner-fp-disassembly.txt",
+      "sha256": "8cf0adf5821340d3eb8337733c6304ecea6d05ba6478ddcbad723269d8bb2f91",
+      "bytes": 458435
+    },
+    "phase_symbols": {
+      "path": "/tmp/litchi-performance-0929/phase-symbols.txt",
+      "sha256": "d266980c1d64a38c066d37635621d5ce0e10b27df9ab2b415be2c960ad8e039e",
+      "bytes": 775
+    },
+    "build_receipt": {
+      "path": "docs/performance/results/change-0929/receipts/diagnostic-build-fp-receipt-v1.json",
+      "sha256": "ccf53f92228bd3c37c9184053ac5771a34aecd4df440b7b281b398e1669220f5",
+      "bytes": 6205
+    }
+  },
+  "frame_pointer_proof": [
+    {
+      "symbol": "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save",
+      "start": "0xf46b40",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_docx::source_backed::Package::section_layout_snapshot",
+      "start": "0x3093ac0",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+      "start": "0x3094060",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream [expected clone]",
+      "start": "0x16bbce0",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream [timed clone]",
+      "start": "0x16bc8f0",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_docx::source_backed::Package::publish_section_layout_inverse_to_stream",
+      "start": "0x16bd500",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_perf_baseline::verify_docx_section_layout_output",
+      "start": "0xe89670",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    },
+    {
+      "symbol": "litchi_perf_baseline::sha256_hex",
+      "start": "0xc4f8a0",
+      "prologue_bytes": "55 48 89 e5",
+      "prologue": "push rbp; mov rsp,rbp"
+    }
+  ],
+  "static_targets": {
+    "section_layout_snapshot": {
+      "got": "0x373e810",
+      "relocation_target": "0x3093ac0"
+    },
+    "main_section_layout_snapshot": {
+      "got": "0x3742278",
+      "relocation_target": "0x3094060"
+    },
+    "instant_now": {
+      "got": "0x373d398",
+      "relocation_target": "0x3683100"
+    },
+    "instant_elapsed": {
+      "got": "0x373d3a0",
+      "relocation_target": "0x3683110"
+    }
+  },
+  "calls": [
+    {
+      "phase": "expected_snapshot",
+      "scope": "expected_oracle",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 50757
+      },
+      "call_pc": "0xf47137",
+      "call_pc_decimal": 16019767,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf4713d",
+      "return_pc_decimal": 16019773,
+      "return_minus_one": "0xf4713c",
+      "return_minus_one_decimal": 16019772,
+      "target": "litchi_docx::source_backed::Package::section_layout_snapshot",
+      "target_static_address": "0x3093ac0",
+      "got_static_address": "0x373e810",
+      "notes": "expected package created before sample loop"
+    },
+    {
+      "phase": "expected_publication",
+      "scope": "expected_oracle",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 50775
+      },
+      "call_pc": "0xf4783f",
+      "call_pc_decimal": 16021567,
+      "instruction_length_bytes": 5,
+      "return_pc": "0xf47844",
+      "return_pc_decimal": 16021572,
+      "return_minus_one": "0xf47843",
+      "return_minus_one_decimal": 16021571,
+      "target": "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream [expected clone]",
+      "target_static_address": "0x16bbce0",
+      "notes": "expected output oracle, outside timed sample phases"
+    },
+    {
+      "phase": "preparation_timer_end",
+      "scope": "setup",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 50969
+      },
+      "call_pc": "0xf49220",
+      "call_pc_decimal": 16028192,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49226",
+      "return_pc_decimal": 16028198,
+      "return_minus_one": "0xf49225",
+      "return_minus_one_decimal": 16028197,
+      "target": "<std::time::Instant>::elapsed",
+      "target_static_address": "0x3683110",
+      "got_static_address": "0x373d3a0",
+      "notes": "preparation closes before open timer"
+    },
+    {
+      "phase": "open_timer_start",
+      "scope": "setup",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 50971
+      },
+      "call_pc": "0xf49278",
+      "call_pc_decimal": 16028280,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf4927e",
+      "return_pc_decimal": 16028286,
+      "return_minus_one": "0xf4927d",
+      "return_minus_one_decimal": 16028285,
+      "target": "<std::time::Instant>::now",
+      "target_static_address": "0x3683100",
+      "got_static_address": "0x373d398"
+    },
+    {
+      "phase": "open_timer_end",
+      "scope": "setup",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51006
+      },
+      "call_pc": "0xf497d0",
+      "call_pc_decimal": 16029648,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf497d6",
+      "return_pc_decimal": 16029654,
+      "return_minus_one": "0xf497d5",
+      "return_minus_one_decimal": 16029653,
+      "target": "<std::time::Instant>::elapsed",
+      "target_static_address": "0x3683110",
+      "got_static_address": "0x373d3a0"
+    },
+    {
+      "phase": "query_timer_start",
+      "scope": "query",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51008
+      },
+      "call_pc": "0xf49814",
+      "call_pc_decimal": 16029716,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf4981a",
+      "return_pc_decimal": 16029722,
+      "return_minus_one": "0xf49819",
+      "return_minus_one_decimal": 16029721,
+      "target": "<std::time::Instant>::now",
+      "target_static_address": "0x3683100",
+      "got_static_address": "0x373d398"
+    },
+    {
+      "phase": "query",
+      "scope": "query",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51009
+      },
+      "call_pc": "0xf49831",
+      "call_pc_decimal": 16029745,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49837",
+      "return_pc_decimal": 16029751,
+      "return_minus_one": "0xf49836",
+      "return_minus_one_decimal": 16029750,
+      "target": "litchi_docx::source_backed::Package::section_layout_snapshot",
+      "target_static_address": "0x3093ac0",
+      "got_static_address": "0x373e810",
+      "notes": "timed sample-loop query body"
+    },
+    {
+      "phase": "query_timer_end",
+      "scope": "query",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51011
+      },
+      "call_pc": "0xf49931",
+      "call_pc_decimal": 16030001,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49937",
+      "return_pc_decimal": 16030007,
+      "return_minus_one": "0xf49936",
+      "return_minus_one_decimal": 16030006,
+      "target": "<std::time::Instant>::elapsed",
+      "target_static_address": "0x3683110",
+      "got_static_address": "0x373d3a0"
+    },
+    {
+      "phase": "edit_timer_start",
+      "scope": "edit",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51013
+      },
+      "call_pc": "0xf49975",
+      "call_pc_decimal": 16030069,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf4997b",
+      "return_pc_decimal": 16030075,
+      "return_minus_one": "0xf4997a",
+      "return_minus_one_decimal": 16030074,
+      "target": "<std::time::Instant>::now",
+      "target_static_address": "0x3683100",
+      "got_static_address": "0x373d398"
+    },
+    {
+      "phase": "edit_timer_end",
+      "scope": "edit",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51025
+      },
+      "call_pc": "0xf49ade",
+      "call_pc_decimal": 16030430,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49ae4",
+      "return_pc_decimal": 16030436,
+      "return_minus_one": "0xf49ae3",
+      "return_minus_one_decimal": 16030435,
+      "target": "<std::time::Instant>::elapsed",
+      "target_static_address": "0x3683110",
+      "got_static_address": "0x373d3a0"
+    },
+    {
+      "phase": "commit_timer_start",
+      "scope": "commit",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51027
+      },
+      "call_pc": "0xf49b22",
+      "call_pc_decimal": 16030498,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49b28",
+      "return_pc_decimal": 16030504,
+      "return_minus_one": "0xf49b27",
+      "return_minus_one_decimal": 16030503,
+      "target": "<std::time::Instant>::now",
+      "target_static_address": "0x3683100",
+      "got_static_address": "0x373d398"
+    },
+    {
+      "phase": "commit_timer_end",
+      "scope": "commit",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51030
+      },
+      "call_pc": "0xf49c1e",
+      "call_pc_decimal": 16030750,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49c24",
+      "return_pc_decimal": 16030756,
+      "return_minus_one": "0xf49c23",
+      "return_minus_one_decimal": 16030755,
+      "target": "<std::time::Instant>::elapsed",
+      "target_static_address": "0x3683110",
+      "got_static_address": "0x373d3a0"
+    },
+    {
+      "phase": "publication_timer_start",
+      "scope": "publication",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51033
+      },
+      "call_pc": "0xf49c76",
+      "call_pc_decimal": 16030838,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49c7c",
+      "return_pc_decimal": 16030844,
+      "return_minus_one": "0xf49c7b",
+      "return_minus_one_decimal": 16030843,
+      "target": "<std::time::Instant>::now",
+      "target_static_address": "0x3683100",
+      "got_static_address": "0x373d398"
+    },
+    {
+      "phase": "publication",
+      "scope": "publication",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51034
+      },
+      "call_pc": "0xf49cb8",
+      "call_pc_decimal": 16030904,
+      "instruction_length_bytes": 5,
+      "return_pc": "0xf49cbd",
+      "return_pc_decimal": 16030909,
+      "return_minus_one": "0xf49cbc",
+      "return_minus_one_decimal": 16030908,
+      "target": "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream [timed clone]",
+      "target_static_address": "0x16bc8f0",
+      "notes": "timed sample-loop publication body"
+    },
+    {
+      "phase": "publication_timer_end",
+      "scope": "publication",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51036
+      },
+      "call_pc": "0xf49d7d",
+      "call_pc_decimal": 16031101,
+      "instruction_length_bytes": 6,
+      "return_pc": "0xf49d83",
+      "return_pc_decimal": 16031107,
+      "return_minus_one": "0xf49d82",
+      "return_minus_one_decimal": 16031106,
+      "target": "<std::time::Instant>::elapsed",
+      "target_static_address": "0x3683110",
+      "got_static_address": "0x373d3a0"
+    },
+    {
+      "phase": "output_verification",
+      "scope": "verification",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51123
+      },
+      "call_pc": "0xf4a494",
+      "call_pc_decimal": 16032916,
+      "instruction_length_bytes": 5,
+      "return_pc": "0xf4a499",
+      "return_pc_decimal": 16032921,
+      "return_minus_one": "0xf4a498",
+      "return_minus_one_decimal": 16032920,
+      "target": "litchi_perf_baseline::verify_docx_section_layout_output",
+      "target_static_address": "0xe89670",
+      "notes": "post-publication correctness verification"
+    },
+    {
+      "phase": "inverse_publication",
+      "scope": "verification",
+      "source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+        "line": 51128
+      },
+      "call_pc": "0xf4a622",
+      "call_pc_decimal": 16033314,
+      "instruction_length_bytes": 5,
+      "return_pc": "0xf4a627",
+      "return_pc_decimal": 16033319,
+      "return_minus_one": "0xf4a626",
+      "return_minus_one_decimal": 16033318,
+      "target": "litchi_docx::source_backed::Package::publish_section_layout_inverse_to_stream",
+      "target_static_address": "0x16bd500",
+      "notes": "post-publication inverse/reopen restoration"
+    }
+  ],
+  "publication_internal_snapshot": [
+    {
+      "phase": "expected_publication_internal_snapshot",
+      "scope": "expected_oracle",
+      "call_pc": "0x16bbd3e",
+      "call_pc_decimal": 23838014,
+      "instruction_length_bytes": 6,
+      "return_pc": "0x16bbd44",
+      "return_pc_decimal": 23838020,
+      "return_minus_one": "0x16bbd43",
+      "return_minus_one_decimal": 23838019,
+      "target": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+      "target_static_address": "0x3094060",
+      "got_static_address": "0x3742278",
+      "notes": "inside expected publication clone",
+      "target_source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/crates/litchi-docx/src/source_backed.rs",
+        "line": 1279
+      }
+    },
+    {
+      "phase": "timed_publication_internal_snapshot",
+      "scope": "publication",
+      "call_pc": "0x16bc94e",
+      "call_pc_decimal": 23841102,
+      "instruction_length_bytes": 6,
+      "return_pc": "0x16bc954",
+      "return_pc_decimal": 23841108,
+      "return_minus_one": "0x16bc953",
+      "return_minus_one_decimal": 23841107,
+      "target": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+      "target_static_address": "0x3094060",
+      "got_static_address": "0x3742278",
+      "notes": "inside timed publication clone",
+      "target_source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/crates/litchi-docx/src/source_backed.rs",
+        "line": 1279
+      }
+    },
+    {
+      "phase": "inverse_publication_internal_snapshot",
+      "scope": "verification",
+      "call_pc": "0x16bd541",
+      "call_pc_decimal": 23844161,
+      "instruction_length_bytes": 6,
+      "return_pc": "0x16bd547",
+      "return_pc_decimal": 23844167,
+      "return_minus_one": "0x16bd546",
+      "return_minus_one_decimal": 23844166,
+      "target": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+      "target_static_address": "0x3094060",
+      "got_static_address": "0x3742278",
+      "notes": "inside inverse publication clone",
+      "target_source": {
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/crates/litchi-docx/src/source_backed.rs",
+        "line": 1350
+      }
+    }
+  ],
+  "generation": {
+    "binary_build_receipt": "docs/performance/results/change-0929/receipts/diagnostic-build-fp-receipt-v1.json (corrected_relink.binary)",
+    "debugline_focused_command": "readelf --debug-dump=decodedline /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline | rg -n -B2 -A3 'lib.rs[[:space:]]+(50742|50757|50774|50775|50969|50971|51006|51008|51009|51011|51013|51025|51027|51030|51033|51034|51036|51123|51128)[[:space:]]' > /tmp/litchi-performance-0929/debugline-phase-focused.txt",
+    "runner_disassembly_command": "objdump -drwC --start-address=0xf46b40 --stop-address=0xf4f460 /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline > /tmp/litchi-performance-0929/runner-fp-disassembly.txt",
+    "symbol_command": "nm -C --defined-only /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline | rg 'run_docx_source_backed_existing_section_layout_edit_save|main_section_layout_snapshot|section_layout_snapshot|publish_section_layout_commit_to_stream|publish_section_layout_inverse_to_stream|verify_docx_section_layout_output|sha256_hex' > /tmp/litchi-performance-0929/phase-symbols.txt",
+    "call_validation_command": "addr2line -e /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline -f -C 0xf49831 0xf49837 0xf49cb8 0xf49cbd 0xf4783f 0xf47844 0xf4a494 0xf4a499 0xf4a622 0xf4a627",
+    "disassembly_validation_command": "objdump -drwC --start-address=0xf49820 --stop-address=0xf49840 /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline; objdump -drwC --start-address=0xf49ca8 --stop-address=0xf49cc0 /tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "cleanup_note": "The prior 1GB full debug-line dump was an intermediate readback; final proof is the focused extract above plus the retained debug ELF and is regenerable with this command."
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "sample_count": 15966,
+  "period": 63813450383,
+  "leaf_first_frame_ip_mismatches": 0,
+  "top": {
+    "other": [
+      [
+        "sha2::sha256::x86_sha::compress",
+        13844627947
+      ],
+      [
+        "litchi_perf_baseline::payload_bytes",
+        12811554249
+      ],
+      [
+        "__memcmp_evex_movbe",
+        2554442040
+      ],
+      [
+        "__memmove_avx512_unaligned_erms",
+        2366945031
+      ],
+      [
+        "[unknown]",
+        2292049185
+      ],
+      [
+        "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+        1299701228
+      ],
+      [
+        "crc32fast::specialized::pclmulqdq::calculate",
+        1190009194
+      ],
+      [
+        "litchi_docx::section::inventory::Inventory::parse_with_limits",
+        1025692770
+      ],
+      [
+        "quick_xml::name::NamespaceResolver::resolve_event",
+        719232134
+      ],
+      [
+        "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+        682384832
+      ],
+      [
+        "quick_xml::reader::Reader<R>::read_event_impl",
+        452231298
+      ],
+      [
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+        437858213
+      ]
+    ],
+    "query": [
+      [
+        "sha2::sha256::x86_sha::compress",
+        4228981709
+      ],
+      [
+        "__memcmp_evex_movbe",
+        245157232
+      ],
+      [
+        "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+        205437059
+      ],
+      [
+        "litchi_docx::section::inventory::Inventory::parse_with_limits",
+        146071904
+      ],
+      [
+        "quick_xml::name::NamespaceResolver::resolve_event",
+        134538804
+      ],
+      [
+        "__memmove_avx512_unaligned_erms",
+        130595493
+      ],
+      [
+        "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+        90916423
+      ],
+      [
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+        67204800
+      ],
+      [
+        "quick_xml::reader::Reader<R>::read_event_impl",
+        55230362
+      ],
+      [
+        "litchi_docx::section::inventory::NamespaceContext::enter",
+        51546308
+      ],
+      [
+        "cfree@GLIBC_2.2.5",
+        43550222
+      ],
+      [
+        "malloc",
+        35623829
+      ]
+    ],
+    "publication": [
+      [
+        "sha2::sha256::x86_sha::compress",
+        8570643406
+      ],
+      [
+        "__memmove_avx512_unaligned_erms",
+        461305620
+      ],
+      [
+        "[unknown]",
+        335108410
+      ],
+      [
+        "__memcmp_evex_movbe",
+        206907392
+      ],
+      [
+        "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+        174336232
+      ],
+      [
+        "litchi_docx::section::inventory::Inventory::parse_with_limits",
+        129854542
+      ],
+      [
+        "zlib_rs::deflate::algorithm::medium::deflate_medium",
+        97856319
+      ],
+      [
+        "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+        97113311
+      ],
+      [
+        "quick_xml::name::NamespaceResolver::resolve_event",
+        93247754
+      ],
+      [
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+        89302843
+      ],
+      [
+        "quick_xml::reader::Reader<R>::read_event_impl",
+        89291771
+      ],
+      [
+        "xml_minifier::audit::verify_source_replacement",
+        69251745
+      ]
+    ]
+  },
+  "depth_min": 1,
+  "depth_max": 35,
+  "empty_stacks": 0,
+  "hashes": {
+    "perf-script-leaf-period.txt": "5c3845ec4039c29a7d45fe2c7aedd61331ff685208a593b8783356c41cb89b47",
+    "perf-script-no-inline.txt": "1eb10ce0b86d76b11ce055dcd41511b0b065ee9893bdc3301d829a2824c68f07"
+  },
+  "caller_address_only_counts": {
+    "other": 11657,
+    "query": 1504,
+    "publication": 2805
+  },
+  "caller_address_only_periods": {
+    "other": 46461910949,
+    "query": 5953322348,
+    "publication": 11398217086
+  },
+  "top_note": "Leaf totals before rejecting the one contradictory, non-SHA publication candidate; SHA totals unchanged.",
+  "strict_phase_counts": {
+    "query": 1504,
+    "publication": 2804
+  },
+  "strict_phase_periods": {
+    "query": 5953322348,
+    "publication": 11394220603
+  },
+  "rejected_publication_sample": {
+    "time": "156601.483747",
+    "period": 3996483,
+    "reason": "publication return PC but Edit::commit cleanup frames and no publication callee"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "binary": {
+    "bytes": 529059232,
+    "debug_line": true,
+    "frame_pointer_flags": "-C force-frame-pointers=yes -C debuginfo=1; strip=none",
+    "path": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline",
+    "sha256": "c195a1d94acb7b240ca86ad32c13a9fd8b4c7b3affe085122970fe0f75c2169e"
+  },
+  "capture": {
+    "artifacts": {
+      "generic-read-at-report.json": {
+        "bytes": 724998,
+        "path": "/tmp/litchi-performance-0929/capture-fp/generic-read-at-report.json",
+        "sha256": "cd9d3e845523d332a3fefe42dd4d176a8aa9f90d67f9cd57d3193973e2f66b12"
+      },
+      "perf.data": {
+        "bytes": 2855464,
+        "path": "/tmp/litchi-performance-0929/capture-fp/perf.data",
+        "sha256": "9a4aa1051bfdbad3c148948cd25c5164c07181fa2d45169847c4c3859619c93f"
+      },
+      "stderr.log": {
+        "bytes": 160,
+        "path": "/tmp/litchi-performance-0929/capture-fp/stderr.log",
+        "sha256": "da70c724fe8d594dd60c045febc17a4014f5474d8a201c51e439601bb12102b5"
+      },
+      "stdout.log": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0929/capture-fp/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "cpu": 12,
+    "deadline_seconds": 120,
+    "environment": {
+      "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+    },
+    "perf": {
+      "call_graph": "fp",
+      "event": "cycles:u",
+      "frequency_hz": 997
+    },
+    "route": "generic_read_at",
+    "samples": 1000,
+    "warmups": 0
+  },
+  "claim_scope": "one diagnostic profile; no comparator timing, speedup, or adoption claim",
+  "end_utc": "2026-10-06T12:48:57.314840749Z",
+  "exit_file": {
+    "bytes": 2,
+    "path": "/tmp/litchi-performance-0929/capture-fp/exit",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "schema": "litchi.performance.0929.fixed-profile-terminal-receipt.v1",
+  "source": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+  },
+  "start_utc": "2026-10-06T12:48:40.897219304Z",
+  "status": "terminal_success_persisted_before_offline_analysis",
+  "tool_return": {
+    "exit_code": 0,
+    "same_handle_polled": true,
+    "session_id": 62586
+  }
+}

@@ -1,0 +1,10 @@
+header_command=perf report --header-only --input=/tmp/litchi-performance-0929/capture-fp/perf.data
+# event : name = cycles:u, , id = { 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 883, 884, 885, 886, 887, 888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898, 899, 900, 901 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1
+# time of first sample : 156599.382595
+# time of last sample : 156615.509625
+# sample duration :  16127.030 ms
+summary_command=perf report --stdio --no-children --call-graph none --sort comm,dso,symbol --input=/tmp/litchi-performance-0929/capture-fp/perf.data
+# Total Lost Samples: 0
+#
+# Samples: 15K of event 'cycles:u'
+# Event count (approx.): 63813450383
