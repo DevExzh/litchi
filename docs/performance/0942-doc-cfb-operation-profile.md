@@ -105,16 +105,28 @@ profile process; there is no allocator comparison or memory improvement claim.
 
 Raw captures, source manifests, build logs, and binaries remain outside Git
 under `/home/zhuhe/litchi-performance-0942`. The verified archive is
-`/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.tar.zst`,
-176,574,454 bytes, SHA-256
-`bc03acd40a3a1992df8b27047904039139db72f5e46abdc28586d222ed609301`.
-Extraction verifies all 21,823 selected files and 845,267,181 logical bytes.
-The [custody summary](results/change-0942/custody-summary-v1.json) records the
+`/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v2.tar.zst`,
+176,528,825 bytes, SHA-256
+`c85eafc1c6ad1d9f6493fac7c1e8e921f2ca35b5a0165625793c609a1f6d6774`.
+Extraction verifies all 21,847 selected files and 845,306,852 logical bytes.
+The [archive correction](results/change-0942/archive-correction-v2.json)
+supersedes v1: its cache filter mistakenly excluded ten `target-*` fixture
+filenames from each external source copy and removed those copies during
+cleanup. The checkout was unaffected. All twenty files were restored from
+the checkout with exact original-manifest hashes, and all 10,790 files in each
+original source manifest were rechecked. The measured DOC dependency sources,
+executables, and captures did not change. V1 remains retained as history.
+
+V2 restricts cache filtering and cleanup to the two explicitly named top-level
+build directories; synthetic tests prove that nested target-prefixed source
+files survive. The correction record binds the new archive, complete source
+recheck, tests, and cleanup. The original
+[custody summary](results/change-0942/custody-summary-v1.json) records the
 per-file manifest identity, regeneration commands, build command and environment,
 source/binary hashes, and cleanup receipt. The committed
-[archive script](results/change-0942/archive-v1.py) generates that manifest and
+[archive script](results/change-0942/archive-0942-v2.py) generates that manifest and
 archive with `--go --archive`, verifies with `--go --verify`, and permits
-cleanup only after verification; its exact original invocation is in the summary.
+cleanup only after verification; its exact invocation is in the correction record.
 
 [Independent review](results/change-0942/independent-review-v1.json) checks all
 seventeen children and replays a relocated raw packet. A second
