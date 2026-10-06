@@ -1,0 +1,196 @@
+{
+  "schema": "litchi.performance.0935.compiler-metadata.v1",
+  "commands": [
+    {
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/baseline_normal.terminal.json",
+        "bytes": 1093,
+        "sha256": "3c4afda77228dcc445f61496893058fa539163bfb6b3b3f7386840fab58ca4ec"
+      },
+      "role": "baseline_normal",
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-10-06T18:12:41.115684+00:00",
+      "ended_utc": "2026-10-06T18:12:41.116518+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/baseline_normal.stdout",
+        "bytes": 249,
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/baseline_normal.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "environment_policy": "inherited process environment; read-only metadata commands",
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline",
+        "bytes": 69934624,
+        "sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66"
+      }
+    },
+    {
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/candidate_normal.terminal.json",
+        "bytes": 1096,
+        "sha256": "fe15909bdd1927e9ada088cd8cfbfe3a9e2ce2bb5dc2b0391c9f1369288a0e84"
+      },
+      "role": "candidate_normal",
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/litchi-perf-baseline"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-10-06T18:12:41.169980+00:00",
+      "ended_utc": "2026-10-06T18:12:41.170863+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/candidate_normal.stdout",
+        "bytes": 249,
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/candidate_normal.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "environment_policy": "inherited process environment; read-only metadata commands",
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/litchi-perf-baseline",
+        "bytes": 69907728,
+        "sha256": "1f3ac64688cbad84741577e3c772e35d7ac3df6420daffa470fe30f333ece659"
+      }
+    },
+    {
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/baseline_allocator.terminal.json",
+        "bytes": 1120,
+        "sha256": "2f41e4dcfde853be75d3b69b09c1cd73d9f3f62646041902ba3aba4b89fc2624"
+      },
+      "role": "baseline_allocator",
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-10-06T18:12:41.224840+00:00",
+      "ended_utc": "2026-10-06T18:12:41.225901+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/baseline_allocator.stdout",
+        "bytes": 249,
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/baseline_allocator.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "environment_policy": "inherited process environment; read-only metadata commands",
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+        "bytes": 68448792,
+        "sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9"
+      }
+    },
+    {
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/candidate_allocator.terminal.json",
+        "bytes": 1123,
+        "sha256": "79e8a73f6abac599ecb9832009709b6cd117248f05f27f21904559a416d1b9ff"
+      },
+      "role": "candidate_allocator",
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/litchi-perf-baseline-alloc"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-10-06T18:12:41.275317+00:00",
+      "ended_utc": "2026-10-06T18:12:41.276382+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/candidate_allocator.stdout",
+        "bytes": 249,
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/candidate_allocator.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "environment_policy": "inherited process environment; read-only metadata commands",
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+        "bytes": 68421320,
+        "sha256": "a80d9041f785e55242ea54f00f50ba7be4b82c45acb2660a87b68a3357698c1a"
+      }
+    },
+    {
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/rustc.terminal.json",
+        "bytes": 748,
+        "sha256": "ec277e87c7fc793720fc19565883652858d3166c13c0724c9a37478b8ed1193d"
+      },
+      "role": "rustc",
+      "argv": [
+        "/home/zhuhe/.cargo/bin/rustc",
+        "+1.95.0",
+        "-Vv"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-10-06T18:12:41.326403+00:00",
+      "ended_utc": "2026-10-06T18:12:41.335584+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/rustc.stdout",
+        "bytes": 196,
+        "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/rustc.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "environment_policy": "inherited process environment; read-only metadata commands"
+    },
+    {
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/cargo.terminal.json",
+        "bytes": 746,
+        "sha256": "e825b984073b8012f27193f2a6c57c3f830756fcd116421371c093c2064d5203"
+      },
+      "role": "cargo",
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "+1.95.0",
+        "-V"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "started_utc": "2026-10-06T18:12:41.335773+00:00",
+      "ended_utc": "2026-10-06T18:12:41.341025+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/cargo.stdout",
+        "bytes": 36,
+        "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0935/compiler-metadata-v1/cargo.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "environment_policy": "inherited process environment; read-only metadata commands"
+    }
+  ],
+  "all_four_elf_comment_sections_equal": true,
+  "elf_comment_section": "\nString dump of section '.comment':\n  [     0]  rustc version 1.95.0 (59807616e 2026-04-14)\n  [    2c]  Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)\n  [    8b]  GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0\n\n",
+  "scope": "Embedded compiler/linker metadata and currently selected tool versions. Does not reconstruct undisclosed historical build environment."
+}

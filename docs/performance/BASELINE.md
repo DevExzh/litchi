@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0935 — fragment parse reuse evaluated and rejected
+
+[0935](0935-docx-inventory-fragment-parse-reuse.md) evaluates a private single-parse
+inventory path across 72 fixed comparison children. Construction requested bytes
+fall 9.68–19.50%, but the small independent-source cell misses the prospective
+10% minimum. The primary paired latency ratio is 1.008732, below 1.05. Both
+adoption gates fail, so the production change is removed. Six regression tests
+remain; the retained baseline passes 1,931 tests. Individual reader latency
+outliers and offline checker/reducer corrections are recorded explicitly.
+
 ## 0934 — adopted scanner allocation profile
 
 [0934](0934-docx-post-scanner-allocation-profile.md) records exactly two

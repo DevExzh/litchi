@@ -1,0 +1,104 @@
+{
+  "baseline_attempt": {
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-j2",
+      "-p",
+      "litchi-docx",
+      "--lib",
+      "inventory_reuse"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0935/baseline-source",
+    "exit": 101,
+    "failures": [
+      "Inventory mixed footnote/type oracle expected direct Section footnote error; actual Inventory preprocesses first and returned semantic invalid type because unknown Word 2012 was stripped by MCE.",
+      "Inherited mc:Ignorable footnote oracle expected focused refusal; actual Inventory correctly admitted the document after MCE removed unknown ignorable Word 2012 content."
+    ],
+    "name": "baseline-newbehavior",
+    "stderr": {
+      "bytes": 4196,
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-stderr.log",
+      "sha256": "49e2048a773e7f04c5669689ed534ba29c6161db45e920e1831d380ee388121a"
+    },
+    "stdout": {
+      "bytes": 3454,
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-stdout.log",
+      "sha256": "970d824c68386ad635230af9bb81c7c2a052c44b4d0611d57b64d22a72ca6206"
+    },
+    "terminal_receipt": {
+      "bytes": 912,
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-terminal.json",
+      "sha256": "419cb7aba74d515005a00f9d011e42dca6648894db6ea17e58dcde6347984440"
+    },
+    "tests": {
+      "failed": 2,
+      "filtered": 1239,
+      "ignored": 0,
+      "passed": 4
+    }
+  },
+  "change": "0935",
+  "coverage_mapping": {
+    "footnote_context": "MCE filtering, detached explicit zero, and non-ignorable refusal are now distinct cases.",
+    "limits": "Reference preflight control passed; existing exact section-size boundary remains the source of the boundary oracle.",
+    "namespace_and_tolerance": "Aliased q/rel tolerance offset control passed.",
+    "public_lazy_and_order": "Direct Section controls remain unchanged and pass in the first baseline attempt.",
+    "publication_inverse": "Existing source_backed_sections controls remain unchanged and are not duplicated.",
+    "raw_versus_footnote": "Depth control now uses PreserveElements so a valid and malformed retained extension are compared behind raw codec depth failure."
+  },
+  "created_utc": "2026-10-06T17:59:18.794242+00:00",
+  "execution": {
+    "builds_run": true,
+    "candidate_quality_run": false,
+    "format_check": {
+      "argv": "rustfmt --edition 2024 --check crates/litchi-docx/src/section/fragment_reuse_tests.rs crates/litchi-docx/src/section/mod.rs",
+      "exit": 0
+    },
+    "note": "One authorized baseline filtered test run occurred before oracle correction; no candidate test run has occurred after correction.",
+    "tests_run": true
+  },
+  "next_authorized_step": "Rerun baseline filtered inventory_reuse and then candidate filtered inventory_reuse against the corrected test file; preserve this exit-101 attempt.",
+  "oracle_corrections": [
+    "Use mc:PreserveElements=\"w12:footnoteColumns\" with mc:Ignorable=\"w12\" to retain the extension through Inventory MCE when testing private footnote ordering.",
+    "Expect inherited mc:Ignorable Word 2012 content to be removed before section inventory; do not claim inherited Context reaches the temporary fragment.",
+    "Keep a non-ignorable w12 extension control to assert the focused codec still refuses missing mc:Ignorable.",
+    "Check explicit zero through detached Section, where footnote layout is observable; Inventory descriptors do not expose that extension."
+  ],
+  "schema": "litchi.performance.0935.docx-inventory-fragment-test-design.v2",
+  "source_binding": {
+    "base_head": "df394db17dd441aa763548ac1f1242343201b84a",
+    "candidate_files": [
+      {
+        "path": "crates/litchi-docx/src/section/codec.rs",
+        "sha256": "10ace300e62645b596d83bef606806b1a133c79ba5c1fb4d6ed9d5c034585d66"
+      },
+      {
+        "path": "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+        "sha256": "b77a7ae8208802f05a4b78926636ca7e2f09b9795d3726ab429b389d4fbb3caf"
+      },
+      {
+        "path": "crates/litchi-docx/src/section/inventory.rs",
+        "sha256": "6e75d6f2fde31fdbc640bb430cefe083498dee0bf6ad144e04f05f6d23486c1e"
+      }
+    ],
+    "candidate_state": "shared uncommitted candidate snapshot; production changes are owned by candidate_review",
+    "supersedes": {
+      "path": "docs/performance/results/change-0935/test-design-receipt.json",
+      "sha256": "fc2a03718ab4ed93fad445f561307332c2557471c0841c3ac96e483756bb9c7f"
+    },
+    "test_file": {
+      "bytes": 9112,
+      "path": "crates/litchi-docx/src/section/fragment_reuse_tests.rs",
+      "sha256": "96adeebb179ff3c6621640c96a441479e7653819f3b1a09cce423f21f83cfbd0"
+    },
+    "test_registration": {
+      "path": "crates/litchi-docx/src/section/mod.rs",
+      "sha256": "ba6950d7913f55c8f9097dbdca774006f191ef0577cccf2f13a4ba50ff2ccc81"
+    }
+  },
+  "status": "oracle_corrected_baseline_retry_pending"
+}

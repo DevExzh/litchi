@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0935 — parse reuse alone misses adoption thresholds
+
+[0935](0935-docx-inventory-fragment-parse-reuse.md) removes a duplicate section
+codec parse in an external candidate, but its 9.6828% small independent-source
+allocation reduction misses the frozen 10% all-cell gate. Primary latency also
+misses the 5% improvement threshold. The candidate is rejected; the adopted
+0933 implementation remains. New tests clarify that inventory MCE processing
+can remove ignorable footnote extensions before fragment validation. The still
+measured footnote scanner copies are a separate next candidate; any combined
+change needs a new prospective comparison, not a relaxed threshold.
+
 ## 0934 — fragment validation and decoding lead remaining allocations
 
 [0934](0934-docx-post-scanner-allocation-profile.md) reprofiles the adopted

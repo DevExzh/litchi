@@ -1,0 +1,32 @@
+{
+  "allocator_secondary": {
+    "calls_must_strictly_reduce": true,
+    "cells": [
+      "sections=16/shared_snapshot_clones",
+      "sections=16/independent_sources",
+      "sections=8192/shared_snapshot_clones",
+      "sections=8192/independent_sources"
+    ],
+    "correctness_required": true,
+    "metric": "after_snapshot_drop construction delta from baseline checkpoint, retaining absolute allocated counters separately",
+    "minimum_allocation_calls_reduction_fraction": null,
+    "minimum_requested_bytes_reduction_fraction": 0.1,
+    "no_latency_claim": true,
+    "rss_review_threshold_fraction": 0.05
+  },
+  "capture_authorized": false,
+  "latency_safety_for_allocator_review": {
+    "candidate_over_baseline_p50_maximum": 1.05,
+    "tails_or_rss_over_fraction": 0.05
+  },
+  "no_recapture": true,
+  "normal_primary": {
+    "bootstrap_lower_95_strictly_greater_than": 1.0,
+    "draws": 10000,
+    "median_ratio_minimum": 1.05,
+    "primary_route": "generic_read_at",
+    "seed": 935,
+    "statistic": "median of paired baseline_p50/candidate_p50 ratios; ratio is baseline p50 divided by candidate p50, so >1 means candidate speedup"
+  },
+  "schema": "litchi.performance.0935.comparison-gate-correction.v1"
+}

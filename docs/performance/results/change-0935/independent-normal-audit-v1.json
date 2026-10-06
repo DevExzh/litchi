@@ -1,0 +1,2866 @@
+{
+  "adoption": {
+    "adoption": false,
+    "allocator_calls_strictly_reduce": true,
+    "allocator_correctness_and_source_sharing": true,
+    "allocator_requested_bytes_10_percent": false,
+    "memory_peak_review_clear": true,
+    "normal_latency_improvement": false,
+    "normal_route_p50_safety": false,
+    "reasons": [
+      "generic_read_at median paired p50 ratio is below 1.05",
+      "owned_reader block 2 p50 safety ratio exceeds 1.05",
+      "sections=16/independent_sources requested-byte reduction is below 10%"
+    ]
+  },
+  "allocator": {
+    "allocation_gate_10_percent": false,
+    "calls_gate": true,
+    "cells": {
+      "sections=16/independent_sources": {
+        "all_calls_strictly_reduced": true,
+        "all_correctness": true,
+        "all_requested_bytes_ge_10_percent": false,
+        "all_source_sharing_verified": true,
+        "max_named_peak_ratio": 1.0000566411781364,
+        "max_rss_ratio": 1.0039318479685453,
+        "pairs": 3,
+        "requested_bytes_reduction_fractions": [
+          0.09682785145283146,
+          0.09682785145283146,
+          0.09682785145283146
+        ]
+      },
+      "sections=16/shared_snapshot_clones": {
+        "all_calls_strictly_reduced": true,
+        "all_correctness": true,
+        "all_requested_bytes_ge_10_percent": true,
+        "all_source_sharing_verified": true,
+        "max_named_peak_ratio": 1.0000916464280805,
+        "max_rss_ratio": 1.0170527670527671,
+        "pairs": 3,
+        "requested_bytes_reduction_fractions": [
+          0.14506260367948964,
+          0.14506260367948964,
+          0.14506260367948964
+        ]
+      },
+      "sections=8192/independent_sources": {
+        "all_calls_strictly_reduced": true,
+        "all_correctness": true,
+        "all_requested_bytes_ge_10_percent": true,
+        "all_source_sharing_verified": true,
+        "max_named_peak_ratio": 1.0000041664062662,
+        "max_rss_ratio": 1.0029036420992257,
+        "pairs": 3,
+        "requested_bytes_reduction_fractions": [
+          0.19465925707466103,
+          0.19465925707466103,
+          0.19465925707466103
+        ]
+      },
+      "sections=8192/shared_snapshot_clones": {
+        "all_calls_strictly_reduced": true,
+        "all_correctness": true,
+        "all_requested_bytes_ge_10_percent": true,
+        "all_source_sharing_verified": true,
+        "max_named_peak_ratio": 1.000004286850301,
+        "max_rss_ratio": 1.008476835314816,
+        "pairs": 3,
+        "requested_bytes_reduction_fractions": [
+          0.19495568966937737,
+          0.19495568966937737,
+          0.19495568966937737
+        ]
+      }
+    },
+    "children": 24,
+    "correctness_gate": true,
+    "max_named_peak_ratio": 1.0000916464280805,
+    "max_rss_ratio": 1.0170527670527671,
+    "memory_peak_review_flags": [],
+    "pair_rows": [
+      {
+        "allocation_calls": {
+          "baseline": 47928,
+          "candidate": 38968
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "independent_sources",
+        "pair_id": "allocator-section-00016-independent_sources-rep-01",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 35310,
+              "candidate": 35312,
+              "candidate_over_baseline": 1.0000566411781364
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 130046,
+              "candidate": 130048,
+              "candidate_over_baseline": 1.0000153791735231
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 137118,
+              "candidate": 137120,
+              "candidate_over_baseline": 1.0000145859770417
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 186622,
+              "candidate": 186624,
+              "candidate_over_baseline": 1.0000107168501033
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 130046,
+              "candidate": 130048,
+              "candidate_over_baseline": 1.0000153791735231
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 137118,
+              "candidate": 137120,
+              "candidate_over_baseline": 1.0000145859770417
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 222822,
+              "candidate": 222824,
+              "candidate_over_baseline": 1.0000089757743849
+            },
+            "peak_live_bytes": {
+              "baseline": 522515,
+              "candidate": 522517,
+              "candidate_over_baseline": 1.0000038276413117
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 232946,
+              "candidate": 232948,
+              "candidate_over_baseline": 1.0000085856808016
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 186622,
+              "candidate": 186624,
+              "candidate_over_baseline": 1.0000107168501033
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 5607808,
+          "candidate": 5064816
+        },
+        "requested_bytes_reduction_fraction": 0.09682785145283146,
+        "rss_bytes": {
+          "baseline": 13090816,
+          "candidate": 13094912
+        },
+        "rss_candidate_over_baseline": 1.0003128911138923,
+        "sections": 16,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 47928,
+          "candidate": 38968
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "independent_sources",
+        "pair_id": "allocator-section-00016-independent_sources-rep-02",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 35310,
+              "candidate": 35312,
+              "candidate_over_baseline": 1.0000566411781364
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 130046,
+              "candidate": 130048,
+              "candidate_over_baseline": 1.0000153791735231
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 137118,
+              "candidate": 137120,
+              "candidate_over_baseline": 1.0000145859770417
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 186622,
+              "candidate": 186624,
+              "candidate_over_baseline": 1.0000107168501033
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 130046,
+              "candidate": 130048,
+              "candidate_over_baseline": 1.0000153791735231
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 137118,
+              "candidate": 137120,
+              "candidate_over_baseline": 1.0000145859770417
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 222822,
+              "candidate": 222824,
+              "candidate_over_baseline": 1.0000089757743849
+            },
+            "peak_live_bytes": {
+              "baseline": 522515,
+              "candidate": 522517,
+              "candidate_over_baseline": 1.0000038276413117
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 232946,
+              "candidate": 232948,
+              "candidate_over_baseline": 1.0000085856808016
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 186622,
+              "candidate": 186624,
+              "candidate_over_baseline": 1.0000107168501033
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 5607808,
+          "candidate": 5064816
+        },
+        "requested_bytes_reduction_fraction": 0.09682785145283146,
+        "rss_bytes": {
+          "baseline": 12931072,
+          "candidate": 12902400
+        },
+        "rss_candidate_over_baseline": 0.9977827050997783,
+        "sections": 16,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 47928,
+          "candidate": 38968
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "independent_sources",
+        "pair_id": "allocator-section-00016-independent_sources-rep-03",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 35310,
+              "candidate": 35312,
+              "candidate_over_baseline": 1.0000566411781364
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 130046,
+              "candidate": 130048,
+              "candidate_over_baseline": 1.0000153791735231
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 137118,
+              "candidate": 137120,
+              "candidate_over_baseline": 1.0000145859770417
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 186622,
+              "candidate": 186624,
+              "candidate_over_baseline": 1.0000107168501033
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 130046,
+              "candidate": 130048,
+              "candidate_over_baseline": 1.0000153791735231
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 137118,
+              "candidate": 137120,
+              "candidate_over_baseline": 1.0000145859770417
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 222822,
+              "candidate": 222824,
+              "candidate_over_baseline": 1.0000089757743849
+            },
+            "peak_live_bytes": {
+              "baseline": 522515,
+              "candidate": 522517,
+              "candidate_over_baseline": 1.0000038276413117
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 232946,
+              "candidate": 232948,
+              "candidate_over_baseline": 1.0000085856808016
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 186622,
+              "candidate": 186624,
+              "candidate_over_baseline": 1.0000107168501033
+            },
+            "peak_live_bytes": {
+              "baseline": 709832,
+              "candidate": 709834,
+              "candidate_over_baseline": 1.0000028175681006
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 5607808,
+          "candidate": 5064816
+        },
+        "requested_bytes_reduction_fraction": 0.09682785145283146,
+        "rss_bytes": {
+          "baseline": 12500992,
+          "candidate": 12550144
+        },
+        "rss_candidate_over_baseline": 1.0039318479685453,
+        "sections": 16,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 28398,
+          "candidate": 23358
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "shared_snapshot_clones",
+        "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-01",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 21823,
+              "candidate": 21825,
+              "candidate_over_baseline": 1.0000916464280805
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 99948,
+              "candidate": 99950,
+              "candidate_over_baseline": 1.0000200104054109
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 99948,
+              "candidate": 99950,
+              "candidate_over_baseline": 1.0000200104054109
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 111545,
+              "candidate": 111547,
+              "candidate_over_baseline": 1.0000179299834147
+            },
+            "peak_live_bytes": {
+              "baseline": 522524,
+              "candidate": 522526,
+              "candidate_over_baseline": 1.0000038275753842
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 121669,
+              "candidate": 121671,
+              "candidate_over_baseline": 1.0000164380409142
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 2108662,
+          "candidate": 1802774
+        },
+        "requested_bytes_reduction_fraction": 0.14506260367948964,
+        "rss_bytes": {
+          "baseline": 12853248,
+          "candidate": 13008896
+        },
+        "rss_candidate_over_baseline": 1.0121096239643084,
+        "sections": 16,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 28398,
+          "candidate": 23358
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "shared_snapshot_clones",
+        "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-02",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 21823,
+              "candidate": 21825,
+              "candidate_over_baseline": 1.0000916464280805
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 99948,
+              "candidate": 99950,
+              "candidate_over_baseline": 1.0000200104054109
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 99948,
+              "candidate": 99950,
+              "candidate_over_baseline": 1.0000200104054109
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 111545,
+              "candidate": 111547,
+              "candidate_over_baseline": 1.0000179299834147
+            },
+            "peak_live_bytes": {
+              "baseline": 522524,
+              "candidate": 522526,
+              "candidate_over_baseline": 1.0000038275753842
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 121669,
+              "candidate": 121671,
+              "candidate_over_baseline": 1.0000164380409142
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 2108662,
+          "candidate": 1802774
+        },
+        "requested_bytes_reduction_fraction": 0.14506260367948964,
+        "rss_bytes": {
+          "baseline": 12730368,
+          "candidate": 12947456
+        },
+        "rss_candidate_over_baseline": 1.0170527670527671,
+        "sections": 16,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 28398,
+          "candidate": 23358
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "shared_snapshot_clones",
+        "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-03",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 21823,
+              "candidate": 21825,
+              "candidate_over_baseline": 1.0000916464280805
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 99948,
+              "candidate": 99950,
+              "candidate_over_baseline": 1.0000200104054109
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 99948,
+              "candidate": 99950,
+              "candidate_over_baseline": 1.0000200104054109
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 111545,
+              "candidate": 111547,
+              "candidate_over_baseline": 1.0000179299834147
+            },
+            "peak_live_bytes": {
+              "baseline": 522524,
+              "candidate": 522526,
+              "candidate_over_baseline": 1.0000038275753842
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 121669,
+              "candidate": 121671,
+              "candidate_over_baseline": 1.0000164380409142
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 107020,
+              "candidate": 107022,
+              "candidate_over_baseline": 1.000018688095683
+            },
+            "peak_live_bytes": {
+              "baseline": 598555,
+              "candidate": 598557,
+              "candidate_over_baseline": 1.0000033413804914
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 2108662,
+          "candidate": 1802774
+        },
+        "requested_bytes_reduction_fraction": 0.14506260367948964,
+        "rss_bytes": {
+          "baseline": 12894208,
+          "candidate": 12939264
+        },
+        "rss_candidate_over_baseline": 1.0034942820838628,
+        "sections": 16,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 21109592,
+          "candidate": 16522072
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "independent_sources",
+        "pair_id": "allocator-section-08192-independent_sources-rep-01",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 480030,
+              "candidate": 480032,
+              "candidate_over_baseline": 1.0000041664062662
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 47848990,
+              "candidate": 47848992,
+              "candidate_over_baseline": 1.0000000417981654
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 51428974,
+              "candidate": 51428976,
+              "candidate_over_baseline": 1.0000000388885846
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 76488862,
+              "candidate": 76488864,
+              "candidate_over_baseline": 1.0000000261475979
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 47848990,
+              "candidate": 47848992,
+              "candidate_over_baseline": 1.0000000417981654
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 51428974,
+              "candidate": 51428976,
+              "candidate_over_baseline": 1.0000000388885846
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 76720630,
+              "candidate": 76720632,
+              "candidate_over_baseline": 1.0000000260686077
+            },
+            "peak_live_bytes": {
+              "baseline": 79020034,
+              "candidate": 79020036,
+              "candidate_over_baseline": 1.0000000253100372
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 79020034,
+              "candidate": 79020036,
+              "candidate_over_baseline": 1.0000000253100372
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 76488862,
+              "candidate": 76488864,
+              "candidate_over_baseline": 1.0000000261475979
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 1425467600,
+          "candidate": 1147987136
+        },
+        "requested_bytes_reduction_fraction": 0.19465925707466103,
+        "rss_bytes": {
+          "baseline": 115421184,
+          "candidate": 114241536
+        },
+        "rss_candidate_over_baseline": 0.9897796231236027,
+        "sections": 8192,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 21109592,
+          "candidate": 16522072
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "independent_sources",
+        "pair_id": "allocator-section-08192-independent_sources-rep-02",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 480030,
+              "candidate": 480032,
+              "candidate_over_baseline": 1.0000041664062662
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 47848990,
+              "candidate": 47848992,
+              "candidate_over_baseline": 1.0000000417981654
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 51428974,
+              "candidate": 51428976,
+              "candidate_over_baseline": 1.0000000388885846
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 76488862,
+              "candidate": 76488864,
+              "candidate_over_baseline": 1.0000000261475979
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 47848990,
+              "candidate": 47848992,
+              "candidate_over_baseline": 1.0000000417981654
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 51428974,
+              "candidate": 51428976,
+              "candidate_over_baseline": 1.0000000388885846
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 76720630,
+              "candidate": 76720632,
+              "candidate_over_baseline": 1.0000000260686077
+            },
+            "peak_live_bytes": {
+              "baseline": 79020034,
+              "candidate": 79020036,
+              "candidate_over_baseline": 1.0000000253100372
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 79020034,
+              "candidate": 79020036,
+              "candidate_over_baseline": 1.0000000253100372
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 76488862,
+              "candidate": 76488864,
+              "candidate_over_baseline": 1.0000000261475979
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 1425467600,
+          "candidate": 1147987136
+        },
+        "requested_bytes_reduction_fraction": 0.19465925707466103,
+        "rss_bytes": {
+          "baseline": 114262016,
+          "candidate": 114593792
+        },
+        "rss_candidate_over_baseline": 1.0029036420992257,
+        "sections": 8192,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 21109592,
+          "candidate": 16522072
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "independent_sources",
+        "pair_id": "allocator-section-08192-independent_sources-rep-03",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 480030,
+              "candidate": 480032,
+              "candidate_over_baseline": 1.0000041664062662
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 47848990,
+              "candidate": 47848992,
+              "candidate_over_baseline": 1.0000000417981654
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 51428974,
+              "candidate": 51428976,
+              "candidate_over_baseline": 1.0000000388885846
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 76488862,
+              "candidate": 76488864,
+              "candidate_over_baseline": 1.0000000261475979
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 47848990,
+              "candidate": 47848992,
+              "candidate_over_baseline": 1.0000000417981654
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 51428974,
+              "candidate": 51428976,
+              "candidate_over_baseline": 1.0000000388885846
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 76720630,
+              "candidate": 76720632,
+              "candidate_over_baseline": 1.0000000260686077
+            },
+            "peak_live_bytes": {
+              "baseline": 79020034,
+              "candidate": 79020036,
+              "candidate_over_baseline": 1.0000000253100372
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 79020034,
+              "candidate": 79020036,
+              "candidate_over_baseline": 1.0000000253100372
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 76488862,
+              "candidate": 76488864,
+              "candidate_over_baseline": 1.0000000261475979
+            },
+            "peak_live_bytes": {
+              "baseline": 91004058,
+              "candidate": 91004060,
+              "candidate_over_baseline": 1.000000021977042
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 1425467600,
+          "candidate": 1147987136
+        },
+        "requested_bytes_reduction_fraction": 0.19465925707466103,
+        "rss_bytes": {
+          "baseline": 115519488,
+          "candidate": 115671040
+        },
+        "rss_candidate_over_baseline": 1.001311917171932,
+        "sections": 8192,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 11875584,
+          "candidate": 9295104
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "shared_snapshot_clones",
+        "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-01",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 466543,
+              "candidate": 466545,
+              "candidate_over_baseline": 1.000004286850301
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 39641611,
+              "candidate": 39641613,
+              "candidate_over_baseline": 1.0000000504520363
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 39641611,
+              "candidate": 39641613,
+              "candidate_over_baseline": 1.0000000504520363
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 43250566,
+              "candidate": 43250568,
+              "candidate_over_baseline": 1.0000000462421694
+            },
+            "peak_live_bytes": {
+              "baseline": 45549970,
+              "candidate": 45549972,
+              "candidate_over_baseline": 1.0000000439078225
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 45549970,
+              "candidate": 45549972,
+              "candidate_over_baseline": 1.0000000439078225
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 800608673,
+          "candidate": 644525457
+        },
+        "requested_bytes_reduction_fraction": 0.19495568966937737,
+        "rss_bytes": {
+          "baseline": 76656640,
+          "candidate": 76955648
+        },
+        "rss_candidate_over_baseline": 1.0039006144803633,
+        "sections": 8192,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 11875584,
+          "candidate": 9295104
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "shared_snapshot_clones",
+        "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-02",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 466543,
+              "candidate": 466545,
+              "candidate_over_baseline": 1.000004286850301
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 39641611,
+              "candidate": 39641613,
+              "candidate_over_baseline": 1.0000000504520363
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 39641611,
+              "candidate": 39641613,
+              "candidate_over_baseline": 1.0000000504520363
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 43250566,
+              "candidate": 43250568,
+              "candidate_over_baseline": 1.0000000462421694
+            },
+            "peak_live_bytes": {
+              "baseline": 45549970,
+              "candidate": 45549972,
+              "candidate_over_baseline": 1.0000000439078225
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 45549970,
+              "candidate": 45549972,
+              "candidate_over_baseline": 1.0000000439078225
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 800608673,
+          "candidate": 644525457
+        },
+        "requested_bytes_reduction_fraction": 0.19495568966937737,
+        "rss_bytes": {
+          "baseline": 76828672,
+          "candidate": 77479936
+        },
+        "rss_candidate_over_baseline": 1.008476835314816,
+        "sections": 8192,
+        "source_sharing_verified": true
+      },
+      {
+        "allocation_calls": {
+          "baseline": 11875584,
+          "candidate": 9295104
+        },
+        "allocation_calls_strictly_reduced": true,
+        "correctness": {
+          "measured_commit_shape_verified": true,
+          "measured_inverse_verified": true,
+          "measured_output_verified": true,
+          "preflight_inverse_verified": true,
+          "preflight_output_verified": true
+        },
+        "correctness_all_required": true,
+        "ownership": "shared_snapshot_clones",
+        "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-03",
+        "peak_flags_gt_5_percent": [],
+        "peak_ratios": {
+          "after_commit_drop": {
+            "live_bytes": {
+              "baseline": 466543,
+              "candidate": 466545,
+              "candidate_over_baseline": 1.000004286850301
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 39641611,
+              "candidate": 39641613,
+              "candidate_over_baseline": 1.0000000504520363
+            }
+          },
+          "after_release_all_but_last": {
+            "live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            }
+          },
+          "after_release_last": {
+            "live_bytes": {
+              "baseline": 39641611,
+              "candidate": 39641613,
+              "candidate_over_baseline": 1.0000000504520363
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            }
+          },
+          "after_snapshot_drop": {
+            "live_bytes": {
+              "baseline": 43250566,
+              "candidate": 43250568,
+              "candidate_over_baseline": 1.0000000462421694
+            },
+            "peak_live_bytes": {
+              "baseline": 45549970,
+              "candidate": 45549972,
+              "candidate_over_baseline": 1.0000000439078225
+            },
+            "present": true,
+            "region_peak_live_bytes": {
+              "baseline": 45549970,
+              "candidate": 45549972,
+              "candidate_over_baseline": 1.0000000439078225
+            }
+          },
+          "commits_retained": {
+            "live_bytes": {
+              "baseline": 43221595,
+              "candidate": 43221597,
+              "candidate_over_baseline": 1.000000046273165
+            },
+            "peak_live_bytes": {
+              "baseline": 57533994,
+              "candidate": 57533996,
+              "candidate_over_baseline": 1.0000000347620575
+            },
+            "present": true
+          }
+        },
+        "requested_bytes": {
+          "baseline": 800608673,
+          "candidate": 644525457
+        },
+        "requested_bytes_reduction_fraction": 0.19495568966937737,
+        "rss_bytes": {
+          "baseline": 76726272,
+          "candidate": 76820480
+        },
+        "rss_candidate_over_baseline": 1.001227845398249,
+        "sections": 8192,
+        "source_sharing_verified": true
+      }
+    ],
+    "pairs": 12
+  },
+  "normal": {
+    "child_checks_passed": 48,
+    "child_identity_failures": [],
+    "children": 48,
+    "gate": {
+      "bootstrap_lower_95": 1.0072960075882962,
+      "bootstrap_lower_pass": true,
+      "latency_improvement_gate_pass": false,
+      "median_pass": false,
+      "median_ratio": 1.0087322250031896,
+      "median_ratio_minimum": 1.05,
+      "primary_route": "generic_read_at",
+      "route_p50_safety_pass": false
+    },
+    "pair_rows": [
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4089588,
+          "mean_ns": 4051014.46,
+          "min_ns": 4029617,
+          "p50_ns": 4048047.0,
+          "p95_ns": 4077667,
+          "p99_ns": 4089588,
+          "rss_bytes": 38113280,
+          "spread_ns": 59971,
+          "stdev_ns": 12927.73429051365
+        },
+        "block": 1,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4105758,
+          "mean_ns": 4024497.02,
+          "min_ns": 4003997,
+          "p50_ns": 4021327.0,
+          "p95_ns": 4040387,
+          "p99_ns": 4105758,
+          "rss_bytes": 37945344,
+          "spread_ns": 101761,
+          "stdev_ns": 15063.762019604044
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-01-01-generic_read_at",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.006644572798979,
+          "candidate_over_baseline_p50": 0.9933992861248894,
+          "candidate_over_baseline_p95": 0.9908575173009468,
+          "candidate_over_baseline_p99": 1.0039539435268297,
+          "candidate_over_baseline_rss": 0.9955937667920473,
+          "candidate_over_baseline_spread": 1.696836804455487,
+          "candidate_over_baseline_stdev": 1.165228313104935
+        },
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3308734,
+          "mean_ns": 3280358.36,
+          "min_ns": 3264584,
+          "p50_ns": 3277783.5,
+          "p95_ns": 3306144,
+          "p99_ns": 3308734,
+          "rss_bytes": 37855232,
+          "spread_ns": 44150,
+          "stdev_ns": 10423.686773372834
+        },
+        "block": 1,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3279654,
+          "mean_ns": 3240057.44,
+          "min_ns": 3226344,
+          "p50_ns": 3238459.0,
+          "p95_ns": 3259523,
+          "p99_ns": 3279654,
+          "rss_bytes": 38498304,
+          "spread_ns": 53310,
+          "stdev_ns": 9723.266863370898
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-01-02-owned_vec",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0121429667628956,
+          "candidate_over_baseline_p50": 0.9880027158596655,
+          "candidate_over_baseline_p95": 0.9858986783394794,
+          "candidate_over_baseline_p99": 0.9912111399707562,
+          "candidate_over_baseline_rss": 1.0169876650075742,
+          "candidate_over_baseline_spread": 1.2074745186862967,
+          "candidate_over_baseline_stdev": 0.932804973400472
+        },
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3755636,
+          "mean_ns": 3619576.14,
+          "min_ns": 3387614,
+          "p50_ns": 3621945.0,
+          "p95_ns": 3661936,
+          "p99_ns": 3755636,
+          "rss_bytes": 41132032,
+          "spread_ns": 368022,
+          "stdev_ns": 52538.32996033293
+        },
+        "block": 1,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3594246,
+          "mean_ns": 3436118.5,
+          "min_ns": 3345694,
+          "p50_ns": 3367294.5,
+          "p95_ns": 3589916,
+          "p99_ns": 3594246,
+          "rss_bytes": 39133184,
+          "spread_ns": 248552,
+          "stdev_ns": 103550.64593266151
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-01-03-owned_reader",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0756246595003793,
+          "candidate_over_baseline_p50": 0.9296923338151186,
+          "candidate_over_baseline_p95": 0.9803328075640864,
+          "candidate_over_baseline_p99": 0.9570272518422979,
+          "candidate_over_baseline_rss": 0.9514041027683728,
+          "candidate_over_baseline_spread": 0.6753726679383297,
+          "candidate_over_baseline_stdev": 1.9709542730201646
+        },
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4113917,
+          "mean_ns": 4086151,
+          "min_ns": 4065897,
+          "p50_ns": 4084237.0,
+          "p95_ns": 4101217,
+          "p99_ns": 4113917,
+          "rss_bytes": 37425152,
+          "spread_ns": 48020,
+          "stdev_ns": 10026.898792136833
+        },
+        "block": 1,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4083807,
+          "mean_ns": 4056895.14,
+          "min_ns": 4043267,
+          "p50_ns": 4054667.5,
+          "p95_ns": 4077897,
+          "p99_ns": 4083807,
+          "rss_bytes": 37965824,
+          "spread_ns": 40540,
+          "stdev_ns": 9755.206745808588
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-01-04-range_short",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0072927064919626,
+          "candidate_over_baseline_p50": 0.9927600920318777,
+          "candidate_over_baseline_p95": 0.9943138829279211,
+          "candidate_over_baseline_p99": 0.9926809413024132,
+          "candidate_over_baseline_rss": 1.0144467549523914,
+          "candidate_over_baseline_spread": 0.844231570179092,
+          "candidate_over_baseline_stdev": 0.9729036811919046
+        },
+        "route": "range_short"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4277639,
+          "mean_ns": 4089919.4,
+          "min_ns": 4067148,
+          "p50_ns": 4080907.0,
+          "p95_ns": 4122877,
+          "p99_ns": 4277639,
+          "rss_bytes": 38023168,
+          "spread_ns": 210491,
+          "stdev_ns": 37957.517449089835
+        },
+        "block": 2,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4075767,
+          "mean_ns": 4052896.38,
+          "min_ns": 4038767,
+          "p50_ns": 4052912.5,
+          "p95_ns": 4068568,
+          "p99_ns": 4075767,
+          "rss_bytes": 38326272,
+          "spread_ns": 37000,
+          "stdev_ns": 7942.30731624723
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-02-01-range_short",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0069072549678781,
+          "candidate_over_baseline_p50": 0.9931401279176418,
+          "candidate_over_baseline_p95": 0.9868274023212431,
+          "candidate_over_baseline_p99": 0.952807611862525,
+          "candidate_over_baseline_rss": 1.0079715609178068,
+          "candidate_over_baseline_spread": 0.17577948700894575,
+          "candidate_over_baseline_stdev": 0.20924201185970012
+        },
+        "route": "range_short"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3448604,
+          "mean_ns": 3396563.72,
+          "min_ns": 3378255,
+          "p50_ns": 3393894.0,
+          "p95_ns": 3422955,
+          "p99_ns": 3448604,
+          "rss_bytes": 38813696,
+          "spread_ns": 70349,
+          "stdev_ns": 15265.61044594506
+        },
+        "block": 2,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3623855,
+          "mean_ns": 3543439.22,
+          "min_ns": 3334694,
+          "p50_ns": 3567925.0,
+          "p95_ns": 3608515,
+          "p99_ns": 3623855,
+          "rss_bytes": 39055360,
+          "spread_ns": 289161,
+          "stdev_ns": 78887.37229547772
+        },
+        "flags": {
+          "p50_gt_1_05": true,
+          "p95_gt_1_05": true,
+          "p99_gt_1_05": true,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-02-02-owned_reader",
+        "ratios": {
+          "baseline_over_candidate_p50": 0.95122347022429,
+          "candidate_over_baseline_p50": 1.0512776769103573,
+          "candidate_over_baseline_p95": 1.0542104701931518,
+          "candidate_over_baseline_p99": 1.050817954163482,
+          "candidate_over_baseline_rss": 1.0062262558041368,
+          "candidate_over_baseline_spread": 4.110378256975935,
+          "candidate_over_baseline_stdev": 5.167652651350883
+        },
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3314954,
+          "mean_ns": 3265220.28,
+          "min_ns": 3240254,
+          "p50_ns": 3264489.0,
+          "p95_ns": 3293344,
+          "p99_ns": 3314954,
+          "rss_bytes": 38281216,
+          "spread_ns": 74700,
+          "stdev_ns": 13230.288190113977
+        },
+        "block": 2,
+        "candidate": {
+          "count": 50,
+          "max_ns": 2849492,
+          "mean_ns": 2816021.12,
+          "min_ns": 2803712,
+          "p50_ns": 2814882.0,
+          "p95_ns": 2825992,
+          "p99_ns": 2849492,
+          "rss_bytes": 38109184,
+          "spread_ns": 45780,
+          "stdev_ns": 7500.873235259251
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-02-03-owned_vec",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.1597249902482591,
+          "candidate_over_baseline_p50": 0.8622733910268958,
+          "candidate_over_baseline_p95": 0.8580919575968985,
+          "candidate_over_baseline_p99": 0.8595871918584692,
+          "candidate_over_baseline_rss": 0.995506098865825,
+          "candidate_over_baseline_spread": 0.61285140562249,
+          "candidate_over_baseline_stdev": 0.5669470783610067
+        },
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4130737,
+          "mean_ns": 4049370.84,
+          "min_ns": 4033536,
+          "p50_ns": 4047326.0,
+          "p95_ns": 4069757,
+          "p99_ns": 4130737,
+          "rss_bytes": 37208064,
+          "spread_ns": 97201,
+          "stdev_ns": 14866.488983905092
+        },
+        "block": 2,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4152657,
+          "mean_ns": 4021012.9,
+          "min_ns": 3999796,
+          "p50_ns": 4013281.5,
+          "p95_ns": 4088366,
+          "p99_ns": 4152657,
+          "rss_bytes": 38207488,
+          "spread_ns": 152861,
+          "stdev_ns": 26068.003942005384
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-02-04-generic_read_at",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0084829583970125,
+          "candidate_over_baseline_p50": 0.9915883968822872,
+          "candidate_over_baseline_p95": 1.0045725088746085,
+          "candidate_over_baseline_p99": 1.0053065590958707,
+          "candidate_over_baseline_rss": 1.0268604139145752,
+          "candidate_over_baseline_spread": 1.572627853622905,
+          "candidate_over_baseline_stdev": 1.7534741370492648
+        },
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4131177,
+          "mean_ns": 4048802.7,
+          "min_ns": 4034526,
+          "p50_ns": 4045241.0,
+          "p95_ns": 4069896,
+          "p99_ns": 4131177,
+          "rss_bytes": 38182912,
+          "spread_ns": 96651,
+          "stdev_ns": 14695.833645656729
+        },
+        "block": 3,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4080339,
+          "mean_ns": 4007978.02,
+          "min_ns": 3991378,
+          "p50_ns": 4005343.5,
+          "p95_ns": 4024799,
+          "p99_ns": 4080339,
+          "rss_bytes": 38428672,
+          "spread_ns": 88961,
+          "stdev_ns": 13319.588409847922
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-03-01-generic_read_at",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.009961068257941,
+          "candidate_over_baseline_p50": 0.9901371760050884,
+          "candidate_over_baseline_p95": 0.9889193728783242,
+          "candidate_over_baseline_p99": 0.9876940639435202,
+          "candidate_over_baseline_rss": 1.0064363870414075,
+          "candidate_over_baseline_spread": 0.9204353809065607,
+          "candidate_over_baseline_stdev": 0.9063513326979209
+        },
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3287025,
+          "mean_ns": 3265866.78,
+          "min_ns": 3249075,
+          "p50_ns": 3264545.0,
+          "p95_ns": 3285625,
+          "p99_ns": 3287025,
+          "rss_bytes": 38387712,
+          "spread_ns": 37950,
+          "stdev_ns": 9551.63916115438
+        },
+        "block": 3,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3312305,
+          "mean_ns": 3239296.26,
+          "min_ns": 3224404,
+          "p50_ns": 3236110.0,
+          "p95_ns": 3266165,
+          "p99_ns": 3312305,
+          "rss_bytes": 37621760,
+          "spread_ns": 87901,
+          "stdev_ns": 14596.260500706672
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-03-02-owned_vec",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0087867841328013,
+          "candidate_over_baseline_p50": 0.9912897509453844,
+          "candidate_over_baseline_p95": 0.9940772303595207,
+          "candidate_over_baseline_p99": 1.0076908450650663,
+          "candidate_over_baseline_rss": 0.9800469483568075,
+          "candidate_over_baseline_spread": 2.316231884057971,
+          "candidate_over_baseline_stdev": 1.5281419507625762
+        },
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3939098,
+          "mean_ns": 3614275.22,
+          "min_ns": 3380285,
+          "p50_ns": 3602376.5,
+          "p95_ns": 3685857,
+          "p99_ns": 3939098,
+          "rss_bytes": 41549824,
+          "spread_ns": 558813,
+          "stdev_ns": 72879.4595466223
+        },
+        "block": 3,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3403886,
+          "mean_ns": 3370254.1,
+          "min_ns": 3352985,
+          "p50_ns": 3366751.0,
+          "p95_ns": 3393595,
+          "p99_ns": 3403886,
+          "rss_bytes": 38014976,
+          "spread_ns": 50901,
+          "stdev_ns": 13143.62356810328
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-03-03-owned_reader",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0699860191620942,
+          "candidate_over_baseline_p50": 0.9345916508171759,
+          "candidate_over_baseline_p95": 0.9207071788189287,
+          "candidate_over_baseline_p99": 0.8641282852064102,
+          "candidate_over_baseline_rss": 0.9149250788643533,
+          "candidate_over_baseline_spread": 0.09108771628433841,
+          "candidate_over_baseline_stdev": 0.18034743465262756
+        },
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4098179,
+          "mean_ns": 4077511.18,
+          "min_ns": 4062369,
+          "p50_ns": 4077504.0,
+          "p95_ns": 4092449,
+          "p99_ns": 4098179,
+          "rss_bytes": 38064128,
+          "spread_ns": 35810,
+          "stdev_ns": 8411.787930721302
+        },
+        "block": 3,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4093039,
+          "mean_ns": 4062117.76,
+          "min_ns": 4047539,
+          "p50_ns": 4061648.5,
+          "p95_ns": 4078609,
+          "p99_ns": 4093039,
+          "rss_bytes": 38256640,
+          "spread_ns": 45500,
+          "stdev_ns": 8739.774836122637
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-03-04-range_short",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0039037105254185,
+          "candidate_over_baseline_p50": 0.9961114691732982,
+          "candidate_over_baseline_p95": 0.9966181618879062,
+          "candidate_over_baseline_p99": 0.9987457844081481,
+          "candidate_over_baseline_rss": 1.0050575702141398,
+          "candidate_over_baseline_spread": 1.270594805920134,
+          "candidate_over_baseline_stdev": 1.0389913426375705
+        },
+        "route": "range_short"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4106219,
+          "mean_ns": 4080338.2,
+          "min_ns": 4064169,
+          "p50_ns": 4078129.0,
+          "p95_ns": 4100169,
+          "p99_ns": 4106219,
+          "rss_bytes": 38137856,
+          "spread_ns": 42050,
+          "stdev_ns": 9563.642299919855
+        },
+        "block": 4,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4100059,
+          "mean_ns": 4047720.18,
+          "min_ns": 4033639,
+          "p50_ns": 4045489.0,
+          "p95_ns": 4065659,
+          "p99_ns": 4100059,
+          "rss_bytes": 38264832,
+          "spread_ns": 66420,
+          "stdev_ns": 10330.09290451535
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-04-01-range_short",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0080682458906698,
+          "candidate_over_baseline_p50": 0.9919963296894238,
+          "candidate_over_baseline_p95": 0.9915832737626181,
+          "candidate_over_baseline_p99": 0.998499836467563,
+          "candidate_over_baseline_rss": 1.0033293953388465,
+          "candidate_over_baseline_spread": 1.5795481569560048,
+          "candidate_over_baseline_stdev": 1.0801421237389774
+        },
+        "route": "range_short"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3616776,
+          "mean_ns": 3397633.32,
+          "min_ns": 3373213,
+          "p50_ns": 3388586.0,
+          "p95_ns": 3431716,
+          "p99_ns": 3616776,
+          "rss_bytes": 37773312,
+          "spread_ns": 243563,
+          "stdev_ns": 43625.610433453294
+        },
+        "block": 4,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3391266,
+          "mean_ns": 3363490.58,
+          "min_ns": 3347695,
+          "p50_ns": 3361185.5,
+          "p95_ns": 3387515,
+          "p99_ns": 3391266,
+          "rss_bytes": 38342656,
+          "spread_ns": 43571,
+          "stdev_ns": 10349.77996628973
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-04-02-owned_reader",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0081520344533201,
+          "candidate_over_baseline_p50": 0.9919138838441757,
+          "candidate_over_baseline_p95": 0.9871198549064083,
+          "candidate_over_baseline_p99": 0.937648889508225,
+          "candidate_over_baseline_rss": 1.0150726523530686,
+          "candidate_over_baseline_spread": 0.17889006129830887,
+          "candidate_over_baseline_stdev": 0.23724092026350743
+        },
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3323273,
+          "mean_ns": 3269307.62,
+          "min_ns": 3249213,
+          "p50_ns": 3267408.0,
+          "p95_ns": 3294953,
+          "p99_ns": 3323273,
+          "rss_bytes": 38486016,
+          "spread_ns": 74060,
+          "stdev_ns": 14554.204900344934
+        },
+        "block": 4,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3261823,
+          "mean_ns": 3233049.54,
+          "min_ns": 3216383,
+          "p50_ns": 3231838.0,
+          "p95_ns": 3245463,
+          "p99_ns": 3261823,
+          "rss_bytes": 38023168,
+          "spread_ns": 45440,
+          "stdev_ns": 8685.045985121407
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-04-03-owned_vec",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.011006120975123,
+          "candidate_over_baseline_p50": 0.9891136950145192,
+          "candidate_over_baseline_p95": 0.984980058896136,
+          "candidate_over_baseline_p99": 0.9815091928950767,
+          "candidate_over_baseline_rss": 0.9879736057896977,
+          "candidate_over_baseline_spread": 0.6135565757493924,
+          "candidate_over_baseline_stdev": 0.5967379217613992
+        },
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4216807,
+          "mean_ns": 4050297.7,
+          "min_ns": 4014337,
+          "p50_ns": 4040311.0,
+          "p95_ns": 4116496,
+          "p99_ns": 4216807,
+          "rss_bytes": 38035456,
+          "spread_ns": 202470,
+          "stdev_ns": 35541.22839702347
+        },
+        "block": 4,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4082367,
+          "mean_ns": 4008429.04,
+          "min_ns": 3992686,
+          "p50_ns": 4004346.0,
+          "p95_ns": 4032136,
+          "p99_ns": 4082367,
+          "rss_bytes": 37339136,
+          "spread_ns": 89681,
+          "stdev_ns": 14957.73620048386
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-04-04-generic_read_at",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0089814916093665,
+          "candidate_over_baseline_p50": 0.9910984575197306,
+          "candidate_over_baseline_p95": 0.9795068427128315,
+          "candidate_over_baseline_p99": 0.9681180570986531,
+          "candidate_over_baseline_rss": 0.9816928709885849,
+          "candidate_over_baseline_spread": 0.4429347557662864,
+          "candidate_over_baseline_stdev": 0.4208559150908962
+        },
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4086946,
+          "mean_ns": 4042169.52,
+          "min_ns": 4021896,
+          "p50_ns": 4041331.0,
+          "p95_ns": 4061406,
+          "p99_ns": 4086946,
+          "rss_bytes": 38363136,
+          "spread_ns": 65050,
+          "stdev_ns": 12127.524560642192
+        },
+        "block": 5,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4059307,
+          "mean_ns": 4013276.66,
+          "min_ns": 3996946,
+          "p50_ns": 4009466.0,
+          "p95_ns": 4042476,
+          "p99_ns": 4059307,
+          "rss_bytes": 38330368,
+          "spread_ns": 62361,
+          "stdev_ns": 13390.448790104392
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-05-01-generic_read_at",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0079474423776134,
+          "candidate_over_baseline_p50": 0.9921152214456079,
+          "candidate_over_baseline_p95": 0.9953390525350088,
+          "candidate_over_baseline_p99": 0.993237248546959,
+          "candidate_over_baseline_rss": 0.9991458466794789,
+          "candidate_over_baseline_spread": 0.958662567255957,
+          "candidate_over_baseline_stdev": 1.1041370168452023
+        },
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3305223,
+          "mean_ns": 3275904.56,
+          "min_ns": 3258253,
+          "p50_ns": 3274423.5,
+          "p95_ns": 3297633,
+          "p99_ns": 3305223,
+          "rss_bytes": 38223872,
+          "spread_ns": 46970,
+          "stdev_ns": 10824.074006036879
+        },
+        "block": 5,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3277353,
+          "mean_ns": 3236434.74,
+          "min_ns": 3221503,
+          "p50_ns": 3233813.5,
+          "p95_ns": 3253673,
+          "p99_ns": 3277353,
+          "rss_bytes": 38109184,
+          "spread_ns": 55850,
+          "stdev_ns": 10179.883640347782
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-05-02-owned_vec",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0125579288972602,
+          "candidate_over_baseline_p50": 0.9875978168370707,
+          "candidate_over_baseline_p95": 0.9866692260782204,
+          "candidate_over_baseline_p99": 0.9915678911831365,
+          "candidate_over_baseline_rss": 0.9969995713673382,
+          "candidate_over_baseline_spread": 1.1890568447945498,
+          "candidate_over_baseline_stdev": 0.9404854063885913
+        },
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3454184,
+          "mean_ns": 3401554.12,
+          "min_ns": 3379013,
+          "p50_ns": 3399513.5,
+          "p95_ns": 3429024,
+          "p99_ns": 3454184,
+          "rss_bytes": 38223872,
+          "spread_ns": 75171,
+          "stdev_ns": 16136.108015989279
+        },
+        "block": 5,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3525634,
+          "mean_ns": 3375929.46,
+          "min_ns": 3351363,
+          "p50_ns": 3365648.0,
+          "p95_ns": 3441544,
+          "p99_ns": 3525634,
+          "rss_bytes": 38072320,
+          "spread_ns": 174271,
+          "stdev_ns": 30027.030002037587
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": true,
+          "stdev_gt_1_05": true
+        },
+        "pair_id": "normal-block-05-03-owned_reader",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0100621039395683,
+          "candidate_over_baseline_p50": 0.990038133397617,
+          "candidate_over_baseline_p95": 1.003651184710285,
+          "candidate_over_baseline_p99": 1.020685059047231,
+          "candidate_over_baseline_rss": 0.9960351478782683,
+          "candidate_over_baseline_spread": 2.318327546527251,
+          "candidate_over_baseline_stdev": 1.8608595066594613
+        },
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4106007,
+          "mean_ns": 4080202.56,
+          "min_ns": 4061337,
+          "p50_ns": 4077567.0,
+          "p95_ns": 4098367,
+          "p99_ns": 4106007,
+          "rss_bytes": 37924864,
+          "spread_ns": 44670,
+          "stdev_ns": 10537.869896981756
+        },
+        "block": 5,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4079526,
+          "mean_ns": 4050137.64,
+          "min_ns": 4038367,
+          "p50_ns": 4047796.0,
+          "p95_ns": 4066257,
+          "p99_ns": 4079526,
+          "rss_bytes": 38129664,
+          "spread_ns": 41159,
+          "stdev_ns": 8017.867531040041
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-05-04-range_short",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0073548666978276,
+          "candidate_over_baseline_p50": 0.9926988324164876,
+          "candidate_over_baseline_p95": 0.9921651721283136,
+          "candidate_over_baseline_p99": 0.993550668569245,
+          "candidate_over_baseline_rss": 1.0054001512042336,
+          "candidate_over_baseline_spread": 0.9214013879561227,
+          "candidate_over_baseline_stdev": 0.7608622624328005
+        },
+        "route": "range_short"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4264667,
+          "mean_ns": 4092587.34,
+          "min_ns": 4065056,
+          "p50_ns": 4082791.5,
+          "p95_ns": 4140497,
+          "p99_ns": 4264667,
+          "rss_bytes": 38170624,
+          "spread_ns": 199611,
+          "stdev_ns": 34262.81716595042
+        },
+        "block": 6,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4107706,
+          "mean_ns": 4064763.68,
+          "min_ns": 4044166,
+          "p50_ns": 4061832.0,
+          "p95_ns": 4094867,
+          "p99_ns": 4107706,
+          "rss_bytes": 38178816,
+          "spread_ns": 63540,
+          "stdev_ns": 14223.559383226242
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-06-01-range_short",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0051601100193213,
+          "candidate_over_baseline_p50": 0.9948663800245494,
+          "candidate_over_baseline_p95": 0.9889795838518902,
+          "candidate_over_baseline_p99": 0.9631950161642163,
+          "candidate_over_baseline_rss": 1.000214615302071,
+          "candidate_over_baseline_spread": 0.31831913070922946,
+          "candidate_over_baseline_stdev": 0.415131053419661
+        },
+        "route": "range_short"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3668645,
+          "mean_ns": 3565401.6,
+          "min_ns": 3369873,
+          "p50_ns": 3618499.5,
+          "p95_ns": 3645864,
+          "p99_ns": 3668645,
+          "rss_bytes": 39473152,
+          "spread_ns": 298772,
+          "stdev_ns": 104546.20805136056
+        },
+        "block": 6,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3475035,
+          "mean_ns": 3373210.32,
+          "min_ns": 3350084,
+          "p50_ns": 3367978.0,
+          "p95_ns": 3411534,
+          "p99_ns": 3475035,
+          "rss_bytes": 38223872,
+          "spread_ns": 124951,
+          "stdev_ns": 22206.616626986633
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-06-02-owned_reader",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0743833540480372,
+          "candidate_over_baseline_p50": 0.9307664682556955,
+          "candidate_over_baseline_p95": 0.9357271691977539,
+          "candidate_over_baseline_p99": 0.9472257468356846,
+          "candidate_over_baseline_rss": 0.9683511466223929,
+          "candidate_over_baseline_spread": 0.41821522766524305,
+          "candidate_over_baseline_stdev": 0.2124095846314881
+        },
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 3323263,
+          "mean_ns": 3273423.32,
+          "min_ns": 3255273,
+          "p50_ns": 3272708.0,
+          "p95_ns": 3291503,
+          "p99_ns": 3323263,
+          "rss_bytes": 37683200,
+          "spread_ns": 67990,
+          "stdev_ns": 11412.277394283827
+        },
+        "block": 6,
+        "candidate": {
+          "count": 50,
+          "max_ns": 3267803,
+          "mean_ns": 3249214.62,
+          "min_ns": 3237883,
+          "p50_ns": 3247823.0,
+          "p95_ns": 3265324,
+          "p99_ns": 3267803,
+          "rss_bytes": 38182912,
+          "spread_ns": 29920,
+          "stdev_ns": 7170.1803122233905
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-06-03-owned_vec",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0076620554753137,
+          "candidate_over_baseline_p50": 0.9923962052220974,
+          "candidate_over_baseline_p95": 0.9920464906153815,
+          "candidate_over_baseline_p99": 0.9833115826222601,
+          "candidate_over_baseline_rss": 1.0132608695652174,
+          "candidate_over_baseline_spread": 0.4400647153993234,
+          "candidate_over_baseline_stdev": 0.6282865430360802
+        },
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "count": 50,
+          "max_ns": 4115227,
+          "mean_ns": 4046840.64,
+          "min_ns": 4022897,
+          "p50_ns": 4044791.0,
+          "p95_ns": 4074997,
+          "p99_ns": 4115227,
+          "rss_bytes": 38236160,
+          "spread_ns": 92330,
+          "stdev_ns": 16806.09711124665
+        },
+        "block": 6,
+        "candidate": {
+          "count": 50,
+          "max_ns": 4027846,
+          "mean_ns": 4007835.28,
+          "min_ns": 3991416,
+          "p50_ns": 4007401.0,
+          "p95_ns": 4018066,
+          "p99_ns": 4027846,
+          "rss_bytes": 37408768,
+          "spread_ns": 36430,
+          "stdev_ns": 6694.935960249115
+        },
+        "flags": {
+          "p50_gt_1_05": false,
+          "p95_gt_1_05": false,
+          "p99_gt_1_05": false,
+          "rss_gt_1_05": false,
+          "spread_gt_1_05": false,
+          "stdev_gt_1_05": false
+        },
+        "pair_id": "normal-block-06-04-generic_read_at",
+        "ratios": {
+          "baseline_over_candidate_p50": 1.0093302367294912,
+          "candidate_over_baseline_p50": 0.9907560118681039,
+          "candidate_over_baseline_p95": 0.9860291921687304,
+          "candidate_over_baseline_p99": 0.9787664204186063,
+          "candidate_over_baseline_rss": 0.9783610069630423,
+          "candidate_over_baseline_spread": 0.39456298061301853,
+          "candidate_over_baseline_stdev": 0.3983635174741945
+        },
+        "route": "generic_read_at"
+      }
+    ],
+    "review_flags": {
+      "p50_gt_1_05": [
+        "normal-block-02-02-owned_reader"
+      ],
+      "p95_gt_1_05": [
+        "normal-block-02-02-owned_reader"
+      ],
+      "p99_gt_1_05": [
+        "normal-block-02-02-owned_reader"
+      ],
+      "rss_gt_1_05": [],
+      "spread_gt_1_05": [
+        "normal-block-01-01-generic_read_at",
+        "normal-block-01-02-owned_vec",
+        "normal-block-02-02-owned_reader",
+        "normal-block-02-04-generic_read_at",
+        "normal-block-03-02-owned_vec",
+        "normal-block-03-04-range_short",
+        "normal-block-04-01-range_short",
+        "normal-block-05-02-owned_vec",
+        "normal-block-05-03-owned_reader"
+      ],
+      "stdev_gt_1_05": [
+        "normal-block-01-01-generic_read_at",
+        "normal-block-01-03-owned_reader",
+        "normal-block-02-02-owned_reader",
+        "normal-block-02-04-generic_read_at",
+        "normal-block-03-02-owned_vec",
+        "normal-block-04-01-range_short",
+        "normal-block-05-01-generic_read_at",
+        "normal-block-05-03-owned_reader"
+      ]
+    },
+    "route_summaries": {
+      "generic_read_at": {
+        "bootstrap": {
+          "draws": 10000,
+          "lower_95_nearest_rank": 1.0072960075882962,
+          "median": 1.0087322250031896,
+          "seed": 935,
+          "statistic": "median paired baseline_p50/candidate_p50",
+          "upper_95_nearest_rank": 1.009645652493716
+        },
+        "max_candidate_over_baseline_p95": 1.0045725088746085,
+        "max_candidate_over_baseline_p99": 1.0053065590958707,
+        "max_candidate_over_baseline_rss": 1.0268604139145752,
+        "max_candidate_over_baseline_spread": 1.696836804455487,
+        "max_candidate_over_baseline_stdev": 1.7534741370492648,
+        "median_candidate_over_baseline_rss": 0.997369806735763,
+        "median_ratio": 1.0087322250031896,
+        "paired_baseline_over_candidate_p50": [
+          1.006644572798979,
+          1.0084829583970125,
+          1.009961068257941,
+          1.0089814916093665,
+          1.0079474423776134,
+          1.0093302367294912
+        ],
+        "pairs": 6,
+        "pooled_baseline": {
+          "count": 300,
+          "max_ns": 4216807,
+          "mean_ns": 4048082.6433333335,
+          "min_ns": 4014337,
+          "p50_ns": 4044641.0,
+          "p95_ns": 4071736,
+          "p99_ns": 4130737,
+          "spread_ns": 202470,
+          "stdev_ns": 19624.648433110837
+        },
+        "pooled_candidate": {
+          "count": 300,
+          "max_ns": 4152657,
+          "mean_ns": 4013838.1533333333,
+          "min_ns": 3991378,
+          "p50_ns": 4010136.5,
+          "p95_ns": 4039117,
+          "p99_ns": 4088366,
+          "spread_ns": 161279,
+          "stdev_ns": 17185.456166245982
+        },
+        "route_p50_safety_pass": true
+      },
+      "owned_reader": {
+        "bootstrap": {
+          "draws": 10000,
+          "lower_95_nearest_rank": 0.979687752338805,
+          "median": 1.0400240615508314,
+          "seed": 935,
+          "statistic": "median paired baseline_p50/candidate_p50",
+          "upper_95_nearest_rank": 1.0750040067742082
+        },
+        "max_candidate_over_baseline_p95": 1.0542104701931518,
+        "max_candidate_over_baseline_p99": 1.050817954163482,
+        "max_candidate_over_baseline_rss": 1.0150726523530686,
+        "max_candidate_over_baseline_spread": 4.110378256975935,
+        "max_candidate_over_baseline_stdev": 5.167652651350883,
+        "median_candidate_over_baseline_rss": 0.9821931472503306,
+        "median_ratio": 1.0400240615508314,
+        "paired_baseline_over_candidate_p50": [
+          1.0756246595003793,
+          0.95122347022429,
+          1.0699860191620942,
+          1.0081520344533201,
+          1.0100621039395683,
+          1.0743833540480372
+        ],
+        "pairs": 6,
+        "pooled_baseline": {
+          "count": 300,
+          "max_ns": 3939098,
+          "mean_ns": 3499167.3533333335,
+          "min_ns": 3369873,
+          "p50_ns": 3418939.5,
+          "p95_ns": 3641046,
+          "p99_ns": 3685857,
+          "spread_ns": 569225,
+          "stdev_ns": 118145.03094229712
+        },
+        "pooled_candidate": {
+          "count": 300,
+          "max_ns": 3623855,
+          "mean_ns": 3410407.03,
+          "min_ns": 3334694,
+          "p50_ns": 3367065.0,
+          "p95_ns": 3581316,
+          "p99_ns": 3597345,
+          "spread_ns": 289161,
+          "stdev_ns": 84790.24252767595
+        },
+        "route_p50_safety_pass": false
+      },
+      "owned_vec": {
+        "bootstrap": {
+          "draws": 10000,
+          "lower_95_nearest_rank": 1.0082244198040575,
+          "median": 1.0115745438690094,
+          "seed": 935,
+          "statistic": "median paired baseline_p50/candidate_p50",
+          "upper_95_nearest_rank": 1.0861414595727596
+        },
+        "max_candidate_over_baseline_p95": 0.9940772303595207,
+        "max_candidate_over_baseline_p99": 1.0076908450650663,
+        "max_candidate_over_baseline_rss": 1.0169876650075742,
+        "max_candidate_over_baseline_spread": 2.316231884057971,
+        "max_candidate_over_baseline_stdev": 1.5281419507625762,
+        "median_candidate_over_baseline_rss": 0.9962528351165816,
+        "median_ratio": 1.0115745438690094,
+        "paired_baseline_over_candidate_p50": [
+          1.0121429667628956,
+          1.1597249902482591,
+          1.0087867841328013,
+          1.011006120975123,
+          1.0125579288972602,
+          1.0076620554753137
+        ],
+        "pairs": 6,
+        "pooled_baseline": {
+          "count": 300,
+          "max_ns": 3323273,
+          "mean_ns": 3271680.1533333333,
+          "min_ns": 3240254,
+          "p50_ns": 3271040.0,
+          "p95_ns": 3293583,
+          "p99_ns": 3308734,
+          "spread_ns": 83019,
+          "stdev_ns": 12897.977296367608
+        },
+        "pooled_candidate": {
+          "count": 300,
+          "max_ns": 3312305,
+          "mean_ns": 3169012.2866666666,
+          "min_ns": 2803712,
+          "p50_ns": 3235043.5,
+          "p95_ns": 3256973,
+          "p99_ns": 3274166,
+          "spread_ns": 508593,
+          "stdev_ns": 158510.74607530236
+        },
+        "route_p50_safety_pass": true
+      },
+      "range_short": {
+        "bootstrap": {
+          "draws": 10000,
+          "lower_95_nearest_rank": 1.00453191027237,
+          "median": 1.0070999807299204,
+          "seed": 935,
+          "statistic": "median paired baseline_p50/candidate_p50",
+          "upper_95_nearest_rank": 1.0077115562942487
+        },
+        "max_candidate_over_baseline_p95": 0.9966181618879062,
+        "max_candidate_over_baseline_p99": 0.9987457844081481,
+        "max_candidate_over_baseline_rss": 1.0144467549523914,
+        "max_candidate_over_baseline_spread": 1.5795481569560048,
+        "max_candidate_over_baseline_stdev": 1.0801421237389774,
+        "median_candidate_over_baseline_rss": 1.0052288607091868,
+        "median_ratio": 1.0070999807299204,
+        "paired_baseline_over_candidate_p50": [
+          1.0072927064919626,
+          1.0069072549678781,
+          1.0039037105254185,
+          1.0080682458906698,
+          1.0073548666978276,
+          1.0051601100193213
+        ],
+        "pairs": 6,
+        "pooled_baseline": {
+          "count": 300,
+          "max_ns": 4277639,
+          "mean_ns": 4084451.6133333333,
+          "min_ns": 4061337,
+          "p50_ns": 4080292.5,
+          "p95_ns": 4104087,
+          "p99_ns": 4222527,
+          "spread_ns": 216302,
+          "stdev_ns": 22808.161287168543
+        },
+        "pooled_candidate": {
+          "count": 300,
+          "max_ns": 4107706,
+          "mean_ns": 4055755.13,
+          "min_ns": 4033639,
+          "p50_ns": 4054147.0,
+          "p95_ns": 4077897,
+          "p99_ns": 4094867,
+          "spread_ns": 74067,
+          "stdev_ns": 11731.397854696768
+        },
+        "route_p50_safety_pass": true
+      }
+    }
+  },
+  "packet": {
+    "capture_state": {
+      "bytes": 78432,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/capture-state.json",
+      "sha256": "f09ddba51f4a1957b85a4180d9c83429d552270906a1b50be16f79c4859d1b58"
+    },
+    "child_count": 72,
+    "manifest": {
+      "bytes": 55085,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/manifest.json",
+      "sha256": "7fa1ae4bc9a653419b1db1fd01b62731753281e302f9064ee02535700df786f8"
+    },
+    "root": "/home/zhuhe/litchi-performance-0935/formal-packet-v1"
+  },
+  "reproduction": {
+    "bootstrap": "Python random.Random(935), 10000 paired resamples, median statistic, nearest-rank 2.5/97.5%",
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0935/independent-normal-audit-v1.py --packet /home/zhuhe/litchi-performance-0935/formal-packet-v1 --output /home/zhuhe/litchi-performance-0935/independent-normal-audit-v1.json",
+    "quantile": "p50 median; p95/p99 nearest rank",
+    "script": "/home/zhuhe/litchi-performance-0935/independent-normal-audit-v1.py",
+    "script_sha256": "81fc20541f004284f012ad0f75904aef3b39a8e3129adbe8d7f82af0c16905fc"
+  },
+  "schema": "litchi.performance.0935.independent-normal-audit.v1",
+  "scope": "independent raw report, terminal, normal pair, RSS, allocator peak/counter cross-check; no workload invocation",
+  "status": "passed_raw_identity_with_adoption_failures"
+}

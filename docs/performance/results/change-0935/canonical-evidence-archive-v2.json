@@ -1,0 +1,65 @@
+{
+  "schema": "litchi.performance.0935.canonical-evidence-archive.v2",
+  "archive": {
+    "path": "/home/zhuhe/litchi-performance-0935/archives/canonical-evidence-v2.tar.zst",
+    "bytes": 849980,
+    "sha256": "f48b5b61977f59e6af47273375c227aa7457f7586f98d0487e16f9f3508c4832"
+  },
+  "uncompressed": {
+    "path": "/home/zhuhe/litchi-performance-0935/archives/canonical-evidence-v2.tar",
+    "bytes": 29491200,
+    "sha256": "5e4ef3984ed7e4593d203e9e580e3ef3841c51eeffbf6bac37b136679c8f99d3"
+  },
+  "member_list": {
+    "path": "/home/zhuhe/litchi-performance-0935/archives/archive-members-v2.nul",
+    "bytes": 48357,
+    "sha256": "b5403fbe8a729086632c5c06f7ba861b98585ceca2eafccb67049d1090716426"
+  },
+  "input_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0935/archives/archive-inputs-v2.jsonl",
+    "bytes": 209520,
+    "sha256": "fa7f2a4c383cff0ea57a309a6819dec9b90da950fd22eac79d4e3fc5879f14c8"
+  },
+  "file_count": 703,
+  "input_logical_bytes": 28874580,
+  "regeneration_argv": [
+    [
+      "/usr/bin/tar",
+      "--no-recursion",
+      "--sort=name",
+      "--mtime=@0",
+      "--owner=0",
+      "--group=0",
+      "--numeric-owner",
+      "-C",
+      "/home/zhuhe/litchi-performance-0935",
+      "--null",
+      "-T",
+      "/home/zhuhe/litchi-performance-0935/archives/archive-members-v2.nul",
+      "-cf",
+      "/home/zhuhe/litchi-performance-0935/archives/canonical-evidence-v2.tar"
+    ],
+    [
+      "/usr/bin/zstd",
+      "-19",
+      "-T2",
+      "-f",
+      "/home/zhuhe/litchi-performance-0935/archives/canonical-evidence-v2.tar",
+      "-o",
+      "/home/zhuhe/litchi-performance-0935/archives/canonical-evidence-v2.tar.zst"
+    ]
+  ],
+  "terminal_records": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/archives/archive-v2-command-1.terminal.json",
+      "bytes": 586,
+      "sha256": "bb7bfd06756b70969e1c9cc616f162c0c5aba7f7975481a73a927054f187178b"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/archives/archive-v2-command-2.terminal.json",
+      "bytes": 619,
+      "sha256": "33b9ad237612206418ebbe083bf5bb216fdd0e4fd4e6214539762314ba54a6bb"
+    }
+  ],
+  "scope": "Frozen explicit file list includes capture packet, corrected checker replays, build/quality history, source listings and compact repository evidence snapshot. Source trees and executable binaries remain separately retained outside this archive. Historical v1 archive is unchanged."
+}

@@ -1,0 +1,74 @@
+{
+  "change": "0935",
+  "coverage_mapping": {
+    "footnote_context": "New controls retain absent versus local explicit zero and assert the current inherited mc:Ignorable refusal; focused footnote package tests remain the out-of-band Context oracle.",
+    "limits": "New malformed-footnote/reference-limit control proves preflight wins; existing inventory_preflights_reference_limits_before_semantic_retention and inventory_bounds_inherited_namespace_materialization remain authoritative for the boundary values.",
+    "namespace_and_tolerance": "New aliased q/rel section requires synthetic declarations and checks relationship, column-width, and column-count defect contexts against original document offsets. Existing nested-rebinding tests cover scope restoration.",
+    "public_lazy_and_order": "New tests compare Section constructor/accessor behavior and Inventory private-route error text for codec, footnote, and semantic stages.",
+    "publication_inverse": "Existing source_backed_sections tests section_layout_namespace_shadowing_restores_section_root_alias, section_layout_default_word_namespace_rebinds_inserted_qnames, section_layout_retained_malformed_source_keeps_parse_error_before_sink, and section_layout_complex_noop_remains_byte_exact; no duplicate publication matrix was added.",
+    "raw_versus_footnote": "New depth-65 section control is below Inventory max_depth but above codec MAX_XML_DEPTH; valid and malformed footnote variants must return the same raw-depth error."
+  },
+  "created_utc": "2026-10-06T17:53:38.425227+00:00",
+  "execution": {
+    "builds_run": false,
+    "candidate_quality_run": false,
+    "format_check": {
+      "argv": "rustfmt --edition 2024 --check crates/litchi-docx/src/section/fragment_reuse_tests.rs crates/litchi-docx/src/section/mod.rs",
+      "exit": 0
+    },
+    "note": "Only source inspection and test-file formatting were performed; no cargo command was started.",
+    "tests_run": false
+  },
+  "new_test_artifact": {
+    "bytes": 8277,
+    "path": "crates/litchi-docx/src/section/fragment_reuse_tests.rs",
+    "sha256": "56e2317fbd63807576aca269a4dadee10682468b52a0234122455c25686f915b",
+    "tests": [
+      "inventory_reuse_keeps_public_semantic_laziness_and_error_order",
+      "inventory_reuse_matches_section_footnote_before_semantic_error",
+      "inventory_reuse_keeps_raw_depth_error_before_footnote_error",
+      "inventory_reuse_keeps_reference_preflight_before_section_and_footnote_errors",
+      "inventory_reuse_maps_tolerance_to_original_offsets_after_namespace_injection",
+      "inventory_reuse_preserves_footnote_absence_zero_and_inherited_context_refusal"
+    ]
+  },
+  "non_goals": [
+    "No private-helper implementation assertions or mirrored raw-parser tests.",
+    "No builds, benchmark/profiler runs, fixture changes, commits, or production edits."
+  ],
+  "planned_quality_commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-docx fragment_reuse_tests -- --nocapture",
+    "cargo +1.95.0 test --offline --locked -p litchi-docx --lib inventory_ -- --nocapture",
+    "cargo +1.95.0 test --offline --locked -p litchi-docx --lib footnote_columns -- --nocapture",
+    "cargo +1.95.0 test --offline --locked -p litchi-docx --test source_backed_sections section_layout_ -- --nocapture"
+  ],
+  "schema": "litchi.performance.0935.docx-inventory-fragment-test-design.v1",
+  "source_binding": {
+    "base_head": "df394db17dd441aa763548ac1f1242343201b84a",
+    "candidate_files": [
+      {
+        "path": "crates/litchi-docx/src/section/codec.rs",
+        "sha256": "10ace300e62645b596d83bef606806b1a133c79ba5c1fb4d6ed9d5c034585d66"
+      },
+      {
+        "path": "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+        "sha256": "b77a7ae8208802f05a4b78926636ca7e2f09b9795d3726ab429b389d4fbb3caf"
+      },
+      {
+        "path": "crates/litchi-docx/src/section/inventory.rs",
+        "sha256": "6e75d6f2fde31fdbc640bb430cefe083498dee0bf6ad144e04f05f6d23486c1e"
+      }
+    ],
+    "candidate_state": "shared uncommitted candidate snapshot; production changes are owned by candidate_review",
+    "prior_design_review": {
+      "bytes": 14079,
+      "path": "docs/performance/results/change-0934/validation-review.json",
+      "sha256": "73bca3378d6eaa002ec4e9036dc05b2a3822eb7524959b648eacb47919f2458f"
+    },
+    "test_registration": {
+      "path": "crates/litchi-docx/src/section/mod.rs",
+      "sha256": "ba6950d7913f55c8f9097dbdca774006f191ef0577cccf2f13a4ba50ff2ccc81"
+    }
+  },
+  "status": "focused_tests_ready_quality_not_run"
+}

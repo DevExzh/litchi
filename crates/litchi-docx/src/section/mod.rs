@@ -17,6 +17,9 @@ pub(crate) use codec::parse_universal_twips;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod fragment_reuse_tests;
+
 pub use inventory::{
     Descriptor, Inventory, Limits, Ownership, ParagraphRange, Property, PropertyValue, Selector,
     Snapshot,

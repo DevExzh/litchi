@@ -1,0 +1,76 @@
+{
+  "schema": "litchi.performance.0935.cleanup.v1",
+  "completed_utc": "2026-10-06T18:28:19.666549+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/quality-target",
+      "files": 14074,
+      "logical_bytes": 14894490339
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/.fingerprint",
+      "files": 986,
+      "logical_bytes": 306677
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/build",
+      "files": 166,
+      "logical_bytes": 24865714
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/deps",
+      "files": 625,
+      "logical_bytes": 1167620006
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/examples",
+      "files": 0,
+      "logical_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/incremental",
+      "files": 0,
+      "logical_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/.fingerprint",
+      "files": 986,
+      "logical_bytes": 314746
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/build",
+      "files": 166,
+      "logical_bytes": 24870817
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/deps",
+      "files": 625,
+      "logical_bytes": 1163472545
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/examples",
+      "files": 0,
+      "logical_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/incremental",
+      "files": 0,
+      "logical_bytes": 0
+    }
+  ],
+  "logical_bytes_removed": 17275940844,
+  "size_scope": "sum of file lengths, not measured physical disk recovery",
+  "retained_binaries_rehashed": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-normal/release/litchi-perf-baseline",
+      "bytes": 69907728,
+      "sha256": "1f3ac64688cbad84741577e3c772e35d7ac3df6420daffa470fe30f333ece659"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0935/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+      "bytes": 68421320,
+      "sha256": "a80d9041f785e55242ea54f00f50ba7be4b82c45acb2660a87b68a3357698c1a"
+    }
+  ],
+  "retained": "Candidate/baseline source trees, original build and capture receipts, raw/copy packets, rejected candidate patch, offline tools and outputs remain external. Shared checkout target and unrelated files were untouched."
+}

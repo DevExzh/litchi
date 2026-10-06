@@ -1,0 +1,32 @@
+{
+  "schema": "litchi.performance.0935.rejection-decision.v1",
+  "decision": "reject_production_candidate_retain_behavior_tests",
+  "frozen_allocation_minimum_each_cell": 0.1,
+  "failing_cell": "sections=16/independent_sources",
+  "actual_requested_bytes_reduction": 0.09682785145283146,
+  "normal_primary_minimum_paired_ratio": 1.05,
+  "actual_normal_primary_paired_ratio": 1.0087322250031896,
+  "gate_waiver": false,
+  "production_restoration": [
+    {
+      "path": "crates/litchi-docx/src/section/codec.rs",
+      "rejected_candidate_sha256": "10ace300e62645b596d83bef606806b1a133c79ba5c1fb4d6ed9d5c034585d66",
+      "restored_head_sha256": "dac8d1495653973be53eb2bb971430d87a924e8b9bac9c7d97a59fc0ac3ee886"
+    },
+    {
+      "path": "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+      "rejected_candidate_sha256": "b77a7ae8208802f05a4b78926636ca7e2f09b9795d3726ab429b389d4fbb3caf",
+      "restored_head_sha256": "56b9f9977c38955a5c15770676bd2e292a15d8b1bbdc33e81b14a5e466b0b9dd"
+    },
+    {
+      "path": "crates/litchi-docx/src/section/inventory.rs",
+      "rejected_candidate_sha256": "6e75d6f2fde31fdbc640bb430cefe083498dee0bf6ad144e04f05f6d23486c1e",
+      "restored_head_sha256": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b"
+    }
+  ],
+  "final_docx_files_matching_tested_baseline_source": 450,
+  "candidate_source_retained": "/home/zhuhe/litchi-performance-0935/candidate-source",
+  "candidate_patch_retained": "/home/zhuhe/litchi-performance-0935/candidate-production-0935.patch",
+  "final_tests_sha256": "a77538860f4a786290ea1ef5555acf6a29081833a8fdd5e2e4049889dbd70e5b",
+  "final_state_quality_receipt": "docs/performance/results/change-0935/final-retained-baseline-quality-audit-v1.json"
+}

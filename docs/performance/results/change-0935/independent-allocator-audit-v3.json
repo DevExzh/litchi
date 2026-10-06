@@ -1,0 +1,1001 @@
+{
+  "allocator_cells": [
+    {
+      "allocation_gate_pass": true,
+      "ownership": "shared_snapshot_clones",
+      "repetitions": [
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 28398,
+          "baseline_requested_bytes": 2108662,
+          "baseline_rss_bytes": 12853248,
+          "candidate_allocation_calls": 23358,
+          "candidate_requested_bytes": 1802774,
+          "candidate_rss_bytes": 13008896,
+          "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-01",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 99948
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 107020
+              },
+              "after_release_last": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 107020
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522524,
+                "region_peak_live_bytes": 121669
+              },
+              "commits_retained": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 99950
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 107022
+              },
+              "after_release_last": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 107022
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522526,
+                "region_peak_live_bytes": 121671
+              },
+              "commits_retained": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.14506260367948964
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 28398,
+          "baseline_requested_bytes": 2108662,
+          "baseline_rss_bytes": 12730368,
+          "candidate_allocation_calls": 23358,
+          "candidate_requested_bytes": 1802774,
+          "candidate_rss_bytes": 12947456,
+          "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-02",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 99948
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 107020
+              },
+              "after_release_last": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 107020
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522524,
+                "region_peak_live_bytes": 121669
+              },
+              "commits_retained": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 99950
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 107022
+              },
+              "after_release_last": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 107022
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522526,
+                "region_peak_live_bytes": 121671
+              },
+              "commits_retained": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.14506260367948964
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 28398,
+          "baseline_requested_bytes": 2108662,
+          "baseline_rss_bytes": 12894208,
+          "candidate_allocation_calls": 23358,
+          "candidate_requested_bytes": 1802774,
+          "candidate_rss_bytes": 12939264,
+          "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-03",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 99948
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 107020
+              },
+              "after_release_last": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": 107020
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522524,
+                "region_peak_live_bytes": 121669
+              },
+              "commits_retained": {
+                "peak_live_bytes": 598555,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 99950
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 107022
+              },
+              "after_release_last": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": 107022
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522526,
+                "region_peak_live_bytes": 121671
+              },
+              "commits_retained": {
+                "peak_live_bytes": 598557,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.14506260367948964
+        }
+      ],
+      "sections": 16
+    },
+    {
+      "allocation_gate_pass": false,
+      "ownership": "independent_sources",
+      "repetitions": [
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 47928,
+          "baseline_requested_bytes": 5607808,
+          "baseline_rss_bytes": 13090816,
+          "candidate_allocation_calls": 38968,
+          "candidate_requested_bytes": 5064816,
+          "candidate_rss_bytes": 13094912,
+          "pair_id": "allocator-section-00016-independent_sources-rep-01",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 130046
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 186622
+              },
+              "after_release_last": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 137118
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522515,
+                "region_peak_live_bytes": 232946
+              },
+              "commits_retained": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 130048
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 186624
+              },
+              "after_release_last": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 137120
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522517,
+                "region_peak_live_bytes": 232948
+              },
+              "commits_retained": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.09682785145283149
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 47928,
+          "baseline_requested_bytes": 5607808,
+          "baseline_rss_bytes": 12931072,
+          "candidate_allocation_calls": 38968,
+          "candidate_requested_bytes": 5064816,
+          "candidate_rss_bytes": 12902400,
+          "pair_id": "allocator-section-00016-independent_sources-rep-02",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 130046
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 186622
+              },
+              "after_release_last": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 137118
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522515,
+                "region_peak_live_bytes": 232946
+              },
+              "commits_retained": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 130048
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 186624
+              },
+              "after_release_last": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 137120
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522517,
+                "region_peak_live_bytes": 232948
+              },
+              "commits_retained": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.09682785145283149
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 47928,
+          "baseline_requested_bytes": 5607808,
+          "baseline_rss_bytes": 12500992,
+          "candidate_allocation_calls": 38968,
+          "candidate_requested_bytes": 5064816,
+          "candidate_rss_bytes": 12550144,
+          "pair_id": "allocator-section-00016-independent_sources-rep-03",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 130046
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 186622
+              },
+              "after_release_last": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": 137118
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522515,
+                "region_peak_live_bytes": 232946
+              },
+              "commits_retained": {
+                "peak_live_bytes": 709832,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 130048
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 186624
+              },
+              "after_release_last": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": 137120
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 522517,
+                "region_peak_live_bytes": 232948
+              },
+              "commits_retained": {
+                "peak_live_bytes": 709834,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.09682785145283149
+        }
+      ],
+      "sections": 16
+    },
+    {
+      "allocation_gate_pass": true,
+      "ownership": "shared_snapshot_clones",
+      "repetitions": [
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 11875584,
+          "baseline_requested_bytes": 800608673,
+          "baseline_rss_bytes": 76656640,
+          "candidate_allocation_calls": 9295104,
+          "candidate_requested_bytes": 644525457,
+          "candidate_rss_bytes": 76955648,
+          "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-01",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 39641611
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 43221595
+              },
+              "after_release_last": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 43221595
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 45549970,
+                "region_peak_live_bytes": 45549970
+              },
+              "commits_retained": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 39641613
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 43221597
+              },
+              "after_release_last": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 43221597
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 45549972,
+                "region_peak_live_bytes": 45549972
+              },
+              "commits_retained": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.19495568966937735
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 11875584,
+          "baseline_requested_bytes": 800608673,
+          "baseline_rss_bytes": 76828672,
+          "candidate_allocation_calls": 9295104,
+          "candidate_requested_bytes": 644525457,
+          "candidate_rss_bytes": 77479936,
+          "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-02",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 39641611
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 43221595
+              },
+              "after_release_last": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 43221595
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 45549970,
+                "region_peak_live_bytes": 45549970
+              },
+              "commits_retained": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 39641613
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 43221597
+              },
+              "after_release_last": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 43221597
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 45549972,
+                "region_peak_live_bytes": 45549972
+              },
+              "commits_retained": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.19495568966937735
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 11875584,
+          "baseline_requested_bytes": 800608673,
+          "baseline_rss_bytes": 76726272,
+          "candidate_allocation_calls": 9295104,
+          "candidate_requested_bytes": 644525457,
+          "candidate_rss_bytes": 76820480,
+          "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-03",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 39641611
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 43221595
+              },
+              "after_release_last": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": 43221595
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 45549970,
+                "region_peak_live_bytes": 45549970
+              },
+              "commits_retained": {
+                "peak_live_bytes": 57533994,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 39641613
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 43221597
+              },
+              "after_release_last": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": 43221597
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 45549972,
+                "region_peak_live_bytes": 45549972
+              },
+              "commits_retained": {
+                "peak_live_bytes": 57533996,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.19495568966937735
+        }
+      ],
+      "sections": 8192
+    },
+    {
+      "allocation_gate_pass": true,
+      "ownership": "independent_sources",
+      "repetitions": [
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 21109592,
+          "baseline_requested_bytes": 1425467600,
+          "baseline_rss_bytes": 115421184,
+          "candidate_allocation_calls": 16522072,
+          "candidate_requested_bytes": 1147987136,
+          "candidate_rss_bytes": 114241536,
+          "pair_id": "allocator-section-08192-independent_sources-rep-01",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 47848990
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 76488862
+              },
+              "after_release_last": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 51428974
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 79020034,
+                "region_peak_live_bytes": 79020034
+              },
+              "commits_retained": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 47848992
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 76488864
+              },
+              "after_release_last": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 51428976
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 79020036,
+                "region_peak_live_bytes": 79020036
+              },
+              "commits_retained": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.19465925707466097
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 21109592,
+          "baseline_requested_bytes": 1425467600,
+          "baseline_rss_bytes": 114262016,
+          "candidate_allocation_calls": 16522072,
+          "candidate_requested_bytes": 1147987136,
+          "candidate_rss_bytes": 114593792,
+          "pair_id": "allocator-section-08192-independent_sources-rep-02",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 47848990
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 76488862
+              },
+              "after_release_last": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 51428974
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 79020034,
+                "region_peak_live_bytes": 79020034
+              },
+              "commits_retained": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 47848992
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 76488864
+              },
+              "after_release_last": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 51428976
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 79020036,
+                "region_peak_live_bytes": 79020036
+              },
+              "commits_retained": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.19465925707466097
+        },
+        {
+          "allocation_calls_strictly_reduced": true,
+          "baseline_allocation_calls": 21109592,
+          "baseline_requested_bytes": 1425467600,
+          "baseline_rss_bytes": 115519488,
+          "candidate_allocation_calls": 16522072,
+          "candidate_requested_bytes": 1147987136,
+          "candidate_rss_bytes": 115671040,
+          "pair_id": "allocator-section-08192-independent_sources-rep-03",
+          "phase_peaks": {
+            "baseline": {
+              "after_commit_drop": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 47848990
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 76488862
+              },
+              "after_release_last": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": 51428974
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 79020034,
+                "region_peak_live_bytes": 79020034
+              },
+              "commits_retained": {
+                "peak_live_bytes": 91004058,
+                "region_peak_live_bytes": null
+              }
+            },
+            "candidate": {
+              "after_commit_drop": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 47848992
+              },
+              "after_release_all_but_last": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 76488864
+              },
+              "after_release_last": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": 51428976
+              },
+              "after_snapshot_drop": {
+                "peak_live_bytes": 79020036,
+                "region_peak_live_bytes": 79020036
+              },
+              "commits_retained": {
+                "peak_live_bytes": 91004060,
+                "region_peak_live_bytes": null
+              }
+            }
+          },
+          "requested_bytes_reduction_fraction": 0.19465925707466097
+        }
+      ],
+      "sections": 8192
+    }
+  ],
+  "checker": {
+    "gate": {
+      "calls_must_strictly_reduce": true,
+      "memory_review_threshold_ratio": 1.05,
+      "minimum_requested_bytes_reduction_fraction": 0.1
+    },
+    "v1": {
+      "bytes": 36634,
+      "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v1.py",
+      "sha256": "66f93811cd4ba5c22a49246a40ef47293972bca34d02c8ce38e98bfa9ef9b535"
+    },
+    "v2": {
+      "bytes": 36684,
+      "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v2.py",
+      "sha256": "e8fbfa51bb2da4734f24f71653bcf5f935b1ba2e802575e8a1b5a5e0a7954b6b"
+    },
+    "v2_to_v3_diff": {
+      "bytes": 3993,
+      "path": "/home/zhuhe/litchi-performance-0935/replays/checker-v3-source.diff",
+      "sha256": "ed3bc3eaf497603a00c5efee7d1c131679128c8e8872e9f3696047e95be9887d"
+    },
+    "v3": {
+      "bytes": 39568,
+      "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v3.py",
+      "sha256": "1a8258569bb72a70aafe919ee12779a342366eb0856651985ddfd365782ff805"
+    },
+    "v3_changes": [
+      "retained 0933 exact fixture constants for section counts 16 and 8192",
+      "reject source archive bytes/hash drift",
+      "reject expected output bytes/hash vector drift",
+      "reject required retained-base cap drift"
+    ]
+  },
+  "historical_failures": [
+    {
+      "exit_code": 1,
+      "failure": "KeyError: source_revision in negative-control sample lookup",
+      "stderr": {
+        "bytes": 64,
+        "path": "/home/zhuhe/litchi-performance-0935/replays/original-v1/checker.stderr",
+        "sha256": "0450f2a4f814d83363b06efaab97a3dd5376d62b54bb27b5724ad7918cc70248"
+      },
+      "terminal": {
+        "bytes": 1432,
+        "path": "/home/zhuhe/litchi-performance-0935/replays/original-v1/terminal.json",
+        "sha256": "d5c0e6ba8bad22451fa75ef1b7f0a4f218e16f157ad441f0638b8e009f0bcced"
+      },
+      "version": "v1"
+    },
+    {
+      "exit_code": 1,
+      "failure": "negative control accepted: allocator_source_fixture_hash; no expected fixture hash was checked",
+      "stderr": {
+        "bytes": 105,
+        "path": "/home/zhuhe/litchi-performance-0935/replays/original-v2/checker.stderr",
+        "sha256": "4e3f44806203471cf0572331ca6049dc832390cd856b7688b14194a8ef064503"
+      },
+      "terminal": {
+        "bytes": 1528,
+        "path": "/home/zhuhe/litchi-performance-0935/replays/original-v2/terminal.json",
+        "sha256": "d23b678e0915f5f82d57cc32b04b088920810b99c8610db2406ee11bb1f8c9e5"
+      },
+      "version": "v2"
+    }
+  ],
+  "replays": {
+    "checker_sha_equal": true,
+    "manifest_sha_equal": true,
+    "moved": {
+      "packet": "/home/zhuhe/litchi-performance-0935/formal-packet-v1-moved",
+      "result": {
+        "allocation_gate_pass": false,
+        "allocator_rows_verified": 24,
+        "bytes": 29237,
+        "checker_sha256": "1a8258569bb72a70aafe919ee12779a342366eb0856651985ddfd365782ff805",
+        "memory_review_flags": [],
+        "memory_review_required": false,
+        "negative_controls": [
+          {
+            "name": "allocator_source_fixture_hash",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: source fixture changed",
+            "rejected": true
+          },
+          {
+            "name": "allocator_output_fixture_hash",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: output fixture changed",
+            "rejected": true
+          },
+          {
+            "name": "allocator_exact_cap",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: retention boundary changed",
+            "rejected": true
+          },
+          {
+            "name": "allocator_observer_invalid",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: baseline: allocator observer invalid",
+            "rejected": true
+          },
+          {
+            "name": "allocator_absolute_phase_peak",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: after_snapshot_drop absolute region peak missing",
+            "rejected": true
+          },
+          {
+            "name": "terminal_source_receipt_binding",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline: source receipt binding changed",
+            "rejected": true
+          },
+          {
+            "name": "manifest_schedule",
+            "reason": "manifest schedule rows changed",
+            "rejected": true
+          },
+          {
+            "name": "packet_report_descriptor",
+            "reason": "negative report descriptor: packet descriptor changed",
+            "rejected": true
+          }
+        ],
+        "packet_manifest_sha256": "7fa1ae4bc9a653419b1db1fd01b62731753281e302f9064ee02535700df786f8",
+        "path": "/home/zhuhe/litchi-performance-0935/replays/moved-v3/checker-result.json",
+        "schema": "litchi.performance.0935.independent-allocator-check.v1",
+        "sha256": "9a70c12b9ff636ed81acd99733be1729c1722f20444215ddea80a77c0d41c2d6",
+        "status": "failed",
+        "terminal_rows_verified": 72
+      },
+      "terminal": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v3.py",
+          "--packet",
+          "/home/zhuhe/litchi-performance-0935/formal-packet-v1-moved",
+          "--output",
+          "/home/zhuhe/litchi-performance-0935/replays/moved-v3/checker-result.json"
+        ],
+        "bytes": 1660,
+        "checker": {
+          "bytes": 39568,
+          "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v3.py",
+          "sha256": "1a8258569bb72a70aafe919ee12779a342366eb0856651985ddfd365782ff805"
+        },
+        "cwd": "/home/zhuhe/code/litchi",
+        "end_utc": "2026-10-06T18:26:56.196766+00:00",
+        "exit_code": 0,
+        "path": "/home/zhuhe/litchi-performance-0935/replays/moved-v3/terminal.json",
+        "sha256": "d7c702e93da13e063767044676c0cdbc0251f137b320ecd866f2c132f0d8e81e",
+        "start_utc": "2026-10-06T18:26:55.983756+00:00",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0935/replays/moved-v3/checker.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 29237,
+          "path": "/home/zhuhe/litchi-performance-0935/replays/moved-v3/checker.stdout",
+          "sha256": "9a70c12b9ff636ed81acd99733be1729c1722f20444215ddea80a77c0d41c2d6"
+        }
+      }
+    },
+    "normalized_equal_after_removing_only_packet_path": true,
+    "original": {
+      "packet": "/home/zhuhe/litchi-performance-0935/formal-packet-v1",
+      "result": {
+        "allocation_gate_pass": false,
+        "allocator_rows_verified": 24,
+        "bytes": 29231,
+        "checker_sha256": "1a8258569bb72a70aafe919ee12779a342366eb0856651985ddfd365782ff805",
+        "memory_review_flags": [],
+        "memory_review_required": false,
+        "negative_controls": [
+          {
+            "name": "allocator_source_fixture_hash",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: source fixture changed",
+            "rejected": true
+          },
+          {
+            "name": "allocator_output_fixture_hash",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: output fixture changed",
+            "rejected": true
+          },
+          {
+            "name": "allocator_exact_cap",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: retention boundary changed",
+            "rejected": true
+          },
+          {
+            "name": "allocator_observer_invalid",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: baseline: allocator observer invalid",
+            "rejected": true
+          },
+          {
+            "name": "allocator_absolute_phase_peak",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: after_snapshot_drop absolute region peak missing",
+            "rejected": true
+          },
+          {
+            "name": "terminal_source_receipt_binding",
+            "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline: source receipt binding changed",
+            "rejected": true
+          },
+          {
+            "name": "manifest_schedule",
+            "reason": "manifest schedule rows changed",
+            "rejected": true
+          },
+          {
+            "name": "packet_report_descriptor",
+            "reason": "negative report descriptor: packet descriptor changed",
+            "rejected": true
+          }
+        ],
+        "packet_manifest_sha256": "7fa1ae4bc9a653419b1db1fd01b62731753281e302f9064ee02535700df786f8",
+        "path": "/home/zhuhe/litchi-performance-0935/replays/original-v3/checker-result.json",
+        "schema": "litchi.performance.0935.independent-allocator-check.v1",
+        "sha256": "e85b5aa7fa0ef0850561313dab6546bb31004a28400e03276664e55715763a02",
+        "status": "failed",
+        "terminal_rows_verified": 72
+      },
+      "terminal": {
+        "argv": [
+          "python3",
+          "-B",
+          "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v3.py",
+          "--packet",
+          "/home/zhuhe/litchi-performance-0935/formal-packet-v1",
+          "--output",
+          "/home/zhuhe/litchi-performance-0935/replays/original-v3/checker-result.json"
+        ],
+        "bytes": 1660,
+        "checker": {
+          "bytes": 39568,
+          "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v3.py",
+          "sha256": "1a8258569bb72a70aafe919ee12779a342366eb0856651985ddfd365782ff805"
+        },
+        "cwd": "/home/zhuhe/code/litchi",
+        "end_utc": "2026-10-06T18:26:40.863185+00:00",
+        "exit_code": 0,
+        "path": "/home/zhuhe/litchi-performance-0935/replays/original-v3/terminal.json",
+        "sha256": "3ab8caad501b8a4807eb4142c432b9582569f2cedccdc94bb6fa84d2c0f6c045",
+        "start_utc": "2026-10-06T18:26:40.651005+00:00",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0935/replays/original-v3/checker.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 29231,
+          "path": "/home/zhuhe/litchi-performance-0935/replays/original-v3/checker.stdout",
+          "sha256": "e85b5aa7fa0ef0850561313dab6546bb31004a28400e03276664e55715763a02"
+        }
+      }
+    }
+  },
+  "schema": "litchi.performance.0935.independent-allocator-audit.v3",
+  "scope": {
+    "capture_started": false,
+    "iwork": "excluded",
+    "packet_mutated": false,
+    "source_or_binary_mutated": false,
+    "terminal_first": true,
+    "workload_started": false
+  },
+  "status": "completed_checker_replay; allocation_gate_failed",
+  "summary": {
+    "allocator_rows_verified": 24,
+    "max_absolute_phase_peak_candidate_over_baseline": 1.0000038276413117,
+    "max_region_phase_peak_candidate_over_baseline": 1.0000200104054109,
+    "max_rss_candidate_over_baseline": 1.0170527670527671,
+    "memory_review_flags": [],
+    "memory_review_required": false,
+    "negative_control_names": [
+      "allocator_source_fixture_hash",
+      "allocator_output_fixture_hash",
+      "allocator_exact_cap",
+      "allocator_observer_invalid",
+      "allocator_absolute_phase_peak",
+      "terminal_source_receipt_binding",
+      "manifest_schedule",
+      "packet_report_descriptor"
+    ],
+    "negative_controls_all_rejected": true,
+    "rejection_reason": "16-section independent_sources requested-byte reduction is 0.096827851, below the 0.10 gate; calls are strictly reduced in all cells. Primary latency rejection is recorded by the runner, outside this checker.",
+    "terminal_rows_verified": 72
+  }
+}

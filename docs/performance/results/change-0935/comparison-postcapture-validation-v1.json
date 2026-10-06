@@ -1,0 +1,174 @@
+{
+  "archive": {
+    "bytes": 145432,
+    "command": "/usr/bin/tar -C /home/zhuhe/litchi-performance-0935 -cf - formal-packet-v1 formal-reduction-v1.json formal-reduction-v2.json replay-summary-v1.json replay-tool-terminal-v1.json replay-tool-terminal-v2.json moved-replay-summary-v1.json moved-replay-terminal-v1.json moved-replay-comparison-v1.json capture-outer-terminal-v1.json reduce-corrected-tool-output-v1.json reduce-corrected-tool-terminal-v1.json reduce-tool-output-v1.json reduce-tool-terminal-v1.json replays formal-manifest-authorized-v1.json formal-manifest-unauthorized-v7.json controls-v6.json independent-normal-audit-v1.json comparison-runner-0935-v2.py independent-allocator-check-0935-v1.py independent-allocator-check-0935-v2.py receipts/baseline-source-final-v3.json receipts/candidate-source-final-v3.json receipts/baseline-normal-retained-v3.json receipts/normal-build-final-v3.json receipts/allocator-build-final-v3.json receipts/retained-allocator-equivalence-v3.json receipts/toolchain-v3.json source-snapshot-differential-v4.json | /usr/bin/zstd -T0 -19 -o /home/zhuhe/litchi-performance-0935/archives/formal-evidence-v1.tar.zst",
+    "path": "/home/zhuhe/litchi-performance-0935/archives/formal-evidence-v1.tar.zst",
+    "sha256": "b78aa0cdca279961b9097e4d553ca75da129ef9ba1edea3b836f89e08d0e303a"
+  },
+  "capture": {
+    "authorized_manifest": {
+      "bytes": 52494,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-manifest-authorized-v1.json",
+      "sha256": "e619df6a771b241aed60f520e1bc12c395bfdcb5ddff395d376f2250a63dd29e"
+    },
+    "children_failed": 0,
+    "children_passed": 72,
+    "children_run": 72,
+    "outer_terminal": {
+      "bytes": 1080,
+      "path": "/home/zhuhe/litchi-performance-0935/capture-outer-terminal-v1.json",
+      "sha256": "eaf5e6a3797dc34e91b1ca0970985661414b254d91b31bc2d85c9dbccd039733"
+    },
+    "packet": {
+      "bytes": 4343014,
+      "file_count": 521,
+      "manifest": {
+        "bytes": 55085,
+        "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/manifest.json",
+        "sha256": "7fa1ae4bc9a653419b1db1fd01b62731753281e302f9064ee02535700df786f8"
+      },
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1"
+    },
+    "packet_mutated_after_capture": false,
+    "recaptures": 0
+  },
+  "independent_audits": {
+    "checker_attempt_audit": {
+      "bytes": 3504,
+      "path": "/home/zhuhe/litchi-performance-0935/replays/independent-checker-audit-v1.json",
+      "sha256": "f3f240e6b0f500646383d4757794fffc1adc5ca845ea209a37d91bceafa369f1"
+    },
+    "checker_v1_failure": "KeyError: source_revision; preserved at external original-v1 terminal, no result produced.",
+    "checker_v2_failure": "After the authorized nested lookup-only correction, negative control allocator_source_fixture_hash was accepted; preserved at external original-v2 terminal, no result produced.",
+    "checker_v2_scope": "Only sample[\"source_revision\"] -> sample[\"report\"][\"source_revision\"] in negative-control calls; no packet, runner, or gate edits.",
+    "raw_normal_allocator_audit": {
+      "bytes": 95723,
+      "path": "/home/zhuhe/litchi-performance-0935/independent-normal-audit-v1.json",
+      "sha256": "45bdaeece7284a389245a346cc1029cae877a183ef5992314c39ca5a1c0f4198"
+    }
+  },
+  "provenance": {
+    "compiler_metadata": {
+      "bytes": 8571,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/compiler-metadata-v1.json",
+      "sha256": "dc11fa2e6ea7d21c4c4e6dda900baf4df2efeded21e8072813b304aab2aca20b"
+    },
+    "environment_note": "The capture/build wrappers record selected effective values and explicit RUSTFLAGS/CARGO_ENCODED_RUSTFLAGS decisions; they do not reconstruct or claim a fully clean inherited environment.",
+    "no_workload_after_capture": true,
+    "postcapture_reducer": {
+      "bytes": 2809,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/comparison-reduce-postcapture.py",
+      "sha256": "ef621dcbdc24b30f8331021ea49dc0d683c94cbf9925da4c6ee437ebf8afd529"
+    },
+    "runner": {
+      "bytes": 81843,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/comparison-runner.py",
+      "sha256": "38a07041be26082aa429faae45a3cbac5a960ae4fb30e926e3e4f898f08ee92b"
+    },
+    "source_binding": {
+      "bytes": 12069,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/source-binding-v3.json",
+      "sha256": "e2b6d7a6dbf9b6060c970ce8813695a2a4efd0ff6ba53891e27b72bb95a0ad15"
+    }
+  },
+  "reduction": {
+    "adoption": false,
+    "allocator_cells": {
+      "sections=16/independent_sources": {
+        "calls_strictly_reduced": true,
+        "passed": false,
+        "requested_bytes_reduction": 0.09682785145283146,
+        "required": 0.1
+      },
+      "sections=16/shared_snapshot_clones": {
+        "calls_strictly_reduced": true,
+        "passed": true,
+        "requested_bytes_reduction": 0.14506260367948964,
+        "required": 0.1
+      },
+      "sections=8192/independent_sources": {
+        "calls_strictly_reduced": true,
+        "passed": true,
+        "requested_bytes_reduction": 0.19465925707466103,
+        "required": 0.1
+      },
+      "sections=8192/shared_snapshot_clones": {
+        "calls_strictly_reduced": true,
+        "passed": true,
+        "requested_bytes_reduction": 0.19495568966937737,
+        "required": 0.1
+      }
+    },
+    "corrected_v2": {
+      "bytes": 28231,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-reduction-v2.json",
+      "sha256": "3e96424dc57268bf6b02b3e5382c0acadcabc9b4c0890e46629762f3baa8d163"
+    },
+    "correction": "Offline recomputation adds the 0935 0.10 requested-byte threshold and explicitly labels the frozen reducer ge_20_percent field as stale; no frozen file was modified.",
+    "decision": "Reject candidate for adoption: normal primary and all-cell allocator gates do not pass.",
+    "frozen_v1": {
+      "bytes": 26811,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-reduction-v1.json",
+      "sha256": "d613bb7e5e2cbb166271cbc68016df1ee04dd152622f3661cfa2e36ea3fa5d70"
+    },
+    "normal_primary": {
+      "bootstrap_lower95": 1.0072960075882962,
+      "passed": false,
+      "ratio_baseline_over_candidate_p50": 1.0087322250031896,
+      "required_ratio": 1.05,
+      "route": "generic_read_at"
+    },
+    "terminal": {
+      "bytes": 1503,
+      "path": "/home/zhuhe/litchi-performance-0935/reduce-corrected-tool-terminal-v1.json",
+      "sha256": "c5865815ba6a0c5872a3fd08b5fca5b2a00bf761af5d197c00a5b53f135765cb"
+    }
+  },
+  "replay": {
+    "canonical": {
+      "status": "passed",
+      "summary": {
+        "bytes": 26811,
+        "path": "/home/zhuhe/litchi-performance-0935/replay-summary-v1.json",
+        "sha256": "d613bb7e5e2cbb166271cbc68016df1ee04dd152622f3661cfa2e36ea3fa5d70"
+      },
+      "terminal": {
+        "bytes": 846,
+        "path": "/home/zhuhe/litchi-performance-0935/replay-tool-terminal-v2.json",
+        "sha256": "34489530c7453d4b2f4a63ae845f91755d03fd8326ad1fac4cdb53638d4c97af"
+      }
+    },
+    "canonical_metrics_normalized_sha256": "2733a9892412e0d075451ff9e1f65180501b62c49db67f7a25a02ec2678f240c",
+    "moved": {
+      "comparison": {
+        "bytes": 917,
+        "path": "/home/zhuhe/litchi-performance-0935/moved-replay-comparison-v1.json",
+        "sha256": "e24eacdaa455365ef009d36a0b5f1e96effb4ea808d99cf0e30d8e79ef1c8837"
+      },
+      "comparison_note": "Top-level packet path differs; normalized metrics digest matches.",
+      "file_count": 521,
+      "manifest": {
+        "bytes": 55085,
+        "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1-moved/manifest.json",
+        "sha256": "7fa1ae4bc9a653419b1db1fd01b62731753281e302f9064ee02535700df786f8"
+      },
+      "metrics_byte_identical": true,
+      "packet_bytes": 4343014,
+      "packet_path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1-moved",
+      "status": "passed",
+      "summary": {
+        "bytes": 26817,
+        "path": "/home/zhuhe/litchi-performance-0935/moved-replay-summary-v1.json",
+        "sha256": "4ee82e73bc7831f0a302acf74c449150b0896a268d6ba7328e1135c7763667ff"
+      },
+      "terminal": {
+        "bytes": 1057,
+        "path": "/home/zhuhe/litchi-performance-0935/moved-replay-terminal-v1.json",
+        "sha256": "a8fa4e970f563042bf08aae27c0a4a6c97273635d0510d12603fbb69b6bfae28"
+      }
+    }
+  },
+  "schema": "litchi.performance.0935.comparison-postcapture-validation.v1",
+  "scope": "Offline reduction, canonical replay, moved-packet replay, and checker-attempt custody after the single frozen 72-child capture.",
+  "status": "completed_candidate_rejected"
+}

@@ -1,0 +1,65 @@
+{
+  "schema": "litchi.performance.0935.docx-inventory-fragment-test-design.v3",
+  "change": "0935",
+  "created_utc": "2026-10-06T18:04:17.840406502Z",
+  "status": "baseline_corrected_pass; candidate_filtered_run_pending",
+  "test_source": {
+    "path": "crates/litchi-docx/src/section/fragment_reuse_tests.rs",
+    "bytes": 9436,
+    "sha256": "a77538860f4a786290ea1ef5555acf6a29081833a8fdd5e2e4049889dbd70e5b",
+    "supersedes_v2_sha256": "96adeebb179ff3c6621640c96a441479e7653819f3b1a09cce423f21f83cfbd0",
+    "registration_sha256": "ba6950d7913f55c8f9097dbdca774006f191ef0577cccf2f13a4ba50ff2ccc81"
+  },
+  "baseline_corrected": {
+    "name": "baseline-newbehavior-v2",
+    "cwd": "/home/zhuhe/litchi-performance-0935/baseline-source",
+    "argv": ["cargo", "+1.95.0", "test", "--offline", "--locked", "-j2", "-p", "litchi-docx", "--lib", "inventory_reuse"],
+    "env": {"CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0935/quality-target"},
+    "start_utc": "2026-10-06T18:00:09.889967+00:00",
+    "end_utc": "2026-10-06T18:00:18.598809+00:00",
+    "elapsed_seconds": 8.708845859015128,
+    "exit": 0,
+    "tests": {"passed": 6, "failed": 0, "ignored": 0, "filtered": 1239},
+    "terminal_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-v2-terminal.json",
+      "bytes": 1009,
+      "sha256": "a82678bcade9bacb024f34b9440b0736eaed1d43a3f9ee8f24cadac935c8e344"
+    },
+    "stdout": {
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-v2-stdout.log",
+      "bytes": 776,
+      "sha256": "812ef60a33e6511707dfc39968ec9184d46ea5f4cd8bf88215b96ce1c5378c40"
+    },
+    "stderr": {
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-v2-stderr.log",
+      "bytes": 305,
+      "sha256": "09e922422f62fe48b671fd47a276ae2ec811470c254dce4908e745f6c38ae67c"
+    }
+  },
+  "historical_baseline_failure": {
+    "terminal_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0935/quality/baseline-newbehavior-terminal.json",
+      "bytes": 912,
+      "sha256": "419cb7aba74d515005a00f9d011e42dca6648894db6ea17e58dcde6347984440"
+    },
+    "exit": 101,
+    "tests": {"passed": 4, "failed": 2, "ignored": 0, "filtered": 1239},
+    "cause": "The old oracle compared Inventory after MCE preprocessing with direct Section parsing. Unknown Word 2012 content was stripped by Inventory, so the expected footnote and inherited-ignorable errors were invalid."
+  },
+  "oracle_correction": {
+    "footnote_order": "The combined retained-extension case now compares with a footnote-only Inventory oracle through the same MCE pipeline; PreserveElements retains the extension for focused validation.",
+    "mce_controls": "Inherited mc:Ignorable Word 2012 content is expected to be admitted after MCE removal; a non-ignorable Word 2012 extension remains the refusal control.",
+    "coverage": ["raw depth before footnote", "reference preflight", "namespace/tolerance offsets", "public lazy semantic validation", "MCE and explicit-zero footnote controls"]
+  },
+  "source_copy_incident": {
+    "paths": [
+      "/home/zhuhe/litchi-performance-0935/baseline-source/crates/litchi-docx/src/section/fragment_reuse_tests.rs",
+      "/home/zhuhe/litchi-performance-0935/candidate-source/crates/litchi-docx/src/section/fragment_reuse_tests.rs"
+    ],
+    "sha256": "a77538860f4a786290ea1ef5555acf6a29081833a8fdd5e2e4049889dbd70e5b",
+    "bytes": 9436,
+    "copied_utc": "2026-10-06T18:00:03.388+00:00",
+    "note": "The corrected test-only file was copied into both immutable build source trees while the v2 build activity was already in progress; this was not before all builds. No production file was changed, no old test backup existed, and no quality-* source copies were created. The registration was also test-only and hash-bound above."
+  },
+  "scope": "Test design and one corrected baseline filtered run only; no candidate filtered run is claimed here, and no production source was edited by this receipt update."
+}

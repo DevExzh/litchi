@@ -1,0 +1,190 @@
+{
+  "build_receipts": {
+    "baseline_allocator_retained": {
+      "bytes": 5191,
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+      "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+    },
+    "baseline_normal_retained": {
+      "bytes": 5502,
+      "path": "/home/zhuhe/litchi-performance-0935/receipts/baseline-normal-retained-v3.json",
+      "sha256": "b815b9601794f06c27dea8f6992ee39529896baf07c914e0b069cd6d00ac6a84"
+    },
+    "candidate_allocator": {
+      "bytes": 5717,
+      "path": "/home/zhuhe/litchi-performance-0935/receipts/allocator-build-final-v3.json",
+      "sha256": "427ae8b4a158ad022c76ff8f50d1b8071bb329a201995b4a75f6b3328c14969d"
+    },
+    "candidate_normal": {
+      "bytes": 5570,
+      "path": "/home/zhuhe/litchi-performance-0935/receipts/normal-build-final-v3.json",
+      "sha256": "a100952940724e1a54ff4b70dcd883489f62e6c6d9d5868340a13f2f542fba0f"
+    },
+    "retained_allocator_equivalence": {
+      "bytes": 1878,
+      "path": "/home/zhuhe/litchi-performance-0935/receipts/retained-allocator-equivalence-v3.json",
+      "sha256": "858c3ea557488844e860f7326a8c27e3297e64feda8b4999afd205c93f0f70fa"
+    }
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0935/comparison-runner.py check-schedule",
+    "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0935/comparison-runner.py freeze --manifest /home/zhuhe/litchi-performance-0935/formal-manifest-unauthorized-v7.json ...",
+    "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0935/comparison-runner.py controls --manifest /home/zhuhe/litchi-performance-0935/formal-manifest-unauthorized-v7.json --output /home/zhuhe/litchi-performance-0935/controls-v6.json"
+  ],
+  "compiler_metadata": {
+    "bytes": 8571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/compiler-metadata-v1.json",
+    "sha256": "dc11fa2e6ea7d21c4c4e6dda900baf4df2efeded21e8072813b304aab2aca20b"
+  },
+  "control_results": {
+    "capture_started": false,
+    "document_children_started": 0,
+    "manifest": {
+      "bytes": 52083,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-manifest-unauthorized-v7.json",
+      "sha256": "151a840075831e24668ea2bd4149ac9e908a0228f5283a7a598157debe9c5dfb"
+    },
+    "runner": {
+      "bytes": 81843,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/comparison-runner.py",
+      "sha256": "38a07041be26082aa429faae45a3cbac5a960ae4fb30e926e3e4f898f08ee92b"
+    },
+    "schedule_sha256": "0ac8e13ff21de9d86e8eef800de34ce2f9417e44bae6897c5f0e94bb9003865c",
+    "schema": "litchi.performance.0935.formal-runner-controls.v1",
+    "status": "passed",
+    "tests": {
+      "allocator_source_revision_binding": {
+        "passed": true,
+        "source_revision": "df394db17dd441aa763548ac1f1242343201b84a"
+      },
+      "allocator_validation_and_negative": {
+        "passed": true,
+        "rejected_observer_invalid": true,
+        "report": {
+          "bytes": 7376,
+          "path": "/home/zhuhe/litchi-performance-0933/formal-packet-v1/children/allocator-section-08192-shared_snapshot_clones-rep-01-candidate/report.json",
+          "sha256": "4cc72e725cc061f7cea7e4219c79f870bd496307725582b2db3c36d8428b7f8e"
+        }
+      },
+      "copied_validator_resolution": {
+        "bytes": 39792,
+        "passed": true,
+        "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+      },
+      "exclusive_receipt": {
+        "passed": true,
+        "sha256": "363c528a76416c5fc1e04a411cc18d9ccbf0c5c02d8020063a5860cbe361fdb6"
+      },
+      "process_group_closure": {
+        "passed": true,
+        "probes": 1
+      }
+    }
+  },
+  "controls": {
+    "bytes": 1617,
+    "path": "/home/zhuhe/litchi-performance-0935/controls-v6.json",
+    "sha256": "eb50cbfce01d58989fe62bd455120702df668d19aee39b8d0630a628cc5bc6ad"
+  },
+  "created_utc": "2026-10-06T18:16:59.649922+00:00",
+  "gate": {
+    "allocator_calls_must_strictly_reduce": true,
+    "allocator_peak_rss_review_threshold": 0.05,
+    "allocator_requested_bytes_reduction_each_cell_at_least": 0.1,
+    "bootstrap_draws": 10000,
+    "bootstrap_lower_95_strictly_greater_than": 1.0,
+    "bootstrap_seed": 935,
+    "correctness_required": true,
+    "normal_median_ratio_minimum": 1.05,
+    "normal_primary": "generic_read_at",
+    "normal_ratio": "baseline_p50 / candidate_p50"
+  },
+  "history": {
+    "v1_build_setup_failures": [
+      {
+        "bytes": 1350,
+        "path": "/home/zhuhe/litchi-performance-0935/builds/candidate-normal-v1/setup-failure-v1.json",
+        "sha256": "86d4a3d54a9a41fb75c3ac2522397de4ae499b745c35c077682a496ddc0ea84d"
+      },
+      {
+        "bytes": 1411,
+        "path": "/home/zhuhe/litchi-performance-0935/builds/candidate-allocator-v1/setup-failure-v1.json",
+        "sha256": "64e057c3c573c20aa8ce030d6c19605ec8ecc0c4eb59a9d25b0fcce11d209361"
+      }
+    ],
+    "v2_source_contamination": "v2 cargo terminal exits were 0 but test-only overlay changed from SHA56e2317f... to SHAa7753886 during build; v2 terminals/binaries preserved externally and superseded by v3 source/final builds",
+    "v3_final_builds": {
+      "allocator_terminal": {
+        "bytes": 1915,
+        "path": "/home/zhuhe/litchi-performance-0935/builds/candidate-allocator-v3/terminal.json",
+        "sha256": "4aa5d82ab950fe47d85560ab778bec937f6fc79d5f79bde862467b1c88b1779c"
+      },
+      "normal_terminal": {
+        "bytes": 1827,
+        "path": "/home/zhuhe/litchi-performance-0935/builds/candidate-normal-v3/terminal.json",
+        "sha256": "7e77b86ea4a0f753579662e08294a5a2bf3e1e95c358ea31a3af673aa7cd8a33"
+      }
+    }
+  },
+  "independent_checker": {
+    "bytes": 36634,
+    "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v1.py",
+    "sha256": "66f93811cd4ba5c22a49246a40ef47293972bca34d02c8ce38e98bfa9ef9b535"
+  },
+  "independent_checker_descriptor": {
+    "bytes": 2159,
+    "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v1-descriptor.json",
+    "sha256": "fc8d9ba69bfe72dfbd03de56fd71f25c67e4c7d42e05df12f9d731d1524a134d"
+  },
+  "manifest": {
+    "bytes": 52083,
+    "path": "/home/zhuhe/litchi-performance-0935/formal-manifest-unauthorized-v7.json",
+    "sha256": "151a840075831e24668ea2bd4149ac9e908a0228f5283a7a598157debe9c5dfb"
+  },
+  "runner": {
+    "bytes": 81843,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/comparison-runner.py",
+    "sha256": "38a07041be26082aa429faae45a3cbac5a960ae4fb30e926e3e4f898f08ee92b"
+  },
+  "schedule": {
+    "allocator_children": 24,
+    "allocator_ownership": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "allocator_repetitions_per_cell_per_version": 3,
+    "allocator_sections": [
+      16,
+      8192
+    ],
+    "blocks": 6,
+    "children": 72,
+    "normal_children": 48,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "samples": 50,
+    "schedule_sha256": "0ac8e13ff21de9d86e8eef800de34ce2f9417e44bae6897c5f0e94bb9003865c",
+    "warmups": 5
+  },
+  "schema": "litchi.performance.0935.comparison-tooling-validation.v1",
+  "source_binding": {
+    "bytes": 12069,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0935/source-binding-v3.json",
+    "sha256": "e2b6d7a6dbf9b6060c970ce8813695a2a4efd0ff6ba53891e27b72bb95a0ad15"
+  },
+  "source_differential": {
+    "bytes": 8257,
+    "path": "/home/zhuhe/litchi-performance-0935/source-snapshot-differential-v4.json",
+    "sha256": "f55003b2e6e7dfebe48b3eeada21a99fd890284d15a51590f8cab9706ff92e81"
+  },
+  "source_manifest": {
+    "bytes": 5675286,
+    "path": "/home/zhuhe/litchi-performance-0935/source-manifest-v4.jsonl",
+    "sha256": "72c529b5b6d1c082ed9973e2561b2c225125805ee955502657ee9fa1dab58016"
+  },
+  "status": "prospective_tooling_validated_capture_not_authorized"
+}

@@ -1,0 +1,251 @@
+{
+  "adr_scope": {
+    "applicable_non_iwork": [
+      "0001",
+      "0002",
+      "0003",
+      "0004",
+      "0005",
+      "0006",
+      "0007",
+      "0008",
+      "0010",
+      "0011",
+      "0024",
+      "0030",
+      "0031",
+      "0032"
+    ],
+    "constraints": [
+      "lossless preservation and typed refusal precede speed",
+      "private reuse cannot change public API, lazy semantic timing, source identity, or error order",
+      "all resource/cancellation/size limits remain bounded and fail closed",
+      "allocation and latency evidence must be representative, paired, and hash-bound",
+      "iWork-only amendments/records are outside this DOCX measurement scope"
+    ],
+    "readme": "docs/adr/README.md"
+  },
+  "allocator_lane": {
+    "children": 24,
+    "concurrent_commits": 8,
+    "cpu": "12",
+    "deadline_seconds": 600,
+    "metric_scope": "Whole-process allocator gauges and max RSS; construction deltas are after_snapshot_drop absolute allocated_bytes/allocation_calls minus baseline, not absolute process totals.",
+    "ownership": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "pair_unit": "same sections, ownership, and repetition; version order alternates by repetition",
+    "policy": "exact",
+    "raw_held_across_footnote_focus": "Retain after_snapshot_drop, commits_retained, releaseN-1, release_last, and drop gauges so raw-source retention across footnote/section work is visible; do not infer a phase attribution from these checkpoints.",
+    "repetitions_per_cell_per_version": 3,
+    "required_metrics": [
+      "baseline and every checkpoint gauges",
+      "construction_requested_bytes_delta",
+      "construction_allocation_calls_delta",
+      "region_peak_live_bytes at creation/release endpoints",
+      "max RSS from terminal time record",
+      "logical retained base bytes",
+      "source sharing/validation counters"
+    ],
+    "samples_per_child": 1,
+    "secondary_allocation_gate": {
+      "construction_allocation_calls": "strictly lower in every cell",
+      "construction_requested_bytes_reduction_each_cell_at_least": 0.1,
+      "correctness_and_counter_gates": "all pass",
+      "memory_guardrail": "peak live bytes and max RSS increases >5% require resolution; no memory claim is accepted with an unresolved increase",
+      "peak_live_comparison": "Compare observer absolute peak_live_bytes at the same named phase between versions; retain live/retained values separately and never report a baseline-subtracted peak as absolute peak live."
+    },
+    "sections": [
+      16,
+      8192
+    ],
+    "warmups_per_child": 0
+  },
+  "change": "0935",
+  "corpus_and_correctness": {
+    "allocator_fixtures": {
+      "16": {
+        "required_retained_base_bytes": 7280,
+        "source_archive_bytes": 1052,
+        "source_archive_sha256": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726"
+      },
+      "8192": {
+        "required_retained_base_bytes": 3580192,
+        "source_archive_bytes": 25498,
+        "source_archive_sha256": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3"
+      }
+    },
+    "normal": {
+      "archive_bytes": 2101427,
+      "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+      "expected_output_bytes": 2101446,
+      "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+    },
+    "required_report_contracts": [
+      "schema docx_section_retention_v1",
+      "exact source/output/inverse/shape identity",
+      "boundary checks verified",
+      "overflowed=false and observer_invalid=false",
+      "monotone allocator gauges and live-byte conservation",
+      "region peak is present at creation/release endpoints and absent at commits_retained",
+      "returned_to_baseline=true and final live bytes equal baseline",
+      "shared/independent source sharing and measured validation counts match frozen fixtures"
+    ]
+  },
+  "created_utc": "2026-10-06T17:48:31.354685+00:00",
+  "evidence_policy": "No benchmark binary or artifact >=1 MiB is written under docs/performance/results. Repository receives only compact plans/receipts; raw packet, source listing, profiles, logs, and binaries stay under /home/zhuhe/litchi-performance-0935.",
+  "failure_and_replay": {
+    "failed_child": "preserve terminal, streams, report, and validation; invalidate interpretation rather than replacing the child",
+    "large_artifacts": "all raw reports, logs, source listing, profiles, and archives remain external with size/SHA/regeneration descriptors",
+    "moved_replay": "rehash copied source/build/runner/manifest/report/terminal/stream descriptors and recompute summaries from relative packet paths",
+    "observation_timeout": "poll the same process; only confirmed deadline may terminate it",
+    "packet": "/home/zhuhe/litchi-performance-0935/formal-packet-v1",
+    "retry_or_recapture": false,
+    "terminal_first": true
+  },
+  "normal_lane": {
+    "blocks": 6,
+    "children": 48,
+    "cpu": "12",
+    "deadline_seconds": 900,
+    "no_selective_recapture": true,
+    "normal_guardrails": "candidate_p50 / baseline_p50 <=1.05 for every route; p95/p99/spread and max RSS increases >5% are review flags",
+    "optional_latency_gate": "generic_read_at ratio >=1.05 with nearest-rank bootstrap lower 95% >1.0; seed 935, 10000 paired draws",
+    "pair_unit": "same route, block, and position; version order alternates by block",
+    "primary_statistic": "baseline_p50 / candidate_p50",
+    "route_order_even": [
+      "range_short",
+      "owned_reader",
+      "owned_vec",
+      "generic_read_at"
+    ],
+    "route_order_odd": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "samples_per_child": 50,
+    "selector_env": "LITCHI_DOCX_INGRESS_ROUTE",
+    "warmups_per_child": 5
+  },
+  "planned_commands": {
+    "candidate_allocator_build": "env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS=\"-C force-frame-pointers=yes\" cargo +1.95.0 build --offline --locked -j2 --release --features allocator-metrics --bin litchi-perf-baseline-alloc --manifest-path /home/zhuhe/litchi-performance-0935/candidate-source/tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0935/target-candidate-allocator",
+    "candidate_normal_build": "env -u CARGO_ENCODED_RUSTFLAGS cargo +1.95.0 build --offline --locked -j2 --release --bin litchi-perf-baseline --manifest-path /home/zhuhe/litchi-performance-0935/candidate-source/tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0935/target-candidate-normal",
+    "capture": "Not authorized by this plan; only after source/build review and a root-authorized immutable manifest.",
+    "normal_baseline_reuse": "Revalidate retained 0933 candidate-normal binary/source/runtime closure against current HEAD df394db; do not rebuild before source review."
+  },
+  "purpose": "Measure the private inventory raw-parse reuse candidate against the retained 0933 candidate as a freshly bound baseline, with normal latency controls and allocator/live-memory evidence.",
+  "reusable_tooling": {
+    "adaptation": "Only 0935 identifiers, current HEAD label, external root, and repository-root resolution were adapted. No capture/build command was run; the 0933 hard-coded runtime allowlist remains provisional until source review.",
+    "adapted_runner": {
+      "bytes": 80656,
+      "path": "/home/zhuhe/litchi-performance-0935/comparison-runner-0935-v1.py",
+      "sha256": "9f403e2f447d9fd6e484e34afbd2991430d17080ec246f789e75a0c8027d16b5",
+      "status": "inert template only; source allowlist/build receipts/manifest must be refreshed after candidate review"
+    },
+    "origin_runner": {
+      "bytes": 80681,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0933/comparison-formal-runner-v2.py",
+      "sha256": "cd0abdb5e9b6656ec52d3e6b9e8d1f3c9bc5ffb298a1ccd40dac8463c35e3f53"
+    },
+    "validator_origin": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  },
+  "review_requirements_before_freeze": [
+    "candidate source review and exact changed-path allowlist",
+    "revalidation of both retained baseline binaries against current HEAD df394db",
+    "fresh candidate normal/allocator release receipts with actual terminal status, compiler/profile/lock/fingerprint bindings",
+    "preflight correctness and negative controls for source/output/allocator counters/peak/RSS identity",
+    "final manifest hash and auditor approval"
+  ],
+  "schema": "litchi.performance.0935.comparison-plan.v1",
+  "scope": {
+    "builds_started": false,
+    "captures_started": false,
+    "claims_withheld_until_replay": "All latency, allocation, RSS, and adoption claims remain withheld until source/build custody, correctness, terminal records, and moved-packet replay pass.",
+    "hypothesis": "Reusing the private inventory raw parse should reduce repeated section codec parsing and temporary snapshot ownership while preserving the independent footnote grammar pass, public semantics, authored bytes, lazy/public timing, limits, and atomic publication.",
+    "iwork": "excluded",
+    "production_edits_by_tooling_owner": false
+  },
+  "source_binding": {
+    "baseline_identity": "retained 0933 candidate binaries are the baseline only after explicit runtime/source equivalence is revalidated against current HEAD df394db; their original build identity remains 3ae856d76424f2f9b58d26dcd20fd074b8e97541.",
+    "baseline_runtime_equivalence_context": {
+      "head_transition_check": {
+        "changed_path_count": 10,
+        "from": "5f05944e9994a4cc1b387823c503fbab8650aca3",
+        "must_rehash_before_freeze": true,
+        "runtime_paths_changed": false,
+        "to": "df394db17dd441aa763548ac1f1242343201b84a"
+      },
+      "prior_0934_binding": {
+        "bytes": 7580,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/independent-source-binding-v1.json",
+        "sha256": "6b69121e6cadef6d35c20d13dab714c93f401896c721ac9a36fbe9e5a9caf657"
+      },
+      "prior_binding_scope": "0934 bound the retained 0933 candidate runtime/harness paths to 5f05944e9994a4cc1b387823c503fbab8650aca3."
+    },
+    "candidate_source": {
+      "changed_runtime_paths": "pending candidate review; do not infer an allowlist from 0933",
+      "full_listing": "/home/zhuhe/litchi-performance-0935/candidate-source-list.jsonl (external; retain only descriptor in repo)",
+      "patch": "pending final reviewed patch",
+      "required_binding": "exact base revision, reviewed patch identity, complete source listing, build receipt, binary SHA, compiler/profile/lock/fingerprint parity",
+      "source_receipt": "pending final source review",
+      "source_root": "/home/zhuhe/litchi-performance-0935/candidate-source"
+    },
+    "current_head": "df394db17dd441aa763548ac1f1242343201b84a",
+    "retained_baseline_binaries": {
+      "allocator": {
+        "build_receipt": {
+          "bytes": 5191,
+          "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+          "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+        },
+        "bytes": 68448792,
+        "path": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+        "sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9"
+      },
+      "normal": {
+        "build_receipt": {
+          "bytes": 5043,
+          "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_normal-final-v3.json",
+          "sha256": "a35598df8461002c7acfcad7c7677e8684c3bfe4a29295df88a8ab51a006cf54"
+        },
+        "bytes": 69934624,
+        "path": "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline",
+        "sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66"
+      }
+    }
+  },
+  "status": "prospective_only_pending_candidate_source_review",
+  "toolchain_and_environment": {
+    "allocator_flags": "RUSTFLAGS=-C force-frame-pointers=yes, CARGO_ENCODED_RUSTFLAGS unset",
+    "cargo_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "cpu": "12",
+    "env_allowlist": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    },
+    "external_root": "/home/zhuhe/litchi-performance-0935",
+    "inherited_environment": "not captured; only the allowlisted effective child environment is permitted",
+    "jobs": 2,
+    "normal_flags": "no RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS unset",
+    "offline_locked": true,
+    "profile": "release",
+    "repository_binaries": "none",
+    "rustc": "1.95.0 via cargo +1.95.0"
+  }
+}
