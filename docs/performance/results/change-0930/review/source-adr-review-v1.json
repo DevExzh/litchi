@@ -1,0 +1,69 @@
+{
+  "schema": "litchi.performance.0930.source-adr-review.v1",
+  "review_scope": "static read-only review of current worktree DOCX section-layout retention/reuse implementation; no build, test, capture, or source edit performed",
+  "review_status": "approved",
+  "review_basis": {
+    "git_diff_check": "clean for five reviewed source/test files",
+    "source_ranges": {
+      "source_backed_snapshot_helper": "crates/litchi-docx/src/source_backed.rs:2116-2167",
+      "snapshot_reuse_and_commit_retention": "crates/litchi-docx/src/section/layout.rs:88-104,132-137,434-525",
+      "inventory_weight": "crates/litchi-docx/src/section/inventory.rs:394-441",
+      "tolerance_weight": "crates/litchi-docx/src/leniency.rs:838-860",
+      "integration_coverage": "crates/litchi-docx/tests/source_backed_sections.rs:606-633,908-1033",
+      "formal_gate": "docs/performance/results/change-0930/comparison-formal-gate-correction-v1.json"
+    }
+  },
+  "verdicts": {
+    "exact_xml_and_limits_reuse": "pass",
+    "fresh_full_fingerprint_and_fences": "pass",
+    "patch_authorization_order_before_output": "pass",
+    "retained_weight_field_coverage": "pass_as_logical_accounting",
+    "cap_and_release_fallback": "pass",
+    "noop_target_reuse": "pass",
+    "formal_gate_correction": "pass_authoritative_file_only"
+  },
+  "evidence": [
+    "Publication captures source version, reads the current main XML, computes the complete SourceArtifact fingerprint, then reuses only when current XML bytes and Limits are exactly equal.",
+    "The post-read source-version fence and existing Commit/Patch byte, lineage, revision, artifact-fingerprint, and Limits authorization run before the writer receives output.",
+    "Inventory accounting covers descriptor arrays, column Vec capacities, header/footer slices and relationship String capacities, source-span binding arrays and nested Vec capacities, Arc headers, and tolerance report/vector/location payloads.",
+    "Changed commits retain the source base only when checked weight is nonzero and within the caller cap; zero cap, overflow, over-cap, detached source, or explicit release use the existing parse path. No-op commits retain the projected snapshot and reuse it after normal authorization.",
+    "The formal correction defines baseline_p50/candidate_p50, with values greater than one meaning candidate speedup, and remains prospective pending a fresh formal cohort."
+  ],
+  "conditional_documentation_fix": {
+    "severity": "low",
+    "path": "crates/litchi-docx/src/section/layout.rs",
+    "issue": "Snapshot::retained_bytes adds size_of::<Snapshot>(), while Commit always contains the inline Option<Snapshot> field even when no base is retained. The Commit docs say the fixed inline Option field is outside the estimate while also saying the snapshot owner is included.",
+    "required_resolution": "Either remove the inline owner size from the incremental retained-weight value, or state explicitly that this is a logical total including the already-present owner and revise the fixed-field sentence. Keep the cap/release behavior unchanged.",
+    "code_impact": "No semantic, authorization, or output correctness issue; the wording-only clarification is accepted.",
+    "status": "resolved_by_wording_only",
+    "resolution": "The current layout.rs wording now identifies the Snapshot owner as a logical charge and separately excludes the always-present inline Option slot from the conditional retention estimate."
+  },
+  "adr_matrix": [
+    {
+      "adr": "0003",
+      "topic": "immutable snapshots, full commit validation, exact patches, no-op behavior",
+      "result": "satisfied: target is fully parsed/read back at commit; publication uses exact bytes and existing auth; no-op returns current clone and can reuse the already-held target inventory"
+    },
+    {
+      "adr": "0005",
+      "topic": "positional source freshness, bounded limits, declared retained state, release and recomputation fallback",
+      "result": "satisfied with wording condition: full fingerprint/version fences and equal Limits are enforced; cap is observable; release and over-cap fall back without changing results; weight is logical rather than RSS"
+    },
+    {
+      "adr": "0031",
+      "topic": "execution-context budget boundary",
+      "result": "satisfied for this route: managed cache-backed sources are refused before section-layout editing; no new managed-budget claim is made"
+    }
+  ],
+  "sha256": {
+    "crates/litchi-docx/src/leniency.rs": "32d64ea50aa802b2a98e8ad8fb09d0268137c32c835281c240c5985557409642",
+    "crates/litchi-docx/src/section/inventory.rs": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99",
+    "crates/litchi-docx/src/section/layout.rs": "2a5849c277728e428fc060983f0facd3be26503f5a98337decc92d7e684024f4",
+    "crates/litchi-docx/src/source_backed.rs": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d",
+    "crates/litchi-docx/tests/source_backed_sections.rs": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0",
+    "docs/adr/0003-snapshots-edits-and-patches.md": "9200d3546d91f1604d44a9ade7ad0a6bdea50b6442d12a0517b09db5e8e802ef",
+    "docs/adr/0005-io-memory-and-performance.md": "8279fd2dc0b074aa104bf0c83df6187d12e18756cd8c8d7f25750b2a997cb0aa",
+    "docs/adr/0031-execution-context-budgets.md": "ce7e16baa101cfdd8abfc6d606dc0a56fad6d86cc79eba997d338f919a063eb3",
+    "docs/performance/results/change-0930/comparison-formal-gate-correction-v1.json": "b3b0909aade06d4d42a9484135346ed6e20fb212567198af7be98331521937f8"
+  }
+}

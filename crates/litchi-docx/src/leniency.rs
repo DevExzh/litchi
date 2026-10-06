@@ -91,6 +91,8 @@
 //! apply the same repairs; the document-level accessor over the same part
 //! enumerates them.
 
+use std::mem::size_of;
+
 /// Upper bound on individually recorded defects.
 ///
 /// A hostile or merely enormous part must not be able to make the report grow
@@ -833,6 +835,31 @@ impl ToleranceReport {
         self.defects.len() as u64 + u64::from(self.unrecorded)
     }
 
+    /// Estimate the report's retained payload and nested location strings.
+    /// This is a checked accounting value, not a physical allocator or RSS
+    /// measurement.
+    pub(crate) fn retained_bytes(&self) -> Option<usize> {
+        let mut bytes = self
+            .defects
+            .capacity()
+            .checked_mul(size_of::<ToleratedDefect>())?
+            .checked_add(size_of::<Self>())?;
+        for defect in &self.defects {
+            let Some(location) = defect.location.as_deref() else {
+                continue;
+            };
+            bytes = bytes.checked_add(size_of::<PartLocation>())?;
+            bytes = bytes.checked_add(location.part.len())?;
+            if let Some(item) = location.item.as_deref() {
+                bytes = bytes.checked_add(item.len())?;
+            }
+            if let Some(value) = location.value.as_deref() {
+                bytes = bytes.checked_add(value.len())?;
+            }
+        }
+        Some(bytes)
+    }
+
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
     pub(crate) fn record(&mut self, defect: impl Into<Defect>, context: u64) {
         self.push(ToleratedDefect {
@@ -925,6 +952,37 @@ mod tests {
         assert!(report.is_clean());
         assert_eq!(report.total(), 0);
         assert!(report.defects().is_empty());
+    }
+
+    #[test]
+    fn retained_bytes_counts_capacity_and_locations() {
+        let mut without_location = ToleranceReport::default();
+        without_location
+            .defects
+            .try_reserve_exact(4)
+            .expect("test reservation");
+        without_location.record(TextDefect::SkippedForeignMarkup, 7);
+
+        let with_location = ToleranceReport {
+            defects: vec![ToleratedDefect {
+                defect: Defect::Text(TextDefect::SkippedForeignMarkup),
+                context: 7,
+                location: Some(Box::new(PartLocation {
+                    part: "word/document.xml".into(),
+                    item: Some("rId1".into()),
+                    value: Some("repaired".into()),
+                })),
+            }],
+            unrecorded: 0,
+        };
+
+        assert!(
+            without_location.retained_bytes().unwrap()
+                >= size_of::<ToleranceReport>() + 4 * size_of::<ToleratedDefect>()
+        );
+        assert!(
+            with_location.retained_bytes().unwrap() > without_location.retained_bytes().unwrap()
+        );
     }
 
     #[test]

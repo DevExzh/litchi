@@ -1,0 +1,537 @@
+{
+  "build": {
+    "binary": {
+      "bytes": 70187352,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "build_receipt": {
+      "bytes": 3137,
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "lock_hashes": {
+      "root_cargo_lock": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+      "rustfmt_toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+      "tools_perf_baseline_cargo_lock": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "profile": "release",
+    "toolchain": "rustc/cargo +1.95.0"
+  },
+  "claim_scope": "descriptive normal-release baseline precheck only; no candidate comparison, ranking, adoption, or formal timing claim",
+  "corpus": {
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+  },
+  "created_utc": "2026-10-06T13:26:28.787756+00:00",
+  "executed_plan": {
+    "bytes": 8242,
+    "path": "/tmp/litchi-performance-0930/plan-v1.json",
+    "sha256": "a62e79dfcfd0ca0872bf2b2f0237929a9065c00c0f3e2cb54b6b8b845032d6f0"
+  },
+  "independent_audit": {
+    "bytes": 36222,
+    "path": "/tmp/litchi-performance-0930/baseline-precheck-audit.json",
+    "sha256": "70945ce3ef5f79504d67379dc5c902228a42e7916482e6f53a2121c5f3a055ee"
+  },
+  "independent_audit_script": {
+    "bytes": 8651,
+    "path": "/tmp/litchi-performance-0930/audit-baseline-precheck.py",
+    "sha256": "cef7eb810bcd404e9196885184a34a6e8335dbc40d83d98c850b3bcb713cf071"
+  },
+  "packet_root": "/tmp/litchi-performance-0930/baseline-precheck",
+  "packet_summary": {
+    "bytes": 89551,
+    "path": "/tmp/litchi-performance-0930/baseline-precheck/summary.json",
+    "sha256": "fdec259d875b15eb1cedbc1bec04051cfab133f656ff47b377ca40de10490748"
+  },
+  "prospective_formal_gate_correction": {
+    "bytes": 8797,
+    "path": "/tmp/litchi-performance-0930/plan-v1-formal-correction-v1.json",
+    "sha256": "b3b0909aade06d4d42a9484135346ed6e20fb212567198af7be98331521937f8"
+  },
+  "raw_evidence_policy": "raw reports, logs and per-child receipts remain external; this repository receipt contains only compact descriptors and scalar summaries",
+  "replay_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B /tmp/litchi-performance-0930/audit-baseline-precheck.py",
+  "repository_bindings": {
+    "executed_plan": {
+      "bytes": 8242,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-plan-v1.json",
+      "sha256": "a62e79dfcfd0ca0872bf2b2f0237929a9065c00c0f3e2cb54b6b8b845032d6f0"
+    },
+    "formal_gate_correction": {
+      "bytes": 8797,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-gate-correction-v1.json",
+      "sha256": "b3b0909aade06d4d42a9484135346ed6e20fb212567198af7be98331521937f8"
+    }
+  },
+  "results": {
+    "all_reports_under_1MiB": true,
+    "all_rss_present": true,
+    "failed_children": 0,
+    "passed_children": 24,
+    "per_route": {
+      "generic_read_at": {
+        "children": [
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4559089,
+              "mean": 4485646.66,
+              "min": 4456888,
+              "p50": 4481738.5,
+              "p95": 4515008.0,
+              "p99": 4559089.0
+            },
+            "id": "baseline-precheck-block-01-01-generic_read_at",
+            "rss_bytes": 37109760
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4533488,
+              "mean": 4505229.0,
+              "min": 4487958,
+              "p50": 4501903.0,
+              "p95": 4532099.0,
+              "p99": 4533488.0
+            },
+            "id": "baseline-precheck-block-02-04-generic_read_at",
+            "rss_bytes": 37367808
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4535438,
+              "mean": 4499552.62,
+              "min": 4476928,
+              "p50": 4499018.5,
+              "p95": 4524519.0,
+              "p99": 4535438.0
+            },
+            "id": "baseline-precheck-block-03-01-generic_read_at",
+            "rss_bytes": 37097472
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4538258,
+              "mean": 4486884.72,
+              "min": 4468879,
+              "p50": 4483328.0,
+              "p95": 4519488.0,
+              "p99": 4538258.0
+            },
+            "id": "baseline-precheck-block-04-04-generic_read_at",
+            "rss_bytes": 37376000
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4517179,
+              "mean": 4489052.48,
+              "min": 4472008,
+              "p50": 4487003.5,
+              "p95": 4506639.0,
+              "p99": 4517179.0
+            },
+            "id": "baseline-precheck-block-05-01-generic_read_at",
+            "rss_bytes": 37695488
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4513678,
+              "mean": 4484363.98,
+              "min": 4460538,
+              "p50": 4482763.0,
+              "p95": 4505098.0,
+              "p99": 4513678.0
+            },
+            "id": "baseline-precheck-block-06-04-generic_read_at",
+            "rss_bytes": 36814848
+          }
+        ],
+        "pooled_elapsed_ns": {
+          "count": 300,
+          "max": 4559089,
+          "mean": 4491788.243333333,
+          "min": 4456888,
+          "p50": 4490078.5,
+          "p95": 4519798.0,
+          "p99": 4533488.0
+        },
+        "raw_samples": 300,
+        "rss_bytes": {
+          "count": 6,
+          "max": 37695488,
+          "mean": 37243562.666666664,
+          "min": 36814848,
+          "p50": 37238784.0,
+          "p95": 37695488.0,
+          "p99": 37695488.0
+        }
+      },
+      "owned_reader": {
+        "children": [
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4058357,
+              "mean": 3860173.24,
+              "min": 3827726,
+              "p50": 3849861.0,
+              "p95": 3901016.0,
+              "p99": 4058357.0
+            },
+            "id": "baseline-precheck-block-01-03-owned_reader",
+            "rss_bytes": 37376000
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3866066,
+              "mean": 3836660.92,
+              "min": 3813196,
+              "p50": 3833615.5,
+              "p95": 3864085.0,
+              "p99": 3866066.0
+            },
+            "id": "baseline-precheck-block-02-02-owned_reader",
+            "rss_bytes": 37416960
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3927956,
+              "mean": 3848080.2,
+              "min": 3819026,
+              "p50": 3841076.0,
+              "p95": 3901686.0,
+              "p99": 3927956.0
+            },
+            "id": "baseline-precheck-block-03-03-owned_reader",
+            "rss_bytes": 37367808
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4088106,
+              "mean": 3841041.36,
+              "min": 3812486,
+              "p50": 3832040.5,
+              "p95": 3890686.0,
+              "p99": 4088106.0
+            },
+            "id": "baseline-precheck-block-04-02-owned_reader",
+            "rss_bytes": 37830656
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4053446,
+              "mean": 3833126.82,
+              "min": 3805346,
+              "p50": 3826380.5,
+              "p95": 3861586.0,
+              "p99": 4053446.0
+            },
+            "id": "baseline-precheck-block-05-03-owned_reader",
+            "rss_bytes": 37711872
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3924606,
+              "mean": 3846804.78,
+              "min": 3812885,
+              "p50": 3839670.0,
+              "p95": 3892775.0,
+              "p99": 3924606.0
+            },
+            "id": "baseline-precheck-block-06-02-owned_reader",
+            "rss_bytes": 37105664
+          }
+        ],
+        "pooled_elapsed_ns": {
+          "count": 300,
+          "max": 4088106,
+          "mean": 3844314.553333333,
+          "min": 3805346,
+          "p50": 3838531.0,
+          "p95": 3885326.0,
+          "p99": 4023596.0
+        },
+        "raw_samples": 300,
+        "rss_bytes": {
+          "count": 6,
+          "max": 37830656,
+          "mean": 37468160.0,
+          "min": 37105664,
+          "p50": 37396480.0,
+          "p95": 37830656.0,
+          "p99": 37830656.0
+        }
+      },
+      "owned_vec": {
+        "children": [
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3746316,
+              "mean": 3725552.12,
+              "min": 3708675,
+              "p50": 3724920.0,
+              "p95": 3739806.0,
+              "p99": 3746316.0
+            },
+            "id": "baseline-precheck-block-01-02-owned_vec",
+            "rss_bytes": 37150720
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3746075,
+              "mean": 3717151.1,
+              "min": 3699825,
+              "p50": 3717140.5,
+              "p95": 3736085.0,
+              "p99": 3746075.0
+            },
+            "id": "baseline-precheck-block-02-03-owned_vec",
+            "rss_bytes": 37101568
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3749205,
+              "mean": 3718217.52,
+              "min": 3702555,
+              "p50": 3715955.0,
+              "p95": 3739985.0,
+              "p99": 3749205.0
+            },
+            "id": "baseline-precheck-block-03-02-owned_vec",
+            "rss_bytes": 37699584
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3913766,
+              "mean": 3727782.04,
+              "min": 3695535,
+              "p50": 3720075.0,
+              "p95": 3761585.0,
+              "p99": 3913766.0
+            },
+            "id": "baseline-precheck-block-04-03-owned_vec",
+            "rss_bytes": 37076992
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3882046,
+              "mean": 3712632.32,
+              "min": 3691685,
+              "p50": 3704130.5,
+              "p95": 3765415.0,
+              "p99": 3882046.0
+            },
+            "id": "baseline-precheck-block-05-02-owned_vec",
+            "rss_bytes": 37105664
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 3759725,
+              "mean": 3711105.42,
+              "min": 3693105,
+              "p50": 3706590.0,
+              "p95": 3747166.0,
+              "p99": 3759725.0
+            },
+            "id": "baseline-precheck-block-06-03-owned_vec",
+            "rss_bytes": 36839424
+          }
+        ],
+        "pooled_elapsed_ns": {
+          "count": 300,
+          "max": 3913766,
+          "mean": 3718740.0866666664,
+          "min": 3691685,
+          "p50": 3715750.0,
+          "p95": 3743526.0,
+          "p99": 3778966.0
+        },
+        "raw_samples": 300,
+        "rss_bytes": {
+          "count": 6,
+          "max": 37699584,
+          "mean": 37162325.333333336,
+          "min": 36839424,
+          "p50": 37103616.0,
+          "p95": 37699584.0,
+          "p99": 37699584.0
+        }
+      },
+      "range_short": {
+        "children": [
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4559378,
+              "mean": 4524839.78,
+              "min": 4503068,
+              "p50": 4523568.5,
+              "p95": 4549589.0,
+              "p99": 4559378.0
+            },
+            "id": "baseline-precheck-block-01-04-range_short",
+            "rss_bytes": 37101568
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4699429,
+              "mean": 4544272.26,
+              "min": 4512158,
+              "p50": 4539209.0,
+              "p95": 4591629.0,
+              "p99": 4699429.0
+            },
+            "id": "baseline-precheck-block-02-01-range_short",
+            "rss_bytes": 37089280
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4634208,
+              "mean": 4541400.36,
+              "min": 4507018,
+              "p50": 4539753.0,
+              "p95": 4579339.0,
+              "p99": 4634208.0
+            },
+            "id": "baseline-precheck-block-03-04-range_short",
+            "rss_bytes": 37351424
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4569808,
+              "mean": 4535092.2,
+              "min": 4516598,
+              "p50": 4531668.5,
+              "p95": 4563988.0,
+              "p99": 4569808.0
+            },
+            "id": "baseline-precheck-block-04-01-range_short",
+            "rss_bytes": 37380096
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4553449,
+              "mean": 4534117.08,
+              "min": 4517008,
+              "p50": 4532359.0,
+              "p95": 4550259.0,
+              "p99": 4553449.0
+            },
+            "id": "baseline-precheck-block-05-04-range_short",
+            "rss_bytes": 37089280
+          },
+          {
+            "elapsed_ns": {
+              "count": 50,
+              "max": 4567089,
+              "mean": 4530893.4,
+              "min": 4499818,
+              "p50": 4528283.0,
+              "p95": 4565688.0,
+              "p99": 4567089.0
+            },
+            "id": "baseline-precheck-block-06-01-range_short",
+            "rss_bytes": 37404672
+          }
+        ],
+        "pooled_elapsed_ns": {
+          "count": 300,
+          "max": 4699429,
+          "mean": 4535102.513333334,
+          "min": 4499818,
+          "p50": 4531774.0,
+          "p95": 4563988.0,
+          "p99": 4626919.0
+        },
+        "raw_samples": 300,
+        "rss_bytes": {
+          "count": 6,
+          "max": 37404672,
+          "mean": 37236053.333333336,
+          "min": 37089280,
+          "p50": 37226496.0,
+          "p95": 37404672.0,
+          "p99": 37404672.0
+        }
+      }
+    },
+    "recapture_count": 0,
+    "source_output_binary_contracts_revalidated": true,
+    "terminal_children": 24
+  },
+  "runner": {
+    "bytes": 14582,
+    "path": "/tmp/litchi-performance-0930/baseline-precheck-run.py",
+    "sha256": "89b7c921930ded05a20e5a02a96903b6f92ca7b257bd0d1487e483a2b61c813c"
+  },
+  "runner_terminal_receipt": {
+    "bytes": 1584,
+    "path": "/tmp/litchi-performance-0930/runner-terminal-receipt.json",
+    "sha256": "d031b56c3d8b07ad178fa2c69a33deb157651aea09fa6d213f5d321ec05fad5b"
+  },
+  "schedule": {
+    "blocks": 6,
+    "children": 24,
+    "children_per_route": 6,
+    "cpu": 12,
+    "failure_policy": "retain every terminal child; no retry or selective recapture",
+    "measured_samples_total": 1200,
+    "process_deadline_seconds": 900,
+    "route_order": "odd blocks forward, even blocks reversed",
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "samples_per_child": 50,
+    "terminal_before_parse": true,
+    "warmups_per_child": 5
+  },
+  "schema": "litchi.performance.0930.baseline-precheck-receipt.v1",
+  "source": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "current_worktree_production_delta": "none; unrelated worktree files excluded by the executed plan",
+    "full_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    },
+    "harness_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "source_receipt": {
+      "bytes": 356812,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    },
+    "source_root": "/tmp/litchi-performance-0925/measurement-source-v4"
+  },
+  "status": "passed",
+  "validator": {
+    "bytes": 39792,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+    "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+  }
+}

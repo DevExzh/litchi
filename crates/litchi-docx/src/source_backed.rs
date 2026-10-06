@@ -1019,7 +1019,8 @@ impl Package {
         &self,
         limits: &crate::section::Limits,
     ) -> Result<layout::Snapshot> {
-        let (_, snapshot) = self.main_section_layout_snapshot("section_layout_snapshot", limits)?;
+        let (_, snapshot) =
+            self.main_section_layout_snapshot("section_layout_snapshot", limits, None)?;
         Ok(snapshot)
     }
 
@@ -1276,9 +1277,11 @@ impl Package {
         self.trim_clean_paragraph_index_for_operation();
         // Preserve the second trim performed by the delegated patch route.
         self.trim_clean_paragraph_index_for_operation();
+        let retained_base = commit.base_snapshot_for_publication();
         let (main, current) = self.main_section_layout_snapshot(
             "publish_section_layout_patch_to_stream",
             commit.patch().limits(),
+            retained_base,
         )?;
         let target = commit.apply_to_current(&current)?;
         self.publish_section_layout_target_to_stream(writer, &main, commit.patch(), current, target)
@@ -1296,6 +1299,7 @@ impl Package {
         let (main, current) = self.main_section_layout_snapshot(
             "publish_section_layout_patch_to_stream",
             patch.limits(),
+            None,
         )?;
         let target = patch.apply(&current)?;
         self.publish_section_layout_target_to_stream(writer, &main, patch, current, target)
@@ -1350,6 +1354,7 @@ impl Package {
         let (_, current) = self.main_section_layout_snapshot(
             "publish_section_layout_inverse_to_stream",
             publication.snapshot().limits(),
+            None,
         )?;
         publication.inverse_patch().apply(&current)?;
         publication
@@ -2112,6 +2117,7 @@ impl Package {
         &self,
         operation: &'static str,
         limits: &crate::section::Limits,
+        retained_base: Option<&layout::Snapshot>,
     ) -> Result<(PackURI, layout::Snapshot)> {
         self.package.check_execution()?;
         let main = self.package.main_document_part()?;
@@ -2129,13 +2135,26 @@ impl Package {
         let data = self.main_data(main)?;
         let raw = data.into_arc()?;
         let artifact_fingerprint = self.package.source_artifact().fingerprint()?;
-        let snapshot = layout::Snapshot::from_source_xml(
-            Arc::clone(&raw),
-            source_version,
-            lineage.clone(),
-            artifact_fingerprint,
-            limits,
-        );
+        let snapshot = if let Some(base) =
+            retained_base.filter(|base| base.xml_matches(&raw) && base.limits() == limits)
+        {
+            Ok(layout::Snapshot::from_reused_inventory(
+                Arc::clone(&raw),
+                source_version,
+                lineage.clone(),
+                artifact_fingerprint,
+                limits,
+                base,
+            ))
+        } else {
+            layout::Snapshot::from_source_xml(
+                Arc::clone(&raw),
+                source_version,
+                lineage.clone(),
+                artifact_fingerprint,
+                limits,
+            )
+        };
         let observed = self.package.source_version()?;
         if observed != source_version {
             return Err(litchi_opc::OpcError::SourceChanged {

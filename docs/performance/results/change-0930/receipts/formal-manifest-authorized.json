@@ -1,0 +1,952 @@
+{
+  "argv_template": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "12",
+    "<binary>",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "50",
+    "--warmup",
+    "5",
+    "--json",
+    "<report.json>"
+  ],
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "build": {
+    "baseline": {
+      "binary": {
+        "bytes": 70187352,
+        "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+      },
+      "build_log": {
+        "bytes": 9174,
+        "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.log",
+        "sha256": "2411cca6718d0e6fcd39a04063fd7d1998e4ecc83d1bfdeacfe34edfd9a48e1f"
+      },
+      "command_argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "-j2",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline",
+        "--target-dir",
+        "/tmp/litchi-performance-0925/measurement-target-v4-final"
+      ],
+      "environment_scope": "legacy receipt: environment object is the recorded allowlist; no wholesale environment was retained",
+      "locks": {
+        "root_cargo_lock": {
+          "bytes": 138465,
+          "path": "/tmp/litchi-performance-0925/measurement-source-v4/Cargo.lock",
+          "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+        },
+        "rustfmt_toml": {
+          "bytes": 79,
+          "path": "/tmp/litchi-performance-0925/measurement-source-v4/rustfmt.toml",
+          "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+        },
+        "tools_performance_cargo_lock": {
+          "bytes": 56289,
+          "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.lock",
+          "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+        }
+      },
+      "profile": "release",
+      "receipt": {
+        "bytes": 3137,
+        "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+        "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+      },
+      "source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "terminal_receipt": null,
+      "toolchain": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    },
+    "candidate": {
+      "binary": {
+        "bytes": 70197424,
+        "path": "/home/zhuhe/litchi-performance-0930/candidate-binary-v2",
+        "sha256": "ae9d7c303496a30ae2850e397076093322adb6fe2be4a598ac446b206bd88eff"
+      },
+      "build_log": {
+        "bytes": 8758,
+        "path": "/tmp/litchi-performance-0930/candidate-build-v2.log",
+        "sha256": "f3a24cf505cd30dec5918d191cbe54713067e7eaeb72d166a79575f8bbd5466d"
+      },
+      "command_argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "-j2",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/tmp/litchi-performance-0930/candidate-source-v2/tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline",
+        "--target-dir",
+        "/home/zhuhe/litchi-performance-0930/candidate-target-v2"
+      ],
+      "environment_scope": "environment is an empty recorded allowlist; the build inherited its process environment, which is not retained wholesale",
+      "locks": {
+        "root_cargo_lock": {
+          "bytes": 138465,
+          "path": "/tmp/litchi-performance-0925/measurement-source-v4/Cargo.lock",
+          "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+        },
+        "rustfmt_toml": {
+          "bytes": 79,
+          "path": "/tmp/litchi-performance-0925/measurement-source-v4/rustfmt.toml",
+          "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+        },
+        "tools_performance_cargo_lock": {
+          "bytes": 56289,
+          "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.lock",
+          "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+        }
+      },
+      "profile": "release",
+      "receipt": {
+        "bytes": 5821,
+        "path": "/tmp/litchi-performance-0930/candidate-build-binding-v2.json",
+        "sha256": "33c613c2cbe488665784a5ff08cd48312b734af7617a778a6c9d660ae7d5e0e0"
+      },
+      "source_root": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2",
+      "terminal_receipt": {
+        "bytes": 1346,
+        "path": "/tmp/litchi-performance-0930/candidate-build-terminal-v2.json",
+        "sha256": "213c0e4f766cc6daa942cfb5d2cf81a019359175bd4c5f6154c76c4e69df896c"
+      },
+      "toolchain": {
+        "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+      }
+    }
+  },
+  "capture_authorized": true,
+  "child_environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0",
+    "TZ": "UTC"
+  },
+  "claim_scope": "prospective paired normal-release cohort; no claim until all 48 children and independent replay pass",
+  "corpus": {
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+  },
+  "created_utc": "2026-10-06T14:20:46.605674+00:00",
+  "custody_sources": {
+    "baseline_build_receipt": {
+      "bytes": 3137,
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "baseline_source_receipt": {
+      "bytes": 356812,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    },
+    "candidate_build_receipt": {
+      "bytes": 5821,
+      "path": "/tmp/litchi-performance-0930/candidate-build-binding-v2.json",
+      "sha256": "33c613c2cbe488665784a5ff08cd48312b734af7617a778a6c9d660ae7d5e0e0"
+    },
+    "candidate_source_receipt": {
+      "bytes": 360656,
+      "path": "/tmp/litchi-performance-0930/candidate-source-build-v2-binding.json",
+      "sha256": "b81a6433b3e4607ecdb4f3f1320e0e4b104feb251b3611234ce548b4e9b08675"
+    },
+    "gate_correction": {
+      "bytes": 8797,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-gate-correction-v1.json",
+      "sha256": "b3b0909aade06d4d42a9484135346ed6e20fb212567198af7be98331521937f8"
+    },
+    "plan": {
+      "bytes": 8242,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-plan-v1.json",
+      "sha256": "a62e79dfcfd0ca0872bf2b2f0237929a9065c00c0f3e2cb54b6b8b845032d6f0"
+    }
+  },
+  "failure_policy": "retain every terminal child; any failed report/control invalidates the cohort; never retry or selectively recapture",
+  "formal_children_run": 0,
+  "formal_gate": {
+    "bootstrap_draws": 10000,
+    "bootstrap_lower_95_strictly_greater_than": 1.0,
+    "bootstrap_percentile": "nearest-rank percentile of paired process ratios",
+    "bootstrap_seed": 930,
+    "correction": {
+      "bytes": 8797,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-gate-correction-v1.json",
+      "sha256": "b3b0909aade06d4d42a9484135346ed6e20fb212567198af7be98331521937f8"
+    },
+    "median_ratio_minimum": 1.05,
+    "pair_unit": "same route, block, and position; version order alternates by block",
+    "primary_route": "generic_read_at",
+    "ratio": "baseline_p50 / candidate_p50",
+    "secondary_flags": {
+      "rss_regression": ">5%; setup-inclusive review flag",
+      "semantic_or_counter_failure": "invalidates the complete cohort",
+      "tail_or_pooled_p95_p99_regression": ">5%"
+    },
+    "source_plan": {
+      "bytes": 8242,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-plan-v1.json",
+      "sha256": "a62e79dfcfd0ca0872bf2b2f0237929a9065c00c0f3e2cb54b6b8b845032d6f0"
+    }
+  },
+  "raw_evidence": "external packet only; terminal receipts contain descriptors and scalar status, never duplicated raw vectors",
+  "root_authorization": {
+    "idle_barrier": "Owned quality/build/profiling agents idle; no cargo/rustc/perf/heaptrack processes observed; shared machine quiescence is not guaranteed.",
+    "review": "Independent final static audit reports no material blocker; frozen scripts remain unmodified.",
+    "scope": "Exactly the frozen 48-child schedule; no selective retries or recapture. Original terminal receipt before reduction.",
+    "unauthorized_manifest_sha256": "92db4fbbf5e386508934fe6b50a31c467d6fc04734e6e1cd47fb251f4e496e45",
+    "utc": "2026-10-06T14:23:23.211124+00:00"
+  },
+  "route_selector": {
+    "name": "LITCHI_DOCX_INGRESS_ROUTE",
+    "values": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ]
+  },
+  "schedule": {
+    "blocks": 6,
+    "children": 48,
+    "children_per_route_per_version": 6,
+    "cpu": 12,
+    "process_deadline_seconds": 900,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "rows": [
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-01-generic_read_at-baseline",
+        "pair_id": "formal-block-01-01-generic_read_at",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-01-generic_read_at-candidate",
+        "pair_id": "formal-block-01-01-generic_read_at",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-02-owned_vec-baseline",
+        "pair_id": "formal-block-01-02-owned_vec",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-02-owned_vec-candidate",
+        "pair_id": "formal-block-01-02-owned_vec",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-03-owned_reader-baseline",
+        "pair_id": "formal-block-01-03-owned_reader",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-03-owned_reader-candidate",
+        "pair_id": "formal-block-01-03-owned_reader",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-04-range_short-baseline",
+        "pair_id": "formal-block-01-04-range_short",
+        "position": 4,
+        "route": "range_short",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "id": "formal-block-01-04-range_short-candidate",
+        "pair_id": "formal-block-01-04-range_short",
+        "position": 4,
+        "route": "range_short",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-01-range_short-candidate",
+        "pair_id": "formal-block-02-01-range_short",
+        "position": 1,
+        "route": "range_short",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-01-range_short-baseline",
+        "pair_id": "formal-block-02-01-range_short",
+        "position": 1,
+        "route": "range_short",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-02-owned_reader-candidate",
+        "pair_id": "formal-block-02-02-owned_reader",
+        "position": 2,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-02-owned_reader-baseline",
+        "pair_id": "formal-block-02-02-owned_reader",
+        "position": 2,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-03-owned_vec-candidate",
+        "pair_id": "formal-block-02-03-owned_vec",
+        "position": 3,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-03-owned_vec-baseline",
+        "pair_id": "formal-block-02-03-owned_vec",
+        "position": 3,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-04-generic_read_at-candidate",
+        "pair_id": "formal-block-02-04-generic_read_at",
+        "position": 4,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "id": "formal-block-02-04-generic_read_at-baseline",
+        "pair_id": "formal-block-02-04-generic_read_at",
+        "position": 4,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-01-generic_read_at-baseline",
+        "pair_id": "formal-block-03-01-generic_read_at",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-01-generic_read_at-candidate",
+        "pair_id": "formal-block-03-01-generic_read_at",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-02-owned_vec-baseline",
+        "pair_id": "formal-block-03-02-owned_vec",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-02-owned_vec-candidate",
+        "pair_id": "formal-block-03-02-owned_vec",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-03-owned_reader-baseline",
+        "pair_id": "formal-block-03-03-owned_reader",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-03-owned_reader-candidate",
+        "pair_id": "formal-block-03-03-owned_reader",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-04-range_short-baseline",
+        "pair_id": "formal-block-03-04-range_short",
+        "position": 4,
+        "route": "range_short",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "id": "formal-block-03-04-range_short-candidate",
+        "pair_id": "formal-block-03-04-range_short",
+        "position": 4,
+        "route": "range_short",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-01-range_short-candidate",
+        "pair_id": "formal-block-04-01-range_short",
+        "position": 1,
+        "route": "range_short",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-01-range_short-baseline",
+        "pair_id": "formal-block-04-01-range_short",
+        "position": 1,
+        "route": "range_short",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-02-owned_reader-candidate",
+        "pair_id": "formal-block-04-02-owned_reader",
+        "position": 2,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-02-owned_reader-baseline",
+        "pair_id": "formal-block-04-02-owned_reader",
+        "position": 2,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-03-owned_vec-candidate",
+        "pair_id": "formal-block-04-03-owned_vec",
+        "position": 3,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-03-owned_vec-baseline",
+        "pair_id": "formal-block-04-03-owned_vec",
+        "position": 3,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-04-generic_read_at-candidate",
+        "pair_id": "formal-block-04-04-generic_read_at",
+        "position": 4,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "id": "formal-block-04-04-generic_read_at-baseline",
+        "pair_id": "formal-block-04-04-generic_read_at",
+        "position": 4,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-01-generic_read_at-baseline",
+        "pair_id": "formal-block-05-01-generic_read_at",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-01-generic_read_at-candidate",
+        "pair_id": "formal-block-05-01-generic_read_at",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-02-owned_vec-baseline",
+        "pair_id": "formal-block-05-02-owned_vec",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-02-owned_vec-candidate",
+        "pair_id": "formal-block-05-02-owned_vec",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-03-owned_reader-baseline",
+        "pair_id": "formal-block-05-03-owned_reader",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-03-owned_reader-candidate",
+        "pair_id": "formal-block-05-03-owned_reader",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-04-range_short-baseline",
+        "pair_id": "formal-block-05-04-range_short",
+        "position": 4,
+        "route": "range_short",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "id": "formal-block-05-04-range_short-candidate",
+        "pair_id": "formal-block-05-04-range_short",
+        "position": 4,
+        "route": "range_short",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-01-range_short-candidate",
+        "pair_id": "formal-block-06-01-range_short",
+        "position": 1,
+        "route": "range_short",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-01-range_short-baseline",
+        "pair_id": "formal-block-06-01-range_short",
+        "position": 1,
+        "route": "range_short",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-02-owned_reader-candidate",
+        "pair_id": "formal-block-06-02-owned_reader",
+        "position": 2,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-02-owned_reader-baseline",
+        "pair_id": "formal-block-06-02-owned_reader",
+        "position": 2,
+        "route": "owned_reader",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-03-owned_vec-candidate",
+        "pair_id": "formal-block-06-03-owned_vec",
+        "position": 3,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-03-owned_vec-baseline",
+        "pair_id": "formal-block-06-03-owned_vec",
+        "position": 3,
+        "route": "owned_vec",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-04-generic_read_at-candidate",
+        "pair_id": "formal-block-06-04-generic_read_at",
+        "position": 4,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "candidate",
+        "version_position": 1,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "id": "formal-block-06-04-generic_read_at-baseline",
+        "pair_id": "formal-block-06-04-generic_read_at",
+        "position": 4,
+        "route": "generic_read_at",
+        "samples": 50,
+        "version": "baseline",
+        "version_position": 2,
+        "warmups": 5
+      }
+    ],
+    "samples_per_child": 50,
+    "sha256": "4834b67e0340d31e34dc7bafeb527bf37f20b9d5f0964a1d86a6803ccd6379cb",
+    "warmups": 5
+  },
+  "schema": "litchi.performance.0930.formal-comparison-manifest.v1",
+  "scripts": {
+    "gate_correction": {
+      "bytes": 8797,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-gate-correction-v1.json",
+      "sha256": "b3b0909aade06d4d42a9484135346ed6e20fb212567198af7be98331521937f8"
+    },
+    "plan": {
+      "bytes": 8242,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-plan-v1.json",
+      "sha256": "a62e79dfcfd0ca0872bf2b2f0237929a9065c00c0f3e2cb54b6b8b845032d6f0"
+    },
+    "runner": {
+      "bytes": 54433,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-runner-v1.py",
+      "sha256": "17a433994d2aa0a7de979a33731597e768b8056e491d924f4ed32c41b28f7bc5"
+    },
+    "validator": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  },
+  "source": {
+    "baseline": {
+      "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+      "candidate_patch": null,
+      "candidate_source_files": {},
+      "changed_paths": [],
+      "full_source_listing": {
+        "bytes": 940213,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+        "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+      },
+      "receipt": {
+        "bytes": 356812,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+        "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+      },
+      "reconstruction": null,
+      "source_bytes": 109831506,
+      "source_file_count": 6276,
+      "source_root": "/tmp/litchi-performance-0925/measurement-source-v4"
+    },
+    "candidate": {
+      "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+      "candidate_patch": {
+        "bytes": 31244,
+        "path": "/tmp/litchi-performance-0930/candidate-production-and-test-v2.patch",
+        "sha256": "350980abeba1675bcd3c736830de1052e36395a5dea65e4872222ef67f030056"
+      },
+      "candidate_source_files": {
+        "crates/litchi-docx/src/leniency.rs": {
+          "bytes": 50075,
+          "path": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2/crates/litchi-docx/src/leniency.rs",
+          "sha256": "32d64ea50aa802b2a98e8ad8fb09d0268137c32c835281c240c5985557409642"
+        },
+        "crates/litchi-docx/src/section/inventory.rs": {
+          "bytes": 61473,
+          "path": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2/crates/litchi-docx/src/section/inventory.rs",
+          "sha256": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99"
+        },
+        "crates/litchi-docx/src/section/layout.rs": {
+          "bytes": 87348,
+          "path": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2/crates/litchi-docx/src/section/layout.rs",
+          "sha256": "2a5849c277728e428fc060983f0facd3be26503f5a98337decc92d7e684024f4"
+        },
+        "crates/litchi-docx/src/source_backed.rs": {
+          "bytes": 146648,
+          "path": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2/crates/litchi-docx/src/source_backed.rs",
+          "sha256": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d"
+        },
+        "crates/litchi-docx/tests/source_backed_sections.rs": {
+          "bytes": 61823,
+          "path": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2/crates/litchi-docx/tests/source_backed_sections.rs",
+          "sha256": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0"
+        }
+      },
+      "changed_paths": [
+        "crates/litchi-docx/src/section/layout.rs",
+        "crates/litchi-docx/src/section/inventory.rs",
+        "crates/litchi-docx/src/leniency.rs",
+        "crates/litchi-docx/src/source_backed.rs",
+        "crates/litchi-docx/tests/source_backed_sections.rs"
+      ],
+      "full_source_listing": {
+        "bytes": 940213,
+        "path": "/tmp/litchi-performance-0930/candidate-source-v2-list.jsonl",
+        "sha256": "abd8ceb01ebe9bbbeeae7aa53350e0631e3027ee9d6d4b0f0132b01bc78c1f93"
+      },
+      "receipt": {
+        "bytes": 360656,
+        "path": "/tmp/litchi-performance-0930/candidate-source-build-v2-binding.json",
+        "sha256": "b81a6433b3e4607ecdb4f3f1320e0e4b104feb251b3611234ce548b4e9b08675"
+      },
+      "reconstruction": {
+        "base_source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+        "candidate_patch": "/tmp/litchi-performance-0930/candidate-production-and-test-v2.patch",
+        "historical_build_ended_utc": "2026-10-06T13:54:29.354131+00:00",
+        "historical_build_started_utc": "2026-10-06T13:45:30.824390+00:00",
+        "historical_build_terminal": {
+          "bytes": 1346,
+          "path": "/tmp/litchi-performance-0930/candidate-build-terminal-v2.json",
+          "sha256": "213c0e4f766cc6daa942cfb5d2cf81a019359175bd4c5f6154c76c4e69df896c"
+        },
+        "historical_full_source_listing": {
+          "bytes": 940213,
+          "path": "/tmp/litchi-performance-0930/candidate-source-v2-list.jsonl",
+          "sha256": "abd8ceb01ebe9bbbeeae7aa53350e0631e3027ee9d6d4b0f0132b01bc78c1f93"
+        },
+        "historical_receipt": {
+          "bytes": 359121,
+          "path": "/tmp/litchi-performance-0930/candidate-source-receipt-v2.json",
+          "sha256": "a4aa16f42aaad90610acaa6f11a2eb9d0435d8c4df4b6c827f257a11026c7a94"
+        },
+        "historical_source_root_was_reused_after_v2_build": true,
+        "method": "copy retained measurement-source-v4, then patch -p4 --batch with candidate-production-and-test-v2.patch",
+        "post_terminal_source_update_utc": "2026-10-06T13:55:05.943120+00:00",
+        "status": "verified",
+        "tree_match": "full_source_listing path/bytes/SHA256 and source_bytes/source_file_count revalidated after reconstruction"
+      },
+      "source_bytes": 109852927,
+      "source_file_count": 6276,
+      "source_root": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2"
+    }
+  },
+  "status": "prospective_unfinished"
+}

@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0930 — repeated base inventory parsing removed within a cap
+
+[0930](0930-docx-commit-base-retention.md) reuses a commit's validated base
+inventory only after exact current XML and Limits equality. Generic publication
+p50 falls 12.51% (2.671086 to 2.337030 ms); total p50 falls 7.52%. Source and
+output fingerprints remain mandatory. The cap is observable and releasable;
+zero, excess weight or accounting overflow falls back to parsing. Process RSS
+rises within the frozen guardrail, so do not claim free retention. Next measure
+allocation/live-memory behavior with many live commits and larger inventories,
+and profile the remaining publication work before proposing another shortcut.
+The earlier phase fractions are not a profile of this adopted build.
+
 ## 0929 — publication parsing is a measured reuse candidate
 
 [0929](0929-frame-pointer-phase-profile.md) recovers native query/publication

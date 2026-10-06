@@ -597,6 +597,41 @@ fn main_xml(zip: &[u8]) -> String {
     String::from_utf8(main.to_vec()).unwrap()
 }
 
+fn section_layout_document() -> String {
+    format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+    )
+}
+
+fn changed_section_layout_commit(
+    document: &[u8],
+    retained_cap: Option<usize>,
+) -> (
+    Vec<u8>,
+    source_backed::Package,
+    litchi_docx::section::layout::Commit,
+) {
+    let source_bytes = fixture(document);
+    let package =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    let commit = {
+        let snapshot = package.section_layout_snapshot().unwrap();
+        let mut edit = snapshot.edit(0).unwrap();
+        if let Some(retained_cap) = retained_cap {
+            edit = edit.with_max_retained_base_bytes(retained_cap);
+        }
+        edit.set_page_size(Some(PageSize {
+            width: Some(Emu::from_twips(11906)),
+            height: Some(Emu::from_twips(16838)),
+            orientation: Orientation::Landscape,
+        }))
+        .unwrap();
+        edit.commit().unwrap()
+    };
+    (source_bytes, package, commit)
+}
+
 #[test]
 fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     let document = format!(
@@ -836,6 +871,7 @@ fn section_layout_commit_rechecks_complete_artifact_before_target_reuse() {
     }))
     .unwrap();
     let commit = edit.commit().unwrap();
+    assert!(commit.retained_base_bytes() > 0);
 
     source.mutate_unused();
     let mut output = Vec::new();
@@ -861,6 +897,7 @@ fn section_layout_commit_rejects_revision_change_before_output() {
     }))
     .unwrap();
     let commit = edit.commit().unwrap();
+    assert!(commit.retained_base_bytes() > 0);
 
     source.arm_change();
     let mut output = Vec::new();
@@ -869,6 +906,140 @@ fn section_layout_commit_rejects_revision_change_before_output() {
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
+}
+
+#[test]
+fn section_layout_commit_retained_fallback_and_release_are_byte_parity() {
+    let document = section_layout_document();
+
+    let (source_bytes, retained_package, retained_commit) =
+        changed_section_layout_commit(document.as_bytes(), None);
+    assert!(retained_commit.retained_base_bytes() > 0);
+    let mut retained_output = Vec::new();
+    let publication = retained_package
+        .publish_section_layout_commit_to_stream(&mut retained_output, &retained_commit)
+        .unwrap();
+    assert_ne!(retained_output, source_bytes);
+
+    let reopened =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(retained_output.clone())))
+            .unwrap();
+    let mut restored = Vec::new();
+    reopened
+        .publish_section_layout_inverse_to_stream(&mut restored, &publication)
+        .unwrap();
+    assert_eq!(restored, source_bytes);
+
+    let (_, zero_package, zero_commit) =
+        changed_section_layout_commit(document.as_bytes(), Some(0));
+    assert_eq!(zero_commit.retained_base_bytes(), 0);
+    let mut zero_output = Vec::new();
+    zero_package
+        .publish_section_layout_commit_to_stream(&mut zero_output, &zero_commit)
+        .unwrap();
+    assert_eq!(zero_output, retained_output);
+
+    let (_, released_package, mut released_commit) =
+        changed_section_layout_commit(document.as_bytes(), Some(1 << 20));
+    assert!(released_commit.retained_base_bytes() > 0);
+    assert!(released_commit.retained_base_bytes() <= 1 << 20);
+    released_commit.release_retained_base();
+    assert_eq!(released_commit.retained_base_bytes(), 0);
+    let mut released_output = Vec::new();
+    released_package
+        .publish_section_layout_commit_to_stream(&mut released_output, &released_commit)
+        .unwrap();
+    assert_eq!(released_output, retained_output);
+}
+
+#[test]
+fn section_layout_noop_retention_and_release_preserve_exact_source() {
+    let document = section_layout_document();
+    let source_bytes = fixture(document.as_bytes());
+
+    let package =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    let noop = {
+        let snapshot = package.section_layout_snapshot().unwrap();
+        snapshot.edit(0).unwrap().commit().unwrap()
+    };
+    // A no-op already keeps the target snapshot required for its exact
+    // source identity; it needs no additional retained base allocation.
+    assert_eq!(noop.retained_base_bytes(), 0);
+    let mut retained_output = Vec::new();
+    package
+        .publish_section_layout_commit_to_stream(&mut retained_output, &noop)
+        .unwrap();
+    assert_eq!(retained_output, source_bytes);
+
+    let package =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    let mut released_noop = {
+        let snapshot = package.section_layout_snapshot().unwrap();
+        snapshot.edit(0).unwrap().commit().unwrap()
+    };
+    assert_eq!(released_noop.retained_base_bytes(), 0);
+    released_noop.release_retained_base();
+    assert_eq!(released_noop.retained_base_bytes(), 0);
+    let mut released_output = Vec::new();
+    package
+        .publish_section_layout_commit_to_stream(&mut released_output, &released_noop)
+        .unwrap();
+    assert_eq!(released_output, source_bytes);
+}
+
+#[test]
+fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
+    let document = section_layout_document();
+    let (_source_bytes, _source_package, retained_commit) =
+        changed_section_layout_commit(document.as_bytes(), None);
+    assert!(retained_commit.retained_base_bytes() > 0);
+
+    let malformed_document = b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>";
+    let malformed_package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(malformed_document),
+    )))
+    .unwrap();
+    let mut retained_output = Vec::new();
+    let retained_error = match malformed_package
+        .publish_section_layout_commit_to_stream(&mut retained_output, &retained_commit)
+    {
+        Ok(_) => panic!("malformed source unexpectedly published"),
+        Err(error) => error,
+    };
+    assert!(retained_output.is_empty());
+
+    let (_, _source_package, fallback_commit) =
+        changed_section_layout_commit(document.as_bytes(), Some(0));
+    assert_eq!(fallback_commit.retained_base_bytes(), 0);
+    let malformed_package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        malformed_fixture(malformed_document),
+    )))
+    .unwrap();
+    let mut fallback_output = Vec::new();
+    let fallback_error = match malformed_package
+        .publish_section_layout_commit_to_stream(&mut fallback_output, &fallback_commit)
+    {
+        Ok(_) => panic!("malformed source unexpectedly published"),
+        Err(error) => error,
+    };
+    assert!(fallback_output.is_empty());
+    assert_eq!(
+        std::mem::discriminant(&retained_error),
+        std::mem::discriminant(&fallback_error)
+    );
+    assert_eq!(retained_error.to_string(), fallback_error.to_string());
+    assert!(!matches!(
+        &retained_error,
+        Error::SectionLayoutStaleSource
+            | Error::SectionLayoutRevisionConflict
+            | Error::SectionLayoutForeignSource
+            | Error::SectionLayoutFingerprintConflict
+            | Error::SectionLayoutPolicyConflict
+            | Error::SectionLayoutAuthorizationConflict
+    ));
 }
 
 #[test]

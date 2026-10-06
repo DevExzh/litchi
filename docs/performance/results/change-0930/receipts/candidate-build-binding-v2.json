@@ -1,0 +1,122 @@
+{
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "binary": {
+    "bytes": 70197424,
+    "path": "/home/zhuhe/litchi-performance-0930/candidate-binary-v2",
+    "sha256": "ae9d7c303496a30ae2850e397076093322adb6fe2be4a598ac446b206bd88eff"
+  },
+  "binary_target": {
+    "bytes": 70197424,
+    "path": "/home/zhuhe/litchi-performance-0930/candidate-target-v2/release/litchi-perf-baseline",
+    "sha256": "ae9d7c303496a30ae2850e397076093322adb6fe2be4a598ac446b206bd88eff"
+  },
+  "build_input_reconstruction": {
+    "exact_content_binding": "candidate-source-build-v2-binding.json and v2 full listing",
+    "historical_build_terminal": {
+      "bytes": 1346,
+      "path": "/tmp/litchi-performance-0930/candidate-build-terminal-v2.json",
+      "sha256": "213c0e4f766cc6daa942cfb5d2cf81a019359175bd4c5f6154c76c4e69df896c"
+    },
+    "historical_command_cwd": "/tmp/litchi-performance-0930/candidate-source-v2",
+    "historical_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0930/candidate-source-v2-list.jsonl",
+      "sha256": "abd8ceb01ebe9bbbeeae7aa53350e0631e3027ee9d6d4b0f0132b01bc78c1f93"
+    },
+    "historical_source_receipt": {
+      "bytes": 359121,
+      "path": "/tmp/litchi-performance-0930/candidate-source-receipt-v2.json",
+      "sha256": "a4aa16f42aaad90610acaa6f11a2eb9d0435d8c4df4b6c827f257a11026c7a94"
+    },
+    "historical_source_root": "/tmp/litchi-performance-0930/candidate-source-v2",
+    "original_source_receipt_created_utc": null,
+    "post_terminal_source_update_utc": "2026-10-06T13:55:05.943120+00:00",
+    "recipe": "copy retained measurement-source-v4 and apply candidate-production-and-test-v2.patch with patch -p4 --batch",
+    "reconstructed_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0930/candidate-source-v2-list.jsonl",
+      "sha256": "abd8ceb01ebe9bbbeeae7aa53350e0631e3027ee9d6d4b0f0132b01bc78c1f93"
+    },
+    "reconstructed_source_root": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2",
+    "source_root": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2"
+  },
+  "build_log": {
+    "bytes": 8758,
+    "path": "/tmp/litchi-performance-0930/candidate-build-v2.log",
+    "sha256": "f3a24cf505cd30dec5918d191cbe54713067e7eaeb72d166a79575f8bbd5466d"
+  },
+  "command": "cargo +1.95.0 build --offline -j2 --locked --release --manifest-path /tmp/litchi-performance-0930/candidate-source-v2/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /home/zhuhe/litchi-performance-0930/candidate-target-v2",
+  "command_argv": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "-j2",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0930/candidate-source-v2/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "--target-dir",
+    "/home/zhuhe/litchi-performance-0930/candidate-target-v2"
+  ],
+  "created_utc": "2026-10-06T14:02:17.888546+00:00",
+  "cwd": "/tmp/litchi-performance-0930/candidate-source-v2",
+  "ended_utc": "2026-10-06T13:54:29.354131+00:00",
+  "environment": {},
+  "environment_scope": "environment is an empty recorded allowlist; the build inherited its process environment, which is not retained wholesale",
+  "exit_code": 0,
+  "historical_terminal_cwd": "/tmp/litchi-performance-0930/candidate-source-v2",
+  "locks": {
+    "root_cargo_lock": {
+      "bytes": 138465,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "rustfmt_toml": {
+      "bytes": 79,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/rustfmt.toml",
+      "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+    },
+    "tools_performance_cargo_lock": {
+      "bytes": 56289,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    }
+  },
+  "profile": "release",
+  "reconstructed_source_root": "/tmp/litchi-performance-0930/candidate-source-built-v2-check2",
+  "runtime_prefix_supersession": {
+    "historical_v2_binary_sha256": "ae9d7c303496a30ae2850e397076093322adb6fe2be4a598ac446b206bd88eff",
+    "note": "This binding does not claim a new release build after the later test-only source update.",
+    "runtime_source_review_required_before_capture": true,
+    "scope": "parent/auditor-reviewed test-only/doc-only supersession; no workload rerun"
+  },
+  "schema": "litchi.performance.0930.candidate-build-binding.v2",
+  "source_custody": {
+    "full_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0930/candidate-source-v2-list.jsonl",
+      "sha256": "abd8ceb01ebe9bbbeeae7aa53350e0631e3027ee9d6d4b0f0132b01bc78c1f93"
+    },
+    "source_receipt": {
+      "bytes": 360656,
+      "path": "/tmp/litchi-performance-0930/candidate-source-build-v2-binding.json",
+      "sha256": "b81a6433b3e4607ecdb4f3f1320e0e4b104feb251b3611234ce548b4e9b08675"
+    }
+  },
+  "source_root": "/tmp/litchi-performance-0930/candidate-source-v2",
+  "started_utc": "2026-10-06T13:45:30.824390+00:00",
+  "status": "completed",
+  "target_dir": "/home/zhuhe/litchi-performance-0930/candidate-target-v2",
+  "terminal_receipt": {
+    "bytes": 1346,
+    "path": "/tmp/litchi-performance-0930/candidate-build-terminal-v2.json",
+    "sha256": "213c0e4f766cc6daa942cfb5d2cf81a019359175bd4c5f6154c76c4e69df896c"
+  },
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "analysis_started_after_terminal_receipt": true,
+  "build_log": {
+    "bytes": 8758,
+    "path": "/tmp/litchi-performance-0930/candidate-build-v2.log",
+    "sha256": "f3a24cf505cd30dec5918d191cbe54713067e7eaeb72d166a79575f8bbd5466d"
+  },
+  "command": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "-j2",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0930/candidate-source-v2/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "--target-dir",
+    "/home/zhuhe/litchi-performance-0930/candidate-target-v2"
+  ],
+  "cwd": "/tmp/litchi-performance-0930/candidate-source-v2",
+  "ended_utc": "2026-10-06T13:54:29.354131+00:00",
+  "environment_policy": {
+    "recorded_allowlist": [
+      "RUSTFLAGS",
+      "CARGO_ENCODED_RUSTFLAGS",
+      "CARGO_PROFILE_RELEASE_STRIP"
+    ],
+    "release_flags": [
+      "--offline",
+      "--locked",
+      "--release",
+      "-j2"
+    ],
+    "unset_before_build": []
+  },
+  "exit_code": 0,
+  "recapture_count": 0,
+  "runner_error": null,
+  "schema": "litchi.performance.0930.candidate-build-terminal.v2",
+  "source_root": "/tmp/litchi-performance-0930/candidate-source-v2",
+  "started_utc": "2026-10-06T13:45:30.824390+00:00",
+  "status": "completed",
+  "target_dir": "/home/zhuhe/litchi-performance-0930/candidate-target-v2"
+}

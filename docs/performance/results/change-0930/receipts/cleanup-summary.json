@@ -1,0 +1,31 @@
+{
+  "candidate_target_cleanup_receipt": {
+    "bytes": 295574,
+    "path": "/tmp/litchi-performance-0930/candidate-target-cleanup-final.json",
+    "sha256": "d31866d86ea5064f8f0a8cf5ca92e33026a246a5f958970b7d99369922d0b65b"
+  },
+  "candidate_target_removed_bytes": 1192920388,
+  "fixture_scratch_removed": [
+    {
+      "bytes": 259504344,
+      "path": "/tmp/litchi-performance-0930/test-source-fixture"
+    },
+    {
+      "bytes": 259504874,
+      "path": "/tmp/litchi-performance-0930/test-source-fixture-v2"
+    },
+    {
+      "bytes": 1890082885,
+      "path": "/tmp/litchi-performance-0930/test-target-fixture"
+    },
+    {
+      "bytes": 1890337708,
+      "path": "/tmp/litchi-performance-0930/test-target-fixture-v2"
+    }
+  ],
+  "physical_reclaimed_bytes": "not measured; hardlink sharing may differ",
+  "preserved": "Shared target, quality checkout/receipts/logs, source closures, captures, packet archives, retained baseline/candidate binaries and rustc metadata. No source or frozen measurement script changed.",
+  "removed_logical_bytes": 5492353322,
+  "schema": "litchi.performance.0930.cleanup-summary.v1",
+  "unexecuted_v3_runner_removed_bytes": 3123
+}

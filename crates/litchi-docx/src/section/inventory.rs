@@ -10,6 +10,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::mem::size_of;
 use std::sync::Arc;
 
 /// Resource policy for one main-document section inventory.
@@ -390,6 +391,56 @@ impl Inventory {
         Arc::ptr_eq(&self.sections, &other.sections) && Arc::ptr_eq(&self.sources, &other.sources)
     }
 
+    /// Estimate the owned heap payload retained by this immutable inventory.
+    ///
+    /// The estimate includes slice capacities, nested vectors and strings,
+    /// and conservative control-block overhead for each `Arc`. It is an
+    /// accounting value rather than a physical allocator or RSS measurement.
+    pub(crate) fn retained_bytes(&self) -> Option<usize> {
+        let mut bytes = 0;
+        bytes = add_arc_slice_bytes(bytes, self.sections.len(), size_of::<Descriptor>())?;
+        for descriptor in self.sections.iter() {
+            if let Some(columns) = &descriptor.columns {
+                bytes = add_vec_bytes(
+                    bytes,
+                    columns.columns.capacity(),
+                    size_of::<super::Column>(),
+                )?;
+            }
+            bytes = add_box_slice_bytes(bytes, descriptor.headers.len(), size_of::<Reference>())?;
+            bytes = add_box_slice_bytes(bytes, descriptor.footers.len(), size_of::<Reference>())?;
+            for reference in descriptor.headers.iter().chain(descriptor.footers.iter()) {
+                bytes = bytes.checked_add(reference.relationship_id.capacity())?;
+            }
+        }
+
+        bytes = add_arc_slice_bytes(bytes, self.sources.len(), size_of::<Option<SourceSpan>>())?;
+        for source in self.sources.iter().flatten() {
+            bytes = add_box_slice_bytes(
+                bytes,
+                source.relationship_bindings.len(),
+                size_of::<RelationshipBinding>(),
+            )?;
+            bytes = add_box_slice_bytes(
+                bytes,
+                source.namespace_bindings.len(),
+                size_of::<RelationshipBinding>(),
+            )?;
+            for binding in source
+                .relationship_bindings
+                .iter()
+                .chain(source.namespace_bindings.iter())
+            {
+                bytes = bytes.checked_add(binding.prefix.capacity())?;
+                bytes = bytes.checked_add(binding.namespace.capacity())?;
+            }
+        }
+
+        bytes = bytes.checked_add(arc_header_bytes())?;
+        bytes = bytes.checked_add(self.tolerance.retained_bytes()?)?;
+        Some(bytes)
+    }
+
     pub(crate) fn topology_matches(&self, other: &Self) -> bool {
         self.paragraph_count == other.paragraph_count
             && self.sections.len() == other.sections.len()
@@ -442,6 +493,22 @@ impl Inventory {
             self_contained_fragment(bytes, &source.namespace_bindings, max_section_bytes)?,
         )))
     }
+}
+
+fn arc_header_bytes() -> usize {
+    2 * size_of::<usize>()
+}
+
+fn add_arc_slice_bytes(total: usize, len: usize, element_size: usize) -> Option<usize> {
+    add_box_slice_bytes(total, len, element_size)?.checked_add(arc_header_bytes())
+}
+
+fn add_box_slice_bytes(total: usize, len: usize, element_size: usize) -> Option<usize> {
+    total.checked_add(len.checked_mul(element_size)?)
+}
+
+fn add_vec_bytes(total: usize, capacity: usize, element_size: usize) -> Option<usize> {
+    add_box_slice_bytes(total, capacity, element_size)
 }
 
 fn relationship_bindings_match(
@@ -1598,4 +1665,86 @@ fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     origin
         .offset(reader.buffer_position())
         .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::header_footer::Kind;
+    use crate::section::{Column, Columns, Emu, Reference};
+
+    fn descriptor(columns: Columns, headers: Box<[Reference]>) -> Descriptor {
+        Descriptor {
+            position: Position::new(0),
+            ownership: Ownership::Paragraph(Position::new(0)),
+            paragraphs: ParagraphRange {
+                start: Position::new(0),
+                end: Position::new(1),
+            },
+            page_size: None,
+            margins: None,
+            start: None,
+            columns: Some(columns),
+            headers,
+            footers: Box::default(),
+        }
+    }
+
+    fn inventory(descriptor: Descriptor, source: Option<SourceSpan>) -> Inventory {
+        Inventory {
+            sections: Arc::from(vec![descriptor].into_boxed_slice()),
+            paragraph_count: 1,
+            sources: Arc::from(vec![source].into_boxed_slice()),
+            tolerance: Arc::new(crate::leniency::ToleranceReport::default()),
+        }
+    }
+
+    #[test]
+    fn retained_bytes_counts_nested_capacities() {
+        let empty = inventory(descriptor(Columns::default(), Box::default()), None)
+            .retained_bytes()
+            .unwrap();
+        let populated = inventory(
+            descriptor(
+                Columns {
+                    equal_width: false,
+                    count: 2,
+                    space: Some(Emu::from_twips(120)),
+                    separator: true,
+                    columns: Vec::with_capacity(4),
+                },
+                vec![Reference {
+                    kind: Kind::Primary,
+                    relationship_id: "rId-with-capacity".to_owned(),
+                }]
+                .into_boxed_slice(),
+            ),
+            Some(SourceSpan {
+                start: 0,
+                end: 1,
+                relationship_bindings: vec![RelationshipBinding {
+                    prefix: Vec::with_capacity(4),
+                    namespace: Vec::with_capacity(24),
+                }]
+                .into_boxed_slice(),
+                namespace_bindings: vec![RelationshipBinding {
+                    prefix: Vec::with_capacity(2),
+                    namespace: Vec::with_capacity(12),
+                }]
+                .into_boxed_slice(),
+            }),
+        )
+        .retained_bytes()
+        .unwrap();
+
+        assert!(populated > empty);
+        assert!(populated >= 4 * size_of::<Column>());
+    }
+
+    #[test]
+    fn retained_byte_accounting_is_checked() {
+        assert_eq!(add_box_slice_bytes(usize::MAX, 1, 1), None);
+        assert_eq!(add_arc_slice_bytes(usize::MAX, 1, 1), None);
+        assert_eq!(add_vec_bytes(usize::MAX, 1, 1), None);
+    }
 }

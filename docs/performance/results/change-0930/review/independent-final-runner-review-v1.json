@@ -1,0 +1,37 @@
+{
+  "authorization": "approved for root-controlled fixed 48-child capture after idle barrier; this receipt does not authorize capture independently",
+  "checks": {
+    "ast_import_and_verify_manifest": "passed",
+    "child_environment": "exact allowlisted map is passed to Popen and replay-checked",
+    "controls": "capture_started=false and document_children_started=0",
+    "process_groups": "start_new_session, deadline termination, and closure probes are recorded; controls closure test passed",
+    "receipt_creation": "write_new_json uses exclusive xb plus flush/fsync; capture-state checkpoints have unique names",
+    "schedule": "48 frozen children; schedule SHA 4834b67e0340d31e34dc7bafeb527bf37f20b9d5f0964a1d86a6803ccd6379cb",
+    "source_build_identity": "historical v2 listing/receipt/terminal bridge and timestamp ordering passed; reconstructed closure matches listing",
+    "source_closure": "verify_manifest passed baseline and candidate closures at 6276 files each",
+    "validator_custody": "capture and replay load the packet-local copied validator; controls copied-validator test passed"
+  },
+  "controls": {
+    "bytes": 1079,
+    "path": "/tmp/litchi-performance-0930/formal-runner-controls-final-v2.json",
+    "sha256": "3239689aef1a257d63d2e367194daa61001699ae9652f73d785fe81e0e0e3645"
+  },
+  "manifest": {
+    "bytes": 31560,
+    "path": "/tmp/litchi-performance-0930/formal-manifest-final-unauthorized.json",
+    "sha256": "92db4fbbf5e386508934fe6b50a31c467d6fc04734e6e1cd47fb251f4e496e45"
+  },
+  "residual_observation": {
+    "status": "non_blocking",
+    "text": "Script copies are created exclusively and replay rechecks their descriptors; this review did not add a separate immediate copy-descriptor assertion before the first child. Frozen script hashes and the enforced no-writer idle barrier make this a hardening observation, not a gate failure."
+  },
+  "reviewed_utc": "2026-10-06T14:23:23.521002+00:00",
+  "runner": {
+    "bytes": 54433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-runner-v1.py",
+    "sha256": "17a433994d2aa0a7de979a33731597e768b8056e491d924f4ed32c41b28f7bc5"
+  },
+  "schema": "litchi.performance.0930.independent-final-runner-review.v1",
+  "scope": "read-only pre-capture audit; no workload, build, or formal child started by this reviewer",
+  "status": "approved"
+}

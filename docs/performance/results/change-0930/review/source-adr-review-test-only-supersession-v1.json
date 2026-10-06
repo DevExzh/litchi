@@ -1,0 +1,87 @@
+{
+  "boundary_proof": {
+    "approved_runtime_prefix_sha256": "951cd80a131c00d2a4a42d2ea061e6444becfff23e1c84f03391be9a641f6e28",
+    "current_candidate_file": {
+      "bytes": 87887,
+      "path": "/tmp/litchi-performance-0930/candidate-source-v2/crates/litchi-docx/src/section/layout.rs",
+      "sha256": "0c1732a566d35096a9cc02949f880b81dd07b0a1bf3db4dcc4a43d87cf6da03e"
+    },
+    "current_shared_file": {
+      "bytes": 87887,
+      "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/layout.rs",
+      "sha256": "0c1732a566d35096a9cc02949f880b81dd07b0a1bf3db4dcc4a43d87cf6da03e"
+    },
+    "current_test_suffix_sha256": "baaa95c9c2317ad51253449fb387b946f978d99a519e4b958dfdf34cab7dd877",
+    "file": "crates/litchi-docx/src/section/layout.rs",
+    "marker": "#[cfg(test)]\nmod tests {",
+    "marker_bytes_hex": "235b6366672874657374295d0a6d6f64207465737473207b",
+    "production_prefix_unchanged": true,
+    "runtime_prefix_definition": "bytes before first exact marker",
+    "runtime_prefix_offset": 83018,
+    "runtime_prefix_sha256": "951cd80a131c00d2a4a42d2ea061e6444becfff23e1c84f03391be9a641f6e28"
+  },
+  "claim_scope": "The final fixture correction is confined to #[cfg(test)] suffix; approved runtime prefix and integration test are byte-identical. This receipt supersedes only the test-source binding for the formal candidate source; it does not modify or replace source-adr-review-v1.",
+  "created_utc": "2026-10-06T13:59:55.817481+00:00",
+  "immutable_prior_review": {
+    "approved_layout_whole_sha256": "2a5849c277728e428fc060983f0facd3be26503f5a98337decc92d7e684024f4",
+    "approved_production_file_binding": "whole-file layout.rs hash 2a5849c277728e428fc060983f0facd3be26503f5a98337decc92d7e684024f4",
+    "json": {
+      "bytes": 5549,
+      "path": "/tmp/litchi-performance-0930/source-adr-review-v1.json",
+      "sha256": "b32bf9c3627abe10e68aa0f5e0fad574124bdc6b0cb43938e93ff4371c3eaf45"
+    },
+    "markdown": {
+      "bytes": 1801,
+      "path": "/tmp/litchi-performance-0930/source-adr-review-v1.md",
+      "sha256": "ecf3cad25be304888a70d9ee4424cbac14e65d4e4405b877c969bd063a86cd7c"
+    }
+  },
+  "integration_test_proof": {
+    "byte_identical": true,
+    "candidate": {
+      "bytes": 61823,
+      "path": "/tmp/litchi-performance-0930/candidate-source-v2/crates/litchi-docx/tests/source_backed_sections.rs",
+      "sha256": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0"
+    },
+    "path": "crates/litchi-docx/tests/source_backed_sections.rs",
+    "shared": {
+      "bytes": 61823,
+      "path": "/home/zhuhe/code/litchi/crates/litchi-docx/tests/source_backed_sections.rs",
+      "sha256": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0"
+    }
+  },
+  "schema": "litchi.performance.0930.source-adr-review-test-only-supersession.v1",
+  "status": "approved_test_only_supersession",
+  "superseding_source_custody": {
+    "candidate_patch_v3": {
+      "bytes": 32309,
+      "path": "/tmp/litchi-performance-0930/candidate-production-and-test-v3.patch",
+      "sha256": "ae98d90b20e223d7fb2949a32a3b6a2c9b93d0946b301d74b6399c2a775c4d22"
+    },
+    "post_v2_changed_paths": [
+      "crates/litchi-docx/src/section/layout.rs"
+    ],
+    "source_listing_v3": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0930/candidate-source-v3-list.jsonl",
+      "sha256": "0b8eaf8dbe2468d00eb05542374bbb00b7ed701e1a9c2757156088aa1d906a4b"
+    },
+    "source_receipt_v2": {
+      "bytes": 359121,
+      "path": "/tmp/litchi-performance-0930/candidate-source-receipt-v2.json",
+      "sha256": "a4aa16f42aaad90610acaa6f11a2eb9d0435d8c4df4b6c827f257a11026c7a94"
+    },
+    "source_receipt_v3": {
+      "bytes": 359265,
+      "path": "/tmp/litchi-performance-0930/candidate-source-receipt-v3.json",
+      "sha256": "281af348d5c8a57917111624e0e6a82be85a2f17d7192eca3370a3da2a86669d"
+    },
+    "test_only_reason": "Only bytes at and after #[cfg(test)] changed relative to the reviewed whole-file v2 layout binding; runtime prefix hash and byte offset are equal."
+  },
+  "verification": {
+    "build_run": false,
+    "capture_run": false,
+    "command": "python3 -B: read layout.rs, locate first exact b'#[cfg(test)]\\nmod tests {', hash bytes before marker, compare candidate/shared; hash integration files",
+    "workload_run": false
+  }
+}

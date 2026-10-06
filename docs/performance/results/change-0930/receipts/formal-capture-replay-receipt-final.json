@@ -1,0 +1,476 @@
+{
+  "build_binding": {
+    "candidate_binary_sha256": "ae9d7c303496a30ae2850e397076093322adb6fe2be4a598ac446b206bd88eff",
+    "candidate_build_binding_sha256": "33c6132cbe488665784a5ff08cd48312b734af7617a778a6c9d660ae7d5e0e0"
+  },
+  "claim_scope": "formal descriptive paired timing and review flags; no adoption decision in this receipt",
+  "created_utc": "2026-10-06T14:26:42.675783+00:00",
+  "manifest": {
+    "bytes": 32145,
+    "path": "/tmp/litchi-performance-0930/formal-manifest-authorized.json",
+    "sha256": "1362bf3be1c2f8ce870b9f0901f1b219b2032def2afdbda02fbe15376a9b8acc"
+  },
+  "moved_packet_replay": {
+    "bytes": 17115,
+    "path": "/tmp/litchi-performance-0930/replay-moved-terminal.json",
+    "sha256": "88afeebbfb7b5e13ef3b93bec6032ad47ce50d02c72311b36a76c0faf4471212"
+  },
+  "moved_packet_root": "/tmp/litchi-performance-0930/formal-packet-authorized-moved",
+  "original_replay": {
+    "bytes": 17109,
+    "path": "/tmp/litchi-performance-0930/replay-original-terminal.json",
+    "sha256": "97bdbfa100f9f427cbb0929c267a41ce0a2c3205e56dee696083617cd0414b31"
+  },
+  "outer_terminal": {
+    "bytes": 2307,
+    "path": "/tmp/litchi-performance-0930/outer-capture-terminal-final.json",
+    "sha256": "3a86a58b0a98e530294920f860a149cb31f187e098a76e22fd287e08b011c11b"
+  },
+  "packet_root": "/tmp/litchi-performance-0930/formal-packet-authorized",
+  "packet_state": {
+    "bytes": 49716,
+    "path": "/tmp/litchi-performance-0930/formal-packet-authorized/capture-state.json",
+    "sha256": "de54ec206a79fadb993ebb6e23216b4a377f6de7106a3c177108864f915bdd44"
+  },
+  "paired_gate": {
+    "bootstrap_lower_95_strictly_greater_than": 1.0,
+    "claim": "descriptive paired gate only; adoption requires independent review and semantic controls",
+    "median_ratio_minimum": 1.05,
+    "per_route": {
+      "generic_read_at": {
+        "baseline_p50_ns": [
+          4485478.0,
+          4484768.0,
+          4480798.0,
+          4483528.0,
+          4492498.0,
+          4501043.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.079743999159794,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.0838465070674286,
+        "candidate_p50_ns": [
+          4143641.5,
+          4152012.0,
+          4151406.0,
+          4146452.0,
+          4155142.0,
+          4147676.5
+        ],
+        "median_ratio": 1.0812413189464196,
+        "paired_baseline_over_candidate_p50": [
+          1.0824966397310192,
+          1.0801433136513092,
+          1.0793446846682786,
+          1.081292632834047,
+          1.0811900050587921,
+          1.085196374403838
+        ],
+        "pairs": 6
+      },
+      "owned_reader": {
+        "baseline_p50_ns": [
+          3838715.5,
+          4061131.5,
+          4057941.0,
+          3838580.5,
+          3576789.5,
+          3844090.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.0520913580548936,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.1303049668739942,
+        "candidate_p50_ns": [
+          3490724.0,
+          3735330.5,
+          3495454.0,
+          3514249.5,
+          3517134.5,
+          3514039.0
+        ],
+        "median_ratio": 1.093106973613593,
+        "paired_baseline_over_candidate_p50": [
+          1.0996903507696398,
+          1.0872214654098211,
+          1.1609195829783485,
+          1.0922902599829636,
+          1.0169612506999661,
+          1.0939236872442224
+        ],
+        "pairs": 6
+      },
+      "owned_vec": {
+        "baseline_p50_ns": [
+          3721205.0,
+          3704465.0,
+          3723745.0,
+          3707870.0,
+          3718024.5,
+          3722890.0
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.097352233250477,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.179917366196232,
+        "candidate_p50_ns": [
+          3375908.5,
+          3384229.0,
+          3379458.0,
+          2948482.0,
+          3379678.5,
+          3384204.0
+        ],
+        "median_ratio": 1.100994142452488,
+        "paired_baseline_over_candidate_p50": [
+          1.102282541129299,
+          1.0946259842345185,
+          1.1018763955640225,
+          1.2575521912631653,
+          1.1001118893409536,
+          1.1000784822664356
+        ],
+        "pairs": 6
+      },
+      "range_short": {
+        "baseline_p50_ns": [
+          4529818.0,
+          4534038.0,
+          4539583.0,
+          4531808.0,
+          4536438.5,
+          4527838.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.07999874461089,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.0831975955995996,
+        "candidate_p50_ns": [
+          4192942.0,
+          4184156.5,
+          4192546.5,
+          4191907.0,
+          4197992.0,
+          4193787.0
+        ],
+        "median_ratio": 1.080853048617728,
+        "paired_baseline_over_candidate_p50": [
+          1.080343586913437,
+          1.083620557691855,
+          1.0827746335073445,
+          1.0810850526979725,
+          1.0806210445374835,
+          1.0796539023083433
+        ],
+        "pairs": 6
+      }
+    },
+    "primary_pass": true,
+    "primary_route": "generic_read_at",
+    "ratio": "baseline_p50 / candidate_p50",
+    "schema": "litchi.performance.0930.paired-gate.v1"
+  },
+  "per_route": {
+    "generic_read_at": {
+      "baseline_elapsed_ns": {
+        "max": 4562928,
+        "mean": 4490166.473333334,
+        "min": 4463278,
+        "p50": 4487302.5,
+        "p95": 4515988.0,
+        "p99": 4544588.0
+      },
+      "baseline_rss_bytes": {
+        "count": 6,
+        "max": 37679104,
+        "min": 37097472,
+        "p50": 37236736.0,
+        "p95": 37679104,
+        "p99": 37679104
+      },
+      "candidate_elapsed_ns": {
+        "max": 4221857,
+        "mean": 4152499.63,
+        "min": 4128067,
+        "p50": 4149882.0,
+        "p95": 4179217.0,
+        "p99": 4196837.0
+      },
+      "candidate_over_baseline_p95": -0.07457305023839744,
+      "candidate_over_baseline_p99": -0.07651980773614686,
+      "candidate_over_baseline_rss_p50": 0.039104608953910436,
+      "candidate_over_baseline_rss_p95": 0.03239482552451345,
+      "candidate_rss_bytes": {
+        "count": 6,
+        "max": 38899712,
+        "min": 38440960,
+        "p50": 38692864.0,
+        "p95": 38899712,
+        "p99": 38899712
+      },
+      "paired": {
+        "baseline_p50_ns": [
+          4485478.0,
+          4484768.0,
+          4480798.0,
+          4483528.0,
+          4492498.0,
+          4501043.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.079743999159794,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.0838465070674286,
+        "candidate_p50_ns": [
+          4143641.5,
+          4152012.0,
+          4151406.0,
+          4146452.0,
+          4155142.0,
+          4147676.5
+        ],
+        "median_ratio": 1.0812413189464196,
+        "paired_baseline_over_candidate_p50": [
+          1.0824966397310192,
+          1.0801433136513092,
+          1.0793446846682786,
+          1.081292632834047,
+          1.0811900050587921,
+          1.085196374403838
+        ],
+        "pairs": 6
+      }
+    },
+    "owned_reader": {
+      "baseline_elapsed_ns": {
+        "max": 4205047,
+        "mean": 3866938.0033333334,
+        "min": 3560424,
+        "p50": 3843230.5,
+        "p95": 4079897.0,
+        "p99": 4100587.0
+      },
+      "baseline_rss_bytes": {
+        "count": 6,
+        "max": 38739968,
+        "min": 37101568,
+        "p50": 37836800.0,
+        "p95": 38739968,
+        "p99": 38739968
+      },
+      "candidate_elapsed_ns": {
+        "max": 3779225,
+        "mean": 3549605.8866666667,
+        "min": 3242923,
+        "p50": 3513424.5,
+        "p95": 3741125.0,
+        "p99": 3762406.0
+      },
+      "candidate_over_baseline_p95": -0.08303444915398595,
+      "candidate_over_baseline_p99": -0.08247136324628646,
+      "candidate_over_baseline_rss_p50": 0.023978349120433062,
+      "candidate_over_baseline_rss_p95": 0.013216324804398383,
+      "candidate_rss_bytes": {
+        "count": 6,
+        "max": 39251968,
+        "min": 38457344,
+        "p50": 38744064.0,
+        "p95": 39251968,
+        "p99": 39251968
+      },
+      "paired": {
+        "baseline_p50_ns": [
+          3838715.5,
+          4061131.5,
+          4057941.0,
+          3838580.5,
+          3576789.5,
+          3844090.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.0520913580548936,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.1303049668739942,
+        "candidate_p50_ns": [
+          3490724.0,
+          3735330.5,
+          3495454.0,
+          3514249.5,
+          3517134.5,
+          3514039.0
+        ],
+        "median_ratio": 1.093106973613593,
+        "paired_baseline_over_candidate_p50": [
+          1.0996903507696398,
+          1.0872214654098211,
+          1.1609195829783485,
+          1.0922902599829636,
+          1.0169612506999661,
+          1.0939236872442224
+        ],
+        "pairs": 6
+      }
+    },
+    "owned_vec": {
+      "baseline_elapsed_ns": {
+        "max": 3820516,
+        "mean": 3719840.816666667,
+        "min": 3683685,
+        "p50": 3717930.0,
+        "p95": 3749255.0,
+        "p99": 3789565.0
+      },
+      "baseline_rss_bytes": {
+        "count": 6,
+        "max": 37695488,
+        "min": 36806656,
+        "p50": 37097472.0,
+        "p95": 37695488,
+        "p99": 37695488
+      },
+      "candidate_elapsed_ns": {
+        "max": 3471254,
+        "mean": 3312824.21,
+        "min": 2933912,
+        "p50": 3379289.0,
+        "p95": 3407134.0,
+        "p99": 3418823.0
+      },
+      "candidate_over_baseline_p95": -0.09125039507848898,
+      "candidate_over_baseline_p99": -0.09783233695688032,
+      "candidate_over_baseline_rss_p50": 0.043115822016120076,
+      "candidate_over_baseline_rss_p95": 0.03542323155492766,
+      "candidate_rss_bytes": {
+        "count": 6,
+        "max": 39030784,
+        "min": 38375424,
+        "p50": 38696960.0,
+        "p95": 39030784,
+        "p99": 39030784
+      },
+      "paired": {
+        "baseline_p50_ns": [
+          3721205.0,
+          3704465.0,
+          3723745.0,
+          3707870.0,
+          3718024.5,
+          3722890.0
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.097352233250477,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.179917366196232,
+        "candidate_p50_ns": [
+          3375908.5,
+          3384229.0,
+          3379458.0,
+          2948482.0,
+          3379678.5,
+          3384204.0
+        ],
+        "median_ratio": 1.100994142452488,
+        "paired_baseline_over_candidate_p50": [
+          1.102282541129299,
+          1.0946259842345185,
+          1.1018763955640225,
+          1.2575521912631653,
+          1.1001118893409536,
+          1.1000784822664356
+        ],
+        "pairs": 6
+      }
+    },
+    "range_short": {
+      "baseline_elapsed_ns": {
+        "max": 4633208,
+        "mean": 4536195.993333333,
+        "min": 4508818,
+        "p50": 4533633.0,
+        "p95": 4567028.0,
+        "p99": 4585788.0
+      },
+      "baseline_rss_bytes": {
+        "count": 6,
+        "max": 37703680,
+        "min": 37371904,
+        "p50": 37691392.0,
+        "p95": 37703680,
+        "p99": 37703680
+      },
+      "candidate_elapsed_ns": {
+        "max": 4494258,
+        "mean": 4197374.203333333,
+        "min": 4169047,
+        "p50": 4192777.0,
+        "p95": 4221487.0,
+        "p99": 4328218.0
+      },
+      "candidate_over_baseline_p95": -0.07565992588615611,
+      "candidate_over_baseline_p99": -0.056167009901024634,
+      "candidate_over_baseline_rss_p50": 0.025755270593349255,
+      "candidate_over_baseline_rss_p95": 0.028462791960890854,
+      "candidate_rss_bytes": {
+        "count": 6,
+        "max": 38776832,
+        "min": 38281216,
+        "p50": 38662144.0,
+        "p95": 38776832,
+        "p99": 38776832
+      },
+      "paired": {
+        "baseline_p50_ns": [
+          4529818.0,
+          4534038.0,
+          4539583.0,
+          4531808.0,
+          4536438.5,
+          4527838.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.07999874461089,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.0831975955995996,
+        "candidate_p50_ns": [
+          4192942.0,
+          4184156.5,
+          4192546.5,
+          4191907.0,
+          4197992.0,
+          4193787.0
+        ],
+        "median_ratio": 1.080853048617728,
+        "paired_baseline_over_candidate_p50": [
+          1.080343586913437,
+          1.083620557691855,
+          1.0827746335073445,
+          1.0810850526979725,
+          1.0806210445374835,
+          1.0796539023083433
+        ],
+        "pairs": 6
+      }
+    }
+  },
+  "raw_children": {
+    "all_reports_below_1MiB": true,
+    "capture_state_status": "completed",
+    "failed_children": 0,
+    "reports": 48,
+    "terminals": 48,
+    "validations": 48
+  },
+  "recapture_count": 0,
+  "reduction": {
+    "bytes": 17115,
+    "path": "/tmp/litchi-performance-0930/formal-reduction-final.json",
+    "sha256": "88afeebbfb7b5e13ef3b93bec6032ad47ce50d02c72311b36a76c0faf4471212"
+  },
+  "schema": "litchi.performance.0930.formal-capture-replay-receipt.v1",
+  "source_binding": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_source_binding_sha256": "b81a6433b3e4607ecdb4f3f1320e0e4b104feb251b3611234ce548b4e9b08675"
+  },
+  "status": "completed"
+}

@@ -1,0 +1,56 @@
+{
+  "analysis_started_after_terminal_receipt": true,
+  "authorized_manifest": {
+    "bytes": 32145,
+    "path": "/tmp/litchi-performance-0930/formal-manifest-authorized.json",
+    "sha256": "1362bf3be1c2f8ce870b9f0901f1b219b2032def2afdbda02fbe15376a9b8acc"
+  },
+  "capture_state": {
+    "bytes": 49716,
+    "path": "/tmp/litchi-performance-0930/formal-packet-authorized/capture-state.json",
+    "sha256": "de54ec206a79fadb993ebb6e23216b4a377f6de7106a3c177108864f915bdd44"
+  },
+  "children_failed": 0,
+  "children_passed": 48,
+  "children_run": 48,
+  "command_argv": [
+    "env",
+    "LITCHI_PERF_0930_CAPTURE_APPROVED=1",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-runner-v1.py",
+    "capture",
+    "--manifest",
+    "/tmp/litchi-performance-0930/formal-manifest-authorized.json",
+    "--packet",
+    "/tmp/litchi-performance-0930/formal-packet-authorized"
+  ],
+  "effective_environment_allowlist": {
+    "LITCHI_PERF_0930_CAPTURE_APPROVED": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "ended_utc": "not captured by outer tool; see packet capture-state",
+  "observed_utc": "2026-10-06T14:25:01.711313+00:00",
+  "packet_manifest": {
+    "bytes": 34066,
+    "path": "/tmp/litchi-performance-0930/formal-packet-authorized/manifest.json",
+    "sha256": "cebf1d3fd8561375b7bfeaccdf522c0a2cb8e444939d9d76f041238d6e739187"
+  },
+  "recapture_count": 0,
+  "retry_count": 0,
+  "runner": {
+    "bytes": 54433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-runner-v1.py",
+    "sha256": "17a433994d2aa0a7de979a33731597e768b8056e491d924f4ed32c41b28f7bc5"
+  },
+  "schema": "litchi.performance.0930.outer-capture-terminal.v1",
+  "session_id": 52965,
+  "started_utc": "not captured by outer tool; see packet capture-state",
+  "status": "terminal",
+  "tool_reported_exit_code": 0,
+  "tool_reported_output": "{\n  \"children_run\": 48,\n  \"failed\": 0,\n  \"packet\": \"/tmp/litchi-performance-0930/formal-packet-authorized\",\n  \"passed\": 48,\n  \"status\": \"completed\"\n}\n",
+  "tool_reported_output_sha256": "796468d687728102771fd043f34e16a5c7dbe4888dc8607010c7be9efece029e",
+  "tool_reported_wall_time_seconds": 37.9,
+  "working_directory": "/home/zhuhe/code/litchi"
+}

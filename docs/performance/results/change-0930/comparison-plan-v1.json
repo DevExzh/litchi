@@ -1,0 +1,173 @@
+{
+  "approval": {
+    "approved_utc": "2026-10-06T13:23:53.106424+00:00",
+    "formal_capture_requires_new_source_review_build_receipt_and_root_freeze": true,
+    "formal_children_authorized": false,
+    "scope": "baseline precheck only; root approved 24 children while source remains unmodified"
+  },
+  "baseline_precheck": {
+    "blocks": 6,
+    "children": 24,
+    "children_per_route": 6,
+    "even_block_route_order": [
+      "range_short",
+      "owned_reader",
+      "owned_vec",
+      "generic_read_at"
+    ],
+    "label": "descriptive baseline precheck; not formal before/after evidence",
+    "measured_samples_per_route": 300,
+    "measured_samples_total": 1200,
+    "odd_block_route_order": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "output_root": "/tmp/litchi-performance-0930/baseline-precheck",
+    "version": "retained 0925 normal baseline only"
+  },
+  "build_binding": {
+    "baseline_binary": {
+      "bytes": 70187352,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "build_receipt": {
+      "bytes": 3137,
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "formal_candidate_requirement": "separate target and build receipt with identical toolchain, release profile, locks, harness bytes, corpus and runtime environment; exact reviewed production diff only",
+    "lock_hashes": {
+      "root_cargo_lock": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+      "rustfmt_toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+      "tools_perf_baseline_cargo_lock": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "profile": "release",
+    "toolchain": "rustc/cargo +1.95.0"
+  },
+  "child_argv_template": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "12",
+    "<binary>",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "50",
+    "--warmup",
+    "5",
+    "--json",
+    "<report.json>"
+  ],
+  "corpus": {
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+  },
+  "created_utc": "2026-10-06T13:23:53.106402+00:00",
+  "formal_gate": {
+    "claim_scope": "gates apply only after the complete fresh 48-child interleaved cohort, source/build review, and independent copied-packet replay; precheck cannot satisfy them",
+    "primary_per_route": {
+      "bootstrap_lower_95_minimum": 1.0,
+      "bootstrap_method": "10,000 fixed-seed resamples of the route paired-ratio vector; percentile 2.5th lower bound; nearest-rank percentile definition",
+      "draws": 10000,
+      "median_ratio_minimum": 1.05,
+      "pair_unit": "same route, same block/position, matched baseline/candidate process pair; odd blocks baseline then candidate, even blocks candidate then baseline",
+      "seed": 930,
+      "statistic": "paired process ratio candidate_p50 / baseline_p50, one ratio per matched process pair"
+    },
+    "secondary_flags": {
+      "pooled_latency_regression_threshold": "flag if candidate pooled p95 or p99 exceeds baseline by >5%; retain raw pooled vectors",
+      "rss_regression_threshold": "flag if candidate per-route RSS exceeds baseline by >5%; RSS is setup-inclusive / review flag only",
+      "semantic_or_counter_failure": "any failed report/control invalidates the formal cohort; no selective recapture",
+      "tail_regression_threshold": "flag if paired p95 or p99 tail regression exceeds 5%; retain per-child and pooled tails"
+    },
+    "status": "frozen_prospectively_pending_candidate_cohort"
+  },
+  "formal_paired_cohort": {
+    "baseline_binary": "retained 0925 normal binary",
+    "blocks": 6,
+    "candidate_binary": "bound only after source review and matched build receipt",
+    "children": 48,
+    "children_per_route_per_version": 6,
+    "even_block_route_order": [
+      "range_short",
+      "owned_reader",
+      "owned_vec",
+      "generic_read_at"
+    ],
+    "even_block_version_order": "candidate,baseline for each route",
+    "label": "fresh interleaved paired cohort after candidate source/build/review freeze",
+    "measured_samples_per_route_per_version": 300,
+    "measured_samples_per_version": 1200,
+    "measured_samples_total": 2400,
+    "odd_block_route_order": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "odd_block_version_order": "baseline,candidate for each route",
+    "output_root": "/tmp/litchi-performance-0930/formal-paired"
+  },
+  "metrics_and_controls": {
+    "claims": "baseline precheck is descriptive; no candidate adoption or speed claim until formal cohort, source review, quality gates and independent replay pass",
+    "custody": "write terminal child receipt with start/end/exit/stdout/stderr/time/report hashes before parsing; preserve every failure and never recapture",
+    "rss": "/usr/bin/time -v per child; retain maximum RSS and complete time stderr; RSS is setup-inclusive and not allocation evidence",
+    "semantic": "validate exact source/output hashes, phase conservation, source/read contracts, cache/source/sink/preservation/refusal controls, and route-specific unavailable counters",
+    "timing": "retain raw elapsed_ns vectors, per-child p50/p95/p99, pooled raw p50/p95/p99 and paired ratios only for formal cohort"
+  },
+  "purpose": "fresh normal-release baseline precheck before the next candidate source edit, followed later by an interleaved paired formal cohort",
+  "reuse": "reuse 0925 comparison-capture.py/comparison.py/reducer logic offline; no new capture framework or source edits in this planning step",
+  "routes": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader",
+    "range_short"
+  ],
+  "runner": {
+    "path": "/tmp/litchi-performance-0930/baseline-precheck-run.py",
+    "scope": "external bounded precheck runner; terminal receipt is written before report parsing; no formal/adoption path",
+    "sha256": "89b7c921930ded05a20e5a02a96903b6f92ca7b257bd0d1487e483a2b61c813c"
+  },
+  "runtime": {
+    "cpu": 12,
+    "filesystem_scope": "existing in-memory corpus; range_short is a bounded provider control, no disk/network claim",
+    "polling": "same live process handle until terminal; observation timeout polls, confirmed deadline/nonzero/malformed/missing RSS invalidates cohort; never retries",
+    "process_deadline_seconds": 900,
+    "route_env": "LITCHI_DOCX_INGRESS_ROUTE",
+    "samples_per_child": 50,
+    "warmups_per_child": 5
+  },
+  "schema": "litchi.performance.0930.normal-baseline-plan.v1",
+  "source_binding": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "current_production_source_delta": "none relative to the retained 0925 production closure; current worktree-only files are excluded",
+    "excluded_worktree_files": [
+      "tools/check_iwork_leaf_public_api.py",
+      "crates/litchi/examples/bench_word_parse.rs",
+      "docs/UNIFIED_OPS_API_DESIGN.md"
+    ],
+    "full_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    },
+    "harness_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "retained_source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "source_receipt": {
+      "bytes": 356812,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    }
+  },
+  "status": "baseline_precheck_approved_formal_pending"
+}

@@ -1,0 +1,8 @@
+{
+  "bytes": 6062080,
+  "contents": "Complete original formal packet: 48 raw reports, terminal and validation receipts, stream logs, frozen runner/validator, manifest and source/build custody receipts. No compiled executables.",
+  "path": "/home/zhuhe/litchi-performance-0930/formal-packet-authorized.tar",
+  "regeneration_command": "tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C /tmp/litchi-performance-0930 -cf /home/zhuhe/litchi-performance-0930/formal-packet-authorized.tar formal-packet-authorized",
+  "schema": "litchi.performance.0930.external-packet-archive.v1",
+  "sha256": "2630e4d2f03c6434579bcb19b5f98fcfae8ecf3746fcad48679088272c9beb85"
+}

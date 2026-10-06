@@ -1,0 +1,26 @@
+{
+  "artifacts": [
+    {
+      "bytes": 17115,
+      "path": "/tmp/litchi-performance-0930/formal-reduction-final.json",
+      "sha256": "88afeebbfb7b5e13ef3b93bec6032ad47ce50d02c72311b36a76c0faf4471212"
+    },
+    {
+      "bytes": 17127,
+      "path": "/tmp/litchi-performance-0930/independent-reduction.json",
+      "sha256": "e48389e58bb4b37d505377e77f1d3f647f66e70f675b5355112d4ee10d1dfca1"
+    },
+    {
+      "bytes": 17127,
+      "path": "/tmp/litchi-performance-0930/independent-replay-output.json",
+      "sha256": "e48389e58bb4b37d505377e77f1d3f647f66e70f675b5355112d4ee10d1dfca1"
+    }
+  ],
+  "equal_fields": [
+    "paired_gate",
+    "per_version_route"
+  ],
+  "schema": "litchi.performance.0930.root-independent-output-crosscheck.v1",
+  "scope": "Root comparison of completed profiler and independent reviewer reduction artifacts; no workloads run.",
+  "status": "passed"
+}

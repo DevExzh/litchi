@@ -1,0 +1,534 @@
+{
+  "artifact_policy": "Raw logs and large artifacts remain outside repository under /tmp/litchi-performance-0930/quality; this summary is small.",
+  "change": "0930",
+  "checks": {
+    "all_targets": "PASS",
+    "clippy_D_warnings": "PASS",
+    "crate_boundary_dependency_direction": "PASS",
+    "doctest": "PASS",
+    "focused_retention_parity": "PASS",
+    "rustdoc_D_warnings_no_deps": "PASS",
+    "rustfmt_changed_DOCX_files": "PASS",
+    "workspace_fmt_all": "BASELINE_FAILURE_UNRELATED_FILES"
+  },
+  "fixtures": {
+    "literal_include_references_scanned": 28,
+    "runtime_paths_bound": {
+      "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx": "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d",
+      "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx": "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283"
+    }
+  },
+  "generated_utc": "2026-10-06T13:58:09Z",
+  "preserved_failures": [
+    {
+      "classification": "setup/baseline",
+      "reason": "root checkout ignored Cargo.lock differs; --locked refused to update it; not a candidate source failure",
+      "receipt": "docx-all-targets.receipt.json"
+    },
+    {
+      "classification": "quality-tree-setup",
+      "reason": "initial sparse quality tree omitted workspace member crates/litchi-formula; no candidate execution",
+      "receipt": "docx-all-targets-canonical.receipt.json"
+    },
+    {
+      "classification": "quality-tree-fixture-setup",
+      "reason": "literal test-data fixtures absent before exact root fixture copy",
+      "receipt": "docx-all-targets-canonical-rerun.receipt.json"
+    },
+    {
+      "classification": "candidate-test-fixture",
+      "reason": "pre-fix coder unit fixture used ve namespace rejected by source-bound inventory; coder replaced it with minimal accepted OPC fixture",
+      "receipt": "docx-all-targets-canonical-fixtures.receipt.json"
+    },
+    {
+      "classification": "candidate-test-fixture",
+      "reason": "second unsupported unit fixture was documentProperties.docx with the same source-bound markup-compatibility namespace rejection; replaced by the minimal accepted OPC fixture before final pass",
+      "receipt": "docx-all-targets-canonical-final.receipt.json"
+    },
+    {
+      "classification": "quality-tree-fixture-setup",
+      "reason": "runtime Open-XML SDK svg.docx absent",
+      "receipt": "docx-all-targets-final.receipt.json"
+    },
+    {
+      "classification": "quality-tree-fixture-setup",
+      "reason": "runtime LibreOffice tdf164835_nonDummyLineHeight.docx absent",
+      "receipt": "docx-all-targets-final-fixtures.receipt.json"
+    },
+    {
+      "classification": "baseline/unrelated",
+      "reason": "workspace formatter drift in soapberry-zip, litchi example, litchi-iwa-archive, and litchi-opc files; no 0930 DOCX file reported; targeted DOCX check passes",
+      "receipt": "workspace-fmt-check.receipt.json"
+    }
+  ],
+  "receipts": [
+    {
+      "bytes": 1281,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--test",
+        "source_backed_sections"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 0,
+      "name": "source-backed-sections-focused.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/source-backed-sections-focused.receipt.json",
+      "sha256": "80b9fc357322a88f544b0c9dbd67c00e619e4f5a6bd860cd7e22ae5ff0fc6d76",
+      "stderr": {
+        "bytes": 299,
+        "path": "/tmp/litchi-performance-0930/quality/source-backed-sections-focused.stderr.log",
+        "sha256": "8ecbbd9a95c282a2a8008b99c79ff3a7a4d26562131f1b96cfefdf290fdd10d6"
+      },
+      "stdout": {
+        "bytes": 1957,
+        "path": "/tmp/litchi-performance-0930/quality/source-backed-sections-focused.stdout.log",
+        "sha256": "4b25c447953addeee9f7747a7896e519aa26f1895d8ae53ba49a600d1e8d216d"
+      }
+    },
+    {
+      "bytes": 1470,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 0,
+      "name": "docx-all-targets-final-all-fixtures.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final-all-fixtures.receipt.json",
+      "sha256": "6238be797f154f5a3ae5c9fd34ce3fa0a914d844d5932ceb2d7184b8f86c92cb",
+      "stderr": {
+        "bytes": 9168,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final-all-fixtures.stderr.log",
+        "sha256": "aaeccb19c60c99275842a0e2819aed9b03ff4be8df3a077345d094b9c6c19fc3"
+      },
+      "stdout": {
+        "bytes": 169297,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final-all-fixtures.stdout.log",
+        "sha256": "f879d37e25aa66a53f7b81b02afc497a0cb2aec3f91001f2c64ce19e98884ed6"
+      }
+    },
+    {
+      "bytes": 1416,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 0,
+      "name": "docx-clippy-all-targets.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-clippy-all-targets.receipt.json",
+      "sha256": "26b4ffa3f5cd0ff3ef5caa581854ac2c3b6094ed820277e4d280d081d951b4ab",
+      "stderr": {
+        "bytes": 1353,
+        "path": "/tmp/litchi-performance-0930/quality/docx-clippy-all-targets.stderr.log",
+        "sha256": "b7bd13e2bbf81847b1827babc73e6dcbe379c10d308f5c021748e8b30790905d"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-clippy-all-targets.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "bytes": 1350,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--doc"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 0,
+      "name": "docx-doctest.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-doctest.receipt.json",
+      "sha256": "9e929db9571f94ec73858d1a2672a368a339a906e62dcacbf3ee89ab3603e019",
+      "stderr": {
+        "bytes": 98,
+        "path": "/tmp/litchi-performance-0930/quality/docx-doctest.stderr.log",
+        "sha256": "8a27e072887a300092bed3b5fba8d9b3d2aae28d05e35406e2fea6d837da4c17"
+      },
+      "stdout": {
+        "bytes": 12989,
+        "path": "/tmp/litchi-performance-0930/quality/docx-doctest.stdout.log",
+        "sha256": "e51d241dfb7084d6c6525167f4782ae7f843d8d4fe82b050bb8ff3945a596e7e"
+      }
+    },
+    {
+      "bytes": 1401,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "doc",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--no-deps"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 0,
+      "name": "docx-rustdoc-no-deps.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-rustdoc-no-deps.receipt.json",
+      "sha256": "0e9c414fcd4a5809b4c4d1e9255c05430e1fbfeb2393e42ba0f5ce8f97e0a320",
+      "stderr": {
+        "bytes": 966,
+        "path": "/tmp/litchi-performance-0930/quality/docx-rustdoc-no-deps.stderr.log",
+        "sha256": "b17abff1625fc4ada1696d64c0af94b89d5ee85a8e5514fe4b32440062b59def"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-rustdoc-no-deps.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "bytes": 2071,
+      "command": [
+        "rustfmt",
+        "+1.95.0",
+        "--edition",
+        "2024",
+        "--config-path",
+        "/tmp/litchi-performance-0930/quality-source/rustfmt.toml",
+        "--check",
+        "crates/litchi-docx/src/leniency.rs",
+        "crates/litchi-docx/src/section/inventory.rs",
+        "crates/litchi-docx/src/section/layout.rs",
+        "crates/litchi-docx/src/source_backed.rs",
+        "crates/litchi-docx/tests/source_backed_sections.rs"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 0,
+      "name": "docx-changed-files-rustfmt-check.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-changed-files-rustfmt-check.receipt.json",
+      "sha256": "38cd8299fc28f7e909aab4659e66a269cdf8b5dad4e48e41c6071f137b680750",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-changed-files-rustfmt-check.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-changed-files-rustfmt-check.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "bytes": 1205,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 1,
+      "name": "workspace-fmt-check.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/workspace-fmt-check.receipt.json",
+      "sha256": "320baca3755957550a3e5ec7d4e1c90d7c73eaac96816087d3a0bc88d5764cfd",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/workspace-fmt-check.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 13616,
+        "path": "/tmp/litchi-performance-0930/quality/workspace-fmt-check.stdout.log",
+        "sha256": "dee037c5e0e1fc61498768b11b772b79a45f7863027bd2e0502c655e819dbf4a"
+      }
+    },
+    {
+      "bytes": 1599,
+      "command": [
+        "python3",
+        "tools/check_crate_boundaries.py"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "name": "crate-boundaries.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/crate-boundaries.receipt.json",
+      "sha256": "00803cc2d38cf31808beb6b2f73c26aa93098d88ca4c376c623313f55c66fadc",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/crate-boundaries.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 565,
+        "path": "/tmp/litchi-performance-0930/quality/crate-boundaries.stdout.log",
+        "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+      }
+    },
+    {
+      "bytes": 742,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 101,
+      "name": "docx-all-targets.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets.receipt.json",
+      "sha256": "1e16e65d544c6449fa7420bf2a1eabcbba147caddff3aa2ece13fdd49af7ff52",
+      "stderr": {
+        "bytes": 229,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets.stderr.log",
+        "sha256": "0c94c596689f16beedc2a4337759006c151cfd0e39837886931efe87912cf96a"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "bytes": 1043,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 101,
+      "name": "docx-all-targets-canonical.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical.receipt.json",
+      "sha256": "a9f70d2505c616fb3773c349d1c4331e5d0d2407ffe7b597b8a80c2bf799ca3e",
+      "stderr": {
+        "bytes": 508,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical.stderr.log",
+        "sha256": "9d68330da62352d5a28eac37e7af375545a08977df2ddb6909832ee59e95ffdd"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "bytes": 1056,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 101,
+      "name": "docx-all-targets-canonical-rerun.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-rerun.receipt.json",
+      "sha256": "02a1aac9a98b209198d43179d8aaeb06c032d7b2c0ab8e679711dd447111fa85",
+      "stderr": {
+        "bytes": 8655,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-rerun.stderr.log",
+        "sha256": "f5ed470cdcc970d0413bfe61d80d5235deb69d651ff231f0d6650b7739a9d03d"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-rerun.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "bytes": 1157,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 101,
+      "name": "docx-all-targets-canonical-fixtures.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-fixtures.receipt.json",
+      "sha256": "9687a470e95723b0b351e62b2d6764a64f8de8f65453fd894db05aa0ed40effc",
+      "stderr": {
+        "bytes": 335,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-fixtures.stderr.log",
+        "sha256": "beee37c51afa2903175236279e56bdc79dc34f4740b0940703493cc4152cfac4"
+      },
+      "stdout": {
+        "bytes": 109262,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-fixtures.stdout.log",
+        "sha256": "31262c419edd065e5548d0444e4b7c394baa6ca800f40692e8921c4ae6033775"
+      }
+    },
+    {
+      "bytes": 1266,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 101,
+      "name": "docx-all-targets-canonical-final.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-final.receipt.json",
+      "sha256": "35c2502894ff90407a1bab1821857b5cfb8fab993614d62ad622486c8f525586",
+      "stderr": {
+        "bytes": 335,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-final.stderr.log",
+        "sha256": "cca41f54e513714b8c4c33c306688c377022e7f6d67c2de499b7178b6fcd369b"
+      },
+      "stdout": {
+        "bytes": 109262,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-canonical-final.stdout.log",
+        "sha256": "1cbdf7fb5de15bc4cc4262d2fa83af1492a7c6cd1bed5374568dfc861212daac"
+      }
+    },
+    {
+      "bytes": 1247,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 101,
+      "name": "docx-all-targets-final.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final.receipt.json",
+      "sha256": "a78b4dea91c072608327e2f2ba531ac9b385f060919acfbde4838068bc5dfef9",
+      "stderr": {
+        "bytes": 1433,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final.stderr.log",
+        "sha256": "07805b3dad63d7c6ee0583f0ffcaf8e396edba3cb30218a8d316354bfdf60aa8"
+      },
+      "stdout": {
+        "bytes": 117743,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final.stdout.log",
+        "sha256": "dbf39c5848b7afdbe8e4bef2a18ab31e670591c0a3971aea4e41e866d6f20bae"
+      }
+    },
+    {
+      "bytes": 1514,
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-docx",
+        "--all-targets"
+      ],
+      "cwd": "/tmp/litchi-performance-0930/quality-source",
+      "exit_code": 101,
+      "name": "docx-all-targets-final-fixtures.receipt.json",
+      "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final-fixtures.receipt.json",
+      "sha256": "90e25cfa8a4b2d6a49583dba3dbb92ffaabaad423d81623a85052e61066e7027",
+      "stderr": {
+        "bytes": 1335,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final-fixtures.stderr.log",
+        "sha256": "fd64ef5f2a69cba80b34cbeeb59de62adf376f5d58c5ba791a640ed6dbb71474"
+      },
+      "stdout": {
+        "bytes": 117259,
+        "path": "/tmp/litchi-performance-0930/quality/docx-all-targets-final-fixtures.stdout.log",
+        "sha256": "54310e3082924814157f33f660edd966c3d75fd03126172105241832dd384612"
+      }
+    }
+  ],
+  "schema": "litchi.docx.shared-owner-quality.v1",
+  "scope": "DOCX section-layout optional retained-base snapshot; shared-owner quality only; no benchmark capture",
+  "source_binding": {
+    "canonical_lock_path": "/tmp/litchi-performance-0930/quality-source/Cargo.lock",
+    "canonical_lock_provenance_path": "/tmp/litchi-performance-0922/source/Cargo.lock",
+    "canonical_lock_provenance_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "canonical_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "files_sha256": {
+      "crates/litchi-docx/src/leniency.rs": "32d64ea50aa802b2a98e8ad8fb09d0268137c32c835281c240c5985557409642",
+      "crates/litchi-docx/src/section/inventory.rs": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99",
+      "crates/litchi-docx/src/section/layout.rs": "0c1732a566d35096a9cc02949f880b81dd07b0a1bf3db4dcc4a43d87cf6da03e",
+      "crates/litchi-docx/src/source_backed.rs": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d",
+      "crates/litchi-docx/tests/source_backed_sections.rs": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0"
+    },
+    "git_head": "5c92c1e2786751c6dedc0ccf28870da76cec84aa",
+    "rustfmt_config_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "status": "qualified_for_quality_gates",
+  "test_totals": {
+    "all_targets_suites": 73,
+    "doctest_failed": 0,
+    "doctest_ignored": 31,
+    "doctest_passed": 78,
+    "failed": 0,
+    "focused_failed": 0,
+    "focused_source_backed_sections_passed": 24,
+    "ignored": 1,
+    "passed": 1921
+  },
+  "toolchain": {
+    "cargo_lock_mode": "--locked",
+    "offline": true,
+    "quality_cwd": "/tmp/litchi-performance-0930/quality-source",
+    "rustup_toolchain": "1.95.0",
+    "target_dir": "/home/zhuhe/code/litchi/target"
+  }
+}

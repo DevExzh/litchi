@@ -1,0 +1,53 @@
+{
+  "build_argv": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "-j2",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0930/candidate-source/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "--target-dir",
+    "/tmp/litchi-performance-0930/candidate-target-v1"
+  ],
+  "build_log": {
+    "bytes": 8094,
+    "path": "/tmp/litchi-performance-0930/candidate-build-v1.log",
+    "sha256": "d68e99771636d17b0da98a4be1f5eef6aade07f6172018bb5957bfd5a62ba445"
+  },
+  "build_process_result": "cargo emitted compile failures with No space left on device; no candidate binary was accepted",
+  "command": [
+    "env",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "-B",
+    "/tmp/litchi-performance-0930/run-candidate-build.py"
+  ],
+  "environment_policy": {
+    "release_flags": [
+      "--offline",
+      "--locked",
+      "--release",
+      "-j2"
+    ],
+    "unset_before_build": [
+      "RUSTFLAGS",
+      "CARGO_ENCODED_RUSTFLAGS",
+      "CARGO_PROFILE_RELEASE_STRIP"
+    ]
+  },
+  "note": "This receipt was persisted on /home/zhuhe before cleanup of the newly-created failed target, then copied back to /tmp. Timestamp fields from the failed wrapper were not reconstructed.",
+  "recapture_count": 0,
+  "runner_terminal_write_error": "OSError [Errno 28] No space left on device while writing /tmp/litchi-performance-0930/candidate-build-terminal-v1.json",
+  "schema": "litchi.performance.0930.candidate-build-terminal.v1",
+  "session_id": 68726,
+  "source_root": "/tmp/litchi-performance-0930/candidate-source",
+  "status": "failed",
+  "target_dir": "/tmp/litchi-performance-0930/candidate-target-v1",
+  "terminal_observed_utc": "2026-10-06T13:42:13.501247+00:00",
+  "tool_result_exit_code": 1
+}

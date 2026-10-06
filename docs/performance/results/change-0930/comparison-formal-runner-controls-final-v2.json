@@ -1,0 +1,32 @@
+{
+  "capture_started": false,
+  "document_children_started": 0,
+  "manifest": {
+    "bytes": 31560,
+    "path": "/tmp/litchi-performance-0930/formal-manifest-final-unauthorized.json",
+    "sha256": "92db4fbbf5e386508934fe6b50a31c467d6fc04734e6e1cd47fb251f4e496e45"
+  },
+  "runner": {
+    "bytes": 54433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-runner-v1.py",
+    "sha256": "17a433994d2aa0a7de979a33731597e768b8056e491d924f4ed32c41b28f7bc5"
+  },
+  "schedule_sha256": "4834b67e0340d31e34dc7bafeb527bf37f20b9d5f0964a1d86a6803ccd6379cb",
+  "schema": "litchi.performance.0930.formal-runner-controls.v1",
+  "status": "passed",
+  "tests": {
+    "copied_validator_resolution": {
+      "bytes": 39792,
+      "passed": true,
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "exclusive_receipt": {
+      "passed": true,
+      "sha256": "363c528a76416c5fc1e04a411cc18d9ccbf0c5c02d8020063a5860cbe361fdb6"
+    },
+    "process_group_closure": {
+      "passed": true,
+      "probes": 1
+    }
+  }
+}

@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0930 — bounded DOCX commit base retention adopted
+
+[0930](0930-docx-commit-base-retention.md) adopts capped retention of an already
+validated base inventory. Forty-eight interleaved normal-release children pass;
+primary generic ReadAt pooled p50 falls 7.52%, from 4.487303 to 4.149882 ms.
+The six-pair ratio is 1.081241, with 95% interval [1.079744, 1.083847]. All
+three control routes improve. Maximum process RSS rises 1.32–3.54%, with no
+5% review flag. Full freshness, inverse and refusal checks remain; default
+retention is bounded to 1 MiB and can be disabled or released. This is one warm
+generated DOCX section-edit/publication workload, with 1,921 tests and 78
+doctests passing.
+
 ## 0929 — frame-pointer native phase attribution
 
 [0929](0929-frame-pointer-phase-profile.md) records one 1,000-iteration

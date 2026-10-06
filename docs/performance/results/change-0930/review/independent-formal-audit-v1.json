@@ -1,0 +1,490 @@
+{
+  "adoption_assessment": {
+    "assessment": "candidate passes the frozen primary generic_read_at gate; pooled and paired p95/p99 tails and per-route maximum RSS have no >5% regression. Production adoption remains the root/documentation decision under the frozen claim scope.",
+    "formal_primary_pass": true,
+    "secondary_flags_pass": true,
+    "semantic_and_counter_controls_pass": true
+  },
+  "copied_reduction": {
+    "children": 48,
+    "output": {
+      "bytes": 17127,
+      "path": "/tmp/litchi-performance-0930/independent-reduction.json",
+      "sha256": "e48389e58bb4b37d505377e77f1d3f647f66e70f675b5355112d4ee10d1dfca1"
+    },
+    "path_note": "Copied runner replay passed; reduction used the same frozen runner against the copied packet because the copied script derives its repository guard from /tmp.",
+    "status": "passed"
+  },
+  "copied_replay": {
+    "children": 48,
+    "output": {
+      "bytes": 17127,
+      "path": "/tmp/litchi-performance-0930/independent-replay-output.json",
+      "sha256": "e48389e58bb4b37d505377e77f1d3f647f66e70f675b5355112d4ee10d1dfca1"
+    },
+    "status": "passed"
+  },
+  "outer_terminal": {
+    "bytes": 2307,
+    "path": "/tmp/litchi-performance-0930/outer-capture-terminal-final.json",
+    "sha256": "3a86a58b0a98e530294920f860a149cb31f187e098a76e22fd287e08b011c11b"
+  },
+  "packet": {
+    "bytes": 5764475,
+    "files": 348,
+    "path": "/tmp/litchi-performance-0930/formal-packet-authorized-independent-audit"
+  },
+  "paired_gate": {
+    "all_routes": {
+      "generic_read_at": {
+        "baseline_p50_ns": [
+          4485478.0,
+          4484768.0,
+          4480798.0,
+          4483528.0,
+          4492498.0,
+          4501043.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.079743999159794,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.0838465070674286,
+        "candidate_p50_ns": [
+          4143641.5,
+          4152012.0,
+          4151406.0,
+          4146452.0,
+          4155142.0,
+          4147676.5
+        ],
+        "median_ratio": 1.0812413189464196,
+        "paired_baseline_over_candidate_p50": [
+          1.0824966397310192,
+          1.0801433136513092,
+          1.0793446846682786,
+          1.081292632834047,
+          1.0811900050587921,
+          1.085196374403838
+        ],
+        "pairs": 6
+      },
+      "owned_reader": {
+        "baseline_p50_ns": [
+          3838715.5,
+          4061131.5,
+          4057941.0,
+          3838580.5,
+          3576789.5,
+          3844090.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.0520913580548936,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.1303049668739942,
+        "candidate_p50_ns": [
+          3490724.0,
+          3735330.5,
+          3495454.0,
+          3514249.5,
+          3517134.5,
+          3514039.0
+        ],
+        "median_ratio": 1.093106973613593,
+        "paired_baseline_over_candidate_p50": [
+          1.0996903507696398,
+          1.0872214654098211,
+          1.1609195829783485,
+          1.0922902599829636,
+          1.0169612506999661,
+          1.0939236872442224
+        ],
+        "pairs": 6
+      },
+      "owned_vec": {
+        "baseline_p50_ns": [
+          3721205.0,
+          3704465.0,
+          3723745.0,
+          3707870.0,
+          3718024.5,
+          3722890.0
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.097352233250477,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.179917366196232,
+        "candidate_p50_ns": [
+          3375908.5,
+          3384229.0,
+          3379458.0,
+          2948482.0,
+          3379678.5,
+          3384204.0
+        ],
+        "median_ratio": 1.100994142452488,
+        "paired_baseline_over_candidate_p50": [
+          1.102282541129299,
+          1.0946259842345185,
+          1.1018763955640225,
+          1.2575521912631653,
+          1.1001118893409536,
+          1.1000784822664356
+        ],
+        "pairs": 6
+      },
+      "range_short": {
+        "baseline_p50_ns": [
+          4529818.0,
+          4534038.0,
+          4539583.0,
+          4531808.0,
+          4536438.5,
+          4527838.5
+        ],
+        "bootstrap_draws": 10000,
+        "bootstrap_lower_95": 1.07999874461089,
+        "bootstrap_seed": 930,
+        "bootstrap_upper_95": 1.0831975955995996,
+        "candidate_p50_ns": [
+          4192942.0,
+          4184156.5,
+          4192546.5,
+          4191907.0,
+          4197992.0,
+          4193787.0
+        ],
+        "median_ratio": 1.080853048617728,
+        "paired_baseline_over_candidate_p50": [
+          1.080343586913437,
+          1.083620557691855,
+          1.0827746335073445,
+          1.0810850526979725,
+          1.0806210445374835,
+          1.0796539023083433
+        ],
+        "pairs": 6
+      }
+    },
+    "bootstrap_draws": 10000,
+    "bootstrap_lower_95": 1.079743999159794,
+    "bootstrap_upper_95": 1.0838465070674286,
+    "median_ratio": 1.0812413189464196,
+    "minimum_lower": 1.0,
+    "minimum_median": 1.05,
+    "primary_pass": true,
+    "primary_route": "generic_read_at",
+    "seed": 930
+  },
+  "raw_audit": {
+    "children_checked": 48,
+    "counter_contracts": "packet replay passed all route-specific source/cache/sink contracts",
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "expected_source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "outer_exit": "exit 0, 48 passed, 0 failed, no retry or recapture",
+    "phase_conservation": "all 48 reports and 50 samples per report",
+    "semantic_gate_values_true": 576,
+    "terminal_controls": "all 48 exit 0, deadline false, runner_error null, process_group_closed true"
+  },
+  "reviewed_hashes": {
+    "independent_reduction": {
+      "bytes": 17127,
+      "path": "/tmp/litchi-performance-0930/independent-reduction.json",
+      "sha256": "e48389e58bb4b37d505377e77f1d3f647f66e70f675b5355112d4ee10d1dfca1"
+    },
+    "independent_replay": {
+      "bytes": 17127,
+      "path": "/tmp/litchi-performance-0930/independent-replay-output.json",
+      "sha256": "e48389e58bb4b37d505377e77f1d3f647f66e70f675b5355112d4ee10d1dfca1"
+    },
+    "packet_manifest": {
+      "bytes": 34066,
+      "path": "/tmp/litchi-performance-0930/formal-packet-authorized-independent-audit/manifest.json",
+      "sha256": "cebf1d3fd8561375b7bfeaccdf522c0a2cb8e444939d9d76f041238d6e739187"
+    },
+    "packet_validator": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "runner": {
+      "bytes": 54433,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0930/comparison-formal-runner-v1.py",
+      "sha256": "17a433994d2aa0a7de979a33731597e768b8056e491d924f4ed32c41b28f7bc5"
+    }
+  },
+  "reviewed_utc": "2026-10-06T14:37:40.326690+00:00",
+  "schema": "litchi.performance.0930.independent-formal-audit.v1",
+  "scope": "read-only copied-packet replay/reduction and raw metric audit; no workload, build, recapture, or source edit",
+  "secondary_controls": {
+    "adverse_rows": [],
+    "any_tail_or_rss_flag": false,
+    "per_route": {
+      "generic_read_at": {
+        "baseline": {
+          "max_rss": 37679104,
+          "pooled": {
+            "max": 4562928,
+            "mean": 4490166.473333334,
+            "min": 4463278,
+            "p50": 4487302.5,
+            "p95": 4515988.0,
+            "p99": 4544588.0
+          },
+          "rss_values": [
+            37109760,
+            37097472,
+            37679104,
+            37404672,
+            37105664,
+            37363712
+          ]
+        },
+        "candidate": {
+          "max_rss": 38899712,
+          "pooled": {
+            "max": 4221857,
+            "mean": 4152499.63,
+            "min": 4128067,
+            "p50": 4149882.0,
+            "p95": 4179217.0,
+            "p99": 4196837.0
+          },
+          "rss_values": [
+            38440960,
+            38662144,
+            38690816,
+            38694912,
+            38768640,
+            38899712
+          ]
+        },
+        "paired_p95_candidate_over_baseline": [
+          0.9217890192360917,
+          0.9279715866243665,
+          0.9282491141111859,
+          0.9272081776282871,
+          0.9286151655361832,
+          0.922123217203785
+        ],
+        "paired_p95_max_ratio": 0.9286151655361832,
+        "paired_p95_regression_count_over_5pct": 0,
+        "paired_p99_candidate_over_baseline": [
+          0.9252517243313942,
+          0.9234801922638531,
+          0.9245557588551833,
+          0.9272427296919975,
+          0.9314748081163539,
+          0.9175261532223258
+        ],
+        "paired_p99_max_ratio": 0.9314748081163539,
+        "paired_p99_regression_count_over_5pct": 0,
+        "pooled_ratios": {
+          "p50": 0.9248054928322751,
+          "p95": 0.9254269497616026,
+          "p99": 0.9234801922638531
+        },
+        "rss_ratio": 1.0323948255245134
+      },
+      "owned_reader": {
+        "baseline": {
+          "max_rss": 38739968,
+          "pooled": {
+            "max": 4205047,
+            "mean": 3866938.0033333334,
+            "min": 3560424,
+            "p50": 3843230.5,
+            "p95": 4079897.0,
+            "p99": 4100587.0
+          },
+          "rss_values": [
+            37785600,
+            38404096,
+            38739968,
+            37703680,
+            37888000,
+            37101568
+          ]
+        },
+        "candidate": {
+          "max_rss": 39251968,
+          "pooled": {
+            "max": 3779225,
+            "mean": 3549605.8866666667,
+            "min": 3242923,
+            "p50": 3513424.5,
+            "p95": 3741125.0,
+            "p99": 3762406.0
+          },
+          "rss_values": [
+            38862848,
+            38621184,
+            38457344,
+            38658048,
+            39251968,
+            38830080
+          ]
+        },
+        "paired_p95_candidate_over_baseline": [
+          0.9155827782971477,
+          0.9189891593569408,
+          0.9113889979444223,
+          0.9163206147828807,
+          0.9844579681822684,
+          0.8863979966216284
+        ],
+        "paired_p95_max_ratio": 0.9844579681822684,
+        "paired_p95_regression_count_over_5pct": 0,
+        "paired_p99_candidate_over_baseline": [
+          0.950134767454781,
+          0.9171547229685407,
+          0.9118453654986429,
+          0.8772089001112118,
+          0.938605985491067,
+          0.8459439335636438
+        ],
+        "paired_p99_max_ratio": 0.950134767454781,
+        "paired_p99_regression_count_over_5pct": 0,
+        "pooled_ratios": {
+          "p50": 0.9141852147561798,
+          "p95": 0.916965550846014,
+          "p99": 0.9175286367537135
+        },
+        "rss_ratio": 1.0132163248043984
+      },
+      "owned_vec": {
+        "baseline": {
+          "max_rss": 37695488,
+          "pooled": {
+            "max": 3820516,
+            "mean": 3719840.816666667,
+            "min": 3683685,
+            "p50": 3717930.0,
+            "p95": 3749255.0,
+            "p99": 3789565.0
+          },
+          "rss_values": [
+            36872192,
+            37105664,
+            37687296,
+            36806656,
+            37695488,
+            37089280
+          ]
+        },
+        "candidate": {
+          "max_rss": 39030784,
+          "pooled": {
+            "max": 3471254,
+            "mean": 3312824.21,
+            "min": 2933912,
+            "p50": 3379289.0,
+            "p95": 3407134.0,
+            "p99": 3418823.0
+          },
+          "rss_values": [
+            38739968,
+            38961152,
+            39030784,
+            38551552,
+            38653952,
+            38375424
+          ]
+        },
+        "paired_p95_candidate_over_baseline": [
+          0.9067709117759566,
+          0.9151274650952557,
+          0.9088189520318036,
+          0.8154989024026893,
+          0.9053303980560209,
+          0.9098055201426993
+        ],
+        "paired_p95_max_ratio": 0.9151274650952557,
+        "paired_p95_regression_count_over_5pct": 0,
+        "paired_p99_candidate_over_baseline": [
+          0.9068589515125408,
+          0.9068479980931067,
+          0.893841041367187,
+          0.8370213938847604,
+          0.8960391403293612,
+          0.9145769633576825
+        ],
+        "paired_p99_max_ratio": 0.9145769633576825,
+        "paired_p99_regression_count_over_5pct": 0,
+        "pooled_ratios": {
+          "p50": 0.9089167897190104,
+          "p95": 0.908749604921511,
+          "p99": 0.9021676630431197
+        },
+        "rss_ratio": 1.0354232315549277
+      },
+      "range_short": {
+        "baseline": {
+          "max_rss": 37703680,
+          "pooled": {
+            "max": 4633208,
+            "mean": 4536195.993333333,
+            "min": 4508818,
+            "p50": 4533633.0,
+            "p95": 4567028.0,
+            "p99": 4585788.0
+          },
+          "rss_values": [
+            37691392,
+            37703680,
+            37388288,
+            37371904,
+            37691392,
+            37703680
+          ]
+        },
+        "candidate": {
+          "max_rss": 38776832,
+          "pooled": {
+            "max": 4494258,
+            "mean": 4197374.203333333,
+            "min": 4169047,
+            "p50": 4192777.0,
+            "p95": 4221487.0,
+            "p99": 4328218.0
+          },
+          "rss_values": [
+            38281216,
+            38662144,
+            38334464,
+            38707200,
+            38662144,
+            38776832
+          ]
+        },
+        "paired_p95_candidate_over_baseline": [
+          0.934968980417943,
+          0.9242266438367913,
+          0.9201887446943423,
+          0.9272153460974667,
+          0.9329561262227672,
+          0.923905232311989
+        ],
+        "paired_p95_max_ratio": 0.934968980417943,
+        "paired_p95_regression_count_over_5pct": 0,
+        "paired_p99_candidate_over_baseline": [
+          0.9700099801260811,
+          0.9258467405804679,
+          0.9174893830291319,
+          0.9284594903604454,
+          0.9767219207390911,
+          0.9188018603340329
+        ],
+        "paired_p99_max_ratio": 0.9767219207390911,
+        "paired_p99_regression_count_over_5pct": 0,
+        "pooled_ratios": {
+          "p50": 0.9248161463444439,
+          "p95": 0.9243400741138439,
+          "p99": 0.9438329900989754
+        },
+        "rss_ratio": 1.0284627919608909
+      }
+    },
+    "threshold": 1.05
+  },
+  "status": "passed"
+}

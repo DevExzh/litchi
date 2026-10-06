@@ -21,7 +21,10 @@ use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::mem::size_of;
 use std::sync::Arc;
+
+const DEFAULT_MAX_RETAINED_BASE_BYTES: usize = 1024 * 1024;
 
 /// An immutable, exact-source section-layout snapshot.
 #[derive(Clone)]
@@ -82,6 +85,25 @@ impl Snapshot {
         })
     }
 
+    pub(crate) fn from_reused_inventory(
+        xml: Arc<Vec<u8>>,
+        source_version: SourceVersion,
+        lineage: SourceLineage,
+        artifact_fingerprint: SourceArtifactFingerprint,
+        limits: &Limits,
+        retained: &Self,
+    ) -> Self {
+        debug_assert_eq!(&retained.limits, limits);
+        Self {
+            xml,
+            inventory: retained.inventory.clone(),
+            source_version: Some(source_version),
+            lineage: Some(lineage),
+            artifact_fingerprint: Some(artifact_fingerprint),
+            limits: limits.clone(),
+        }
+    }
+
     /// Borrow the immutable section inventory.
     #[must_use]
     pub const fn inventory(&self) -> &Inventory {
@@ -105,6 +127,14 @@ impl Snapshot {
 
     pub(crate) fn shared_xml(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.xml)
+    }
+
+    pub(crate) fn xml_matches(&self, xml: &[u8]) -> bool {
+        self.xml.as_slice() == xml
+    }
+
+    pub(crate) fn retained_bytes(&self) -> Option<usize> {
+        size_of::<Self>().checked_add(self.inventory.retained_bytes()?)
     }
 
     pub(crate) fn with_artifact_fingerprint(
@@ -144,6 +174,7 @@ pub struct Edit {
     source_context: FragmentContext,
     base_state: LocalState,
     projected_state: LocalState,
+    max_retained_base_bytes: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -221,7 +252,20 @@ impl Edit {
             source_context,
             projected_state: base_state.clone(),
             base_state,
+            max_retained_base_bytes: DEFAULT_MAX_RETAINED_BASE_BYTES,
         })
+    }
+
+    /// Set the maximum retained base-snapshot weight for the resulting
+    /// commit. Edits default to 1 MiB; a zero value disables extra base
+    /// retention and keeps the existing parse path available at publication
+    /// time. If checked accounting overflows or exceeds this ceiling, the
+    /// commit simply retains no base snapshot and publication recomputes it;
+    /// the ceiling never changes semantic results, refusals, or output bytes.
+    #[must_use]
+    pub fn with_max_retained_base_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_base_bytes = maximum;
+        self
     }
 
     /// Borrow the exact immutable source snapshot.
@@ -387,9 +431,23 @@ impl Edit {
             limits: self.base.limits.clone(),
             selector: self.selector,
         };
+        let retained_base_bytes = if self.max_retained_base_bytes == 0
+            || self.base.source_version.is_none()
+            || semantic_noop
+        {
+            0
+        } else {
+            self.base
+                .retained_bytes()
+                .filter(|bytes| *bytes <= self.max_retained_base_bytes)
+                .unwrap_or(0)
+        };
+        let base_snapshot = (retained_base_bytes != 0).then_some(self.base);
         Ok(Commit {
             snapshot: target,
             patch,
+            base_snapshot,
+            retained_base_bytes,
         })
     }
 }
@@ -399,6 +457,8 @@ impl Edit {
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
+    base_snapshot: Option<Snapshot>,
+    retained_base_bytes: usize,
 }
 
 impl Commit {
@@ -418,6 +478,43 @@ impl Commit {
     #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
+    }
+
+    /// The estimated bytes retained by the optional source base snapshot.
+    ///
+    /// The estimate includes the immutable inventory allocations and their
+    /// nested values, plus one logical `Snapshot` owner charge. The XML
+    /// allocation is excluded because the patch already retains that same
+    /// allocation. A no-op commit reports zero because its projected snapshot
+    /// already holds the base inventory without extra retention.
+    /// Cloned commits share these allocations. The fixed inline
+    /// `Option<Snapshot>` slot exists in every `Commit`, including one that
+    /// reports zero; it is outside this conditional retained-state estimate,
+    /// while an active retained base includes its `Snapshot` owner once. The
+    /// estimate excludes allocator bookkeeping and physical RSS.
+    #[must_use]
+    pub const fn retained_base_bytes(&self) -> usize {
+        self.retained_base_bytes
+    }
+
+    /// Release the optional retained source base snapshot.
+    ///
+    /// Releasing it does not change the commit, patch, or any published
+    /// result. A later publication of a changed commit falls back to the
+    /// existing current-source inventory parse. A no-op commit may still
+    /// reuse its already-held projected snapshot because that needs no extra
+    /// retained base state.
+    pub fn release_retained_base(&mut self) {
+        self.base_snapshot = None;
+        self.retained_base_bytes = 0;
+    }
+
+    pub(crate) fn base_snapshot_for_publication(&self) -> Option<&Snapshot> {
+        if self.patch.is_noop() {
+            Some(&self.snapshot)
+        } else {
+            self.base_snapshot.as_ref()
+        }
     }
 
     pub(crate) fn apply_to_current(&self, current: &Snapshot) -> Result<Snapshot> {
@@ -2248,8 +2345,24 @@ fn ensure_semantic_readback(
 mod tests {
     use super::{PageSize, Snapshot};
     use crate::section::{Emu, Orientation};
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
 
     const DOCUMENT: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#;
+
+    fn source_package() -> crate::source_backed::Package {
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/word/document.xml").unwrap(),
+                ct::WML_DOCUMENT_MAIN.to_owned(),
+                DOCUMENT.to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        crate::source_backed::Package::from_reader(std::io::Cursor::new(bytes)).unwrap()
+    }
 
     #[test]
     fn commit_apply_to_current_reuses_target_and_noop_current_allocations() {
@@ -2280,5 +2393,74 @@ mod tests {
         let current_xml = current.shared_xml();
         assert!(std::sync::Arc::ptr_eq(&target_xml, &current_xml));
         assert!(target.inventory.shares_allocation_with(&current.inventory));
+    }
+
+    #[test]
+    fn source_commit_retention_observes_cap_and_release() {
+        let package = source_package();
+        let source = package.section_layout_snapshot().unwrap();
+        let base_bytes = source.retained_bytes().unwrap();
+
+        let mut edit = source.edit(0).unwrap();
+        edit.set_page_size(Some(PageSize {
+            width: Some(Emu::from_twips(11906)),
+            height: Some(Emu::from_twips(16838)),
+            orientation: Orientation::Landscape,
+        }))
+        .unwrap();
+        let at_cap = edit
+            .with_max_retained_base_bytes(base_bytes)
+            .commit()
+            .unwrap();
+        assert_eq!(at_cap.retained_base_bytes(), base_bytes);
+
+        let mut released = at_cap.clone();
+        released.release_retained_base();
+        assert_eq!(released.retained_base_bytes(), 0);
+
+        let mut output = Vec::new();
+        let publication = package
+            .publish_section_layout_commit_to_stream(&mut output, &at_cap)
+            .unwrap();
+        assert!(
+            at_cap
+                .snapshot()
+                .inventory()
+                .shares_allocation_with(publication.snapshot().inventory())
+        );
+        assert!(
+            source
+                .inventory()
+                .shares_allocation_with(publication.original_snapshot().inventory())
+        );
+
+        let noop = source.edit(0).unwrap().commit().unwrap();
+        assert_eq!(noop.retained_base_bytes(), 0);
+
+        let mut zero = source.edit(0).unwrap();
+        zero.set_page_size(Some(PageSize {
+            width: Some(Emu::from_twips(11906)),
+            height: Some(Emu::from_twips(16838)),
+            orientation: Orientation::Landscape,
+        }))
+        .unwrap();
+        let zero = zero.with_max_retained_base_bytes(0).commit().unwrap();
+        assert_eq!(zero.retained_base_bytes(), 0);
+
+        if base_bytes > 0 {
+            let mut below = source.edit(0).unwrap();
+            below
+                .set_page_size(Some(PageSize {
+                    width: Some(Emu::from_twips(11906)),
+                    height: Some(Emu::from_twips(16838)),
+                    orientation: Orientation::Landscape,
+                }))
+                .unwrap();
+            let below = below
+                .with_max_retained_base_bytes(base_bytes - 1)
+                .commit()
+                .unwrap();
+            assert_eq!(below.retained_base_bytes(), 0);
+        }
     }
 }
