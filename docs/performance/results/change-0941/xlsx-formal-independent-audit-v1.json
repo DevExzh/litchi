@@ -1,0 +1,1698 @@
+{
+  "custody": {
+    "outer_return_code": 0,
+    "outer_start": {
+      "bytes": 892,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-formal-outer-v1/start.json",
+      "sha256": "2c261e898b3f1a65763ed24f6ce1ddd2eb11d61b079ccec2fc1eb29c342fffe6"
+    },
+    "outer_terminal": {
+      "bytes": 718,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-formal-outer-v1/terminal.json",
+      "sha256": "bff666f01d99f89fa6afba5dc5970b48b488a92b66205351663ba84b85c3a33e"
+    },
+    "outer_terminal_first": true,
+    "preflight_root_audit": {
+      "bytes": 310,
+      "checks": [
+        "start/terminal/report/stdout/stderr/RSS digests match",
+        "true prelaunch binary equals both terminal binary descriptors",
+        "all exit0, groupsclear, no deadlines"
+      ],
+      "children": 24,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/preflight-real-v3/root-audit-v1.json",
+      "performance_claim": false,
+      "sha256": "8e1453d93c3b7ced79645a6881aeca1d1b806e9f91a795b916a7af2f1134b346",
+      "status": "passed",
+      "utc": "2026-10-06T22:38:45.654536+00:00"
+    },
+    "wrapper_children": 96,
+    "wrapper_complete": {
+      "bytes": 1346,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/formal-wrapper-v4/complete.json",
+      "sha256": "bc7a7c2cbec233afd3a16fe0059b476710544ec0c6bb5eb110044771d9d244c4"
+    },
+    "wrapper_lanes": [
+      {
+        "expected_children": 72,
+        "lane": "native",
+        "return_code": 0,
+        "start": {
+          "bytes": 1132,
+          "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/formal-wrapper-v4/00-native.start.json",
+          "sha256": "8837353a63a78a821b2b5d3573a9e55fc0573372bcb6a0b9341ac662eb1879a3"
+        },
+        "terminal": {
+          "bytes": 1693,
+          "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/formal-wrapper-v4/00-native.terminal.json",
+          "sha256": "ee0d31de1a2f6e51fd3f8fee374fa446803e77d9cdb7afabcd67086e7bcd7d53"
+        }
+      },
+      {
+        "expected_children": 24,
+        "lane": "allocator",
+        "return_code": 0,
+        "start": {
+          "bytes": 1138,
+          "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/formal-wrapper-v4/01-allocator.start.json",
+          "sha256": "153e1bdf0b12005f5b1cf876d3069c10251e2e3563976c94767097b4d8cb020f"
+        },
+        "terminal": {
+          "bytes": 1705,
+          "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/formal-wrapper-v4/01-allocator.terminal.json",
+          "sha256": "bd393f5fbe3eb787178581ceb99135585899fc1d04a8ea19fc6e2a00dcaf54b4"
+        }
+      }
+    ],
+    "wrapper_workload_started": true
+  },
+  "findings": [
+    "The frozen v4 reducer validated and reduced all 96 rows, but its hard_native_p50_adoption_reject compares six-block leg medians per cell and can hide a block-level p50 ratio above 1.05.",
+    "Independent block-pair joins find two native elapsed p50 ratios above 1.05 in generated-xlsx/open: block 1 ratio 1.130723550451683 and block 5 ratio 1.1418469900591435. This rejects the frozen native adoption gate; no adoption claim is made.",
+    "No independent allocator retained-live, region-peak, or whole-child RSS pair exceeded 1.05; allocator elapsed is retained as informational only.",
+    "Original and moved offline reductions both validate; their only semantic difference is packet_root provenance. No capture was rerun."
+  ],
+  "frozen_inputs": {
+    "authorized_manifest": {
+      "bytes": 13371,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/xlsx-formal-authorized-v4.json",
+      "sha256": "2767f9cdba089b9b53d042e6531651b9f374762d2bca3692daf715ba02e94311"
+    },
+    "capture_runner": {
+      "bytes": 21363,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/xlsx-capture-v4.py",
+      "sha256": "8c26a65d7f9610534f599859107147b1abb76033143e522f15ecff1e0ae6a6ce"
+    },
+    "plan": {
+      "bytes": 10124,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/xlsx-plan-v4.json",
+      "sha256": "8537935324593bb9db51ea5dcc7972d00460814904388bb29c4dbd06b3adf1f8"
+    },
+    "reducer": {
+      "bytes": 20806,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/xlsx-reduce-v4.py",
+      "sha256": "8e0f6e47770d6ff687bb1d2329511ac30d191e9a047909caa97fe74172f4dae3"
+    },
+    "root_reduction": {
+      "bytes": 277887,
+      "path": "/home/zhuhe/litchi-performance-0941/reductions/xlsx-formal-v1.json",
+      "sha256": "b117934738b7792ed41975f175b37922a12d1ff9b57f71c2c797efa4dfac4615"
+    },
+    "root_reduction_status": "validated_and_reduced",
+    "validator": {
+      "bytes": 17456,
+      "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/validate-xlsx-plan-v4.py",
+      "sha256": "017491cd43e1c772a1a049e19ac26020dd775b587cf204dafa77b22895fad799"
+    }
+  },
+  "frozen_v4_aggregate_reference": {
+    "aggregate_hard_native_p50_adoption_reject": false,
+    "baseline_leg_p50": 375999.0,
+    "candidate_leg_p50": 369493.75,
+    "candidate_over_baseline_p50": 0.9826987571775457,
+    "cell": "generated-xlsx/open",
+    "interpretation": "This six-block leg aggregate is retained for provenance; independent block-pair gate below is authoritative for the any-pair rule.",
+    "lane": "native",
+    "metric": "elapsed_ns"
+  },
+  "generated_utc": "2026-10-06T22:45:11.073624+00:00",
+  "independent_pair_audit": {
+    "allocator": {
+      "live_bytes": {
+        "_all_pairs": {
+          "statistics": {
+            "max": 1.013422857295424,
+            "median": 1.0051880758022969,
+            "min": 1.0000848512275144,
+            "n": 12,
+            "over_1_00": 12,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.013422857295424,
+            "p99_nearest_rank": 1.013422857295424
+          }
+        },
+        "boundary-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 92,
+              "baseline_value": 36043,
+              "block": 0,
+              "candidate_ordinal": 93,
+              "candidate_over_baseline": 1.006298032905141,
+              "candidate_value": 36270,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 95,
+              "baseline_value": 36043,
+              "block": 1,
+              "candidate_ordinal": 94,
+              "candidate_over_baseline": 1.006298032905141,
+              "candidate_value": 36270,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.006298032905141,
+            "median": 1.006298032905141,
+            "min": 1.006298032905141,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.006298032905141,
+            "p99_nearest_rank": 1.006298032905141
+          }
+        },
+        "conditional-formatting/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 84,
+              "baseline_value": 1290430,
+              "block": 0,
+              "candidate_ordinal": 85,
+              "candidate_over_baseline": 1.004004866594856,
+              "candidate_value": 1295598,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 87,
+              "baseline_value": 1290430,
+              "block": 1,
+              "candidate_ordinal": 86,
+              "candidate_over_baseline": 1.004004866594856,
+              "candidate_value": 1295598,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.004004866594856,
+            "median": 1.004004866594856,
+            "min": 1.004004866594856,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.004004866594856,
+            "p99_nearest_rank": 1.004004866594856
+          }
+        },
+        "conditional-formatting/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 80,
+              "baseline_value": 1267251,
+              "block": 0,
+              "candidate_ordinal": 81,
+              "candidate_over_baseline": 1.0040781186994525,
+              "candidate_value": 1272419,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 83,
+              "baseline_value": 1267251,
+              "block": 1,
+              "candidate_ordinal": 82,
+              "candidate_over_baseline": 1.0040781186994525,
+              "candidate_value": 1272419,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0040781186994525,
+            "median": 1.0040781186994525,
+            "min": 1.0040781186994525,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0040781186994525,
+            "p99_nearest_rank": 1.0040781186994525
+          }
+        },
+        "generated-xlsx/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 76,
+              "baseline_value": 5033627,
+              "block": 0,
+              "candidate_ordinal": 77,
+              "candidate_over_baseline": 1.012085122715688,
+              "candidate_value": 5094459,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 79,
+              "baseline_value": 5033627,
+              "block": 1,
+              "candidate_ordinal": 78,
+              "candidate_over_baseline": 1.012085122715688,
+              "candidate_value": 5094459,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.012085122715688,
+            "median": 1.012085122715688,
+            "min": 1.012085122715688,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.012085122715688,
+            "p99_nearest_rank": 1.012085122715688
+          }
+        },
+        "generated-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 72,
+              "baseline_value": 4531971,
+              "block": 0,
+              "candidate_ordinal": 73,
+              "candidate_over_baseline": 1.013422857295424,
+              "candidate_value": 4592803,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 75,
+              "baseline_value": 4531971,
+              "block": 1,
+              "candidate_ordinal": 74,
+              "candidate_over_baseline": 1.013422857295424,
+              "candidate_value": 4592803,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.013422857295424,
+            "median": 1.013422857295424,
+            "min": 1.013422857295424,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.013422857295424,
+            "p99_nearest_rank": 1.013422857295424
+          }
+        },
+        "small-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 88,
+              "baseline_value": 35356,
+              "block": 0,
+              "candidate_ordinal": 89,
+              "candidate_over_baseline": 1.0000848512275144,
+              "candidate_value": 35359,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 91,
+              "baseline_value": 35356,
+              "block": 1,
+              "candidate_ordinal": 90,
+              "candidate_over_baseline": 1.0000848512275144,
+              "candidate_value": 35359,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0000848512275144,
+            "median": 1.0000848512275144,
+            "min": 1.0000848512275144,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0000848512275144,
+            "p99_nearest_rank": 1.0000848512275144
+          }
+        }
+      },
+      "region_peak_live_bytes": {
+        "_all_pairs": {
+          "statistics": {
+            "max": 1.0131758606588623,
+            "median": 1.0030021513952114,
+            "min": 1.0000261449300623,
+            "n": 12,
+            "over_1_00": 12,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0131758606588623,
+            "p99_nearest_rank": 1.0131758606588623
+          }
+        },
+        "boundary-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 92,
+              "baseline_value": 116793,
+              "block": 0,
+              "candidate_ordinal": 93,
+              "candidate_over_baseline": 1.001943609634139,
+              "candidate_value": 117020,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 95,
+              "baseline_value": 116793,
+              "block": 1,
+              "candidate_ordinal": 94,
+              "candidate_over_baseline": 1.001943609634139,
+              "candidate_value": 117020,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.001943609634139,
+            "median": 1.001943609634139,
+            "min": 1.001943609634139,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.001943609634139,
+            "p99_nearest_rank": 1.001943609634139
+          }
+        },
+        "conditional-formatting/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 84,
+              "baseline_value": 2393591,
+              "block": 0,
+              "candidate_ordinal": 85,
+              "candidate_over_baseline": 1.002159099027361,
+              "candidate_value": 2398759,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 87,
+              "baseline_value": 2393591,
+              "block": 1,
+              "candidate_ordinal": 86,
+              "candidate_over_baseline": 1.002159099027361,
+              "candidate_value": 2398759,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.002159099027361,
+            "median": 1.002159099027361,
+            "min": 1.002159099027361,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.002159099027361,
+            "p99_nearest_rank": 1.002159099027361
+          }
+        },
+        "conditional-formatting/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 80,
+              "baseline_value": 1344012,
+              "block": 0,
+              "candidate_ordinal": 81,
+              "candidate_over_baseline": 1.0038452037630616,
+              "candidate_value": 1349180,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 83,
+              "baseline_value": 1344012,
+              "block": 1,
+              "candidate_ordinal": 82,
+              "candidate_over_baseline": 1.0038452037630616,
+              "candidate_value": 1349180,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0038452037630616,
+            "median": 1.0038452037630616,
+            "min": 1.0038452037630616,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0038452037630616,
+            "p99_nearest_rank": 1.0038452037630616
+          }
+        },
+        "generated-xlsx/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 76,
+              "baseline_value": 6468773,
+              "block": 0,
+              "candidate_ordinal": 77,
+              "candidate_over_baseline": 1.0094039472400715,
+              "candidate_value": 6529605,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 79,
+              "baseline_value": 6468773,
+              "block": 1,
+              "candidate_ordinal": 78,
+              "candidate_over_baseline": 1.0094039472400715,
+              "candidate_value": 6529605,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0094039472400715,
+            "median": 1.0094039472400715,
+            "min": 1.0094039472400715,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0094039472400715,
+            "p99_nearest_rank": 1.0094039472400715
+          }
+        },
+        "generated-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 72,
+              "baseline_value": 4616928,
+              "block": 0,
+              "candidate_ordinal": 73,
+              "candidate_over_baseline": 1.0131758606588623,
+              "candidate_value": 4677760,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 75,
+              "baseline_value": 4616928,
+              "block": 1,
+              "candidate_ordinal": 74,
+              "candidate_over_baseline": 1.0131758606588623,
+              "candidate_value": 4677760,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0131758606588623,
+            "median": 1.0131758606588623,
+            "min": 1.0131758606588623,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0131758606588623,
+            "p99_nearest_rank": 1.0131758606588623
+          }
+        },
+        "small-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 88,
+              "baseline_value": 114745,
+              "block": 0,
+              "candidate_ordinal": 89,
+              "candidate_over_baseline": 1.0000261449300623,
+              "candidate_value": 114748,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 91,
+              "baseline_value": 114745,
+              "block": 1,
+              "candidate_ordinal": 90,
+              "candidate_over_baseline": 1.0000261449300623,
+              "candidate_value": 114748,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0000261449300623,
+            "median": 1.0000261449300623,
+            "min": 1.0000261449300623,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0000261449300623,
+            "p99_nearest_rank": 1.0000261449300623
+          }
+        }
+      },
+      "rss_kib": {
+        "_all_pairs": {
+          "statistics": {
+            "max": 1.0310246886606949,
+            "median": 0.9999940751273848,
+            "min": 0.8843308675184937,
+            "n": 12,
+            "over_1_00": 6,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0310246886606949,
+            "p99_nearest_rank": 1.0310246886606949
+          }
+        },
+        "boundary-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 92,
+              "baseline_value": 5864,
+              "block": 0,
+              "candidate_ordinal": 93,
+              "candidate_over_baseline": 1.0218281036834924,
+              "candidate_value": 5992,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 95,
+              "baseline_value": 5928,
+              "block": 1,
+              "candidate_ordinal": 94,
+              "candidate_over_baseline": 0.9892037786774629,
+              "candidate_value": 5864,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0218281036834924,
+            "median": 1.0055159411804777,
+            "min": 0.9892037786774629,
+            "n": 2,
+            "over_1_00": 1,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0218281036834924,
+            "p99_nearest_rank": 1.0218281036834924
+          }
+        },
+        "conditional-formatting/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 84,
+              "baseline_value": 11504,
+              "block": 0,
+              "candidate_ordinal": 85,
+              "candidate_over_baseline": 0.9228094575799722,
+              "candidate_value": 10616,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 87,
+              "baseline_value": 11896,
+              "block": 1,
+              "candidate_ordinal": 86,
+              "candidate_over_baseline": 0.8843308675184937,
+              "candidate_value": 10520,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 0.9228094575799722,
+            "median": 0.903570162549233,
+            "min": 0.8843308675184937,
+            "n": 2,
+            "over_1_00": 0,
+            "over_1_05": 0,
+            "p95_nearest_rank": 0.9228094575799722,
+            "p99_nearest_rank": 0.9228094575799722
+          }
+        },
+        "conditional-formatting/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 80,
+              "baseline_value": 8428,
+              "block": 0,
+              "candidate_ordinal": 81,
+              "candidate_over_baseline": 1.0047460844803038,
+              "candidate_value": 8468,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 83,
+              "baseline_value": 8608,
+              "block": 1,
+              "candidate_ordinal": 82,
+              "candidate_over_baseline": 0.9795539033457249,
+              "candidate_value": 8432,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0047460844803038,
+            "median": 0.9921499939130143,
+            "min": 0.9795539033457249,
+            "n": 2,
+            "over_1_00": 1,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0047460844803038,
+            "p99_nearest_rank": 1.0047460844803038
+          }
+        },
+        "generated-xlsx/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 76,
+              "baseline_value": 17824,
+              "block": 0,
+              "candidate_ordinal": 77,
+              "candidate_over_baseline": 1.0092010771992819,
+              "candidate_value": 17988,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 79,
+              "baseline_value": 17956,
+              "block": 1,
+              "candidate_ordinal": 78,
+              "candidate_over_baseline": 0.9881933615504567,
+              "candidate_value": 17744,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0092010771992819,
+            "median": 0.9986972193748693,
+            "min": 0.9881933615504567,
+            "n": 2,
+            "over_1_00": 1,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0092010771992819,
+            "p99_nearest_rank": 1.0092010771992819
+          }
+        },
+        "generated-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 72,
+              "baseline_value": 18308,
+              "block": 0,
+              "candidate_ordinal": 73,
+              "candidate_over_baseline": 1.0310246886606949,
+              "candidate_value": 18876,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 75,
+              "baseline_value": 18456,
+              "block": 1,
+              "candidate_ordinal": 74,
+              "candidate_over_baseline": 1.0279583875162548,
+              "candidate_value": 18972,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0310246886606949,
+            "median": 1.0294915380884748,
+            "min": 1.0279583875162548,
+            "n": 2,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0310246886606949,
+            "p99_nearest_rank": 1.0310246886606949
+          }
+        },
+        "small-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 88,
+              "baseline_value": 5800,
+              "block": 0,
+              "candidate_ordinal": 89,
+              "candidate_over_baseline": 0.996551724137931,
+              "candidate_value": 5780,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 91,
+              "baseline_value": 5820,
+              "block": 1,
+              "candidate_ordinal": 90,
+              "candidate_over_baseline": 1.0034364261168385,
+              "candidate_value": 5840,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0034364261168385,
+            "median": 0.9999940751273848,
+            "min": 0.996551724137931,
+            "n": 2,
+            "over_1_00": 1,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0034364261168385,
+            "p99_nearest_rank": 1.0034364261168385
+          }
+        }
+      }
+    },
+    "allocator_memory_pair_gate_pass": true,
+    "flagged_pairs_over_1_05": [
+      {
+        "baseline_ordinal": 3,
+        "baseline_value": 378971.5,
+        "block": 1,
+        "candidate_ordinal": 2,
+        "candidate_over_baseline": 1.130723550451683,
+        "candidate_value": 428512.0,
+        "cell": "generated-xlsx/open",
+        "lane": "native",
+        "metric": "elapsed_ns",
+        "over_1_05": true
+      },
+      {
+        "baseline_ordinal": 10,
+        "baseline_value": 374766.5,
+        "block": 5,
+        "candidate_ordinal": 11,
+        "candidate_over_baseline": 1.1418469900591435,
+        "candidate_value": 427926.0,
+        "cell": "generated-xlsx/open",
+        "lane": "native",
+        "metric": "elapsed_ns",
+        "over_1_05": true
+      }
+    ],
+    "native": {
+      "elapsed_ns": {
+        "_all_pairs": {
+          "statistics": {
+            "max": 1.1418469900591435,
+            "median": 0.9944870052695647,
+            "min": 0.9783422718428341,
+            "n": 36,
+            "over_1_00": 7,
+            "over_1_05": 2,
+            "p95_nearest_rank": 1.130723550451683,
+            "p99_nearest_rank": 1.1418469900591435
+          }
+        },
+        "boundary-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 60,
+              "baseline_value": 63075.0,
+              "block": 0,
+              "candidate_ordinal": 61,
+              "candidate_over_baseline": 0.9988981371383274,
+              "candidate_value": 63005.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 63,
+              "baseline_value": 63765.0,
+              "block": 1,
+              "candidate_ordinal": 62,
+              "candidate_over_baseline": 0.9909041009958441,
+              "candidate_value": 63185.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 64,
+              "baseline_value": 63305.0,
+              "block": 2,
+              "candidate_ordinal": 65,
+              "candidate_over_baseline": 0.9849222020377537,
+              "candidate_value": 62350.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 67,
+              "baseline_value": 62950.5,
+              "block": 3,
+              "candidate_ordinal": 66,
+              "candidate_over_baseline": 0.991818968872368,
+              "candidate_value": 62435.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 69,
+              "baseline_value": 63180.0,
+              "block": 4,
+              "candidate_ordinal": 68,
+              "candidate_over_baseline": 0.9932731877176322,
+              "candidate_value": 62755.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 70,
+              "baseline_value": 63275.0,
+              "block": 5,
+              "candidate_ordinal": 71,
+              "candidate_over_baseline": 0.9849071513235875,
+              "candidate_value": 62320.0,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 0.9988981371383274,
+            "median": 0.9913615349341061,
+            "min": 0.9849071513235875,
+            "n": 6,
+            "over_1_00": 0,
+            "over_1_05": 0,
+            "p95_nearest_rank": 0.9988981371383274,
+            "p99_nearest_rank": 0.9988981371383274
+          }
+        },
+        "conditional-formatting/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 36,
+              "baseline_value": 3142152.5,
+              "block": 0,
+              "candidate_ordinal": 37,
+              "candidate_over_baseline": 0.9995242115078756,
+              "candidate_value": 3140657.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 39,
+              "baseline_value": 3141172.5,
+              "block": 1,
+              "candidate_ordinal": 38,
+              "candidate_over_baseline": 0.9963200047116164,
+              "candidate_value": 3129613.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 40,
+              "baseline_value": 3138768.0,
+              "block": 2,
+              "candidate_ordinal": 41,
+              "candidate_over_baseline": 1.0019956874799285,
+              "candidate_value": 3145032.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 43,
+              "baseline_value": 3141742.5,
+              "block": 3,
+              "candidate_ordinal": 42,
+              "candidate_over_baseline": 0.9965671916142077,
+              "candidate_value": 3130957.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 45,
+              "baseline_value": 3154017.5,
+              "block": 4,
+              "candidate_ordinal": 44,
+              "candidate_over_baseline": 0.9974255057240488,
+              "candidate_value": 3145897.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 46,
+              "baseline_value": 3138718.0,
+              "block": 5,
+              "candidate_ordinal": 47,
+              "candidate_over_baseline": 0.9955234908010213,
+              "candidate_value": 3124667.5,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0019956874799285,
+            "median": 0.9969963486691282,
+            "min": 0.9955234908010213,
+            "n": 6,
+            "over_1_00": 1,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0019956874799285,
+            "p99_nearest_rank": 1.0019956874799285
+          }
+        },
+        "conditional-formatting/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 24,
+              "baseline_value": 1080304.5,
+              "block": 0,
+              "candidate_ordinal": 25,
+              "candidate_over_baseline": 0.9872073105314288,
+              "candidate_value": 1066484.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 27,
+              "baseline_value": 1079334.5,
+              "block": 1,
+              "candidate_ordinal": 26,
+              "candidate_over_baseline": 0.9944034958578643,
+              "candidate_value": 1073294.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 28,
+              "baseline_value": 1077834.0,
+              "block": 2,
+              "candidate_ordinal": 29,
+              "candidate_over_baseline": 0.9963166869851944,
+              "candidate_value": 1073864.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 31,
+              "baseline_value": 1078279.0,
+              "block": 3,
+              "candidate_ordinal": 30,
+              "candidate_over_baseline": 0.9945705146812652,
+              "candidate_value": 1072424.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 33,
+              "baseline_value": 1082854.5,
+              "block": 4,
+              "candidate_ordinal": 32,
+              "candidate_over_baseline": 0.9933047329996781,
+              "candidate_value": 1075604.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 34,
+              "baseline_value": 1076139.0,
+              "block": 5,
+              "candidate_ordinal": 35,
+              "candidate_over_baseline": 0.9934255704885707,
+              "candidate_value": 1069064.0,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 0.9963166869851944,
+            "median": 0.9939145331732175,
+            "min": 0.9872073105314288,
+            "n": 6,
+            "over_1_00": 0,
+            "over_1_05": 0,
+            "p95_nearest_rank": 0.9963166869851944,
+            "p99_nearest_rank": 0.9963166869851944
+          }
+        },
+        "generated-xlsx/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 12,
+              "baseline_value": 4606718.5,
+              "block": 0,
+              "candidate_ordinal": 13,
+              "candidate_over_baseline": 1.000425465545594,
+              "candidate_value": 4608678.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 15,
+              "baseline_value": 4582359.0,
+              "block": 1,
+              "candidate_ordinal": 14,
+              "candidate_over_baseline": 0.9984732754461185,
+              "candidate_value": 4575363.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 16,
+              "baseline_value": 4593039.0,
+              "block": 2,
+              "candidate_ordinal": 17,
+              "candidate_over_baseline": 0.9998160259470908,
+              "candidate_value": 4592194.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 19,
+              "baseline_value": 4594683.5,
+              "block": 3,
+              "candidate_ordinal": 18,
+              "candidate_over_baseline": 0.998368766858479,
+              "candidate_value": 4587188.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 21,
+              "baseline_value": 4648974.0,
+              "block": 4,
+              "candidate_ordinal": 20,
+              "candidate_over_baseline": 0.9891868614451275,
+              "candidate_value": 4598704.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 22,
+              "baseline_value": 4595514.0,
+              "block": 5,
+              "candidate_ordinal": 23,
+              "candidate_over_baseline": 1.0014850351886644,
+              "candidate_value": 4602338.5,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0014850351886644,
+            "median": 0.9991446506966046,
+            "min": 0.9891868614451275,
+            "n": 6,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0014850351886644,
+            "p99_nearest_rank": 1.0014850351886644
+          }
+        },
+        "generated-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 0,
+              "baseline_value": 377231.5,
+              "block": 0,
+              "candidate_ordinal": 1,
+              "candidate_over_baseline": 0.9799725102490116,
+              "candidate_value": 369676.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 3,
+              "baseline_value": 378971.5,
+              "block": 1,
+              "candidate_ordinal": 2,
+              "candidate_over_baseline": 1.130723550451683,
+              "candidate_value": 428512.0,
+              "over_1_05": true
+            },
+            {
+              "baseline_ordinal": 4,
+              "baseline_value": 377486.5,
+              "block": 2,
+              "candidate_ordinal": 5,
+              "candidate_over_baseline": 0.9783422718428341,
+              "candidate_value": 369311.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 7,
+              "baseline_value": 371846.5,
+              "block": 3,
+              "candidate_ordinal": 6,
+              "candidate_over_baseline": 0.9818070090749812,
+              "candidate_value": 365081.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 9,
+              "baseline_value": 372037.0,
+              "block": 4,
+              "candidate_ordinal": 8,
+              "candidate_over_baseline": 0.9830245378819849,
+              "candidate_value": 365721.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 10,
+              "baseline_value": 374766.5,
+              "block": 5,
+              "candidate_ordinal": 11,
+              "candidate_over_baseline": 1.1418469900591435,
+              "candidate_value": 427926.0,
+              "over_1_05": true
+            }
+          ],
+          "statistics": {
+            "max": 1.1418469900591435,
+            "median": 0.9824157734784831,
+            "min": 0.9783422718428341,
+            "n": 6,
+            "over_1_00": 2,
+            "over_1_05": 2,
+            "p95_nearest_rank": 1.1418469900591435,
+            "p99_nearest_rank": 1.1418469900591435
+          }
+        },
+        "small-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 48,
+              "baseline_value": 55175.5,
+              "block": 0,
+              "candidate_ordinal": 49,
+              "candidate_over_baseline": 0.9898505677338674,
+              "candidate_value": 54615.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 51,
+              "baseline_value": 55220.0,
+              "block": 1,
+              "candidate_ordinal": 50,
+              "candidate_over_baseline": 0.9932995291561029,
+              "candidate_value": 54850.0,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 52,
+              "baseline_value": 54855.0,
+              "block": 2,
+              "candidate_ordinal": 53,
+              "candidate_over_baseline": 1.0007383100902378,
+              "candidate_value": 54895.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 55,
+              "baseline_value": 54605.0,
+              "block": 3,
+              "candidate_ordinal": 54,
+              "candidate_over_baseline": 1.0001922900833258,
+              "candidate_value": 54615.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 57,
+              "baseline_value": 54980.5,
+              "block": 4,
+              "candidate_ordinal": 56,
+              "candidate_over_baseline": 0.9859040932694318,
+              "candidate_value": 54205.5,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 58,
+              "baseline_value": 54940.0,
+              "block": 5,
+              "candidate_ordinal": 59,
+              "candidate_over_baseline": 0.9888150709865308,
+              "candidate_value": 54325.5,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0007383100902378,
+            "median": 0.9915750484449851,
+            "min": 0.9859040932694318,
+            "n": 6,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0007383100902378,
+            "p99_nearest_rank": 1.0007383100902378
+          }
+        }
+      },
+      "rss_kib": {
+        "_all_pairs": {
+          "statistics": {
+            "max": 1.0408022130013832,
+            "median": 1.0076386833436028,
+            "min": 0.958,
+            "n": 36,
+            "over_1_00": 21,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0350274725274726,
+            "p99_nearest_rank": 1.0408022130013832
+          }
+        },
+        "boundary-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 60,
+              "baseline_value": 5784,
+              "block": 0,
+              "candidate_ordinal": 61,
+              "candidate_over_baseline": 1.0408022130013832,
+              "candidate_value": 6020,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 63,
+              "baseline_value": 6044,
+              "block": 1,
+              "candidate_ordinal": 62,
+              "candidate_over_baseline": 0.9887491727332892,
+              "candidate_value": 5976,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 64,
+              "baseline_value": 5884,
+              "block": 2,
+              "candidate_ordinal": 65,
+              "candidate_over_baseline": 1.0203942895989122,
+              "candidate_value": 6004,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 67,
+              "baseline_value": 5944,
+              "block": 3,
+              "candidate_ordinal": 66,
+              "candidate_over_baseline": 1.006056527590848,
+              "candidate_value": 5980,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 69,
+              "baseline_value": 6008,
+              "block": 4,
+              "candidate_ordinal": 68,
+              "candidate_over_baseline": 0.96271637816245,
+              "candidate_value": 5784,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 70,
+              "baseline_value": 5812,
+              "block": 5,
+              "candidate_ordinal": 71,
+              "candidate_over_baseline": 1.0103234686854783,
+              "candidate_value": 5872,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0408022130013832,
+            "median": 1.008189998138163,
+            "min": 0.96271637816245,
+            "n": 6,
+            "over_1_00": 4,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0408022130013832,
+            "p99_nearest_rank": 1.0408022130013832
+          }
+        },
+        "conditional-formatting/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 36,
+              "baseline_value": 11428,
+              "block": 0,
+              "candidate_ordinal": 37,
+              "candidate_over_baseline": 1.0150507525376269,
+              "candidate_value": 11600,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 39,
+              "baseline_value": 11788,
+              "block": 1,
+              "candidate_ordinal": 38,
+              "candidate_over_baseline": 0.9843909060061079,
+              "candidate_value": 11604,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 40,
+              "baseline_value": 11640,
+              "block": 2,
+              "candidate_ordinal": 41,
+              "candidate_over_baseline": 1.0096219931271477,
+              "candidate_value": 11752,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 43,
+              "baseline_value": 11852,
+              "block": 3,
+              "candidate_ordinal": 42,
+              "candidate_over_baseline": 0.9625379682753965,
+              "candidate_value": 11408,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 45,
+              "baseline_value": 11604,
+              "block": 4,
+              "candidate_ordinal": 44,
+              "candidate_over_baseline": 0.9993105825577387,
+              "candidate_value": 11596,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 46,
+              "baseline_value": 11596,
+              "block": 5,
+              "candidate_ordinal": 47,
+              "candidate_over_baseline": 0.9879268713349431,
+              "candidate_value": 11456,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0150507525376269,
+            "median": 0.9936187269463409,
+            "min": 0.9625379682753965,
+            "n": 6,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0150507525376269,
+            "p99_nearest_rank": 1.0150507525376269
+          }
+        },
+        "conditional-formatting/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 24,
+              "baseline_value": 8692,
+              "block": 0,
+              "candidate_ordinal": 25,
+              "candidate_over_baseline": 0.9912563276576162,
+              "candidate_value": 8616,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 27,
+              "baseline_value": 8728,
+              "block": 1,
+              "candidate_ordinal": 26,
+              "candidate_over_baseline": 0.9899175068744271,
+              "candidate_value": 8640,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 28,
+              "baseline_value": 8556,
+              "block": 2,
+              "candidate_ordinal": 29,
+              "candidate_over_baseline": 0.9789621318373072,
+              "candidate_value": 8376,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 31,
+              "baseline_value": 8816,
+              "block": 3,
+              "candidate_ordinal": 30,
+              "candidate_over_baseline": 1.0009074410163339,
+              "candidate_value": 8824,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 33,
+              "baseline_value": 8820,
+              "block": 4,
+              "candidate_ordinal": 32,
+              "candidate_over_baseline": 0.9850340136054422,
+              "candidate_value": 8688,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 34,
+              "baseline_value": 8676,
+              "block": 5,
+              "candidate_ordinal": 35,
+              "candidate_over_baseline": 1.0092208390963577,
+              "candidate_value": 8756,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0092208390963577,
+            "median": 0.9905869172660217,
+            "min": 0.9789621318373072,
+            "n": 6,
+            "over_1_00": 2,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0092208390963577,
+            "p99_nearest_rank": 1.0092208390963577
+          }
+        },
+        "generated-xlsx/lifecycle": {
+          "pairs": [
+            {
+              "baseline_ordinal": 12,
+              "baseline_value": 18100,
+              "block": 0,
+              "candidate_ordinal": 13,
+              "candidate_over_baseline": 0.9834254143646409,
+              "candidate_value": 17800,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 15,
+              "baseline_value": 17936,
+              "block": 1,
+              "candidate_ordinal": 14,
+              "candidate_over_baseline": 0.9884032114183765,
+              "candidate_value": 17728,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 16,
+              "baseline_value": 17836,
+              "block": 2,
+              "candidate_ordinal": 17,
+              "candidate_over_baseline": 1.0161471181879345,
+              "candidate_value": 18124,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 19,
+              "baseline_value": 17968,
+              "block": 3,
+              "candidate_ordinal": 18,
+              "candidate_over_baseline": 0.9968833481745325,
+              "candidate_value": 17912,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 21,
+              "baseline_value": 17592,
+              "block": 4,
+              "candidate_ordinal": 20,
+              "candidate_over_baseline": 1.025011368804002,
+              "candidate_value": 18032,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 22,
+              "baseline_value": 17888,
+              "block": 5,
+              "candidate_ordinal": 23,
+              "candidate_over_baseline": 1.0118515205724508,
+              "candidate_value": 18100,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.025011368804002,
+            "median": 1.0043674343734916,
+            "min": 0.9834254143646409,
+            "n": 6,
+            "over_1_00": 3,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.025011368804002,
+            "p99_nearest_rank": 1.025011368804002
+          }
+        },
+        "generated-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 0,
+              "baseline_value": 18360,
+              "block": 0,
+              "candidate_ordinal": 1,
+              "candidate_over_baseline": 1.0281045751633986,
+              "candidate_value": 18876,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 3,
+              "baseline_value": 18328,
+              "block": 1,
+              "candidate_ordinal": 2,
+              "candidate_over_baseline": 1.0333915320820601,
+              "candidate_value": 18940,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 4,
+              "baseline_value": 18364,
+              "block": 2,
+              "candidate_ordinal": 5,
+              "candidate_over_baseline": 1.023306469178828,
+              "candidate_value": 18792,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 7,
+              "baseline_value": 18424,
+              "block": 3,
+              "candidate_ordinal": 6,
+              "candidate_over_baseline": 1.0106382978723405,
+              "candidate_value": 18620,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 9,
+              "baseline_value": 18364,
+              "block": 4,
+              "candidate_ordinal": 8,
+              "candidate_over_baseline": 1.018950119799608,
+              "candidate_value": 18712,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 10,
+              "baseline_value": 18360,
+              "block": 5,
+              "candidate_ordinal": 11,
+              "candidate_over_baseline": 1.0191721132897604,
+              "candidate_value": 18712,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0333915320820601,
+            "median": 1.0212392912342942,
+            "min": 1.0106382978723405,
+            "n": 6,
+            "over_1_00": 6,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0333915320820601,
+            "p99_nearest_rank": 1.0333915320820601
+          }
+        },
+        "small-xlsx/open": {
+          "pairs": [
+            {
+              "baseline_ordinal": 48,
+              "baseline_value": 5696,
+              "block": 0,
+              "candidate_ordinal": 49,
+              "candidate_over_baseline": 1.0301966292134832,
+              "candidate_value": 5868,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 51,
+              "baseline_value": 5944,
+              "block": 1,
+              "candidate_ordinal": 50,
+              "candidate_over_baseline": 1.0013458950201883,
+              "candidate_value": 5952,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 52,
+              "baseline_value": 5868,
+              "block": 2,
+              "candidate_ordinal": 53,
+              "candidate_over_baseline": 0.9795501022494888,
+              "candidate_value": 5748,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 55,
+              "baseline_value": 5712,
+              "block": 3,
+              "candidate_ordinal": 54,
+              "candidate_over_baseline": 1.0252100840336134,
+              "candidate_value": 5856,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 57,
+              "baseline_value": 6000,
+              "block": 4,
+              "candidate_ordinal": 56,
+              "candidate_over_baseline": 0.958,
+              "candidate_value": 5748,
+              "over_1_05": false
+            },
+            {
+              "baseline_ordinal": 58,
+              "baseline_value": 5824,
+              "block": 5,
+              "candidate_ordinal": 59,
+              "candidate_over_baseline": 1.0350274725274726,
+              "candidate_value": 6028,
+              "over_1_05": false
+            }
+          ],
+          "statistics": {
+            "max": 1.0350274725274726,
+            "median": 1.0132779895269008,
+            "min": 0.958,
+            "n": 6,
+            "over_1_00": 4,
+            "over_1_05": 0,
+            "p95_nearest_rank": 1.0350274725274726,
+            "p99_nearest_rank": 1.0350274725274726
+          }
+        }
+      }
+    },
+    "native_pair_p50_gate_pass": false
+  },
+  "limits": [
+    "This is a descriptive packet audit and gate review; it does not establish a causal explanation for the two slow native pairs.",
+    "No production adoption should be inferred from the allocator metrics while the native p50 gate is rejected."
+  ],
+  "pairwise_supplement_v5": {
+    "counts": {
+      "allocator_memory_review_flags": 0,
+      "allocator_pairs": 12,
+      "allocator_region_peak_review_flags": 0,
+      "allocator_retained_live_review_flags": 0,
+      "allocator_rss_review_flags": 0,
+      "native_hard_p50_adoption_rejects": 2,
+      "native_pairs": 36,
+      "native_review_flags": 35
+    },
+    "independently_recomputed_pair_flags": true,
+    "json": {
+      "bytes": 164231,
+      "path": "/home/zhuhe/litchi-performance-0941/reductions/xlsx-formal-v1-pairwise-v5.json",
+      "sha256": "d2364b436cf53a5acd2ed116428432911db40dc0b7758577a5ebc816d40d1fce"
+    },
+    "no_workload_rerun": true,
+    "reduction_input": {
+      "bytes": 277887,
+      "path": "/home/zhuhe/litchi-performance-0941/reductions/xlsx-formal-v1.json",
+      "sha256": "b117934738b7792ed41975f175b37922a12d1ff9b57f71c2c797efa4dfac4615"
+    },
+    "schema": "litchi.performance.0941.xlsx-pairwise-supplement.v5",
+    "status": "validated_pairwise_supplement",
+    "text": {
+      "bytes": 4333,
+      "path": "/home/zhuhe/litchi-performance-0941/reductions/xlsx-formal-v1-pairwise-v5.txt",
+      "sha256": "277c058371359df8ce17368d17616b8d0a8335bdda2c5038f2d38df6305e3b9a"
+    }
+  },
+  "replay": {
+    "moved": {
+      "output": {
+        "bytes": 277882,
+        "path": "/tmp/litchi-performance-0941-xlsx-independent-moved-reduction-v2.json",
+        "sha256": "63eeed5ce53c3d271d3c15aee2b955f523a9d573cab950f618dbdb30d5b4dd8d"
+      },
+      "packet_root": "/tmp/litchi-performance-0941-xlsx-captures-moved-v2",
+      "validated_and_reduced": true
+    },
+    "moved_equivalence_ignoring_packet_root": true,
+    "moved_reduction_diff_paths_from_original": [
+      "/packet_root"
+    ],
+    "original": {
+      "output": {
+        "bytes": 277887,
+        "path": "/tmp/litchi-performance-0941-xlsx-independent-original-reduction-v1.json",
+        "sha256": "b117934738b7792ed41975f175b37922a12d1ff9b57f71c2c797efa4dfac4615"
+      },
+      "packet_root": "/home/zhuhe/litchi-performance-0941/xlsx-probes/captures",
+      "validated_and_reduced": true
+    },
+    "original_output_equals_root_reduction": true
+  },
+  "schema": "litchi.performance.0941.xlsx-independent-audit.v1",
+  "scope": {
+    "all_child_environment_exact": true,
+    "all_child_process_groups_clear": true,
+    "all_child_return_code_zero": true,
+    "all_child_terminal_before_report_parse": true,
+    "all_child_timeouts_false": true,
+    "all_ordinals_unique_0_through_95": true,
+    "allocator_children": 24,
+    "allocator_pairs": 12,
+    "formal_children": 96,
+    "native_children": 72,
+    "native_pairs": 36,
+    "pair_join_valid": true,
+    "pair_key": [
+      "lane",
+      "cell",
+      "block"
+    ],
+    "terminal_first": true,
+    "workload_rerun": false
+  },
+  "status": "descriptive_audit_complete_pair_gate_reject"
+}

@@ -147,7 +147,7 @@ impl ReadAt for ShortReadSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
-        Ok(SourceVersion::new(0x5348_4f52_54, 0))
+        Ok(SourceVersion::new(0x0053_484f_5254, 0))
     }
 }
 

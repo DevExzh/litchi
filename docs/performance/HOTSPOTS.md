@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0941 — bounded reader growth reduces requests but fails latency safety
+
+[0941](0941-opc-bounded-reader-growth.md) tests a 1/32 growth fraction capped at
+64 KiB after [0940](0940-docx-owned-ingress-attribution.md) attributed repeated
+reader-open reallocations. DOCX reader-open gross requested bytes fall 75.70%
+and reallocations fall from 295 to 138, but reader block 5 p50 rises 7.812%.
+Generated XLSX open also has paired p50 regressions of 13.072% and 14.185%.
+The candidate is rejected; baseline production remains, with new reader behavior
+tests. Gross requests are not physical copies or RSS savings.
+
+The 0940 reader-preparation/minor-fault association remains a separate research
+target. This batch does not establish its cause or justify waiving paired
+regressions. The historical 0779 growth-policy rejection and 0937 rejection
+remain in force. Future candidates need their own prospective qualification;
+do not use per-leg aggregate medians to hide individual paired failures.
+
 ## 0937 — allocation gains qualified; paired latency safety fails
 
 [0937](0937-docx-combined-fragment-validation.md) measures the combined

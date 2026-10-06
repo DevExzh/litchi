@@ -1,0 +1,219 @@
+{
+  "schema": "litchi.performance.0941.docx-owned-ingress-plan.v2",
+  "status": "prospective_only_no_build_no_workload",
+  "scope": {
+    "purpose": "Compare the reviewed bounded OPC read_limited growth candidate through the existing DOCX owned-ingress workload, with owned_vec retained as an unchanged route control.",
+    "iwork": "excluded",
+    "production_edits_by_tooling": false,
+    "candidate_production_scope": "Only crates/litchi-opc/src/phys_pkg.rs changes production read_limited capacity growth. The candidate source also carries the focused reader_ingress.rs test and the existing ZIP64 fixture required by the frozen quality closure.",
+    "workloads_started": false,
+    "builds_started_by_this_plan": false,
+    "overall_adoption": "pending DOCX gates, required XLSX 0779 boundary controls, independent review, and root decision"
+  },
+  "hypothesis": {
+    "candidate": "When a read exceeds Vec capacity, request bounded_input_capacity(current_capacity, new_len, maximum) instead of exact new_len capacity.",
+    "target_formula": "min(maximum, max(new_len, current_capacity + min(current_capacity / 32, 64 KiB)))",
+    "expected_effect": "Reduce repeated exact-read reallocation requests on large owned-reader ingress while preserving the 8 KiB read request, maximum-plus-one probe, short/Interrupted-read behavior, fallible reserve, and typed error order.",
+    "interpretation_limit": "The DOCX corpus is an in-memory workload. It does not establish cold storage, network, physical copy traffic, or general OPC performance."
+  },
+  "source_binding": {
+    "report_source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "baseline": {
+      "source_root": "/home/zhuhe/litchi-performance-0940/source-candidate-v1",
+      "source_receipt": {
+        "path": "/home/zhuhe/litchi-performance-0940/receipts/source-candidate-v1.json",
+        "bytes": 1232,
+        "sha256": "83317ba38fcd14a407bff85671624e353ab3a8ccbc70ffadecad4ef1537fe74e"
+      },
+      "source_listing": {
+        "path": "/home/zhuhe/litchi-performance-0940/source-candidate-manifest-v1.jsonl",
+        "bytes": 1665554,
+        "sha256": "8eb16940342230e36c4c121a71a49675e30b77b67a52f73e18b977fa1a100f1f"
+      },
+      "source_file_count": 10780,
+      "source_bytes": 260009611,
+      "phys_pkg_sha256": "3dfa9ec92c0d090b0bc753ecacc63f263975a470c267b79b03ae1c5898ac3ab8"
+    },
+    "candidate": {
+      "source_root": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+      "source_receipt": {
+        "path": "/home/zhuhe/litchi-performance-0941/receipts/source-candidate-v3.json",
+        "bytes": 2014,
+        "sha256": "2f9de9833ee36f6ab0e71c77be9a22f85c97215c7e6d60937dcd199e211cb229"
+      },
+      "source_listing": {
+        "path": "/home/zhuhe/litchi-performance-0941/source-candidate-manifest-v3.jsonl",
+        "bytes": 1665867,
+        "sha256": "f0628c6b23bd02968b9948f29a3f2787a6bc4736b1f2a5c791da819157c2cb29"
+      },
+      "source_file_count": 10782,
+      "source_bytes": 260028642,
+      "phys_pkg_sha256": "899ce1567755d8b4d2c3128a016ccc85c968874750e426d0ffd7da1ff5dc147c",
+      "reader_ingress_sha256": "70de65fe8de228216f51cf84b72806faba12d43153472f9502ff73515eced46f",
+      "receipt_baseline_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541"
+    },
+    "allowed_source_difference": {
+      "changed": ["crates/litchi-opc/src/phys_pkg.rs"],
+      "added": [
+        "crates/litchi-opc/tests/reader_ingress.rs",
+        "docs/performance/results/change-0416/corpus/opc-local-only-signed.zip"
+      ],
+      "removed": [],
+      "runtime_equivalence": {
+        "path": "/home/zhuhe/litchi-performance-0941/baseline-runtime-equivalence-v1.json",
+        "bytes": 2014514,
+        "sha256": "32bdfc9e2b6fe938b9d9329070dbf0333a65328eda535b537f502bc3eda47d92",
+        "root_verified_runtime_files": 7928,
+        "candidate_phys_pkg_excluded": true
+      }
+    },
+    "canonical_lock": {
+      "path": "/home/zhuhe/litchi-performance-0940/source-candidate-v1/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+    }
+  },
+  "source_constants": {
+    "path": "crates/litchi-opc/src/phys_pkg.rs",
+    "sha256": "899ce1567755d8b4d2c3128a016ccc85c968874750e426d0ffd7da1ff5dc147c",
+    "input_read_chunk_bytes": 8192,
+    "input_growth_step_bytes": 65536,
+    "input_growth_fraction_denominator": 32,
+    "expected_capacity_expression": "current_capacity.saturating_add((current_capacity / INPUT_GROWTH_FRACTION_DENOMINATOR).min(INPUT_GROWTH_STEP_BYTES)).max(new_len).min(maximum)",
+    "expected_reserve_policy": "reserve only when new_len > data.capacity(); additional = target_capacity - data.len(); try_reserve_exact(additional)",
+    "validation": "Runner checks these constants and expression against frozen candidate source bytes; no strong expectation is inferred from a workload report."
+  },
+  "corpus": {
+    "generator": "litchi-docx-section-layout-source-v1",
+    "source_bytes": 2101427,
+    "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+  },
+  "harness": {
+    "report_validator": {
+      "path": "/home/zhuhe/litchi-performance-0940/docx_owned_attribution_validator_v3.py",
+      "bytes": 28626,
+      "sha256": "7592d51124edd46a15d664594823cf3fbd2f6a480989e3462cb695b3a88c486f",
+      "role": "Independent DOCX report shape, timing conservation, allocation conservation, process status, correctness, sink, and ingress validation."
+    },
+    "child_validation": {
+      "path": "/home/zhuhe/code/litchi/tools/perf_child_validation.py",
+      "bytes": 28257,
+      "sha256": "198223e4231fe62c503f60010b7867724aa9d8311f8067a14b36ed56eb69667a",
+      "role": "Hash-bound ChildSpec boundary; terminal receipt is durably written before report parsing and semantic validation; no retry."
+    },
+    "synthetic_fixture_provider": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison.py",
+      "sha256": "c332d90b6e2a542adc24ea97942d0d2b43705b34f9f08d0c28511c5ed8d2745a",
+      "role": "Synthetic report construction only; never used as the formal semantic validator."
+    },
+    "rss_wrapper": {
+      "time": "/usr/bin/time",
+      "time_format": "%M",
+      "time_unit": "KiB",
+      "taskset": "/usr/bin/taskset",
+      "argv": ["/usr/bin/time", "-f", "%M", "-o", "CHILD/max-rss-kib.txt", "--", "/usr/bin/taskset", "--cpu-list", "12", "BINARY", "docx-owned-attribution", "..."]
+    }
+  },
+  "schedule": {
+    "cpu": 12,
+    "warmups": 5,
+    "samples": 50,
+    "deadline_seconds": 900,
+    "observation_seconds": 1,
+    "normal": {
+      "blocks": 12,
+      "children": 48,
+      "routes": ["owned_vec", "owned_reader"],
+      "route_order_odd_block": ["owned_vec", "owned_reader"],
+      "route_order_even_block": ["owned_reader", "owned_vec"],
+      "version_order_odd_block": ["baseline", "candidate"],
+      "version_order_even_block": ["candidate", "baseline"],
+      "pairing": "same block and route; operation p50 is computed from each child’s 50 validated operation samples"
+    },
+    "allocator": {
+      "pairs_per_route": 3,
+      "children": 12,
+      "route_order_odd_pair": ["owned_vec", "owned_reader"],
+      "route_order_even_pair": ["owned_reader", "owned_vec"],
+      "version_order_odd_pair": ["baseline", "candidate"],
+      "version_order_even_pair": ["candidate", "baseline"],
+      "pairing": "same repetition and route; allocator reports retain 50 warmups-discarded samples, and open-phase gauges are compared per paired child"
+    },
+    "total_children": 60,
+    "calibration": "none; the existing synthetic controls exercise schema/counter checks without adding real workload children",
+    "order_is_frozen_by": "schedule rows and SHA-256 emitted by comparison-runner.py --check-schedule and bound into the authorized manifest"
+  },
+  "binary_binding": {
+    "source_revision_field_for_both": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "baseline_normal": {
+      "path": "/home/zhuhe/litchi-performance-0940/target-normal-v1/release/litchi-perf-baseline",
+      "binary_identity": "litchi-perf-baseline",
+      "build_terminal": "/home/zhuhe/litchi-performance-0940/builds/normal-v1/terminal.json"
+    },
+    "baseline_allocator": {
+      "path": "/home/zhuhe/litchi-performance-0940/target-allocator-v1/release/litchi-perf-baseline-alloc",
+      "binary_identity": "litchi-perf-baseline-alloc",
+      "build_terminal": "/home/zhuhe/litchi-performance-0940/builds/allocator-v1/terminal.json"
+    },
+    "candidate_normal": {
+      "path": "/home/zhuhe/litchi-performance-0941/target-normal-v1/release/litchi-perf-baseline",
+      "binary_identity": "litchi-perf-baseline",
+      "build_terminal": "/home/zhuhe/litchi-performance-0941/builds/normal-v1/terminal.json"
+    },
+    "candidate_allocator": {
+      "path": "/home/zhuhe/litchi-performance-0941/target-allocator-v1/release/litchi-perf-baseline-alloc",
+      "binary_identity": "litchi-perf-baseline-alloc",
+      "build_terminal": "/home/zhuhe/litchi-performance-0941/builds/allocator-v1/terminal.json"
+    },
+    "identity_rule": "Normal timing compares only normal probes-off binaries. Allocator elapsed values are never substituted into normal timing; allocator binaries are bound independently by lane, source root, feature, receipt, and SHA-256."
+  },
+  "gates": {
+    "correctness_and_custody": [
+      "All 60 children reach terminal status, exit 0, close their process groups, and pass the independent report validator.",
+      "Every workload report binds the historical source_revision, frozen corpus source/output hashes, route, warmup/sample counts, correctness gates, source immutability, inverse, sink bounds, and owned-reader ingress counters.",
+      "Source listings, receipts, build terminals, binaries, runner, helper, validator, plan, and max RSS sidecars remain hash-bound. Any failed or missing child invalidates interpretation; retain it and do not retry."
+    ],
+    "normal_safety_required_for_both_adoption_paths": {
+      "pairs": "12 per route",
+      "criterion": "For every paired normal block and route, candidate operation p50 / baseline operation p50 <= 1.05.",
+      "tail_review_flags": "Retain and review any paired candidate/baseline p95, p99, operation spread, or max RSS ratio > 1.05. Spread is (max - min) / min within each child’s operation samples. No route pooling hides a flagged pair.",
+      "rss": "Compare external /usr/bin/time maximum RSS directly from raw KiB sidecars; report process snapshots separately and do not treat diagnostic-off process as present."
+    },
+    "latency_adoption": {
+      "primary_route": "owned_reader",
+      "ratio": "baseline operation p50 / candidate operation p50",
+      "criterion": "Median of the 12 paired reader ratios >= 1.05 and the nearest-rank bootstrap 95% lower bound is strictly > 1.0.",
+      "bootstrap_draws": 10000,
+      "bootstrap_seed": 941,
+      "bootstrap_statistic": "For each draw, sample 12 paired ratios with replacement and take their midpoint median; sort 10,000 draw medians and use ranks 250 and 9,750 for the two-sided 95% interval.",
+      "scope": "Descriptive DOCX latency adoption candidate only; it remains subject to all correctness, source, binary, normal-safety, tail/RSS review, XLSX controls, independent review, and root decision."
+    },
+    "allocation_adoption": {
+      "target_route": "owned_reader",
+      "target_phase": "allocation.open",
+      "requested_bytes": "Per child, median allocated_bytes across the 50 validated allocator samples; candidate must be at least 10% below baseline in all 3 paired reader repetitions.",
+      "calls": "Per child, median allocation_calls; candidate strictly lower than baseline in all 3 paired reader repetitions.",
+      "reallocations": "Per child, median reallocation_calls; candidate strictly lower than baseline in all 3 paired reader repetitions.",
+      "memory_safety": "Across both routes and all 3 pairs, retain live_bytes_after, peak_live_bytes_after, region_peak_live_bytes, and external max RSS as separate absolute metrics. Any candidate/baseline ratio >1.05 is a retained memory flag; allocation adoption requires all such route/pair flags resolved as safe by review.",
+      "no_sum_absolute_gauges": true,
+      "scope": "Requested allocator bytes and call counts are allocation evidence; they do not measure physical copies or imply RSS savings."
+    },
+    "overall_rule": "A DOCX adoption path may be considered only if its primary gate passes, every normal safety pair passes, all memory/correctness/custody requirements pass, no unresolved review flags remain, the XLSX 0779 control matrix is complete, and independent review plus root authorization accepts the result."
+  },
+  "failure_policy": {
+    "terminal_first": true,
+    "no_retries": true,
+    "no_selective_recapture": true,
+    "observation_timeout": "Poll the same process; only a confirmed 900-second deadline terminates it and invalidates interpretation.",
+    "sidecar_order": "Do not parse max-rss-kib.txt until perf_child_validation has written and the runner has observed the child terminal receipt. Preserve raw sidecar bytes and parse result.",
+    "invalid_child": "Retain terminal, stdout, stderr, report, validation, and RSS sidecar; mark the cohort invalid rather than replacing the child."
+  },
+  "storage": {
+    "artifact_root": "/home/zhuhe/litchi-performance-0941",
+    "raw_packet": "External only; no report, log, source listing, binary, or executable is written under docs/performance/results.",
+    "repository_outputs": "Only small plan/runner/reducer/control scripts and compact receipts may be added under docs/performance/results/change-0941; apply the repository size checks before any commit.",
+    "source_listing_regeneration": "Use the retained source-candidate-v3 listing receipt; do not regenerate from the mutable checkout during capture."
+  }
+}

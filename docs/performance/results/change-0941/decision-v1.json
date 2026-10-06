@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0941.decision.v1",
+  "decision": "reject_production_optimization",
+  "decided_by": "/root",
+  "basis": "Frozen DOCX all-pair operation p50 safety requirement failed",
+  "failed_pair": "normal-block-05-02-owned_reader",
+  "candidate_over_baseline_operation_p50": 1.0781197207319575,
+  "allowed_maximum": 1.05,
+  "reader_primary_median_baseline_over_candidate": 1.0380105481613557,
+  "reader_primary_required_minimum": 1.05,
+  "allocation_reader_gate_passed": true,
+  "allocation_improvement_overrides_safety": false,
+  "review_flags": 21,
+  "independent_reviewer": "/root/audit_evidence",
+  "production_restored_to_head": true,
+  "retained_changes": "Four reader behavior unit tests, six public ingress tests, numerically unchanged test seed lint correction, reproducible measurement tooling and evidence",
+  "xlsx_status_at_decision": "24 real preflight children passed; formal96 still pending; cannot reverse this rejection",
+  "no_retry_or_replacement": true,
+  "xlsx_final": {
+    "children": 96,
+    "native_pairs": 36,
+    "allocator_pairs": 12,
+    "hard_native_p50_failures": [
+      {
+        "cell": "generated-xlsx/open",
+        "block_zero_based": 1,
+        "candidate_over_baseline": 1.130723550451683
+      },
+      {
+        "cell": "generated-xlsx/open",
+        "block_zero_based": 5,
+        "candidate_over_baseline": 1.1418469900591435
+      }
+    ],
+    "native_review_flags": 35,
+    "allocator_memory_flags": 0,
+    "reducer_correction": "v5 pairwise supplement applies original frozen rule; v4 aggregate gate fields not used"
+  }
+}

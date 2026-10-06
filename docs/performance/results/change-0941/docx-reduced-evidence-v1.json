@@ -1,0 +1,2232 @@
+{
+  "allocation": {
+    "adoption_pass": false,
+    "memory_flags": [
+      {
+        "candidate_over_baseline": 1.072457194693276,
+        "kind": "allocator_max_rss",
+        "pair_id": "allocator-pair-03-02-owned_reader",
+        "route": "owned_reader"
+      }
+    ],
+    "memory_safe_all_routes": false,
+    "pairs": [
+      {
+        "baseline_max_rss_bytes": 36081664,
+        "baseline_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 271870860,
+            "mean": 271870860.0,
+            "min": 271870860,
+            "p50": 271870860.0,
+            "p95": 271870860.0,
+            "p99": 271870860.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 645,
+            "mean": 645.0,
+            "min": 645,
+            "p50": 645.0,
+            "p95": 645.0,
+            "p99": 645.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000936,
+            "mean": 10999368.0,
+            "min": 10997800,
+            "p50": 10999368.0,
+            "p95": 11000808.0,
+            "p99": 11000936.0,
+            "spread": 0.0002851479386786448
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156632,
+            "mean": 22155065.28,
+            "min": 22153560,
+            "p50": 22155064.0,
+            "p95": 22156504.0,
+            "p99": 22156632.0,
+            "spread": 0.00013866845780091328
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 295,
+            "mean": 295.0,
+            "min": 295,
+            "p50": 295.0,
+            "p95": 295.0,
+            "p99": 295.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 13092738,
+            "mean": 13091170.0,
+            "min": 13089602,
+            "p50": 13091170.0,
+            "p95": 13092610.0,
+            "p99": 13092738.0,
+            "spread": 0.00023957947690082554
+          }
+        },
+        "candidate_max_rss_bytes": 36904960,
+        "candidate_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 66071775,
+            "mean": 66071775.0,
+            "min": 66071775,
+            "p50": 66071775.0,
+            "p95": 66071775.0,
+            "p99": 66071775.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 488,
+            "mean": 488.0,
+            "min": 488,
+            "p50": 488.0,
+            "p95": 488.0,
+            "p99": 488.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11024081,
+            "mean": 11022513.0,
+            "min": 11020945,
+            "p50": 11022513.0,
+            "p95": 11023953.0,
+            "p99": 11024081.0,
+            "spread": 0.00028454910173310907
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22179777,
+            "mean": 22178210.28,
+            "min": 22176705,
+            "p50": 22178209.0,
+            "p95": 22179649.0,
+            "p99": 22179777.0,
+            "spread": 0.00013852373470269816
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 138,
+            "mean": 138.0,
+            "min": 138,
+            "p50": 138.0,
+            "p95": 138.0,
+            "p99": 138.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 13115883,
+            "mean": 13114315.0,
+            "min": 13112747,
+            "p50": 13114315.0,
+            "p95": 13115755.0,
+            "p99": 13115883.0,
+            "spread": 0.00023915660082513603
+          }
+        },
+        "memory": {
+          "live_bytes_after": {
+            "baseline": 10999368.0,
+            "candidate": 11022513.0,
+            "candidate_over_baseline": 1.0021042118056238
+          },
+          "peak_live_bytes_after": {
+            "baseline": 22155064.0,
+            "candidate": 22178209.0,
+            "candidate_over_baseline": 1.0010446821548338
+          },
+          "region_peak_live_bytes": {
+            "baseline": 13091170.0,
+            "candidate": 13114315.0,
+            "candidate_over_baseline": 1.0017679855963981
+          }
+        },
+        "pair_id": "allocator-pair-01-02-owned_reader",
+        "reader_gate_pass": true,
+        "requested_bytes_reduction": 0.7569736786060852,
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 36306944,
+        "baseline_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 271870860,
+            "mean": 271870860.0,
+            "min": 271870860,
+            "p50": 271870860.0,
+            "p95": 271870860.0,
+            "p99": 271870860.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 645,
+            "mean": 645.0,
+            "min": 645,
+            "p50": 645.0,
+            "p95": 645.0,
+            "p99": 645.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000936,
+            "mean": 10999368.0,
+            "min": 10997800,
+            "p50": 10999368.0,
+            "p95": 11000808.0,
+            "p99": 11000936.0,
+            "spread": 0.0002851479386786448
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156632,
+            "mean": 22155065.28,
+            "min": 22153560,
+            "p50": 22155064.0,
+            "p95": 22156504.0,
+            "p99": 22156632.0,
+            "spread": 0.00013866845780091328
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 295,
+            "mean": 295.0,
+            "min": 295,
+            "p50": 295.0,
+            "p95": 295.0,
+            "p99": 295.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 13092738,
+            "mean": 13091170.0,
+            "min": 13089602,
+            "p50": 13091170.0,
+            "p95": 13092610.0,
+            "p99": 13092738.0,
+            "spread": 0.00023957947690082554
+          }
+        },
+        "candidate_max_rss_bytes": 35364864,
+        "candidate_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 66071775,
+            "mean": 66071775.0,
+            "min": 66071775,
+            "p50": 66071775.0,
+            "p95": 66071775.0,
+            "p99": 66071775.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 488,
+            "mean": 488.0,
+            "min": 488,
+            "p50": 488.0,
+            "p95": 488.0,
+            "p99": 488.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11024081,
+            "mean": 11022513.0,
+            "min": 11020945,
+            "p50": 11022513.0,
+            "p95": 11023953.0,
+            "p99": 11024081.0,
+            "spread": 0.00028454910173310907
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22179777,
+            "mean": 22178210.28,
+            "min": 22176705,
+            "p50": 22178209.0,
+            "p95": 22179649.0,
+            "p99": 22179777.0,
+            "spread": 0.00013852373470269816
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 138,
+            "mean": 138.0,
+            "min": 138,
+            "p50": 138.0,
+            "p95": 138.0,
+            "p99": 138.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 13115883,
+            "mean": 13114315.0,
+            "min": 13112747,
+            "p50": 13114315.0,
+            "p95": 13115755.0,
+            "p99": 13115883.0,
+            "spread": 0.00023915660082513603
+          }
+        },
+        "memory": {
+          "live_bytes_after": {
+            "baseline": 10999368.0,
+            "candidate": 11022513.0,
+            "candidate_over_baseline": 1.0021042118056238
+          },
+          "peak_live_bytes_after": {
+            "baseline": 22155064.0,
+            "candidate": 22178209.0,
+            "candidate_over_baseline": 1.0010446821548338
+          },
+          "region_peak_live_bytes": {
+            "baseline": 13091170.0,
+            "candidate": 13114315.0,
+            "candidate_over_baseline": 1.0017679855963981
+          }
+        },
+        "pair_id": "allocator-pair-02-01-owned_reader",
+        "reader_gate_pass": true,
+        "requested_bytes_reduction": 0.7569736786060852,
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 36122624,
+        "baseline_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 271870860,
+            "mean": 271870860.0,
+            "min": 271870860,
+            "p50": 271870860.0,
+            "p95": 271870860.0,
+            "p99": 271870860.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 645,
+            "mean": 645.0,
+            "min": 645,
+            "p50": 645.0,
+            "p95": 645.0,
+            "p99": 645.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000936,
+            "mean": 10999368.0,
+            "min": 10997800,
+            "p50": 10999368.0,
+            "p95": 11000808.0,
+            "p99": 11000936.0,
+            "spread": 0.0002851479386786448
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156632,
+            "mean": 22155065.28,
+            "min": 22153560,
+            "p50": 22155064.0,
+            "p95": 22156504.0,
+            "p99": 22156632.0,
+            "spread": 0.00013866845780091328
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 295,
+            "mean": 295.0,
+            "min": 295,
+            "p50": 295.0,
+            "p95": 295.0,
+            "p99": 295.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 13092738,
+            "mean": 13091170.0,
+            "min": 13089602,
+            "p50": 13091170.0,
+            "p95": 13092610.0,
+            "p99": 13092738.0,
+            "spread": 0.00023957947690082554
+          }
+        },
+        "candidate_max_rss_bytes": 38739968,
+        "candidate_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 66071775,
+            "mean": 66071775.0,
+            "min": 66071775,
+            "p50": 66071775.0,
+            "p95": 66071775.0,
+            "p99": 66071775.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 488,
+            "mean": 488.0,
+            "min": 488,
+            "p50": 488.0,
+            "p95": 488.0,
+            "p99": 488.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11024081,
+            "mean": 11022513.0,
+            "min": 11020945,
+            "p50": 11022513.0,
+            "p95": 11023953.0,
+            "p99": 11024081.0,
+            "spread": 0.00028454910173310907
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22179777,
+            "mean": 22178210.28,
+            "min": 22176705,
+            "p50": 22178209.0,
+            "p95": 22179649.0,
+            "p99": 22179777.0,
+            "spread": 0.00013852373470269816
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 138,
+            "mean": 138.0,
+            "min": 138,
+            "p50": 138.0,
+            "p95": 138.0,
+            "p99": 138.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 13115883,
+            "mean": 13114315.0,
+            "min": 13112747,
+            "p50": 13114315.0,
+            "p95": 13115755.0,
+            "p99": 13115883.0,
+            "spread": 0.00023915660082513603
+          }
+        },
+        "memory": {
+          "live_bytes_after": {
+            "baseline": 10999368.0,
+            "candidate": 11022513.0,
+            "candidate_over_baseline": 1.0021042118056238
+          },
+          "peak_live_bytes_after": {
+            "baseline": 22155064.0,
+            "candidate": 22178209.0,
+            "candidate_over_baseline": 1.0010446821548338
+          },
+          "region_peak_live_bytes": {
+            "baseline": 13091170.0,
+            "candidate": 13114315.0,
+            "candidate_over_baseline": 1.0017679855963981
+          }
+        },
+        "pair_id": "allocator-pair-03-02-owned_reader",
+        "reader_gate_pass": true,
+        "requested_bytes_reduction": 0.7569736786060852,
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 37359616,
+        "baseline_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 285401,
+            "mean": 285401.0,
+            "min": 285401,
+            "p50": 285401.0,
+            "p95": 285401.0,
+            "p99": 285401.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 388,
+            "mean": 388.0,
+            "min": 388,
+            "p50": 388.0,
+            "p95": 388.0,
+            "p99": 388.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000879,
+            "mean": 10999311.0,
+            "min": 10997743,
+            "p50": 10999311.0,
+            "p95": 11000751.0,
+            "p99": 11000879.0,
+            "spread": 0.00028514941656665373
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156575,
+            "mean": 22155008.28,
+            "min": 22153503,
+            "p50": 22155007.0,
+            "p95": 22156447.0,
+            "p99": 22156575.0,
+            "spread": 0.00013866881458882597
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 39,
+            "mean": 39.0,
+            "min": 39,
+            "p50": 39.0,
+            "p95": 39.0,
+            "p99": 39.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 11084325,
+            "mean": 11082757.0,
+            "min": 11081189,
+            "p50": 11082757.0,
+            "p95": 11084197.0,
+            "p99": 11084325.0,
+            "spread": 0.000283002121884213
+          }
+        },
+        "candidate_max_rss_bytes": 35266560,
+        "candidate_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 285401,
+            "mean": 285401.0,
+            "min": 285401,
+            "p50": 285401.0,
+            "p95": 285401.0,
+            "p99": 285401.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 388,
+            "mean": 388.0,
+            "min": 388,
+            "p50": 388.0,
+            "p95": 388.0,
+            "p99": 388.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000881,
+            "mean": 10999313.0,
+            "min": 10997745,
+            "p50": 10999313.0,
+            "p95": 11000753.0,
+            "p99": 11000881.0,
+            "spread": 0.0002851493647106748
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156577,
+            "mean": 22155010.28,
+            "min": 22153505,
+            "p50": 22155009.0,
+            "p95": 22156449.0,
+            "p99": 22156577.0,
+            "spread": 0.00013866880206992076
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 39,
+            "mean": 39.0,
+            "min": 39,
+            "p50": 39.0,
+            "p95": 39.0,
+            "p99": 39.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 11084327,
+            "mean": 11082759.0,
+            "min": 11081191,
+            "p50": 11082759.0,
+            "p95": 11084199.0,
+            "p99": 11084327.0,
+            "spread": 0.0002830020708062879
+          }
+        },
+        "memory": {
+          "live_bytes_after": {
+            "baseline": 10999311.0,
+            "candidate": 10999313.0,
+            "candidate_over_baseline": 1.000000181829571
+          },
+          "peak_live_bytes_after": {
+            "baseline": 22155007.0,
+            "candidate": 22155009.0,
+            "candidate_over_baseline": 1.0000000902730475
+          },
+          "region_peak_live_bytes": {
+            "baseline": 11082757.0,
+            "candidate": 11082759.0,
+            "candidate_over_baseline": 1.0000001804605119
+          }
+        },
+        "pair_id": "allocator-pair-01-01-owned_vec",
+        "reader_gate_pass": true,
+        "requested_bytes_reduction": 0.0,
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34963456,
+        "baseline_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 285401,
+            "mean": 285401.0,
+            "min": 285401,
+            "p50": 285401.0,
+            "p95": 285401.0,
+            "p99": 285401.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 388,
+            "mean": 388.0,
+            "min": 388,
+            "p50": 388.0,
+            "p95": 388.0,
+            "p99": 388.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000879,
+            "mean": 10999311.0,
+            "min": 10997743,
+            "p50": 10999311.0,
+            "p95": 11000751.0,
+            "p99": 11000879.0,
+            "spread": 0.00028514941656665373
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156575,
+            "mean": 22155008.28,
+            "min": 22153503,
+            "p50": 22155007.0,
+            "p95": 22156447.0,
+            "p99": 22156575.0,
+            "spread": 0.00013866881458882597
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 39,
+            "mean": 39.0,
+            "min": 39,
+            "p50": 39.0,
+            "p95": 39.0,
+            "p99": 39.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 11084325,
+            "mean": 11082757.0,
+            "min": 11081189,
+            "p50": 11082757.0,
+            "p95": 11084197.0,
+            "p99": 11084325.0,
+            "spread": 0.000283002121884213
+          }
+        },
+        "candidate_max_rss_bytes": 34877440,
+        "candidate_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 285401,
+            "mean": 285401.0,
+            "min": 285401,
+            "p50": 285401.0,
+            "p95": 285401.0,
+            "p99": 285401.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 388,
+            "mean": 388.0,
+            "min": 388,
+            "p50": 388.0,
+            "p95": 388.0,
+            "p99": 388.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000881,
+            "mean": 10999313.0,
+            "min": 10997745,
+            "p50": 10999313.0,
+            "p95": 11000753.0,
+            "p99": 11000881.0,
+            "spread": 0.0002851493647106748
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156577,
+            "mean": 22155010.28,
+            "min": 22153505,
+            "p50": 22155009.0,
+            "p95": 22156449.0,
+            "p99": 22156577.0,
+            "spread": 0.00013866880206992076
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 39,
+            "mean": 39.0,
+            "min": 39,
+            "p50": 39.0,
+            "p95": 39.0,
+            "p99": 39.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 11084327,
+            "mean": 11082759.0,
+            "min": 11081191,
+            "p50": 11082759.0,
+            "p95": 11084199.0,
+            "p99": 11084327.0,
+            "spread": 0.0002830020708062879
+          }
+        },
+        "memory": {
+          "live_bytes_after": {
+            "baseline": 10999311.0,
+            "candidate": 10999313.0,
+            "candidate_over_baseline": 1.000000181829571
+          },
+          "peak_live_bytes_after": {
+            "baseline": 22155007.0,
+            "candidate": 22155009.0,
+            "candidate_over_baseline": 1.0000000902730475
+          },
+          "region_peak_live_bytes": {
+            "baseline": 11082757.0,
+            "candidate": 11082759.0,
+            "candidate_over_baseline": 1.0000001804605119
+          }
+        },
+        "pair_id": "allocator-pair-02-02-owned_vec",
+        "reader_gate_pass": true,
+        "requested_bytes_reduction": 0.0,
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34844672,
+        "baseline_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 285401,
+            "mean": 285401.0,
+            "min": 285401,
+            "p50": 285401.0,
+            "p95": 285401.0,
+            "p99": 285401.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 388,
+            "mean": 388.0,
+            "min": 388,
+            "p50": 388.0,
+            "p95": 388.0,
+            "p99": 388.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000879,
+            "mean": 10999311.0,
+            "min": 10997743,
+            "p50": 10999311.0,
+            "p95": 11000751.0,
+            "p99": 11000879.0,
+            "spread": 0.00028514941656665373
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156575,
+            "mean": 22155008.28,
+            "min": 22153503,
+            "p50": 22155007.0,
+            "p95": 22156447.0,
+            "p99": 22156575.0,
+            "spread": 0.00013866881458882597
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 39,
+            "mean": 39.0,
+            "min": 39,
+            "p50": 39.0,
+            "p95": 39.0,
+            "p99": 39.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 11084325,
+            "mean": 11082757.0,
+            "min": 11081189,
+            "p50": 11082757.0,
+            "p95": 11084197.0,
+            "p99": 11084325.0,
+            "spread": 0.000283002121884213
+          }
+        },
+        "candidate_max_rss_bytes": 35074048,
+        "candidate_open": {
+          "allocated_bytes": {
+            "count": 50,
+            "max": 285401,
+            "mean": 285401.0,
+            "min": 285401,
+            "p50": 285401.0,
+            "p95": 285401.0,
+            "p99": 285401.0,
+            "spread": 0.0
+          },
+          "allocation_calls": {
+            "count": 50,
+            "max": 388,
+            "mean": 388.0,
+            "min": 388,
+            "p50": 388.0,
+            "p95": 388.0,
+            "p99": 388.0,
+            "spread": 0.0
+          },
+          "live_bytes_after": {
+            "count": 50,
+            "max": 11000881,
+            "mean": 10999313.0,
+            "min": 10997745,
+            "p50": 10999313.0,
+            "p95": 11000753.0,
+            "p99": 11000881.0,
+            "spread": 0.0002851493647106748
+          },
+          "peak_live_bytes_after": {
+            "count": 50,
+            "max": 22156577,
+            "mean": 22155010.28,
+            "min": 22153505,
+            "p50": 22155009.0,
+            "p95": 22156449.0,
+            "p99": 22156577.0,
+            "spread": 0.00013866880206992076
+          },
+          "reallocation_calls": {
+            "count": 50,
+            "max": 39,
+            "mean": 39.0,
+            "min": 39,
+            "p50": 39.0,
+            "p95": 39.0,
+            "p99": 39.0,
+            "spread": 0.0
+          },
+          "region_peak_live_bytes": {
+            "count": 50,
+            "max": 11084327,
+            "mean": 11082759.0,
+            "min": 11081191,
+            "p50": 11082759.0,
+            "p95": 11084199.0,
+            "p99": 11084327.0,
+            "spread": 0.0002830020708062879
+          }
+        },
+        "memory": {
+          "live_bytes_after": {
+            "baseline": 10999311.0,
+            "candidate": 10999313.0,
+            "candidate_over_baseline": 1.000000181829571
+          },
+          "peak_live_bytes_after": {
+            "baseline": 22155007.0,
+            "candidate": 22155009.0,
+            "candidate_over_baseline": 1.0000000902730475
+          },
+          "region_peak_live_bytes": {
+            "baseline": 11082757.0,
+            "candidate": 11082759.0,
+            "candidate_over_baseline": 1.0000001804605119
+          }
+        },
+        "pair_id": "allocator-pair-03-01-owned_vec",
+        "reader_gate_pass": true,
+        "requested_bytes_reduction": 0.0,
+        "route": "owned_vec"
+      }
+    ],
+    "reader_gate_pass": true
+  },
+  "children": 60,
+  "docx_allocation_adoption_path": false,
+  "docx_latency_adoption_path": false,
+  "no_absolute_gauge_sums": true,
+  "normal": {
+    "adoption_pass": false,
+    "pairs": [
+      {
+        "baseline_max_rss_bytes": 38203392,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3633654,
+          "mean": 3594707.06,
+          "min": 3391184,
+          "p50": 3600510.0,
+          "p95": 3628965.0,
+          "p99": 3633654.0,
+          "spread": 0.07150010143949724
+        },
+        "baseline_over_candidate_operation_p50": 1.151660891585526,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3634434,
+          "mean": 3595391.06,
+          "min": 3391784,
+          "p50": 3601200.0,
+          "p95": 3629935.0,
+          "p99": 3634434.0,
+          "spread": 0.07154052262762016
+        },
+        "candidate_max_rss_bytes": 34447360,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3163142,
+          "mean": 3129124.56,
+          "min": 3112703,
+          "p50": 3126363.0,
+          "p95": 3153612.0,
+          "p99": 3163142.0,
+          "spread": 0.016204244349685787
+        },
+        "candidate_over_baseline_operation_p50": 0.8683111559195781,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3163782,
+          "mean": 3129779.56,
+          "min": 3113273,
+          "p50": 3127043.0,
+          "p95": 3154182.0,
+          "p99": 3163782.0,
+          "spread": 0.01622376193799901
+        },
+        "pair_id": "normal-block-01-02-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 34701312,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3608055,
+          "mean": 3382996.8,
+          "min": 3125142,
+          "p50": 3382634.0,
+          "p95": 3601415.0,
+          "p99": 3608055.0,
+          "spread": 0.15452513837771212
+        },
+        "baseline_over_candidate_operation_p50": 1.0807265133805095,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3608815,
+          "mean": 3383691.2,
+          "min": 3125722,
+          "p50": 3383224.0,
+          "p95": 3602105.0,
+          "p99": 3608815.0,
+          "spread": 0.15455405183186477
+        },
+        "candidate_max_rss_bytes": 34680832,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3168202,
+          "mean": 3131581.3,
+          "min": 3115913,
+          "p50": 3129963.0,
+          "p95": 3146893.0,
+          "p99": 3168202.0,
+          "spread": 0.016781277269294747
+        },
+        "candidate_over_baseline_operation_p50": 0.925303476521551,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3169012,
+          "mean": 3132324.1,
+          "min": 3116783,
+          "p50": 3130653.0,
+          "p95": 3147683.0,
+          "p99": 3169012.0,
+          "spread": 0.016757342426469857
+        },
+        "pair_id": "normal-block-02-01-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 35491840,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3659725,
+          "mean": 3489516.42,
+          "min": 3363434,
+          "p50": 3409368.5,
+          "p95": 3623965.0,
+          "p99": 3659725.0,
+          "spread": 0.08809181330747087
+        },
+        "baseline_over_candidate_operation_p50": 1.0090222110350948,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3660455,
+          "mean": 3490217.62,
+          "min": 3364024,
+          "p50": 3410183.5,
+          "p95": 3624715.0,
+          "p99": 3660455.0,
+          "spread": 0.08811798013331652
+        },
+        "candidate_max_rss_bytes": 35868672,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3602064,
+          "mean": 3377136.32,
+          "min": 3157153,
+          "p50": 3378883.5,
+          "p95": 3421624.0,
+          "p99": 3602064.0,
+          "spread": 0.1409215834645961
+        },
+        "candidate_over_baseline_operation_p50": 0.9910584614130153,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3602694,
+          "mean": 3377722.12,
+          "min": 3157733,
+          "p50": 3379428.5,
+          "p95": 3422214.0,
+          "p99": 3602694.0,
+          "spread": 0.14091153368571693
+        },
+        "pair_id": "normal-block-03-02-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 35135488,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3606044,
+          "mean": 3391322.18,
+          "min": 3364584,
+          "p50": 3385208.5,
+          "p95": 3435144.0,
+          "p99": 3606044.0,
+          "spread": 0.07176518701866264
+        },
+        "baseline_over_candidate_operation_p50": 1.0747896391580327,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3606594,
+          "mean": 3391927.78,
+          "min": 3365144,
+          "p50": 3385808.5,
+          "p95": 3435864.0,
+          "p99": 3606594.0,
+          "spread": 0.07175027279664704
+        },
+        "candidate_max_rss_bytes": 38100992,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3634065,
+          "mean": 3208818.4,
+          "min": 3136022,
+          "p50": 3149647.5,
+          "p95": 3586724.0,
+          "p99": 3634065.0,
+          "spread": 0.15881361801671035
+        },
+        "candidate_over_baseline_operation_p50": 0.9304146258642563,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3634995,
+          "mean": 3209471.0,
+          "min": 3136682,
+          "p50": 3150257.5,
+          "p95": 3587454.0,
+          "p99": 3634995.0,
+          "spread": 0.1588662797185051
+        },
+        "pair_id": "normal-block-04-01-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 35127296,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3217183,
+          "mean": 3135617.38,
+          "min": 3109833,
+          "p50": 3132832.5,
+          "p95": 3165233.0,
+          "p99": 3217183.0,
+          "spread": 0.034519538508981026
+        },
+        "baseline_over_candidate_operation_p50": 0.9275407737844547,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3218253,
+          "mean": 3136331.78,
+          "min": 3110493,
+          "p50": 3133632.5,
+          "p95": 3166713.0,
+          "p99": 3218253.0,
+          "spread": 0.03464402588271377
+        },
+        "candidate_max_rss_bytes": 36032512,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3592825,
+          "mean": 3387494.04,
+          "min": 3358623,
+          "p50": 3377568.5,
+          "p95": 3412904.0,
+          "p99": 3592825.0,
+          "spread": 0.06973155367541996
+        },
+        "candidate_over_baseline_operation_p50": 1.0781197207319575,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3593485,
+          "mean": 3388178.04,
+          "min": 3359193,
+          "p50": 3378303.5,
+          "p95": 3413754.0,
+          "p99": 3593485.0,
+          "spread": 0.06974651352274192
+        },
+        "pair_id": "normal-block-05-02-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 36069376,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3668415,
+          "mean": 3467421.46,
+          "min": 3371544,
+          "p50": 3402429.0,
+          "p95": 3638755.0,
+          "p99": 3668415.0,
+          "spread": 0.08805194296737637
+        },
+        "baseline_over_candidate_operation_p50": 1.0016031872988471,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3669245,
+          "mean": 3468124.68,
+          "min": 3372214,
+          "p50": 3403159.0,
+          "p95": 3639475.0,
+          "p99": 3669245.0,
+          "spread": 0.08808189515849231
+        },
+        "candidate_max_rss_bytes": 36007936,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3625405,
+          "mean": 3423310.08,
+          "min": 3165253,
+          "p50": 3396983.0,
+          "p95": 3609825.0,
+          "p99": 3625405.0,
+          "spread": 0.145376056827053
+        },
+        "candidate_over_baseline_operation_p50": 0.9983993787967361,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3626165,
+          "mean": 3424009.28,
+          "min": 3165833,
+          "p50": 3397568.0,
+          "p95": 3610435.0,
+          "p99": 3626165.0,
+          "spread": 0.14540628011648118
+        },
+        "pair_id": "normal-block-06-01-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 38502400,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3657575,
+          "mean": 3578992.06,
+          "min": 3372234,
+          "p50": 3613409.0,
+          "p95": 3646615.0,
+          "p99": 3657575.0,
+          "spread": 0.08461482803387903
+        },
+        "baseline_over_candidate_operation_p50": 1.0657627732532966,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3658495,
+          "mean": 3579716.06,
+          "min": 3372934,
+          "p50": 3614064.5,
+          "p95": 3647205.0,
+          "p99": 3658495.0,
+          "spread": 0.08466249265476289
+        },
+        "candidate_max_rss_bytes": 38072320,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3656445,
+          "mean": 3419396.8,
+          "min": 3152872,
+          "p50": 3390444.0,
+          "p95": 3624165.0,
+          "p99": 3656445.0,
+          "spread": 0.1597188214427988
+        },
+        "candidate_over_baseline_operation_p50": 0.9382951113477606,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3657345,
+          "mean": 3420148.2,
+          "min": 3153562,
+          "p50": 3391224.0,
+          "p95": 3624785.0,
+          "p99": 3657345.0,
+          "spread": 0.15975046629810988
+        },
+        "pair_id": "normal-block-07-02-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 36044800,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3658435,
+          "mean": 3561159.8,
+          "min": 3382534,
+          "p50": 3615194.5,
+          "p95": 3646035.0,
+          "p99": 3658435.0,
+          "spread": 0.08156636415184593
+        },
+        "baseline_over_candidate_operation_p50": 1.063316268245996,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3659355,
+          "mean": 3561928.8,
+          "min": 3383154,
+          "p50": 3615920.0,
+          "p95": 3646825.0,
+          "p99": 3659355.0,
+          "spread": 0.08164009087378228
+        },
+        "candidate_max_rss_bytes": 35983360,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3847236,
+          "mean": 3437851.62,
+          "min": 3155552,
+          "p50": 3399924.0,
+          "p95": 3629594.0,
+          "p99": 3847236.0,
+          "spread": 0.21919588078409102
+        },
+        "candidate_over_baseline_operation_p50": 0.9404539645100699,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3849296,
+          "mean": 3438647.82,
+          "min": 3156262,
+          "p50": 3400594.0,
+          "p95": 3630394.0,
+          "p99": 3849296.0,
+          "spread": 0.2195742938957539
+        },
+        "pair_id": "normal-block-08-01-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 35946496,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3692245,
+          "mean": 3525453.54,
+          "min": 3374024,
+          "p50": 3603635.0,
+          "p95": 3668005.0,
+          "p99": 3692245.0,
+          "spread": 0.09431497819813967
+        },
+        "baseline_over_candidate_operation_p50": 1.0632013923330221,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3692975,
+          "mean": 3526374.94,
+          "min": 3374724,
+          "p50": 3604610.0,
+          "p95": 3669325.0,
+          "p99": 3692975.0,
+          "spread": 0.09430430458905677
+        },
+        "candidate_max_rss_bytes": 36093952,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3617695,
+          "mean": 3387228.44,
+          "min": 3168733,
+          "p50": 3389419.0,
+          "p95": 3450514.0,
+          "p99": 3617695.0,
+          "spread": 0.14168502047979428
+        },
+        "candidate_over_baseline_operation_p50": 0.9405555779095275,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3618315,
+          "mean": 3387866.64,
+          "min": 3169283,
+          "p50": 3390134.0,
+          "p95": 3451144.0,
+          "p99": 3618315.0,
+          "spread": 0.1416825193584795
+        },
+        "pair_id": "normal-block-09-02-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 36306944,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3656705,
+          "mean": 3433774.02,
+          "min": 3379954,
+          "p50": 3407554.0,
+          "p95": 3618845.0,
+          "p99": 3656705.0,
+          "spread": 0.08188010842751114
+        },
+        "baseline_over_candidate_operation_p50": 1.0049961452409504,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3657515,
+          "mean": 3434518.42,
+          "min": 3380684,
+          "p50": 3408324.0,
+          "p95": 3619575.0,
+          "p99": 3657515.0,
+          "spread": 0.08188609169032066
+        },
+        "candidate_max_rss_bytes": 34902016,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3607905,
+          "mean": 3395953.96,
+          "min": 3373423,
+          "p50": 3390614.0,
+          "p95": 3417904.0,
+          "p99": 3607905.0,
+          "spread": 0.06950862669757098
+        },
+        "candidate_over_baseline_operation_p50": 0.9950286921351796,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3608465,
+          "mean": 3396622.56,
+          "min": 3374013,
+          "p50": 3391354.0,
+          "p95": 3418824.0,
+          "p99": 3608465.0,
+          "spread": 0.0694875805161391
+        },
+        "pair_id": "normal-block-10-01-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 35893248,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3709995,
+          "mean": 3507564.32,
+          "min": 3377813,
+          "p50": 3435529.0,
+          "p95": 3637325.0,
+          "p99": 3709995.0,
+          "spread": 0.09834232978557428
+        },
+        "baseline_over_candidate_operation_p50": 1.0128197039896887,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3710815,
+          "mean": 3508625.12,
+          "min": 3378623,
+          "p50": 3436699.0,
+          "p95": 3638255.0,
+          "p99": 3710815.0,
+          "spread": 0.09832171272142527
+        },
+        "candidate_max_rss_bytes": 35098624,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3644455,
+          "mean": 3426457.28,
+          "min": 3159022,
+          "p50": 3392044.0,
+          "p95": 3636085.0,
+          "p99": 3644455.0,
+          "spread": 0.15366559650423453
+        },
+        "candidate_over_baseline_operation_p50": 0.9873425606362223,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3645085,
+          "mean": 3427132.28,
+          "min": 3159672,
+          "p50": 3392614.0,
+          "p95": 3636835.0,
+          "p99": 3645085.0,
+          "spread": 0.15362765502242004
+        },
+        "pair_id": "normal-block-11-02-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 36200448,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3651295,
+          "mean": 3490109.22,
+          "min": 3370384,
+          "p50": 3413239.0,
+          "p95": 3634625.0,
+          "p99": 3651295.0,
+          "spread": 0.08334688272908962
+        },
+        "baseline_over_candidate_operation_p50": 1.0074959177577243,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3652015,
+          "mean": 3490871.42,
+          "min": 3371144,
+          "p50": 3414069.0,
+          "p95": 3635485.0,
+          "p99": 3652015.0,
+          "spread": 0.08331622736970001
+        },
+        "candidate_max_rss_bytes": 35012608,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3629224,
+          "mean": 3407804.62,
+          "min": 3156182,
+          "p50": 3387844.0,
+          "p95": 3607725.0,
+          "p99": 3629224.0,
+          "spread": 0.14987792212236176
+        },
+        "candidate_over_baseline_operation_p50": 0.9925598529724992,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3629784,
+          "mean": 3408441.22,
+          "min": 3156892,
+          "p50": 3388479.0,
+          "p95": 3608475.0,
+          "p99": 3629784.0,
+          "spread": 0.14979669877841878
+        },
+        "pair_id": "normal-block-12-01-owned_reader",
+        "route": "owned_reader"
+      },
+      {
+        "baseline_max_rss_bytes": 34713600,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3088602,
+          "mean": 3061387.22,
+          "min": 3042323,
+          "p50": 3060172.5,
+          "p95": 3081352.0,
+          "p99": 3088602.0,
+          "spread": 0.015211731298747701
+        },
+        "baseline_over_candidate_operation_p50": 1.0062676086905054,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3089192,
+          "mean": 3062070.62,
+          "min": 3042923,
+          "p50": 3060867.0,
+          "p95": 3082052.0,
+          "p99": 3089192.0,
+          "spread": 0.01520544555350234
+        },
+        "candidate_max_rss_bytes": 34652160,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3070082,
+          "mean": 3041923.64,
+          "min": 3029562,
+          "p50": 3041112.0,
+          "p95": 3058352.0,
+          "p99": 3070082.0,
+          "spread": 0.013374870690878747
+        },
+        "candidate_over_baseline_operation_p50": 0.9937714295517655,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3071232,
+          "mean": 3042622.84,
+          "min": 3030272,
+          "p50": 3041802.0,
+          "p95": 3059012.0,
+          "p99": 3071232.0,
+          "spread": 0.013516938413449354
+        },
+        "pair_id": "normal-block-01-01-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 35041280,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3067663,
+          "mean": 3046694.34,
+          "min": 3033613,
+          "p50": 3045492.5,
+          "p95": 3062872.0,
+          "p99": 3067663.0,
+          "spread": 0.011224239875026907
+        },
+        "baseline_over_candidate_operation_p50": 0.9929638127295959,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3068293,
+          "mean": 3047336.34,
+          "min": 3034153,
+          "p50": 3046147.5,
+          "p95": 3063602.0,
+          "p99": 3068293.0,
+          "spread": 0.011251904567765699
+        },
+        "candidate_max_rss_bytes": 37007360,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3369104,
+          "mean": 3079022.56,
+          "min": 3051683,
+          "p50": 3067073.0,
+          "p95": 3124913.0,
+          "p99": 3369104.0,
+          "spread": 0.10401506316350682
+        },
+        "candidate_over_baseline_operation_p50": 1.0070860460171878,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3370864,
+          "mean": 3079787.36,
+          "min": 3052373,
+          "p50": 3067798.0,
+          "p95": 3125923.0,
+          "p99": 3370864.0,
+          "spread": 0.10434209711591605
+        },
+        "pair_id": "normal-block-02-02-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34627584,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3103193,
+          "mean": 3050605.88,
+          "min": 3026982,
+          "p50": 3047092.5,
+          "p95": 3082462.0,
+          "p99": 3103193.0,
+          "spread": 0.025177222725473757
+        },
+        "baseline_over_candidate_operation_p50": 0.9996704501201896,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3104293,
+          "mean": 3051328.68,
+          "min": 3027602,
+          "p50": 3047832.5,
+          "p95": 3083382.0,
+          "p99": 3104293.0,
+          "spread": 0.025330608184298994
+        },
+        "candidate_max_rss_bytes": 34639872,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3076123,
+          "mean": 3048856.96,
+          "min": 3034302,
+          "p50": 3048097.0,
+          "p95": 3064673.0,
+          "p99": 3076123.0,
+          "spread": 0.013782741467395138
+        },
+        "candidate_over_baseline_operation_p50": 1.0003296585187356,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3077273,
+          "mean": 3049499.36,
+          "min": 3034902,
+          "p50": 3048637.0,
+          "p95": 3065703.0,
+          "p99": 3077273.0,
+          "spread": 0.01396124158210051
+        },
+        "pair_id": "normal-block-03-01-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34963456,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3095943,
+          "mean": 3050331.78,
+          "min": 3034582,
+          "p50": 3047738.0,
+          "p95": 3066512.0,
+          "p99": 3095943.0,
+          "spread": 0.02022057733157318
+        },
+        "baseline_over_candidate_operation_p50": 1.0030013644360694,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3096683,
+          "mean": 3051063.98,
+          "min": 3035242,
+          "p50": 3048553.0,
+          "p95": 3067352.0,
+          "p99": 3096683.0,
+          "spread": 0.02024253749783378
+        },
+        "candidate_max_rss_bytes": 34484224,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3054802,
+          "mean": 3039297.48,
+          "min": 3028282,
+          "p50": 3038618.0,
+          "p95": 3048502.0,
+          "p99": 3054802.0,
+          "spread": 0.008757440687492115
+        },
+        "candidate_over_baseline_operation_p50": 0.9970076167964569,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3055452,
+          "mean": 3039936.68,
+          "min": 3028872,
+          "p50": 3039273.0,
+          "p95": 3049152.0,
+          "p99": 3055452.0,
+          "spread": 0.008775544162975523
+        },
+        "pair_id": "normal-block-04-02-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34709504,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3079593,
+          "mean": 3056231.16,
+          "min": 3040032,
+          "p50": 3055147.0,
+          "p95": 3067333.0,
+          "p99": 3079593.0,
+          "spread": 0.013013349859475163
+        },
+        "baseline_over_candidate_operation_p50": 0.9994976580001358,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3080183,
+          "mean": 3057089.76,
+          "min": 3040692,
+          "p50": 3055862.0,
+          "p95": 3068213.0,
+          "p99": 3080183.0,
+          "spread": 0.01298750416023721
+        },
+        "candidate_max_rss_bytes": 34643968,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3213533,
+          "mean": 3065057.68,
+          "min": 3037172,
+          "p50": 3056682.5,
+          "p95": 3119332.0,
+          "p99": 3213533.0,
+          "spread": 0.05806750490258701
+        },
+        "candidate_over_baseline_operation_p50": 1.0005025944741774,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3215453,
+          "mean": 3065965.68,
+          "min": 3037802,
+          "p50": 3057802.5,
+          "p95": 3120322.0,
+          "p99": 3215453.0,
+          "spread": 0.058480111607010596
+        },
+        "pair_id": "normal-block-05-01-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34500608,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3079723,
+          "mean": 3048969.6,
+          "min": 3028593,
+          "p50": 3046077.5,
+          "p95": 3075432.0,
+          "p99": 3079723.0,
+          "spread": 0.016882426922336543
+        },
+        "baseline_over_candidate_operation_p50": 0.9990324783886009,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3081333,
+          "mean": 3049787.02,
+          "min": 3029373,
+          "p50": 3046887.5,
+          "p95": 3076562.0,
+          "p99": 3081333.0,
+          "spread": 0.01715206414000521
+        },
+        "candidate_max_rss_bytes": 34746368,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3116183,
+          "mean": 3052707.0,
+          "min": 3041263,
+          "p50": 3049027.5,
+          "p95": 3069613.0,
+          "p99": 3116183.0,
+          "spread": 0.024634502178864506
+        },
+        "candidate_over_baseline_operation_p50": 1.00096845861604,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3117593,
+          "mean": 3053460.2,
+          "min": 3041903,
+          "p50": 3049647.5,
+          "p95": 3070453.0,
+          "p99": 3117593.0,
+          "spread": 0.024882450229346563
+        },
+        "pair_id": "normal-block-06-02-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34537472,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3109113,
+          "mean": 3056167.42,
+          "min": 3038332,
+          "p50": 3055617.5,
+          "p95": 3073433.0,
+          "p99": 3109113.0,
+          "spread": 0.0232960058347804
+        },
+        "baseline_over_candidate_operation_p50": 1.0037334294269988,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3110983,
+          "mean": 3056914.42,
+          "min": 3039062,
+          "p50": 3056277.5,
+          "p95": 3074203.0,
+          "p99": 3110983.0,
+          "spread": 0.023665525744456677
+        },
+        "candidate_max_rss_bytes": 34635776,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3072283,
+          "mean": 3046262.72,
+          "min": 3028142,
+          "p50": 3044252.0,
+          "p95": 3066942.0,
+          "p99": 3072283.0,
+          "spread": 0.014576925388571606
+        },
+        "candidate_over_baseline_operation_p50": 0.9962804572234581,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3073113,
+          "mean": 3046967.12,
+          "min": 3028912,
+          "p50": 3045007.0,
+          "p95": 3067692.0,
+          "p99": 3073113.0,
+          "spread": 0.014593028783932977
+        },
+        "pair_id": "normal-block-07-01-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 35065856,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3094732,
+          "mean": 3066581.08,
+          "min": 3043923,
+          "p50": 3065472.5,
+          "p95": 3087603.0,
+          "p99": 3094732.0,
+          "spread": 0.01669194654398288
+        },
+        "baseline_over_candidate_operation_p50": 1.0051429812732855,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3095472,
+          "mean": 3067271.08,
+          "min": 3044763,
+          "p50": 3066072.5,
+          "p95": 3088243.0,
+          "p99": 3095472.0,
+          "spread": 0.016654498231882087
+        },
+        "candidate_max_rss_bytes": 34734080,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3075063,
+          "mean": 3051138.96,
+          "min": 3036172,
+          "p50": 3049787.5,
+          "p95": 3064142.0,
+          "p99": 3075063.0,
+          "spread": 0.012809221611950838
+        },
+        "candidate_over_baseline_operation_p50": 0.994883333645955,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3075653,
+          "mean": 3051816.16,
+          "min": 3036752,
+          "p50": 3050512.5,
+          "p95": 3064842.0,
+          "p99": 3075653.0,
+          "spread": 0.01281006812541821
+        },
+        "pair_id": "normal-block-08-02-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34648064,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3094182,
+          "mean": 3062143.34,
+          "min": 3045532,
+          "p50": 3060287.0,
+          "p95": 3085992.0,
+          "p99": 3094182.0,
+          "spread": 0.01597422059594186
+        },
+        "baseline_over_candidate_operation_p50": 1.004340081636002,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3095012,
+          "mean": 3062884.54,
+          "min": 3046142,
+          "p50": 3060977.0,
+          "p95": 3086922.0,
+          "p99": 3095012.0,
+          "spread": 0.016043244208575964
+        },
+        "candidate_max_rss_bytes": 34398208,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3069212,
+          "mean": 3047999.16,
+          "min": 3034292,
+          "p50": 3047062.5,
+          "p95": 3063822.0,
+          "p99": 3069212.0,
+          "spread": 0.011508450735789436
+        },
+        "candidate_over_baseline_operation_p50": 0.9956786732747614,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3069822,
+          "mean": 3048696.96,
+          "min": 3034912,
+          "p50": 3047727.5,
+          "p95": 3064502.0,
+          "p99": 3069822.0,
+          "spread": 0.011502804694172352
+        },
+        "pair_id": "normal-block-09-01-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 35020800,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3220953,
+          "mean": 3071729.5,
+          "min": 3042312,
+          "p50": 3060128.0,
+          "p95": 3133213.0,
+          "p99": 3220953.0,
+          "spread": 0.05871882962694162
+        },
+        "baseline_over_candidate_operation_p50": 1.0028545749639306,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3222773,
+          "mean": 3072558.52,
+          "min": 3042922,
+          "p50": 3060728.0,
+          "p95": 3134683.0,
+          "p99": 3222773.0,
+          "spread": 0.059104702650938805
+        },
+        "candidate_max_rss_bytes": 34742272,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3077753,
+          "mean": 3053997.56,
+          "min": 3039192,
+          "p50": 3051417.5,
+          "p95": 3071712.0,
+          "p99": 3077753.0,
+          "spread": 0.01268791178708025
+        },
+        "candidate_over_baseline_operation_p50": 0.9971535504397202,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3078323,
+          "mean": 3054645.76,
+          "min": 3040022,
+          "p50": 3052003.0,
+          "p95": 3072222.0,
+          "p99": 3078323.0,
+          "spread": 0.012598921981485661
+        },
+        "pair_id": "normal-block-10-02-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34631680,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3123762,
+          "mean": 3056356.46,
+          "min": 3034962,
+          "p50": 3055432.5,
+          "p95": 3070293.0,
+          "p99": 3123762.0,
+          "spread": 0.02925901543413064
+        },
+        "baseline_over_candidate_operation_p50": 1.0005532554638683,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3124562,
+          "mean": 3057203.66,
+          "min": 3035712,
+          "p50": 3056307.0,
+          "p95": 3071043.0,
+          "p99": 3124562.0,
+          "spread": 0.029268257331393755
+        },
+        "candidate_max_rss_bytes": 34848768,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3086652,
+          "mean": 3053812.4,
+          "min": 3035633,
+          "p50": 3053743.0,
+          "p95": 3077122.0,
+          "p99": 3086652.0,
+          "spread": 0.016806708847874562
+        },
+        "candidate_over_baseline_operation_p50": 0.9994470504584867,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3087472,
+          "mean": 3054489.4,
+          "min": 3036353,
+          "p50": 3054352.5,
+          "p95": 3077973.0,
+          "p99": 3087472.0,
+          "spread": 0.016835657777603593
+        },
+        "pair_id": "normal-block-11-01-owned_vec",
+        "route": "owned_vec"
+      },
+      {
+        "baseline_max_rss_bytes": 34988032,
+        "baseline_operation": {
+          "count": 50,
+          "max": 3091132,
+          "mean": 3060217.12,
+          "min": 3041252,
+          "p50": 3059022.5,
+          "p95": 3083042.0,
+          "p99": 3091132.0,
+          "spread": 0.0164011400567924
+        },
+        "baseline_over_candidate_operation_p50": 1.0028950636550091,
+        "baseline_wall": {
+          "count": 50,
+          "max": 3092202,
+          "mean": 3060916.32,
+          "min": 3042052,
+          "p50": 3059662.5,
+          "p95": 3083732.0,
+          "p99": 3092202.0,
+          "spread": 0.01648558275795417
+        },
+        "candidate_max_rss_bytes": 34643968,
+        "candidate_operation": {
+          "count": 50,
+          "max": 3094713,
+          "mean": 3051174.3,
+          "min": 3035193,
+          "p50": 3050192.0,
+          "p95": 3070052.0,
+          "p99": 3094713.0,
+          "spread": 0.01960995561073052
+        },
+        "candidate_over_baseline_operation_p50": 0.9971132935439344,
+        "candidate_wall": {
+          "count": 50,
+          "max": 3095473,
+          "mean": 3051826.9,
+          "min": 3035633,
+          "p50": 3050962.0,
+          "p95": 3070772.0,
+          "p99": 3095473.0,
+          "spread": 0.019712527831921713
+        },
+        "pair_id": "normal-block-12-02-owned_vec",
+        "route": "owned_vec"
+      }
+    ],
+    "reader_primary": {
+      "draws": 10000,
+      "lower_95": 1.0062460314993373,
+      "median": 1.0380105481613557,
+      "seed": 941,
+      "statistic": "median of paired baseline_p50/candidate_p50 ratios",
+      "upper_95": 1.0702762062056648
+    },
+    "reader_primary_pass": false,
+    "safety_pass": false
+  },
+  "overall_adoption": "pending required XLSX 0779 controls, independent review, and root decision",
+  "review_flags": [
+    {
+      "candidate_over_baseline": 1.599712597273155,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-03-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 2.2129618080060274,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-04-01-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.0844019584984845,
+      "kind": "normal_max_rss",
+      "pair_id": "normal-block-04-01-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.0782473201814842,
+      "kind": "normal_tail_or_spread",
+      "metric": "p95",
+      "pair_id": "normal-block-05-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.1167611540903952,
+      "kind": "normal_tail_or_spread",
+      "metric": "p99",
+      "pair_id": "normal-block-05-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 2.0200604262793878,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-05-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.0781197207319575,
+      "kind": "normal_operation_p50_safety",
+      "pair_id": "normal-block-05-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.6510261094512757,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-06-01-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.887598487806993,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-07-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.0516070396221335,
+      "kind": "normal_tail_or_spread",
+      "metric": "p99",
+      "pair_id": "normal-block-08-01-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 2.6873317581746154,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-08-01-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.5022536524595091,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-09-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.5625580239891323,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-11-02-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.7982426842468047,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-12-01-owned_reader",
+      "route": "owned_reader"
+    },
+    {
+      "candidate_over_baseline": 1.0982640531244794,
+      "kind": "normal_tail_or_spread",
+      "metric": "p99",
+      "pair_id": "normal-block-02-02-owned_vec",
+      "route": "owned_vec"
+    },
+    {
+      "candidate_over_baseline": 9.267002872500306,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-02-02-owned_vec",
+      "route": "owned_vec"
+    },
+    {
+      "candidate_over_baseline": 1.0561075394506136,
+      "kind": "normal_max_rss",
+      "pair_id": "normal-block-02-02-owned_vec",
+      "route": "owned_vec"
+    },
+    {
+      "candidate_over_baseline": 4.462148910897636,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-05-01-owned_vec",
+      "route": "owned_vec"
+    },
+    {
+      "candidate_over_baseline": 1.4591801458516291,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-06-02-owned_vec",
+      "route": "owned_vec"
+    },
+    {
+      "candidate_over_baseline": 1.1956458845438136,
+      "kind": "normal_tail_or_spread",
+      "metric": "spread",
+      "pair_id": "normal-block-12-02-owned_vec",
+      "route": "owned_vec"
+    },
+    {
+      "candidate_over_baseline": 1.072457194693276,
+      "kind": "allocator_max_rss",
+      "pair_id": "allocator-pair-03-02-owned_reader",
+      "route": "owned_reader"
+    }
+  ],
+  "schedule_sha256": "ccd7f8d2aad19c4702d95c69902626ac7845e3d82fac131285af77a270533a40",
+  "schema": "litchi.performance.0941.reduced-evidence.v1",
+  "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+  "status": "passed"
+}

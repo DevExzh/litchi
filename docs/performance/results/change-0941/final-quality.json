@@ -1,0 +1,278 @@
+{
+  "$schema": "litchi.performance.0941.final-quality.v1",
+  "artifact_policy": "Raw logs and build target remain external; this repository summary is small and contains no binary.",
+  "change": "0941",
+  "checks": {
+    "clippy_all_features_Dwarnings": {
+      "receipt": "final-v5-opc-clippy-all-features",
+      "status": "PASS"
+    },
+    "clippy_default_Dwarnings": {
+      "receipt": "final-v5-opc-clippy-default",
+      "status": "PASS"
+    },
+    "opc_all_features_all_targets": {
+      "receipt": "final-v5-opc-test-all-features",
+      "status": "PASS",
+      "totals": "1035 passed, 0 failed, 1 ignored"
+    },
+    "opc_default_all_targets": {
+      "receipt": "final-v5-opc-test-default",
+      "status": "PASS",
+      "totals": "1013 passed, 0 failed, 1 ignored"
+    },
+    "rustfmt_owned_files": {
+      "files": [
+        "crates/litchi-opc/src/phys_pkg.rs",
+        "crates/litchi-opc/tests/reader_ingress.rs"
+      ],
+      "receipt": "final-v5-rustfmt-owned",
+      "status": "PASS"
+    }
+  },
+  "created_utc": "2026-10-06T22:44:58.992968+00:00",
+  "limitations_and_preservation": [
+    "The rejected bounded-growth implementation remains documented in new-quality.json and its external receipts; final-v5 tests bind the restored production reader body.",
+    "The prior full-workspace fmt baseline drift and v3 Clippy baseline warning remain preserved in new-quality.json; final-v5 scoped fmt and both warning-denied Clippy gates pass.",
+    "No performance capture or benchmark child was started by these checks."
+  ],
+  "prior_bound_quality_summary": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0941/new-quality.json",
+    "sha256": "e22b12826474a9010714a4480b496c2849b9787ae72719ed079cf642c782e7b1",
+    "unchanged_during_final_v5": true
+  },
+  "scope": {
+    "benchmark_children_started": 0,
+    "docx_retested": false,
+    "iwork_in_scope": false,
+    "source": "final source-quality-v5 only; restored production reader body plus retained test coverage",
+    "source_path": "/home/zhuhe/litchi-performance-0941/source-quality-v5",
+    "target_dir": "/home/zhuhe/litchi-performance-0941/target-quality-v1",
+    "toolchain": "Rust 1.95.0 via +1.95.0; offline locked; -j2",
+    "workspace_fmt_repeated": false
+  },
+  "source_binding": {
+    "cargo_lock": {
+      "bytes": 138201,
+      "path": "/home/zhuhe/litchi-performance-0941/source-quality-v5/Cargo.lock",
+      "sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+    },
+    "lint_overlay": "0x0053_484f_5254 preserves numeric value 357695443540; quality-only test snapshot",
+    "phys_pkg_rs": {
+      "bytes": 120176,
+      "path": "/home/zhuhe/litchi-performance-0941/source-quality-v5/crates/litchi-opc/src/phys_pkg.rs",
+      "sha256": "1ee24e5296de8a6bc67946681a080da54580ccab03a3099363e4526df4f36248"
+    },
+    "reader_ingress_rs": {
+      "bytes": 11260,
+      "path": "/home/zhuhe/litchi-performance-0941/source-quality-v5/crates/litchi-opc/tests/reader_ingress.rs",
+      "sha256": "70de65fe8de228216f51cf84b72806faba12d43153472f9502ff73515eced46f"
+    },
+    "restored_production_body_matches_HEAD": true,
+    "source_fingerprint_quality_rs": {
+      "bytes": 7908,
+      "path": "/home/zhuhe/litchi-performance-0941/source-quality-v5/crates/litchi-opc/tests/source_fingerprint_quality.rs",
+      "sha256": "2954ae0295b557dfb58e2462548e31ac3706be31c2034c076abd79759511180e"
+    },
+    "source_quality_v5_receipt": {
+      "bytes": 2915,
+      "path": "/home/zhuhe/litchi-performance-0941/receipts/source-quality-v5.json",
+      "sha256": "814df2f77d163f8ce3c52c9596a420d228f71dd188dc704f7e1f30c8b744b776"
+    }
+  },
+  "status": "passed",
+  "terminals": [
+    {
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-opc",
+        "--all-targets"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v5",
+      "duration_seconds": 42.254,
+      "exit_code": 0,
+      "finished_at": "2026-10-06T22:42:39.996437Z",
+      "name": "final-v5-opc-test-default",
+      "started_at": "2026-10-06T22:41:57.742545Z",
+      "stderr": {
+        "bytes": 7071,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-test-default.stderr.log",
+        "sha256": "ae2c631fe382c722ce4d49aa9bb4f23dba8dc9a819dc75b0a84c861ff5d92dbf"
+      },
+      "stdout": {
+        "bytes": 94019,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-test-default.stdout.log",
+        "sha256": "fbd2879605ac7d0432b289b5adf399b710e8a26c3ee07f8c829afe26c74fbe75"
+      },
+      "terminal": {
+        "bytes": 2297,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-test-default.terminal.json",
+        "sha256": "d4e97e408e0c071798eaf89e515f41cc2f56463b4397edf906a889e431f17da0"
+      },
+      "test_result_rows": 46,
+      "test_totals": [
+        1013,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--all-features"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v5",
+      "duration_seconds": 44.28,
+      "exit_code": 0,
+      "finished_at": "2026-10-06T22:43:30.187053Z",
+      "name": "final-v5-opc-test-all-features",
+      "started_at": "2026-10-06T22:42:45.906854Z",
+      "stderr": {
+        "bytes": 7071,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-test-all-features.stderr.log",
+        "sha256": "62193ec362f506a74b4b1f62468d8489d5584f83cc926d800fe1551a209c7397"
+      },
+      "stdout": {
+        "bytes": 95959,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-test-all-features.stdout.log",
+        "sha256": "bb59caee6654316c8add1127aa1305da918a67be8600993bc9665ff60aaff2cf"
+      },
+      "terminal": {
+        "bytes": 2334,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-test-all-features.terminal.json",
+        "sha256": "7d793220847537be94c77a9aef7257dc85738efa8f7cac33f9ea38ebfc83b488"
+      },
+      "test_result_rows": 46,
+      "test_totals": [
+        1035,
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v5",
+      "duration_seconds": 5.619,
+      "exit_code": 0,
+      "finished_at": "2026-10-06T22:43:39.644251Z",
+      "name": "final-v5-opc-clippy-default",
+      "started_at": "2026-10-06T22:43:34.025399Z",
+      "stderr": {
+        "bytes": 177,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-clippy-default.stderr.log",
+        "sha256": "feefc3946b91c3d670788568a1e97c60e800bf9492fa116b06313ce12f77561c"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-clippy-default.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2336,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-clippy-default.terminal.json",
+        "sha256": "af2928f9511ccf9d2a3a384b9ebe8d9affd06a5547364db370843e1f462ec17b"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-j2",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v5",
+      "duration_seconds": 5.842,
+      "exit_code": 0,
+      "finished_at": "2026-10-06T22:43:49.418893Z",
+      "name": "final-v5-opc-clippy-all-features",
+      "started_at": "2026-10-06T22:43:43.576802Z",
+      "stderr": {
+        "bytes": 177,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-clippy-all-features.stderr.log",
+        "sha256": "ca51f9d826b785f126722bf8f5dda9bff7b8fcd427b4b665641ab9421442a1a5"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-clippy-all-features.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2373,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-opc-clippy-all-features.terminal.json",
+        "sha256": "6a2af4833da8bf1089b82852bfbde89c7b9293f13b4d5a6008eb983418ef55e4"
+      }
+    },
+    {
+      "argv": [
+        "rustfmt",
+        "+1.95.0",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/litchi-opc/src/phys_pkg.rs",
+        "crates/litchi-opc/tests/reader_ingress.rs"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v5",
+      "duration_seconds": 0.027,
+      "exit_code": 0,
+      "finished_at": "2026-10-06T22:44:00.855863Z",
+      "name": "final-v5-rustfmt-owned",
+      "started_at": "2026-10-06T22:44:00.828445Z",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-rustfmt-owned.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-rustfmt-owned.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2312,
+        "path": "/home/zhuhe/litchi-performance-0941/checks/final-v5-rustfmt-owned.terminal.json",
+        "sha256": "8a9cd2a703e0a5feb141901305b9712e392e25202edea0022bc23dabd781355c"
+      }
+    }
+  ]
+}

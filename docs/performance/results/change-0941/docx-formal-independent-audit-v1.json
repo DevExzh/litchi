@@ -1,0 +1,108 @@
+{
+  "audited_at": "2026-10-06T22:45:00Z",
+  "bindings": {
+    "authorized_manifest": {
+      "bytes": 40947,
+      "path": "/home/zhuhe/litchi-performance-0941/manifests/docx-owned-ingress-0941-formal-authorized-v1.json",
+      "sha256": "ce75947a0b39e0dd85a0cbb50923c7f58818ab0a957695e8dea649377b541f75"
+    },
+    "outer_terminal": {
+      "bytes": 1832,
+      "path": "/home/zhuhe/litchi-performance-0941/formal-v1/terminal.json",
+      "sha256": "5b4f3db49fd020eabb8345ab8ebc04641741c21c4f00fb2aa71c797972aec07b"
+    },
+    "packet_capture_state": {
+      "bytes": 99090,
+      "path": "/home/zhuhe/litchi-performance-0941/formal-v1/packet/capture-state.json",
+      "sha256": "673fcc5a26604d0cfb8ee57269584eb9f969884def9260c264ec75c13bff5c2d"
+    },
+    "packet_manifest": {
+      "bytes": 42518,
+      "path": "/home/zhuhe/litchi-performance-0941/formal-v1/packet/manifest.json",
+      "sha256": "0884004aaa95b0800aca13ba22d726688ca56968d38f73dc6029fd318529597c"
+    },
+    "reduction": {
+      "bytes": 64923,
+      "path": "/home/zhuhe/litchi-performance-0941/reductions/docx-formal-v1.json",
+      "sha256": "6b6585d19dbff329812c9fd7f9e8ee6a391244846135e43bd8f46a37647c15ed"
+    },
+    "runner": {
+      "bytes": 101679,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0941/comparison-runner.py",
+      "sha256": "c8d44ede114aeeaf509b250ef17223bd8821ad789c9424dcd7f087798998027e"
+    }
+  },
+  "custody_checks": {
+    "allocator_children": 12,
+    "children_expected": 60,
+    "children_run": 60,
+    "deadline_false": 60,
+    "failed": 0,
+    "normal_children": 48,
+    "observation_timeout_zero": 60,
+    "passed": 60,
+    "process_group_closed": 60,
+    "report_descriptors_verified": 60,
+    "retry_count": 0,
+    "rss_receipts_passed": 60,
+    "state_status": "completed",
+    "terminal_descriptors_verified": 60,
+    "terminal_exit_zero": 60,
+    "unique_child_ids": 60,
+    "validation_passed": 60
+  },
+  "limitations": [
+    "This receipt audits the completed DOCX packet and reduction; it makes no XLSX performance claim.",
+    "The copied replay validates path normalization and equality of reduction output; it is not a second workload capture."
+  ],
+  "metrics": {
+    "allocation_adoption_path": false,
+    "allocation_memory_safe_all_routes": false,
+    "allocation_reader_gate_pass": true,
+    "allocator_pairs": 6,
+    "flag_kinds": {
+      "allocator_max_rss": 1,
+      "normal_max_rss": 2,
+      "normal_operation_p50_safety": 1,
+      "normal_tail_or_spread": 17
+    },
+    "latency_adoption_path": false,
+    "normal_pairs": 24,
+    "normal_safety_pass": false,
+    "overall_adoption": "rejected_pending_XLSX_controls_and_DOCX_gates",
+    "reader_primary": {
+      "draws": 10000,
+      "lower_95": 1.0062460314993373,
+      "median": 1.0380105481613557,
+      "seed": 941,
+      "statistic": "median of paired baseline_p50/candidate_p50 ratios",
+      "upper_95": 1.0702762062056648
+    },
+    "review_flags": 21
+  },
+  "replay": {
+    "children_moved": 60,
+    "children_original": 60,
+    "moved_output": {
+      "bytes": 64923,
+      "path": "/tmp/litchi-performance-0941-formal-moved-replay-v2.json",
+      "sha256": "6b6585d19dbff329812c9fd7f9e8ee6a391244846135e43bd8f46a37647c15ed"
+    },
+    "moved_packet_copy": "/tmp/litchi-performance-0941-formal-moved-v2",
+    "normalization": "copied packet retained original capture_origin; runner mapped packet-owned absolute terminal paths to copied root; frozen packet was not modified",
+    "original_output": {
+      "bytes": 64923,
+      "path": "/tmp/litchi-performance-0941-formal-replay-v2.json",
+      "sha256": "6b6585d19dbff329812c9fd7f9e8ee6a391244846135e43bd8f46a37647c15ed"
+    },
+    "original_packet": "/home/zhuhe/litchi-performance-0941/formal-v1/packet",
+    "outputs_equal": true
+  },
+  "schema": "litchi.performance.0941.docx-formal-independent-audit.v1",
+  "scope": {
+    "source_edits": false,
+    "workload_rerun": false,
+    "xlsx_workload_started_by_auditor": false
+  },
+  "status": "passed_custody_and_replay_rejected_adoption"
+}

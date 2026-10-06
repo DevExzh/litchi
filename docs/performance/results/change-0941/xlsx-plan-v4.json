@@ -1,0 +1,150 @@
+{
+  "schema": "litchi.performance.0941.xlsx-controls-plan.v4",
+  "status": "prospective_only_pending_root_approval",
+  "created_utc": "2026-10-06T22:25:30Z",
+  "scope": {
+    "purpose": "Measure shared OPC XLSX open and open-edit-save controls for the frozen 0941 baseline/candidate pair.",
+    "iwork": "excluded",
+    "cpu": 12,
+    "deadline_seconds": 900,
+    "review_percent": 5,
+    "no_retry_or_replacement": true,
+    "terminal_first": true,
+    "rss": "whole-child maximum RSS from /usr/bin/time -f %M; allocator region peaks remain separate",
+    "native": {
+      "blocks": 6,
+      "warmup": 3,
+      "samples": 30,
+      "orders": [
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"]
+      ],
+      "children_per_cell": 12,
+      "total_children": 72
+    },
+    "allocator": {
+      "blocks": 2,
+      "warmup": 0,
+      "samples": 3,
+      "orders": [
+        ["baseline", "candidate"],
+        ["candidate", "baseline"]
+      ],
+      "children_per_cell": 4,
+      "total_children": 24
+    }
+  },
+  "cells": [
+    {"id": "generated-xlsx/open", "fixture": "generated-xlsx", "phase": "open", "sheet": "Sheet1", "group": "primary"},
+    {"id": "generated-xlsx/lifecycle", "fixture": "generated-xlsx", "phase": "lifecycle", "sheet": "Sheet1", "group": "primary"},
+    {"id": "conditional-formatting/open", "fixture": "conditional-formatting", "phase": "open", "sheet": "Home", "group": "primary"},
+    {"id": "conditional-formatting/lifecycle", "fixture": "conditional-formatting", "phase": "lifecycle", "sheet": "Home", "group": "primary"},
+    {"id": "small-xlsx/open", "fixture": "small-xlsx", "phase": "open", "sheet": "Sheet1", "group": "boundary-control"},
+    {"id": "boundary-xlsx/open", "fixture": "boundary-xlsx", "phase": "open", "sheet": "Sheet1", "group": "boundary-control"}
+  ],
+  "source_and_probe": {
+    "probe_source": "/home/zhuhe/code/litchi/docs/performance/results/change-0779/probe-src",
+    "probe_source_sha256": {
+      "src/main.rs": "c601ce2b369b51f3921ac24b972b0fa573c02dec356289a5c5ccbd4995d35695",
+      "src/allocation_metrics.rs": "68b1c02c3a576cd6e0dde23c7c8442f1ff9a034d586cae3e960fec5cbec320d1",
+      "src/counting_allocator.rs": "bd89fa4d5bdd1ac9d02921dbdf373dd7b484f358e5ac3c34455259a4cd7cfe10"
+    },
+    "probe_lock_sha256": "9f5e7da95e9af1ec0a35c21fd1c2daa6081d14c54031553cdca56a8804d26d3f",
+    "toolchain": "1.95.0",
+    "legs": {
+      "baseline": {
+        "source_root": "/home/zhuhe/litchi-performance-0940/source-candidate-v1",
+        "probe_root": "/home/zhuhe/litchi-performance-0941/xlsx-probes/baseline",
+        "source_receipt": "/home/zhuhe/litchi-performance-0941/xlsx-probes/baseline/source-receipt-v2.json",
+        "fixture_root": "/home/zhuhe/litchi-performance-0941/xlsx-probes/baseline/fixtures",
+        "normal_binary": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/baseline-native-v2",
+        "allocator_binary": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/baseline-allocator-v2"
+      },
+      "candidate": {
+        "source_root": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "probe_root": "/home/zhuhe/litchi-performance-0941/xlsx-probes/candidate",
+        "source_receipt": "/home/zhuhe/litchi-performance-0941/xlsx-probes/candidate/source-receipt-v1.json",
+        "fixture_root": "/home/zhuhe/litchi-performance-0941/xlsx-probes/candidate/fixtures",
+        "normal_binary": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/candidate-native-v1",
+        "allocator_binary": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/candidate-allocator-v1"
+      }
+    }
+  },
+  "script_witness": {
+    "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/xlsx-capture-v4.py",
+    "bytes": 21363,
+    "sha256": "8c26a65d7f9610534f599859107147b1abb76033143e522f15ecff1e0ae6a6ce"
+  },
+  "validator_witness": {
+    "path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/validate-xlsx-plan-v4.py",
+    "bytes": 17456,
+    "sha256": "017491cd43e1c772a1a049e19ac26020dd775b587cf204dafa77b22895fad799"
+  },
+  "source_receipt_witnesses": {
+    "baseline": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/baseline/source-receipt-v2.json", "bytes": 3304, "sha256": "58321f7c06de43d46f75ca8ba1a6c2e277f2770d930e7ee2d40a4363f31c0510"},
+    "candidate": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/candidate/source-receipt-v1.json", "bytes": 2966, "sha256": "6f5dbc66a2fd8c582cfd7298c6a3417170e11606abad184038341c9f88e65727"}
+  },
+  "runtime_environment": {
+    "PATH": "/usr/bin:/bin",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC",
+    "RUST_BACKTRACE": "0",
+    "unset": ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_HOME", "RUSTUP_TOOLCHAIN", "CARGO_INCREMENTAL"]
+  },
+  "tool_witnesses": {
+    "time": {"path": "/usr/bin/time", "bytes": 27232, "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"},
+    "taskset": {"path": "/usr/bin/taskset", "bytes": 31184, "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"}
+  },
+  "binary_witnesses": {
+    "baseline": {
+      "normal": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/baseline-native-v2", "bytes": 36560888, "sha256": "7f3f81e2ae3f45250d804c4654c57fb0c945cf063005668255aec76d4a203d2f"},
+      "allocator": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/baseline-allocator-v2", "bytes": 36074728, "sha256": "800ec93aa17c2beb8e2649b62e52f8a37b7f2da4a91ecdc38d0289308c75db72"}
+    },
+    "candidate": {
+      "normal": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/candidate-native-v1", "bytes": 36564792, "sha256": "ae13df0275e02f9a3425926c94c5303c7f2f22350784d67816dd4222ce40d180"},
+      "allocator": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/binaries/candidate-allocator-v1", "bytes": 36080080, "sha256": "abe0a733e8dfe4e2d82f6df7ce5800cc7ba19d7b49184db7631a56b82b46d37f"}
+    }
+  },
+  "build_witnesses": {
+    "baseline": {
+      "native": {"start": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/baseline/native-v3/start-v3.json", "sha256": "3855ca3270751fc2fdf969955014612c627d6e28fa510cd3175eb1be3dcfbcda"}, "terminal": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/baseline/native-v3/terminal-v3.json", "sha256": "b9ee1dd07b08f87cad2d640972876e9365c4500cf78e1c9e99b1b956d20e49e4"}},
+      "allocator": {"start": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/baseline/allocator-v3/start-v3.json", "sha256": "f876d9c1a19d45a652ff215d6e953893c8ee886c5f9ba79fdd52da04eb19d280"}, "terminal": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/baseline/allocator-v3/terminal-v3.json", "sha256": "4ed31f59633e57a4fd3c9b8d0ac835fc37d670aa1245c9f1be1c4b613be3d2ae"}}
+    },
+    "candidate": {
+      "native": {"start": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/candidate/native/start-v2.json", "sha256": "d8d562c4d5e38dd788895b8f685d1f9f45df3ca63dc39d94992a684deaa2e564"}, "terminal": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/candidate/native/terminal-v2.json", "sha256": "4ef0f326b5d2aa6e984e715b0652985a68a66aed8550db1486870b394508cc91"}},
+      "allocator": {"start": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/candidate/allocator/start-v2.json", "sha256": "0620efef33e640925d4c5341e79fdec23cba1f1bc3fd4d6e152ffc2016eeb4a1"}, "terminal": {"path": "/home/zhuhe/litchi-performance-0941/xlsx-probes/builds/candidate/allocator/terminal-v2.json", "sha256": "b48227fbd64b705d870cc23f9378ae876455707fbad6113a9aa346e008dc2129"}}
+    }
+  },
+  "fixtures": {
+    "generated-xlsx": {"bytes": 4226429, "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"},
+    "conditional-formatting": {"bytes": 654688, "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"},
+    "small-xlsx": {"bytes": 3555, "sha256": "a6d7f8a056622201862c354bd508820f7e57a84c5e2531e4e4da20180615f312"},
+    "boundary-xlsx": {"bytes": 8224, "sha256": "9d57919aa4f6036fb922daba5d1dc913a8847581fd9a3dd3c4d79bca7d28bdb8"}
+  },
+  "expected_published_outputs_from_0779": {
+    "generated-xlsx/lifecycle": {"bytes": 4226568, "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687", "marker": "litchi-perf-0638-ordinary-save"},
+    "conditional-formatting/lifecycle": {"bytes": 652357, "sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb", "marker": "litchi-perf-0638-ordinary-save"}
+  },
+  "gates": {
+    "correctness": "Every child must exit zero, report the frozen source hash and expected route/binary identity, and pass marker/output verification where applicable.",
+    "native_review": "Any paired candidate/baseline p50, p95, p99, spread, or whole-child RSS increase above 5% is a retained review flag; no selective recapture.",
+    "allocator_review": "Any paired retained-live, region-peak, or whole-child max-RSS increase above 5% is a retained review flag. Allocator elapsed is informational; requested bytes alone cannot support an adoption claim.",
+    "adoption": "Candidate/base native p50 above 1.05 on any cell rejects adoption pending resolution; all failed or flagged children remain in the packet."
+  },
+  "output_layout": {
+    "root": "/home/zhuhe/litchi-performance-0941/xlsx-probes/captures",
+    "native": "native",
+    "allocator": "allocator",
+    "terminal_suffix": ".terminal-v3.json",
+    "stdout_suffix": ".stdout-v3.log",
+    "stderr_suffix": ".stderr-v3.log",
+    "rss_suffix": ".maxrss-kib-v3.txt",
+    "report_suffix": ".report-v3.json"
+  },
+  "status_note": "Root must review this frozen matrix and change status to authorized before invoking xlsx-capture-v4.py --execute. No capture directories are created by the plan validator. Allocator elapsed is informational; native adoption gates use native timing, while allocator retained-live, region-peak, and whole-child RSS remain review gates."
+}

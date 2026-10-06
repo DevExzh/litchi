@@ -1994,6 +1994,143 @@ mod tests {
         writer.finish().unwrap()
     }
 
+    fn input_limits(maximum: usize) -> ReadLimits {
+        ReadLimits::builder()
+            .max_input_bytes(maximum as u64)
+            .unwrap()
+            .build()
+            .unwrap()
+    }
+
+    struct ScriptedInput {
+        bytes: Vec<u8>,
+        offset: usize,
+        maximum_per_read: usize,
+        interrupted_reads: usize,
+        failure: Option<std::io::ErrorKind>,
+        requested_lengths: Vec<usize>,
+    }
+
+    impl Read for ScriptedInput {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            self.requested_lengths.push(output.len());
+            if self.interrupted_reads != 0 {
+                self.interrupted_reads -= 1;
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "scripted interruption",
+                ));
+            }
+            if let Some(kind) = self.failure {
+                return Err(std::io::Error::new(kind, "scripted input failure"));
+            }
+
+            let remaining = &self.bytes[self.offset..];
+            if remaining.is_empty() {
+                return Ok(0);
+            }
+            let count = remaining.len().min(output.len()).min(self.maximum_per_read);
+            output[..count].copy_from_slice(&remaining[..count]);
+            self.offset += count;
+            Ok(count)
+        }
+    }
+
+    struct OverreportingInput;
+
+    impl Read for OverreportingInput {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            Ok(output.len().saturating_add(1))
+        }
+    }
+
+    #[test]
+    fn reader_ingress_handles_initial_buffer_boundaries() {
+        for maximum in [
+            1,
+            8 * 1024 - 1,
+            8 * 1024,
+            8 * 1024 + 1,
+            256 * 1024 - 1,
+            256 * 1024,
+            256 * 1024 + 1,
+            2 * 1024 * 1024 - 1,
+            2 * 1024 * 1024,
+            2 * 1024 * 1024 + 1,
+            2_101_427,
+        ] {
+            let bytes: Vec<u8> = (0..maximum).map(|index| (index % 251) as u8).collect();
+            assert_eq!(
+                read_limited(Cursor::new(bytes.as_slice()), input_limits(maximum)).unwrap(),
+                bytes
+            );
+        }
+    }
+
+    #[test]
+    fn reader_ingress_matches_cursor_for_short_and_interrupted_reads() {
+        let bytes: Vec<u8> = (0..20_000).map(|index| (index % 251) as u8).collect();
+        let limits = input_limits(bytes.len());
+        let expected = read_limited(Cursor::new(bytes.clone()), limits).unwrap();
+        let mut scripted = ScriptedInput {
+            bytes,
+            offset: 0,
+            maximum_per_read: 3,
+            interrupted_reads: 5,
+            failure: None,
+            requested_lengths: Vec::new(),
+        };
+
+        let actual = read_limited(&mut scripted, limits).unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(scripted.requested_lengths.last(), Some(&1));
+    }
+
+    #[test]
+    fn reader_ingress_keeps_max_plus_one_probe_and_error_order() {
+        let maximum = 16 * 1024 + 1;
+        let mut scripted = ScriptedInput {
+            bytes: vec![0x5a; maximum + 1],
+            offset: 0,
+            maximum_per_read: 4 * 1024,
+            interrupted_reads: 3,
+            failure: None,
+            requested_lengths: Vec::new(),
+        };
+
+        assert!(matches!(
+            read_limited(&mut scripted, input_limits(maximum)),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::InputBytes,
+                actual,
+                maximum: observed_maximum,
+            }) if actual == (maximum + 1) as u64 && observed_maximum == maximum as u64
+        ));
+        assert_eq!(scripted.requested_lengths.last(), Some(&1));
+
+        let mut failing = ScriptedInput {
+            bytes: Vec::new(),
+            offset: 0,
+            maximum_per_read: 1,
+            interrupted_reads: 2,
+            failure: Some(std::io::ErrorKind::Other),
+            requested_lengths: Vec::new(),
+        };
+        assert!(matches!(
+            read_limited(&mut failing, input_limits(1)),
+            Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::Other
+        ));
+        assert_eq!(failing.requested_lengths.len(), 3);
+    }
+
+    #[test]
+    fn reader_ingress_retains_overreported_read_refusal() {
+        assert!(matches!(
+            read_limited(OverreportingInput, input_limits(1)),
+            Err(OpcError::IoError(error)) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+    }
+
     fn write_spool_fixture<W: Write>(writer: &mut PhysPkgWriter<W>) {
         let content_types = PackURI::new("/[Content_Types].xml").unwrap();
         let rels = PackURI::new("/_rels/.rels").unwrap();

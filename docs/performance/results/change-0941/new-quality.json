@@ -1,0 +1,653 @@
+{
+  "$schema": "litchi.performance.0941.quality.v1",
+  "artifact_policy": "Raw logs, targets, source copies, and fixtures remain outside the repository. This summary is intentionally small; no binaries or large evidence are committed.",
+  "change": "0941",
+  "coverage": {
+    "controls": [
+      "short read",
+      "Interrupted read",
+      "underlying read error",
+      "exact-limit probe error",
+      "malformed oversized input typed before ZIP validation",
+      "physical-path metadata limit",
+      "zero and unaddressable input limits"
+    ],
+    "existing_inline_coverage": "buffer-boundary, max+1 probe, late error, invalid read count, and package/source-backed reader/path limits retained.",
+    "path_ingress": "OwnedPhysPkgReader::open_with_limits and OpcPackage::open_with_limits metadata precheck plus read_limited",
+    "public_ingress_tests": 6,
+    "read_limited_sequential_callers": [
+      "OwnedPhysPkgReader::from_reader_with_limits",
+      "OpcPackage::from_reader_with_limits",
+      "SourceBackedPackage::from_reader_with_limits"
+    ]
+  },
+  "generated_utc": "2026-10-06T22:29:52.233436+00:00",
+  "preserved_failures": [
+    {
+      "classification": "setup/sparse-v1",
+      "detail": "missing exact ZIP fixture and unused reader test import; superseded by source-candidate-v3 fixture closure and final test hash.",
+      "receipt": "docx-opc-test-default.terminal.json"
+    },
+    {
+      "classification": "baseline/pre-existing",
+      "detail": "source_fingerprint_quality unusual_byte_groupings only; v4 numeric-equivalent lint-only copy passes.",
+      "receipts": [
+        "opc-clippy-default-v3.terminal.json",
+        "opc-clippy-all-features-v3.terminal.json"
+      ]
+    },
+    {
+      "classification": "baseline/unrelated workspace drift",
+      "detail": "full workspace format exit 1; direct formatting of owned reader files passes.",
+      "receipt": "opc-fmt-v3.terminal.json"
+    }
+  ],
+  "receipts": {
+    "external_directory": "/home/zhuhe/litchi-performance-0941/checks",
+    "initial_superseded": [
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "litchi-opc",
+          "--all-targets"
+        ],
+        "classification": "setup_failure_superseded",
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v1",
+        "ended_utc": null,
+        "exit_code": 101,
+        "name": "docx-opc-test-default.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/docx-opc-test-default.terminal.json",
+        "reason": "candidate-v1 quality tree lacked the exact ZIP fixture and retained an unused test import; no candidate-v3 test execution was claimed from this attempt.",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 4150,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/docx-opc-test-default.stderr.log",
+          "sha256": "fde87df325574e6e4a017e0028bcdba2d5e793897ec326a80f91d300298fa7e4"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/docx-opc-test-default.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "terminal": [
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--all-targets"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-test-default-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-test-default-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 7072,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-test-default-v3.stderr.log",
+          "sha256": "30f1a4d6a16a219e7ebeedd0b7300389d651966e30314f344aa0d02a55ce3b17"
+        },
+        "stdout": {
+          "bytes": 94108,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-test-default-v3.stdout.log",
+          "sha256": "ba65aa1a76b0bb99bebfbb47b5380ee3c2cb79c85904d29c19e4cc3ee17d39ab"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--all-targets",
+          "--all-features"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-test-all-features-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-test-all-features-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 9069,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-test-all-features-v3.stderr.log",
+          "sha256": "711238aa551b2cbe09b5b3dd4a07d0ba7e4ba1ce3941970b9176a6125143351f"
+        },
+        "stdout": {
+          "bytes": 96048,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-test-all-features-v3.stdout.log",
+          "sha256": "986849ca3eac66f608edbe069481f8f3b9198264863658b4a2f5a3135a16a25e"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--doc"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-doctest-default-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-doctest-default-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 97,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-doctest-default-v3.stderr.log",
+          "sha256": "3d405c54d254c09688da5ae9cbd7fe0f94466f92c423f41d0b52f5faf07eeca8"
+        },
+        "stdout": {
+          "bytes": 920,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-doctest-default-v3.stdout.log",
+          "sha256": "b1b0d187de5527dcd230af00a32c3f6d902006e2a7dd8395637a044ed7e4a721"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--doc",
+          "--all-features"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-doctest-all-features-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-doctest-all-features-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 97,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-doctest-all-features-v3.stderr.log",
+          "sha256": "3d405c54d254c09688da5ae9cbd7fe0f94466f92c423f41d0b52f5faf07eeca8"
+        },
+        "stdout": {
+          "bytes": 920,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-doctest-all-features-v3.stdout.log",
+          "sha256": "fe00bcbaf4a4b47c087d4b6970c0a2b1bcfbd83b3032afb453c695db078b47b6"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "RUSTDOCFLAGS=-Dwarnings",
+          "cargo",
+          "+1.95.0",
+          "doc",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--no-deps"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-rustdoc-default-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-rustdoc-default-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 887,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-rustdoc-default-v3.stderr.log",
+          "sha256": "a9ac645870a8ba4166c646330e13267ddfd44f06b6e260c107d19a3dfc6df41a"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-rustdoc-default-v3.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "env",
+          "RUSTDOCFLAGS=-Dwarnings",
+          "cargo",
+          "+1.95.0",
+          "doc",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--no-deps",
+          "--all-features"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-rustdoc-all-features-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-rustdoc-all-features-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 946,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-rustdoc-all-features-v3.stderr.log",
+          "sha256": "ab9e06df7f27062b33b2bdf44b9fa899b5c27ffaedac96d4735ab2edc5ea7352"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-rustdoc-all-features-v3.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 101,
+        "name": "opc-clippy-default-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-default-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 3558,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-default-v3.stderr.log",
+          "sha256": "0ea419f7d5dbe814fa3344ca6d73aa717912256cb76c9d5c3dcf717fc1132cc1"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-default-v3.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--all-targets",
+          "--all-features",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 101,
+        "name": "opc-clippy-all-features-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-all-features-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 2719,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-all-features-v3.stderr.log",
+          "sha256": "892877ee277259f83548654a823504f3f92ffc7f90f590818a94307d9422d6c5"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-all-features-v3.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 1,
+        "name": "opc-fmt-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-fmt-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-fmt-v3.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 13892,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-fmt-v3.stdout.log",
+          "sha256": "a5f1f0a7d3b065b2f6a4008f21a1e59f702c4707e15b5d7637ab53e7851e0e34"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--test",
+          "source_fingerprint_quality"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v4",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "fingerprint-test-default-v4.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/fingerprint-test-default-v4.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 338,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/fingerprint-test-default-v4.stderr.log",
+          "sha256": "2bca8a1ceb052c0956acbc06c632b8db021ae5893632511ebfcce08a0e48a34b"
+        },
+        "stdout": {
+          "bytes": 365,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/fingerprint-test-default-v4.stdout.log",
+          "sha256": "155b8b12813c5a1c79776b8c2ec8ab906700ff6353a530f083b30840daa15abd"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--test",
+          "source_fingerprint_quality",
+          "--all-features"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v4",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "fingerprint-test-all-features-v4.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/fingerprint-test-all-features-v4.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 338,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/fingerprint-test-all-features-v4.stderr.log",
+          "sha256": "9735a6226a06327c5a95a16f60e2542b9cd83fee2fe5453cda3616470580f907"
+        },
+        "stdout": {
+          "bytes": 365,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/fingerprint-test-all-features-v4.stdout.log",
+          "sha256": "50f0ef174e09023cb979c3ddf5020f25eb9dbaa9871450bd2c546251a96e5834"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v4",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-clippy-default-v4.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-default-v4.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 177,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-default-v4.stderr.log",
+          "sha256": "17b6afe39eee3c36d9abfb48aeba2f01c96582313f5b134fd6e7ece5465c1e76"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-default-v4.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-opc",
+          "--all-targets",
+          "--all-features",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-quality-v4",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "opc-clippy-all-features-v4.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-all-features-v4.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 177,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-all-features-v4.stderr.log",
+          "sha256": "006fc4fcf15a6f0e53e62ff8f02415ab49d9e2f1a4f9392ed164f15d10de63c5"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/opc-clippy-all-features-v4.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--all-targets"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "docx-test-default-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/docx-test-default-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 13254,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/docx-test-default-v3.stderr.log",
+          "sha256": "ee58b73e4246e53885c1fa3bcf085530099125e14ff3cd2624ce2afb302454e4"
+        },
+        "stdout": {
+          "bytes": 170780,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/docx-test-default-v3.stdout.log",
+          "sha256": "eff200e5d90fd898833bc952faaa867eea898d3a7108cce65295608da44275c9"
+        }
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--doc"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+        "ended_utc": null,
+        "exit_code": 0,
+        "name": "docx-doctest-default-v3.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/docx-doctest-default-v3.terminal.json",
+        "started_utc": null,
+        "stderr": {
+          "bytes": 98,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/docx-doctest-default-v3.stderr.log",
+          "sha256": "8a27e072887a300092bed3b5fba8d9b3d2aae28d05e35406e2fea6d837da4c17"
+        },
+        "stdout": {
+          "bytes": 12989,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/docx-doctest-default-v3.stdout.log",
+          "sha256": "fbc4a87a531642d99ea21a2e7a1f6c4634c423a7ab4ec46b3a0547edee81c714"
+        }
+      },
+      {
+        "argv": [
+          "python3",
+          "-B",
+          "tools/check_crate_boundaries.py"
+        ],
+        "cwd": "/home/zhuhe/code/litchi",
+        "ended_utc": "2026-10-06T22:23:19.336424+00:00",
+        "exit_code": 0,
+        "name": "boundary-check-v1.terminal.json",
+        "path": "/home/zhuhe/litchi-performance-0941/checks/boundary-check-v1.terminal.json",
+        "started_utc": "2026-10-06T22:18:53.110704+00:00",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/boundary-check-v1.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 565,
+          "path": "/home/zhuhe/litchi-performance-0941/checks/boundary-check-v1.stdout.log",
+          "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+        }
+      }
+    ]
+  },
+  "reproduction": "Use each terminal receipt argv and cwd above with CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0941/target-quality-v1; raw stdout/stderr and terminal metadata remain external and hash-bound.",
+  "results": {
+    "boundary_checker": {
+      "cwd": "/home/zhuhe/code/litchi",
+      "receipt": "boundary-check-v1.terminal.json",
+      "status": "PASS",
+      "summary": "65 workspace packages, 244 internal dependency declarations, 11 explicit debt items"
+    },
+    "clippy_Dwarnings_candidate_v3": {
+      "reason": "pre-existing unusual_byte_groupings warning in tests/source_fingerprint_quality.rs at 0x5348_4f52_54; unrelated to reader ingress",
+      "receipts": [
+        "opc-clippy-default-v3.terminal.json",
+        "opc-clippy-all-features-v3.terminal.json"
+      ],
+      "status": "BASELINE_FAILURE"
+    },
+    "clippy_Dwarnings_quality_v4": {
+      "receipts": [
+        "opc-clippy-default-v4.terminal.json",
+        "opc-clippy-all-features-v4.terminal.json"
+      ],
+      "scope": "lint-only quality copy; focused source_fingerprint_quality tests also pass in default and all-features receipts",
+      "status": "PASS"
+    },
+    "docx_default_all_targets": {
+      "receipt": "docx-test-default-v3.terminal.json",
+      "status": "PASS",
+      "summary": "73 rows; 1936 passed, 0 failed, 1 ignored"
+    },
+    "docx_default_doctest": {
+      "receipt": "docx-doctest-default-v3.terminal.json",
+      "status": "PASS",
+      "summary": "77 passed, 31 ignored, 1 expected compile-fail, 0 failures"
+    },
+    "opc_all_features_all_targets": {
+      "receipt": "opc-test-all-features-v3.terminal.json",
+      "status": "PASS",
+      "summary": "46 result rows; 1036 passed, 0 failed, 1 ignored"
+    },
+    "opc_all_features_doctest": {
+      "receipt": "opc-doctest-all-features-v3.terminal.json",
+      "status": "PASS",
+      "summary": "5 compile-pass, 1 expected compile-fail, 0 failures"
+    },
+    "opc_default_all_targets": {
+      "receipt": "opc-test-default-v3.terminal.json",
+      "status": "PASS",
+      "summary": "46 result rows; 1014 passed, 0 failed, 1 ignored"
+    },
+    "opc_default_doctest": {
+      "receipt": "opc-doctest-default-v3.terminal.json",
+      "status": "PASS",
+      "summary": "5 compile-pass, 1 expected compile-fail, 0 failures"
+    },
+    "rustdoc_Dwarnings_default_and_all_features": {
+      "receipts": [
+        "opc-rustdoc-default-v3.terminal.json",
+        "opc-rustdoc-all-features-v3.terminal.json"
+      ],
+      "status": "PASS"
+    },
+    "workspace_fmt": {
+      "reason": "cargo fmt --all -- --check reports existing unrelated drift in office/bench_word_parse/iWork/archive/source_backed/source_fingerprint files; owned phys_pkg.rs and reader_ingress.rs pass direct rustfmt --check. No unrelated formatting churn applied.",
+      "receipt": "opc-fmt-v3.terminal.json",
+      "status": "BASELINE_FAILURE"
+    }
+  },
+  "scope": {
+    "active_quality_processes_after_checks": 0,
+    "benchmark_children_started": 0,
+    "objective": "Independent read_limited ingress correctness and shared-owner quality gates for OPC; no production benchmark or capture children.",
+    "source": "OPC reader ingress only; user-excluded iWork.",
+    "target_dir": "/home/zhuhe/litchi-performance-0941/target-quality-v1",
+    "toolchain": "Rust 1.95.0; cargo commands used +1.95.0; offline locked; -j2."
+  },
+  "source_binding": {
+    "candidate_source": "/home/zhuhe/litchi-performance-0941/source-candidate-v3",
+    "cargo_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "fixture": {
+      "bytes": 1348,
+      "path": "/home/zhuhe/litchi-performance-0941/source-candidate-v3/docs/performance/results/change-0416/corpus/opc-local-only-signed.zip",
+      "sha256": "6c534b529d6546bac4f9c7d1e9a0a18991751101d0e6b1b1488547b1f8d2d51a"
+    },
+    "phys_pkg_rs_sha256": "899ce1567755d8b4d2c3128a016ccc85c968874750e426d0ffd7da1ff5dc147c",
+    "quality_lint_source": {
+      "changed_literal": "0x5348_4f52_54 -> 0x0053_484f_5254 (same numeric value)",
+      "fingerprint_test_sha256": "2954ae0295b557dfb58e2462548e31ac3706be31c2034c076abd79759511180e",
+      "path": "/home/zhuhe/litchi-performance-0941/source-quality-v4",
+      "purpose": "lint-only snapshot for one pre-existing source_fingerprint_quality unusual_byte_groupings warning; not production/benchmark source"
+    },
+    "reader_ingress_rs_sha256": "70de65fe8de228216f51cf84b72806faba12d43153472f9502ff73515eced46f"
+  }
+}
