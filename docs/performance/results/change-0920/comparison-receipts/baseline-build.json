@@ -1,0 +1,162 @@
+{
+  "schema": "litchi.performance.0920.baseline-preparation.v1",
+  "created_utc": "2026-10-05T19:55:35.409024+00:00",
+  "purpose": "Fresh baseline for prospective comparison; not a performance result",
+  "source_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "source_archive": {
+    "path": "/tmp/litchi-performance-0920-baseline/source.tar",
+    "bytes": 12748800,
+    "sha256": "869aa001cc81972c3881f972ea6d34fe47bccf2bc2dc2c90c3303662eb6a6d3f"
+  },
+  "source_archive_command": [
+    "git",
+    "archive",
+    "--format=tar",
+    "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "--",
+    "Cargo.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml",
+    "clippy.toml",
+    ".cargo",
+    "crates/litchi-cfb",
+    "crates/litchi-codepage",
+    "crates/litchi-core",
+    "crates/litchi-crypto",
+    "crates/litchi-doc",
+    "crates/litchi-formula",
+    "crates/litchi-odraw",
+    "crates/litchi-ole-common",
+    "crates/litchi-sign",
+    "crates/litchi-vba"
+  ],
+  "source_manifest": {
+    "path": "/tmp/litchi-performance-0920-baseline/source-receipt.json",
+    "bytes": 118656,
+    "sha256": "4b7967901c42fccd89dcb4893f9147eaaad0f66106ef7be6ea4ac4112b074867"
+  },
+  "source_file_count": 938,
+  "source_unchanged_after_build": true,
+  "build": {
+    "schema": "litchi.performance.0920.baseline-build.v1",
+    "argv": [
+      "taskset",
+      "-c",
+      "14,15",
+      "cargo",
+      "build",
+      "--locked",
+      "--offline",
+      "-j2",
+      "--release",
+      "--manifest-path",
+      "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/Cargo.toml",
+      "--bins"
+    ],
+    "cwd": "/tmp/litchi-performance-0920-baseline/source",
+    "environment_overrides": {
+      "CARGO_TARGET_DIR": "/tmp/litchi-performance-0920-baseline/target",
+      "CARGO_TERM_COLOR": "never",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": "false",
+      "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "false",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+      "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_STRIP": "none",
+      "CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO": "off"
+    },
+    "removed_environment_names": [],
+    "toolchain": {
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    "start_utc": "2026-10-05T19:54:03.643545+00:00",
+    "exit_code": 0,
+    "end_utc": "2026-10-05T19:55:17.998551+00:00",
+    "elapsed_seconds": 74.32407263299683,
+    "artifacts": [
+      {
+        "path": "/tmp/litchi-performance-0920-baseline/build.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/tmp/litchi-performance-0920-baseline/build.stderr",
+        "bytes": 4270,
+        "sha256": "02095699f26a0a4635bbbd6003146ad09ddcdd09ee0951d549746b649c47c2b5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe_alloc.d",
+        "bytes": 54393,
+        "sha256": "9c677805b29fe2c7f17f43757c441e337f5246fda522ac09122579d60a67d9cd"
+      },
+      {
+        "path": "/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe.d",
+        "bytes": 54382,
+        "sha256": "3793eb5f0b1a7988b77e932551f5e6050c9623f5c9d8088acd43098c14fab211"
+      },
+      {
+        "path": "/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe_alloc",
+        "bytes": 54800008,
+        "sha256": "20b96ebbdf611c22b7114b88580044a707d7fce2e4c8811c8084679feb1060dd"
+      },
+      {
+        "path": "/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe",
+        "bytes": 54795488,
+        "sha256": "9f3c2bb2c589ba8e7a47b99c051d4a4910e41002d28f1caa1d1edc036a7515e5"
+      }
+    ]
+  },
+  "probe_files": {
+    "Cargo.lock": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/Cargo.lock",
+      "bytes": 33633,
+      "sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"
+    },
+    "Cargo.toml": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/Cargo.toml",
+      "bytes": 541,
+      "sha256": "0e6f34cc57d56b2725034d4ed067e06a9a28d571f59348d0412c3c6966ea157d"
+    },
+    "README.md": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/README.md",
+      "bytes": 2932,
+      "sha256": "fe5630cb4f41da2b79f1ed83c336ca908171d20fb00277df121891b80b72d2b4"
+    },
+    "src/alloc_metrics.rs": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/src/alloc_metrics.rs",
+      "bytes": 4912,
+      "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+    },
+    "src/bin/alloc.rs": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/src/bin/alloc.rs",
+      "bytes": 1797,
+      "sha256": "11a1b9d765399ad0917c657108f4a5ea81011a20d7b6ebd5385f95bbc702e320"
+    },
+    "src/lib.rs": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/src/lib.rs",
+      "bytes": 34827,
+      "sha256": "b932992f10ecee244eaa3bd14833a07dcd2456f0bfc2de0dce3bf64403737dc3"
+    },
+    "src/main.rs": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/src/main.rs",
+      "bytes": 105,
+      "sha256": "496530a1954a6e014c59e5e82e9a7ba2a6b4e3e5077758f1c6a12b85d5cc439c"
+    },
+    "src/oracle_0730.rs": {
+      "path": "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/src/oracle_0730.rs",
+      "bytes": 58805,
+      "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+    }
+  },
+  "limitations": [
+    "Candidate build and paired qualification outstanding",
+    "No native comparison or adoption claim",
+    "Inherited environment outside recorded release/compiler overrides is not fully captured",
+    "Git metadata is read-only; no staging or commit"
+  ]
+}

@@ -1,0 +1,267 @@
+--- a/crates/litchi-cfb/src/writer/core.rs
++++ b/crates/litchi-cfb/src/writer/core.rs
+@@ -79,7 +79,7 @@
+ use std::ffi::OsString;
+ use std::fs::{self, File};
+ use std::hash::Hash;
+-use std::io::{self, ErrorKind, Seek, SeekFrom, Write};
++use std::io::{self, Cursor, ErrorKind, Seek, SeekFrom, Write};
+ use std::path::{Path, PathBuf};
+ use std::sync::Arc;
+ use std::sync::atomic::{AtomicU64, Ordering};
+@@ -1629,6 +1629,60 @@
+     /// too many sectors), if an allocation cannot grow, or if writing to
+     /// `writer` fails.
+     pub fn write_to<W: Write + Seek>(&mut self, writer: &mut W) -> Result<(), OleError> {
++        self.write_to_with_reservation(writer, |_, _| Ok(()), |_, _| Ok(()))
++    }
++
++    /// Serializes this writer into an owned byte vector.
++    ///
++    /// When a source-backed sector-reuse plan is accepted, its already
++    /// validated exact output length is used for one fallible reservation
++    /// before emission.  The from-scratch fallback remains the same writer
++    /// path and retains its existing checked layout and sink semantics.
++    ///
++    /// # Errors
++    ///
++    /// Returns the same validation and allocation errors as [`Self::write_to`].
++    /// An accepted source-backed layout additionally reports a typed allocation
++    /// error if its checked output length cannot be reserved, before any owned
++    /// output bytes are emitted. The owned sink's final length is checked before
++    /// the successful sector-layout report is published.
++    pub fn write_to_vec(&mut self) -> Result<Vec<u8>, OleError> {
++        let mut output = Cursor::new(Vec::new());
++        self.write_to_with_reservation(
++            &mut output,
++            |sink, length| {
++                let capacity = usize::try_from(length).map_err(|_| {
++                    OleError::InvalidData("CFB output length exceeds usize".to_string())
++                })?;
++                sink.get_mut()
++                    .try_reserve_exact(capacity)
++                    .map_err(|source| OleError::allocation("CFB owned output", source))?;
++                Ok(())
++            },
++            |sink, expected| {
++                let actual = sink.seek(SeekFrom::End(0))?;
++                if actual != expected {
++                    return Err(OleError::InvalidData(
++                        "CFB owned output length differs from validated plan".to_string(),
++                    ));
++                }
++                Ok(())
++            },
++        )?;
++        Ok(output.into_inner())
++    }
++
++    fn write_to_with_reservation<W, F, V>(
++        &mut self,
++        writer: &mut W,
++        mut reserve: F,
++        mut verify: V,
++    ) -> Result<(), OleError>
++    where
++        W: Write + Seek,
++        F: FnMut(&mut W, u64) -> Result<(), OleError>,
++        V: FnMut(&mut W, u64) -> Result<(), OleError>,
++    {
+         for (_, data) in &self.streams {
+             validate_stream_size(self.sector_size, data.len(), "user stream")?;
+         }
+@@ -1643,9 +1697,12 @@
+                 let inputs = self.stream_inputs()?;
+                 match plan.validate(&inputs) {
+                     Ok(()) => {
++                        let output_len = plan.output_len()?;
++                        reserve(writer, output_len)?;
+                         writer.seek(SeekFrom::Start(0))?;
+                         plan.emit(&inputs, writer)?;
+                         writer.flush()?;
++                        verify(writer, output_len)?;
+                         self.last_sector_layout = Some(report);
+                         return Ok(());
+                     },
+@@ -2712,6 +2769,67 @@
+         assert_eq!(writer.streams.len(), 1);
+     }
+ 
++    fn adopted_writer_for_reservation_tests() -> OleWriter {
++        let data = vec![0x5a; 8_192];
++        let mut source_writer = OleWriter::new();
++        source_writer.create_stream(&["Payload"], &data).unwrap();
++        let mut source_output = Cursor::new(Vec::new());
++        source_writer.write_to(&mut source_output).unwrap();
++
++        let mut writer = OleWriter::new();
++        writer.create_stream(&["Payload"], &data).unwrap();
++        assert!(writer.adopt_source_layout(source_output.get_ref()).unwrap());
++        writer
++    }
++
++    #[test]
++    fn owned_reservation_failure_is_typed_and_pre_emission() {
++        let mut writer = adopted_writer_for_reservation_tests();
++        let mut output = Cursor::new(Vec::new());
++        let result = writer.write_to_with_reservation(
++            &mut output,
++            |_, _| {
++                let mut probe = Vec::<u8>::new();
++                let source = probe.try_reserve(usize::MAX).unwrap_err();
++                Err(OleError::allocation("CFB owned output", source))
++            },
++            |_, _| Ok(()),
++        );
++
++        assert!(matches!(
++            result,
++            Err(OleError::Allocation {
++                resource: "CFB owned output",
++                ..
++            })
++        ));
++        assert!(output.into_inner().is_empty());
++        assert!(writer.last_sector_layout().is_none());
++    }
++
++    #[test]
++    fn owned_length_verification_failure_does_not_publish_report() {
++        let mut writer = adopted_writer_for_reservation_tests();
++        let mut output = Cursor::new(Vec::new());
++        let result = writer.write_to_with_reservation(
++            &mut output,
++            |_, _| Ok(()),
++            |_, _| {
++                Err(OleError::InvalidData(
++                    "injected owned length verification failure".to_string(),
++                ))
++            },
++        );
++
++        assert!(matches!(
++            result,
++            Err(OleError::InvalidData(message))
++                if message == "injected owned length verification failure"
++        ));
++        assert!(!output.into_inner().is_empty());
++        assert!(writer.last_sector_layout().is_none());
++    }
++
+     #[test]
+     fn owned_stream_retains_payload_allocation_through_write() {
+         let mut writer = OleWriter::new();
+--- a/crates/litchi-cfb/src/writer/layout.rs
++++ b/crates/litchi-cfb/src/writer/layout.rs
+@@ -1164,7 +1164,7 @@
+         Ok(equal)
+     }
+ 
+-    fn output_len(&self) -> Result<u64, OleError> {
++    pub(super) fn output_len(&self) -> Result<u64, OleError> {
+         let body = self
+             .sectors
+             .len()
+--- a/crates/litchi-ole-common/src/object/codec.rs
++++ b/crates/litchi-ole-common/src/object/codec.rs
+@@ -12,7 +12,7 @@
+ };
+ use litchi_core::SourceVersion;
+ use std::collections::HashMap;
+-use std::io::{Cursor, Read, Seek};
++use std::io::{Read, Seek};
+ use std::sync::Arc;
+ 
+ #[derive(Debug, Clone)]
+@@ -717,9 +717,7 @@
+             }
+             writer.create_stream_shared(&refs, stream.bytes_shared())?;
+         }
+-        let mut output = Cursor::new(Vec::new());
+-        writer.write_to(&mut output)?;
+-        Ok(output.into_inner())
++        writer.write_to_vec()
+     }
+ 
+     /// Publishes equal-length stream edits through the validated source-backed
+--- /dev/null
++++ b/crates/litchi-cfb/tests/owned_output.rs
+@@ -0,0 +1,78 @@
++use litchi_cfb::{OleWriter, SectorLayoutFallback};
++use std::io::Cursor;
++use std::sync::Arc;
++
++fn writer_model() -> OleWriter {
++    let mut writer = OleWriter::new();
++    writer
++        .create_storage(&["ObjectPool"])
++        .expect("storage path");
++    writer
++        .create_stream(&["WordDocument"], &[0x11; 8192])
++        .expect("large stream");
++    writer
++        .create_stream_shared(&["ObjectPool", "_101"], Arc::<[u8]>::from(vec![0x22; 177]))
++        .expect("mini stream");
++    writer
++}
++
++fn generic_bytes(mut writer: OleWriter) -> Vec<u8> {
++    let mut output = Cursor::new(Vec::new());
++    writer.write_to(&mut output).expect("generic serialization");
++    output.into_inner()
++}
++
++#[test]
++fn owned_output_matches_generic_from_scratch_fallback() {
++    let expected = generic_bytes(writer_model());
++    let actual = writer_model().write_to_vec().expect("owned serialization");
++    assert_eq!(actual, expected);
++}
++
++#[test]
++fn owned_output_matches_generic_after_reused_plan() {
++    let source = generic_bytes(writer_model());
++
++    let mut generic = writer_model();
++    assert!(generic.adopt_source_layout(&source).expect("adopt source"));
++    let expected = generic_bytes(generic);
++
++    let mut owned = writer_model();
++    assert!(owned.adopt_source_layout(&source).expect("adopt source"));
++    let actual = owned.write_to_vec().expect("owned serialization");
++    assert_eq!(actual, expected);
++    assert!(
++        owned
++            .last_sector_layout()
++            .expect("published layout report")
++            .reused_source_layout()
++    );
++}
++
++#[test]
++fn owned_output_matches_generic_when_reuse_declines() {
++    let source = generic_bytes(writer_model());
++
++    let mut generic = writer_model();
++    assert!(generic.adopt_source_layout(&source).expect("adopt source"));
++    generic
++        .create_stream(&["Added"], b"forces the from-scratch fallback")
++        .expect("new stream");
++    let expected = generic_bytes(generic);
++
++    let mut owned = writer_model();
++    assert!(owned.adopt_source_layout(&source).expect("adopt source"));
++    owned
++        .create_stream(&["Added"], b"forces the from-scratch fallback")
++        .expect("new stream");
++    let actual = owned.write_to_vec().expect("owned serialization");
++    assert_eq!(actual, expected);
++    let report = owned
++        .last_sector_layout()
++        .expect("published fallback report");
++    assert!(!report.reused_source_layout());
++    assert_eq!(
++        report.fallback(),
++        Some(SectorLayoutFallback::DirectoryShapeChanged)
++    );
++}

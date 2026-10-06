@@ -1,0 +1,460 @@
+{
+  "schema": "litchi.performance.0920.baseline-qualification-summary.v1",
+  "purpose": "Functional qualification only; no performance statistics or comparison",
+  "start_utc": "2026-10-05T19:56:27.321630+00:00",
+  "end_utc": "2026-10-05T19:56:31.039758+00:00",
+  "passed": true,
+  "children": 48,
+  "warmups_per_child": 0,
+  "samples_per_child": 1,
+  "validator": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0917/capture.py",
+    "bytes": 69575,
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  },
+  "build_receipt": {
+    "path": "/tmp/litchi-performance-0920-baseline/build-receipt.json",
+    "bytes": 2603,
+    "sha256": "eb052a09753ef8c8b941c61df288107229735ec2ab81efcf2e081c89a5f03c47"
+  },
+  "raw_results": {
+    "path": "/tmp/litchi-performance-0920-baseline/qualification/results.json",
+    "bytes": 394117,
+    "sha256": "b33110b585fdb65a0b24ea31f6cf834a113687939f5d2e349b38f60750e42ba5"
+  },
+  "reproduction": "Run each raw_results row argv from /home/zhuhe/code/litchi into a fresh external directory. Import the hash-bound 0917 capture.py and call validate_report(report, row, fixture_rows(protocol())[row.case], row.lane, expected_warmups=0, expected_samples=1). All twenty correctness gates are mandatory; elapsed samples are not performance statistics.",
+  "runs": [
+    {
+      "label": "native-docnohf-e01-zero",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 1,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e01-default",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 1,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e01-release",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 1,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e02-zero",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 2,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e02-default",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 2,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e02-release",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 2,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e08-zero",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 8,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e08-default",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 8,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e08-release",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 8,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e32-zero",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 32,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e32-default",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 32,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docnohf-e32-release",
+      "lane": "native",
+      "case": "docnohf",
+      "edits": 32,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e01-zero",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 1,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e01-default",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 1,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e01-release",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 1,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e02-zero",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 2,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e02-default",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 2,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e02-release",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 2,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e08-zero",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 8,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e08-default",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 8,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e08-release",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 8,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e32-zero",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 32,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e32-default",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 32,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "native-docfloat-e32-release",
+      "lane": "native",
+      "case": "docfloat",
+      "edits": 32,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e01-zero",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 1,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e01-default",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 1,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e01-release",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 1,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e02-zero",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 2,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e02-default",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 2,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e02-release",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 2,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e08-zero",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 8,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e08-default",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 8,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e08-release",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 8,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e32-zero",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 32,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e32-default",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 32,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docnohf-e32-release",
+      "lane": "allocator",
+      "case": "docnohf",
+      "edits": 32,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e01-zero",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 1,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e01-default",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 1,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e01-release",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 1,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e02-zero",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 2,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e02-default",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 2,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e02-release",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 2,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e08-zero",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 8,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e08-default",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 8,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e08-release",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 8,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e32-zero",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 32,
+      "retention": "zero",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e32-default",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 32,
+      "retention": "default",
+      "exit_code": 0,
+      "passed": true
+    },
+    {
+      "label": "allocator-docfloat-e32-release",
+      "lane": "allocator",
+      "case": "docfloat",
+      "edits": 32,
+      "retention": "release",
+      "exit_code": 0,
+      "passed": true
+    }
+  ]
+}

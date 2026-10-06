@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0920 — fewer output allocations do not establish lower latency
+
+[0920](0920-cfb-output-reservation-rejected.md) rejects exact output reservation:
+32-edit requested bytes decrease about 15%, while FloatingPictures fails the
+latency gate at every edit count. Required validation remains intact, and no
+production change is adopted. Before another reservation candidate, attribute
+native allocator/CPU/syscall costs; allocator placement and page faults remain
+hypotheses. Source-bound recapture comparison remains a separate measured
+opportunity from 0919, subject to complete readback and preservation checks.
+
 ## 0919 — output growth and recapture lead requested-byte owners
 
 [0919](0919-doc-allocation-attribution.md) attributes 164,233,879 requested

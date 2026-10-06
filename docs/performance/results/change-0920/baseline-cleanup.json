@@ -1,0 +1,15 @@
+{
+  "schema": "litchi.performance.0920.baseline-cleanup.v1",
+  "utc": "2026-10-05T20:07:43.235606+00:00",
+  "reason": "The baseline build and 48 qualifications are complete. Discard reproducible intermediate outputs while retaining binaries, 157 fingerprints, source, logs and receipts for comparison.",
+  "removed_directories": [
+    "/tmp/litchi-performance-0920-baseline/target/release/deps",
+    "/tmp/litchi-performance-0920-baseline/target/release/build",
+    "/tmp/litchi-performance-0920-baseline/target/release/incremental"
+  ],
+  "allocated_bytes_before": 652337152,
+  "allocated_bytes_after": 112140288,
+  "allocated_bytes_released": 540196864,
+  "retained_artifacts_hash_verified": 163,
+  "regeneration": "Re-run exact build argv/environment in baseline-preparation.json into fresh target directory; no intermediate is committed."
+}

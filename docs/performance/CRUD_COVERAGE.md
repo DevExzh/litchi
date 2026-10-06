@@ -1,5 +1,13 @@
 # Performance CRUD coverage
 
+## 0920 — repeated DOC edit comparison, unchanged scenario scope
+
+[0920](0920-cfb-output-reservation-rejected.md) compares existing NoHeadFoot and
+FloatingPictures paragraph-zero edit workloads at 1/2/8/32 edits. All 288
+children pass the existing correctness validator; rejection comes from the
+latency gate. It adds no distinct-object, provider, producer, cold-cache or
+concurrency coverage and changes no production capability.
+
 ## 0919 — allocation diagnosis of existing DOC scenarios
 
 [0919](0919-doc-allocation-attribution.md) profiles NoHeadFoot at 32 edits and

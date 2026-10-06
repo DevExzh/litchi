@@ -1,0 +1,144 @@
+{
+  "schema": "litchi.performance.0920.pre-admission-archive.v1",
+  "utc": "2026-10-05T20:26:38.918843+00:00",
+  "status": "prototype; ADR prerequisite not satisfied; no performance capture",
+  "archive": {
+    "path": "/tmp/litchi-performance-0920-pre-admission/packet.tar",
+    "bytes": 501760,
+    "sha256": "f0f17ee3e1a24866250b845f29d4cf77a70557b10914efc2baca528e6744b9df"
+  },
+  "files": [
+    {
+      "relative_path": "baseline-cleanup.json",
+      "path": "docs/performance/results/change-0920/baseline-cleanup.json",
+      "bytes": 845,
+      "sha256": "761da448bc0ecedb7df9751504e68142f06a2f156cf01a088b3d06f74f548495"
+    },
+    {
+      "relative_path": "baseline-dependencies.json",
+      "path": "docs/performance/results/change-0920/baseline-dependencies.json",
+      "bytes": 40842,
+      "sha256": "92abe6fe821b30460af9006c01f8787d750f0523dd54817118f7fc96d45f977d"
+    },
+    {
+      "relative_path": "baseline-preparation.json",
+      "path": "docs/performance/results/change-0920/baseline-preparation.json",
+      "bytes": 6331,
+      "sha256": "1a941066372dd80b7a1e46f0901674667b4234115c7bdacb69c7a5762046819a"
+    },
+    {
+      "relative_path": "baseline-qualification.json",
+      "path": "docs/performance/results/change-0920/baseline-qualification.json",
+      "bytes": 10961,
+      "sha256": "bb3ff2d35579e20a40e6eb98cdc96611b8805a5af1f327ae1d67ef889c00a762"
+    },
+    {
+      "relative_path": "candidate-admission.md",
+      "path": "docs/performance/results/change-0920/candidate-admission.md",
+      "bytes": 2516,
+      "sha256": "cd901f202bb4c49ea3ce50f4aa8f43891ee2e85e6e7f7c40f7b6fd2686590ad9"
+    },
+    {
+      "relative_path": "candidate-qualification.json",
+      "path": "docs/performance/results/change-0920/candidate-qualification.json",
+      "bytes": 37885,
+      "sha256": "d14db7fdfc014f648e226785ff19aa8f16f40e702922a06995af369041025752"
+    },
+    {
+      "relative_path": "capacity-controls-initial-note.md",
+      "path": "docs/performance/results/change-0920/capacity-controls-initial-note.md",
+      "bytes": 400,
+      "sha256": "c0539c8b96f057e67aff17a399c067ed90defcaf71f11b1dc9b0a3970a224f49"
+    },
+    {
+      "relative_path": "capacity-controls-initial.json",
+      "path": "docs/performance/results/change-0920/capacity-controls-initial.json",
+      "bytes": 104906,
+      "sha256": "e76e7b5571b6945398c3867bef43609561711cc1a665987bba9bb1fa659fa017"
+    },
+    {
+      "relative_path": "capacity-controls-pre-build-binding-note.md",
+      "path": "docs/performance/results/change-0920/capacity-controls-pre-build-binding-note.md",
+      "bytes": 334,
+      "sha256": "9c3e9c1065bd95b74cd3638a90cef0158ad9b1f69fc228265ac99b759edf6478"
+    },
+    {
+      "relative_path": "capacity-controls-pre-build-binding.json",
+      "path": "docs/performance/results/change-0920/capacity-controls-pre-build-binding.json",
+      "bytes": 2519,
+      "sha256": "11b5ee321fe67412740b8c12417d88196004e691d827a4fdd5be92b1ebd8d61d"
+    },
+    {
+      "relative_path": "capacity-controls-pre-source-envelope-note.md",
+      "path": "docs/performance/results/change-0920/capacity-controls-pre-source-envelope-note.md",
+      "bytes": 316,
+      "sha256": "6d0bb665df75883b492734ef51fb84e2ec942b288b75a9165c6c47d7bf2eb94c"
+    },
+    {
+      "relative_path": "capacity-controls-pre-source-envelope.json",
+      "path": "docs/performance/results/change-0920/capacity-controls-pre-source-envelope.json",
+      "bytes": 2539,
+      "sha256": "d11fdf0cb91d6c9df0673e35c26a708ac1ef6f71eb6280fdb3694efa964da7db"
+    },
+    {
+      "relative_path": "capacity-controls.json",
+      "path": "docs/performance/results/change-0920/capacity-controls.json",
+      "bytes": 2519,
+      "sha256": "f858fe11888c4faa4cd920a9d5bbacaf7e858667703475dd0014c3bb3f298b8d"
+    },
+    {
+      "relative_path": "comparison-controls.py",
+      "path": "docs/performance/results/change-0920/comparison-controls.py",
+      "bytes": 8979,
+      "sha256": "60ca92cf3ee52c69791b4bf8dc5082553e564c11d9de55c35c87343e3b3f305f"
+    },
+    {
+      "relative_path": "comparison-protocol.json",
+      "path": "docs/performance/results/change-0920/comparison-protocol.json",
+      "bytes": 9500,
+      "sha256": "2bb0ba457db283ba0d3a6673aa5ac34cbcbf5798e41605b36a8dcf6b213d69a7"
+    },
+    {
+      "relative_path": "comparison-replay.py",
+      "path": "docs/performance/results/change-0920/comparison-replay.py",
+      "bytes": 7256,
+      "sha256": "d6102ed795286dab59c149b25c3073e7b2d073f6c22f3d4427d5dedd67df56b6"
+    },
+    {
+      "relative_path": "comparison.py",
+      "path": "docs/performance/results/change-0920/comparison.py",
+      "bytes": 86322,
+      "sha256": "574194efda2b9f55997d7c27a695eb75fc241dd544b2d159c2447c7a5a55702e"
+    },
+    {
+      "relative_path": "design-review.md",
+      "path": "docs/performance/results/change-0920/design-review.md",
+      "bytes": 23824,
+      "sha256": "597e32ed7ca0df7c4130f79c91d6ccabc57da7dccc327b7af9247392739144ed"
+    },
+    {
+      "relative_path": "measurement-plan.md",
+      "path": "docs/performance/results/change-0920/measurement-plan.md",
+      "bytes": 9244,
+      "sha256": "c5aae6d19db6591a67b341e57f3049a1033f57c1c523cd6222383fc9f8f1d775"
+    },
+    {
+      "relative_path": "root-build-parity.json",
+      "path": "docs/performance/results/change-0920/root-build-parity.json",
+      "bytes": 104607,
+      "sha256": "0ef6ad67adf442008e1fe91afe157bac59c3323cfe9bde9a94824359d2a71830"
+    },
+    {
+      "relative_path": "root-control-replay.json",
+      "path": "docs/performance/results/change-0920/root-control-replay.json",
+      "bytes": 1072,
+      "sha256": "6270068bfc34c430f1c848acb81e538cb5c8dfbe3c2c0739c1a3cfd269d31fd7"
+    }
+  ],
+  "regeneration": "The retained tar is the immutable pre-admission snapshot. Verify member sizes and SHA-256 against this manifest; later live-packet edits are not substitutes for its bytes.",
+  "external_candidate_source_receipt": {
+    "path": "/tmp/litchi-performance-0920/receipts/candidate-source-final.json",
+    "bytes": 173028,
+    "sha256": "b0fd362805cd6ba1abba0ff0a43ee52df871568183f6aac4802eadb641b31a4e"
+  }
+}

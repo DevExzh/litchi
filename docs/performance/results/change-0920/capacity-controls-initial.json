@@ -1,0 +1,3769 @@
+{
+  "negative_controls": [
+    {
+      "error": "EvidenceError: capacity-controls: output equality gate failed",
+      "name": "output",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: source identity mismatch",
+      "name": "identity",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: correctness gate failed: foreign_patch_refused",
+      "name": "refusal",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: route ceiling mismatch",
+      "name": "ceiling",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: stage 2: default route lost predecessor",
+      "name": "retainedtransition",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: sample output size mismatch",
+      "name": "mismatch",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity_growth: candidate capacity grew at output_capacity: 1280 > 1024",
+      "name": "capacity_growth",
+      "status": "rejected"
+    }
+  ],
+  "performance_children_run": 0,
+  "positive_smaller_capacity": {
+    "capacity": {
+      "baseline": {
+        "output_capacity": 1024,
+        "retained_bytes": 1024,
+        "routes": {
+          "default_8mib": {
+            "final_retained_before_commit": 256,
+            "output_capacity": 1024,
+            "stages": [
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              }
+            ]
+          },
+          "release_8mib": {
+            "final_retained_before_commit": null,
+            "output_capacity": 1024,
+            "stages": [
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              }
+            ]
+          },
+          "zero": {
+            "final_retained_before_commit": null,
+            "output_capacity": 1024,
+            "stages": [
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              }
+            ]
+          }
+        },
+        "samples": [
+          {
+            "output_capacity": 1024,
+            "retained_bytes": 1024,
+            "stages": [
+              {
+                "after": 256,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              },
+              {
+                "after": 256,
+                "after_release": null,
+                "before": 256
+              }
+            ]
+          }
+        ]
+      },
+      "candidate": {
+        "output_capacity": 768,
+        "retained_bytes": 768,
+        "routes": {
+          "default_8mib": {
+            "final_retained_before_commit": 128,
+            "output_capacity": 768,
+            "stages": [
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              }
+            ]
+          },
+          "release_8mib": {
+            "final_retained_before_commit": null,
+            "output_capacity": 768,
+            "stages": [
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              }
+            ]
+          },
+          "zero": {
+            "final_retained_before_commit": null,
+            "output_capacity": 768,
+            "stages": [
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": null,
+                "after_release": null,
+                "before": null
+              }
+            ]
+          }
+        },
+        "samples": [
+          {
+            "output_capacity": 768,
+            "retained_bytes": 768,
+            "stages": [
+              {
+                "after": 128,
+                "after_release": null,
+                "before": null
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              },
+              {
+                "after": 128,
+                "after_release": null,
+                "before": 128
+              }
+            ]
+          }
+        ]
+      },
+      "changes": [
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "output_capacity"
+        },
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].output_capacity"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].final_retained_before_commit"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[1].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[1].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[1].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[2].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[2].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[2].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[3].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[3].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[3].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[4].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[4].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[4].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[5].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[5].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[5].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[6].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[6].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[6].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[7].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[7].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[7].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[8].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[8].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[8].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[9].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[9].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[9].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[10].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[10].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[10].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[11].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[11].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[11].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[12].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[12].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[12].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[13].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[13].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[13].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[14].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[14].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[14].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[15].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[15].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[15].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[16].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[16].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[16].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[17].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[17].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[17].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[18].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[18].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[18].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[19].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[19].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[19].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[20].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[20].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[20].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[21].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[21].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[21].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[22].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[22].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[22].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[23].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[23].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[23].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[24].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[24].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[24].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[25].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[25].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[25].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[26].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[26].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[26].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[27].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[27].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[27].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[28].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[28].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[28].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[29].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[29].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[29].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[30].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[30].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[30].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[31].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[31].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[31].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[32].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[32].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[default_8mib].stages[32].after_release"
+        },
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].output_capacity"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].final_retained_before_commit"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[1].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[1].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[1].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[2].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[2].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[2].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[3].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[3].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[3].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[4].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[4].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[4].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[5].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[5].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[5].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[6].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[6].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[6].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[7].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[7].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[7].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[8].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[8].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[8].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[9].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[9].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[9].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[10].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[10].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[10].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[11].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[11].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[11].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[12].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[12].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[12].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[13].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[13].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[13].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[14].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[14].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[14].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[15].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[15].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[15].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[16].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[16].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[16].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[17].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[17].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[17].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[18].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[18].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[18].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[19].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[19].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[19].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[20].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[20].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[20].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[21].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[21].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[21].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[22].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[22].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[22].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[23].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[23].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[23].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[24].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[24].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[24].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[25].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[25].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[25].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[26].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[26].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[26].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[27].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[27].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[27].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[28].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[28].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[28].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[29].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[29].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[29].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[30].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[30].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[30].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[31].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[31].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[31].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[32].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[32].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[release_8mib].stages[32].after_release"
+        },
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].output_capacity"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].final_retained_before_commit"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[1].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[1].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[1].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[2].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[2].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[2].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[3].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[3].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[3].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[4].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[4].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[4].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[5].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[5].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[5].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[6].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[6].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[6].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[7].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[7].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[7].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[8].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[8].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[8].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[9].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[9].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[9].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[10].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[10].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[10].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[11].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[11].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[11].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[12].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[12].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[12].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[13].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[13].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[13].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[14].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[14].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[14].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[15].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[15].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[15].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[16].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[16].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[16].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[17].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[17].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[17].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[18].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[18].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[18].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[19].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[19].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[19].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[20].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[20].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[20].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[21].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[21].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[21].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[22].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[22].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[22].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[23].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[23].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[23].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[24].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[24].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[24].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[25].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[25].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[25].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[26].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[26].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[26].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[27].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[27].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[27].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[28].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[28].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[28].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[29].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[29].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[29].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[30].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[30].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[30].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[31].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[31].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[31].after_release"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[32].before"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[32].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "route_outputs[zero].stages[32].after_release"
+        },
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "samples[0].output_capacity"
+        },
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "samples[0].retained_bytes"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[1].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[1].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[1].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[2].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[2].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[2].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[3].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[3].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[3].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[4].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[4].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[4].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[5].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[5].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[5].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[6].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[6].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[6].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[7].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[7].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[7].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[8].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[8].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[8].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[9].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[9].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[9].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[10].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[10].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[10].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[11].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[11].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[11].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[12].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[12].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[12].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[13].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[13].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[13].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[14].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[14].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[14].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[15].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[15].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[15].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[16].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[16].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[16].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[17].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[17].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[17].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[18].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[18].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[18].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[19].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[19].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[19].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[20].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[20].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[20].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[21].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[21].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[21].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[22].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[22].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[22].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[23].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[23].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[23].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[24].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[24].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[24].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[25].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[25].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[25].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[26].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[26].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[26].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[27].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[27].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[27].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[28].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[28].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[28].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[29].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[29].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[29].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[30].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[30].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[30].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[31].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[31].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[31].after_release"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[32].before"
+        },
+        {
+          "baseline": 256,
+          "candidate": 128,
+          "nonincreasing": true,
+          "path": "samples[0].stages[32].after"
+        },
+        {
+          "baseline": null,
+          "candidate": null,
+          "nonincreasing": true,
+          "path": "samples[0].stages[32].after_release"
+        },
+        {
+          "baseline": 1024,
+          "candidate": 768,
+          "nonincreasing": true,
+          "path": "allocation.retained_bytes"
+        }
+      ]
+    },
+    "status": "accepted"
+  },
+  "runner": {
+    "bytes": 72740,
+    "sha256": "81661e8479e871ff706362e3140f71b4cc7fabc314c7658900d31a5ca7da4252"
+  },
+  "schema": "litchi.performance.0920.capacity-controls.v1",
+  "source_report": {
+    "bytes": 21833,
+    "path": "/tmp/litchi-performance-0920-baseline/qualification/allocator-docfloat-e32-default/stdout",
+    "sha256": "03caf93926f6189e535f2ab53ade9e5fba736c0b6cc22cacd94a278c3a08629e"
+  },
+  "validator": {
+    "bytes": 69575,
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "litchi.performance.0920.boundary-check.v1",
+  "utc": "2026-10-06T06:31:05.040079+00:00",
+  "checks": {
+    "manifest_inventory": [],
+    "manifest_dependency_inventory": [],
+    "dependency_direction": []
+  },
+  "scope": "Manifest inventories and dependency-direction checker on current checkout. Candidate changes no manifests/dependency edges. Full checker was terminated during unrelated iWork source audits; no full-checker pass claimed."
+}

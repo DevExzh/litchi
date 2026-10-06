@@ -1,0 +1,150 @@
+{
+  "schema": "litchi.performance.0920.shared-owner-quality.v1",
+  "created_utc": "2026-10-06T06:25:00Z",
+  "scope": {
+    "candidate_source": "/tmp/litchi-performance-0920/source",
+    "quality_workspace": "/tmp/litchi-performance-0920/shared-owner-quality",
+    "receipts": "/tmp/litchi-performance-0920/shared-owner-receipts",
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_patch_sha256": "0441e3d739155ab4bbe05cf2dde02c837d10c48b3162352f6b3327055ab929e3",
+    "method": "git archive of the hash-bound base, with only the four final candidate files overlaid; targeted package checks only",
+    "excluded": "This is shared-owner quality evidence, not full-workspace release verification, probe verification, or comparative capture. iWork is out of scope."
+  },
+  "candidate_files": [
+    {
+      "path": "crates/litchi-cfb/src/writer/core.rs",
+      "bytes": 124854,
+      "sha256": "4c4b3c38533694a92e9a2d2dc4b119ef427f6ed5633f110e2d30b3fb74b4d368"
+    },
+    {
+      "path": "crates/litchi-cfb/src/writer/layout.rs",
+      "bytes": 96624,
+      "sha256": "c8d33cfab4a4c38d05395dfe665553eea88f364e4a7a5486c6b8e64730037233"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/codec.rs",
+      "bytes": 52878,
+      "sha256": "24db2bec57e06627f31c2c68ea9f414b01fa95dfb3c8bbd6673b7d9045c47bd9"
+    },
+    {
+      "path": "crates/litchi-cfb/tests/owned_output.rs",
+      "bytes": 2516,
+      "sha256": "e1c2b74059d7efd9d9854fb2b2b987a758dc9c356a8f73f4429a4880ef024127"
+    }
+  ],
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cpu_affinity": "24,25",
+    "workspace_lock": {
+      "path": "/tmp/litchi-performance-0920/shared-owner-quality/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+    },
+    "fixture_root": "/tmp/litchi-performance-0920/shared-owner-quality/test-data",
+    "fixture_file_count": 1426,
+    "xls_fixture_count": 126
+  },
+  "commands": [
+    {
+      "id": "cfb-tests",
+      "argv": "cargo test --offline --locked -j1 -p litchi-cfb --features write",
+      "exit": 0,
+      "tests": {"passed": 554, "failed": 0, "ignored": 2},
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/cfb-test.stdout", "bytes": 47326, "sha256": "ea10423fcc7609924dfce768adb42ba3e1d252491bdd8b88fa5c4f292a2a8713"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/cfb-test.stderr", "bytes": 1733, "sha256": "2ebc5cfa0b527158f1c5f85ff583cf9dc1f54dcd4b481296ce630406147d04a1"}
+    },
+    {
+      "id": "ole-common-tests",
+      "argv": "cargo test --offline --locked -j1 -p litchi-ole-common",
+      "exit": 0,
+      "tests": {"passed": 285, "failed": 0, "ignored": 2},
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/ole-common-test.stdout", "bytes": 26806, "sha256": "38ccd08413bc6646f620bafba590828dc5d8c335bd333aa0dbd9ab986bf08c2a"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/ole-common-test.stderr", "bytes": 1926, "sha256": "c542c65869db412f4d3155b2fc904393eb18c90cf24551f8d36e2535e87fe3e0"}
+    },
+    {
+      "id": "doc-tests",
+      "argv": "cargo test --offline --locked -j1 -p litchi-doc",
+      "exit": 0,
+      "tests": {"passed": 1361, "failed": 0, "ignored": 13},
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/doc-test.stdout", "bytes": 115552, "sha256": "9fd437a72cbeb300cc5f07b6b40d0332cca22568847548f3d695bcf1c07d40e2"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/doc-test.stderr", "bytes": 6734, "sha256": "3a65a162109bd3985ea63a8a3d5f8f972f07230c9383a56959a290d4fb3464b6"}
+    },
+    {
+      "id": "xls-tests",
+      "argv": "cargo test --offline --locked -j1 -p litchi-xls",
+      "exit": 0,
+      "tests": {"passed": 1705, "failed": 0, "ignored": 1},
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/xls-test-rerun.stdout", "bytes": 137166, "sha256": "d42a27e1dd0708b34c96c511097dfda01df54334e365bd015b834bb8021651e1"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/xls-test-rerun.stderr", "bytes": 11124, "sha256": "804d54d32ff324df5fb95e819460454e6c8d1d832de4d97248cea961494a40a8"}
+    },
+    {
+      "id": "ppt-tests",
+      "argv": "cargo test --offline --locked -j1 -p litchi-ppt",
+      "exit": 0,
+      "tests": {"passed": 1314, "failed": 0, "ignored": 11},
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/ppt-test.stdout", "bytes": 108546, "sha256": "3bcfda3102a7a76640f9d1f58889b9471ec70376f9bd9a24c05118cdfa423f5c"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/ppt-test.stderr", "bytes": 7970, "sha256": "92ce3831611bc0f5ff69cd886532dda37139dc1b68c68c03b58c290848ac0f6b"}
+    },
+    {
+      "id": "clippy",
+      "argv": "cargo clippy --offline --locked -j1 -p litchi-cfb --features write -p litchi-ole-common -p litchi-doc -p litchi-xls -p litchi-ppt --all-targets -- -D warnings",
+      "exit": 0,
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/clippy.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/clippy.stderr", "bytes": 6114, "sha256": "b5993809e259814e76e8921a2ee2be427eabfcf03acf05c435d24cb2f5b51961"}
+    },
+    {
+      "id": "rustdoc-consumers",
+      "argv": "RUSTDOCFLAGS=-Dwarnings cargo doc --offline --locked -j1 --no-deps -p litchi-cfb -p litchi-ole-common -p litchi-xls -p litchi-ppt",
+      "exit": 0,
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/rustdoc-consumers.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/rustdoc-consumers.stderr", "bytes": 2085, "sha256": "6e44d27f96e9051e08ef99c27eef28a9949fa5ed81f4b37b91bbf998fb8b5b50"}
+    },
+    {
+      "id": "cargo-check",
+      "argv": "cargo check --offline --locked -j1 -p litchi-cfb --features write -p litchi-ole-common -p litchi-doc -p litchi-xls -p litchi-ppt",
+      "exit": 0,
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/cargo-check.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/cargo-check.stderr", "bytes": 1010, "sha256": "0913a2dfbd222b9a4e5a5b816562664f260d83c88c827ccff0bdf7dabb262b6c"}
+    },
+    {
+      "id": "candidate-rustfmt",
+      "argv": "rustfmt --edition 2024 --check candidate core/layout/codec/test files",
+      "exit": 0,
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/rustfmt-candidate.stdout", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/rustfmt-candidate.stderr", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+    },
+    {
+      "id": "metadata",
+      "argv": "cargo metadata --offline --locked --format-version 1 --no-deps",
+      "exit": 0,
+      "metadata_bytes": 641825,
+      "metadata_sha256": "2116e382f8834107458f4ef1d14291d9247f198302d6ac100729933e884270b9"
+    }
+  ],
+  "baseline_failures": [
+    {
+      "id": "rustdoc-doc-private-links",
+      "argv": "RUSTDOCFLAGS=-Dwarnings cargo doc --offline --locked -j1 --no-deps -p litchi-doc",
+      "exit": 101,
+      "classification": "pre-existing baseline failure",
+      "reason": "four public litchi-doc links reference private Self::parse_recording items; the failure is outside the candidate files",
+      "stderr": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/rustdoc-doc.stderr", "bytes": 2978, "sha256": "b746da9e062301019fa18a08c88c09802f77b9152d87bfaa193453b0738895d5"}
+    },
+    {
+      "id": "workspace-format",
+      "argv": "cargo fmt --all -- --check",
+      "exit": 1,
+      "classification": "pre-existing baseline failure",
+      "reason": "format drift is reported in unrelated soapberry-zip and litchi-iwa-archive files; all four candidate files pass the targeted rustfmt check",
+      "stdout": {"path": "/tmp/litchi-performance-0920/shared-owner-receipts/cargo-fmt-all.stdout", "bytes": 7133, "sha256": "3d94b4485fff6956f93fcd941d20e4f542c253dbc66298d7814ab62339062029"}
+    }
+  ],
+  "setup_note": {
+    "discarded_attempt": "/tmp/litchi-performance-0920/shared-owner-receipts/xls-test.stdout",
+    "reason": "The archive already contained test-data; an extra setup symlink created test-data/test-data, doubling traversal to 242 fixtures and causing a false pinned-SST mismatch. The nested symlink was removed and the exact command reran successfully over 126 XLS fixtures.",
+    "discarded_stdout_sha256": "ca085c00ef975225716ebf07dfda1b96a83e881cac057b990145e911a45e706a",
+    "discarded_stderr_sha256": "cc7cd0fe1f9ba43dc9880bec0de5401e7898ac1b0129f09ac9aa360cb0fd2a5e"
+  },
+  "result": "CFB, OLE common, DOC, XLS, and PPT functional suites pass against the final candidate overlay; consumer Clippy, rustdoc, check, metadata, and targeted formatting pass. The two baseline failures remain explicitly scoped and are not candidate regressions."
+}

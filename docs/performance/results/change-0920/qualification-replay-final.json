@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.performance.0920.final-qualification-replay.v1",
+  "utc": "2026-10-06T06:30:19.620013+00:00",
+  "runner": {
+    "path": "docs/performance/results/change-0920/comparison.py",
+    "bytes": 87012,
+    "sha256": "8e60b200efeff61ac00dcd4d9742f5954251d3733364141d8ce2da29467b3c77"
+  },
+  "protocol": {
+    "path": "docs/performance/results/change-0920/comparison-protocol.json",
+    "bytes": 10355,
+    "sha256": "f9223232f8dbc3ac05348e889ca08028c8a4aacbbf6154d7ffa05d28f3920355"
+  },
+  "validator": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0917/capture.py",
+    "bytes": 69575,
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  },
+  "source_aggregates": [
+    {
+      "path": "/tmp/litchi-performance-0920-baseline/qualification/results.json",
+      "bytes": 394117,
+      "sha256": "b33110b585fdb65a0b24ea31f6cf834a113687939f5d2e349b38f60750e42ba5"
+    },
+    {
+      "path": "/tmp/litchi-performance-0920-candidate-qualification/results.json",
+      "bytes": 394714,
+      "sha256": "0ad6f64b946fbbf19a6c142d2db20d47c786c66a4a2df0c4cb06402c73f30e3f"
+    }
+  ],
+  "reports_validated": 96,
+  "paired_reports_validated": 48,
+  "all_pass": true,
+  "performance_children_run": 0,
+  "method": "Verify raw aggregate and stdout hashes; parse every report; validate_probe_report(warmups=0,samples=1); compare_reports on every matching baseline/candidate label."
+}

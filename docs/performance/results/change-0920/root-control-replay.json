@@ -1,0 +1,29 @@
+{
+  "schema": "litchi.performance.0920.root-control-replay.v1",
+  "utc": "2026-10-05T20:18:35.197569+00:00",
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0920/comparison-controls.py",
+    "--report",
+    "/tmp/litchi-performance-0920-baseline/qualification/allocator-docfloat-e32-default/stdout"
+  ],
+  "exit_code": 0,
+  "exact_receipt_match": true,
+  "receipt": {
+    "path": "docs/performance/results/change-0920/capacity-controls.json",
+    "bytes": 2539,
+    "sha256": "d11fdf0cb91d6c9df0673e35c26a708ac1ef6f71eb6280fdb3694efa964da7db"
+  },
+  "stdout": {
+    "path": "/tmp/litchi-performance-0920-root-controls/stdout",
+    "bytes": 2175,
+    "sha256": "b3123919ef8e9537fb03f0ef30092b6b4ab24e14f113a966d41645c2f2158062"
+  },
+  "stderr": {
+    "path": "/tmp/litchi-performance-0920-root-controls/stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "scope": "Control replay only; no benchmark children. Size assertion covers capacity summaries, not the entire final reduction."
+}

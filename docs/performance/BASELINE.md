@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0920 — CFB output reservation comparison rejected
+
+[0920](0920-cfb-output-reservation-rejected.md) completes 192 paired native
+children and 96 allocator children. Requested bytes fall 14.83–15.07% at
+32 default-route edits, but all four FloatingPictures latency confidence
+bounds fail the frozen guardrail. Both replay paths reproduce rejection;
+production is unchanged. This is warm in-memory evidence on the named machine.
+
 ## 0919 — scoped DOC allocation attribution
 
 [0919](0919-doc-allocation-attribution.md) adds six Heaptrack captures of the

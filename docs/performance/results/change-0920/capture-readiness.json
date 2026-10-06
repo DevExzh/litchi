@@ -1,0 +1,110 @@
+{
+  "schema": "litchi.performance.0920.capture-readiness.v1",
+  "utc": "2026-10-06T06:31:53.041058+00:00",
+  "status": "admitted_to_comparative_capture_only",
+  "production_adoption": false,
+  "disposition": "Source review found no defect. Existing baseline/candidate source and builds remain exact. Root verified final controls, qualification replay, scoped shared-owner quality and build parity before freeze. Statistical adoption gates are unchanged.",
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0920/source-review-final.md",
+      "bytes": 7542,
+      "sha256": "021d1698364d8409d4ea04006b4e778d7fe45bbd13df2cbfb3ea64cd32fb8249"
+    },
+    {
+      "path": "docs/performance/results/change-0920/new-quality.json",
+      "bytes": 9457,
+      "sha256": "4f837677982cb5cb24ac5a3562e60d004eacf422ffc09a93085a9e0e673a8122"
+    },
+    {
+      "path": "docs/performance/results/change-0920/boundary-check.json",
+      "bytes": 460,
+      "sha256": "a2f30a366d8be09dc68f6250f04c74ff4f91ac303f05dccc6ef4cd502ee6b101"
+    },
+    {
+      "path": "docs/performance/results/change-0920/comparison-tooling-validation.json",
+      "bytes": 6141,
+      "sha256": "6e552ddd81d6469d1cd0ddaa6aac2a25f92d4db2e9a10dc06ddbf12a95b8cfc7"
+    },
+    {
+      "path": "docs/performance/results/change-0920/capacity-controls-final.json",
+      "bytes": 2520,
+      "sha256": "f59c9862faee8fa9158dd8fe51cec412263625997ecf969a9f56592c67435926"
+    },
+    {
+      "path": "docs/performance/results/change-0920/qualification-replay-final.json",
+      "bytes": 1437,
+      "sha256": "fdca44689490bd8200172542fb22ce2915638e9f65b9d415ec5783e52755a180"
+    },
+    {
+      "path": "docs/performance/results/change-0920/root-build-parity.json",
+      "bytes": 104607,
+      "sha256": "0ef6ad67adf442008e1fe91afe157bac59c3323cfe9bde9a94824359d2a71830"
+    },
+    {
+      "path": "docs/performance/results/change-0920/baseline-dependencies.json",
+      "bytes": 40842,
+      "sha256": "92abe6fe821b30460af9006c01f8787d750f0523dd54817118f7fc96d45f977d"
+    },
+    {
+      "path": "docs/performance/results/change-0920/comparison.py",
+      "bytes": 87012,
+      "sha256": "8e60b200efeff61ac00dcd4d9742f5954251d3733364141d8ce2da29467b3c77"
+    },
+    {
+      "path": "docs/performance/results/change-0920/comparison-replay.py",
+      "bytes": 7256,
+      "sha256": "d6102ed795286dab59c149b25c3073e7b2d073f6c22f3d4427d5dedd67df56b6"
+    },
+    {
+      "path": "docs/performance/results/change-0920/comparison-protocol.json",
+      "bytes": 10355,
+      "sha256": "f9223232f8dbc3ac05348e889ca08028c8a4aacbbf6154d7ffa05d28f3920355"
+    }
+  ],
+  "root_rechecks": {
+    "baseline_source_files": 938,
+    "candidate_source_files": 942,
+    "all_source_and_build_artifact_hashes_match": true,
+    "fingerprint_records": 157,
+    "fingerprint_multisets_equal": true,
+    "normalized_dependency_graphs_equal": true,
+    "dependency_graph_sha256": "437357b509d1b8f377043c4de6510302f10dfa1e6a5fc38a3662d7d54df0c6c9",
+    "quality_artifact_descriptors_verified": 21,
+    "qualification_reports": 96,
+    "paired_qualifications": 48,
+    "statistical_protocol_keys_unchanged": [
+      "fixtures",
+      "edits",
+      "native",
+      "allocator",
+      "bootstrap",
+      "review_flags",
+      "capacity_fields",
+      "mandatory_gates",
+      "negative_controls",
+      "positive_control"
+    ]
+  },
+  "tooling_note": "The bound earlier synthetic replay exercised the same reducer and measured 526890 bytes. Later runner change only checks candidate_base_revision; final controls and qualification replay bind that runner. Protocol edits clarify base-plus-patch identity and root readiness, not statistical gates.",
+  "limitations": [
+    "Existing DOC public rustdoc private links and unrelated formatting fail; candidate source passes targeted formatting and scoped consumer rustdoc.",
+    "Full source-boundary checker stopped during excluded iWork audits; manifest/dependency-direction checks pass.",
+    "No full-workspace release claim; native/range/cold/concurrency coverage remains open.",
+    "Inherited historical build environment beyond explicit overrides was not fully captured."
+  ],
+  "host": {
+    "platform": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.43",
+    "machine": "x86_64",
+    "cpu_model": "AMD EPYC 9R45",
+    "logical_cpus": 32,
+    "affinity_cpu": 14,
+    "cpu14_siblings": "14",
+    "memory": "MemTotal:       129447072 kB",
+    "libc": [
+      "glibc",
+      "2.43"
+    ],
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "performance_children_run_before_readiness": 0
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "litchi.performance.0920.final-cleanup.v1",
+  "utc": "2026-10-06T06:34:46.029626+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-performance-0920-tooling-freeze-KuD8MI",
+      "logical_bytes": 1328643
+    },
+    {
+      "path": "/tmp/litchi-performance-0920-tooling-freeze-sWkWsc",
+      "logical_bytes": 76960385
+    },
+    {
+      "path": "/tmp/litchi-performance-0920-tooling-freeze-JmBWgD",
+      "logical_bytes": 48027415
+    },
+    {
+      "path": "/tmp/litchi-performance-0920-tooling-packet-copy-mWG1fk",
+      "logical_bytes": 5484073
+    },
+    {
+      "path": "docs/performance/results/change-0920/__pycache__",
+      "logical_bytes": 164746
+    },
+    {
+      "path": "/tmp/litchi-performance-0920-tooling-packet-copy.path",
+      "logical_bytes": 56
+    },
+    {
+      "path": "/tmp/litchi-performance-0920-tooling-freeze-dryrun.path",
+      "logical_bytes": 51
+    },
+    {
+      "path": "/tmp/litchi-performance-0920/candidate-target/release/deps",
+      "logical_bytes": 547695703
+    },
+    {
+      "path": "/tmp/litchi-performance-0920/candidate-target/release/build",
+      "logical_bytes": 177382306
+    },
+    {
+      "path": "/tmp/litchi-performance-0920/candidate-target/release/incremental",
+      "logical_bytes": 0
+    }
+  ],
+  "candidate_build_artifacts_reverified": 6,
+  "retained": "Measured binaries, release fingerprints, source trees, fixture/build/capture/control/replay receipts and raw evidence remain external. The tooling-validation directory remains because the earlier validation receipt references its controls. Shared-owner test target already cleaned by tester."
+}

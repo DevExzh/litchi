@@ -1,0 +1,75 @@
+{
+  "schema": "litchi.performance.0920.final-replay.v1",
+  "utc": "2026-10-06T06:36:19.552436+00:00",
+  "manifest": {
+    "path": "docs/performance/results/change-0920/comparison-manifest.json",
+    "bytes": 7749,
+    "sha256": "abd01971d218d4d74ccfdd3ffb5ead1f67910bf5223499c359ad196942bd4702"
+  },
+  "reduction": {
+    "path": "docs/performance/results/change-0920/comparison-reduced.json",
+    "bytes": 555046,
+    "sha256": "a987bed1e28c3537fabc376faf1b823deb8e8a5709a0083543d1ad76796b74e4"
+  },
+  "runner": {
+    "path": "docs/performance/results/change-0920/comparison.py",
+    "bytes": 87012,
+    "sha256": "8e60b200efeff61ac00dcd4d9742f5954251d3733364141d8ce2da29467b3c77"
+  },
+  "replay_script": {
+    "path": "docs/performance/results/change-0920/comparison-replay.py",
+    "bytes": 7256,
+    "sha256": "d6102ed795286dab59c149b25c3073e7b2d073f6c22f3d4427d5dedd67df56b6"
+  },
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0920/comparison.py",
+        "replay"
+      ],
+      "exit_code": 0,
+      "result": {
+        "status": "verified",
+        "native_children": 192,
+        "allocator_children": 96,
+        "adoption": false
+      }
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0920/comparison-replay.py",
+        "--packet",
+        "docs/performance/results/change-0920"
+      ],
+      "exit_code": 0,
+      "result": {
+        "status": "verified",
+        "native_children": 192,
+        "allocator_children": 96,
+        "adoption": false,
+        "canonical_reports": 288,
+        "canonical_sha256": "eb0bf4111b147b707e057c5221c53d668d5f88dc62373f5ea250324f99c46730"
+      }
+    }
+  ],
+  "independent_review": {
+    "replays_exit_zero": true,
+    "unique_successful_child_receipts": 288,
+    "compressed_artifacts_verified": 864,
+    "gzip_and_canonical_hash_errors": 0,
+    "native_adverse_flags": {
+      "p50": 23,
+      "p95": 22,
+      "p99": 20,
+      "rss": 1
+    },
+    "allocator_adverse_flags": 0,
+    "all_four_floatingpictures_latency_cells_fail": true,
+    "all_noheadfoot_latency_cells_pass": true,
+    "disposition": "No evidence or custody blocker; rejection confirmed."
+  }
+}

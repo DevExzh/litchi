@@ -1,0 +1,78 @@
+{
+  "controls": {
+    "bytes": 8979,
+    "sha256": "60ca92cf3ee52c69791b4bf8dc5082553e564c11d9de55c35c87343e3b3f305f"
+  },
+  "negative_controls": [
+    {
+      "error": "EvidenceError: capacity-controls: output equality gate failed",
+      "name": "output",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: source identity mismatch",
+      "name": "identity",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: correctness gate failed: foreign_patch_refused",
+      "name": "refusal",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: route ceiling mismatch",
+      "name": "ceiling",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: stage 2: default route lost predecessor",
+      "name": "retainedtransition",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity-controls: retained allocation is not output capacity",
+      "name": "mismatch",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: capacity_growth: candidate capacity grew at output_capacity: 686720 > 686656",
+      "name": "capacity_growth",
+      "status": "rejected"
+    }
+  ],
+  "performance_children_run": 0,
+  "planned_population_capacity_summary_bytes": 53713,
+  "positive_smaller_capacity": {
+    "capacity": {
+      "all_nonincreasing": true,
+      "baseline_capacity_sha256": "a6f19cd9c8544aad3fd6067d4668f6e77eccfce1b0a1a8330c3727d9578c583f",
+      "baseline_max": 1175616,
+      "candidate_capacity_sha256": "8b801bdad7ad707d1a347d0fbafd9217497f06e12699943d4b34e51cdd361539",
+      "candidate_max": 1175552,
+      "changed_field_count": 166,
+      "field_count": 394,
+      "max_decrease": 64,
+      "none_field_count": 228,
+      "numeric_field_count": 166
+    },
+    "status": "accepted"
+  },
+  "protocol": {
+    "bytes": 9500,
+    "sha256": "2bb0ba457db283ba0d3a6673aa5ac34cbcbf5798e41605b36a8dcf6b213d69a7"
+  },
+  "runner": {
+    "bytes": 83021,
+    "sha256": "f90d0d7540b07d12f74ce5653ccf8330b1a5df8ea2a79ecdb074b2e6d2ccd45e"
+  },
+  "schema": "litchi.performance.0920.capacity-controls.v1",
+  "source_report": {
+    "bytes": 21833,
+    "path": "/tmp/litchi-performance-0920-baseline/qualification/allocator-docfloat-e32-default/stdout",
+    "sha256": "03caf93926f6189e535f2ab53ade9e5fba736c0b6cc22cacd94a278c3a08629e"
+  },
+  "validator": {
+    "bytes": 69575,
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  }
+}

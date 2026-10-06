@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0920 — validated reservation candidate remains unadopted
+
+[0920](0920-cfb-output-reservation-rejected.md) reviews exact output reservation
+inside CFB's validated plan boundary, typed pre-emission allocation failure,
+existing fallback and full publication validation. Scoped affected-owner tests
+pass, but the candidate fails its latency gate and is not applied. The patch
+is experimental evidence only; no ADR semantic exception, public facade change,
+or full-workspace verification claim is made.
+
 ## 0919 — evidence-only allocation diagnosis
 
 [0919](0919-doc-allocation-attribution.md) changes no production or harness

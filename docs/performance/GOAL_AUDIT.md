@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0920 — exact output reservation measured and rejected
+
+[0920](0920-cfb-output-reservation-rejected.md) completes the next allocation
+hypothesis with 288 children, independent source review, 5,219 scoped test
+passes and reproducible rejection. Allocation/peak-live gates pass; all four
+FloatingPictures latency confidence bounds fail. Production is unchanged.
+Unrelated DOC rustdoc/format failures and the excluded iWork source-topology
+checks remain explicit. Broad CRUD, provider, streaming, producer and scaling
+requirements remain open; no program completion claim follows from this batch.
+
 ## 0919 — next DOC allocation target measured
 
 [0919](0919-doc-allocation-attribution.md) reconciles six scoped Heaptrack

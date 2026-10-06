@@ -1,0 +1,132 @@
+{
+  "schema": "litchi.performance.0920.comparison-tooling-validation.v1",
+  "generated_utc": "2026-10-06T06:20:00Z",
+  "scope": "Tooling repair and no-capture validation only; no comparative performance child was launched and no adoption or speedup claim is made.",
+  "runner": {
+    "path": "docs/performance/results/change-0920/comparison.py",
+    "bytes": 86854,
+    "sha256": "1d1adf1baefbdf40751386e0a01320ae2ef97ef7d51066f03c1bd3fa02c36329"
+  },
+  "controls_script": {
+    "path": "docs/performance/results/change-0920/comparison-controls.py",
+    "bytes": 8979,
+    "sha256": "60ca92cf3ee52c69791b4bf8dc5082553e564c11d9de55c35c87343e3b3f305f"
+  },
+  "replay_script": {
+    "path": "docs/performance/results/change-0920/comparison-replay.py",
+    "bytes": 7256,
+    "sha256": "d6102ed795286dab59c149b25c3073e7b2d073f6c22f3d4427d5dedd67df56b6"
+  },
+  "protocol": {
+    "path": "docs/performance/results/change-0920/comparison-protocol.json",
+    "bytes": 9500,
+    "sha256": "2bb0ba457db283ba0d3a6673aa5ac34cbcbf5798e41605b36a8dcf6b213d69a7"
+  },
+  "validator": {
+    "path": "docs/performance/results/change-0917/capture.py",
+    "bytes": 69575,
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  },
+  "source_build_binding": {
+    "baseline_source_receipt": {
+      "path": "/tmp/litchi-performance-0920-baseline/source-receipt.json",
+      "bytes": 118656,
+      "sha256": "4b7967901c42fccd89dcb4893f9147eaaad0f66106ef7be6ea4ac4112b074867"
+    },
+    "baseline_build_receipt": {
+      "path": "docs/performance/results/change-0920/baseline-preparation.json",
+      "bytes": 6331,
+      "sha256": "1a941066372dd80b7a1e46f0901674667b4234115c7bdacb69c7a5762046819a"
+    },
+    "candidate_source_receipt": {
+      "path": "/tmp/litchi-performance-0920/receipts/candidate-source-final.json",
+      "bytes": 173028,
+      "sha256": "b0fd362805cd6ba1abba0ff0a43ee52df871568183f6aac4802eadb641b31a4e"
+    },
+    "candidate_build_receipt": {
+      "path": "/tmp/litchi-performance-0920/receipts/candidate-build-final.json",
+      "bytes": 3193,
+      "sha256": "03708890258129c636c380e9604154b22bb9dbb367058dd4c2e6435105411371"
+    },
+    "candidate_patch": {
+      "path": "/tmp/litchi-performance-0920/source/docs/performance/results/change-0920/candidate.patch",
+      "bytes": 9665,
+      "sha256": "0441e3d739155ab4bbe05cf2dde02c837d10c48b3162352f6b3327055ab929e3"
+    },
+    "candidate_source_head": null,
+    "candidate_base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_build_binding": {
+      "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+      "candidate_patch_sha256": "0441e3d739155ab4bbe05cf2dde02c837d10c48b3162352f6b3327055ab929e3",
+      "candidate_manifest_sha256": "c4e30450dd4e0f5f185c6b535da790f375063ab07c996fa168947d6564deda24"
+    },
+    "git_revision_validator": {
+      "valid_status": "accepted",
+      "negative_controls": [
+        "39-hex revision rejected",
+        "non-hex 40-character revision rejected",
+        "64-hex SHA-256-length revision rejected"
+      ]
+    }
+  },
+  "freeze_dry_run": {
+    "status": "passed",
+    "manifest_bytes": 7795,
+    "manifest_sha256": "ca38a133e3ca36233dcc2302fd53172187776a09a6fedd3325f4bee472ab63e5",
+    "source_head_remains_null": true,
+    "base_revision_and_patch_are_bound": true,
+    "candidate_binary_hashes_verified": true,
+    "scratch_packet_removed_after_validation": true
+  },
+  "capacity_controls": {
+    "status": "passed",
+    "receipt": {
+      "path": "/tmp/litchi-performance-0920/tooling-validation-20261006T061338Z/capacity-controls.json",
+      "bytes": 2519,
+      "sha256": "7701263c1f8f145e54d911af70ac8fd4356f8748dda31069bd55f0cd8b636577"
+    },
+    "negative_controls_rejected": [
+      "output",
+      "identity",
+      "refusal",
+      "ceiling",
+      "retainedtransition",
+      "mismatch",
+      "capacity_growth"
+    ],
+    "positive_smaller_capacity": "accepted",
+    "planned_capacity_summary_bytes": 53713,
+    "performance_children_run": 0
+  },
+  "planned_reduction": {
+    "basis": "Retained qualified report templates duplicated to the frozen 192/96 schedule; no benchmark child was launched.",
+    "native_children": 192,
+    "allocator_children": 96,
+    "total_children": 288,
+    "reduction_bytes": 526890,
+    "packet_limit_bytes": 1048576,
+    "under_packet_limit": true,
+    "reduction_sha256": "b138ed4e1820c706b8aeb678870dbb5c877e8389e488672dcaa633d3c59ee969",
+    "runner_replay_status": "verified",
+    "adoption": false
+  },
+  "copied_packet_replay": {
+    "status": "verified",
+    "canonical_reports": 288,
+    "canonical_reports_sha256": "e1e2e624391124070ee68e8bdc7b888d275424d0a32882e6f59812d5231a1297",
+    "fixture_hashes_verified": [
+      "docfloat",
+      "docnohf"
+    ],
+    "reduced_bytes": 526890,
+    "reduced_sha256": "b138ed4e1820c706b8aeb678870dbb5c877e8389e488672dcaa633d3c59ee969",
+    "original_fixture_aliases_validation_only": true,
+    "scratch_packet_removed_after_validation": true
+  },
+  "commands": [
+    "python3 -B docs/performance/results/change-0920/comparison-controls.py --report /tmp/litchi-performance-0920-baseline/qualification/allocator-docfloat-e32-default/stdout --output <external>/capacity-controls.json",
+    "python3 -B <scratch>/docs/performance/results/change-0920/comparison.py freeze --baseline-source-receipt /tmp/litchi-performance-0920-baseline/source-receipt.json --baseline-build-receipt docs/performance/results/change-0920/baseline-preparation.json --candidate-source-receipt /tmp/litchi-performance-0920/receipts/candidate-source-final.json --candidate-build-receipt /tmp/litchi-performance-0920/receipts/candidate-build-final.json --candidate-patch /tmp/litchi-performance-0920/source/docs/performance/results/change-0920/candidate.patch",
+    "python3 -B <copied-packet>/docs/performance/results/change-0920/comparison-replay.py --packet <copied-packet>/docs/performance/results/change-0920",
+    "python3 -m py_compile docs/performance/results/change-0920/comparison.py docs/performance/results/change-0920/comparison-controls.py docs/performance/results/change-0920/comparison-replay.py"
+  ]
+}
