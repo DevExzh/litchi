@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0928 — native process-tree profile, with explicit unwind limits
+
+[0928](0928-native-cpu-profile.md) binds one CPU-12 native profile of the
+retained release binary: 200 generic-route iterations, 3,267 sampled events,
+12,961,608,407 total period units and no reported lost samples. Independent
+leaf decoding conserves every sample and period, including inherited metadata
+subprocesses. Missing DWARF ancestry prevents timed-phase attribution. This
+adds CPU evidence but no latency comparison, speedup or adoption claim.
+
 ## 0927 — test-only provider phase attribution
 
 [0927](0927-provider-phase-diagnostic.md) observes 1,692 open bytes, 2,102,808

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "--start-address=0x1057b40",
+    "--stop-address=0x1058aa0",
+    "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline"
+  ],
+  "exit_code": 0,
+  "bytes": 48924,
+  "sha256": "2e81220200cb03482eebb3196ab7a590f5d4f9ee94577207452d01d9c258c4fe",
+  "binary_sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+}

@@ -1,0 +1,28 @@
+{
+  "binary_sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7",
+  "claim": "sampled compression symbol contains native SHA-256 instructions; not a CPU phase attribution",
+  "commands": {
+    "sha256-compress.asm": {
+      "command": [
+        "objdump",
+        "-d",
+        "--start-address=0x37d4140",
+        "--stop-address=0x37d44fc",
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline"
+      ],
+      "exit_code": 0,
+      "bytes": 12623,
+      "sha256": "27be11f3dfd25539348cad531a26add8161ec5d58cc3af0c7e69fbdd2892326a"
+    },
+    "perf-build-options.txt": {
+      "command": [
+        "perf",
+        "version",
+        "--build-options"
+      ],
+      "exit_code": 0,
+      "bytes": 1793,
+      "sha256": "a2a91b237b60d4b5852d3afc72d88ebe3caf67918bfb5205b368f6cf6905e18c"
+    }
+  }
+}

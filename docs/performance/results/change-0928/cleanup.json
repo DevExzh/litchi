@@ -1,0 +1,43 @@
+{
+  "schema": "litchi.performance.0928.cleanup.v1",
+  "scope": "redundant offline analysis exports and handoff scratch only",
+  "removed": [
+    {
+      "path": "/tmp/litchi-performance-0928/root-leaf-replay.json",
+      "bytes": 1950,
+      "sha256": "bcda112bf5191357e308698fe3de9e0b3649c10355feda04bb576ab291e585df"
+    },
+    {
+      "path": "/tmp/litchi-performance-0928/handoff.txt",
+      "bytes": 1424,
+      "sha256": "07b65219632c5191876bebd08aed7e35e120d2b99ba28f8838703b4e9337b73a"
+    },
+    {
+      "path": "/tmp/litchi-performance-0928/show-lost.txt",
+      "bytes": 467313,
+      "sha256": "c5503a0ef31abc838501ad20b78c7a192d218c99330f2417d1152877bd614fb9"
+    },
+    {
+      "path": "/tmp/litchi-performance-0928/show-lost.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0928/verbose-script.txt",
+      "bytes": 467313,
+      "sha256": "c5503a0ef31abc838501ad20b78c7a192d218c99330f2417d1152877bd614fb9"
+    },
+    {
+      "path": "/tmp/litchi-performance-0928/verbose-script.stderr",
+      "bytes": 118,
+      "sha256": "bb4d9c447cae041cc31ecd961f3ab3db1ad99a1a5f3d2e068b8c9717bd75baad"
+    },
+    {
+      "path": "/tmp/litchi-performance-0928/perf-report-sort.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "removed_bytes": 938118,
+  "retained": "original perf.data, complete benchmark report, capture logs, failed reader attempt, verbose unwind diagnostics, canonical period/leaf exports, source-bound binary and source remain intact"
+}

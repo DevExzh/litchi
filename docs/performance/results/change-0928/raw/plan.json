@@ -1,0 +1,42 @@
+{
+  "schema": "litchi.performance.0928.whole-process-perf-record-plan.v1",
+  "status": "planned_before_execution",
+  "claim_scope": "one source-bound diagnostic profile; no timing qualification, speedup, or adoption claim",
+  "binary": {
+    "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+    "bytes": 70187352,
+    "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+  },
+  "source": {
+    "revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+  },
+  "route": "generic_read_at",
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "samples": 200,
+  "warmups": 0,
+  "cpu": 12,
+  "deadline_seconds": 120,
+  "perf": {
+    "event": "cycles:u",
+    "frequency": 997,
+    "call_graph": "dwarf,16384"
+  },
+  "argv": [
+    "timeout", "--foreground", "--signal=TERM", "--kill-after=10s", "120s",
+    "taskset", "-c", "12", "perf", "record", "-o",
+    "/tmp/litchi-performance-0928/perf.data", "-F", "997", "-e", "cycles:u",
+    "--call-graph", "dwarf,16384", "--",
+    "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+    "--case", "docx_source_backed_existing_section_layout_edit_save",
+    "--samples", "200", "--warmup", "0", "--json",
+    "/tmp/litchi-performance-0928/generic-read-at-report.json"
+  ],
+  "environment": {
+    "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+  },
+  "output_root": "/tmp/litchi-performance-0928",
+  "recovery": "single process handle; preserve terminal failure and never restart or recapture"
+}

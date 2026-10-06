@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0928 — native leaf costs recovered; phase ancestry unavailable
+
+[0928](0928-native-cpu-profile.md) records one successful native CPU profile
+with 3,267 samples and no reported loss. Direct-IP decoding assigns 41.50% of
+period weight to hardware-assisted SHA-256 and 20.03% to harness payload
+generation. These are whole-profile costs, including setup and verification.
+DWARF decoding prints no frames for 59.48% of sampled weight; only three
+harness frames survive, all in post-publication checks. Do not rank query or
+publication optimizations from those incomplete stacks. Use a separate
+frame-pointer diagnostic build and prove phase ancestry before adopting a
+candidate. The complete profile remains retained; no child was replaced.
+
 ## 0927 — provider request amplification localized to query and publication
 
 [0927](0927-provider-phase-diagnostic.md) adds a test-only phase counter

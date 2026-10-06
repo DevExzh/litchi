@@ -1,0 +1,201 @@
+{
+  "schema": "litchi.performance.0928.whole-process-perf-record-receipt.v1",
+  "recorded_utc": "2026-10-06T12:25:32.745844120Z",
+  "scope": "one source-bound whole-process diagnostic profile; no timing qualification, speedup, or adoption claim",
+  "plan": {
+    "path": "/tmp/litchi-performance-0928/plan.json",
+    "bytes": 1804,
+    "sha256": "0e023cc7fbf012ac613dadd29dcd62a42f940696c83b63e913dc352bac9eefae"
+  },
+  "source_binding": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch": {
+      "path": "/tmp/litchi-performance-0925/section-layout-provider-final.patch",
+      "bytes": 41560,
+      "sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+    },
+    "source_receipt": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "bytes": 356812,
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    },
+    "source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "source_file_count": 6276,
+    "source_bytes": 109831506,
+    "full_source_listing": {
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "bytes": 940213,
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    }
+  },
+  "build_binding": {
+    "build_receipt": {
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "bytes": 3137,
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "binary": {
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "bytes": 70187352,
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7",
+      "profile": "release"
+    },
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "build_command": "cargo +1.95.0 build --offline -j2 --locked --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0925/measurement-target-v4-final"
+  },
+  "capture": {
+    "route": "generic_read_at",
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "cpu": 12,
+    "samples": 200,
+    "warmups": 0,
+    "deadline_seconds": 120,
+    "process_count": 1,
+    "restart_count": 0,
+    "polling": "same process handle until terminal; no parser/error restart",
+    "environment": {
+      "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+    },
+    "command_argv": [
+      "timeout", "--foreground", "--signal=TERM", "--kill-after=10s", "120s",
+      "taskset", "-c", "12", "perf", "record", "-o", "/tmp/litchi-performance-0928/perf.data",
+      "-F", "997", "-e", "cycles:u", "--call-graph", "dwarf,16384", "--",
+      "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "--case", "docx_source_backed_existing_section_layout_edit_save",
+      "--samples", "200", "--warmup", "0", "--json",
+      "/tmp/litchi-performance-0928/generic-read-at-report.json"
+    ],
+    "terminal": {
+      "wrapper_exit_code": 0,
+      "perf_record_exit_code": 0,
+      "authoritative_tool_return": {
+        "tool": "functions.exec_command followed by write_stdin polling",
+        "initial_session_id": 54623,
+        "tool_reported_exit_code": 0,
+        "terminal_status": "completed",
+        "same_handle_polled": true,
+        "capture_start_end_timestamps": "not captured by the terminal tool result"
+      },
+      "stdout": {
+        "path": "/tmp/litchi-performance-0928/capture.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "/tmp/litchi-performance-0928/capture.stderr.log",
+        "bytes": 150,
+        "sha256": "ec7ee974b304c97308f753a6a46e4ca73af71c5667810687c3ac8329844fbc7d"
+      }
+    }
+  },
+  "benchmark_report": {
+    "path": "/tmp/litchi-performance-0928/generic-read-at-report.json",
+    "bytes": 159371,
+    "sha256": "104395cfaef7f85468d4e0f709c4e7ab0ec691302b43104c65301a264da0526d",
+    "schema_version": 1,
+    "result_count": 1,
+    "sample_count": 200,
+    "corpus_bytes": 2101427,
+    "corpus_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "source_contract": {
+      "read_calls": 202,
+      "read_bytes": 8409488,
+      "ordinary_payload_read_calls": 138,
+      "ordinary_payload_read_bytes": 8397632,
+      "max_in_flight_reads": 1,
+      "ordinary_payload_materializations": 1
+    },
+    "report_claim": "descriptive harness report; its elapsed samples are retained for context and are not used as a comparison or acceptance gate"
+  },
+  "profiler": {
+    "record": {
+      "path": "/tmp/litchi-performance-0928/perf.data",
+      "bytes": 54767504,
+      "sha256": "af3121cf9499534ee0d0581e5e9bf0e8a9d5f02855d4936b8738912c27796ff6",
+      "event": "cycles:u",
+      "frequency_hz": 997,
+      "call_graph": "dwarf,16384",
+      "reported_perf_samples": 3267,
+      "reported_lost_samples": 0,
+      "reported_event_count_approx": 12961608407,
+      "reported_capture_bytes": "52.191 MB"
+    },
+    "report_stdio": {
+      "command": "perf report --stdio --input=/tmp/litchi-performance-0928/perf.data",
+      "exit_code": 0,
+      "path": "/tmp/litchi-performance-0928/perf-report-stdio.txt",
+      "bytes": 60050,
+      "sha256": "4f1333df6f6d743e3ee6bc7d12a3777654768f1e575558d1fc230335a96e3922",
+      "stderr_path": "/tmp/litchi-performance-0928/perf-report-stdio.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "script_symbol_offset_ip": {
+      "command": "perf script --verbose --demangle --fields comm,pid,tid,time,event,ip,sym,dso,dsoff,symoff --input=/tmp/litchi-performance-0928/perf.data",
+      "exit_code": 0,
+      "path": "/tmp/litchi-performance-0928/perf-script-symbol-ip.txt",
+      "bytes": 475551,
+      "sha256": "4a9ad7f1eaeeefd3d7a8280b85ed0d18bff1082717cc72d17530385b8855e7d5",
+      "stderr_path": "/tmp/litchi-performance-0928/perf-script-symbol-ip.stderr",
+      "stderr_bytes": 1214687,
+      "stderr_sha256": "be421ec8e1f2da34d7e36571294154ff023c69efc5fa894c3536c3e795036364",
+      "fields": ["comm", "pid", "tid", "time", "event", "ip", "sym", "dso", "dsoff", "symoff"],
+      "classification_note": "retained output contains symbol, symbol offset, DSO offset, and IP call frames; verbose unwind diagnostics are retained separately"
+    },
+    "script_period_symbol_offset": {
+      "command": "perf script -F comm,pid,tid,time,event,period,ip,sym,symoff,dso --demangle --input=/tmp/litchi-performance-0928/perf.data",
+      "exit_code": 0,
+      "path": "/tmp/litchi-performance-0928/perf-script-period-symbol-offset.txt",
+      "bytes": 497465,
+      "sha256": "a6bc4005f335bb5cf459d311539542424745030f8937a986319c741f9d3e1da8",
+      "stderr_path": "/tmp/litchi-performance-0928/perf-script-period-symbol-offset.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fields": ["comm", "pid", "tid", "time", "event", "period", "ip", "sym", "symoff", "dso"]
+    },
+    "leaf_period": {
+      "command": "perf script --hide-call-graph -F comm,pid,tid,time,event,period,ip,sym,symoff,dso --demangle --input=/tmp/litchi-performance-0928/perf.data",
+      "exit_code": 0,
+      "path": "/tmp/litchi-performance-0928/perf-script-leaf-period.txt",
+      "bytes": 673931,
+      "sha256": "2e7878290421aa811324db9796dcfce1f9e0874b4a99e4d9af396debc20cdaec",
+      "stderr_path": "/tmp/litchi-performance-0928/perf-script-leaf-period.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fields": ["comm", "pid", "tid", "time", "event", "period", "ip", "sym", "symoff", "dso"],
+      "call_graph_hidden": true,
+      "sample_header_lines": 3267,
+      "process_breakdown": {
+        "litchi-perf-bas": 3254,
+        "rustc": 12,
+        "uname": 1
+      },
+      "classification_note": "one leaf/self-symbol record with explicit period and IP per recorded sample; the 13 rustc/uname records are retained because this was a whole-process inherited profile"
+    }
+  },
+  "preserved_offline_parser_attempt": {
+    "command": "perf script --show-ip --demangle --input=/tmp/litchi-performance-0928/perf.data",
+    "exit_code": 129,
+    "reason": "installed perf does not support --show-ip",
+    "stdout": {
+      "path": "/tmp/litchi-performance-0928/perf-script.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "/tmp/litchi-performance-0928/perf-script.stderr",
+      "bytes": 8056,
+      "sha256": "d782220bf6c9944f564d56e8dab0b4c166590e19bbeeccae6c4bd8a78c271bf5"
+    },
+    "capture_impact": "offline reader failure only; the completed child was not restarted or recaptured"
+  },
+  "limitations": [
+    "This is one diagnostic profile of one generic_read_at document child.",
+    "perf sample percentages and benchmark elapsed values are descriptive only; no cross-version timing or speedup claim is made.",
+    "All profiler data and logs remain external under /tmp/litchi-performance-0928; this receipt intentionally does not duplicate them."
+  ]
+}

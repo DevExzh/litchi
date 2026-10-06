@@ -1,0 +1,73 @@
+{
+  "comm_counts": {
+    "litchi-perf-bas": {
+      "period": 12922068061,
+      "samples": 3254
+    },
+    "rustc": {
+      "period": 35616916,
+      "samples": 12
+    },
+    "uname": {
+      "period": 3923430,
+      "samples": 1
+    }
+  },
+  "commands": {
+    "classify": "python3 -B classify_leaf_period_v1.py perf-script-leaf-period.txt --output leaf-period-classification-v1.json",
+    "export": "perf script --hide-call-graph -F comm,pid,tid,time,event,period,ip,sym,symoff,dso --demangle --input=perf.data"
+  },
+  "families": {
+    "harness": {
+      "period": 2638570402,
+      "period_share": 0.20356813129572893,
+      "samples": 681
+    },
+    "loader": {
+      "period": 120426,
+      "period_share": 9.290976568537834e-06,
+      "samples": 4
+    },
+    "memory_libc": {
+      "period": 1964410485,
+      "period_share": 0.1515560741627642,
+      "samples": 490
+    },
+    "other": {
+      "period": 305271554,
+      "period_share": 0.02355198092816445,
+      "samples": 77
+    },
+    "sha256": {
+      "period": 5378898994,
+      "period_share": 0.41498700046323655,
+      "samples": 1349
+    },
+    "source_provider": {
+      "period": 23971601,
+      "period_share": 0.0018494310464628745,
+      "samples": 6
+    },
+    "unknown": {
+      "period": 493275257,
+      "period_share": 0.03805663938540247,
+      "samples": 127
+    },
+    "xml_layout": {
+      "period": 1703605003,
+      "period_share": 0.13143469155262838,
+      "samples": 422
+    },
+    "zip_deflate_crc": {
+      "period": 453484685,
+      "period_share": 0.034986760189043564,
+      "samples": 111
+    }
+  },
+  "input": "/tmp/litchi-performance-0928/perf-script-leaf-period.txt",
+  "input_sha256": "2e7878290421aa811324db9796dcfce1f9e0874b4a99e4d9af396debc20cdaec",
+  "period_total": 12961608407,
+  "sample_count": 3267,
+  "schema": "litchi.performance.0928.leaf-period-classification.v1",
+  "scope": "whole_process_direct_sampled_ip_descriptive_only"
+}

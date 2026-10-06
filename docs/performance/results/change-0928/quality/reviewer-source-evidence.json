@@ -1,0 +1,286 @@
+{
+  "claim_scope": "source/binary/report identity and generic-read-at capture audit; no new child, no native timing qualification, no speedup or adoption claim",
+  "created_utc": "2026-10-06T12:16:02.405393+00:00",
+  "generic_report": {
+    "binary_identity": {
+      "binary_bytes": 70187352,
+      "binary_sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7",
+      "executable": true,
+      "mode_bits": 509,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "profile": "release"
+    },
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "configuration": {
+      "cases": [
+        "docx_source_backed_existing_section_layout_edit_save"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "samples_per_case": 200,
+      "warmup_iterations_per_case": 0
+    },
+    "correctness_flags": {
+      "cache_counters_verified": true,
+      "header_footer_relationships_verified": true,
+      "patch_forward_inverse_verified": true,
+      "phase_sum_verified": true,
+      "publication_inverse_exact_source_verified": true,
+      "raw_member_order_and_comment_verified": true,
+      "raw_untouched_members_verified": true,
+      "semantic_reopen_all_sections_verified": true,
+      "sink_counters_verified": true,
+      "source_immutability_verified": true,
+      "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+      "table_cell_sectpr_excluded_verified": true
+    },
+    "environment": {
+      "cpu_affinity": "12",
+      "cpu_model": "AMD EPYC 9R45",
+      "git_revision": null,
+      "git_worktree_dirty": null,
+      "logical_cpus_available": 1,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)"
+    },
+    "latency_ns": {
+      "max": 4919669,
+      "mean": 4613899.240000003,
+      "min": 4558798,
+      "p50": 4605578,
+      "p95": 4650108,
+      "p99": 4864279,
+      "unit": "ns"
+    },
+    "output_oracle": {
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "section_expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "section_output_sha256_unique": [
+        "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+      ],
+      "sink_accepted_bytes": 2101446,
+      "sink_largest_write": 65536,
+      "sink_write_calls": 75
+    },
+    "performance_claim": "none",
+    "provider": null,
+    "report": {
+      "bytes": 159371,
+      "path": "/tmp/litchi-performance-0928/generic-read-at-report.json",
+      "sha256": "104395cfaef7f85468d4e0f709c4e7ab0ec691302b43104c65301a264da0526d"
+    },
+    "sample_count": 200,
+    "schema_version": 1,
+    "source_oracle": {
+      "archive_bytes": 2101427,
+      "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+      "operation_end_read_bytes_unique": [
+        6308061
+      ],
+      "operation_end_read_calls_unique": [
+        169
+      ],
+      "section_source_bytes": 2101427,
+      "section_source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+      "total_source_read_bytes_unique": [
+        8409488
+      ],
+      "total_source_read_calls_unique": [
+        202
+      ]
+    },
+    "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded"
+  },
+  "manifest_and_build": {
+    "binary": {
+      "bytes": 70187352,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "binary_matches_report": true,
+    "build_base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "build_command": "cargo +1.95.0 build --offline -j2 --locked --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0925/measurement-target-v4-final",
+    "build_exit_code": 0,
+    "build_receipt": {
+      "bytes": 3137,
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "manifest_path": "tools/perf-baseline/Cargo.toml",
+    "manifest_sha256_current": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "manifest_sha256_frozen": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "root_cargo_lock_sha256_frozen": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "rustfmt_toml_sha256_frozen": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "tools_cargo_lock_sha256_frozen": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "perf_plan_and_capture": {
+    "capture_receipt": {
+      "bytes": 9706,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0928/receipts/perf-record-diagnostic-v1.json",
+      "sha256": "6edfc41c711d953a8e6419c693a9592f12ccb038c296dbfca36f9ecae6f71697"
+    },
+    "capture_receipt_exit_binding": {
+      "current_receipt_sha256": "6edfc41c711d953a8e6419c693a9592f12ccb038c296dbfca36f9ecae6f71697",
+      "initial_session_id": 54623,
+      "perf_record_exit_code": 0,
+      "restart_count": 0,
+      "same_handle_polled": true,
+      "source": "authoritative original capture receipt; not an independent rerun",
+      "tool_reported_exit_code": 0,
+      "wrapper_exit_code": 0
+    },
+    "capture_receipt_history": [
+      {
+        "recorded_utc": "2026-10-06T12:16:01.778208860Z",
+        "scope": "original capture receipt before offline leaf export",
+        "sha256": "6c9a26973c90d4e7f49405052b6ef1ce7a454e75f9ffc07b3206e561e3aedef2"
+      },
+      {
+        "recorded_utc": "2026-10-06T12:25:32.745844120Z",
+        "scope": "current final receipt with leaf export and metadata timestamp",
+        "sha256": "6edfc41c711d953a8e6419c693a9592f12ccb038c296dbfca36f9ecae6f71697"
+      }
+    ],
+    "capture_stderr": {
+      "bytes": 150,
+      "path": "/tmp/litchi-performance-0928/capture.stderr.log",
+      "sha256": "ec7ee974b304c97308f753a6a46e4ca73af71c5667810687c3ac8329844fbc7d"
+    },
+    "capture_stderr_text": "[ perf record: Woken up 209 times to write data ]\n[ perf record: Captured and wrote 52.191 MB /tmp/litchi-performance-0928/perf.data (3267 samples) ]\n",
+    "capture_unchanged_after_leaf_export": {
+      "capture_child_rerun": false,
+      "generic_report_sha256": "104395cfaef7f85468d4e0f709c4e7ab0ec691302b43104c65301a264da0526d",
+      "perf_data_sha256": "af3121cf9499534ee0d0581e5e9bf0e8a9d5f02855d4936b8738912c27796ff6",
+      "record_restart_count": 0
+    },
+    "exit_code_note": "Exit status comes from docs/performance/results/change-0928/receipts/perf-record-diagnostic-v1.json original-session receipt.",
+    "leaf_export": {
+      "artifact": {
+        "bytes": 673931,
+        "path": "/tmp/litchi-performance-0928/perf-script-leaf-period.txt",
+        "sha256": "2e7878290421aa811324db9796dcfce1f9e0874b4a99e4d9af396debc20cdaec"
+      },
+      "call_graph_hidden": true,
+      "command": "perf script --hide-call-graph -F comm,pid,tid,time,event,period,ip,sym,symoff,dso --demangle --input=/tmp/litchi-performance-0928/perf.data",
+      "exit_code": 0,
+      "harness_fraction": "3254/3267",
+      "interpretation": "Whole-process inherited profile: one document workload launch; 3,254 harness leaf records plus 12 rustc and 1 uname inherited startup metadata records. The 13 metadata records are retained and excluded from harness-only counts; this is leaf/self-symbol evidence, not phase timing or a separate workload child.",
+      "process_breakdown": {
+        "litchi-perf-bas": 3254,
+        "rustc": 12,
+        "uname": 1
+      },
+      "sample_header_lines": 3267,
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0928/perf-script-leaf-period.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "perf_data": {
+      "bytes": 54767504,
+      "path": "/tmp/litchi-performance-0928/perf.data",
+      "sha256": "af3121cf9499534ee0d0581e5e9bf0e8a9d5f02855d4936b8738912c27796ff6"
+    },
+    "plan": {
+      "bytes": 1804,
+      "path": "/tmp/litchi-performance-0928/plan.json",
+      "sha256": "0e023cc7fbf012ac613dadd29dcd62a42f940696c83b63e913dc352bac9eefae"
+    },
+    "plan_status": "planned_before_execution",
+    "planned_argv": [
+      "timeout",
+      "--foreground",
+      "--signal=TERM",
+      "--kill-after=10s",
+      "120s",
+      "taskset",
+      "-c",
+      "12",
+      "perf",
+      "record",
+      "-o",
+      "/tmp/litchi-performance-0928/perf.data",
+      "-F",
+      "997",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf,16384",
+      "--",
+      "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "--case",
+      "docx_source_backed_existing_section_layout_edit_save",
+      "--samples",
+      "200",
+      "--warmup",
+      "0",
+      "--json",
+      "/tmp/litchi-performance-0928/generic-read-at-report.json"
+    ],
+    "planned_environment": {
+      "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+    },
+    "planned_perf": {
+      "call_graph": "dwarf,16384",
+      "event": "cycles:u",
+      "frequency": 997
+    },
+    "report": {
+      "bytes": 159371,
+      "path": "/tmp/litchi-performance-0928/generic-read-at-report.json",
+      "sha256": "104395cfaef7f85468d4e0f709c4e7ab0ec691302b43104c65301a264da0526d"
+    },
+    "reviewer_child_started": false,
+    "shell_exit_code": 0,
+    "shell_exit_code_recorded": true,
+    "status": "completed_exit_bound_to_authoritative_capture_receipt",
+    "terminal_artifacts_present": true
+  },
+  "provenance": {
+    "current_candidate_lib_sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+    "frozen_candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "measurement_source_receipt_sha256": "fe35ae7a2926304915be3c48e35541431e1acf902f31233a44fa668e0d44b2",
+    "measurement_source_v4_lib_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "source_revision_frozen": "aa077c030819c3019288e350f34959666ab7204f"
+  },
+  "schema": "litchi.performance.0928.source-evidence-audit.v1",
+  "source_comparison": {
+    "candidate_delta_scope": "0927 test module only",
+    "current_lib": {
+      "bytes": 3076438,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+      "sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9"
+    },
+    "exact_file_count": 6275,
+    "frozen_lib": {
+      "bytes": 3059766,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+      "sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a"
+    },
+    "frozen_source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "listed_file_count": 6276,
+    "mismatch_count": 1,
+    "mismatches": [
+      {
+        "current_bytes": 3076438,
+        "current_sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+        "frozen_bytes": 3059766,
+        "frozen_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+        "path": "tools/perf-baseline/src/lib.rs"
+      }
+    ],
+    "missing_file_count": 0,
+    "non_test_prefix_bytes": 2596984,
+    "non_test_prefix_equal": true,
+    "non_test_prefix_marker": "#[cfg(test)]\\nmod tests",
+    "non_test_prefix_sha256": "dcb886294c9cd6e842688f0a7b28d497e9b4f6aea283f530557e92d03a820677",
+    "source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    }
+  },
+  "status": "descriptive_capture_bound_no_qualification_claim"
+}

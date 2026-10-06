@@ -1,0 +1,16 @@
+{
+  "schema": "litchi.performance.0928.root-offline-validation.v1",
+  "replay_command": "python3 -B docs/performance/results/change-0928/classify_leaf_period_v1.py docs/performance/results/change-0928/raw/perf-script-leaf-period.txt --output /tmp/litchi-performance-0928/root-leaf-replay.json",
+  "classification_matches_retained_except_input_path": true,
+  "exclusive_family_sample_and_period_conservation": true,
+  "stack_export_sha256": "a6bc4005f335bb5cf459d311539542424745030f8937a986319c741f9d3e1da8",
+  "stack_quality": {
+    "sample_count": 3267,
+    "period_total": 12961608407,
+    "empty_frame_samples": 1937,
+    "empty_frame_period": 7709385343,
+    "harness_frame_samples": 3,
+    "harness_frame_period": 12151758
+  },
+  "document_children_started_by_validation": 0
+}

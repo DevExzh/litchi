@@ -1,0 +1,28 @@
+perf version 7.0.14
+                   aio: [ on  ]  # HAVE_AIO_SUPPORT
+                   bpf: [ on  ]  # HAVE_LIBBPF_SUPPORT
+         bpf_skeletons: [ OFF ]  # HAVE_BPF_SKEL
+            debuginfod: [ on  ]  # HAVE_DEBUGINFOD_SUPPORT
+                 dwarf: [ on  ]  # HAVE_LIBDW_SUPPORT
+    dwarf_getlocations: [ on  ]  # HAVE_LIBDW_SUPPORT
+          dwarf-unwind: [ on  ]  # HAVE_DWARF_UNWIND_SUPPORT
+                libbfd: [ OFF ]  # HAVE_LIBBFD_SUPPORT ( tip: Deprecated, license incompatibility, use BUILD_NONDISTRO=1 and install binutils-dev[el] )
+         libbabeltrace: [ OFF ]  # HAVE_LIBBABELTRACE_SUPPORT
+        libbpf-strings: [ on  ]  # HAVE_LIBBPF_STRINGS_SUPPORT
+           libcapstone: [ OFF ]  # HAVE_LIBCAPSTONE_SUPPORT
+    libdw-dwarf-unwind: [ on  ]  # HAVE_LIBDW_SUPPORT
+                libelf: [ on  ]  # HAVE_LIBELF_SUPPORT
+               libLLVM: [ on  ]  # HAVE_LIBLLVM_SUPPORT
+               libnuma: [ on  ]  # HAVE_LIBNUMA_SUPPORT
+            libopencsd: [ OFF ]  # HAVE_CSTRACE_SUPPORT
+               libperl: [ OFF ]  # HAVE_LIBPERL_SUPPORT ( tip: Deprecated, use LIBPERL=1 and install perl-ExtUtils-Embed/libperl-dev to build with it )
+               libpfm4: [ OFF ]  # HAVE_LIBPFM
+             libpython: [ on  ]  # HAVE_LIBPYTHON_SUPPORT
+              libslang: [ on  ]  # HAVE_SLANG_SUPPORT
+         libtraceevent: [ on  ]  # HAVE_LIBTRACEEVENT
+             libunwind: [ OFF ]  # HAVE_LIBUNWIND_SUPPORT ( tip: Deprecated, use LIBUNWIND=1 and install libunwind-dev[el] to build with it )
+                  lzma: [ on  ]  # HAVE_LZMA_SUPPORT
+numa_num_possible_cpus: [ on  ]  # HAVE_LIBNUMA_SUPPORT
+                  zlib: [ on  ]  # HAVE_ZLIB_SUPPORT
+                  zstd: [ on  ]  # HAVE_ZSTD_SUPPORT
+                  rust: [ on  ]  # HAVE_RUST_SUPPORT
