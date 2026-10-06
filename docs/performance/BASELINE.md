@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0925 — current DOCX provider reports retained after receipt failure
+
+[0925](0925-section-layout-provider-baseline.md) adds warm tmpfs FileSource and
+three controlled range routes to the current section-layout harness. All 42
+raw reports validate, but the final aggregate receipt exceeded the runner's
+1 MiB cap and was not written. The cohort is invalid for protocol qualification;
+no child was replaced. Descriptive raw medians are 4.600 ms for warm tmpfs,
+4.537 ms for short range, and 73.456/238.517 ms for paced range models. These
+are not optimization, physical-I/O, cold-storage or network claims.
+
 ## 0924 — retained reader allocation and native phase attribution
 
 [0924](0924-reader-allocation-attribution.md) analyzes existing 0923 data without

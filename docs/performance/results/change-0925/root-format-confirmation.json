@@ -1,0 +1,8 @@
+{
+  "checked_utc": "2026-10-06T11:07:32.583077+00:00",
+  "status": "passed",
+  "method": "Copy v3 lib to temporary lib.rs; rustfmt +1.95.0 --edition 2024 --config-path /home/zhuhe/code/litchi/rustfmt.toml --config skip_children=true; compare exact bytes with v4; temporary copy removed",
+  "source_v3_sha256": "14473e770a23de764015b117fbc1b05a7bf78d7e397eeccde2edc77dd6521e80",
+  "source_v4_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+  "equal": true
+}

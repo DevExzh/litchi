@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## 0925 — explicit provider baseline in the benchmark harness
+
+[0925](0925-section-layout-provider-baseline.md) follows ADR 0005 by separating
+operation-end wrapper observations from correctness reads, nominal service
+models from real network traffic, and warm staged files from cold storage.
+ADR 0003/0006 exact output, source checks and inverse restoration remain in the
+workflow; the generic negative-case suite retains its stated scope. Existing
+FileSource, OwnedSource and range-adapter owners preserve ADR 0010/0011/0024
+boundaries. No production API, cache policy, dependency, implicit networking,
+or execution-context behavior changes. Independent review corrected a duplicate
+backing-vector copy before measurement and verified 15 focused tests.
+The terminal capture-receipt failure remains explicit: retained raw reports
+support descriptive analysis, not successful protocol qualification.
+
 ## 0924 — offline allocation attribution and phase-priority review
 
 [0924](0924-reader-allocation-attribution.md) changes only diagnostic tooling and

@@ -1,0 +1,673 @@
+{
+  "build": {
+    "binary": {
+      "bytes": 70187352,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "profile": "release",
+    "receipt": {
+      "bytes": 3137,
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "source_custody": {
+      "full_source_listing": {
+        "bytes": 940213,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+        "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+      },
+      "source_receipt": {
+        "bytes": 356812,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+        "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+      }
+    },
+    "toolchain": {
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+    }
+  },
+  "claim_scope": "release schema/custody preflight only; no comparative timing claim",
+  "environment": {
+    "bytes": 802,
+    "path": "/tmp/litchi-performance-0925/pre-capture-environment.json",
+    "sha256": "7f7d70d9ed2495e5f4b26c080380485882e6c269fcf4c5c3d0109cfd295e84a4"
+  },
+  "performance_children_run": 0,
+  "results": [
+    {
+      "elapsed_wall_seconds": 0.213994954014197,
+      "ended_utc": "2026-10-06T11:18:27.473469+00:00",
+      "report": {
+        "bytes": 20477,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.json",
+        "sha256": "ffd77cef1547b7ad1481d59e0a2069dea5de33dbbd72b97c5207250d7954387d"
+      },
+      "route": "generic_read_at",
+      "started_utc": "2026-10-06T11:18:27.259477+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 4494050,
+          "mean": 4487263.0,
+          "min": 4479360,
+          "p50": 4488379.0,
+          "p95": 4494050.0,
+          "p99": 4494050.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 350712,
+            "mean": 346088.0,
+            "min": 340851,
+            "p50": 346701.0,
+            "p95": 350712.0,
+            "p99": 350712.0
+          },
+          "edit_ns": {
+            "max": 53230,
+            "mean": 52397.333333333336,
+            "min": 51701,
+            "p50": 52261.0,
+            "p95": 53230.0,
+            "p99": 53230.0
+          },
+          "open_ns": {
+            "max": 48150,
+            "mean": 46307.333333333336,
+            "min": 45061,
+            "p50": 45711.0,
+            "p95": 48150.0,
+            "p99": 48150.0
+          },
+          "preparation_ns": {
+            "max": 33960,
+            "mean": 33833.333333333336,
+            "min": 33760,
+            "p50": 33780.0,
+            "p95": 33960.0,
+            "p99": 33960.0
+          },
+          "publication_ns": {
+            "max": 2677632,
+            "mean": 2673571.6666666665,
+            "min": 2666261,
+            "p50": 2676822.0,
+            "p95": 2677632.0,
+            "p99": 2677632.0
+          },
+          "query_ns": {
+            "max": 1339245,
+            "mean": 1335065.3333333333,
+            "min": 1329685,
+            "p50": 1336266.0,
+            "p95": 1339245.0,
+            "p99": 1339245.0
+          }
+        },
+        "provider_present": false,
+        "samples": 3
+      }
+    },
+    {
+      "elapsed_wall_seconds": 0.21388105399091728,
+      "ended_utc": "2026-10-06T11:18:27.687586+00:00",
+      "report": {
+        "bytes": 20009,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.json",
+        "sha256": "d530ea1f41ae651dea8e58368b83e7c08ea502680286e7ab4af87af40038dcdb"
+      },
+      "route": "owned_vec",
+      "started_utc": "2026-10-06T11:18:27.473720+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 3718666,
+          "mean": 3637089.0,
+          "min": 3489605,
+          "p50": 3702996.0,
+          "p95": 3718666.0,
+          "p99": 3718666.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 347621,
+            "mean": 344751.3333333333,
+            "min": 341772,
+            "p50": 344861.0,
+            "p95": 347621.0,
+            "p99": 347621.0
+          },
+          "edit_ns": {
+            "max": 64080,
+            "mean": 59527.0,
+            "min": 53650,
+            "p50": 60851.0,
+            "p95": 64080.0,
+            "p99": 64080.0
+          },
+          "open_ns": {
+            "max": 47690,
+            "mean": 46966.666666666664,
+            "min": 46300,
+            "p50": 46910.0,
+            "p95": 47690.0,
+            "p99": 47690.0
+          },
+          "preparation_ns": {
+            "max": 248391,
+            "mean": 173687.66666666666,
+            "min": 33711,
+            "p50": 238961.0,
+            "p95": 248391.0,
+            "p99": 248391.0
+          },
+          "publication_ns": {
+            "max": 1692738,
+            "mean": 1687417.3333333333,
+            "min": 1683017,
+            "p50": 1686497.0,
+            "p95": 1692738.0,
+            "p99": 1692738.0
+          },
+          "query_ns": {
+            "max": 1327576,
+            "mean": 1324739.0,
+            "min": 1320255,
+            "p50": 1326386.0,
+            "p95": 1327576.0,
+            "p99": 1327576.0
+          }
+        },
+        "provider_present": false,
+        "samples": 3
+      }
+    },
+    {
+      "elapsed_wall_seconds": 0.21393709399853833,
+      "ended_utc": "2026-10-06T11:18:27.901753+00:00",
+      "report": {
+        "bytes": 20062,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.json",
+        "sha256": "18479dfbc3bb81bcea36140c3821f058e4ca453468d00bfd96cc988407413b80"
+      },
+      "route": "owned_reader",
+      "started_utc": "2026-10-06T11:18:27.687819+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 4058037,
+          "mean": 3902933.6666666665,
+          "min": 3821717,
+          "p50": 3829047.0,
+          "p95": 4058037.0,
+          "p99": 4058037.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 352982,
+            "mean": 349005.3333333333,
+            "min": 345432,
+            "p50": 348602.0,
+            "p95": 352982.0,
+            "p99": 352982.0
+          },
+          "edit_ns": {
+            "max": 61190,
+            "mean": 56190.0,
+            "min": 53340,
+            "p50": 54040.0,
+            "p95": 61190.0,
+            "p99": 61190.0
+          },
+          "open_ns": {
+            "max": 386901,
+            "mean": 383934.6666666667,
+            "min": 378052,
+            "p50": 386851.0,
+            "p95": 386901.0,
+            "p99": 386901.0
+          },
+          "preparation_ns": {
+            "max": 249921,
+            "mean": 106504.0,
+            "min": 34781,
+            "p50": 34810.0,
+            "p95": 249921.0,
+            "p99": 249921.0
+          },
+          "publication_ns": {
+            "max": 1687697,
+            "mean": 1677117.0,
+            "min": 1671517,
+            "p50": 1672137.0,
+            "p95": 1687697.0,
+            "p99": 1687697.0
+          },
+          "query_ns": {
+            "max": 1333286,
+            "mean": 1330182.6666666667,
+            "min": 1326546,
+            "p50": 1330716.0,
+            "p95": 1333286.0,
+            "p99": 1333286.0
+          }
+        },
+        "provider_present": false,
+        "samples": 3
+      }
+    },
+    {
+      "elapsed_wall_seconds": 0.21376368301571347,
+      "ended_utc": "2026-10-06T11:18:28.115608+00:00",
+      "report": {
+        "bytes": 23759,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.json",
+        "sha256": "645fa896877e33a5cd7a445b5839eb7f423f6df77e7404782f60ad3d72c71434"
+      },
+      "route": "file_warm",
+      "started_utc": "2026-10-06T11:18:27.901859+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 4636200,
+          "mean": 4621823.333333333,
+          "min": 4599330,
+          "p50": 4629940.0,
+          "p95": 4636200.0,
+          "p99": 4636200.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 351432,
+            "mean": 348878.3333333333,
+            "min": 344171,
+            "p50": 351032.0,
+            "p95": 351432.0,
+            "p99": 351432.0
+          },
+          "edit_ns": {
+            "max": 60200,
+            "mean": 55670.0,
+            "min": 53210,
+            "p50": 53600.0,
+            "p95": 60200.0,
+            "p99": 60200.0
+          },
+          "open_ns": {
+            "max": 52230,
+            "mean": 52066.666666666664,
+            "min": 51810,
+            "p50": 52160.0,
+            "p95": 52230.0,
+            "p99": 52230.0
+          },
+          "preparation_ns": {
+            "max": 3690,
+            "mean": 3566.6666666666665,
+            "min": 3450,
+            "p50": 3560.0,
+            "p95": 3690.0,
+            "p99": 3690.0
+          },
+          "publication_ns": {
+            "max": 2793162,
+            "mean": 2785742.0,
+            "min": 2774322,
+            "p50": 2789742.0,
+            "p95": 2793162.0,
+            "p99": 2793162.0
+          },
+          "query_ns": {
+            "max": 1390047,
+            "mean": 1375899.6666666667,
+            "min": 1364476,
+            "p50": 1373176.0,
+            "p95": 1390047.0,
+            "p99": 1390047.0
+          }
+        },
+        "provider_present": true,
+        "samples": 3
+      }
+    },
+    {
+      "elapsed_wall_seconds": 0.21383785401121713,
+      "ended_utc": "2026-10-06T11:18:28.329642+00:00",
+      "report": {
+        "bytes": 26295,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_short.json",
+        "sha256": "a6fc2d2bfa86ce8eedd3464da72af688fc069adc775231bd53d4cf70c4ca9f57"
+      },
+      "route": "range_short",
+      "started_utc": "2026-10-06T11:18:28.115819+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_short.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_short.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 4536430,
+          "mean": 4524253.333333333,
+          "min": 4511760,
+          "p50": 4524570.0,
+          "p95": 4536430.0,
+          "p99": 4536430.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 349911,
+            "mean": 343734.3333333333,
+            "min": 339861,
+            "p50": 341431.0,
+            "p95": 349911.0,
+            "p99": 349911.0
+          },
+          "edit_ns": {
+            "max": 54101,
+            "mean": 53287.333333333336,
+            "min": 52710,
+            "p50": 53051.0,
+            "p95": 54101.0,
+            "p99": 54101.0
+          },
+          "open_ns": {
+            "max": 49181,
+            "mean": 47700.666666666664,
+            "min": 46851,
+            "p50": 47070.0,
+            "p95": 49181.0,
+            "p99": 49181.0
+          },
+          "preparation_ns": {
+            "max": 39330,
+            "mean": 37363.666666666664,
+            "min": 33770,
+            "p50": 38991.0,
+            "p95": 39330.0,
+            "p99": 39330.0
+          },
+          "publication_ns": {
+            "max": 2712042,
+            "mean": 2701148.6666666665,
+            "min": 2691692,
+            "p50": 2699712.0,
+            "p95": 2712042.0,
+            "p99": 2712042.0
+          },
+          "query_ns": {
+            "max": 1345756,
+            "mean": 1341018.6666666667,
+            "min": 1333105,
+            "p50": 1344195.0,
+            "p95": 1345756.0,
+            "p99": 1345756.0
+          }
+        },
+        "provider_present": true,
+        "samples": 3
+      }
+    },
+    {
+      "elapsed_wall_seconds": 0.6144094629853498,
+      "ended_utc": "2026-10-06T11:18:28.944276+00:00",
+      "report": {
+        "bytes": 26320,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.json",
+        "sha256": "4e436a3a3b3b2368460611aec263c47c47a84b36d37082a9990fba0eb0c3c615"
+      },
+      "route": "range_zero",
+      "started_utc": "2026-10-06T11:18:28.329871+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 73721588,
+          "mean": 73532491.0,
+          "min": 73397888,
+          "p50": 73477997.0,
+          "p95": 73721588.0,
+          "p99": 73721588.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 355081,
+            "mean": 354771.6666666667,
+            "min": 354212,
+            "p50": 355022.0,
+            "p95": 355081.0,
+            "p99": 355081.0
+          },
+          "edit_ns": {
+            "max": 63631,
+            "mean": 57790.333333333336,
+            "min": 54770,
+            "p50": 54970.0,
+            "p95": 63631.0,
+            "p99": 63631.0
+          },
+          "open_ns": {
+            "max": 793593,
+            "mean": 760456.3333333334,
+            "min": 742843,
+            "p50": 744933.0,
+            "p95": 793593.0,
+            "p99": 793593.0
+          },
+          "preparation_ns": {
+            "max": 39240,
+            "mean": 35667.0,
+            "min": 33651,
+            "p50": 34110.0,
+            "p95": 39240.0,
+            "p99": 39240.0
+          },
+          "publication_ns": {
+            "max": 49327193,
+            "mean": 49148649.0,
+            "min": 49053432,
+            "p50": 49065322.0,
+            "p95": 49327193.0,
+            "p99": 49327193.0
+          },
+          "query_ns": {
+            "max": 23203330,
+            "mean": 23175156.666666668,
+            "min": 23155880,
+            "p50": 23166260.0,
+            "p95": 23203330.0,
+            "p99": 23203330.0
+          }
+        },
+        "provider_present": true,
+        "samples": 3
+      }
+    },
+    {
+      "elapsed_wall_seconds": 1.365483787987614,
+      "ended_utc": "2026-10-06T11:18:30.309886+00:00",
+      "report": {
+        "bytes": 26367,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.json",
+        "sha256": "5786be74c7469cd622ed528e70bc1c98e23a35c7a3a8ae8eef208c04d60b24da"
+      },
+      "route": "range_delayed",
+      "started_utc": "2026-10-06T11:18:28.944408+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "summary": {
+        "elapsed_statistics_ns": {
+          "max": 238488520,
+          "mean": 238418499.66666666,
+          "min": 238329359,
+          "p50": 238437620.0,
+          "p95": 238488520.0,
+          "p99": 238488520.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 348121,
+            "mean": 345228.3333333333,
+            "min": 341782,
+            "p50": 345782.0,
+            "p95": 348121.0,
+            "p99": 348121.0
+          },
+          "edit_ns": {
+            "max": 62691,
+            "mean": 58683.666666666664,
+            "min": 56490,
+            "p50": 56870.0,
+            "p95": 62691.0,
+            "p99": 62691.0
+          },
+          "open_ns": {
+            "max": 14844664,
+            "mean": 14840540.666666666,
+            "min": 14837074,
+            "p50": 14839884.0,
+            "p95": 14844664.0,
+            "p99": 14844664.0
+          },
+          "preparation_ns": {
+            "max": 39390,
+            "mean": 37646.666666666664,
+            "min": 34250,
+            "p50": 39300.0,
+            "p95": 39390.0,
+            "p99": 39390.0
+          },
+          "publication_ns": {
+            "max": 166086527,
+            "mean": 166001290.0,
+            "min": 165936606,
+            "p50": 165980737.0,
+            "p95": 166086527.0,
+            "p99": 166086527.0
+          },
+          "query_ns": {
+            "max": 57171937,
+            "mean": 57135110.333333336,
+            "min": 57115287,
+            "p50": 57118107.0,
+            "p95": 57171937.0,
+            "p99": 57171937.0
+          }
+        },
+        "provider_present": true,
+        "samples": 3
+      }
+    }
+  ],
+  "reviewer_receipt": {
+    "bytes": 11185,
+    "path": "/tmp/litchi-performance-0925/release-preflight-v4/receipt.json",
+    "sha256": "091a73685b70992e9174b7cdd0ed55df472a9a032c298f85edc5092e7554f8e9"
+  },
+  "schedule": {
+    "children": 7,
+    "measured_samples": 21,
+    "processes_started": 7,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "samples": 3,
+    "warmups": 1
+  },
+  "schema": "litchi.performance.0925.comparison-preflight.v1",
+  "source": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "full_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    },
+    "root": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "source_receipt": {
+      "bytes": 356812,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    }
+  },
+  "status": "passed",
+  "validator_scripts": {
+    "capture": {
+      "bytes": 48763,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-capture.py",
+      "sha256": "83ff5789b7a08d1ccf159ddb1ccddcaf546cb30c17518b7cb8d098edfc4ca4c3"
+    },
+    "comparison": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  }
+}

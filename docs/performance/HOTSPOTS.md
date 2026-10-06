@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0925 — provider request shapes observed; terminal custody failed
+
+[0925](0925-section-layout-provider-baseline.md) retains 42 raw reports with an
+explicit terminal-receipt failure and no recapture. Descriptive observations
+show 6,308,061 returned bytes per operation; a 4 KiB cap expands nonempty calls
+from 165 to 1,607 and logical requested-buffer volume to 84,096,471 bytes.
+That request volume is not transferred data. Warm tmpfs and short-range query
+plus publication account for about 90%/89% of summed time. Attribute integrity
+scans and request boundaries before considering coalescing or caching; source
+freshness and fail-closed publication remain mandatory. Simulated pacing and
+invalid terminal custody do not justify a production optimization or ranking.
+
 ## 0924 — reader request volume attributed; growth policy remains rejected
 
 [0924](0924-reader-allocation-attribution.md) traces the 0923 reader/vector

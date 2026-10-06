@@ -60,7 +60,7 @@ pub mod zip_directory_spool;
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     num::{NonZeroU64, NonZeroUsize},
     ops::Range,
@@ -75,13 +75,16 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use crate::pptx_range_source::{
+    PPTX_RANGE_REQUEST_SIZE_BUCKETS, PptxRangeSource, PptxRangeSourceConfig, TransferDelayPolicy,
+};
 use litchi_cfb::{
     OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
 };
 use litchi_core::detection::FileFormat;
 use litchi_core::{
     Budget, CancellationSource, CancellationToken, CheckStatus, ExecutionContext, ExecutionError,
-    ExecutionLimits, Limits, ReadAt, SourceVersion, ValidateReport,
+    ExecutionLimits, FileSource, Limits, ReadAt, SourceVersion, ValidateReport,
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
@@ -335,7 +338,9 @@ const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
 const OLE_COMMON_ORIGINAL: &[u8] = b"litchi-ole-common-original-stream-v1";
 const OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-edited-stream-v1";
 static NEXT_INSTRUMENTED_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_DOCX_SECTION_LAYOUT_STAGE_ID: AtomicU64 = AtomicU64::new(1);
 const MAX_TRACKED_READ_RANGES: usize = 4096;
+const DOCX_SECTION_LAYOUT_RANGE_TRANSFER_BYTES_PER_SECOND: u64 = 104_857_600;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CorpusShape {
@@ -5879,6 +5884,11 @@ struct DocxSectionLayoutSummary {
     publication_ns: Vec<u64>,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
+    /// Generic positional counters captured at the publication boundary,
+    /// before correctness and reopen verification.  The historical
+    /// `source_read_*` vectors remain whole checked-iteration observations.
+    operation_end_source_read_calls: Vec<u64>,
+    operation_end_source_read_bytes: Vec<u64>,
     /// Sequential ingress observations are only populated for the owned
     /// reader route.  The owned-vector route has no reader to observe; its
     /// moved byte count is recorded separately below.  These fields never
@@ -5905,6 +5915,73 @@ struct DocxSectionLayoutSummary {
     stale_foreign_signed_noop_limits_partial_sink_verified: bool,
     cache_counters_verified: bool,
     sink_counters_verified: bool,
+    /// Provider-specific observations are bounded to the operation boundary
+    /// immediately after publication.  They are absent for the historical
+    /// in-memory and sequential ingress routes.
+    provider: Option<DocxSectionLayoutProviderSummary>,
+}
+
+/// Read counters emitted by the section-layout provider matrix.  The
+/// counters describe the named wrapper boundary; they do not claim physical
+/// filesystem, kernel, network, or remote-service I/O.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct DocxProviderReadObservation {
+    read_calls: u64,
+    requested_bytes: u64,
+    returned_bytes: u64,
+    min_request_bytes: Option<u64>,
+    max_request_bytes: Option<u64>,
+    short_reads: u64,
+    delayed_calls: u64,
+    transfer_paced_calls: u64,
+    transfer_delay_ns: u64,
+    request_size_counts: [u64; PPTX_RANGE_REQUEST_SIZE_BUCKETS],
+}
+
+impl DocxProviderReadObservation {
+    fn from_range(snapshot: pptx_range_source::PptxRangeSourceSnapshot) -> Self {
+        Self {
+            read_calls: snapshot.logical_calls,
+            requested_bytes: snapshot.requested_bytes,
+            returned_bytes: snapshot.returned_bytes,
+            min_request_bytes: snapshot.min_request_bytes,
+            max_request_bytes: snapshot.max_request_bytes,
+            short_reads: snapshot.short_reads,
+            delayed_calls: snapshot.delayed_calls,
+            transfer_paced_calls: snapshot.transfer_paced_calls,
+            transfer_delay_ns: snapshot.transfer_delay_ns,
+            request_size_counts: snapshot.request_size_counts,
+        }
+    }
+
+    fn direct(reads: &DocxProviderReadCounter) -> Self {
+        reads.snapshot()
+    }
+}
+
+/// Per-sample provider observations for the four explicit source seams.
+/// `logical` is the caller-facing range adapter for range routes and the
+/// direct positional wrapper for the filesystem route. `underlying` is the
+/// delegated ReadAt boundary beneath the adapter; it remains a logical
+/// wrapper observation rather than physical I/O evidence.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct DocxSectionLayoutProviderSummary {
+    provider: &'static str,
+    source_scope: &'static str,
+    staging_scope: &'static str,
+    observation_boundary: &'static str,
+    logical_observation_scope: &'static str,
+    underlying_observation_scope: &'static str,
+    max_returned_bytes: Option<usize>,
+    fixed_delay_ns: Option<u64>,
+    transfer_bytes_per_second: Option<u64>,
+    transfer_delay_policy: Option<&'static str>,
+    logical: Vec<DocxProviderReadObservation>,
+    /// `null` for the direct FileSource route because its logical and
+    /// delegated boundaries are the same counter; range routes populate this
+    /// with the separate beneath-adapter observation.
+    underlying: Vec<Option<DocxProviderReadObservation>>,
+    nominal_service_delay_ns: Vec<u64>,
 }
 
 /// Actual member-count evidence retained by the ZIP index selector.  The
@@ -50364,6 +50441,10 @@ enum DocxIngressRoute {
     GenericReadAt,
     OwnedVec,
     OwnedReader,
+    FileWarm,
+    RangeShort,
+    RangeZero,
+    RangeDelayed,
 }
 
 impl DocxIngressRoute {
@@ -50375,8 +50456,12 @@ impl DocxIngressRoute {
             "generic_read_at" => Ok(Self::GenericReadAt),
             "owned_vec" => Ok(Self::OwnedVec),
             "owned_reader" => Ok(Self::OwnedReader),
+            "file_warm" => Ok(Self::FileWarm),
+            "range_short" => Ok(Self::RangeShort),
+            "range_zero" => Ok(Self::RangeZero),
+            "range_delayed" => Ok(Self::RangeDelayed),
             route => Err(format!(
-                "unknown LITCHI_DOCX_INGRESS_ROUTE {route:?}; expected generic_read_at, owned_vec, or owned_reader"
+                "unknown LITCHI_DOCX_INGRESS_ROUTE {route:?}; expected generic_read_at, owned_vec, owned_reader, file_warm, range_short, range_zero, or range_delayed"
             )
             .into()),
         }
@@ -50387,6 +50472,10 @@ impl DocxIngressRoute {
             Self::GenericReadAt => "generic_read_at",
             Self::OwnedVec => "owned_vec",
             Self::OwnedReader => "owned_reader",
+            Self::FileWarm => "file_warm",
+            Self::RangeShort => "range_short",
+            Self::RangeZero => "range_zero",
+            Self::RangeDelayed => "range_delayed",
         }
     }
 
@@ -50401,8 +50490,228 @@ impl DocxIngressRoute {
             Self::OwnedReader => {
                 "instrumented sequential reader ingress; no positional ReadAt observer is available after ownership transfer"
             },
+            Self::FileWarm => {
+                "warm recently-written FileSource positional ReadAt wrapper; counters are logical reads, not physical filesystem I/O"
+            },
+            Self::RangeShort => {
+                "PptxRangeSource logical requests over an immutable in-memory backing source; delegated counters are wrapper observations, not physical or network I/O"
+            },
+            Self::RangeZero => {
+                "PptxRangeSource logical requests over an immutable in-memory backing source with zero fixed delay; counters are not physical or network I/O"
+            },
+            Self::RangeDelayed => {
+                "PptxRangeSource logical requests over an immutable in-memory backing source with configured service delay; counters are not physical or network I/O"
+            },
         }
     }
+
+    const fn is_provider_route(self) -> bool {
+        matches!(
+            self,
+            Self::FileWarm | Self::RangeShort | Self::RangeZero | Self::RangeDelayed
+        )
+    }
+
+    fn range_config(self) -> Option<PptxRangeSourceConfig> {
+        let mut config = match self {
+            Self::RangeShort => PptxRangeSourceConfig::new(Some(4 * 1024), None),
+            Self::RangeZero => PptxRangeSourceConfig::new(Some(64 * 1024), Some(Duration::ZERO)),
+            Self::RangeDelayed => {
+                PptxRangeSourceConfig::new(Some(64 * 1024), Some(Duration::from_millis(1)))
+            },
+            Self::GenericReadAt | Self::OwnedVec | Self::OwnedReader | Self::FileWarm => {
+                return None;
+            },
+        };
+        if matches!(self, Self::RangeZero | Self::RangeDelayed) {
+            config.transfer_bytes_per_second =
+                NonZeroU64::new(DOCX_SECTION_LAYOUT_RANGE_TRANSFER_BYTES_PER_SECOND);
+            config.transfer_delay_policy = TransferDelayPolicy::MinimumService;
+        }
+        Some(config)
+    }
+
+    fn provider_summary(&self, samples: usize) -> Option<DocxSectionLayoutProviderSummary> {
+        if !self.is_provider_route() {
+            return None;
+        }
+        let config = self.range_config();
+        Some(DocxSectionLayoutProviderSummary {
+            provider: self.name(),
+            source_scope: match self {
+                Self::FileWarm => {
+                    "staged regular file written and synced before the run; each FileSource is opened during sample preparation; warm recently-written observation, not a filesystem-cold result"
+                },
+                Self::RangeShort | Self::RangeZero | Self::RangeDelayed => {
+                    "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim"
+                },
+                Self::GenericReadAt | Self::OwnedVec | Self::OwnedReader => unreachable!(),
+            },
+            staging_scope: "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+            observation_boundary: "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+            logical_observation_scope: "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+            underlying_observation_scope: match self {
+                Self::FileWarm => {
+                    "no separate delegated boundary; the direct FileSource wrapper is the sole logical observation, not physical filesystem I/O"
+                },
+                Self::RangeShort | Self::RangeZero | Self::RangeDelayed => {
+                    "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+                },
+                Self::GenericReadAt | Self::OwnedVec | Self::OwnedReader => unreachable!(),
+            },
+            max_returned_bytes: config.and_then(|value| value.max_returned_bytes),
+            fixed_delay_ns: config
+                .and_then(|value| value.fixed_delay)
+                .map(|delay| delay.as_nanos() as u64),
+            transfer_bytes_per_second: config
+                .and_then(|value| value.transfer_bytes_per_second)
+                .map(NonZeroU64::get),
+            transfer_delay_policy: config
+                .filter(|value| value.transfer_bytes_per_second.is_some())
+                .map(|value| match value.transfer_delay_policy {
+                    TransferDelayPolicy::SeparateSleeps => "separate-sleeps",
+                    TransferDelayPolicy::MinimumService => "minimum-service",
+                }),
+            logical: Vec::with_capacity(samples),
+            underlying: Vec::with_capacity(samples),
+            nominal_service_delay_ns: Vec::with_capacity(samples),
+        })
+    }
+}
+
+/// Counts one explicit ReadAt boundary beneath a benchmark provider.  It is
+/// deliberately independent from `InstrumentedSource`: the latter tracks
+/// the historical byte-backed generic route and its overlap classifications.
+struct DocxProviderReadCounter {
+    inner: Arc<dyn ReadAt>,
+    read_calls: AtomicU64,
+    requested_bytes: AtomicU64,
+    returned_bytes: AtomicU64,
+    short_reads: AtomicU64,
+    min_request_bytes: AtomicU64,
+    max_request_bytes: AtomicU64,
+    request_size_counts: [AtomicU64; PPTX_RANGE_REQUEST_SIZE_BUCKETS],
+}
+
+impl DocxProviderReadCounter {
+    fn new(inner: Arc<dyn ReadAt>) -> Self {
+        Self {
+            inner,
+            read_calls: AtomicU64::new(0),
+            requested_bytes: AtomicU64::new(0),
+            returned_bytes: AtomicU64::new(0),
+            short_reads: AtomicU64::new(0),
+            min_request_bytes: AtomicU64::new(u64::MAX),
+            max_request_bytes: AtomicU64::new(0),
+            request_size_counts: std::array::from_fn(|_| AtomicU64::new(0)),
+        }
+    }
+
+    fn observe_request(&self, requested: u64) {
+        self.read_calls.fetch_add(1, Ordering::Relaxed);
+        self.requested_bytes.fetch_add(requested, Ordering::Relaxed);
+        self.min_request_bytes
+            .fetch_min(requested, Ordering::Relaxed);
+        self.max_request_bytes
+            .fetch_max(requested, Ordering::Relaxed);
+        let bucket = pptx_range_source::request_size_bucket(requested);
+        self.request_size_counts[bucket].fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn snapshot(&self) -> DocxProviderReadObservation {
+        let read_calls = self.read_calls.load(Ordering::Relaxed);
+        let minimum = self.min_request_bytes.load(Ordering::Relaxed);
+        DocxProviderReadObservation {
+            read_calls,
+            requested_bytes: self.requested_bytes.load(Ordering::Relaxed),
+            returned_bytes: self.returned_bytes.load(Ordering::Relaxed),
+            min_request_bytes: (minimum != u64::MAX).then_some(minimum),
+            max_request_bytes: (read_calls != 0)
+                .then(|| self.max_request_bytes.load(Ordering::Relaxed)),
+            short_reads: self.short_reads.load(Ordering::Relaxed),
+            delayed_calls: 0,
+            transfer_paced_calls: 0,
+            transfer_delay_ns: 0,
+            request_size_counts: std::array::from_fn(|index| {
+                self.request_size_counts[index].load(Ordering::Relaxed)
+            }),
+        }
+    }
+}
+
+impl ReadAt for DocxProviderReadCounter {
+    fn len(&self) -> io::Result<u64> {
+        self.inner.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+        self.observe_request(u64::try_from(output.len()).map_err(|error| {
+            io::Error::other(format!("provider request length does not fit u64: {error}"))
+        })?);
+        let returned = self.inner.read_at(offset, output)?;
+        if returned > output.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "provider source returned more bytes than requested",
+            ));
+        }
+        let returned = u64::try_from(returned).map_err(|error| {
+            io::Error::other(format!("provider result does not fit u64: {error}"))
+        })?;
+        self.returned_bytes.fetch_add(returned, Ordering::Relaxed);
+        if returned < u64::try_from(output.len()).unwrap_or(u64::MAX) {
+            self.short_reads.fetch_add(1, Ordering::Relaxed);
+        }
+        usize::try_from(returned).map_err(|error| {
+            io::Error::other(format!("provider result does not fit usize: {error}"))
+        })
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.inner.version()
+    }
+}
+
+struct DocxSectionLayoutStagedFile {
+    root: PathBuf,
+    path: PathBuf,
+}
+
+impl Drop for DocxSectionLayoutStagedFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+        let _ = fs::remove_dir(&self.root);
+    }
+}
+
+fn stage_docx_section_layout_file(
+    bytes: &[u8],
+) -> Result<DocxSectionLayoutStagedFile, Box<dyn Error>> {
+    let id = NEXT_DOCX_SECTION_LAYOUT_STAGE_ID.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "litchi-docx-section-layout-{}-{id}",
+        std::process::id()
+    ));
+    fs::create_dir(&root)?;
+    let path = root.join("source.docx");
+    let result = (|| -> Result<(), Box<dyn Error>> {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&path)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_dir(&root);
+        return Err(error);
+    }
+    Ok(DocxSectionLayoutStagedFile { root, path })
 }
 
 struct OwnedIngressReader {
@@ -50472,6 +50781,13 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("DOCX section-layout sequential output ceiling overflows u64")?;
     let payload_ranges = docx_section_layout_payload_ranges(corpus)?;
+    // The staged file is written and synced once before warmups.  Opening a
+    // fresh FileSource remains part of each sample's preparation phase.
+    let staged_file = if ingress_route == DocxIngressRoute::FileWarm {
+        Some(stage_docx_section_layout_file(&corpus.archive)?)
+    } else {
+        None
+    };
     let mut elapsed = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
@@ -50501,6 +50817,8 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         publication_ns: Vec::with_capacity(samples),
         source_read_calls: Vec::with_capacity(samples),
         source_read_bytes: Vec::with_capacity(samples),
+        operation_end_source_read_calls: Vec::with_capacity(samples),
+        operation_end_source_read_bytes: Vec::with_capacity(samples),
         owned_ingress_read_calls: Vec::with_capacity(samples),
         owned_ingress_read_bytes: Vec::with_capacity(samples),
         owned_ingress_owned_bytes: Vec::with_capacity(samples),
@@ -50523,6 +50841,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         stale_foreign_signed_noop_limits_partial_sink_verified: true,
         cache_counters_verified: true,
         sink_counters_verified: true,
+        provider: ingress_route.provider_summary(samples),
     };
     let mut measured_digests = Vec::with_capacity(samples);
     let mut cache_observation: Option<(u64, u64, u64, usize, usize)> = None;
@@ -50534,13 +50853,78 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
                 corpus.archive.clone(),
                 payload_ranges.clone(),
             ))),
-            DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader => None,
+            DocxIngressRoute::OwnedVec
+            | DocxIngressRoute::OwnedReader
+            | DocxIngressRoute::FileWarm
+            | DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => None,
         };
         let owned_input = match ingress_route {
-            DocxIngressRoute::GenericReadAt => None,
             DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader => {
                 Some(corpus.archive.clone())
             },
+            DocxIngressRoute::GenericReadAt
+            | DocxIngressRoute::FileWarm
+            | DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => None,
+        };
+        let provider_backing_bytes: Option<Arc<Vec<u8>>> = ingress_route
+            .range_config()
+            .map(|_| Arc::new(corpus.archive.clone()));
+        let provider_counter: Option<Arc<DocxProviderReadCounter>> = match ingress_route {
+            DocxIngressRoute::FileWarm => {
+                let staged = staged_file
+                    .as_ref()
+                    .expect("warm filesystem route stages its source before the loop");
+                Some(Arc::new(DocxProviderReadCounter::new(Arc::new(
+                    FileSource::open(&staged.path)?,
+                ))))
+            },
+            DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => Some(Arc::new(DocxProviderReadCounter::new(
+                Arc::new(OwnedSource::from_arc(Arc::clone(
+                    provider_backing_bytes
+                        .as_ref()
+                        .expect("range route retains its immutable backing bytes"),
+                ))),
+            ))),
+            DocxIngressRoute::GenericReadAt
+            | DocxIngressRoute::OwnedVec
+            | DocxIngressRoute::OwnedReader => None,
+        };
+        // The retained byte alias makes the post-operation immutability check
+        // independent of the adapter's internal source ownership.
+        let range_source: Option<Arc<PptxRangeSource>> =
+            ingress_route.range_config().map(|config| {
+                Arc::new(PptxRangeSource::new(
+                    provider_counter
+                        .as_ref()
+                        .expect("range route creates a delegated provider counter")
+                        .clone(),
+                    config,
+                ))
+            });
+        let provider_read_at: Option<Arc<dyn ReadAt>> = match ingress_route {
+            DocxIngressRoute::FileWarm => Some(
+                provider_counter
+                    .as_ref()
+                    .expect("warm filesystem route creates a provider counter")
+                    .clone(),
+            ),
+            DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => Some(
+                range_source
+                    .as_ref()
+                    .expect("range route creates a range adapter")
+                    .clone(),
+            ),
+            DocxIngressRoute::GenericReadAt
+            | DocxIngressRoute::OwnedVec
+            | DocxIngressRoute::OwnedReader => None,
         };
         // Keep route setup, including observer allocation and the generic
         // trait-object coercion, in the same preparation boundary as the
@@ -50552,16 +50936,34 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
                     .expect("generic route creates an instrumented source")
                     .clone(),
             ),
+            DocxIngressRoute::FileWarm
+            | DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => provider_read_at,
             DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader => None,
         };
         let owned_read_calls = match ingress_route {
             DocxIngressRoute::OwnedReader => Some(Arc::new(AtomicU64::new(0))),
-            DocxIngressRoute::GenericReadAt | DocxIngressRoute::OwnedVec => None,
+            DocxIngressRoute::GenericReadAt
+            | DocxIngressRoute::OwnedVec
+            | DocxIngressRoute::FileWarm
+            | DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => None,
         };
         let owned_read_bytes = match ingress_route {
             DocxIngressRoute::OwnedReader => Some(Arc::new(AtomicU64::new(0))),
-            DocxIngressRoute::GenericReadAt | DocxIngressRoute::OwnedVec => None,
+            DocxIngressRoute::GenericReadAt
+            | DocxIngressRoute::OwnedVec
+            | DocxIngressRoute::FileWarm
+            | DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => None,
         };
+        let provider_version_before = provider_counter
+            .as_ref()
+            .map(|counter| counter.version())
+            .transpose()?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let preparation_ns = elapsed_ns(preparation_started.elapsed())?;
@@ -50570,6 +50972,12 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let package = match ingress_route {
             DocxIngressRoute::GenericReadAt => litchi_docx::source_backed::Package::from_read_at(
                 read_at.expect("generic route prepares its ReadAt observer"),
+            )?,
+            DocxIngressRoute::FileWarm
+            | DocxIngressRoute::RangeShort
+            | DocxIngressRoute::RangeZero
+            | DocxIngressRoute::RangeDelayed => litchi_docx::source_backed::Package::from_read_at(
+                read_at.expect("provider route prepares its ReadAt observer"),
             )?,
             DocxIngressRoute::OwnedVec => {
                 let opc = SourceBackedPackage::from_vec(
@@ -50634,6 +51042,57 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             .and_then(|value| value.checked_add(publication_ns))
             .ok_or("DOCX section-layout phase sum overflows u64")?;
 
+        // This is the provider operation boundary.  Do not move these
+        // snapshots below any reopen, inverse, digest, preservation, or
+        // source-verification work: those checks are intentionally untimed
+        // and must not enter provider observations.
+        let provider_operation_observation = if ingress_route.is_provider_route() {
+            let underlying = provider_counter
+                .as_ref()
+                .expect("provider route creates an underlying read counter")
+                .snapshot();
+            let logical = range_source
+                .as_ref()
+                .map(|range| range.snapshot())
+                .transpose()?
+                .map(DocxProviderReadObservation::from_range)
+                .unwrap_or_else(|| {
+                    DocxProviderReadObservation::direct(
+                        provider_counter
+                            .as_ref()
+                            .expect("direct provider route creates a read counter"),
+                    )
+                });
+            let fixed_delay_ns = ingress_route
+                .range_config()
+                .and_then(|config| config.fixed_delay)
+                .map(|delay| {
+                    u64::try_from(delay.as_nanos()).map_err(
+                        |_| "DOCX section-layout configured fixed delay exceeds u64 nanoseconds",
+                    )
+                })
+                .transpose()?;
+            let nominal_fixed = fixed_delay_ns
+                .map(|fixed| {
+                    fixed
+                        .checked_mul(logical.delayed_calls)
+                        .ok_or("DOCX section-layout nominal fixed delay overflows u64")
+                })
+                .transpose()?
+                .unwrap_or(0);
+            let nominal_service_delay_ns = nominal_fixed
+                .checked_add(logical.transfer_delay_ns)
+                .ok_or("DOCX section-layout nominal service delay overflows u64")?;
+            Some((logical, underlying, nominal_service_delay_ns))
+        } else {
+            None
+        };
+        let provider_version_at_operation_end = provider_counter
+            .as_ref()
+            .map(|counter| counter.version())
+            .transpose()?;
+        let operation_end_source_observation = source.as_ref().map(|source| source.snapshot());
+
         verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
         if !commit.patch().changed()
             || commit.patch().is_noop()
@@ -50674,6 +51133,34 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         if digest != expected_digest {
             return Err("DOCX section-layout output digest differs from expected output".into());
         }
+        let provider_source_immutability_verified = if ingress_route.is_provider_route() {
+            let provider_version_after_check = provider_counter
+                .as_ref()
+                .map(|counter| counter.version())
+                .transpose()?;
+            if provider_version_before != provider_version_at_operation_end
+                || provider_version_at_operation_end != provider_version_after_check
+            {
+                return Err("DOCX section-layout provider source version changed".into());
+            }
+            if ingress_route == DocxIngressRoute::FileWarm {
+                let staged = staged_file
+                    .as_ref()
+                    .expect("warm filesystem route retains its staged source");
+                let staged_bytes = fs::read(&staged.path)?;
+                staged_bytes.len() == corpus.archive.len()
+                    && sha256_hex(&staged_bytes) == corpus.manifest.archive_sha256
+                    && staged_bytes == corpus.archive
+            } else if let Some(backing_bytes) = provider_backing_bytes.as_ref() {
+                backing_bytes.len() == corpus.archive.len()
+                    && sha256_hex(backing_bytes) == corpus.manifest.archive_sha256
+                    && backing_bytes.as_ref() == &corpus.archive
+            } else {
+                false
+            }
+        } else {
+            true
+        };
         let source_immutability_verified = if let Some(source) = source.as_ref() {
             source.bytes.as_ref() == &corpus.archive
         } else {
@@ -50681,7 +51168,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             // exact inverse publication is executed through this same package
             // and retained SourceArtifact; restoring the complete archive is
             // the route's direct post-timer immutability oracle.
-            restored_output == corpus.archive
+            provider_source_immutability_verified && restored_output == corpus.archive
         };
         if !source_immutability_verified {
             return Err("DOCX section-layout source bytes were mutated".into());
@@ -50735,6 +51222,14 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         {
             return Err("DOCX owned-reader ingress performed no sequential reads".into());
         }
+        if let Some((logical, underlying, _nominal)) = provider_operation_observation.as_ref() {
+            if logical.read_calls == 0 || logical.requested_bytes == 0 {
+                return Err("DOCX section-layout provider performed no logical reads".into());
+            }
+            if underlying.read_calls == 0 || underlying.requested_bytes == 0 {
+                return Err("DOCX section-layout provider delegated no underlying reads".into());
+            }
+        }
         if iteration >= warmup_iterations {
             elapsed.push(total_ns);
             section_summary.preparation_ns.push(preparation_ns);
@@ -50743,6 +51238,14 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             section_summary.edit_ns.push(edit_ns);
             section_summary.commit_ns.push(commit_ns);
             section_summary.publication_ns.push(publication_ns);
+            if let Some(operation_metrics) = operation_end_source_observation {
+                section_summary
+                    .operation_end_source_read_calls
+                    .push(operation_metrics.read_calls);
+                section_summary
+                    .operation_end_source_read_bytes
+                    .push(operation_metrics.read_bytes);
+            }
             if let Some(metrics) = metrics {
                 section_summary.source_read_calls.push(metrics.read_calls);
                 section_summary.source_read_bytes.push(metrics.read_bytes);
@@ -50764,7 +51267,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
                         .load(Ordering::Relaxed),
                 );
             }
-            if ingress_route != DocxIngressRoute::GenericReadAt {
+            if matches!(
+                ingress_route,
+                DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader
+            ) {
                 section_summary
                     .owned_ingress_owned_bytes
                     .push(u64::try_from(corpus.archive.len())?);
@@ -50788,6 +51294,17 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
                 .source_cache_before_publication_after_commit_retained_bytes
                 .push(before_publication_after_commit.retained_bytes);
             section_summary.output_sha256.push(digest.clone());
+            if let Some((logical, underlying, nominal)) = provider_operation_observation {
+                let provider = section_summary
+                    .provider
+                    .as_mut()
+                    .expect("provider route has a provider summary");
+                provider.logical.push(logical);
+                provider
+                    .underlying
+                    .push(range_source.is_some().then_some(underlying));
+                provider.nominal_service_delay_ns.push(nominal);
+            }
             if let Some(metrics) = metrics {
                 source_summary
                     .record_opc(metrics, before_publication_after_commit.successful_loads);
@@ -50817,6 +51334,14 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             &mut source_summary.ordinary_payload_read_bytes,
             &sample_order,
         )?;
+        reorder_sample_vector(
+            &mut section_summary.operation_end_source_read_calls,
+            &sample_order,
+        )?;
+        reorder_sample_vector(
+            &mut section_summary.operation_end_source_read_bytes,
+            &sample_order,
+        )?;
         reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
         if let Some(materializations) = source_summary.ordinary_payload_materializations.as_mut() {
             reorder_sample_vector(materializations, &sample_order)?;
@@ -50825,6 +51350,19 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         }
         reorder_sample_vector(&mut section_summary.source_read_calls, &sample_order)?;
         reorder_sample_vector(&mut section_summary.source_read_bytes, &sample_order)?;
+    } else if ingress_route.is_provider_route() {
+        if !source_summary.read_calls.is_empty()
+            || !source_summary.read_bytes.is_empty()
+            || !section_summary.source_read_calls.is_empty()
+            || !section_summary.source_read_bytes.is_empty()
+            || !section_summary.owned_ingress_read_calls.is_empty()
+            || !section_summary.owned_ingress_read_bytes.is_empty()
+            || !section_summary.owned_ingress_owned_bytes.is_empty()
+            || !section_summary.operation_end_source_read_calls.is_empty()
+            || !section_summary.operation_end_source_read_bytes.is_empty()
+        {
+            return Err("DOCX provider route emitted historical ingress counters".into());
+        }
     } else {
         if !source_summary.read_calls.is_empty()
             || !source_summary.read_bytes.is_empty()
@@ -50839,6 +51377,11 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             &mut section_summary.owned_ingress_owned_bytes,
             &sample_order,
         )?;
+        if !section_summary.operation_end_source_read_calls.is_empty()
+            || !section_summary.operation_end_source_read_bytes.is_empty()
+        {
+            return Err("DOCX owned ingress emitted generic operation-end counters".into());
+        }
     }
     reorder_sample_vector(&mut section_summary.preparation_ns, &sample_order)?;
     reorder_sample_vector(&mut section_summary.open_ns, &sample_order)?;
@@ -50871,12 +51414,32 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         &sample_order,
     )?;
     reorder_sample_vector(&mut section_summary.output_sha256, &sample_order)?;
+    if let Some(provider) = section_summary.provider.as_mut() {
+        reorder_sample_vector(&mut provider.logical, &sample_order)?;
+        reorder_sample_vector(&mut provider.underlying, &sample_order)?;
+        reorder_sample_vector(&mut provider.nominal_service_delay_ns, &sample_order)?;
+    }
     section_summary.sample_order = sample_order;
     let sink = deterministic_sink_summary(&sink_summaries, "DOCX section-layout publication")?;
     if sink.accepted_bytes != u64::try_from(expected_output.len())?
         || sink.largest_write > 64 * 1024
     {
         return Err("DOCX section-layout sink counters exceed the configured bounds".into());
+    }
+    if let Some(provider) = section_summary.provider.as_ref()
+        && (provider.logical.len() != samples
+            || provider.underlying.len() != samples
+            || provider.nominal_service_delay_ns.len() != samples)
+    {
+        return Err("DOCX section-layout provider observations are sample-misaligned".into());
+    }
+    if let Some(staged) = staged_file {
+        let path = staged.path.clone();
+        let root = staged.root.clone();
+        drop(staged);
+        if path.exists() || root.exists() {
+            return Err("DOCX section-layout staged file cleanup was not complete".into());
+        }
     }
     source_summary.docx_section_layout = Some(section_summary);
     Ok(CaseResult {
@@ -61265,6 +61828,7 @@ mod tests {
     use std::{
         collections::{BTreeMap, BTreeSet},
         io::{Read, Write},
+        num::NonZeroU64,
         sync::Arc,
         time::Duration,
     };
@@ -61282,7 +61846,8 @@ mod tests {
     use super::operation_metrics::MetricStatus;
     use super::{
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
-        CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
+        CountingSeekSink, CountingSink, DOCX_SECTION_LAYOUT_RANGE_TRANSFER_BYTES_PER_SECOND,
+        DocxIngressRoute, DocxProviderReadObservation, HashingDiscardSink, InstrumentedSource,
         ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_MEDIA_CORPUS_GENERATOR,
         ODP_SOURCE_BACKED_CATALOG_QUERY_INDEX, ODP_TEXT_BOX_BATCH_COUNT, ODS_MEDIA_ENTRY_COUNT,
         ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR,
@@ -61293,9 +61858,10 @@ mod tests {
         PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION, PackURI, PayloadKind, ProviderAxisSummary,
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
-        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
-        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
-        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, TransferDelayPolicy,
+        WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
+        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,
@@ -65506,6 +66072,20 @@ mod tests {
         assert_eq!(section.edit_ns.len(), 2);
         assert_eq!(section.commit_ns.len(), 2);
         assert_eq!(section.publication_ns.len(), 2);
+        assert_eq!(section.operation_end_source_read_calls.len(), 2);
+        assert!(
+            section
+                .operation_end_source_read_calls
+                .iter()
+                .all(|&calls| calls > 0)
+        );
+        assert!(
+            section
+                .operation_end_source_read_bytes
+                .iter()
+                .all(|&bytes| bytes > 0)
+        );
+        assert!(section.provider.is_none());
         assert!(section.phase_sum_verified);
         assert!(section.semantic_reopen_all_sections_verified);
         assert!(section.table_cell_sectpr_excluded_verified);
@@ -65514,6 +66094,46 @@ mod tests {
         assert!(section.header_footer_relationships_verified);
         assert!(section.publication_inverse_exact_source_verified);
         assert!(section.stale_foreign_signed_noop_limits_partial_sink_verified);
+    }
+
+    #[test]
+    fn docx_section_layout_provider_matrix_has_explicit_service_models() {
+        let short = DocxIngressRoute::RangeShort
+            .range_config()
+            .expect("short range config");
+        assert_eq!(short.max_returned_bytes, Some(4 * 1024));
+        assert_eq!(short.fixed_delay, None);
+        assert_eq!(short.transfer_bytes_per_second, None);
+
+        let zero = DocxIngressRoute::RangeZero
+            .range_config()
+            .expect("zero range config");
+        assert_eq!(zero.max_returned_bytes, Some(64 * 1024));
+        assert_eq!(zero.fixed_delay, Some(Duration::ZERO));
+        assert_eq!(
+            zero.transfer_bytes_per_second.map(NonZeroU64::get),
+            Some(DOCX_SECTION_LAYOUT_RANGE_TRANSFER_BYTES_PER_SECOND)
+        );
+        assert_eq!(
+            zero.transfer_delay_policy,
+            TransferDelayPolicy::MinimumService
+        );
+
+        let delayed = DocxIngressRoute::RangeDelayed
+            .range_config()
+            .expect("delayed range config");
+        assert_eq!(delayed.fixed_delay, Some(Duration::from_millis(1)));
+        assert_eq!(
+            DocxIngressRoute::FileWarm
+                .provider_summary(1)
+                .expect("warm file provider summary")
+                .underlying,
+            Vec::<Option<DocxProviderReadObservation>>::new()
+        );
+        assert_eq!(DocxIngressRoute::FileWarm.name(), "file_warm");
+        assert_eq!(DocxIngressRoute::RangeShort.name(), "range_short");
+        assert_eq!(DocxIngressRoute::RangeZero.name(), "range_zero");
+        assert_eq!(DocxIngressRoute::RangeDelayed.name(), "range_delayed");
     }
 
     #[test]

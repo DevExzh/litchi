@@ -1,0 +1,28 @@
+{
+  "after": {
+    "bytes": 3059766,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+    "sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a"
+  },
+  "apply_command": "patch --batch --forward --strip=1 < /tmp/litchi-performance-0925/section-layout-provider-final.patch",
+  "before_sha256": "acf87f8d2cdcc3ed466096cc68e9fc99b1574a1ee1aeb0542e215a54e3bb1787",
+  "byte_equal_to_frozen_v4": true,
+  "changed_path": "tools/perf-baseline/src/lib.rs",
+  "checkout": "/home/zhuhe/code/litchi",
+  "created_utc": "2026-10-06T11:26:07.011294+00:00",
+  "frozen_candidate": {
+    "bytes": 3059766,
+    "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+    "sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a"
+  },
+  "git_status_at_receipt": " M docs/performance/ADR_COMPLIANCE.md\n M tools/check_iwork_leaf_public_api.py\n M tools/perf-baseline/README.md\n M tools/perf-baseline/src/lib.rs\n?? crates/litchi/examples/bench_word_parse.rs\n?? docs/UNIFIED_OPS_API_DESIGN.md\n?? docs/performance/0925-section-layout-provider-baseline.md\n?? docs/performance/results/change-0925/\n",
+  "head": "aa077c030819c3019288e350f34959666ab7204f",
+  "note": "Adoption only; retained preflight/quality evidence and raw captures remain external and unchanged. Comparative metrics remain descriptive pending root audit.",
+  "patch": {
+    "bytes": 41560,
+    "path": "/tmp/litchi-performance-0925/section-layout-provider-final.patch",
+    "sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+  },
+  "schema": "litchi.performance.0925.production-adoption-receipt.v1",
+  "tests_or_builds_run_during_adoption": false
+}

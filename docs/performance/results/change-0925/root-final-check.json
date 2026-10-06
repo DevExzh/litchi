@@ -1,0 +1,16 @@
+{
+  "schema": "litchi.performance.0925.root-final-check.v1",
+  "checked_utc": "2026-10-06T11:43:58.986500+00:00",
+  "postcleanup_moved_recovery": "passed, exact per-route metrics equality; protocol remains invalid",
+  "reports": 42,
+  "performance_children_run": 0,
+  "postcleanup_recovery_sha256": "9035539a57a4216f3bd06dac3e39da7a5a7249d519d29479a28530f766950900",
+  "source_exact_frozen_hash": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+  "source_docs_whitespace_check": "passed",
+  "whitespace_evidence_exclusions": {
+    "section-layout-provider-final.patch": "hash-bound unified diff has space-prefixed empty context lines",
+    "setup-v3-format-failure.log": "hash-bound raw formatter diagnostic includes an empty context line"
+  },
+  "original_terminal_state_present": false,
+  "unrelated_files_staged": false
+}

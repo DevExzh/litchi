@@ -1,0 +1,23 @@
+{
+  "schema": "litchi.performance.0925.root-moved-recovery-check.v1",
+  "checked_utc": "2026-10-06T11:38:01.407582+00:00",
+  "status": "descriptive_replay_verified_protocol_remains_invalid",
+  "packet": "docs/performance/results/change-0925/capture-v4",
+  "canonical_recovery_sha256": "7443848b9cfd25cc89e7005c49fde1217b69b2d3b9c934f2465e9ddaa8a92497",
+  "moved_recovery_sha256": "9035539a57a4216f3bd06dac3e39da7a5a7249d519d29479a28530f766950900",
+  "routes": 7,
+  "reports": 42,
+  "fields_compared": [
+    "elapsed_ns",
+    "phase_shares",
+    "phase_statistics_ns",
+    "provider_accounting",
+    "child_latency_ns",
+    "child_rss_bytes",
+    "samples",
+    "children"
+  ],
+  "exact_equal": true,
+  "performance_children_run": 0,
+  "capture_state_present": false
+}

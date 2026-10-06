@@ -1,0 +1,9 @@
+{
+  "authorized_utc": "2026-10-06T11:20:24.301494+00:00",
+  "scope": "one frozen 42-child cohort, 5 warmups and 50 samples per child, CPU12, 900s deadline; no replacements",
+  "source_manifest_sha256": "5cec7854c4be03a0dd4524b2bf8fa64148d63856a5e5f6dff78cb6822a472fa2",
+  "authorized_manifest_sha256": "ac813964c7cc9e1b7a861b7f7dd3d06e06cf36c4e9ede13176d96745dc90ae82",
+  "mutation": "capture_authorized false to true only",
+  "independent_pre_capture_audit": "passed final v4 source/build/protocol/preflight/controls; root verified schedule and bindings",
+  "background_build_and_preflight_processes": "none active at root process check"
+}

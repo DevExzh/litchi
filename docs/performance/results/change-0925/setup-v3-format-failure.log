@@ -1,0 +1,116 @@
+review=0925 rustfmt check with root rustfmt.toml and Rust 1.95
+utc_start=2026-10-06T11:02:09.460357+00:00
+rustfmt_argv_template=['/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustfmt', '--check', '--edition', '2024', '<lib.rs>']
+root_rustfmt_toml_sha256=5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3
+
+[candidate_measurement_source] cwd=/tmp/litchi-performance-0925/measurement-source file=/tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs source_sha256=14473e770a23de764015b117fbc1b05a7bf78d7e397eeccde2edc77dd6521e80
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:75:
+     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+ };
+ 
+[32m+use crate::pptx_range_source::{
+[m[32m+    PPTX_RANGE_REQUEST_SIZE_BUCKETS, PptxRangeSource, PptxRangeSourceConfig, TransferDelayPolicy,
+[m[32m+};
+[m use litchi_cfb::{
+     OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
+ };
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:97:
+     TargetMode,
+     constants::{content_type as opc_content_type, relationship_type},
+ };
+[31m-use crate::pptx_range_source::{
+[m[31m-    PptxRangeSource, PptxRangeSourceConfig, TransferDelayPolicy,
+[m[31m-    PPTX_RANGE_REQUEST_SIZE_BUCKETS,
+[m[31m-};
+[m use litchi_pptx::shape::text::{
+     extract as extract_drawingml_text, scan_ranges as scan_drawingml_ranges,
+ };
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:50519:
+             Self::RangeZero => PptxRangeSourceConfig::new(Some(64 * 1024), Some(Duration::ZERO)),
+             Self::RangeDelayed => {
+                 PptxRangeSourceConfig::new(Some(64 * 1024), Some(Duration::from_millis(1)))
+[31m-            }
+[m[32m+            },
+[m             Self::GenericReadAt | Self::OwnedVec | Self::OwnedReader | Self::FileWarm => {
+                 return None;
+[31m-            }
+[m[32m+            },
+[m         };
+         if matches!(self, Self::RangeZero | Self::RangeDelayed) {
+             config.transfer_bytes_per_second =
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:50554:
+             underlying_observation_scope: match self {
+                 Self::FileWarm => {
+                     "no separate delegated boundary; the direct FileSource wrapper is the sole logical observation, not physical filesystem I/O"
+[31m-                }
+[m[32m+                },
+[m                 Self::RangeShort | Self::RangeZero | Self::RangeDelayed => {
+                     "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+[31m-                }
+[m[32m+                },
+[m                 Self::GenericReadAt | Self::OwnedVec | Self::OwnedReader => unreachable!(),
+             },
+             max_returned_bytes: config.and_then(|value| value.max_returned_bytes),
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:50882:
+                 Some(Arc::new(DocxProviderReadCounter::new(Arc::new(
+                     FileSource::open(&staged.path)?,
+                 ))))
+[31m-            }
+[m[32m+            },
+[m             DocxIngressRoute::RangeShort
+             | DocxIngressRoute::RangeZero
+[31m-            | DocxIngressRoute::RangeDelayed => {
+[m[31m-                Some(Arc::new(DocxProviderReadCounter::new(Arc::new(
+[m[31m-                    OwnedSource::from_arc(Arc::clone(
+[m[31m-                        provider_backing_bytes
+[m[31m-                            .as_ref()
+[m[31m-                            .expect("range route retains its immutable backing bytes"),
+[m[31m-                    )),
+[m[31m-                ))))
+[m[31m-            }
+[m[32m+            | DocxIngressRoute::RangeDelayed => Some(Arc::new(DocxProviderReadCounter::new(
+[m[32m+                Arc::new(OwnedSource::from_arc(Arc::clone(
+[m[32m+                    provider_backing_bytes
+[m[32m+                        .as_ref()
+[m[32m+                        .expect("range route retains its immutable backing bytes"),
+[m[32m+                ))),
+[m[32m+            ))),
+[m             DocxIngressRoute::GenericReadAt
+             | DocxIngressRoute::OwnedVec
+             | DocxIngressRoute::OwnedReader => None,
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:61862:
+         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
+         SimulatedRangeSource, SinkSummary, SourceBackedPackage, TransferDelayPolicy,
+[31m-        WindowedHashingSink, Workbook,
+[m[31m-        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+[m[31m-        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+[m[32m+        WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
+[m[32m+        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+[m[32m+        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+[m         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
+         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
+         build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,
+Diff in /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/src/lib.rs:66076:
+         assert_eq!(section.commit_ns.len(), 2);
+         assert_eq!(section.publication_ns.len(), 2);
+         assert_eq!(section.operation_end_source_read_calls.len(), 2);
+[31m-        assert!(section
+[m[31m-            .operation_end_source_read_calls
+[m[31m-            .iter()
+[m[31m-            .all(|&calls| calls > 0));
+[m[32m+        assert!(
+[m[32m+            section
+[m[32m+                .operation_end_source_read_calls
+[m[32m+                .iter()
+[m[32m+                .all(|&calls| calls > 0)
+[m[32m+        );
+[m         assert!(
+             section
+                 .operation_end_source_read_bytes
+[candidate_measurement_source] exit_code=1
+
+[baseline_checkout] cwd=/home/zhuhe/code/litchi file=/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs source_sha256=acf87f8d2cdcc3ed466096cc68e9fc99b1574a1ee1aeb0542e215a54e3bb1787
+[baseline_checkout] exit_code=0
+
+utc_end=2026-10-06T11:02:20.002987+00:00

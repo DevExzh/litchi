@@ -1,0 +1,608 @@
+{
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "binary": {
+    "bytes": 70187352,
+    "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+    "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+  },
+  "build": {
+    "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "binary": {
+      "bytes": 70187352,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "command": "cargo +1.95.0 build --offline -j2 --locked --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0925/measurement-target-v4-final",
+    "locks": {
+      "root_cargo_lock": {
+        "bytes": 138465,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/Cargo.lock",
+        "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+      },
+      "rustfmt_toml": {
+        "bytes": 79,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/rustfmt.toml",
+        "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+      },
+      "tools_performance_cargo_lock": {
+        "bytes": 56289,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.lock",
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      }
+    },
+    "profile": "release",
+    "receipt": {
+      "bytes": 3137,
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "source_custody": {
+      "full_source_listing": {
+        "bytes": 940213,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+        "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+      },
+      "source_receipt": {
+        "bytes": 356812,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+        "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+      }
+    },
+    "toolchain": {
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+    }
+  },
+  "capture_authorized": true,
+  "claim_scope": "descriptive provider baseline only; no ranking, optimization, cold filesystem, physical I/O, allocator, or RSS claim",
+  "created_utc": "2026-10-06T11:19:46.748794+00:00",
+  "failure_policy": "retain every child; any terminal failure invalidates the cohort; never rerun or selectively recapture",
+  "formal_capture_children_run": 0,
+  "process_deadline_seconds": 900.0,
+  "protocol": {
+    "bytes": 31245,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-protocol-v1.json",
+    "sha256": "20b73f7408d5911bc8de5f798638dda3a04904ec3f0ab09ea55b6b3f9b9f5855"
+  },
+  "schedule": {
+    "blocks": 6,
+    "children": 42,
+    "children_per_route": 6,
+    "cpu": 12,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "rows": [
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-01-generic_read_at",
+        "order": "forward",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-02-owned_vec",
+        "order": "forward",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-03-owned_reader",
+        "order": "forward",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-04-file_warm",
+        "order": "forward",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-05-range_short",
+        "order": "forward",
+        "position": 5,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-06-range_zero",
+        "order": "forward",
+        "position": 6,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-07-range_delayed",
+        "order": "forward",
+        "position": 7,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-01-range_delayed",
+        "order": "reverse",
+        "position": 1,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-02-range_zero",
+        "order": "reverse",
+        "position": 2,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-03-range_short",
+        "order": "reverse",
+        "position": 3,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-04-file_warm",
+        "order": "reverse",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-05-owned_reader",
+        "order": "reverse",
+        "position": 5,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-06-owned_vec",
+        "order": "reverse",
+        "position": 6,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-07-generic_read_at",
+        "order": "reverse",
+        "position": 7,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-01-generic_read_at",
+        "order": "forward",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-02-owned_vec",
+        "order": "forward",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-03-owned_reader",
+        "order": "forward",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-04-file_warm",
+        "order": "forward",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-05-range_short",
+        "order": "forward",
+        "position": 5,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-06-range_zero",
+        "order": "forward",
+        "position": 6,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-07-range_delayed",
+        "order": "forward",
+        "position": 7,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-01-range_delayed",
+        "order": "reverse",
+        "position": 1,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-02-range_zero",
+        "order": "reverse",
+        "position": 2,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-03-range_short",
+        "order": "reverse",
+        "position": 3,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-04-file_warm",
+        "order": "reverse",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-05-owned_reader",
+        "order": "reverse",
+        "position": 5,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-06-owned_vec",
+        "order": "reverse",
+        "position": 6,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-07-generic_read_at",
+        "order": "reverse",
+        "position": 7,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-01-generic_read_at",
+        "order": "forward",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-02-owned_vec",
+        "order": "forward",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-03-owned_reader",
+        "order": "forward",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-04-file_warm",
+        "order": "forward",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-05-range_short",
+        "order": "forward",
+        "position": 5,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-06-range_zero",
+        "order": "forward",
+        "position": 6,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-07-range_delayed",
+        "order": "forward",
+        "position": 7,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-01-range_delayed",
+        "order": "reverse",
+        "position": 1,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-02-range_zero",
+        "order": "reverse",
+        "position": 2,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-03-range_short",
+        "order": "reverse",
+        "position": 3,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-04-file_warm",
+        "order": "reverse",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-05-owned_reader",
+        "order": "reverse",
+        "position": 5,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-06-owned_vec",
+        "order": "reverse",
+        "position": 6,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-07-generic_read_at",
+        "order": "reverse",
+        "position": 7,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      }
+    ],
+    "samples_per_child": 50,
+    "sha256": "5bf81fcecddb077c90917b5847b163086658094e6320b202fc33b5431553ee41",
+    "warmups": 5
+  },
+  "schema": "litchi.performance.0925.provider-capture-manifest.v1",
+  "scripts": {
+    "capture": {
+      "bytes": 49705,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-capture.py",
+      "sha256": "4a8fb18ffbc82ba03c082d14fbb783b0a5f68e09f877322d6b7cce2706a1a3ac"
+    },
+    "comparison": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "controls": {
+      "bytes": 19095,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-controls.py",
+      "sha256": "202ed881e1364931e3e03f83a59ecead2dffe45850765f6f3c4662868ec6742a"
+    },
+    "reduce": {
+      "bytes": 5618,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-reduce.py",
+      "sha256": "67b08b127ed98271a17caa05d74938226a1420099f03e75d39201a173f138d32"
+    }
+  },
+  "selector": {
+    "name": "LITCHI_DOCX_INGRESS_ROUTE",
+    "values": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ]
+  },
+  "source": {
+    "candidate_file": "tools/perf-baseline/src/lib.rs",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "candidate_patch": {
+      "bytes": 41560,
+      "path": "/tmp/litchi-performance-0925/section-layout-provider-final.patch",
+      "sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+    },
+    "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "full_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+      "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    },
+    "revision": "aa077c030819c3019288e350f34959666ab7204f",
+    "source_bytes": 109831506,
+    "source_files": 6276,
+    "source_receipt": {
+      "bytes": 356812,
+      "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+      "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+    },
+    "source_root": "/tmp/litchi-performance-0925/measurement-source-v4"
+  }
+}

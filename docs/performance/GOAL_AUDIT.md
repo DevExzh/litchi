@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0925 — provider harness added; failed terminal receipt retained
+
+[0925](0925-section-layout-provider-baseline.md) implements, reviews and tests
+current section-layout file/range intersections without production library
+changes. A source-alias issue and formatting issue were corrected before
+measurement. The sole 42-child run wrote all reports but failed its aggregate
+receipt size guard; no children were rerun or replaced. Raw analysis remains
+descriptive, and qualification remains invalid. The harness and evidence tooling
+are useful program work, not proof of the broader performance goal. Native
+producers, cold storage, actual networking and scaling remain open; iWork is
+excluded.
+
 ## 0924 — current reader allocation hypothesis resolved before implementation
 
 [0924](0924-reader-allocation-attribution.md) relates current retained allocation

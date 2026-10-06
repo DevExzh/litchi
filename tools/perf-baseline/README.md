@@ -2001,6 +2001,34 @@ does not establish route-local negative-case coverage for owned inputs.
 See [change 0923](../../docs/performance/0923-owned-source-fingerprint.md) for
 separately tested owned-route controls and qualified results.
 
+The same selector also accepts these explicit provider routes through
+`LITCHI_DOCX_INGRESS_ROUTE`:
+
+| Route | Backing and service model |
+| --- | --- |
+| `file_warm` | Staged, recently written file; a new positional `FileSource` opens during preparation. |
+| `range_short` | Immutable memory; each delegated read returns at most 4 KiB, with no pacing. |
+| `range_zero` | Immutable memory; 64 KiB cap, 100 MiB/s nominal transfer service, zero fixed delay. |
+| `range_delayed` | Same cap and transfer model, with 1 ms fixed delay per delegated request. |
+
+The paced range routes use the `MinimumService` policy: elapsed request work
+counts toward the fixed-plus-transfer service target. Nominal service counters
+are model arithmetic, not measured sleep duration or network bandwidth. These
+are caller-supplied simulated sources; `file_warm` is not a cold-storage test.
+File staging and post-operation length/digest checks are outside the six timers.
+
+Use the operation-end source/provider observations for timed-work attribution.
+They are sampled immediately after publication, before semantic verification
+and inverse restoration. Historical generic source counters retain their
+checked-iteration scope. Logical and capped delegated reads are different
+boundaries; direct-file observations do not establish physical storage traffic
+or syscall counts. The generic observer includes empty reads; the new provider
+observers count nonempty requests, so their call totals have different scopes.
+Shared generic refusal flags remain generic controls.
+See [change 0925](../../docs/performance/0925-section-layout-provider-baseline.md)
+for tmpfs/range observations and the terminal receipt failure that limits its
+measurements to descriptive evidence.
+
 The fixed `litchi-docx-section-layout-source-v1` corpus has 256 direct
 paragraphs, paragraph-owned `sectPr` elements at direct paragraph indices 63
 and 128 (logical inventory positions 64 and 129 because the table-cell

@@ -1,0 +1,3580 @@
+{
+  "actual_report_aggregate_size_control": {
+    "descriptive_reduction_bytes": 64643,
+    "raw_report_bytes": 3793767,
+    "raw_reports_external_only": true,
+    "report_count": 42,
+    "status": "passed",
+    "under_one_mib": true,
+    "writer_limit_bytes": 1048576
+  },
+  "aggregate_size_control": {
+    "children": 42,
+    "routes": 7,
+    "serialized_reduction_bytes": 64643,
+    "status": "passed",
+    "under_one_mib": true,
+    "writer_limit_bytes": 1048576
+  },
+  "claim_scope": "descriptive raw evidence only; no completed-capture custody, timing adoption, ranking, or recapture",
+  "failure": {
+    "capture_state_present": false,
+    "failure_scope": "final aggregate receipt write failed; per-child in-memory receipts were not persisted",
+    "receipt": {
+      "bytes": 8767,
+      "path": "/tmp/litchi-performance-0925/capture-v4/capture-failure.json",
+      "sha256": "dacc0eb868c8580f5ff93087b6119b9f763e5a4cf568caa792747cc90a8ee7f7"
+    },
+    "recovery_policy": "retain existing artifacts; no rerun/replacement; posthoc reconstruction must be labeled and cannot restore original terminal custody",
+    "report_inventory": [
+      {
+        "bytes": 53470,
+        "path": "children/provider-block-01-01-generic_read_at/report.json",
+        "sha256": "b69073d472e4cf868e2748da1080af11fca817bd579a82b5f0b42b58c5106c20"
+      },
+      {
+        "bytes": 47454,
+        "path": "children/provider-block-01-02-owned_vec/report.json",
+        "sha256": "68351ba553679f91e15e807ec363a22e6c7a221029dc6f8b8c2895426124f2b3"
+      },
+      {
+        "bytes": 47868,
+        "path": "children/provider-block-01-03-owned_reader/report.json",
+        "sha256": "84a05de13ee404e6fb906815d94721c4c22ef88591e6184f54381f7924b03cdb"
+      },
+      {
+        "bytes": 89549,
+        "path": "children/provider-block-01-04-file_warm/report.json",
+        "sha256": "15086df6ece82b5a3960ca43ab108362b2570325967c14b53a4760d3e4e53001"
+      },
+      {
+        "bytes": 130954,
+        "path": "children/provider-block-01-05-range_short/report.json",
+        "sha256": "dcf2ad8335ea0f93ed36839ac255bcd2597b61923e9b3541eb73cc446e0d79a8"
+      },
+      {
+        "bytes": 131358,
+        "path": "children/provider-block-01-06-range_zero/report.json",
+        "sha256": "fb9fb9e7ba9abb845e834abeb77ef67380b94abb2723e63471cd4fbe33ba613d"
+      },
+      {
+        "bytes": 131639,
+        "path": "children/provider-block-01-07-range_delayed/report.json",
+        "sha256": "eb757a0a0158984a8a2f245f7bfcbf427ffd35ce5c9962411aa374fffe7b0068"
+      },
+      {
+        "bytes": 131640,
+        "path": "children/provider-block-02-01-range_delayed/report.json",
+        "sha256": "c6b2be7ca5871840f8f56f5818565b2e1c1f818d7df4648cd206d045dc952ee0"
+      },
+      {
+        "bytes": 131361,
+        "path": "children/provider-block-02-02-range_zero/report.json",
+        "sha256": "2ef0c8dff6d6887b32ad8456a79a0d0d3dc151aa22782e0648b02e5adadeb550"
+      },
+      {
+        "bytes": 130955,
+        "path": "children/provider-block-02-03-range_short/report.json",
+        "sha256": "ac51139fedc79f9d4c7e9f2bb05d2a387bd4904df9f7174ef02219cccf4dde4c"
+      },
+      {
+        "bytes": 89548,
+        "path": "children/provider-block-02-04-file_warm/report.json",
+        "sha256": "477b5508a45b3b7083b4c708de22a8d3bb622d6401afebe9fbe3236ab5b2316b"
+      },
+      {
+        "bytes": 47917,
+        "path": "children/provider-block-02-05-owned_reader/report.json",
+        "sha256": "5a05a584ee23966a0547124a4d3f895171913be1495a1a6de981c0fb92ba900e"
+      },
+      {
+        "bytes": 47456,
+        "path": "children/provider-block-02-06-owned_vec/report.json",
+        "sha256": "4f6e568cdea72887e6ac8987795423813006642bdeb13138402fa1bf92484476"
+      },
+      {
+        "bytes": 53463,
+        "path": "children/provider-block-02-07-generic_read_at/report.json",
+        "sha256": "fa19f77b52dd916aef0e6ee265da05d6fdc5d0dc89cbbc62f4124078684d5631"
+      },
+      {
+        "bytes": 53458,
+        "path": "children/provider-block-03-01-generic_read_at/report.json",
+        "sha256": "c3dd34aa264e1977cc4828f049b4a2352a3f3011b8455659870ef3d7455fad37"
+      },
+      {
+        "bytes": 47457,
+        "path": "children/provider-block-03-02-owned_vec/report.json",
+        "sha256": "e1a42519864444bfe9ffccdb9fcb3c26da15b10f9134fbef120ef5367350d3be"
+      },
+      {
+        "bytes": 47874,
+        "path": "children/provider-block-03-03-owned_reader/report.json",
+        "sha256": "5ebf9bb1c798e478757edca4aec83e23bd12ee9c86db1c44b44fec6051e7c187"
+      },
+      {
+        "bytes": 89549,
+        "path": "children/provider-block-03-04-file_warm/report.json",
+        "sha256": "97da8add6fc34940f28c6a755131dcf66f8c9b037e4b2a19438fe7c648c7a7bd"
+      },
+      {
+        "bytes": 130947,
+        "path": "children/provider-block-03-05-range_short/report.json",
+        "sha256": "31e027aebbebc9c485d18f75106a38fe63170165b74ec93c273cd296fa5a5221"
+      },
+      {
+        "bytes": 131356,
+        "path": "children/provider-block-03-06-range_zero/report.json",
+        "sha256": "9d7e61f72b3a1eb09669f4cf6efacc5d0d0b2d3ae8382d9315e07678e3bc2458"
+      },
+      {
+        "bytes": 131634,
+        "path": "children/provider-block-03-07-range_delayed/report.json",
+        "sha256": "fab7fdf6dc697697a3387b75215656a92a662927f133f8eb4f9be4351632c96c"
+      },
+      {
+        "bytes": 131639,
+        "path": "children/provider-block-04-01-range_delayed/report.json",
+        "sha256": "3407028238e740a61b0d07aa1a99585da886feb734e5f7235cbfa6a5551a3f30"
+      },
+      {
+        "bytes": 131363,
+        "path": "children/provider-block-04-02-range_zero/report.json",
+        "sha256": "ac6d3e6c4a88389638eac6d5571ab53f502b66b9d848ba590d904f83489e46c1"
+      },
+      {
+        "bytes": 130947,
+        "path": "children/provider-block-04-03-range_short/report.json",
+        "sha256": "42d53113da59ff63eee1a21615e3c9b2636dc9172242855a88ae5808248f3d19"
+      },
+      {
+        "bytes": 89542,
+        "path": "children/provider-block-04-04-file_warm/report.json",
+        "sha256": "e59c401cc939da0e65467de5a142d38fc26095f6be1233808f7dd5df2cb29602"
+      },
+      {
+        "bytes": 47876,
+        "path": "children/provider-block-04-05-owned_reader/report.json",
+        "sha256": "0e5efafd23d01915eac8d0854cc1080e051da5cd4a543e8b04cebac074f902a8"
+      },
+      {
+        "bytes": 47455,
+        "path": "children/provider-block-04-06-owned_vec/report.json",
+        "sha256": "38b6b6e5be67723a00c9695854f6262d5487bf0841c4f93ab140453f2856c3d3"
+      },
+      {
+        "bytes": 53463,
+        "path": "children/provider-block-04-07-generic_read_at/report.json",
+        "sha256": "1f77bc5a09f2b2d14f97b4d1e10eb5311103351deca3d027548889c7762c3d6f"
+      },
+      {
+        "bytes": 53463,
+        "path": "children/provider-block-05-01-generic_read_at/report.json",
+        "sha256": "599880db9f36a983d6df506b83468d432e9a9ea8a90dca93d90ce42b5080ada3"
+      },
+      {
+        "bytes": 47456,
+        "path": "children/provider-block-05-02-owned_vec/report.json",
+        "sha256": "80902322d900442938bd96495f8b952a709d83868e0b5047d841cee9c02dffd2"
+      },
+      {
+        "bytes": 47870,
+        "path": "children/provider-block-05-03-owned_reader/report.json",
+        "sha256": "863203192f8b1f93bd0e8fe3bc3a4e8723d7fcc7dcb8fafe44f69e0cbfb0a060"
+      },
+      {
+        "bytes": 89548,
+        "path": "children/provider-block-05-04-file_warm/report.json",
+        "sha256": "c6e25751bc81ff3289496e26947ffdd80c42fe007b6368090300fe2a4d525adc"
+      },
+      {
+        "bytes": 130954,
+        "path": "children/provider-block-05-05-range_short/report.json",
+        "sha256": "ae7e60eecad08715f96a4d1e2a46d9de09e7586b4b2d63a5b5e35d7fe9223898"
+      },
+      {
+        "bytes": 131356,
+        "path": "children/provider-block-05-06-range_zero/report.json",
+        "sha256": "8848da9759e8a6ec4eb3051c7d9cd9393975756631b9e80ef6b3fbdff9e1aa8b"
+      },
+      {
+        "bytes": 131632,
+        "path": "children/provider-block-05-07-range_delayed/report.json",
+        "sha256": "4d11f2d7eb232f5c3f71017f6ef6276488e945f77ceb945e37d4c2009e396073"
+      },
+      {
+        "bytes": 131639,
+        "path": "children/provider-block-06-01-range_delayed/report.json",
+        "sha256": "ea0b66a8e53d0eceb6da4cbb2266f8670f685021b5af5b2d47d30d9ad52a58e7"
+      },
+      {
+        "bytes": 131362,
+        "path": "children/provider-block-06-02-range_zero/report.json",
+        "sha256": "75aff147c0faba2943935f9df97f05f6867ded6030b959f8d9b75277f67f4827"
+      },
+      {
+        "bytes": 130955,
+        "path": "children/provider-block-06-03-range_short/report.json",
+        "sha256": "12e1875d8e24862cbf8a01b0457d824f95be552d7f937ca108489adf030b8138"
+      },
+      {
+        "bytes": 89550,
+        "path": "children/provider-block-06-04-file_warm/report.json",
+        "sha256": "9d0490866e789f7e0dfc4431f3765d1f7fb8741b2f479cab622d435d9e017d1e"
+      },
+      {
+        "bytes": 47874,
+        "path": "children/provider-block-06-05-owned_reader/report.json",
+        "sha256": "ca5e8d53f96c3dcae7c3010b6d711e70f29a948f8727b1164e5bfbd65f571002"
+      },
+      {
+        "bytes": 47453,
+        "path": "children/provider-block-06-06-owned_vec/report.json",
+        "sha256": "1a29a114b85c919a3b52a9f4068e5c900503e30668d7316a5cda506e4af27323"
+      },
+      {
+        "bytes": 53463,
+        "path": "children/provider-block-06-07-generic_read_at/report.json",
+        "sha256": "0b930761289c0c5e8a99b0e6c4f8b31fb93023cfa8a8f19e3eec4bc509febfde"
+      }
+    ],
+    "reports_present": 42,
+    "root_exit_code": 1,
+    "schema": "litchi.performance.0925.capture-terminal-failure.v1",
+    "status": "invalid",
+    "terminal_output": "0925 capture tooling failed: CaptureError: receipt is at least 1 MiB: /tmp/litchi-performance-0925/capture-v4/capture-state.json"
+  },
+  "future_compact_state_control": {
+    "not_written_to_failed_packet": true,
+    "omits_full_validation_vectors": true,
+    "omits_unknown_original_fields": [
+      "started_utc",
+      "ended_utc",
+      "cwd",
+      "observation_timeout_count"
+    ],
+    "purpose": "future runner design control only; no replacement capture state",
+    "schema": "litchi.performance.0925.provider-capture-state-compact.v1",
+    "serialized_bytes": 38684,
+    "status": "passed",
+    "under_one_mib": true,
+    "writer_limit_bytes": 1048576
+  },
+  "packet": {
+    "bytes": 20905,
+    "packet_path": "manifest.json",
+    "path": "/tmp/litchi-performance-0925/capture-v4/manifest.json",
+    "sha256": "306ad084cbc6f864187133f3ebaf633e3036f3bc221a7b64ecba5376764bcc61"
+  },
+  "performance_children_run": 0,
+  "raw_inventory": {
+    "children": 42,
+    "packet_raw_bytes": 3878115,
+    "report_bytes": 3793767,
+    "reports": 42
+  },
+  "reduction": {
+    "routes": {
+      "file_warm": {
+        "child_latency_ns": [
+          {
+            "max": 4657420,
+            "min": 4575550,
+            "p50": 4608805.0,
+            "p95": 4649050.0,
+            "p99": 4657420.0,
+            "spread": 81870
+          },
+          {
+            "max": 4638879,
+            "min": 4566509,
+            "p50": 4595699.0,
+            "p95": 4622309.0,
+            "p99": 4638879.0,
+            "spread": 72370
+          },
+          {
+            "max": 4653409,
+            "min": 4573599,
+            "p50": 4594184.0,
+            "p95": 4637230.0,
+            "p99": 4653409.0,
+            "spread": 79810
+          },
+          {
+            "max": 4647510,
+            "min": 4578619,
+            "p50": 4606804.0,
+            "p95": 4635059.0,
+            "p99": 4647510.0,
+            "spread": 68891
+          },
+          {
+            "max": 4733920,
+            "min": 4575459,
+            "p50": 4612549.0,
+            "p95": 4675209.0,
+            "p99": 4733920.0,
+            "spread": 158461
+          },
+          {
+            "max": 4647019,
+            "min": 4572408,
+            "p50": 4591564.0,
+            "p95": 4632039.0,
+            "p99": 4647019.0,
+            "spread": 74611
+          }
+        ],
+        "child_p50_ns": [
+          4608805.0,
+          4595699.0,
+          4594184.0,
+          4606804.0,
+          4612549.0,
+          4591564.0
+        ],
+        "child_p95_ns": [
+          4649050.0,
+          4622309.0,
+          4637230.0,
+          4635059.0,
+          4675209.0,
+          4632039.0
+        ],
+        "child_p99_ns": [
+          4657420.0,
+          4638879.0,
+          4653409.0,
+          4647510.0,
+          4733920.0,
+          4647019.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 35594240,
+            "mean": 35355989.333333336,
+            "min": 35274752,
+            "p50": 35311616.0,
+            "p95": 35594240.0,
+            "p99": 35594240.0
+          },
+          "values": [
+            35328000,
+            35295232,
+            35364864,
+            35278848,
+            35594240,
+            35274752
+          ]
+        },
+        "child_spread_ns": [
+          81870,
+          72370,
+          79810,
+          68891,
+          158461,
+          74611
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 4733920,
+          "mean": 4605275.41,
+          "min": 4566509,
+          "p50": 4600499.0,
+          "p95": 4647019.0,
+          "p99": 4672179.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.07578507955799615,
+          "edit_ns": 0.011736064662417226,
+          "open_ns": 0.011073149549883995,
+          "preparation_ns": 0.0008167488365985332,
+          "publication_ns": 0.6026827083218171,
+          "query_ns": 0.297906249071287
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 376541,
+            "mean": 349011.16333333333,
+            "min": 338381,
+            "p50": 347737.0,
+            "p95": 358811.0,
+            "p99": 364112.0
+          },
+          "edit_ns": {
+            "max": 68810,
+            "mean": 54047.81,
+            "min": 51500,
+            "p50": 53585.0,
+            "p95": 57010.0,
+            "p99": 61340.0
+          },
+          "open_ns": {
+            "max": 61200,
+            "mean": 50994.903333333335,
+            "min": 48490,
+            "p50": 50490.0,
+            "p95": 53940.0,
+            "p99": 60120.0
+          },
+          "preparation_ns": {
+            "max": 12920,
+            "mean": 3761.3533333333335,
+            "min": 3070,
+            "p50": 3605.0,
+            "p95": 4680.0,
+            "p99": 5840.0
+          },
+          "publication_ns": {
+            "max": 2858392,
+            "mean": 2775519.8566666665,
+            "min": 2749441,
+            "p50": 2772911.5,
+            "p95": 2799411.0,
+            "p99": 2816031.0
+          },
+          "query_ns": {
+            "max": 1414256,
+            "mean": 1371940.3233333332,
+            "min": 1353436,
+            "p50": 1370216.0,
+            "p95": 1388036.0,
+            "p99": 1404196.0
+          }
+        },
+        "provider_accounting": {
+          "fixed_delay_ns": null,
+          "logical": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "max_request_bytes": 65536,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "request_size_count_total": 49500,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2100,
+              900,
+              1200,
+              300,
+              0,
+              600,
+              0,
+              0,
+              28800,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            }
+          },
+          "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+          "max_returned_bytes": null,
+          "nominal_service_delay_ns": {
+            "max": 0,
+            "mean": 0.0,
+            "min": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          },
+          "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+          "provider": "file_warm",
+          "source_scope": "staged regular file written and synced before the run; each FileSource is opened during sample preparation; warm recently-written observation, not a filesystem-cold result",
+          "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+          "transfer_bytes_per_second": null,
+          "transfer_delay_policy": null,
+          "underlying": null,
+          "underlying_observation_scope": "no separate delegated boundary; the direct FileSource wrapper is the sole logical observation, not physical filesystem I/O"
+        },
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-04-file_warm",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 35328000,
+            "order": "forward",
+            "position": 4,
+            "report": {
+              "bytes": 89549,
+              "path": "children/provider-block-01-04-file_warm/report.json",
+              "sha256": "15086df6ece82b5a3960ca43ab108362b2570325967c14b53a4760d3e4e53001"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-01-04-file_warm/stderr.log",
+              "sha256": "13b90dfd1b44f367ea2a73c167b5bf271ea0265bf95d715ec517739ce95f40f1"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-04-file_warm/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-01-04-file_warm/time.log",
+              "sha256": "13b90dfd1b44f367ea2a73c167b5bf271ea0265bf95d715ec517739ce95f40f1"
+            },
+            "timed_command_sha256": "de089c2bcf9c3291640ec43fcec253b0afdfb0d5d22bcaa71eb4be63d62a0026"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-04-file_warm",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 35295232,
+            "order": "reverse",
+            "position": 4,
+            "report": {
+              "bytes": 89548,
+              "path": "children/provider-block-02-04-file_warm/report.json",
+              "sha256": "477b5508a45b3b7083b4c708de22a8d3bb622d6401afebe9fbe3236ab5b2316b"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-02-04-file_warm/stderr.log",
+              "sha256": "abd87292bf52edcfda17abd6910909461b6e65eb13cd903d23d9ecd37da781f4"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-04-file_warm/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-02-04-file_warm/time.log",
+              "sha256": "abd87292bf52edcfda17abd6910909461b6e65eb13cd903d23d9ecd37da781f4"
+            },
+            "timed_command_sha256": "f971ff6f138ff36953e778e78a07a2a5dfc9e1b7727ff49484aa53135b5e1e8e"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-04-file_warm",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 35364864,
+            "order": "forward",
+            "position": 4,
+            "report": {
+              "bytes": 89549,
+              "path": "children/provider-block-03-04-file_warm/report.json",
+              "sha256": "97da8add6fc34940f28c6a755131dcf66f8c9b037e4b2a19438fe7c648c7a7bd"
+            },
+            "stderr": {
+              "bytes": 1002,
+              "path": "children/provider-block-03-04-file_warm/stderr.log",
+              "sha256": "2d0ef6ec8b821784467a8d0585192f200556a0507afedb506707f95ad9a49bdd"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-04-file_warm/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1002,
+              "path": "children/provider-block-03-04-file_warm/time.log",
+              "sha256": "2d0ef6ec8b821784467a8d0585192f200556a0507afedb506707f95ad9a49bdd"
+            },
+            "timed_command_sha256": "8efa3d532a685213dbe4cd88741008201bfb97d7e9fae3a3b76a3e9fc5e73458"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-04-file_warm",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 35278848,
+            "order": "reverse",
+            "position": 4,
+            "report": {
+              "bytes": 89542,
+              "path": "children/provider-block-04-04-file_warm/report.json",
+              "sha256": "e59c401cc939da0e65467de5a142d38fc26095f6be1233808f7dd5df2cb29602"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-04-04-file_warm/stderr.log",
+              "sha256": "fa19d54d8a8db206f5bf1604f9c02d6bd4c775265109476f29ba1d2e6846f0ea"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-04-file_warm/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-04-04-file_warm/time.log",
+              "sha256": "fa19d54d8a8db206f5bf1604f9c02d6bd4c775265109476f29ba1d2e6846f0ea"
+            },
+            "timed_command_sha256": "a381b885bd3b645cf854eea7e2c192a446fcdb1c8f55715cdb5e66b2fa386ce8"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-04-file_warm",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 35594240,
+            "order": "forward",
+            "position": 4,
+            "report": {
+              "bytes": 89548,
+              "path": "children/provider-block-05-04-file_warm/report.json",
+              "sha256": "c6e25751bc81ff3289496e26947ffdd80c42fe007b6368090300fe2a4d525adc"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-05-04-file_warm/stderr.log",
+              "sha256": "c2706f6fd1a529dbd682e940557327b5906f0e3f233782e2b9c2ca6254c29a24"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-04-file_warm/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-05-04-file_warm/time.log",
+              "sha256": "c2706f6fd1a529dbd682e940557327b5906f0e3f233782e2b9c2ca6254c29a24"
+            },
+            "timed_command_sha256": "eb635ba9b458bb5e306d2eb6b9bdebf7fde2564b93ba93a670ad530d366c2981"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-04-file_warm",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 35274752,
+            "order": "reverse",
+            "position": 4,
+            "report": {
+              "bytes": 89550,
+              "path": "children/provider-block-06-04-file_warm/report.json",
+              "sha256": "9d0490866e789f7e0dfc4431f3765d1f7fb8741b2f479cab622d435d9e017d1e"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-06-04-file_warm/stderr.log",
+              "sha256": "2f9255c896ea68e695aa0b4602a616dad4122c6644c108ff4b2aa823b9920a52"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-04-file_warm/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-06-04-file_warm/time.log",
+              "sha256": "2f9255c896ea68e695aa0b4602a616dad4122c6644c108ff4b2aa823b9920a52"
+            },
+            "timed_command_sha256": "75592db427f00d0c44b8b5160a4a621a3776e42a523ea936f3a59c68b4c09b9a"
+          }
+        ],
+        "samples": 300
+      },
+      "generic_read_at": {
+        "child_latency_ns": [
+          {
+            "max": 4599920,
+            "min": 4467780,
+            "p50": 4486149.0,
+            "p95": 4536119.0,
+            "p99": 4599920.0,
+            "spread": 132140
+          },
+          {
+            "max": 4546569,
+            "min": 4462368,
+            "p50": 4484893.5,
+            "p95": 4527579.0,
+            "p99": 4546569.0,
+            "spread": 84201
+          },
+          {
+            "max": 4526119,
+            "min": 4463799,
+            "p50": 4486539.0,
+            "p95": 4517009.0,
+            "p99": 4526119.0,
+            "spread": 62320
+          },
+          {
+            "max": 4770130,
+            "min": 4467278,
+            "p50": 4494594.0,
+            "p95": 4579839.0,
+            "p99": 4770130.0,
+            "spread": 302852
+          },
+          {
+            "max": 4548889,
+            "min": 4468509,
+            "p50": 4488548.5,
+            "p95": 4529459.0,
+            "p99": 4548889.0,
+            "spread": 80380
+          },
+          {
+            "max": 4520269,
+            "min": 4470619,
+            "p50": 4489244.0,
+            "p95": 4516018.0,
+            "p99": 4520269.0,
+            "spread": 49650
+          }
+        ],
+        "child_p50_ns": [
+          4486149.0,
+          4484893.5,
+          4486539.0,
+          4494594.0,
+          4488548.5,
+          4489244.0
+        ],
+        "child_p95_ns": [
+          4536119.0,
+          4527579.0,
+          4517009.0,
+          4579839.0,
+          4529459.0,
+          4516018.0
+        ],
+        "child_p99_ns": [
+          4599920.0,
+          4546569.0,
+          4526119.0,
+          4770130.0,
+          4548889.0,
+          4520269.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 37400576,
+            "mean": 37104298.666666664,
+            "min": 36814848,
+            "p50": 37107712.0,
+            "p95": 37400576.0,
+            "p99": 37400576.0
+          },
+          "values": [
+            37371904,
+            37105664,
+            36823040,
+            37109760,
+            37400576,
+            36814848
+          ]
+        },
+        "child_spread_ns": [
+          132140,
+          84201,
+          62320,
+          302852,
+          80380,
+          49650
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 4770130,
+          "mean": 4492460.226666667,
+          "min": 4462368,
+          "p50": 4488258.5,
+          "p95": 4527579.0,
+          "p99": 4579839.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.07756847156149335,
+          "edit_ns": 0.011788249792169556,
+          "open_ns": 0.010162528851266372,
+          "preparation_ns": 0.007824282960003174,
+          "publication_ns": 0.5954435576572287,
+          "query_ns": 0.2972129091778388
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 384922,
+            "mean": 348473.2733333333,
+            "min": 336721,
+            "p50": 346511.0,
+            "p95": 359522.0,
+            "p99": 372641.0
+          },
+          "edit_ns": {
+            "max": 79761,
+            "mean": 52958.24333333333,
+            "min": 50320,
+            "p50": 51890.0,
+            "p95": 61390.0,
+            "p99": 65950.0
+          },
+          "open_ns": {
+            "max": 72150,
+            "mean": 45654.75666666667,
+            "min": 42870,
+            "p50": 44990.0,
+            "p95": 48321.0,
+            "p99": 56050.0
+          },
+          "preparation_ns": {
+            "max": 67910,
+            "mean": 35150.28,
+            "min": 32220,
+            "p50": 34170.0,
+            "p95": 40940.0,
+            "p99": 46510.0
+          },
+          "publication_ns": {
+            "max": 2825962,
+            "mean": 2675006.5,
+            "min": 2651041,
+            "p50": 2671891.0,
+            "p95": 2696372.0,
+            "p99": 2743441.0
+          },
+          "query_ns": {
+            "max": 1399376,
+            "mean": 1335217.1733333333,
+            "min": 1321685,
+            "p50": 1333725.5,
+            "p95": 1346716.0,
+            "p99": 1357006.0
+          }
+        },
+        "provider_accounting": null,
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-01-generic_read_at",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37371904,
+            "order": "forward",
+            "position": 1,
+            "report": {
+              "bytes": 53470,
+              "path": "children/provider-block-01-01-generic_read_at/report.json",
+              "sha256": "b69073d472e4cf868e2748da1080af11fca817bd579a82b5f0b42b58c5106c20"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-01-01-generic_read_at/stderr.log",
+              "sha256": "b67b767469f87f35fc39366c980a3b36861165bd78a918b2a9f295eddf3eb088"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-01-generic_read_at/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-01-01-generic_read_at/time.log",
+              "sha256": "b67b767469f87f35fc39366c980a3b36861165bd78a918b2a9f295eddf3eb088"
+            },
+            "timed_command_sha256": "71bdde09d5b3b66b468851e165f378ca3f8ffd6b4947e9c219630cf42a9f78c0"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-07-generic_read_at",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37105664,
+            "order": "reverse",
+            "position": 7,
+            "report": {
+              "bytes": 53463,
+              "path": "children/provider-block-02-07-generic_read_at/report.json",
+              "sha256": "fa19f77b52dd916aef0e6ee265da05d6fdc5d0dc89cbbc62f4124078684d5631"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-02-07-generic_read_at/stderr.log",
+              "sha256": "e45f96b2f04ea17d97064892da90f83f6368ea34b34949dafa3b0f32e3ab54b6"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-07-generic_read_at/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-02-07-generic_read_at/time.log",
+              "sha256": "e45f96b2f04ea17d97064892da90f83f6368ea34b34949dafa3b0f32e3ab54b6"
+            },
+            "timed_command_sha256": "2c2091f90c2266e24ab590f1e2cb63e5ae3aa390ed7f9034a456a635e1a53d75"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-01-generic_read_at",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 36823040,
+            "order": "forward",
+            "position": 1,
+            "report": {
+              "bytes": 53458,
+              "path": "children/provider-block-03-01-generic_read_at/report.json",
+              "sha256": "c3dd34aa264e1977cc4828f049b4a2352a3f3011b8455659870ef3d7455fad37"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-03-01-generic_read_at/stderr.log",
+              "sha256": "53862f67505b4369a52f8d847e22d9431dab48abf1656cc27a92fcdeb2204054"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-01-generic_read_at/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-03-01-generic_read_at/time.log",
+              "sha256": "53862f67505b4369a52f8d847e22d9431dab48abf1656cc27a92fcdeb2204054"
+            },
+            "timed_command_sha256": "9db797be3bc3adeb693c629f1e74de874eab1c566db583b6d4ce5fd5b58376e7"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-07-generic_read_at",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37109760,
+            "order": "reverse",
+            "position": 7,
+            "report": {
+              "bytes": 53463,
+              "path": "children/provider-block-04-07-generic_read_at/report.json",
+              "sha256": "1f77bc5a09f2b2d14f97b4d1e10eb5311103351deca3d027548889c7762c3d6f"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-04-07-generic_read_at/stderr.log",
+              "sha256": "397c76997abbbf45a7318bcde658db91b818da2db3f0978dd5d2ca69ecfa11cc"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-07-generic_read_at/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-04-07-generic_read_at/time.log",
+              "sha256": "397c76997abbbf45a7318bcde658db91b818da2db3f0978dd5d2ca69ecfa11cc"
+            },
+            "timed_command_sha256": "6244b3d81b3a3bc952442df3dee5e3865819fb1189866d4dae62f9a403d900f1"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-01-generic_read_at",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37400576,
+            "order": "forward",
+            "position": 1,
+            "report": {
+              "bytes": 53463,
+              "path": "children/provider-block-05-01-generic_read_at/report.json",
+              "sha256": "599880db9f36a983d6df506b83468d432e9a9ea8a90dca93d90ce42b5080ada3"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-05-01-generic_read_at/stderr.log",
+              "sha256": "3c72cda85017e604aee29ed763a1b3ca9351519dbd66bf37711f87a7be8538fc"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-01-generic_read_at/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-05-01-generic_read_at/time.log",
+              "sha256": "3c72cda85017e604aee29ed763a1b3ca9351519dbd66bf37711f87a7be8538fc"
+            },
+            "timed_command_sha256": "a4429a940f0857c0af21acacb4fc1a92d4c753f877620766637168eaee5863fb"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-07-generic_read_at",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 36814848,
+            "order": "reverse",
+            "position": 7,
+            "report": {
+              "bytes": 53463,
+              "path": "children/provider-block-06-07-generic_read_at/report.json",
+              "sha256": "0b930761289c0c5e8a99b0e6c4f8b31fb93023cfa8a8f19e3eec4bc509febfde"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-06-07-generic_read_at/stderr.log",
+              "sha256": "dec0ebcca505c6caf706e9eb461c4f61a7c626c948043fb359d085bccf4ab9aa"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-07-generic_read_at/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-06-07-generic_read_at/time.log",
+              "sha256": "dec0ebcca505c6caf706e9eb461c4f61a7c626c948043fb359d085bccf4ab9aa"
+            },
+            "timed_command_sha256": "28693ace71f4a2d70ef8b2686e49ac4c15482236ffdd37a79dcea80c3163cdcc"
+          }
+        ],
+        "samples": 300
+      },
+      "owned_reader": {
+        "child_latency_ns": [
+          {
+            "max": 4041317,
+            "min": 3566806,
+            "p50": 3830896.0,
+            "p95": 3861356.0,
+            "p99": 4041317.0,
+            "spread": 474511
+          },
+          {
+            "max": 4124577,
+            "min": 3866616,
+            "p50": 4071807.0,
+            "p95": 4102087.0,
+            "p99": 4124577.0,
+            "spread": 257961
+          },
+          {
+            "max": 4061707,
+            "min": 3592405,
+            "p50": 3844546.0,
+            "p95": 4051517.0,
+            "p99": 4061707.0,
+            "spread": 469302
+          },
+          {
+            "max": 3911206,
+            "min": 3819246,
+            "p50": 3850341.5,
+            "p95": 3902107.0,
+            "p99": 3911206.0,
+            "spread": 91960
+          },
+          {
+            "max": 4108217,
+            "min": 3815625,
+            "p50": 3838936.0,
+            "p95": 4068467.0,
+            "p99": 4108217.0,
+            "spread": 292592
+          },
+          {
+            "max": 3933316,
+            "min": 3809006,
+            "p50": 3850511.0,
+            "p95": 3907896.0,
+            "p99": 3933316.0,
+            "spread": 124310
+          }
+        ],
+        "child_p50_ns": [
+          3830896.0,
+          4071807.0,
+          3844546.0,
+          3850341.5,
+          3838936.0,
+          3850511.0
+        ],
+        "child_p95_ns": [
+          3861356.0,
+          4102087.0,
+          4051517.0,
+          3902107.0,
+          4068467.0,
+          3907896.0
+        ],
+        "child_p99_ns": [
+          4041317.0,
+          4124577.0,
+          4061707.0,
+          3911206.0,
+          4108217.0,
+          3933316.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 40247296,
+            "mean": 37936469.333333336,
+            "min": 37335040,
+            "p50": 37502976.0,
+            "p95": 40247296.0,
+            "p99": 40247296.0
+          },
+          "values": [
+            37335040,
+            40247296,
+            37691392,
+            37339136,
+            37642240,
+            37363712
+          ]
+        },
+        "child_spread_ns": [
+          474511,
+          257961,
+          469302,
+          91960,
+          292592,
+          124310
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 4124577,
+          "mean": 3887467.1033333335,
+          "min": 3566806,
+          "p50": 3847581.0,
+          "p95": 4077157.0,
+          "p99": 4102087.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.08983964212426848,
+          "edit_ns": 0.013668967973457603,
+          "open_ns": 0.09846606710535157,
+          "preparation_ns": 0.019973077054059974,
+          "publication_ns": 0.4339112293847141,
+          "query_ns": 0.3441410163581483
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 386422,
+            "mean": 349248.6533333333,
+            "min": 337911,
+            "p50": 348046.5,
+            "p95": 361051.0,
+            "p99": 371191.0
+          },
+          "edit_ns": {
+            "max": 80470,
+            "mean": 53137.66333333333,
+            "min": 49740,
+            "p50": 52710.0,
+            "p95": 56331.0,
+            "p99": 61920.0
+          },
+          "open_ns": {
+            "max": 442192,
+            "mean": 382783.5966666667,
+            "min": 330001,
+            "p50": 382261.0,
+            "p95": 396332.0,
+            "p99": 413321.0
+          },
+          "preparation_ns": {
+            "max": 256291,
+            "mean": 77644.68,
+            "min": 32550,
+            "p50": 35060.0,
+            "p95": 243481.0,
+            "p99": 250561.0
+          },
+          "publication_ns": {
+            "max": 1735977,
+            "mean": 1686815.63,
+            "min": 1458967,
+            "p50": 1688122.0,
+            "p95": 1712277.0,
+            "p99": 1727107.0
+          },
+          "query_ns": {
+            "max": 1406896,
+            "mean": 1337836.88,
+            "min": 1321445,
+            "p50": 1336335.5,
+            "p95": 1352495.0,
+            "p99": 1377306.0
+          }
+        },
+        "provider_accounting": null,
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-03-owned_reader",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37335040,
+            "order": "forward",
+            "position": 3,
+            "report": {
+              "bytes": 47868,
+              "path": "children/provider-block-01-03-owned_reader/report.json",
+              "sha256": "84a05de13ee404e6fb906815d94721c4c22ef88591e6184f54381f7924b03cdb"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-01-03-owned_reader/stderr.log",
+              "sha256": "e365598b8dce9bd990aab7337e36a889809b1522fd7da052b9742d1f1d616e8b"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-03-owned_reader/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-01-03-owned_reader/time.log",
+              "sha256": "e365598b8dce9bd990aab7337e36a889809b1522fd7da052b9742d1f1d616e8b"
+            },
+            "timed_command_sha256": "5ed430e35e9eaffbd98c407f3c175926ac3b176a505fe9db712cfa44066e7c28"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-05-owned_reader",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 40247296,
+            "order": "reverse",
+            "position": 5,
+            "report": {
+              "bytes": 47917,
+              "path": "children/provider-block-02-05-owned_reader/report.json",
+              "sha256": "5a05a584ee23966a0547124a4d3f895171913be1495a1a6de981c0fb92ba900e"
+            },
+            "stderr": {
+              "bytes": 1004,
+              "path": "children/provider-block-02-05-owned_reader/stderr.log",
+              "sha256": "c00169a32eda888aef986657474d5c3d4b8870c9b2d17aded6a7c736df5752ac"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-05-owned_reader/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1004,
+              "path": "children/provider-block-02-05-owned_reader/time.log",
+              "sha256": "c00169a32eda888aef986657474d5c3d4b8870c9b2d17aded6a7c736df5752ac"
+            },
+            "timed_command_sha256": "c54158dfb998535f1fec3ae116ee4f1a4620da74ebc50063038dfe4fd6cd512c"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-03-owned_reader",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37691392,
+            "order": "forward",
+            "position": 3,
+            "report": {
+              "bytes": 47874,
+              "path": "children/provider-block-03-03-owned_reader/report.json",
+              "sha256": "5ebf9bb1c798e478757edca4aec83e23bd12ee9c86db1c44b44fec6051e7c187"
+            },
+            "stderr": {
+              "bytes": 1004,
+              "path": "children/provider-block-03-03-owned_reader/stderr.log",
+              "sha256": "a273dd65a5858d9a71f020eca0ac21372480d290ee1badede189ea46bb8e802f"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-03-owned_reader/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1004,
+              "path": "children/provider-block-03-03-owned_reader/time.log",
+              "sha256": "a273dd65a5858d9a71f020eca0ac21372480d290ee1badede189ea46bb8e802f"
+            },
+            "timed_command_sha256": "5d1ef2ff40e8a2382fa0c92c34ccf1226217d135ad37899139a404d0c068a161"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-05-owned_reader",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37339136,
+            "order": "reverse",
+            "position": 5,
+            "report": {
+              "bytes": 47876,
+              "path": "children/provider-block-04-05-owned_reader/report.json",
+              "sha256": "0e5efafd23d01915eac8d0854cc1080e051da5cd4a543e8b04cebac074f902a8"
+            },
+            "stderr": {
+              "bytes": 1004,
+              "path": "children/provider-block-04-05-owned_reader/stderr.log",
+              "sha256": "e9c5fe36cff2dfe75614d83a60424bef62f185c6cff21e76f0063a673b0cf8fd"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-05-owned_reader/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1004,
+              "path": "children/provider-block-04-05-owned_reader/time.log",
+              "sha256": "e9c5fe36cff2dfe75614d83a60424bef62f185c6cff21e76f0063a673b0cf8fd"
+            },
+            "timed_command_sha256": "84b56b7eb6345a37ca0865895141020c4c2c1259cc02d4e624a8eae3917db5bb"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-03-owned_reader",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37642240,
+            "order": "forward",
+            "position": 3,
+            "report": {
+              "bytes": 47870,
+              "path": "children/provider-block-05-03-owned_reader/report.json",
+              "sha256": "863203192f8b1f93bd0e8fe3bc3a4e8723d7fcc7dcb8fafe44f69e0cbfb0a060"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-05-03-owned_reader/stderr.log",
+              "sha256": "2745aae1393a49a2c6d4b7f1782de980af8a641fb842212e4071e4469f563949"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-03-owned_reader/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-05-03-owned_reader/time.log",
+              "sha256": "2745aae1393a49a2c6d4b7f1782de980af8a641fb842212e4071e4469f563949"
+            },
+            "timed_command_sha256": "bda7f225450b1ed927ecc5d6ddd5e418376e4c9658a24a81b23b172105ac6f7f"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-05-owned_reader",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37363712,
+            "order": "reverse",
+            "position": 5,
+            "report": {
+              "bytes": 47874,
+              "path": "children/provider-block-06-05-owned_reader/report.json",
+              "sha256": "ca5e8d53f96c3dcae7c3010b6d711e70f29a948f8727b1164e5bfbd65f571002"
+            },
+            "stderr": {
+              "bytes": 1004,
+              "path": "children/provider-block-06-05-owned_reader/stderr.log",
+              "sha256": "15b55208d36a964116fe5bbdac5c2f0b0a8d2b326dd83a0b82b4f1051b2d7929"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-05-owned_reader/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1004,
+              "path": "children/provider-block-06-05-owned_reader/time.log",
+              "sha256": "15b55208d36a964116fe5bbdac5c2f0b0a8d2b326dd83a0b82b4f1051b2d7929"
+            },
+            "timed_command_sha256": "4b8b45e9d1f4bfce91b2042fc0c0655a84fbc0e73b6168dc7aca93c9221c2674"
+          }
+        ],
+        "samples": 300
+      },
+      "owned_vec": {
+        "child_latency_ns": [
+          {
+            "max": 3914836,
+            "min": 3707096,
+            "p50": 3725711.5,
+            "p95": 3784856.0,
+            "p99": 3914836.0,
+            "spread": 207740
+          },
+          {
+            "max": 3742085,
+            "min": 3677985,
+            "p50": 3705115.5,
+            "p95": 3734665.0,
+            "p99": 3742085.0,
+            "spread": 64100
+          },
+          {
+            "max": 3747396,
+            "min": 3698225,
+            "p50": 3711910.0,
+            "p95": 3741056.0,
+            "p99": 3747396.0,
+            "spread": 49171
+          },
+          {
+            "max": 3733766,
+            "min": 3683386,
+            "p50": 3700535.0,
+            "p95": 3731115.0,
+            "p99": 3733766.0,
+            "spread": 50380
+          },
+          {
+            "max": 3769886,
+            "min": 3695955,
+            "p50": 3722506.0,
+            "p95": 3757676.0,
+            "p99": 3769886.0,
+            "spread": 73931
+          },
+          {
+            "max": 3749175,
+            "min": 3690015,
+            "p50": 3708730.0,
+            "p95": 3729865.0,
+            "p99": 3749175.0,
+            "spread": 59160
+          }
+        ],
+        "child_p50_ns": [
+          3725711.5,
+          3705115.5,
+          3711910.0,
+          3700535.0,
+          3722506.0,
+          3708730.0
+        ],
+        "child_p95_ns": [
+          3784856.0,
+          3734665.0,
+          3741056.0,
+          3731115.0,
+          3757676.0,
+          3729865.0
+        ],
+        "child_p99_ns": [
+          3914836.0,
+          3742085.0,
+          3747396.0,
+          3733766.0,
+          3769886.0,
+          3749175.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 37703680,
+            "mean": 37444266.666666664,
+            "min": 37093376,
+            "p50": 37402624.0,
+            "p95": 37703680.0,
+            "p99": 37703680.0
+          },
+          "values": [
+            37699584,
+            37363712,
+            37400576,
+            37093376,
+            37404672,
+            37703680
+          ]
+        },
+        "child_spread_ns": [
+          207740,
+          64100,
+          49171,
+          50380,
+          73931,
+          59160
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 3914836,
+          "mean": 3715386.0166666666,
+          "min": 3677985,
+          "p50": 3712355.5,
+          "p95": 3741056.0,
+          "p99": 3769886.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.09393852530199856,
+          "edit_ns": 0.014164672642516495,
+          "open_ns": 0.012471276593821492,
+          "preparation_ns": 0.06447319486915046,
+          "publication_ns": 0.4558803640865293,
+          "query_ns": 0.35907196650598366
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 371082,
+            "mean": 349017.88333333336,
+            "min": 334661,
+            "p50": 347051.5,
+            "p95": 360431.0,
+            "p99": 367421.0
+          },
+          "edit_ns": {
+            "max": 80471,
+            "mean": 52627.22666666667,
+            "min": 50051,
+            "p50": 52070.5,
+            "p95": 55771.0,
+            "p99": 64000.0
+          },
+          "open_ns": {
+            "max": 65300,
+            "mean": 46335.60666666667,
+            "min": 43751,
+            "p50": 45555.5,
+            "p95": 51990.0,
+            "p99": 54330.0
+          },
+          "preparation_ns": {
+            "max": 268261,
+            "mean": 239542.80666666667,
+            "min": 230921,
+            "p50": 238396.0,
+            "p95": 247441.0,
+            "p99": 250542.0
+          },
+          "publication_ns": {
+            "max": 1796387,
+            "mean": 1693771.53,
+            "min": 1671827,
+            "p50": 1691572.0,
+            "p95": 1711427.0,
+            "p99": 1736527.0
+          },
+          "query_ns": {
+            "max": 1369075,
+            "mean": 1334090.9633333334,
+            "min": 1320595,
+            "p50": 1332651.0,
+            "p95": 1346335.0,
+            "p99": 1356536.0
+          }
+        },
+        "provider_accounting": null,
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-02-owned_vec",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37699584,
+            "order": "forward",
+            "position": 2,
+            "report": {
+              "bytes": 47454,
+              "path": "children/provider-block-01-02-owned_vec/report.json",
+              "sha256": "68351ba553679f91e15e807ec363a22e6c7a221029dc6f8b8c2895426124f2b3"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-01-02-owned_vec/stderr.log",
+              "sha256": "0dff19fc8bba93d953181f2fb50bc3b9997f5353be45122544ff4d6f77ee72a7"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-02-owned_vec/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-01-02-owned_vec/time.log",
+              "sha256": "0dff19fc8bba93d953181f2fb50bc3b9997f5353be45122544ff4d6f77ee72a7"
+            },
+            "timed_command_sha256": "7fa584318d0913392f386c153fb614b343ed9eb7ef1d3f06d20cad8e0c142878"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-06-owned_vec",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37363712,
+            "order": "reverse",
+            "position": 6,
+            "report": {
+              "bytes": 47456,
+              "path": "children/provider-block-02-06-owned_vec/report.json",
+              "sha256": "4f6e568cdea72887e6ac8987795423813006642bdeb13138402fa1bf92484476"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-02-06-owned_vec/stderr.log",
+              "sha256": "4dbb77161f913710e8b8109fa5301ed2d071e7e33045b57836bb2adddf90247b"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-06-owned_vec/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-02-06-owned_vec/time.log",
+              "sha256": "4dbb77161f913710e8b8109fa5301ed2d071e7e33045b57836bb2adddf90247b"
+            },
+            "timed_command_sha256": "2fd60a18c6ac43f6ca7760d19eff80124ef7784c4da8343a5966855daed5e907"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-02-owned_vec",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37400576,
+            "order": "forward",
+            "position": 2,
+            "report": {
+              "bytes": 47457,
+              "path": "children/provider-block-03-02-owned_vec/report.json",
+              "sha256": "e1a42519864444bfe9ffccdb9fcb3c26da15b10f9134fbef120ef5367350d3be"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-03-02-owned_vec/stderr.log",
+              "sha256": "4ccf5db3ef3bbe928f4fb347518b5d763489acc8fe9ccde672b239213174b62a"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-02-owned_vec/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-03-02-owned_vec/time.log",
+              "sha256": "4ccf5db3ef3bbe928f4fb347518b5d763489acc8fe9ccde672b239213174b62a"
+            },
+            "timed_command_sha256": "318ffdd93a03c7f1b695d5fb43d86848c475ba7a003a23acc46008f0e2a5dd10"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-06-owned_vec",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37093376,
+            "order": "reverse",
+            "position": 6,
+            "report": {
+              "bytes": 47455,
+              "path": "children/provider-block-04-06-owned_vec/report.json",
+              "sha256": "38b6b6e5be67723a00c9695854f6262d5487bf0841c4f93ab140453f2856c3d3"
+            },
+            "stderr": {
+              "bytes": 1002,
+              "path": "children/provider-block-04-06-owned_vec/stderr.log",
+              "sha256": "7e8367956e9647d6d2482e6f28e6cec8b34d57bf53d4ccc7ee1ae3636ee8eb2e"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-06-owned_vec/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1002,
+              "path": "children/provider-block-04-06-owned_vec/time.log",
+              "sha256": "7e8367956e9647d6d2482e6f28e6cec8b34d57bf53d4ccc7ee1ae3636ee8eb2e"
+            },
+            "timed_command_sha256": "9dd24091bf29237bec2ee9d8ac008ada3ab4c7b4b559eb56624523138479b757"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-02-owned_vec",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37404672,
+            "order": "forward",
+            "position": 2,
+            "report": {
+              "bytes": 47456,
+              "path": "children/provider-block-05-02-owned_vec/report.json",
+              "sha256": "80902322d900442938bd96495f8b952a709d83868e0b5047d841cee9c02dffd2"
+            },
+            "stderr": {
+              "bytes": 1002,
+              "path": "children/provider-block-05-02-owned_vec/stderr.log",
+              "sha256": "0ce137ab033ec8366531cc2f4b80705a004f36d476a54f0fc59b0baff012bb82"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-02-owned_vec/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1002,
+              "path": "children/provider-block-05-02-owned_vec/time.log",
+              "sha256": "0ce137ab033ec8366531cc2f4b80705a004f36d476a54f0fc59b0baff012bb82"
+            },
+            "timed_command_sha256": "90a236705d6432b29c7495bca696666e8f744633bc68de3c5f6603e18cf93956"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-06-owned_vec",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37703680,
+            "order": "reverse",
+            "position": 6,
+            "report": {
+              "bytes": 47453,
+              "path": "children/provider-block-06-06-owned_vec/report.json",
+              "sha256": "1a29a114b85c919a3b52a9f4068e5c900503e30668d7316a5cda506e4af27323"
+            },
+            "stderr": {
+              "bytes": 1001,
+              "path": "children/provider-block-06-06-owned_vec/stderr.log",
+              "sha256": "28cc47d5568d455e6ce290f5ecbafa17e8a9f4cde2bb806f298e8ba162d27cb3"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-06-owned_vec/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1001,
+              "path": "children/provider-block-06-06-owned_vec/time.log",
+              "sha256": "28cc47d5568d455e6ce290f5ecbafa17e8a9f4cde2bb806f298e8ba162d27cb3"
+            },
+            "timed_command_sha256": "5cdfa1af353b3a7739001a7d6a3d02ae72cc0820e6c11a263c7bae67608f122f"
+          }
+        ],
+        "samples": 300
+      },
+      "range_delayed": {
+        "child_latency_ns": [
+          {
+            "max": 239867588,
+            "min": 238340621,
+            "p50": 238496967.0,
+            "p95": 239254892.0,
+            "p99": 239867588.0,
+            "spread": 1526967
+          },
+          {
+            "max": 241831162,
+            "min": 238394393,
+            "p50": 238510430.0,
+            "p95": 239421653.0,
+            "p99": 241831162.0,
+            "spread": 3436769
+          },
+          {
+            "max": 239561935,
+            "min": 238345540,
+            "p50": 238505670.5,
+            "p95": 238861443.0,
+            "p99": 239561935.0,
+            "spread": 1216395
+          },
+          {
+            "max": 242655510,
+            "min": 238402683,
+            "p50": 238533593.0,
+            "p95": 239482317.0,
+            "p99": 242655510.0,
+            "spread": 4252827
+          },
+          {
+            "max": 240447073,
+            "min": 238384532,
+            "p50": 238546198.5,
+            "p95": 239215438.0,
+            "p99": 240447073.0,
+            "spread": 2062541
+          },
+          {
+            "max": 241442374,
+            "min": 238384214,
+            "p50": 238505798.0,
+            "p95": 238872484.0,
+            "p99": 241442374.0,
+            "spread": 3058160
+          }
+        ],
+        "child_p50_ns": [
+          238496967.0,
+          238510430.0,
+          238505670.5,
+          238533593.0,
+          238546198.5,
+          238505798.0
+        ],
+        "child_p95_ns": [
+          239254892.0,
+          239421653.0,
+          238861443.0,
+          239482317.0,
+          239215438.0,
+          238872484.0
+        ],
+        "child_p99_ns": [
+          239867588.0,
+          241831162.0,
+          239561935.0,
+          242655510.0,
+          240447073.0,
+          241442374.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 37699584,
+            "mean": 37492736.0,
+            "min": 37367808,
+            "p50": 37412864.0,
+            "p95": 37699584.0,
+            "p99": 37699584.0
+          },
+          "values": [
+            37453824,
+            37371904,
+            37367808,
+            37367808,
+            37695488,
+            37699584
+          ]
+        },
+        "child_spread_ns": [
+          1526967,
+          3436769,
+          1216395,
+          4252827,
+          2062541,
+          3058160
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 242655510,
+          "mean": 238610320.58333334,
+          "min": 238340621,
+          "p50": 238516835.0,
+          "p95": 239067553.0,
+          "p99": 240447073.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.0014856410896227903,
+          "edit_ns": 0.0002663515832479287,
+          "open_ns": 0.06220015746615615,
+          "preparation_ns": 0.00017472968715159099,
+          "publication_ns": 0.6961722646107659,
+          "query_ns": 0.2397008555630557
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 382151,
+            "mean": 354489.2966666667,
+            "min": 339391,
+            "p50": 353261.5,
+            "p95": 366351.0,
+            "p99": 374841.0
+          },
+          "edit_ns": {
+            "max": 82011,
+            "mean": 63554.236666666664,
+            "min": 54170,
+            "p50": 63590.0,
+            "p95": 71590.0,
+            "p99": 77150.0
+          },
+          "open_ns": {
+            "max": 17418893,
+            "mean": 14841599.513333334,
+            "min": 14784354,
+            "p50": 14833631.5,
+            "p95": 14870834.0,
+            "p99": 14970083.0
+          },
+          "preparation_ns": {
+            "max": 61580,
+            "mean": 41692.306666666664,
+            "min": 33570,
+            "p50": 40955.0,
+            "p95": 48741.0,
+            "p99": 52760.0
+          },
+          "publication_ns": {
+            "max": 167935294,
+            "mean": 166113887.24,
+            "min": 165874536,
+            "p50": 166059804.5,
+            "p95": 166486398.0,
+            "p99": 167241618.0
+          },
+          "query_ns": {
+            "max": 60172837,
+            "mean": 57195097.99,
+            "min": 57100165,
+            "p50": 57170987.0,
+            "p95": 57241237.0,
+            "p99": 57490530.0
+          }
+        },
+        "provider_accounting": {
+          "fixed_delay_ns": 1000000,
+          "logical": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "max_request_bytes": 65536,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "request_size_count_total": 49500,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2100,
+              900,
+              1200,
+              300,
+              0,
+              600,
+              0,
+              0,
+              28800,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 60158393,
+                "mean": 60158393.0,
+                "min": 60158393,
+                "p50": 60158393.0,
+                "p95": 60158393.0,
+                "p99": 60158393.0
+              },
+              "total": 18047517900
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            }
+          },
+          "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+          "max_returned_bytes": 65536,
+          "nominal_service_delay_ns": {
+            "max": 225158393,
+            "mean": 225158393.0,
+            "min": 225158393,
+            "p50": 225158393.0,
+            "p95": 225158393.0,
+            "p99": 225158393.0
+          },
+          "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+          "provider": "range_delayed",
+          "source_scope": "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim",
+          "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+          "transfer_bytes_per_second": 104857600,
+          "transfer_delay_policy": "minimum-service",
+          "underlying": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "max_request_bytes": 65536,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "request_size_count_total": 49500,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2100,
+              900,
+              1200,
+              300,
+              0,
+              600,
+              0,
+              0,
+              28800,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            }
+          },
+          "underlying_observation_scope": "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+        },
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-07-range_delayed",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37453824,
+            "order": "forward",
+            "position": 7,
+            "report": {
+              "bytes": 131639,
+              "path": "children/provider-block-01-07-range_delayed/report.json",
+              "sha256": "eb757a0a0158984a8a2f245f7bfcbf427ffd35ce5c9962411aa374fffe7b0068"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-01-07-range_delayed/stderr.log",
+              "sha256": "1a7b33e441bb79f61d2d892c9e91a20658763f5213bd5dbb57733e1d356a80ba"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-07-range_delayed/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-01-07-range_delayed/time.log",
+              "sha256": "1a7b33e441bb79f61d2d892c9e91a20658763f5213bd5dbb57733e1d356a80ba"
+            },
+            "timed_command_sha256": "87aa65f4d7963e4fe91e55f471f6e77af486c064971a3f177980cccfe2c5d7e5"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-01-range_delayed",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37371904,
+            "order": "reverse",
+            "position": 1,
+            "report": {
+              "bytes": 131640,
+              "path": "children/provider-block-02-01-range_delayed/report.json",
+              "sha256": "c6b2be7ca5871840f8f56f5818565b2e1c1f818d7df4648cd206d045dc952ee0"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-02-01-range_delayed/stderr.log",
+              "sha256": "16d843fb452216a38c976465f27cc775ba0f6a690286f256f80554466cc3100c"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-01-range_delayed/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-02-01-range_delayed/time.log",
+              "sha256": "16d843fb452216a38c976465f27cc775ba0f6a690286f256f80554466cc3100c"
+            },
+            "timed_command_sha256": "9c0cb0d314d104a9a9002370f6ad432f69989c569e9cafb663daaf79f9a7341c"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-07-range_delayed",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37367808,
+            "order": "forward",
+            "position": 7,
+            "report": {
+              "bytes": 131634,
+              "path": "children/provider-block-03-07-range_delayed/report.json",
+              "sha256": "fab7fdf6dc697697a3387b75215656a92a662927f133f8eb4f9be4351632c96c"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-03-07-range_delayed/stderr.log",
+              "sha256": "2266d74f89d3f324936973c0e742b768b1fd2ad105e2d4baabebf129492014cf"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-07-range_delayed/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-03-07-range_delayed/time.log",
+              "sha256": "2266d74f89d3f324936973c0e742b768b1fd2ad105e2d4baabebf129492014cf"
+            },
+            "timed_command_sha256": "b0b23be3bb222fa670fdbb9ce27465a1c401db0169691acf2b18ce43fe65fb7b"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-01-range_delayed",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37367808,
+            "order": "reverse",
+            "position": 1,
+            "report": {
+              "bytes": 131639,
+              "path": "children/provider-block-04-01-range_delayed/report.json",
+              "sha256": "3407028238e740a61b0d07aa1a99585da886feb734e5f7235cbfa6a5551a3f30"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-04-01-range_delayed/stderr.log",
+              "sha256": "efd28d4dfdc9c3f17442cec7e178322bb876e20d722dbbf500838ef04efe9911"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-01-range_delayed/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-04-01-range_delayed/time.log",
+              "sha256": "efd28d4dfdc9c3f17442cec7e178322bb876e20d722dbbf500838ef04efe9911"
+            },
+            "timed_command_sha256": "ea6d0c4bc297ac60d63b32c7e571a9582f80bd7fa5795e60d00ac3a994326132"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-07-range_delayed",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37695488,
+            "order": "forward",
+            "position": 7,
+            "report": {
+              "bytes": 131632,
+              "path": "children/provider-block-05-07-range_delayed/report.json",
+              "sha256": "4d11f2d7eb232f5c3f71017f6ef6276488e945f77ceb945e37d4c2009e396073"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-05-07-range_delayed/stderr.log",
+              "sha256": "e5e4d04ee26597e8ac7825447da2766bfb126f1328ba9ee35008f39a9fc93ba2"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-07-range_delayed/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-05-07-range_delayed/time.log",
+              "sha256": "e5e4d04ee26597e8ac7825447da2766bfb126f1328ba9ee35008f39a9fc93ba2"
+            },
+            "timed_command_sha256": "a384a5523f5c9a306fb76d62ab6a10a903ce3702588942fcf82e109dac9d2c48"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-01-range_delayed",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37699584,
+            "order": "reverse",
+            "position": 1,
+            "report": {
+              "bytes": 131639,
+              "path": "children/provider-block-06-01-range_delayed/report.json",
+              "sha256": "ea0b66a8e53d0eceb6da4cbb2266f8670f685021b5af5b2d47d30d9ad52a58e7"
+            },
+            "stderr": {
+              "bytes": 1007,
+              "path": "children/provider-block-06-01-range_delayed/stderr.log",
+              "sha256": "0d3ad35ad9abaaaf76cea17cb423698e96bdd134fd02f27b584b06b5f0e87f57"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-01-range_delayed/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1007,
+              "path": "children/provider-block-06-01-range_delayed/time.log",
+              "sha256": "0d3ad35ad9abaaaf76cea17cb423698e96bdd134fd02f27b584b06b5f0e87f57"
+            },
+            "timed_command_sha256": "b5689b0025f9a9a30cf153f527d6373b6032886abddfa6a5eaa84578e39c2404"
+          }
+        ],
+        "samples": 300
+      },
+      "range_short": {
+        "child_latency_ns": [
+          {
+            "max": 4599670,
+            "min": 4531729,
+            "p50": 4547414.5,
+            "p95": 4579580.0,
+            "p99": 4599670.0,
+            "spread": 67941
+          },
+          {
+            "max": 4731240,
+            "min": 4517769,
+            "p50": 4542184.0,
+            "p95": 4625129.0,
+            "p99": 4731240.0,
+            "spread": 213471
+          },
+          {
+            "max": 4559989,
+            "min": 4511679,
+            "p50": 4527323.5,
+            "p95": 4549729.0,
+            "p99": 4559989.0,
+            "spread": 48310
+          },
+          {
+            "max": 4592909,
+            "min": 4519199,
+            "p50": 4541098.5,
+            "p95": 4576289.0,
+            "p99": 4592909.0,
+            "spread": 73710
+          },
+          {
+            "max": 4580000,
+            "min": 4504968,
+            "p50": 4528794.0,
+            "p95": 4559649.0,
+            "p99": 4580000.0,
+            "spread": 75032
+          },
+          {
+            "max": 4571769,
+            "min": 4505588,
+            "p50": 4529488.5,
+            "p95": 4561419.0,
+            "p99": 4571769.0,
+            "spread": 66181
+          }
+        ],
+        "child_p50_ns": [
+          4547414.5,
+          4542184.0,
+          4527323.5,
+          4541098.5,
+          4528794.0,
+          4529488.5
+        ],
+        "child_p95_ns": [
+          4579580.0,
+          4625129.0,
+          4549729.0,
+          4576289.0,
+          4559649.0,
+          4561419.0
+        ],
+        "child_p99_ns": [
+          4599670.0,
+          4731240.0,
+          4559989.0,
+          4592909.0,
+          4580000.0,
+          4571769.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 37699584,
+            "mean": 37350741.333333336,
+            "min": 37085184,
+            "p50": 37349376.0,
+            "p95": 37699584.0,
+            "p99": 37699584.0
+          },
+          "values": [
+            37376000,
+            37482496,
+            37138432,
+            37085184,
+            37699584,
+            37322752
+          ]
+        },
+        "child_spread_ns": [
+          67941,
+          213471,
+          48310,
+          73710,
+          75032,
+          66181
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 4731240,
+          "mean": 4539567.45,
+          "min": 4504968,
+          "p50": 4536949.0,
+          "p95": 4571769.0,
+          "p99": 4599670.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.07688261429694879,
+          "edit_ns": 0.01174208128574012,
+          "open_ns": 0.010418085097512981,
+          "preparation_ns": 0.00833859842747793,
+          "publication_ns": 0.5956613054253294,
+          "query_ns": 0.2969573154669909
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 371652,
+            "mean": 349013.81333333335,
+            "min": 337601,
+            "p50": 347991.5,
+            "p95": 360652.0,
+            "p99": 371101.0
+          },
+          "edit_ns": {
+            "max": 69021,
+            "mean": 53303.97,
+            "min": 50290,
+            "p50": 52670.0,
+            "p95": 59191.0,
+            "p99": 63820.0
+          },
+          "open_ns": {
+            "max": 59740,
+            "mean": 47293.6,
+            "min": 44601,
+            "p50": 46740.0,
+            "p95": 52450.0,
+            "p99": 57831.0
+          },
+          "preparation_ns": {
+            "max": 82880,
+            "mean": 37853.63,
+            "min": 32970,
+            "p50": 39075.0,
+            "p95": 42290.0,
+            "p99": 50210.0
+          },
+          "publication_ns": {
+            "max": 2823272,
+            "mean": 2704044.6733333333,
+            "min": 2681621,
+            "p50": 2702271.5,
+            "p95": 2724002.0,
+            "p99": 2757131.0
+          },
+          "query_ns": {
+            "max": 1388766,
+            "mean": 1348057.7633333334,
+            "min": 1331606,
+            "p50": 1346755.0,
+            "p95": 1362066.0,
+            "p99": 1373365.0
+          }
+        },
+        "provider_accounting": {
+          "fixed_delay_ns": null,
+          "logical": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "max_request_bytes": 65536,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 1607,
+                "mean": 1607.0,
+                "min": 1607,
+                "p50": 1607.0,
+                "p95": 1607.0,
+                "p99": 1607.0
+              },
+              "total": 482100
+            },
+            "request_size_count_total": 482100,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2700,
+              900,
+              1200,
+              300,
+              9600,
+              10200,
+              20400,
+              40800,
+              380400,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 84096471,
+                "mean": 84096471.0,
+                "min": 84096471,
+                "p50": 84096471.0,
+                "p95": 84096471.0,
+                "p99": 84096471.0
+              },
+              "total": 25228941300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 1506,
+                "mean": 1506.0,
+                "min": 1506,
+                "p50": 1506.0,
+                "p95": 1506.0,
+                "p99": 1506.0
+              },
+              "total": 451800
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            }
+          },
+          "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+          "max_returned_bytes": 4096,
+          "nominal_service_delay_ns": {
+            "max": 0,
+            "mean": 0.0,
+            "min": 0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0
+          },
+          "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+          "provider": "range_short",
+          "source_scope": "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim",
+          "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+          "transfer_bytes_per_second": null,
+          "transfer_delay_policy": null,
+          "underlying": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "max_request_bytes": 4096,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 1607,
+                "mean": 1607.0,
+                "min": 1607,
+                "p50": 1607.0,
+                "p95": 1607.0,
+                "p99": 1607.0
+              },
+              "total": 482100
+            },
+            "request_size_count_total": 482100,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2700,
+              900,
+              1200,
+              300,
+              461400,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            }
+          },
+          "underlying_observation_scope": "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+        },
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-05-range_short",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37376000,
+            "order": "forward",
+            "position": 5,
+            "report": {
+              "bytes": 130954,
+              "path": "children/provider-block-01-05-range_short/report.json",
+              "sha256": "dcf2ad8335ea0f93ed36839ac255bcd2597b61923e9b3541eb73cc446e0d79a8"
+            },
+            "stderr": {
+              "bytes": 1003,
+              "path": "children/provider-block-01-05-range_short/stderr.log",
+              "sha256": "5abcdbee851b09ef48fb846620909ab866f86c82e8480febf7aed2ae2b340d20"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-05-range_short/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1003,
+              "path": "children/provider-block-01-05-range_short/time.log",
+              "sha256": "5abcdbee851b09ef48fb846620909ab866f86c82e8480febf7aed2ae2b340d20"
+            },
+            "timed_command_sha256": "63b5cf29012a1a89f9b87bf46fe56d9e73240ca98b96d7587a11c290b28cc756"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-03-range_short",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37482496,
+            "order": "reverse",
+            "position": 3,
+            "report": {
+              "bytes": 130955,
+              "path": "children/provider-block-02-03-range_short/report.json",
+              "sha256": "ac51139fedc79f9d4c7e9f2bb05d2a387bd4904df9f7174ef02219cccf4dde4c"
+            },
+            "stderr": {
+              "bytes": 1003,
+              "path": "children/provider-block-02-03-range_short/stderr.log",
+              "sha256": "f922744c222360ac51131c743100027ef23e5cea81cf3dfc0bd8e0a9e2f9038b"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-03-range_short/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1003,
+              "path": "children/provider-block-02-03-range_short/time.log",
+              "sha256": "f922744c222360ac51131c743100027ef23e5cea81cf3dfc0bd8e0a9e2f9038b"
+            },
+            "timed_command_sha256": "b9444549cf4e0c3d3210e10785885bc9eeb148b6b53ac4b8c9f86dec0367c230"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-05-range_short",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37138432,
+            "order": "forward",
+            "position": 5,
+            "report": {
+              "bytes": 130947,
+              "path": "children/provider-block-03-05-range_short/report.json",
+              "sha256": "31e027aebbebc9c485d18f75106a38fe63170165b74ec93c273cd296fa5a5221"
+            },
+            "stderr": {
+              "bytes": 1003,
+              "path": "children/provider-block-03-05-range_short/stderr.log",
+              "sha256": "16ece6fea145615593e8bfc4ac9621c11ceefc4a3edd4dcc5a2b5c00ef5837d6"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-05-range_short/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1003,
+              "path": "children/provider-block-03-05-range_short/time.log",
+              "sha256": "16ece6fea145615593e8bfc4ac9621c11ceefc4a3edd4dcc5a2b5c00ef5837d6"
+            },
+            "timed_command_sha256": "5733ff61e67377c575534edbbbd75b6a6bfcece3cb53698e664695563065e875"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-03-range_short",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37085184,
+            "order": "reverse",
+            "position": 3,
+            "report": {
+              "bytes": 130947,
+              "path": "children/provider-block-04-03-range_short/report.json",
+              "sha256": "42d53113da59ff63eee1a21615e3c9b2636dc9172242855a88ae5808248f3d19"
+            },
+            "stderr": {
+              "bytes": 1003,
+              "path": "children/provider-block-04-03-range_short/stderr.log",
+              "sha256": "b11b2e011844059a51f866a20fb4669c635e7e8d26026bc5eb0fb30fc249de21"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-03-range_short/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1003,
+              "path": "children/provider-block-04-03-range_short/time.log",
+              "sha256": "b11b2e011844059a51f866a20fb4669c635e7e8d26026bc5eb0fb30fc249de21"
+            },
+            "timed_command_sha256": "febefcadd1c9a3882d37cf099021beae5326030c4cc199ab00146eb36242b236"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-05-range_short",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37699584,
+            "order": "forward",
+            "position": 5,
+            "report": {
+              "bytes": 130954,
+              "path": "children/provider-block-05-05-range_short/report.json",
+              "sha256": "ae7e60eecad08715f96a4d1e2a46d9de09e7586b4b2d63a5b5e35d7fe9223898"
+            },
+            "stderr": {
+              "bytes": 1004,
+              "path": "children/provider-block-05-05-range_short/stderr.log",
+              "sha256": "0f4d006dfab47521dfc6fc05f6fbcd85522e1010d2dabfd89297d071520d286f"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-05-range_short/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1004,
+              "path": "children/provider-block-05-05-range_short/time.log",
+              "sha256": "0f4d006dfab47521dfc6fc05f6fbcd85522e1010d2dabfd89297d071520d286f"
+            },
+            "timed_command_sha256": "6c710cc141382ef385137b607b147fc4f90d473f7454dc37f09f952b88fcba30"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-03-range_short",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37322752,
+            "order": "reverse",
+            "position": 3,
+            "report": {
+              "bytes": 130955,
+              "path": "children/provider-block-06-03-range_short/report.json",
+              "sha256": "12e1875d8e24862cbf8a01b0457d824f95be552d7f937ca108489adf030b8138"
+            },
+            "stderr": {
+              "bytes": 1003,
+              "path": "children/provider-block-06-03-range_short/stderr.log",
+              "sha256": "4adc1a51b31664b415d152b0ddc06868cb379fa05f2950ca58659eddbdca2cc2"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-03-range_short/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1003,
+              "path": "children/provider-block-06-03-range_short/time.log",
+              "sha256": "4adc1a51b31664b415d152b0ddc06868cb379fa05f2950ca58659eddbdca2cc2"
+            },
+            "timed_command_sha256": "1d503708aee977b53f0ba9188d1fda37a96033e733edfa8cc0e90a9e0c3c889a"
+          }
+        ],
+        "samples": 300
+      },
+      "range_zero": {
+        "child_latency_ns": [
+          {
+            "max": 75608017,
+            "min": 73320517,
+            "p50": 73469898.0,
+            "p95": 74319711.0,
+            "p99": 75608017.0,
+            "spread": 2287500
+          },
+          {
+            "max": 73707475,
+            "min": 73115223,
+            "p50": 73399564.5,
+            "p95": 73523587.0,
+            "p99": 73707475.0,
+            "spread": 592252
+          },
+          {
+            "max": 77080449,
+            "min": 73261323,
+            "p50": 73477024.0,
+            "p95": 73628845.0,
+            "p99": 77080449.0,
+            "spread": 3819126
+          },
+          {
+            "max": 74347410,
+            "min": 73293835,
+            "p50": 73528206.0,
+            "p95": 73852587.0,
+            "p99": 74347410.0,
+            "spread": 1053575
+          },
+          {
+            "max": 76689967,
+            "min": 73301033,
+            "p50": 73465213.5,
+            "p95": 73843455.0,
+            "p99": 76689967.0,
+            "spread": 3388934
+          },
+          {
+            "max": 74459677,
+            "min": 73256512,
+            "p50": 73416227.5,
+            "p95": 73700154.0,
+            "p99": 74459677.0,
+            "spread": 1203165
+          }
+        ],
+        "child_p50_ns": [
+          73469898.0,
+          73399564.5,
+          73477024.0,
+          73528206.0,
+          73465213.5,
+          73416227.5
+        ],
+        "child_p95_ns": [
+          74319711.0,
+          73523587.0,
+          73628845.0,
+          73852587.0,
+          73843455.0,
+          73700154.0
+        ],
+        "child_p99_ns": [
+          75608017.0,
+          73707475.0,
+          77080449.0,
+          74347410.0,
+          76689967.0,
+          74459677.0
+        ],
+        "child_rss_bytes": {
+          "statistics": {
+            "max": 37703680,
+            "mean": 37288618.666666664,
+            "min": 36814848,
+            "p50": 37371904.0,
+            "p95": 37703680.0,
+            "p99": 37703680.0
+          },
+          "values": [
+            36814848,
+            37703680,
+            37376000,
+            37072896,
+            37396480,
+            37367808
+          ]
+        },
+        "child_spread_ns": [
+          2287500,
+          592252,
+          3819126,
+          1053575,
+          3388934,
+          1203165
+        ],
+        "children": 6,
+        "claim": "descriptive provider baseline; no provider ranking or optimization comparison",
+        "elapsed_ns": {
+          "max": 77080449,
+          "mean": 73519402.09,
+          "min": 73115223,
+          "p50": 73455876.0,
+          "p95": 73786187.0,
+          "p99": 75517597.0
+        },
+        "phase_shares": {
+          "commit_ns": 0.004798953473099444,
+          "edit_ns": 0.0008108789648981035,
+          "open_ns": 0.010007765556897499,
+          "preparation_ns": 0.0005128378667603679,
+          "publication_ns": 0.6681229504995466,
+          "query_ns": 0.31574661363879797
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 381222,
+            "mean": 352816.19,
+            "min": 339761,
+            "p50": 352371.0,
+            "p95": 364322.0,
+            "p99": 372961.0
+          },
+          "edit_ns": {
+            "max": 127140,
+            "mean": 59615.33666666667,
+            "min": 52880,
+            "p50": 58185.5,
+            "p95": 68560.0,
+            "p99": 73720.0
+          },
+          "open_ns": {
+            "max": 2259229,
+            "mean": 735764.94,
+            "min": 535982,
+            "p50": 734128.0,
+            "p95": 818183.0,
+            "p99": 847114.0
+          },
+          "preparation_ns": {
+            "max": 54300,
+            "mean": 37703.53333333333,
+            "min": 33361,
+            "p50": 36910.0,
+            "p95": 43390.0,
+            "p99": 53180.0
+          },
+          "publication_ns": {
+            "max": 52649448,
+            "mean": 49119999.843333334,
+            "min": 48928042,
+            "p50": 49074791.5,
+            "p95": 49264693.0,
+            "p99": 50104297.0
+          },
+          "query_ns": {
+            "max": 24030540,
+            "mean": 23213502.246666666,
+            "min": 23145600,
+            "p50": 23209863.0,
+            "p95": 23277827.0,
+            "p99": 23430027.0
+          }
+        },
+        "provider_accounting": {
+          "fixed_delay_ns": 0,
+          "logical": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "max_request_bytes": 65536,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "request_size_count_total": 49500,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2100,
+              900,
+              1200,
+              300,
+              0,
+              600,
+              0,
+              0,
+              28800,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 60158393,
+                "mean": 60158393.0,
+                "min": 60158393,
+                "p50": 60158393.0,
+                "p95": 60158393.0,
+                "p99": 60158393.0
+              },
+              "total": 18047517900
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            }
+          },
+          "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+          "max_returned_bytes": 65536,
+          "nominal_service_delay_ns": {
+            "max": 60158393,
+            "mean": 60158393.0,
+            "min": 60158393,
+            "p50": 60158393.0,
+            "p95": 60158393.0,
+            "p99": 60158393.0
+          },
+          "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+          "provider": "range_zero",
+          "source_scope": "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim",
+          "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+          "transfer_bytes_per_second": 104857600,
+          "transfer_delay_policy": "minimum-service",
+          "underlying": {
+            "delayed_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "max_request_bytes": 65536,
+            "min_request_bytes": 8,
+            "read_calls": {
+              "statistics": {
+                "max": 165,
+                "mean": 165.0,
+                "min": 165,
+                "p50": 165.0,
+                "p95": 165.0,
+                "p99": 165.0
+              },
+              "total": 49500
+            },
+            "request_size_count_total": 49500,
+            "request_size_counts": [
+              0,
+              0,
+              0,
+              3000,
+              3900,
+              2700,
+              4200,
+              1800,
+              2100,
+              900,
+              1200,
+              300,
+              0,
+              600,
+              0,
+              0,
+              28800,
+              0
+            ],
+            "requested_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "returned_bytes": {
+              "statistics": {
+                "max": 6308061,
+                "mean": 6308061.0,
+                "min": 6308061,
+                "p50": 6308061.0,
+                "p95": 6308061.0,
+                "p99": 6308061.0
+              },
+              "total": 1892418300
+            },
+            "samples": 300,
+            "short_reads": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_delay_ns": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            },
+            "transfer_paced_calls": {
+              "statistics": {
+                "max": 0,
+                "mean": 0.0,
+                "min": 0,
+                "p50": 0.0,
+                "p95": 0.0,
+                "p99": 0.0
+              },
+              "total": 0
+            }
+          },
+          "underlying_observation_scope": "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+        },
+        "raw_child_descriptors": [
+          {
+            "block": 1,
+            "id": "provider-block-01-06-range_zero",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 36814848,
+            "order": "forward",
+            "position": 6,
+            "report": {
+              "bytes": 131358,
+              "path": "children/provider-block-01-06-range_zero/report.json",
+              "sha256": "fb9fb9e7ba9abb845e834abeb77ef67380b94abb2723e63471cd4fbe33ba613d"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-01-06-range_zero/stderr.log",
+              "sha256": "4023ff87692a447f83b939ea70415ffb0ee557d679726666ff5fba5a375f2b5b"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-01-06-range_zero/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-01-06-range_zero/time.log",
+              "sha256": "4023ff87692a447f83b939ea70415ffb0ee557d679726666ff5fba5a375f2b5b"
+            },
+            "timed_command_sha256": "1c92ee464ff2b5851473e15d38ad4b37fee77f627929d689bed878cee4c42e86"
+          },
+          {
+            "block": 2,
+            "id": "provider-block-02-02-range_zero",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37703680,
+            "order": "reverse",
+            "position": 2,
+            "report": {
+              "bytes": 131361,
+              "path": "children/provider-block-02-02-range_zero/report.json",
+              "sha256": "2ef0c8dff6d6887b32ad8456a79a0d0d3dc151aa22782e0648b02e5adadeb550"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-02-02-range_zero/stderr.log",
+              "sha256": "00d4cb300566333e5d363ea27e47f4500aa899f2dc04fe9138b28efa2fcd800c"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-02-02-range_zero/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-02-02-range_zero/time.log",
+              "sha256": "00d4cb300566333e5d363ea27e47f4500aa899f2dc04fe9138b28efa2fcd800c"
+            },
+            "timed_command_sha256": "eabd012623542ce43039058895a2670f8315ff8e474730e9be2cce58a3694868"
+          },
+          {
+            "block": 3,
+            "id": "provider-block-03-06-range_zero",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37376000,
+            "order": "forward",
+            "position": 6,
+            "report": {
+              "bytes": 131356,
+              "path": "children/provider-block-03-06-range_zero/report.json",
+              "sha256": "9d7e61f72b3a1eb09669f4cf6efacc5d0d0b2d3ae8382d9315e07678e3bc2458"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-03-06-range_zero/stderr.log",
+              "sha256": "49ba1760803e9cce295e0e0d603f796822ee9804b8c456438730ee55a7c5bb6e"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-03-06-range_zero/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-03-06-range_zero/time.log",
+              "sha256": "49ba1760803e9cce295e0e0d603f796822ee9804b8c456438730ee55a7c5bb6e"
+            },
+            "timed_command_sha256": "3dd9ac8e15d55dc9c28c29f22ce0ed084c00f2dd2433b095f723440c1f2326ce"
+          },
+          {
+            "block": 4,
+            "id": "provider-block-04-02-range_zero",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37072896,
+            "order": "reverse",
+            "position": 2,
+            "report": {
+              "bytes": 131363,
+              "path": "children/provider-block-04-02-range_zero/report.json",
+              "sha256": "ac6d3e6c4a88389638eac6d5571ab53f502b66b9d848ba590d904f83489e46c1"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-04-02-range_zero/stderr.log",
+              "sha256": "ba993e1723398a349be29a65f1c60cb065ac3e557fe5cba66c1132d7dd10d9e5"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-04-02-range_zero/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-04-02-range_zero/time.log",
+              "sha256": "ba993e1723398a349be29a65f1c60cb065ac3e557fe5cba66c1132d7dd10d9e5"
+            },
+            "timed_command_sha256": "12361bb94e2ad45c2f8d9ad3a0fba7eaf03b95729432925aea0944a5b6c82a20"
+          },
+          {
+            "block": 5,
+            "id": "provider-block-05-06-range_zero",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37396480,
+            "order": "forward",
+            "position": 6,
+            "report": {
+              "bytes": 131356,
+              "path": "children/provider-block-05-06-range_zero/report.json",
+              "sha256": "8848da9759e8a6ec4eb3051c7d9cd9393975756631b9e80ef6b3fbdff9e1aa8b"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-05-06-range_zero/stderr.log",
+              "sha256": "76fcb102e28043370fc6f7845cc426e1d321ba670f830ae7334164f6999bacaf"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-05-06-range_zero/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-05-06-range_zero/time.log",
+              "sha256": "76fcb102e28043370fc6f7845cc426e1d321ba670f830ae7334164f6999bacaf"
+            },
+            "timed_command_sha256": "ae2f15349c0c2df2d420eb6c9d204fb45ab4ebd52e5d39c3ac979d3392c61476"
+          },
+          {
+            "block": 6,
+            "id": "provider-block-06-02-range_zero",
+            "observed_exit_code": 0,
+            "observed_rss_bytes": 37367808,
+            "order": "reverse",
+            "position": 2,
+            "report": {
+              "bytes": 131362,
+              "path": "children/provider-block-06-02-range_zero/report.json",
+              "sha256": "75aff147c0faba2943935f9df97f05f6867ded6030b959f8d9b75277f67f4827"
+            },
+            "stderr": {
+              "bytes": 1005,
+              "path": "children/provider-block-06-02-range_zero/stderr.log",
+              "sha256": "d8994eef57b05c3497175f6d504afaeadac20da0cf4344339d6cb19399e9035b"
+            },
+            "stdout": {
+              "bytes": 0,
+              "path": "children/provider-block-06-02-range_zero/stdout.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "time": {
+              "bytes": 1005,
+              "path": "children/provider-block-06-02-range_zero/time.log",
+              "sha256": "d8994eef57b05c3497175f6d504afaeadac20da0cf4344339d6cb19399e9035b"
+            },
+            "timed_command_sha256": "e10781bddd46c999f99c0aa7cff939fe38b32305f3988bf26d88e94360851691"
+          }
+        ],
+        "samples": 300
+      }
+    },
+    "schema": "litchi.performance.0925.descriptive-reduction.v1"
+  },
+  "schema": "litchi.performance.0925.reconstructed-raw-reduction.v1",
+  "source_build_protocol_scripts": {
+    "binary": {
+      "bytes": 70187352,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "recovery_tool": {
+      "bytes": 20851,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-recover.py",
+      "sha256": "fa0f8ac0f7a2ef8a070cdd4cd628c33b443b34eee5439c886d6b771642fc343d"
+    },
+    "scripts": {
+      "capture": {
+        "bytes": 49705,
+        "path": "scripts/comparison-capture.py",
+        "sha256": "4a8fb18ffbc82ba03c082d14fbb783b0a5f68e09f877322d6b7cce2706a1a3ac"
+      },
+      "comparison": {
+        "bytes": 39792,
+        "path": "scripts/comparison.py",
+        "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+      },
+      "controls": {
+        "bytes": 19095,
+        "path": "scripts/comparison-controls.py",
+        "sha256": "202ed881e1364931e3e03f83a59ecead2dffe45850765f6f3c4662868ec6742a"
+      },
+      "reduce": {
+        "bytes": 5618,
+        "path": "scripts/comparison-reduce.py",
+        "sha256": "67b08b127ed98271a17caa05d74938226a1420099f03e75d39201a173f138d32"
+      }
+    },
+    "source": {
+      "candidate_file": "tools/perf-baseline/src/lib.rs",
+      "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+      "candidate_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+      "revision": "aa077c030819c3019288e350f34959666ab7204f"
+    }
+  },
+  "state_size_diagnostic": {
+    "fields_omitted_from_lower_bound": [
+      "schema",
+      "argv",
+      "environment",
+      "cwd",
+      "started_utc",
+      "ended_utc",
+      "observation_timeout_count",
+      "deadline_exceeded"
+    ],
+    "interpretation": "the bound includes the validated vectors and retained stream descriptors but omits runner receipt fields; it is below the writer limit, so no exact original serialized size is claimed. The retained terminal failure remains authoritative, and posthoc recovery cannot restore the omitted custody fields",
+    "lower_bound_under_writer_limit": true,
+    "state_shape_lower_bound_bytes": 758905,
+    "validated_vector_payload_bytes": 718780,
+    "writer_limit_bytes": 1048576
+  },
+  "status": "invalid_terminal_reconstructed",
+  "terminal": {
+    "original_capture_state": "not_written",
+    "reason": "all 42 child artifacts were retained, but the original runner failed writing capture-state.json because its receipt exceeded the 1 MiB limit",
+    "recovery_rule": "posthoc reconstruction cannot restore original per-child start/end/cwd/validation receipt custody; no child was rerun or replaced",
+    "status": "invalid"
+  }
+}

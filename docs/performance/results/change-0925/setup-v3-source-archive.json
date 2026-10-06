@@ -1,0 +1,47 @@
+{
+  "archive": {
+    "bytes": 122705920,
+    "command": "tar --format=posix --sort=name --mtime='UTC 1970-01-01 00:00:00' --owner=0 --group=0 --numeric-owner -cf measurement-source.tar -C measurement-source .",
+    "format": "posix tar",
+    "normalization": {
+      "gid": 0,
+      "mtime": "1970-01-01 00:00:00 UTC",
+      "numeric_owner": true,
+      "sort": "name",
+      "uid": 0
+    },
+    "path": "/tmp/litchi-performance-0925/measurement-source.tar",
+    "sha256": "821e58109668304c6ebf13aff84e8a52a2e430cb42fa39e3132b07ccbcfe23a9"
+  },
+  "archive_scope": "validated measurement-source tree only; no target, binaries, receipts, listing, or patch files inside source root",
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "candidate_patch": {
+    "bytes": 41263,
+    "path": "/tmp/litchi-performance-0925/section-layout-provider-v3.patch",
+    "sha256": "d728feb028a6ac5abd2d6c4963d0de6e49fefad76140b0704e1e6e78f7d4b6a8"
+  },
+  "candidate_source_file": {
+    "path": "tools/perf-baseline/src/lib.rs",
+    "sha256": "14473e770a23de764015b117fbc1b05a7bf78d7e397eeccde2edc77dd6521e80"
+  },
+  "full_source_listing": {
+    "bytes": 940213,
+    "path": "/tmp/litchi-performance-0925/measurement-source-list.jsonl",
+    "sha256": "1849ccc0c23ded927034d1b8a9a1e190c1183f830e6da46709c6717b329a0757"
+  },
+  "generated_targets_included": false,
+  "regenerator": {
+    "bytes": 271,
+    "path": "/tmp/litchi-performance-0925/regenerate-measurement-source-archive.sh",
+    "sha256": "9497108a8408134c13532a6fc7a1dae0d6e0a7f4ede0dcfda7749f20776533c8"
+  },
+  "schema": "litchi.performance.0925.measurement-source-archive.v1",
+  "source_bytes": 109831526,
+  "source_file_count": 6276,
+  "source_receipt": {
+    "bytes": 356563,
+    "path": "/tmp/litchi-performance-0925/measurement-source-receipt.json",
+    "sha256": "02aba5ac8769aac5a0f33bd59cea9623f5627fd978e31b68e8967595d28f7748"
+  },
+  "source_root": "/tmp/litchi-performance-0925/measurement-source"
+}

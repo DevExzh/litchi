@@ -1,0 +1,116 @@
+{
+  "schema": "litchi.performance.0925.python-cache-cleanup.v1",
+  "utc": "2026-10-06T11:38:43.882403+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-recover-portability",
+      "apparent_bytes": 29749
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-recover-check",
+      "apparent_bytes": 27658
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-recover-compile",
+      "apparent_bytes": 27396
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-recover",
+      "apparent_bytes": 25387
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-final-check",
+      "apparent_bytes": 174966
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-reducer",
+      "apparent_bytes": 103628
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v-final",
+      "apparent_bytes": 160785
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v20",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v19",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v18",
+      "apparent_bytes": 154937
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v17",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v16",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v15",
+      "apparent_bytes": 153441
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v14",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v13",
+      "apparent_bytes": 149115
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v12",
+      "apparent_bytes": 147030
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v11",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v10",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v9",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v8",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v7",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v6",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v5",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache-v4",
+      "apparent_bytes": 0
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/pycache",
+      "apparent_bytes": 111598
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/__pycache__",
+      "apparent_bytes": 18584
+    },
+    {
+      "path": "/tmp/litchi-performance-0925/capture-v4/scripts/__pycache__",
+      "apparent_bytes": 74105
+    }
+  ],
+  "apparent_bytes_removed": 1358379,
+  "scope": "generated task-local Python caches only; source/raw report/receipt files preserved"
+}

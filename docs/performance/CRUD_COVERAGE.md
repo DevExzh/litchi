@@ -1,5 +1,16 @@
 # Performance CRUD coverage
 
+## 0925 — section-layout file and simulated range seams
+
+[0925](0925-section-layout-provider-baseline.md) adds four provider routes to the
+existing generated DOCX section edit/publication case. Fifteen focused tests
+and seven release preflights pass. Warm-file scope is tmpfs; range models are
+memory-backed short-read/pacing adapters. Shared negative-case controls remain
+generic-provider controls. All 42 raw measurement reports validate, but missing
+terminal custody prevents performance qualification. This adds harness and
+correctness evidence, not cold-disk, network, native-producer, concurrency,
+or broader format coverage.
+
 ## 0923 — owned ingress for existing DOCX section editing
 
 [0923](0923-owned-source-fingerprint.md) adds owned-vector and sequential-reader

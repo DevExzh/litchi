@@ -1,0 +1,109 @@
+{
+  "schema": "litchi.performance.0925.independent-review-quality.v3",
+  "status": "source approved; scoped quality passed; release build and seven-route final smoke remain tooling steps",
+  "utc_recorded": "2026-10-06T11:07:35.130202+00:00",
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "source_path": "/tmp/litchi-performance-0925/measurement-source-v4",
+  "source_file": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+  "source_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+  "reviewed_patch": "/tmp/litchi-performance-0925/section-layout-provider-final.patch",
+  "reviewed_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+  "patch_scope": {
+    "apply_check": "passed against base aa077c030819c3019288e350f34959666ab7204f",
+    "production_source_files": 0,
+    "changed_file": "tools/perf-baseline/src/lib.rs",
+    "v2_to_v3": "formatting-only behavior delta; source bytes changed from v2 SHA-256 1af6563a3c6f7cfadc0aa44b08daf2ed19b3f854b12c5d48c07ee20a5575540c to v3 SHA-256 14473e770a23de764015b117fbc1b05a7bf78d7e397eeccde2edc77dd6521e80; no semantic change",
+    "material_fix_reviewed": "range routes use OwnedSource::from_arc(Arc::clone(provider_backing_bytes)); retained alias is the actual immutable source backing and no archive payload copy is introduced",
+    "v3_to_v4": {
+      "patch": "/tmp/litchi-performance-0925/section-layout-provider-v4.patch",
+      "sha256": "b010fa2d55fb5ba0dd650f6a10a0b5403eae3313da545dcfdecbdaf8bc26f934",
+      "scope": "formatting-only: import ordering, trailing commas, and rustfmt line wrapping/assert layout; no semantic changes"
+    }
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "common_cwd": "/tmp/litchi-performance-0925/measurement-source-v4"
+  },
+  "independent_tests": [
+    {
+      "name": "docx_section_layout",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "docx_section_layout",
+        "--",
+        "--nocapture"
+      ],
+      "log": "/tmp/litchi-performance-0925/review-docx-test-v3.log",
+      "log_sha256": "7d480db9b531f621f5025f443f5bb8c518a1264b3842ae94f405b19f48eceb73",
+      "result": "2 passed; 0 failed",
+      "scope": "generic DOCX section-layout route, phase/output/preservation/inverse/refusal/cache/sink controls, provider configuration test"
+    },
+    {
+      "name": "pptx_range_source",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "pptx_range_source",
+        "--",
+        "--nocapture"
+      ],
+      "log": "/tmp/litchi-performance-0925/review-pptx-range-test-v3.log",
+      "log_sha256": "1647736ab12c58583a312df9b401ff88e4f1fea70819e9fbfea034fbfcee537b",
+      "result": "13 passed; 0 failed",
+      "scope": "short reads, EOF/empty distinction, version forwarding, delay/transfer models, overflow/failure closure and histogram accounting"
+    }
+  ],
+  "independent_smoke_audit": {
+    "script": "/tmp/litchi-performance-0925/review-smoke-audit-v3.py",
+    "result": "144 checks passed",
+    "report": "/tmp/litchi-performance-0925/review-smoke-audit-v3.json",
+    "report_sha256": "e3c5918da781f205edd34be1eecb80ed4c997e1cfd1291edf6b1e927497920e3",
+    "reports_checked": [
+      "generic_read_at",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "scope": "debug correctness smokes only; no performance capture; final tooling run must provide owned_vec and owned_reader release smokes"
+  },
+  "review_findings": {
+    "phase_boundary": "provider snapshots are immediately after publication and before reopen/inverse/digest/preservation/source checks; six phase sums equal elapsed in all checked reports",
+    "generic_boundary": "operation-end counters are separate from whole checked-iteration counters (generic 169/6,308,061 operation-end vs 202/8,409,488 whole); empty ReadAt calls are excluded by provider counter, so call counts are not comparable",
+    "file_warm": "staged regular file is written/synced outside the operation clock; FileSource opens during preparation; staged length/SHA/bytes and source version fences are checked; cleanup is checked before return; no cold or physical-I/O claim",
+    "range_routes": "memory-backed PptxRangeSource controls are explicitly logical/simulated; short, zero-delay and delayed/transfer counters separate logical from delegated boundaries; nominal service delay is not actual elapsed bandwidth",
+    "old_routes": "generic_read_at, owned_vec and owned_reader keep historical counter scopes; owned_ingress_* fields remain present only where the old owned route defines them and are empty/unavailable for provider routes; generic controls do not qualify owned-route negative coverage",
+    "sink": "existing sequential non-seek sink and exact output/inverse/preservation controls remain active"
+  },
+  "known_pending": [
+    "fresh release build and final seven-route smoke identity are tooling steps after this v4 approval",
+    "owned_vec and owned_reader are unchanged routes; their final release smoke reports are pending tooling, not inferred from generic controls"
+  ],
+  "format_check": {
+    "argv": [
+      "rustfmt",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "--edition",
+      "2024",
+      "tools/perf-baseline/src/lib.rs"
+    ],
+    "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+    "rustfmt_toml_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "result": "pass",
+    "log": "/tmp/litchi-performance-0925/review-rustfmt-v4-check.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_v3_check": "failed on candidate-introduced formatting while same root config baseline passed; /tmp/litchi-performance-0925/review-rustfmt-v3.log SHA-256 9e2050c96bb4e2052f9580f36e15059552fda099978c7cdfc20e1f4da7d960bb"
+  }
+}

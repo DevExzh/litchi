@@ -1,0 +1,266 @@
+{
+  "claim_scope": "validator/preflight only; no provider ranking or optimization comparison",
+  "copied_packet_replay": {
+    "moved_packet_reports": 42,
+    "moved_packet_status": "verified",
+    "negative_controls": {
+      "corrupt_report": {
+        "reason": "provider-block-01-01-generic_read_at: report: local file hash or size changed",
+        "status": "rejected"
+      },
+      "corrupt_stdout": {
+        "reason": "provider-block-01-01-generic_read_at: stdout: local file hash or size changed",
+        "status": "rejected"
+      },
+      "escaped_report_path": {
+        "reason": "provider-block-01-01-generic_read_at: report: unsafe relative path '../report.json'",
+        "status": "rejected"
+      },
+      "incomplete_state": {
+        "reason": "capture state schema changed",
+        "status": "rejected"
+      },
+      "missing_child": {
+        "reason": "copied packet child count changed",
+        "status": "rejected"
+      },
+      "tampered_local_custody": {
+        "reason": "packet custody protocol: local file hash or size changed",
+        "status": "rejected"
+      },
+      "tampered_packet_script_descriptor": {
+        "reason": "copied packet script descriptor differs: comparison",
+        "status": "rejected"
+      }
+    },
+    "offline_reducer": {
+      "bytes": 59331,
+      "children": 42,
+      "performance_children_run": 0,
+      "routes": 7,
+      "rss_fields": true,
+      "status": "verified_and_reduced"
+    }
+  },
+  "negative_controls": [
+    {
+      "name": "phase_sum",
+      "reason": "phase_sum: six-phase sum mismatch at sample 0",
+      "status": "rejected"
+    },
+    {
+      "name": "duplicate_sample_index",
+      "reason": "duplicate_sample_index: elapsed sample order is not a permutation",
+      "status": "rejected"
+    },
+    {
+      "name": "missing_sample_index",
+      "reason": "missing_sample_index: elapsed sample order is not a permutation",
+      "status": "rejected"
+    },
+    {
+      "name": "wrong_binary_identity",
+      "reason": "wrong_binary_identity: binary identity differs from receipt",
+      "status": "rejected"
+    },
+    {
+      "name": "wrong_output_digest",
+      "reason": "wrong_output_digest: output digest changed",
+      "status": "rejected"
+    },
+    {
+      "name": "wrong_route",
+      "reason": "wrong_route: ingress route changed",
+      "status": "rejected"
+    },
+    {
+      "name": "file_warm:provider_histogram",
+      "reason": "file_warm:provider_histogram.provider.logical[0]: request histogram does not conserve calls",
+      "status": "rejected"
+    },
+    {
+      "name": "file_warm:provider_parameter",
+      "reason": "file_warm:provider_parameter.provider parameters changed: (1, None, None, None)",
+      "status": "rejected"
+    },
+    {
+      "name": "file_warm:provider_vector_cardinality",
+      "reason": "file_warm:provider_vector_cardinality.provider.underlying: vector cardinality changed",
+      "status": "rejected"
+    },
+    {
+      "name": "file_warm:provider_nominal_formula",
+      "reason": "file_warm:provider_nominal_formula.provider.nominal_service_delay_ns[0]: expected fixed*delayed+transfer=0, got 1",
+      "status": "rejected"
+    },
+    {
+      "name": "range_short:provider_histogram",
+      "reason": "range_short:provider_histogram.provider.logical[0]: request histogram does not conserve calls",
+      "status": "rejected"
+    },
+    {
+      "name": "range_short:provider_parameter",
+      "reason": "range_short:provider_parameter.provider parameters changed: (1, None, None, None)",
+      "status": "rejected"
+    },
+    {
+      "name": "range_short:provider_vector_cardinality",
+      "reason": "range_short:provider_vector_cardinality.provider.underlying: vector cardinality changed",
+      "status": "rejected"
+    },
+    {
+      "name": "range_short:provider_nominal_formula",
+      "reason": "range_short:provider_nominal_formula.provider.nominal_service_delay_ns[0]: expected fixed*delayed+transfer=0, got 1",
+      "status": "rejected"
+    },
+    {
+      "name": "range_zero:provider_histogram",
+      "reason": "range_zero:provider_histogram.provider.logical[0]: request histogram does not conserve calls",
+      "status": "rejected"
+    },
+    {
+      "name": "range_zero:provider_parameter",
+      "reason": "range_zero:provider_parameter.provider parameters changed: (1, 0, 104857600, 'minimum-service')",
+      "status": "rejected"
+    },
+    {
+      "name": "range_zero:provider_vector_cardinality",
+      "reason": "range_zero:provider_vector_cardinality.provider.underlying: vector cardinality changed",
+      "status": "rejected"
+    },
+    {
+      "name": "range_zero:provider_nominal_formula",
+      "reason": "range_zero:provider_nominal_formula.provider.nominal_service_delay_ns[0]: expected fixed*delayed+transfer=1000, got 1001",
+      "status": "rejected"
+    },
+    {
+      "name": "range_delayed:provider_histogram",
+      "reason": "range_delayed:provider_histogram.provider.logical[0]: request histogram does not conserve calls",
+      "status": "rejected"
+    },
+    {
+      "name": "range_delayed:provider_parameter",
+      "reason": "range_delayed:provider_parameter.provider parameters changed: (1, 1000000, 104857600, 'minimum-service')",
+      "status": "rejected"
+    },
+    {
+      "name": "range_delayed:provider_vector_cardinality",
+      "reason": "range_delayed:provider_vector_cardinality.provider.underlying: vector cardinality changed",
+      "status": "rejected"
+    },
+    {
+      "name": "range_delayed:provider_nominal_formula",
+      "reason": "range_delayed:provider_nominal_formula.provider.nominal_service_delay_ns[0]: expected fixed*delayed+transfer=1001000, got 1001001",
+      "status": "rejected"
+    }
+  ],
+  "performance_children_run": 0,
+  "planned_reduction": {
+    "bytes": 389580,
+    "children": 42,
+    "samples_per_child": 50,
+    "sha256": "4e5fdf015ef3100b6f0edf702a7885092d601f61370628bb48d3d6cd5b68c68b",
+    "under_one_mib": true
+  },
+  "positive_reports": [
+    {
+      "route": "generic_read_at",
+      "samples": 50,
+      "status": "accepted"
+    },
+    {
+      "route": "owned_vec",
+      "samples": 50,
+      "status": "accepted"
+    },
+    {
+      "route": "owned_reader",
+      "samples": 50,
+      "status": "accepted"
+    },
+    {
+      "route": "file_warm",
+      "samples": 50,
+      "status": "accepted"
+    },
+    {
+      "route": "range_short",
+      "samples": 50,
+      "status": "accepted"
+    },
+    {
+      "route": "range_zero",
+      "samples": 50,
+      "status": "accepted"
+    },
+    {
+      "route": "range_delayed",
+      "samples": 50,
+      "status": "accepted"
+    }
+  ],
+  "reduction_contract": {
+    "bytes": 19921,
+    "child_tail_fields": [
+      "p50",
+      "p95",
+      "p99",
+      "spread"
+    ],
+    "provider_accounting_routes": [
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "status": "passed",
+    "under_one_mib": true
+  },
+  "schedule": {
+    "children": 42,
+    "children_per_route": 6,
+    "measured_samples": 2100,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "samples_per_child": 50,
+    "warmups": 5
+  },
+  "schema": "litchi.performance.0925.comparison-controls.v2",
+  "status": "passed",
+  "tooling_bindings": {
+    "protocol": {
+      "bytes": 31245,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-protocol-v1.json",
+      "sha256": "20b73f7408d5911bc8de5f798638dda3a04904ec3f0ab09ea55b6b3f9b9f5855"
+    },
+    "scripts": {
+      "capture": {
+        "bytes": 49705,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-capture.py",
+        "sha256": "4a8fb18ffbc82ba03c082d14fbb783b0a5f68e09f877322d6b7cce2706a1a3ac"
+      },
+      "comparison": {
+        "bytes": 39792,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+        "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+      },
+      "controls": {
+        "bytes": 19095,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-controls.py",
+        "sha256": "202ed881e1364931e3e03f83a59ecead2dffe45850765f6f3c4662868ec6742a"
+      },
+      "reduce": {
+        "bytes": 5618,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-reduce.py",
+        "sha256": "67b08b127ed98271a17caa05d74938226a1420099f03e75d39201a173f138d32"
+      }
+    }
+  }
+}

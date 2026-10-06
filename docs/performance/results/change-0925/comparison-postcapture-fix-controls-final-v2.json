@@ -1,0 +1,66 @@
+{
+  "claim_scope": "future runner custody control only; no repair, capture, timing adoption, or protocol qualification",
+  "helper": {
+    "name": "_compact_validation_receipt",
+    "raw_vectors_persisted": "retained report identified by report_sha256",
+    "scalar_fields": [
+      "route",
+      "samples",
+      "warmups",
+      "status",
+      "report_bytes",
+      "report_sha256"
+    ],
+    "used_by_runner": true
+  },
+  "negative_controls": {
+    "all_42_child_ids_unique": "passed",
+    "raw_phase_vectors_absent_from_compact_receipts": "passed",
+    "report_hash_present_for_all_children": "passed"
+  },
+  "performance_children_run": 0,
+  "prior_capture_repaired": false,
+  "schedule": {
+    "children": 42,
+    "children_per_route": 6,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "samples_per_child": 50
+  },
+  "schema": "litchi.performance.0925.postcapture-fix-controls.v1",
+  "state_size_control": {
+    "children": 42,
+    "compact_state_bytes": 99640,
+    "compact_under_one_mib": true,
+    "legacy_full_vector_state_bytes": 1992796,
+    "legacy_full_vector_state_exceeds_one_mib": true,
+    "same_helper_as_runner": true,
+    "status": "passed",
+    "writer_limit_bytes": 1048576
+  },
+  "status": "passed",
+  "tooling_bindings": {
+    "capture": {
+      "bytes": 51557,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-capture.py",
+      "sha256": "90a6466a39d290fe8722c30132fc4d0e0fc4188763c4e70e4dd4a3a50048c590"
+    },
+    "comparison": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "control_script": {
+      "bytes": 9707,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-postcapture-fix-controls.py",
+      "sha256": "cf2b22d024d7912f7bdc9655e2bedc67f49b2c80c64cf3ed272f75741b1fa9ae"
+    }
+  }
+}

@@ -1,0 +1,875 @@
+{
+  "adr_basis": [
+    "0005 positional I/O, explicit measurement scope, resource accounting, representative statistics",
+    "0006 preserve-or-refuse, deterministic validation, source/version/sink safety",
+    "0010 archive ownership remains below the facade",
+    "0011 physical OPC package ownership remains below the OOXML host",
+    "0030 lazy payload decode and cold ordinary members",
+    "0031 explicit execution context and budget accounting",
+    "0032 bounded owner-held derived memos; no generic provider cache claim",
+    "iWork ADRs 0028/0029 are excluded by user scope"
+  ],
+  "analysis_contract": {
+    "failure_policy": "retain every failed/adverse child and invalidate the cohort; never selectively recapture or restart after timeout/parser failure",
+    "phase_shares": "sum raw phase vectors per route and divide by summed elapsed; never pool child summaries",
+    "pooled_statistics": "pool raw elapsed and phase samples per route; p50 is median, p95/p99 are nearest-rank; retain per-child p50/p95/p99 and process spread",
+    "provider_accounting": "report logical and underlying request/call/byte/service distributions and equality/conservation checks; do not rank providers",
+    "replay": "copied packet replay must verify local manifest, source/build/binary descriptors, raw report hashes, script hashes and all report vectors without original absolute paths"
+  },
+  "base_source": {
+    "allowlist_policy": "populate only from candidate_review's final exact diff; no fallback baseline listing or fabricated paths",
+    "current_repo_revision_at_generation": "aa077c030819c3019288e350f34959666ab7204f",
+    "harness_changed_files_allowlist": [
+      "tools/perf-baseline/src/lib.rs"
+    ],
+    "harness_patch_sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b",
+    "harness_changed_file_sha256": {
+      "tools/perf-baseline/src/lib.rs": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a"
+    },
+    "isolated_archive_required": true,
+    "large_full_source_listing": "external_only",
+    "production_source_changed": false,
+    "required_custody_files": [
+      "rustfmt.toml",
+      "Cargo.toml",
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/Cargo.lock",
+      "Cargo.lock",
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/docx_managed_edit.rs",
+      "tools/perf-baseline/src/pptx_range_source.rs",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "test-data/rtf/watermark.rtf"
+    ],
+    "review_supplied_compile_fixtures": {
+      "paths": [
+        {
+          "bytes": 984576,
+          "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+          "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+        },
+        {
+          "bytes": 69471,
+          "path": "test-data/rtf/watermark.rtf",
+          "sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+        }
+      ],
+      "required_count": 2,
+      "rule": "copy these exact git-bound fixtures into the isolated source closure; freeze fails closed on path, size, or hash drift"
+    },
+    "revision": "aa077c030819c3019288e350f34959666ab7204f"
+  },
+  "build_authorized": false,
+  "build_custody": {
+    "cargo_manifest": "tools/perf-baseline/Cargo.toml",
+    "cargo_manifest_scope": "standalone tools/perf-baseline workspace",
+    "command_template": "cargo +1.95.0 build --offline -j2 --locked --release --manifest-path /tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0925/measurement-target-v4-final",
+    "frozen_0923_targets_mutated": false,
+    "profile_effective_receipt": {
+      "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+      "bytes": 3137,
+      "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+    },
+    "actual_binary": {
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+      "bytes": 70187352,
+      "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+    },
+    "actual_rustc_info": {
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/.rustc_info.json",
+      "bytes": 1040,
+      "sha256": "8fcff6af6f9610c25626b31588689eca31edd31111abb8968b9b772c70be4dcb"
+    },
+    "actual_source_custody": {
+      "source_receipt_sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2",
+      "full_source_listing_sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+    },
+    "actual_toolchain": {
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "environment_overrides": {}
+    },
+    "profile_requested": "release",
+    "record": [
+      "actual rustc/cargo version and paths",
+      "effective release profile values and profile environment overrides",
+      "tools/perf-baseline/Cargo.lock SHA-256",
+      "root Cargo.lock SHA-256",
+      "binary SHA-256, byte size, mode, build ID and .rustc_info.json if present",
+      "complete build log and start/end timestamps"
+    ],
+    "required_versions": [
+      "rustc +1.95.0 -vV",
+      "cargo +1.95.0 -V"
+    ],
+    "retained_lock_hashes_at_draft": {
+      "root_lock": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+      "rustfmt_toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+      "tools_performance_lock": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "toolchain": "1.95.0"
+  },
+  "capture_authorized": false,
+  "claim_scope": {
+    "allocator_or_peak_rss_claim": false,
+    "filesystem_cold_claim": false,
+    "optimization_comparison": false,
+    "performance_claim": "descriptive_provider_baseline_only",
+    "physical_network_or_device_io_claim": false,
+    "provider_ranking": false
+  },
+  "filesystem_staging": {
+    "root": "/tmp",
+    "filesystem_type": "tmpfs",
+    "scope": "FileSource is staged and warmed on tmpfs; this does not claim disk or physical filesystem I/O"
+  },
+  "analysis_tooling": {
+    "reducer_script": "comparison-reduce.py",
+    "reducer_contract": "offline reducer invokes moved-packet replay first, then retains pooled raw phase/provider vectors, per-child phase statistics, RSS receipts, and report descriptors; it never starts or reruns a child"
+  },
+  "corpus": {
+    "archive_bytes": 2101427,
+    "archive_member_count": 10,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "entry_count": 7,
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "generator": "litchi-docx-section-layout-source-v1",
+    "source_stage": "one deterministic archive; FileSource file staged and synced once before the child loop",
+    "target_entry": "word/document.xml"
+  },
+  "created_utc": "2026-10-06T11:18:56.836572+00:00",
+  "fixed_cohort": {
+    "argv_template": [
+      "<binary>",
+      "--case",
+      "docx_source_backed_existing_section_layout_edit_save",
+      "--samples",
+      "50",
+      "--warmup",
+      "5",
+      "--json",
+      "<report.json>"
+    ],
+    "blocks": 6,
+    "children": 42,
+    "children_per_route": 6,
+    "cpu": 12,
+    "measured_samples_per_route": 300,
+    "process_wrapper": [
+      "/usr/bin/time",
+      "-v",
+      "taskset",
+      "-c",
+      "12"
+    ],
+    "process_deadline_seconds": 900,
+    "route_count": 7,
+    "route_selector_name": "LITCHI_DOCX_INGRESS_ROUTE",
+    "route_selector_values": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "samples_per_child": 50,
+    "schedule": [
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-01-generic_read_at",
+        "order": "forward",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-02-owned_vec",
+        "order": "forward",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-03-owned_reader",
+        "order": "forward",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-04-file_warm",
+        "order": "forward",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-05-range_short",
+        "order": "forward",
+        "position": 5,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-06-range_zero",
+        "order": "forward",
+        "position": 6,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 1,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-01-07-range_delayed",
+        "order": "forward",
+        "position": 7,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-01-range_delayed",
+        "order": "reverse",
+        "position": 1,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-02-range_zero",
+        "order": "reverse",
+        "position": 2,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-03-range_short",
+        "order": "reverse",
+        "position": 3,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-04-file_warm",
+        "order": "reverse",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-05-owned_reader",
+        "order": "reverse",
+        "position": 5,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-06-owned_vec",
+        "order": "reverse",
+        "position": 6,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 2,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-02-07-generic_read_at",
+        "order": "reverse",
+        "position": 7,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-01-generic_read_at",
+        "order": "forward",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-02-owned_vec",
+        "order": "forward",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-03-owned_reader",
+        "order": "forward",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-04-file_warm",
+        "order": "forward",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-05-range_short",
+        "order": "forward",
+        "position": 5,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-06-range_zero",
+        "order": "forward",
+        "position": 6,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 3,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-03-07-range_delayed",
+        "order": "forward",
+        "position": 7,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-01-range_delayed",
+        "order": "reverse",
+        "position": 1,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-02-range_zero",
+        "order": "reverse",
+        "position": 2,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-03-range_short",
+        "order": "reverse",
+        "position": 3,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-04-file_warm",
+        "order": "reverse",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-05-owned_reader",
+        "order": "reverse",
+        "position": 5,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-06-owned_vec",
+        "order": "reverse",
+        "position": 6,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 4,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-04-07-generic_read_at",
+        "order": "reverse",
+        "position": 7,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-01-generic_read_at",
+        "order": "forward",
+        "position": 1,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-02-owned_vec",
+        "order": "forward",
+        "position": 2,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-03-owned_reader",
+        "order": "forward",
+        "position": 3,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-04-file_warm",
+        "order": "forward",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-05-range_short",
+        "order": "forward",
+        "position": 5,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-06-range_zero",
+        "order": "forward",
+        "position": 6,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 5,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-05-07-range_delayed",
+        "order": "forward",
+        "position": 7,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-01-range_delayed",
+        "order": "reverse",
+        "position": 1,
+        "route": "range_delayed",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-02-range_zero",
+        "order": "reverse",
+        "position": 2,
+        "route": "range_zero",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-03-range_short",
+        "order": "reverse",
+        "position": 3,
+        "route": "range_short",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-04-file_warm",
+        "order": "reverse",
+        "position": 4,
+        "route": "file_warm",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-05-owned_reader",
+        "order": "reverse",
+        "position": 5,
+        "route": "owned_reader",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-06-owned_vec",
+        "order": "reverse",
+        "position": 6,
+        "route": "owned_vec",
+        "samples": 50,
+        "warmups": 5
+      },
+      {
+        "block": 6,
+        "cpu": 12,
+        "failure_policy": "retain_child_and_invalidate_cohort; never_rerun_or_recapture",
+        "id": "provider-block-06-07-generic_read_at",
+        "order": "reverse",
+        "position": 7,
+        "route": "generic_read_at",
+        "samples": 50,
+        "warmups": 5
+      }
+    ],
+    "schedule_order": "forward route order in odd blocks, exact reverse in even blocks",
+    "timeout_policy": "an observation timeout polls the live process until a terminal state and never restarts it; a confirmed deadline failure, nonzero exit, malformed report, missing RSS, or parser failure invalidates the complete cohort; retain all artifacts and do not restart",
+    "warmups_per_child": 5
+  },
+  "preflight_before_freeze": [
+    "run focused parser/config tests for all seven route names and reject unknown or mismatched delay/range combinations",
+    "run one smoke invocation per route with exact corpus/output/source identity and all counter fields present",
+    "verify FileSource staging cleanup and warm-only declaration",
+    "verify report vectors, sample order, phase sums, operation-end versus after-check counter separation, output digest and the source-immutability boolean; numeric source-version values are internal checks and are not claimed as serialized vectors",
+    "verify source closure by exact file map, harness patch application, rustfmt.toml and two reviewed compile-fixture hashes",
+    "verify standalone Cargo lock/profile/toolchain and binary identity in an isolated target"
+  ],
+  "release_preflight": {
+    "schema": "litchi.performance.0925.comparison-preflight.v1",
+    "receipt": {
+      "path": "comparison-preflight-final.json",
+      "bytes": 21156,
+      "sha256": "16c67fa43a19f00db2d6d3f98f65d0c47835755ae7a74575f12329f137753802"
+    },
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ],
+    "children": 7,
+    "samples": 3,
+    "warmups": 1,
+    "measured_samples": 21,
+    "processes_started": 7,
+    "binary_sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7",
+    "build_receipt_sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99",
+    "candidate_file_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+    "status": "passed; release schema/custody preflight only, no comparative timing claim"
+  },
+  "provider_counter_boundaries": {
+    "checked_iteration_end": "separate snapshot after all semantic, preservation, inverse, refusal, cache and sink checks",
+    "file_warm": "one logical FileSource counter is emitted; underlying is null because it is the same boundary, and the route is warm-only, never physical I/O",
+    "generic_read_at": "logical ReadAt calls, requested/returned bytes, empty and short calls, min/max request, request-size trace or digest",
+    "operation_end": "snapshot immediately after publication phase and before any post-clock verification, output reopen, inverse publication, or report work",
+    "owned_controls": "owned_vec moved bytes and owned_reader sequential calls/bytes; positional provider counters are unavailable and must be explicit null/unavailable",
+    "short_and_range": "logical outer counters, underlying memory-provider counters, request-size distribution, range adapter calls, requested/returned bytes, short calls, delayed calls, transfer-paced calls and observed transfer delay nanoseconds",
+    "source_version": "SourceVersion equality is checked internally and summarized only by source_immutability_verified; numeric before/after version values are not a report claim",
+    "use_rule": "only operation_end vectors describe the timed operation; checked_iteration_end is diagnostic and must never be substituted for it"
+  },
+  "purpose": "descriptive provider baseline for the existing DOCX section-layout edit/save corpus",
+  "report_contract": {
+    "configuration_required": [
+      "samples_per_case",
+      "warmup_iterations_per_case",
+      "cases"
+    ],
+    "control_scope_rule": "generic signed/foreign/limit/partial-sink suite is labeled generic-preflight scope unless it is actually executed route-locally; no inherited true flag may imply route-local execution",
+    "provider_nominal_service_rule": "for every provider sample nominal_service_delay_ns equals fixed_delay_ns * logical.delayed_calls + logical.transfer_delay_ns; short range is zero; transfer-paced zero/delayed ranges retain their observed transfer delay",
+    "provider_underlying_rule": "file_warm underlying entries are null because logical and delegated counters are the same boundary; range routes retain a distinct delegated underlying observation",
+    "counter_vector_rule": "every measured vector is exactly 50 entries and aligned to elapsed_ns.sample_order; generic operation_end_source_read_calls/bytes are distinct from checked-iteration source_read_calls/bytes; provider logical/underlying/nominal_service_delay_ns vectors are operation-end observations; unavailable counters are explicit null or empty with a scope string",
+    "elapsed_required": [
+      "unit",
+      "samples",
+      "sample_order",
+      "p50",
+      "p95",
+      "p99",
+      "min",
+      "max",
+      "mean"
+    ],
+    "required_top_level": [
+      "schema_version",
+      "tool",
+      "binary_identity",
+      "environment",
+      "configuration",
+      "results"
+    ],
+    "result_required": [
+      "case",
+      "corpus",
+      "elapsed_ns",
+      "sink",
+      "source",
+      "output_sha256"
+    ],
+    "schema": "existing litchi-perf-baseline report schema_version=1; provider fields are nested in results[0].source.docx_section_layout",
+    "section_summary_required": [
+      "ingress_route",
+      "source_observation_scope",
+      "sample_order",
+      "preparation_ns",
+      "open_ns",
+      "query_ns",
+      "edit_ns",
+      "commit_ns",
+      "publication_ns",
+      "phase_sum_verified",
+      "expected_output_sha256",
+      "output_sha256",
+      "source_sha256",
+      "source_bytes",
+      "operation_end_source_read_calls",
+      "operation_end_source_read_bytes",
+      "semantic_reopen_all_sections_verified",
+      "raw_untouched_members_verified",
+      "raw_member_order_and_comment_verified",
+      "patch_forward_inverse_verified",
+      "publication_inverse_exact_source_verified",
+      "cache_counters_verified",
+      "sink_counters_verified",
+      "provider",
+      "owned_ingress_read_calls",
+      "owned_ingress_read_bytes",
+      "owned_ingress_owned_bytes"
+    ]
+  },
+  "routes": [
+    {
+      "delay_us": null,
+      "file_cache_claim": "none",
+      "kind": "instrumented_memory_read_at",
+      "max_range_bytes": null,
+      "name": "generic_read_at",
+      "source": "in_memory_InstrumentedSource",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": null
+    },
+    {
+      "delay_us": null,
+      "file_cache_claim": "none",
+      "kind": "owned_vec_control",
+      "max_range_bytes": null,
+      "name": "owned_vec",
+      "source": "in_memory_owned_vec",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": null
+    },
+    {
+      "delay_us": null,
+      "file_cache_claim": "none",
+      "kind": "owned_reader_control",
+      "max_range_bytes": null,
+      "name": "owned_reader",
+      "source": "sequential_owned_reader",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": null
+    },
+    {
+      "delay_us": null,
+      "file_cache_claim": "warm_only",
+      "kind": "file_warm",
+      "max_range_bytes": null,
+      "name": "file_warm",
+      "source": "FileSource",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": null
+    },
+    {
+      "delay_us": null,
+      "file_cache_claim": "none",
+      "kind": "range_short",
+      "max_range_bytes": 4096,
+      "name": "range_short",
+      "source": "owned_memory_wrapped_by_range_adapter",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": null
+    },
+    {
+      "delay_us": 0,
+      "file_cache_claim": "none",
+      "kind": "range_control",
+      "max_range_bytes": 65536,
+      "name": "range_zero",
+      "source": "owned_memory_wrapped_by_range_adapter",
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum_service"
+    },
+    {
+      "delay_us": 1000,
+      "file_cache_claim": "none",
+      "kind": "range_delayed",
+      "max_range_bytes": 65536,
+      "name": "range_delayed",
+      "source": "owned_memory_wrapped_by_range_adapter",
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum_service"
+    }
+  ],
+  "schedule_validation": {
+    "children": 42,
+    "measured_samples": 2100,
+    "route_counts": {
+      "file_warm": 6,
+      "generic_read_at": 6,
+      "owned_reader": 6,
+      "owned_vec": 6,
+      "range_delayed": 6,
+      "range_short": 6,
+      "range_zero": 6
+    },
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "file_warm",
+      "range_short",
+      "range_zero",
+      "range_delayed"
+    ]
+  },
+  "schema": "litchi.performance.0925.docx-provider-protocol.v1",
+  "source_mutation_by_this_tool": false,
+  "status": "prospective_review_only",
+  "timing_boundaries": {
+    "commit": "edit.commit only",
+    "edit": "selected paragraph columns edit staging only",
+    "excluded": "corpus construction, expected output, post-publication semantic/reopen/preservation/refusal checks, report serialization and child teardown",
+    "open": "source-backed Package construction only",
+    "phase_invariant": "each report must prove exact per-sample sum of six phase vectors equals elapsed_ns.samples",
+    "phase_names": [
+      "preparation_ns",
+      "open_ns",
+      "query_ns",
+      "edit_ns",
+      "commit_ns",
+      "publication_ns"
+    ],
+    "preparation": "fresh route adapter/counters, route setup and bounded sink reservation; FileSource::open is inside this phase for file_warm",
+    "publication": "sequential publication only",
+    "query": "section_layout_snapshot only"
+  }
+}

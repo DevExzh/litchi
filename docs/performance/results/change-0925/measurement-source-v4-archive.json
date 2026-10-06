@@ -1,0 +1,47 @@
+{
+  "archive": {
+    "bytes": 115220480,
+    "command": "tar --format=gnu --sort=name --mtime='UTC 1970-01-01 00:00:00' --owner=0 --group=0 --numeric-owner -cf measurement-source-v4.tar -C measurement-source-v4 .",
+    "format": "gnu tar",
+    "normalization": {
+      "gid": 0,
+      "mtime": "1970-01-01 00:00:00 UTC",
+      "numeric_owner": true,
+      "sort": "name",
+      "uid": 0
+    },
+    "path": "/tmp/litchi-performance-0925/measurement-source-v4.tar",
+    "sha256": "41ebda126104fe45e384176857419d38f92c42e4ac9bea238f309f1038a4022c"
+  },
+  "archive_scope": "validated measurement-source-v4 tree only; no target, binaries, receipts, listing, or patch files inside source root",
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "candidate_patch": {
+    "bytes": 41560,
+    "path": "/tmp/litchi-performance-0925/section-layout-provider-final.patch",
+    "sha256": "9675346c827a4d546a47257f9c7cbcbfb37e76dae8055b2c9a38667e7d82fc2b"
+  },
+  "candidate_source_file": {
+    "path": "tools/perf-baseline/src/lib.rs",
+    "sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a"
+  },
+  "full_source_listing": {
+    "bytes": 940213,
+    "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl",
+    "sha256": "95fa57adadba7f24a483090adcaee609aeb3ac72e585f2479477442f81817e68"
+  },
+  "generated_targets_included": false,
+  "regenerator": {
+    "bytes": 269,
+    "path": "/tmp/litchi-performance-0925/regenerate-measurement-source-v4-archive.sh",
+    "sha256": "70c9f7d29737e5a52f9a6c438c2b4a441d87b8bea2896cf71e9eb6d7b8a9f967"
+  },
+  "schema": "litchi.performance.0925.measurement-source-archive.v2",
+  "source_bytes": 109831506,
+  "source_file_count": 6276,
+  "source_receipt": {
+    "bytes": 356812,
+    "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json",
+    "sha256": "fe35ae7a2926304915be3c48e3554143313e1acf902f31233a44fa668e0d44b2"
+  },
+  "source_root": "/tmp/litchi-performance-0925/measurement-source-v4"
+}

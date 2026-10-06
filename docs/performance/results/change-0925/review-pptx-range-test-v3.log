@@ -1,0 +1,31 @@
+review=0925 independent scoped PptxRangeSource test
+utc_start=2026-10-06T10:51:24.388403+00:00
+cwd=/tmp/litchi-performance-0925/source
+argv=['cargo', 'test', '--locked', '--manifest-path', 'tools/perf-baseline/Cargo.toml', '--lib', 'pptx_range_source', '--', '--nocapture']
+rustc=rustc 1.95.0 (59807616e 2026-04-14)
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+source_sha256=14473e770a23de764015b117fbc1b05a7bf78d7e397eeccde2edc77dd6521e80
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-8063837375488db0)
+
+running 13 tests
+test pptx_range_source::tests::checked_delta_rejects_counter_regression ... ok
+test pptx_range_source::tests::failed_reads_do_not_accrue_transfer_pacing ... ok
+test pptx_range_source::tests::request_size_histogram_overflow_fails_closed_without_wrapping ... ok
+test pptx_range_source::tests::empty_buffer_and_eof_have_distinct_call_semantics ... ok
+test pptx_range_source::tests::minimum_service_wait_credits_elapsed_work_and_checks_duration_overflow ... ok
+test pptx_range_source::tests::logical_counter_overflow_fails_closed_without_wrapping ... ok
+test pptx_range_source::tests::delay_policies_preserve_nominal_counters_and_short_read_bytes ... ok
+test pptx_range_source::tests::mixed_request_sizes_fill_the_fixed_histogram ... ok
+test pptx_range_source::tests::short_reads_reconstruct_the_exact_source ... ok
+test pptx_range_source::tests::forwards_length_and_version ... ok
+test pptx_range_source::tests::transfer_delay_rounds_up_and_refuses_overflow ... ok
+test pptx_range_source::tests::transfer_counter_overflow_and_delta_regression_fail_closed ... ok
+test pptx_range_source::tests::transfer_pacing_counts_returned_chunks_and_excludes_empty_eof_and_zero_cap ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 572 filtered out; finished in 0.00s
+
+
+exit_code=0
+utc_end=2026-10-06T10:51:24.485543+00:00

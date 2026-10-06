@@ -1,0 +1,298 @@
+{
+  "binary": {
+    "bytes": 70187352,
+    "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+    "sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7"
+  },
+  "build_receipt": {
+    "bytes": 3137,
+    "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json",
+    "sha256": "2b923bb232a2a433d03e97ee26991b48e4caf548924846ba15060fc7b639bf99"
+  },
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "created_utc": "2026-10-06T11:18:30.309991+00:00",
+  "results": [
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 0.213994954014197,
+      "ended_utc": "2026-10-06T11:18:27.473469+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "generic_read_at"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 20477,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.json",
+        "sha256": "ffd77cef1547b7ad1481d59e0a2069dea5de33dbbd72b97c5207250d7954387d"
+      },
+      "route": "generic_read_at",
+      "started_utc": "2026-10-06T11:18:27.259477+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/generic_read_at.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 0.21388105399091728,
+      "ended_utc": "2026-10-06T11:18:27.687586+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "owned_vec"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 20009,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.json",
+        "sha256": "d530ea1f41ae651dea8e58368b83e7c08ea502680286e7ab4af87af40038dcdb"
+      },
+      "route": "owned_vec",
+      "started_utc": "2026-10-06T11:18:27.473720+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_vec.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 0.21393709399853833,
+      "ended_utc": "2026-10-06T11:18:27.901753+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "owned_reader"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 20062,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.json",
+        "sha256": "18479dfbc3bb81bcea36140c3821f058e4ca453468d00bfd96cc988407413b80"
+      },
+      "route": "owned_reader",
+      "started_utc": "2026-10-06T11:18:27.687819+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/owned_reader.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 0.21376368301571347,
+      "ended_utc": "2026-10-06T11:18:28.115608+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "file_warm"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 23759,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.json",
+        "sha256": "645fa896877e33a5cd7a445b5839eb7f423f6df77e7404782f60ad3d72c71434"
+      },
+      "route": "file_warm",
+      "started_utc": "2026-10-06T11:18:27.901859+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/file_warm.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/range_short.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 0.21383785401121713,
+      "ended_utc": "2026-10-06T11:18:28.329642+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "range_short"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 26295,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_short.json",
+        "sha256": "a6fc2d2bfa86ce8eedd3464da72af688fc069adc775231bd53d4cf70c4ca9f57"
+      },
+      "route": "range_short",
+      "started_utc": "2026-10-06T11:18:28.115819+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_short.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_short.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 0.6144094629853498,
+      "ended_utc": "2026-10-06T11:18:28.944276+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "range_zero"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 26320,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.json",
+        "sha256": "4e436a3a3b3b2368460611aec263c47c47a84b36d37082a9990fba0eb0c3c615"
+      },
+      "route": "range_zero",
+      "started_utc": "2026-10-06T11:18:28.329871+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_zero.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline",
+        "--case",
+        "docx_source_backed_existing_section_layout_edit_save",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.json"
+      ],
+      "cwd": "/tmp/litchi-performance-0925/measurement-source-v4",
+      "elapsed_wall_seconds": 1.365483787987614,
+      "ended_utc": "2026-10-06T11:18:30.309886+00:00",
+      "environment": {
+        "LITCHI_DOCX_INGRESS_ROUTE": "range_delayed"
+      },
+      "exit_code": 0,
+      "report": {
+        "bytes": 26367,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.json",
+        "sha256": "5786be74c7469cd622ed528e70bc1c98e23a35c7a3a8ae8eef208c04d60b24da"
+      },
+      "route": "range_delayed",
+      "started_utc": "2026-10-06T11:18:28.944408+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4/range_delayed.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timed_out": false
+    }
+  ],
+  "routes": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader",
+    "file_warm",
+    "range_short",
+    "range_zero",
+    "range_delayed"
+  ],
+  "samples": 3,
+  "schema": "litchi.performance.0925.provider-release-preflight.v1",
+  "source_file": "/tmp/litchi-performance-0925/measurement-source-v4/tools/perf-baseline/src/lib.rs",
+  "source_root": "/tmp/litchi-performance-0925/measurement-source-v4",
+  "source_sha256": "7904a6161e7b40a675d61acd9867b31b81a47f049b1ebb5a9979778bf14a373a",
+  "status": "completed",
+  "warmup": 1
+}

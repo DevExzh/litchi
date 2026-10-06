@@ -1,0 +1,75 @@
+{
+  "base_revision": "aa077c030819c3019288e350f34959666ab7204f",
+  "binary": {
+    "bytes": 70197328,
+    "path": "/tmp/litchi-performance-0925/measurement-target-final/release/litchi-perf-baseline",
+    "sha256": "60359bcaeadf5014cf189af4f7ad62ced24c0308cc795fdaffbfa9dba228f52b"
+  },
+  "build_log": {
+    "bytes": 9069,
+    "path": "/tmp/litchi-performance-0925/measurement-build-final.log",
+    "sha256": "9458a159374f59966166f5abee557c10a7249cbaa2b23d7f8fe4a330ac813e00"
+  },
+  "command": "cargo +1.95.0 build --offline -j2 --locked --release --manifest-path /tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /tmp/litchi-performance-0925/measurement-target-final",
+  "command_argv": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "-j2",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "--target-dir",
+    "/tmp/litchi-performance-0925/measurement-target-final"
+  ],
+  "created_utc": "2026-10-06T11:03:36.331174+00:00",
+  "ended_utc": "2026-10-06T11:03:36.291451+00:00",
+  "environment": {},
+  "exit_code": 0,
+  "locks": {
+    "root_cargo_lock": {
+      "bytes": 138465,
+      "path": "/tmp/litchi-performance-0925/measurement-source/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "rustfmt_toml": {
+      "bytes": 79,
+      "path": "/tmp/litchi-performance-0925/measurement-source/rustfmt.toml",
+      "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+    },
+    "tools_performance_cargo_lock": {
+      "bytes": 56289,
+      "path": "/tmp/litchi-performance-0925/measurement-source/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    }
+  },
+  "profile": "release",
+  "rustc_info": {
+    "bytes": 1040,
+    "path": "/tmp/litchi-performance-0925/measurement-target-final/.rustc_info.json",
+    "sha256": "8fcff6af6f9610c25626b31588689eca31edd31111abb8968b9b772c70be4dcb"
+  },
+  "schema": "litchi.performance.0925.provider-build-receipt.v1",
+  "source_custody": {
+    "full_source_listing": {
+      "bytes": 940213,
+      "path": "/tmp/litchi-performance-0925/measurement-source-list.jsonl",
+      "sha256": "1849ccc0c23ded927034d1b8a9a1e190c1183f830e6da46709c6717b329a0757"
+    },
+    "source_receipt": {
+      "bytes": 356563,
+      "path": "/tmp/litchi-performance-0925/measurement-source-receipt.json",
+      "sha256": "02aba5ac8769aac5a0f33bd59cea9623f5627fd978e31b68e8967595d28f7748"
+    }
+  },
+  "source_root": "/tmp/litchi-performance-0925/measurement-source",
+  "started_utc": "2026-10-06T10:54:38.945447+00:00",
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+  }
+}

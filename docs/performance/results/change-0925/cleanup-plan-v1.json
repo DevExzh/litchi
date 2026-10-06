@@ -1,0 +1,991 @@
+{
+  "created_utc": "2026-10-06T11:33:06.656016+00:00",
+  "live_relevant_processes": [],
+  "mode": "read-only inventory; no paths removed",
+  "proposed_remove_after_root_authorization": [
+    {
+      "apparent_bytes": 14339246210,
+      "disk_bytes": 14389841920,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/source"
+    },
+    {
+      "apparent_bytes": 1167076992,
+      "disk_bytes": 1168359424,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-final/release/deps"
+    },
+    {
+      "apparent_bytes": 12446364,
+      "disk_bytes": 12869632,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-final/release/build"
+    },
+    {
+      "apparent_bytes": 306647,
+      "disk_bytes": 4124672,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-final/release/.fingerprint"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-final/release/examples"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-final/release/incremental"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-final/release/.cargo-lock"
+    },
+    {
+      "apparent_bytes": 1167193912,
+      "disk_bytes": 1168486400,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/deps"
+    },
+    {
+      "apparent_bytes": 12446571,
+      "disk_bytes": 12869632,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/build"
+    },
+    {
+      "apparent_bytes": 306641,
+      "disk_bytes": 4124672,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/.fingerprint"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/examples"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/incremental"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/.cargo-lock"
+    },
+    {
+      "apparent_bytes": 3059786,
+      "disk_bytes": 3063808,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/v4-format-copy-1"
+    },
+    {
+      "apparent_bytes": 6010194,
+      "disk_bytes": 6012928,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/lib.rustfmt-final.rs"
+    },
+    {
+      "apparent_bytes": 6009409,
+      "disk_bytes": 6012928,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/lib.rustfmt.rs"
+    },
+    {
+      "apparent_bytes": 6009407,
+      "disk_bytes": 6012928,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/lib.rustfmt2.rs"
+    },
+    {
+      "apparent_bytes": 6011639,
+      "disk_bytes": 6012928,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/v3-rustfmt-output.rs"
+    },
+    {
+      "apparent_bytes": 6012359,
+      "disk_bytes": 6012928,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/v4-formatted-lib.rs"
+    },
+    {
+      "apparent_bytes": 9238754,
+      "disk_bytes": 9240576,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/rustfmt.diff"
+    },
+    {
+      "apparent_bytes": 9234749,
+      "disk_bytes": 9236480,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/v4-rustfmt-2.delta"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/v4-rustfmt-full.diff"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/v3-rustfmt-skip-output.rs"
+    },
+    {
+      "apparent_bytes": 5392,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/counter.final"
+    },
+    {
+      "apparent_bytes": 5392,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/counter.final.fmt"
+    },
+    {
+      "apparent_bytes": 5340,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/counter.fmt"
+    },
+    {
+      "apparent_bytes": 5340,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/counter.fmt2"
+    },
+    {
+      "apparent_bytes": 5271,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/counter.orig"
+    },
+    {
+      "apparent_bytes": 5340,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/counter.orig2"
+    },
+    {
+      "apparent_bytes": 33282,
+      "disk_bytes": 36864,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/func.fmt"
+    },
+    {
+      "apparent_bytes": 33144,
+      "disk_bytes": 36864,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/func.fmt2"
+    },
+    {
+      "apparent_bytes": 33226,
+      "disk_bytes": 36864,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/func.orig"
+    },
+    {
+      "apparent_bytes": 33147,
+      "disk_bytes": 36864,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/func.orig2"
+    },
+    {
+      "apparent_bytes": 12112,
+      "disk_bytes": 12288,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/route.fmt"
+    },
+    {
+      "apparent_bytes": 12107,
+      "disk_bytes": 12288,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/route.fmt2"
+    },
+    {
+      "apparent_bytes": 12161,
+      "disk_bytes": 12288,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/route.orig"
+    },
+    {
+      "apparent_bytes": 12198,
+      "disk_bytes": 12288,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/route.orig2"
+    },
+    {
+      "apparent_bytes": 2283,
+      "disk_bytes": 4096,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/test.final"
+    },
+    {
+      "apparent_bytes": 2147,
+      "disk_bytes": 4096,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/test.final.fmt"
+    },
+    {
+      "apparent_bytes": 4503,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/test.fmt"
+    },
+    {
+      "apparent_bytes": 4830,
+      "disk_bytes": 8192,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/test.orig"
+    },
+    {
+      "apparent_bytes": 1643,
+      "disk_bytes": 4096,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/testblock.fmt2"
+    },
+    {
+      "apparent_bytes": 1643,
+      "disk_bytes": 4096,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/testblock.orig2"
+    },
+    {
+      "apparent_bytes": 16427,
+      "disk_bytes": 20480,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/orig-added-block.txt"
+    },
+    {
+      "apparent_bytes": 30808,
+      "disk_bytes": 32768,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/lib.diff"
+    },
+    {
+      "apparent_bytes": 27658,
+      "disk_bytes": 28672,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-recover-check"
+    },
+    {
+      "apparent_bytes": 27396,
+      "disk_bytes": 28672,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-recover-compile"
+    },
+    {
+      "apparent_bytes": 25387,
+      "disk_bytes": 28672,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-recover"
+    },
+    {
+      "apparent_bytes": 174966,
+      "disk_bytes": 184320,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-final-check"
+    },
+    {
+      "apparent_bytes": 103628,
+      "disk_bytes": 110592,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-reducer"
+    },
+    {
+      "apparent_bytes": 160785,
+      "disk_bytes": 167936,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v-final"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v20"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v19"
+    },
+    {
+      "apparent_bytes": 154937,
+      "disk_bytes": 163840,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v18"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v17"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v16"
+    },
+    {
+      "apparent_bytes": 153441,
+      "disk_bytes": 163840,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v15"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v14"
+    },
+    {
+      "apparent_bytes": 149115,
+      "disk_bytes": 155648,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v13"
+    },
+    {
+      "apparent_bytes": 147030,
+      "disk_bytes": 155648,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v12"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v11"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v10"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v9"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v8"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v7"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v6"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v5"
+    },
+    {
+      "apparent_bytes": 0,
+      "disk_bytes": 0,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache-v4"
+    },
+    {
+      "apparent_bytes": 111598,
+      "disk_bytes": 118784,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/pycache"
+    },
+    {
+      "apparent_bytes": 18584,
+      "disk_bytes": 20480,
+      "exists": true,
+      "path": "/tmp/litchi-performance-0925/__pycache__"
+    }
+  ],
+  "proposed_remove_apparent_bytes": 16752141895,
+  "proposed_remove_disk_bytes": 16813940736,
+  "retain_until_audit_or_recovery": {
+    "binary_and_fingerprint_files": [
+      {
+        "apparent_bytes": 1040,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-target-final/.rustc_info.json"
+      },
+      {
+        "apparent_bytes": 70197328,
+        "disk_bytes": 70201344,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-target-final/release/litchi-perf-baseline"
+      },
+      {
+        "apparent_bytes": 368621,
+        "disk_bytes": 368640,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-target-final/release/litchi-perf-baseline.d"
+      },
+      {
+        "apparent_bytes": 1040,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/.rustc_info.json"
+      },
+      {
+        "apparent_bytes": 70187352,
+        "disk_bytes": 70189056,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline"
+      },
+      {
+        "apparent_bytes": 380171,
+        "disk_bytes": 380928,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-target-v4-final/release/litchi-perf-baseline.d"
+      }
+    ],
+    "capture_preflight_and_canonical_evidence": [
+      {
+        "apparent_bytes": 4487296,
+        "disk_bytes": 4861952,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/capture-v4"
+      },
+      {
+        "apparent_bytes": 184084,
+        "disk_bytes": 196608,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/release-preflight-v4"
+      },
+      {
+        "apparent_bytes": 8327,
+        "disk_bytes": 12288,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/audit-capture-v4-descriptive.py"
+      },
+      {
+        "apparent_bytes": 5721,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/audit-capture-v4-raw.py"
+      },
+      {
+        "apparent_bytes": 71346,
+        "disk_bytes": 73728,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/capture-v4-descriptive-audit.json"
+      },
+      {
+        "apparent_bytes": 18141,
+        "disk_bytes": 20480,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/capture-v4-independent-raw-audit.json"
+      },
+      {
+        "apparent_bytes": 123431,
+        "disk_bytes": 126976,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/capture-v4-recovery-independent.json"
+      },
+      {
+        "apparent_bytes": 7074,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-final-v2.stdout"
+      },
+      {
+        "apparent_bytes": 7074,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-final-v3.stdout"
+      },
+      {
+        "apparent_bytes": 6923,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-final.stdout"
+      },
+      {
+        "apparent_bytes": 4718,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v1.json"
+      },
+      {
+        "apparent_bytes": 6670,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v10.json"
+      },
+      {
+        "apparent_bytes": 6826,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v11.json"
+      },
+      {
+        "apparent_bytes": 7140,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v12.json"
+      },
+      {
+        "apparent_bytes": 4952,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v4.json"
+      },
+      {
+        "apparent_bytes": 4972,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v5.json"
+      },
+      {
+        "apparent_bytes": 5738,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v6.json"
+      },
+      {
+        "apparent_bytes": 5738,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v7.json"
+      },
+      {
+        "apparent_bytes": 5738,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v8.json"
+      },
+      {
+        "apparent_bytes": 6670,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/comparison-controls-v9.json"
+      },
+      {
+        "apparent_bytes": 5882,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/controls-reducer-recheck.json"
+      },
+      {
+        "apparent_bytes": 5882,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/controls-v4-recheck.json"
+      },
+      {
+        "apparent_bytes": 5528,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/controls-v8-run.json"
+      },
+      {
+        "apparent_bytes": 5654,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/controls-v9-run.json"
+      },
+      {
+        "apparent_bytes": 3362,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/design-and-receipt.md"
+      },
+      {
+        "apparent_bytes": 132,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/diffstat-v3.txt"
+      },
+      {
+        "apparent_bytes": 132,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/diffstat.txt"
+      },
+      {
+        "apparent_bytes": 262,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/freeze-v4.stdout"
+      },
+      {
+        "apparent_bytes": 3098,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-final.json"
+      },
+      {
+        "apparent_bytes": 9069,
+        "disk_bytes": 12288,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-final.log"
+      },
+      {
+        "apparent_bytes": 3137,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json"
+      },
+      {
+        "apparent_bytes": 9174,
+        "disk_bytes": 12288,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.log"
+      },
+      {
+        "apparent_bytes": 1967,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-archive.json"
+      },
+      {
+        "apparent_bytes": 940213,
+        "disk_bytes": 942080,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-list.jsonl"
+      },
+      {
+        "apparent_bytes": 1319615,
+        "disk_bytes": 1323008,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-metadata.json"
+      },
+      {
+        "apparent_bytes": 356563,
+        "disk_bytes": 360448,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-receipt.json"
+      },
+      {
+        "apparent_bytes": 1990,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-archive.json"
+      },
+      {
+        "apparent_bytes": 940213,
+        "disk_bytes": 942080,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl"
+      },
+      {
+        "apparent_bytes": 356812,
+        "disk_bytes": 360448,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json"
+      },
+      {
+        "apparent_bytes": 115220480,
+        "disk_bytes": 115220480,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4.tar"
+      },
+      {
+        "apparent_bytes": 122705920,
+        "disk_bytes": 122707968,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source.tar"
+      },
+      {
+        "apparent_bytes": 1298159,
+        "disk_bytes": 1298432,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/perf-metadata.json"
+      },
+      {
+        "apparent_bytes": 802,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/pre-capture-environment.json"
+      },
+      {
+        "apparent_bytes": 1722,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/production-adoption-receipt.json"
+      },
+      {
+        "apparent_bytes": 22596,
+        "disk_bytes": 24576,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/provider-baseline-audit-v1.json"
+      },
+      {
+        "apparent_bytes": 4377,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/provider-baseline-audit-v1.md"
+      },
+      {
+        "apparent_bytes": 19626,
+        "disk_bytes": 20480,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/provider-capture-manifest-v4-authorized.json"
+      },
+      {
+        "apparent_bytes": 19627,
+        "disk_bytes": 20480,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/provider-capture-manifest-v4-unauthorized.json"
+      },
+      {
+        "apparent_bytes": 27449,
+        "disk_bytes": 28672,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/provider-protocol-draft-v1.json"
+      },
+      {
+        "apparent_bytes": 18095,
+        "disk_bytes": 20480,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/provider-protocol-draft-v1.py"
+      },
+      {
+        "apparent_bytes": 119424,
+        "disk_bytes": 122880,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/reducer-smoke.json"
+      },
+      {
+        "apparent_bytes": 956,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/review-docx-test-v3.log"
+      },
+      {
+        "apparent_bytes": 1966,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/review-pptx-range-test-v3.log"
+      },
+      {
+        "apparent_bytes": 6658,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/review-rustfmt-v3.log"
+      },
+      {
+        "apparent_bytes": 0,
+        "disk_bytes": 0,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/review-rustfmt-v4-check.log"
+      },
+      {
+        "apparent_bytes": 13612,
+        "disk_bytes": 16384,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/review-smoke-audit-v3.json"
+      },
+      {
+        "apparent_bytes": 6166,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/review-smoke-audit-v3.py"
+      },
+      {
+        "apparent_bytes": 4710,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/reviewer-quality-receipt-v3.json"
+      },
+      {
+        "apparent_bytes": 4986,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/reviewer-quality-receipt-v4.json"
+      },
+      {
+        "apparent_bytes": 6176,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/reviewer-quality-receipt-v5.json"
+      },
+      {
+        "apparent_bytes": 641,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/root-capture-authorization.json"
+      },
+      {
+        "apparent_bytes": 3540,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/run-release-preflight-v4.py"
+      },
+      {
+        "apparent_bytes": 41560,
+        "disk_bytes": 45056,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/section-layout-provider-final.patch"
+      },
+      {
+        "apparent_bytes": 41291,
+        "disk_bytes": 45056,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/section-layout-provider-v2.patch"
+      },
+      {
+        "apparent_bytes": 41263,
+        "disk_bytes": 45056,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/section-layout-provider-v3.patch"
+      },
+      {
+        "apparent_bytes": 4914,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/section-layout-provider-v4.patch"
+      },
+      {
+        "apparent_bytes": 41322,
+        "disk_bytes": 45056,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/section-layout-provider.patch"
+      },
+      {
+        "apparent_bytes": 292628,
+        "disk_bytes": 294912,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/v3-skip-check.log"
+      },
+      {
+        "apparent_bytes": 4828,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/v3-v4-semantic-diff.txt"
+      },
+      {
+        "apparent_bytes": 4362,
+        "disk_bytes": 8192,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/validate-release-preflight-v4.py"
+      }
+    ],
+    "custody_and_final_source": [
+      {
+        "apparent_bytes": 122705920,
+        "disk_bytes": 122707968,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source.tar"
+      },
+      {
+        "apparent_bytes": 1967,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-archive.json"
+      },
+      {
+        "apparent_bytes": 940213,
+        "disk_bytes": 942080,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-list.jsonl"
+      },
+      {
+        "apparent_bytes": 356563,
+        "disk_bytes": 360448,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-receipt.json"
+      },
+      {
+        "apparent_bytes": 271,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/regenerate-measurement-source-archive.sh"
+      },
+      {
+        "apparent_bytes": 115220480,
+        "disk_bytes": 115220480,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4.tar"
+      },
+      {
+        "apparent_bytes": 1990,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-archive.json"
+      },
+      {
+        "apparent_bytes": 940213,
+        "disk_bytes": 942080,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-list.jsonl"
+      },
+      {
+        "apparent_bytes": 356812,
+        "disk_bytes": 360448,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4-receipt.json"
+      },
+      {
+        "apparent_bytes": 269,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/regenerate-measurement-source-v4-archive.sh"
+      },
+      {
+        "apparent_bytes": 109831506,
+        "disk_bytes": 124387328,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-source-v4"
+      },
+      {
+        "apparent_bytes": 3098,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-final.json"
+      },
+      {
+        "apparent_bytes": 9069,
+        "disk_bytes": 12288,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-final.log"
+      },
+      {
+        "apparent_bytes": 3137,
+        "disk_bytes": 4096,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.json"
+      },
+      {
+        "apparent_bytes": 9174,
+        "disk_bytes": 12288,
+        "exists": true,
+        "path": "/tmp/litchi-performance-0925/measurement-build-v4-final.log"
+      }
+    ]
+  },
+  "root": "/tmp/litchi-performance-0925",
+  "safety_notes": [
+    "Do not remove measurement-source-v4, either source archive/listing/receipt packet, build logs/receipts, capture-v4, release-preflight-v4, or canonical review/control evidence before auditor/recovery sign-off.",
+    "Remove only release dependency/build/fingerprint/example/incremental directories; retain each recorded v3/v4 binary, .d file, and .rustc_info.json.",
+    "The mutable v3 source tree includes its 14 GB debug target and is recoverable from measurement-source.tar plus its receipt/listing.",
+    "Do not touch root checkout files or the adopted production source during cleanup."
+  ],
+  "schema": "litchi.performance.0925.cleanup-plan.v1"
+}

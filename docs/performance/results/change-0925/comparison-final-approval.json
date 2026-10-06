@@ -1,0 +1,416 @@
+{
+  "actual_compact_helper_control": {
+    "capture_runner": {
+      "bytes": 51557,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-capture.py",
+      "sha256": "90a6466a39d290fe8722c30132fc4d0e0fc4188763c4e70e4dd4a3a50048c590"
+    },
+    "children": 42,
+    "compact_state_bytes": 99640,
+    "comparison_validator": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "control_script": {
+      "bytes": 9707,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-postcapture-fix-controls.py",
+      "sha256": "cf2b22d024d7912f7bdc9655e2bedc67f49b2c80c64cf3ed272f75741b1fa9ae"
+    },
+    "legacy_full_vector_state_bytes": 1992796,
+    "negative_controls": {
+      "all_42_child_ids_unique": "passed",
+      "raw_phase_vectors_absent_from_compact_receipts": "passed",
+      "report_hash_present_for_all_children": "passed"
+    },
+    "receipt": {
+      "bytes": 2087,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-postcapture-fix-controls-final-v2.json",
+      "sha256": "9faa72db40934b3e20223d0687ddc62f300a9bc6fb0cb814858dc205a8b8f923"
+    },
+    "same_helper_as_runner": true,
+    "status": "passed",
+    "writer_limit_bytes": 1048576
+  },
+  "claim_scope": "custody/recovery/tooling approval only; formal cohort remains invalid descriptive-only and no production adoption or timing ranking is approved",
+  "formal_cohort": {
+    "capture_state_present": false,
+    "classification": "invalid_terminal_custody_failure",
+    "deadline_flags": "unavailable from original in-memory receipts",
+    "no_child_started_by_review": 0,
+    "per_child_timestamps": "unavailable from original in-memory receipts",
+    "performance_children_run": 0,
+    "runner_return_codes": "unavailable from original in-memory receipts",
+    "time_reported_exit_status_zero": 42
+  },
+  "independent_raw_crosscheck": {
+    "described_samples": 2100,
+    "per_route_matches_v3": true,
+    "receipt": {
+      "bytes": 71346,
+      "path": "/tmp/litchi-performance-0925/capture-v4-descriptive-audit.json",
+      "sha256": "d80a0e5ea07a3f8ddc7ab14f859449b2dc71c3154fa83fba89d3c9da6cb3f37c"
+    },
+    "reports_validated": 42
+  },
+  "moved_packet_check": {
+    "exact_equal": true,
+    "fields_compared": [
+      "elapsed_ns",
+      "phase_shares",
+      "phase_statistics_ns",
+      "provider_accounting",
+      "child_latency_ns",
+      "child_rss_bytes",
+      "samples",
+      "children"
+    ],
+    "receipt": {
+      "bytes": 768,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/root-moved-recovery-check.json",
+      "sha256": "eb79882cf2d881e6e20850f32868fca4a46d534c4eda125a84f84cdb3a0fbedd"
+    },
+    "reports": 42,
+    "routes": 7,
+    "status": "descriptive_replay_verified_protocol_remains_invalid"
+  },
+  "per_route": {
+    "file_warm": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 4733920,
+        "mean": 4605275.41,
+        "min": 4566509,
+        "p50": 4600499.0,
+        "p95": 4647019.0,
+        "p99": 4672179.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.07578507955799615,
+        "edit_ns": 0.011736064662417226,
+        "open_ns": 0.011073149549883995,
+        "preparation_ns": 0.0008167488365985332,
+        "publication_ns": 0.6026827083218171,
+        "query_ns": 0.297906249071287
+      },
+      "rss_statistics_bytes": {
+        "max": 35594240,
+        "mean": 35355989.333333336,
+        "min": 35274752,
+        "p50": 35311616.0,
+        "p95": 35594240.0,
+        "p99": 35594240.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    },
+    "generic_read_at": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 4770130,
+        "mean": 4492460.226666667,
+        "min": 4462368,
+        "p50": 4488258.5,
+        "p95": 4527579.0,
+        "p99": 4579839.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.07756847156149335,
+        "edit_ns": 0.011788249792169556,
+        "open_ns": 0.010162528851266372,
+        "preparation_ns": 0.007824282960003174,
+        "publication_ns": 0.5954435576572287,
+        "query_ns": 0.2972129091778388
+      },
+      "rss_statistics_bytes": {
+        "max": 37400576,
+        "mean": 37104298.666666664,
+        "min": 36814848,
+        "p50": 37107712.0,
+        "p95": 37400576.0,
+        "p99": 37400576.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    },
+    "owned_reader": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 4124577,
+        "mean": 3887467.1033333335,
+        "min": 3566806,
+        "p50": 3847581.0,
+        "p95": 4077157.0,
+        "p99": 4102087.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.08983964212426848,
+        "edit_ns": 0.013668967973457603,
+        "open_ns": 0.09846606710535157,
+        "preparation_ns": 0.019973077054059974,
+        "publication_ns": 0.4339112293847141,
+        "query_ns": 0.3441410163581483
+      },
+      "rss_statistics_bytes": {
+        "max": 40247296,
+        "mean": 37936469.333333336,
+        "min": 37335040,
+        "p50": 37502976.0,
+        "p95": 40247296.0,
+        "p99": 40247296.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    },
+    "owned_vec": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 3914836,
+        "mean": 3715386.0166666666,
+        "min": 3677985,
+        "p50": 3712355.5,
+        "p95": 3741056.0,
+        "p99": 3769886.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.09393852530199856,
+        "edit_ns": 0.014164672642516495,
+        "open_ns": 0.012471276593821492,
+        "preparation_ns": 0.06447319486915046,
+        "publication_ns": 0.4558803640865293,
+        "query_ns": 0.35907196650598366
+      },
+      "rss_statistics_bytes": {
+        "max": 37703680,
+        "mean": 37444266.666666664,
+        "min": 37093376,
+        "p50": 37402624.0,
+        "p95": 37703680.0,
+        "p99": 37703680.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    },
+    "range_delayed": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 242655510,
+        "mean": 238610320.58333334,
+        "min": 238340621,
+        "p50": 238516835.0,
+        "p95": 239067553.0,
+        "p99": 240447073.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.0014856410896227903,
+        "edit_ns": 0.0002663515832479287,
+        "open_ns": 0.06220015746615615,
+        "preparation_ns": 0.00017472968715159099,
+        "publication_ns": 0.6961722646107659,
+        "query_ns": 0.2397008555630557
+      },
+      "rss_statistics_bytes": {
+        "max": 37699584,
+        "mean": 37492736.0,
+        "min": 37367808,
+        "p50": 37412864.0,
+        "p95": 37699584.0,
+        "p99": 37699584.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    },
+    "range_short": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 4731240,
+        "mean": 4539567.45,
+        "min": 4504968,
+        "p50": 4536949.0,
+        "p95": 4571769.0,
+        "p99": 4599670.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.07688261429694879,
+        "edit_ns": 0.01174208128574012,
+        "open_ns": 0.010418085097512981,
+        "preparation_ns": 0.00833859842747793,
+        "publication_ns": 0.5956613054253294,
+        "query_ns": 0.2969573154669909
+      },
+      "rss_statistics_bytes": {
+        "max": 37699584,
+        "mean": 37350741.333333336,
+        "min": 37085184,
+        "p50": 37349376.0,
+        "p95": 37699584.0,
+        "p99": 37699584.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    },
+    "range_zero": {
+      "children": 6,
+      "described_samples": 300,
+      "elapsed_ns": {
+        "max": 77080449,
+        "mean": 73519402.09,
+        "min": 73115223,
+        "p50": 73455876.0,
+        "p95": 73786187.0,
+        "p99": 75517597.0
+      },
+      "exact_metric_matches": {
+        "child_latency_ns": true,
+        "child_rss_bytes": true,
+        "elapsed_ns": true,
+        "independent_elapsed_ns": true,
+        "independent_phase_shares": true,
+        "independent_provider_accounting": true,
+        "independent_rss_statistics": true,
+        "phase_shares": true,
+        "phase_statistics_ns": true,
+        "provider_accounting": true
+      },
+      "phase_shares_fraction": {
+        "commit_ns": 0.004798953473099444,
+        "edit_ns": 0.0008108789648981035,
+        "open_ns": 0.010007765556897499,
+        "preparation_ns": 0.0005128378667603679,
+        "publication_ns": 0.6681229504995466,
+        "query_ns": 0.31574661363879797
+      },
+      "rss_statistics_bytes": {
+        "max": 37703680,
+        "mean": 37288618.666666664,
+        "min": 36814848,
+        "p50": 37371904.0,
+        "p95": 37703680.0,
+        "p99": 37703680.0
+      },
+      "time_reported_exit_status_counts": {
+        "0": 6
+      }
+    }
+  },
+  "recovery_v3": {
+    "performance_children_run": 0,
+    "receipt": {
+      "bytes": 133355,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-recovery-final-v3.json",
+      "sha256": "7443848b9cfd25cc89e7005c49fde1217b69b2d3b9c934f2465e9ddaa8a92497"
+    },
+    "serialized_reduction_bytes": 72803,
+    "status": "invalid_terminal_reconstructed",
+    "tool": {
+      "bytes": 22542,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-recover.py",
+      "sha256": "482a59dfdb2ac5839ec9861f6cf24830f9d89a6fbcf2766fee1327aee76024a6"
+    },
+    "under_one_mib": true,
+    "v2_metric_equivalence": true
+  },
+  "reproduction": {
+    "benchmark_children_started": 0,
+    "helper_control": "python3 -B docs/performance/results/change-0925/comparison-postcapture-fix-controls.py",
+    "recovery": "python3 -B docs/performance/results/change-0925/comparison-recover.py --packet <moved-packet> --failure-receipt <capture-failure.json> --authorized-manifest <authorized-manifest.json> --output <recovery.json>"
+  },
+  "schema": "litchi.performance.0925.final-approval.v1",
+  "status": "passed_commit_ready_no_capture",
+  "superseded_receipts": {
+    "v2_crosscheck_retained_for_history": {
+      "bytes": 11398,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-recovery-crosscheck.json",
+      "sha256": "f3d13dcd10cd998ec12a6f7adfc1d0140708fff40a4a857d2b76bbe65aba31fb"
+    },
+    "v2_recovery_retained_for_history": {
+      "bytes": 123431,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/comparison-recovery-final-v2.json",
+      "sha256": "769c1396fc19cd7c1243a887acaec51eb025ce1830de79a40a4a1e27ed11b689"
+    }
+  }
+}
