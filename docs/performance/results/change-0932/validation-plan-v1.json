@@ -1,0 +1,182 @@
+{
+  "adr_scope_reviewed": [
+    "docs/GOAL.md",
+    "docs/adr/0003-snapshots-edits-and-patches.md",
+    "docs/adr/0005-io-memory-and-performance.md",
+    "docs/adr/0006-validation-security-and-compatibility.md",
+    "docs/adr/0030-lazy-opc-part-decode.md",
+    "docs/adr/0031-execution-context-budgets.md",
+    "docs/adr/0032-snapshot-derived-value-memos.md"
+  ],
+  "builds_run_this_batch": false,
+  "canonical_commands_for_future_candidate": [
+    "cargo +1.95.0 test --offline --locked -j2 -p litchi-docx --test source_backed_sections",
+    "cargo +1.95.0 test --offline --locked -j2 -p litchi-docx --all-targets",
+    "cargo +1.95.0 clippy --offline --locked -j2 -p litchi-docx --all-targets -- -D warnings",
+    "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc --offline --locked -j2 -p litchi-docx --no-deps",
+    "cargo +1.95.0 fmt --all -- --check",
+    "python3 tools/check_crate_boundaries.py"
+  ],
+  "change": "0932",
+  "existing_test_coverage": [
+    {
+      "path": "crates/litchi-docx/src/section/tests.rs",
+      "tests": [
+        "reads_geometry_columns_references_and_preserves_unknown_content",
+        "strict_universal_measurements_decode_to_twips_and_preserve_source",
+        "mutations_keep_foreign_children_and_round_trip",
+        "malformed_and_unbounded_fragments_are_rejected",
+        "standalone_sections_validate_qnames_without_rejecting_inherited_prefixes",
+        "inventory_reports_zero_one_and_multiple_logical_sections",
+        "inventory_selects_mce_and_keeps_header_footer_references_inert",
+        "inventory_ignores_table_cell_section_properties_for_main_story_boundaries",
+        "inventory_materializes_inherited_namespaces_after_quoted_gt_and_refuses_malformed_opening",
+        "inventory_rejects_unbound_prefixes_and_records_non_xml_relationship_ids",
+        "inventory_rejects_invalid_qnames_and_reserved_namespace_bindings",
+        "inventory_refuses_unsupported_mce_branch_and_body_final_trailing_content",
+        "inventory_accepts_strict_and_refuses_bad_topology_and_section_grammar",
+        "inventory_enforces_caller_limits_and_snapshot_selection",
+        "inventory_preflights_reference_limits_before_semantic_retention",
+        "inventory_bounds_inherited_namespace_materialization",
+        "inventory_uses_original_namespace_aliases_and_ignores_nested_story_paragraphs",
+        "column_model_deviations_are_repaired_and_recorded"
+      ]
+    },
+    {
+      "path": "crates/litchi-docx/src/section/codec.rs",
+      "tests": [
+        "interleaved_header_footer_references_decode_before_page_size",
+        "reference_after_page_size_is_rejected",
+        "duplicate_same_header_or_footer_type_is_rejected",
+        "opaque_barriers_stay_before_late_modeled_insertions",
+        "late_schema_barriers_preserve_pg_borders_no_endnote_and_change_order",
+        "only_opaque_children_receive_all_modeled_fields_at_root_close",
+        "reversed_no_endnote_and_section_change_are_rejected",
+        "generated_qnames_use_named_root_word_prefix",
+        "generated_qnames_use_named_alias_with_default_element_namespace",
+        "child_relationship_or_foreign_attributes_cannot_hijack_generated_prefix",
+        "explicit_root_bindings_decode_child_word_and_relationship_attributes_exactly",
+        "detached_lexical_prefix_fallback_remains_byte_exact",
+        "explicit_foreign_relationship_binding_cannot_satisfy_reference_id",
+        "default_only_page_size_deletion_preserves_margin_bytes",
+        "named_prefix_page_size_addition_precedes_existing_margins",
+        "repeated_section_attribute_names_are_refused_at_the_same_attribute"
+      ]
+    },
+    {
+      "path": "crates/litchi-docx/src/section/footnote_columns/tests.rs",
+      "tests": [
+        "reads_zero_and_preserves_absence",
+        "transaction_is_lossless_and_inverse_is_atomic",
+        "package_discovery_retains_inherited_namespace_context",
+        "package_discovery_rejects_unignorable_inherited_extension",
+        "value_edits_preserve_extension_attributes_and_lexical_source",
+        "patches_require_exact_source_bytes",
+        "rejects_values_outside_schema_int_bounds",
+        "malformed_extension_and_missing_ignorable_are_rejected",
+        "inserts_before_section_change_without_rewriting_opaque_trivia",
+        "selects_matching_aliases_when_preferred_namespace_prefixes_collide",
+        "rejects_duplicate_expanded_mc_ignorable_aliases",
+        "inherited_ignorable_tokens_are_not_duplicated_or_rebound_locally",
+        "rejects_overdeep_section_fragments"
+      ]
+    },
+    {
+      "path": "crates/litchi-docx/tests/source_backed_sections.rs",
+      "tests": [
+        "source_backed_existing_section_layout_is_exact_and_cell_safe",
+        "source_backed_section_layout_noop_mce_strict_and_limits_are_typed",
+        "section_layout_commit_rechecks_complete_artifact_before_target_reuse",
+        "section_layout_commit_rejects_revision_change_before_output",
+        "section_layout_commit_retained_fallback_and_release_are_byte_parity",
+        "section_layout_retained_malformed_source_keeps_parse_error_before_sink",
+        "section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings",
+        "section_layout_alias_foreign_children_and_column_comments_are_preserved",
+        "section_layout_namespace_shadowing_restores_section_root_alias",
+        "section_layout_default_word_namespace_rebinds_inserted_qnames",
+        "section_layout_missing_children_precede_standard_barriers_losslessly",
+        "section_layout_local_prefix_shadowing_preserves_foreign_markup_and_reopens",
+        "section_layout_missing_field_with_unknown_word_child_is_typed_unsafe_edit",
+        "section_layout_complex_noop_remains_byte_exact",
+        "section_layout_signed_noop_changed_and_partial_sink_are_typed",
+        "section_layout_detached_patch_cannot_publish_to_source_package",
+        "section_inventory_many_sections_stays_within_primary_event_budget"
+      ]
+    }
+  ],
+  "mandatory_differential_cases": [
+    {
+      "id": "owned_vs_inventory_semantics",
+      "requirement": "For the same extracted sectPr (including self-contained inherited namespace declarations), compare Section::from_xml_bytes/validate/local_state/tolerance_report/xml_bytes with Inventory descriptor fields, tolerance defects and remapped source offsets."
+    },
+    {
+      "id": "lazy_error_timing_and_order",
+      "requirement": "Preserve constructor-only structural validation, first semantic-access failures, codec-before-footnote validation order, exact error family/message, and call-order independence for duplicate/order/measurement/type faults."
+    },
+    {
+      "id": "lossless_lexical_preservation",
+      "requirement": "Compare untouched and each known-field set/clear output byte-for-byte, retaining comments, whitespace, foreign children/attributes, lexical units, attribute order, namespace declarations and insertion barriers."
+    },
+    {
+      "id": "footnote_extension_contract",
+      "requirement": "Preserve missing versus val=0 versus lexical val=02, valid inherited aliases, missing mc:Ignorable, malformed/negative/out-of-range values, duplicate/child/text extensions, overdeep input, and atomic inverse/stale refusal."
+    },
+    {
+      "id": "inventory_topology_and_mce",
+      "requirement": "Preserve implicit/paragraph-owned/body-final ownership, table-cell exclusion, nested-story paragraph handling, strict/transitional/default namespaces, MCE branch selection/refusal, and trailing/duplicate topology errors."
+    },
+    {
+      "id": "limits_and_preflight",
+      "requirement": "Exercise zero-limit rejection and each input/events/depth/paragraphs/sections/section-bytes/reference-bytes/MCE output/bindings/choices boundary; retain reference preflight before semantic retention and typed allocation failures."
+    },
+    {
+      "id": "source_publication_atomicity",
+      "requirement": "For source-backed routes preserve exact source version/fingerprint/lineage checks, short-read/version-change behavior, no-op sharing, foreign/stale/policy refusal, zero sink on failure, changed output and inverse/reopen parity."
+    },
+    {
+      "id": "tolerance_and_security",
+      "requirement": "Compare repaired column models and relationship-ID tolerance defects/offsets; retain QName/reserved-namespace, unbound-prefix, malformed XML/DTD/entity and unknown-Word insertion refusal behavior."
+    }
+  ],
+  "production_edits_this_batch": false,
+  "recorded_utc": "2026-10-06T16:10:24Z",
+  "schema": "docx_section_validation_plan_v1",
+  "scope": "Plan differential correctness gates for a proposed borrow-only inventory scanner or deferred fragment parse consolidation; no performance or allocation qualification is asserted.",
+  "source_binding": {
+    "files": [
+      {
+        "bytes": 28343,
+        "path": "crates/litchi-docx/src/section/tests.rs",
+        "sha256": "2b6942ccbeaaca8e0b8af23df3006313c80a5b6954a2efa1fd760a38c5f2008b"
+      },
+      {
+        "bytes": 76303,
+        "path": "crates/litchi-docx/src/section/codec.rs",
+        "sha256": "dac8d1495653973be53eb2bb971430d87a924e8b9bac9c7d97a59fc0ac3ee886"
+      },
+      {
+        "bytes": 61473,
+        "path": "crates/litchi-docx/src/section/inventory.rs",
+        "sha256": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99"
+      },
+      {
+        "bytes": 16407,
+        "path": "crates/litchi-docx/src/section/footnote_columns/tests.rs",
+        "sha256": "1907778dd18b3a89946b030aec5bc65399a2a4f370fe79da733f86d84ec245d2"
+      },
+      {
+        "bytes": 61823,
+        "path": "crates/litchi-docx/tests/source_backed_sections.rs",
+        "sha256": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0"
+      }
+    ],
+    "git_head": "7400b94f7eb7b6f991d92b8e7c982fb4406c6bd5",
+    "quality_reuse_condition": "Reuse only for unchanged production paths; a future 0932 candidate requires its own focused differential evidence.",
+    "reused_quality_scope": [
+      "docs/performance/results/change-0930/new-quality.json",
+      "docs/performance/results/change-0931/new-quality.json"
+    ]
+  },
+  "status": "read_only_planning_only",
+  "tests_run_this_batch": false
+}

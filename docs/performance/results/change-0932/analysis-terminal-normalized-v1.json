@@ -1,0 +1,459 @@
+{
+  "analysis_started_after_capture_terminal": true,
+  "commands": [
+    {
+      "argv": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "-m",
+        "1",
+        "-n",
+        "1000000",
+        "-s",
+        "1000000",
+        "-a",
+        "-p",
+        "-T",
+        "-l",
+        "-H",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-size.histogram",
+        "-F",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-stacks.folded",
+        "--flamegraph-cost-type",
+        "allocations"
+      ],
+      "child": "s8192-c08-exact-independent_sources-heaptrack-v1",
+      "ended_utc": "2026-10-06T16:00:35.358424+00:00",
+      "error": null,
+      "generated": [
+        {
+          "bytes": 1453,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-size.histogram",
+          "sha256": "16b817b57d0c18c014970a1a35082376b29f57480a3ca751a8cbe533a6d3bf8d"
+        },
+        {
+          "bytes": 7675006,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-stacks.folded",
+          "sha256": "e3ce6d81e215f70607071301438ef0387cf328f4a09f116956be2cadbde6a1e9"
+        }
+      ],
+      "label": "full-summary",
+      "profile": {
+        "bytes": 1868403,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "03c7cb95d1f8c86bb25a8155a65d93996ee94eebada27f2274a4acf0f4636686"
+      },
+      "return_code": 0,
+      "schema": "litchi.performance.0932.heaptrack-print-terminal.v1",
+      "started_utc": "2026-10-06T16:00:20.874225+00:00",
+      "status": "completed",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 21781501,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.txt",
+        "sha256": "086fad3cb7b3cdf98d2a81872a685da51033012a2b6290ba4aded35d202ad653"
+      },
+      "wall_seconds": 14.485799264977686
+    },
+    {
+      "argv": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "-m",
+        "1",
+        "-n",
+        "1000000",
+        "-s",
+        "1000000",
+        "-F",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.folded",
+        "--flamegraph-cost-type",
+        "peak"
+      ],
+      "child": "s8192-c08-exact-independent_sources-heaptrack-v1",
+      "ended_utc": "2026-10-06T16:00:49.714365+00:00",
+      "error": null,
+      "generated": [
+        {
+          "bytes": 1453,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-size.histogram",
+          "sha256": "16b817b57d0c18c014970a1a35082376b29f57480a3ca751a8cbe533a6d3bf8d"
+        },
+        {
+          "bytes": 7675006,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-stacks.folded",
+          "sha256": "e3ce6d81e215f70607071301438ef0387cf328f4a09f116956be2cadbde6a1e9"
+        },
+        {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 2374,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.terminal.json",
+          "sha256": "56d311bb43eb05359e18dad2dae6c9b05417aeb1b2ecf766dd5ad9a791cbfa6c"
+        },
+        {
+          "bytes": 21781501,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.txt",
+          "sha256": "086fad3cb7b3cdf98d2a81872a685da51033012a2b6290ba4aded35d202ad653"
+        },
+        {
+          "bytes": 7666226,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.folded",
+          "sha256": "6f870f824d6f6aa4f9cd01797957d7a34d583c3dfae3e2c774bb6a088cb4fd90"
+        }
+      ],
+      "label": "peak-stacks",
+      "profile": {
+        "bytes": 1868403,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "03c7cb95d1f8c86bb25a8155a65d93996ee94eebada27f2274a4acf0f4636686"
+      },
+      "return_code": 0,
+      "schema": "litchi.performance.0932.heaptrack-print-terminal.v1",
+      "started_utc": "2026-10-06T16:00:35.380163+00:00",
+      "status": "completed",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 21780839,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.txt",
+        "sha256": "92f14f16595ae54f0cf3268a2a80b9610ba00e8a4f60984917cce5fcc6835e0a"
+      },
+      "wall_seconds": 14.335732794017531
+    },
+    {
+      "argv": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "-m",
+        "1",
+        "-n",
+        "1000000",
+        "-s",
+        "1000000",
+        "-F",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/temporary-stacks.folded",
+        "--flamegraph-cost-type",
+        "temporary"
+      ],
+      "child": "s8192-c08-exact-independent_sources-heaptrack-v1",
+      "ended_utc": "2026-10-06T16:01:03.986447+00:00",
+      "error": null,
+      "generated": [
+        {
+          "bytes": 1453,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-size.histogram",
+          "sha256": "16b817b57d0c18c014970a1a35082376b29f57480a3ca751a8cbe533a6d3bf8d"
+        },
+        {
+          "bytes": 7675006,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-stacks.folded",
+          "sha256": "e3ce6d81e215f70607071301438ef0387cf328f4a09f116956be2cadbde6a1e9"
+        },
+        {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 2374,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.terminal.json",
+          "sha256": "56d311bb43eb05359e18dad2dae6c9b05417aeb1b2ecf766dd5ad9a791cbfa6c"
+        },
+        {
+          "bytes": 21781501,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/full-summary.txt",
+          "sha256": "086fad3cb7b3cdf98d2a81872a685da51033012a2b6290ba4aded35d202ad653"
+        },
+        {
+          "bytes": 7666226,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.folded",
+          "sha256": "6f870f824d6f6aa4f9cd01797957d7a34d583c3dfae3e2c774bb6a088cb4fd90"
+        },
+        {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 3219,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.terminal.json",
+          "sha256": "8a812d4473b9b73b63699b8b3eab6b25050fbbfbbdf1f7d9b2d7642b85ecf280"
+        },
+        {
+          "bytes": 21780839,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/peak-stacks.txt",
+          "sha256": "92f14f16595ae54f0cf3268a2a80b9610ba00e8a4f60984917cce5fcc6835e0a"
+        },
+        {
+          "bytes": 7667392,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/temporary-stacks.folded",
+          "sha256": "4066ef0255487dce3b17ffa8c21ca8f9962968055d47d7058c695058bc484d81"
+        }
+      ],
+      "label": "temporary-stacks",
+      "profile": {
+        "bytes": 1868403,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "03c7cb95d1f8c86bb25a8155a65d93996ee94eebada27f2274a4acf0f4636686"
+      },
+      "return_code": 0,
+      "schema": "litchi.performance.0932.heaptrack-print-terminal.v1",
+      "started_utc": "2026-10-06T16:00:49.752831+00:00",
+      "status": "completed",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/temporary-stacks.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 21780839,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/temporary-stacks.txt",
+        "sha256": "92f14f16595ae54f0cf3268a2a80b9610ba00e8a4f60984917cce5fcc6835e0a"
+      },
+      "wall_seconds": 14.235092929011444
+    },
+    {
+      "argv": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "-m",
+        "1",
+        "-n",
+        "1000000",
+        "-s",
+        "1000000",
+        "-a",
+        "-p",
+        "-T",
+        "-l",
+        "-H",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-size.histogram",
+        "-F",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-stacks.folded",
+        "--flamegraph-cost-type",
+        "allocations"
+      ],
+      "child": "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+      "ended_utc": "2026-10-06T16:01:14.670266+00:00",
+      "error": null,
+      "generated": [
+        {
+          "bytes": 1430,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-size.histogram",
+          "sha256": "058963a52437be2ec7069a21ef6d431c81ada8094e354fc7bb3d4bde11f83f59"
+        },
+        {
+          "bytes": 7674438,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-stacks.folded",
+          "sha256": "17b7bee32f8830df34949f77a14d0d4f2a63c828317c442548924749d4c278dd"
+        }
+      ],
+      "label": "full-summary",
+      "profile": {
+        "bytes": 1405193,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "5025b7cac8d5f7d9eb2baf1572a4de82d99878747a11ef25ab449020d66deb8d"
+      },
+      "return_code": 0,
+      "schema": "litchi.performance.0932.heaptrack-print-terminal.v1",
+      "started_utc": "2026-10-06T16:01:04.042199+00:00",
+      "status": "completed",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 21709142,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.txt",
+        "sha256": "8d6ae92dfd4dfe4ba0a7bd3b7d8ff05e93435eecf515101e3f7630d06d5de07b"
+      },
+      "wall_seconds": 10.62928669800749
+    },
+    {
+      "argv": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "-m",
+        "1",
+        "-n",
+        "1000000",
+        "-s",
+        "1000000",
+        "-F",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.folded",
+        "--flamegraph-cost-type",
+        "peak"
+      ],
+      "child": "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+      "ended_utc": "2026-10-06T16:01:24.618865+00:00",
+      "error": null,
+      "generated": [
+        {
+          "bytes": 1430,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-size.histogram",
+          "sha256": "058963a52437be2ec7069a21ef6d431c81ada8094e354fc7bb3d4bde11f83f59"
+        },
+        {
+          "bytes": 7674438,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-stacks.folded",
+          "sha256": "17b7bee32f8830df34949f77a14d0d4f2a63c828317c442548924749d4c278dd"
+        },
+        {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 2400,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.terminal.json",
+          "sha256": "90d836d98947daf815a0e50a1de7fd5514d824c7f8992a9840d629a4f23af387"
+        },
+        {
+          "bytes": 21709142,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.txt",
+          "sha256": "8d6ae92dfd4dfe4ba0a7bd3b7d8ff05e93435eecf515101e3f7630d06d5de07b"
+        },
+        {
+          "bytes": 7666152,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.folded",
+          "sha256": "6268b84d03cbae003241a37c367bfccc4e7de4bd19ff599d0426281ba28728d1"
+        }
+      ],
+      "label": "peak-stacks",
+      "profile": {
+        "bytes": 1405193,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "5025b7cac8d5f7d9eb2baf1572a4de82d99878747a11ef25ab449020d66deb8d"
+      },
+      "return_code": 0,
+      "schema": "litchi.performance.0932.heaptrack-print-terminal.v1",
+      "started_utc": "2026-10-06T16:01:14.691830+00:00",
+      "status": "completed",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 21708480,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.txt",
+        "sha256": "78b030f62fcc72d2be95def8bafd28fe943f52348e55850ed0f67da40e4ec66d"
+      },
+      "wall_seconds": 9.928271915006917
+    },
+    {
+      "argv": [
+        "/usr/bin/heaptrack_print",
+        "-f",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "-m",
+        "1",
+        "-n",
+        "1000000",
+        "-s",
+        "1000000",
+        "-F",
+        "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/temporary-stacks.folded",
+        "--flamegraph-cost-type",
+        "temporary"
+      ],
+      "child": "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+      "ended_utc": "2026-10-06T16:01:34.636044+00:00",
+      "error": null,
+      "generated": [
+        {
+          "bytes": 1430,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-size.histogram",
+          "sha256": "058963a52437be2ec7069a21ef6d431c81ada8094e354fc7bb3d4bde11f83f59"
+        },
+        {
+          "bytes": 7674438,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-stacks.folded",
+          "sha256": "17b7bee32f8830df34949f77a14d0d4f2a63c828317c442548924749d4c278dd"
+        },
+        {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 2400,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.terminal.json",
+          "sha256": "90d836d98947daf815a0e50a1de7fd5514d824c7f8992a9840d629a4f23af387"
+        },
+        {
+          "bytes": 21709142,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/full-summary.txt",
+          "sha256": "8d6ae92dfd4dfe4ba0a7bd3b7d8ff05e93435eecf515101e3f7630d06d5de07b"
+        },
+        {
+          "bytes": 7666152,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.folded",
+          "sha256": "6268b84d03cbae003241a37c367bfccc4e7de4bd19ff599d0426281ba28728d1"
+        },
+        {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 3254,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.terminal.json",
+          "sha256": "7d3681e1d88c9b9c21dcfbe6a95b7afb7b1e05c1d825f60c87647a7e726660c3"
+        },
+        {
+          "bytes": 21708480,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/peak-stacks.txt",
+          "sha256": "78b030f62fcc72d2be95def8bafd28fe943f52348e55850ed0f67da40e4ec66d"
+        },
+        {
+          "bytes": 7667302,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/temporary-stacks.folded",
+          "sha256": "8e68f4dfb4759e7ad9f219ef23acb4a60ca0a64f2015fee82dcc870fc82d6b16"
+        }
+      ],
+      "label": "temporary-stacks",
+      "profile": {
+        "bytes": 1405193,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "5025b7cac8d5f7d9eb2baf1572a4de82d99878747a11ef25ab449020d66deb8d"
+      },
+      "return_code": 0,
+      "schema": "litchi.performance.0932.heaptrack-print-terminal.v1",
+      "started_utc": "2026-10-06T16:01:24.658869+00:00",
+      "status": "completed",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/temporary-stacks.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 21708480,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/temporary-stacks.txt",
+        "sha256": "78b030f62fcc72d2be95def8bafd28fe943f52348e55850ed0f67da40e4ec66d"
+      },
+      "wall_seconds": 9.978394281992223
+    }
+  ],
+  "ended_utc": "2026-10-06T16:01:34.692875+00:00",
+  "schema": "litchi.performance.0932.heaptrack-print-run.v1",
+  "started_utc": "2026-10-06T16:00:20.874021+00:00",
+  "status": "terminal"
+}

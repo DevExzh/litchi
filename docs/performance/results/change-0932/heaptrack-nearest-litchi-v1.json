@@ -1,0 +1,1706 @@
+{
+  "all_children_exact_conservation": true,
+  "binding": {
+    "binary_bytes": 68431264,
+    "binary_sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf",
+    "full_source_listing_sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a",
+    "overlay_receipt_sha256": "31f931a671e806bcf9da1c3e7cb937e17df37910799a31c3f96c1b1f03676de5",
+    "source_receipt_sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f",
+    "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+    "source_root": "/home/zhuhe/litchi-performance-0931/source-final"
+  },
+  "children": {
+    "s8192-c08-exact-independent_sources-heaptrack-v1": {
+      "categories": [
+        {
+          "calls": 36192256,
+          "category": "litchi_docx::section::inventory::Inventory::parse_with_limits",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2742047691,
+          "trace_count": 374
+        },
+        {
+          "calls": 20021436,
+          "category": "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2302402348,
+          "trace_count": 187
+        },
+        {
+          "calls": 20791632,
+          "category": "litchi_docx::section::footnote_columns::codec::read_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1554744898,
+          "trace_count": 387
+        },
+        {
+          "calls": 23104530,
+          "category": "litchi_docx::section::codec::attributes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1457022545,
+          "trace_count": 1148
+        },
+        {
+          "calls": 19251410,
+          "category": "litchi_docx::section::model::Section::from_xml_bytes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1064986736,
+          "trace_count": 410
+        },
+        {
+          "calls": 18483063,
+          "category": "litchi_docx::section::codec::decode",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 954159454,
+          "trace_count": 918
+        },
+        {
+          "calls": 2312400,
+          "category": "litchi_docx::section::inventory::append_section",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 588963392,
+          "trace_count": 119
+        },
+        {
+          "calls": 6160384,
+          "category": "litchi_docx::section::codec::root_namespace_bindings",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 488210432,
+          "trace_count": 136
+        },
+        {
+          "calls": 6160636,
+          "category": "litchi_docx::section::codec::validate_attribute_qnames",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 394280704,
+          "trace_count": 138
+        },
+        {
+          "calls": 4620288,
+          "category": "litchi_docx::section::codec::escape_namespace_uri",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 277217280,
+          "trace_count": 102
+        },
+        {
+          "calls": 1540222,
+          "category": "litchi_docx::section::codec::Raw::detached_fragment",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 237199553,
+          "trace_count": 76
+        },
+        {
+          "calls": 1540138,
+          "category": "litchi_docx::section::footnote_columns::transaction::Snapshot::from_xml_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 172495312,
+          "trace_count": 48
+        },
+        {
+          "calls": 770069,
+          "category": "litchi_docx::section::inventory::self_contained_fragment",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 110892109,
+          "trace_count": 24
+        },
+        {
+          "calls": 3851339,
+          "category": "litchi_docx::section::inventory::NamespaceContext::enter",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 100979001,
+          "trace_count": 204
+        },
+        {
+          "calls": 1540222,
+          "category": "litchi_ooxml_common::xml::attributes::SeenNames$LT$K$GT$::insert",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 98574208,
+          "trace_count": 76
+        },
+        {
+          "calls": 1540190,
+          "category": "litchi_docx::section::inventory::validate_namespace_bindings",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 98572160,
+          "trace_count": 34
+        },
+        {
+          "calls": 1540190,
+          "category": "litchi_docx::source_backed::ensure_source_mce_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 98572160,
+          "trace_count": 34
+        },
+        {
+          "calls": 1540190,
+          "category": "litchi_docx::source_backed::validate_source_section_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 98572160,
+          "trace_count": 34
+        },
+        {
+          "calls": 3080276,
+          "category": "litchi_docx::section::inventory::root_declares_prefix",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 61605520,
+          "trace_count": 96
+        },
+        {
+          "calls": 770048,
+          "category": "litchi_docx::section::footnote_columns::codec::root_ignorable_value",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 49283072,
+          "trace_count": 17
+        },
+        {
+          "calls": 198,
+          "category": "litchi_opc::source_backed::SourceBackedPackage::load_part_with_accounting",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 42097924,
+          "trace_count": 30
+        },
+        {
+          "calls": 448,
+          "category": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 30059200,
+          "trace_count": 48
+        },
+        {
+          "calls": 84,
+          "category": "litchi_docx::section::layout::replace_range",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 24586254,
+          "trace_count": 21
+        },
+        {
+          "calls": 131408,
+          "category": "litchi_opc::source_backed::validate_source_part_replacement_xml",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8417664,
+          "trace_count": 42
+        },
+        {
+          "calls": 330,
+          "category": "litchi_opc::pkgreader::read_structural_member",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5347947,
+          "trace_count": 50
+        },
+        {
+          "calls": 8216,
+          "category": "litchi_perf_baseline::docx_section_retention::run_capture",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4431436,
+          "trace_count": 19
+        },
+        {
+          "calls": 65,
+          "category": "litchi_opc::source_backed::SourceArtifact::fingerprint",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4259840,
+          "trace_count": 9
+        },
+        {
+          "calls": 1540222,
+          "category": "litchi_docx::section::codec::root_attribute_prefix",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1540222,
+          "trace_count": 76
+        },
+        {
+          "calls": 1540096,
+          "category": "litchi_docx::section::footnote_columns::codec::is_extension_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1540096,
+          "trace_count": 17
+        },
+        {
+          "calls": 32,
+          "category": "litchi_opc::source_backed::write_exact_snapshot",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1456544,
+          "trace_count": 4
+        },
+        {
+          "calls": 66,
+          "category": "litchi_perf_baseline::docx_section_retention::open_source_package",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 843506,
+          "trace_count": 10
+        },
+        {
+          "calls": 8216,
+          "category": "litchi_opc::pkgwriter::PackageWriter::audit_published_xml",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 525680,
+          "trace_count": 22
+        },
+        {
+          "calls": 26,
+          "category": "litchi_opc::phys_pkg::PhysPkgWriter$LT$W$GT$::write",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 492218,
+          "trace_count": 26
+        },
+        {
+          "calls": 1786,
+          "category": "litchi_ooxml_common::mce::model::Capabilities::understand_namespace",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 159988,
+          "trace_count": 51
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::pkgreader::PackageReader::walk_relationship_graph",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 144276,
+          "trace_count": 10
+        },
+        {
+          "calls": 1,
+          "category": "<unknown>",
+          "classification": "no_resolved_litchi_frame_with_unknown",
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        {
+          "calls": 504,
+          "category": "litchi_docx::section::layout::FragmentAnalysis::parse",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 60186,
+          "trace_count": 84
+        },
+        {
+          "calls": 528,
+          "category": "litchi_opc::pkgreader::indexed_archive_with_limits",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 49830,
+          "trace_count": 50
+        },
+        {
+          "calls": 651,
+          "category": "litchi_docx::section::layout::push_fragment_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 46473,
+          "trace_count": 126
+        },
+        {
+          "calls": 33,
+          "category": "litchi_opc::pkgreader::PackageReader::load_part_catalog",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 35904,
+          "trace_count": 5
+        },
+        {
+          "calls": 840,
+          "category": "litchi_docx::section::layout::lexical_attributes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 32550,
+          "trace_count": 84
+        },
+        {
+          "calls": 132,
+          "category": "litchi_opc::source_backed::relationships_for_package_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 20922,
+          "trace_count": 20
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::source_backed::read_ahead::StructuralPrefetch::prime",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 19899,
+          "trace_count": 10
+        },
+        {
+          "calls": 357,
+          "category": "litchi_docx::section::codec::encode",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 19383,
+          "trace_count": 119
+        },
+        {
+          "calls": 231,
+          "category": "litchi_docx::section::layout::Edit::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 15708,
+          "trace_count": 77
+        },
+        {
+          "calls": 462,
+          "category": "litchi_docx::section::codec::write_columns",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 15288,
+          "trace_count": 126
+        },
+        {
+          "calls": 94,
+          "category": "litchi_docx::section::inventory::inspect_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 15040,
+          "trace_count": 17
+        },
+        {
+          "calls": 231,
+          "category": "litchi_opc::pkgreader::PackageReader::parse_rels_xml_with_source",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 14982,
+          "trace_count": 35
+        },
+        {
+          "calls": 231,
+          "category": "litchi_opc::content_type::ContentTypeMap::from_xml_reporting",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 14817,
+          "trace_count": 35
+        },
+        {
+          "calls": 231,
+          "category": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 14718,
+          "trace_count": 35
+        },
+        {
+          "calls": 524,
+          "category": "litchi_opc::packuri::PackURI::from_rel_ref",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 14148,
+          "trace_count": 76
+        },
+        {
+          "calls": 420,
+          "category": "litchi_docx::section::model::Section::set_columns",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 13188,
+          "trace_count": 126
+        },
+        {
+          "calls": 297,
+          "category": "litchi_opc::content_type::required_attributes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 12144,
+          "trace_count": 30
+        },
+        {
+          "calls": 99,
+          "category": "litchi_opc::members::PartNameIndex::try_with_capacity",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 12144,
+          "trace_count": 15
+        },
+        {
+          "calls": 378,
+          "category": "litchi_docx::section::layout::patch_known_attributes_with_info",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 11214,
+          "trace_count": 91
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::content_type::ContentTypeMap::add_override",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 10758,
+          "trace_count": 10
+        },
+        {
+          "calls": 297,
+          "category": "litchi_opc::pkgreader::inspect_relationship_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 9669,
+          "trace_count": 35
+        },
+        {
+          "calls": 99,
+          "category": "litchi_opc::source_backed::PartView::data",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 9504,
+          "trace_count": 15
+        },
+        {
+          "calls": 7,
+          "category": "litchi_perf_baseline::docx_section_retention::run_from_args",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8352,
+          "trace_count": 6
+        },
+        {
+          "calls": 1,
+          "category": "litchi_perf_baseline::docx_section_retention::_::_$LT$impl$u20$serde_core..ser..Serialize$u20$for$u20$litchi_perf_baseline..docx_section_retention..Gauge$GT$::serialize",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8192,
+          "trace_count": 1
+        },
+        {
+          "calls": 99,
+          "category": "litchi_opc::content_type::ContentTypeMap::add_default",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 7227,
+          "trace_count": 10
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::pkgreader::PackageReader::classify_part_members",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 7128,
+          "trace_count": 10
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::pkgreader::RelationshipLedger::record_relationship_xml_metrics",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 7029,
+          "trace_count": 10
+        },
+        {
+          "calls": 33,
+          "category": "litchi_opc::source_backed::PartCache::insert_locked",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5940,
+          "trace_count": 5
+        },
+        {
+          "calls": 609,
+          "category": "litchi_docx::section::codec::Raw::attribute_name",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5880,
+          "trace_count": 168
+        },
+        {
+          "calls": 99,
+          "category": "litchi_opc::pkgreader::PackageReader::source_catalog",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5643,
+          "trace_count": 15
+        },
+        {
+          "calls": 63,
+          "category": "litchi_docx::section::layout::rewrite_known_children",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5292,
+          "trace_count": 21
+        },
+        {
+          "calls": 189,
+          "category": "litchi_docx::section::model::Section::set_start",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4578,
+          "trace_count": 63
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::content_type::ContentTypeMap::get",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4488,
+          "trace_count": 10
+        },
+        {
+          "calls": 63,
+          "category": "litchi_docx::section::layout::direct_children",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4200,
+          "trace_count": 21
+        },
+        {
+          "calls": 264,
+          "category": "litchi_opc::members::PartNameIndex::insert",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4092,
+          "trace_count": 20
+        },
+        {
+          "calls": 42,
+          "category": "litchi_docx::section::codec::insert_missing_before",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3969,
+          "trace_count": 14
+        },
+        {
+          "calls": 126,
+          "category": "litchi_docx::section::layout::FragmentContext::in_scope_word_attribute_prefix",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3843,
+          "trace_count": 14
+        },
+        {
+          "calls": 233,
+          "category": "litchi_opc::packuri::PackURI::rels_uri",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3784,
+          "trace_count": 37
+        },
+        {
+          "calls": 33,
+          "category": "litchi_docx::source_backed::Package::with_execution",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3432,
+          "trace_count": 5
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::layout::direct_children_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3360,
+          "trace_count": 7
+        },
+        {
+          "calls": 33,
+          "category": "litchi_opc::source_backed::read_ahead::structural_runs",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3168,
+          "trace_count": 5
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::model::Section::to_xml_bytes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2814,
+          "trace_count": 7
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::pkgreader::PackageReader::load_rels_lazy",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2772,
+          "trace_count": 10
+        },
+        {
+          "calls": 9,
+          "category": "<other>",
+          "classification": "no_litchi_frame",
+          "requested_bytes": 2620,
+          "trace_count": 9
+        },
+        {
+          "calls": 84,
+          "category": "litchi_docx::section::codec::write_page_size",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2520,
+          "trace_count": 28
+        },
+        {
+          "calls": 63,
+          "category": "litchi_docx::section::inventory::Inventory::source_fragment",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2289,
+          "trace_count": 21
+        },
+        {
+          "calls": 105,
+          "category": "litchi_docx::section::model::Section::set_page_size",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1995,
+          "trace_count": 35
+        },
+        {
+          "calls": 33,
+          "category": "litchi_core::source::OwnedSource::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1320,
+          "trace_count": 5
+        },
+        {
+          "calls": 147,
+          "category": "litchi_docx::section::codec::Raw::element_name",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1176,
+          "trace_count": 42
+        },
+        {
+          "calls": 65,
+          "category": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1170,
+          "trace_count": 9
+        },
+        {
+          "calls": 99,
+          "category": "litchi_opc::content_type::ContentTypeMap::lookup",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1122,
+          "trace_count": 15
+        },
+        {
+          "calls": 84,
+          "category": "litchi_docx::section::layout::word_attribute_info",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1113,
+          "trace_count": 28
+        },
+        {
+          "calls": 66,
+          "category": "litchi_opc::members::part_name_for_member",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 990,
+          "trace_count": 5
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::layout::Edit::commit",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 840,
+          "trace_count": 7
+        },
+        {
+          "calls": 99,
+          "category": "litchi_opc::content_type::inspect_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 825,
+          "trace_count": 10
+        },
+        {
+          "calls": 33,
+          "category": "litchi_opc::pkgreader::PackageReader::locate_content_types_member",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 792,
+          "trace_count": 5
+        },
+        {
+          "calls": 68,
+          "category": "litchi_opc::rel::Relationships::for_source",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 782,
+          "trace_count": 12
+        },
+        {
+          "calls": 15,
+          "category": "litchi_perf_baseline_alloc::main",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 711,
+          "trace_count": 2
+        },
+        {
+          "calls": 3,
+          "category": "litchi_opc::rel::Relationships::add_relationship",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 633,
+          "trace_count": 3
+        },
+        {
+          "calls": 33,
+          "category": "litchi_opc::pkgreader::PackageReader::enqueue_target",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 594,
+          "trace_count": 5
+        },
+        {
+          "calls": 9,
+          "category": "litchi_perf_baseline::sha256_hex",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 576,
+          "trace_count": 2
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::pkgwriter::authored_content_types_xml_with_limits",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 461,
+          "trace_count": 2
+        },
+        {
+          "calls": 5,
+          "category": "litchi_opc::phys_pkg::PartNameSet::prepare",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 434,
+          "trace_count": 5
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::rel::Relationships::try_to_xml_bytes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 305,
+          "trace_count": 2
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::package::OpcPackage::try_add_part",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 198,
+          "trace_count": 2
+        },
+        {
+          "calls": 2,
+          "category": "litchi_perf_baseline::docx_section_retention::parse_config",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 165,
+          "trace_count": 2
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::pkgwriter::PublicationPlan::from_package",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 112,
+          "trace_count": 1
+        },
+        {
+          "calls": 3,
+          "category": "litchi_opc::package::clone_relationship_binding_text",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 103,
+          "trace_count": 3
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::rel::Relationships::get_or_add",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 99,
+          "trace_count": 2
+        },
+        {
+          "calls": 37,
+          "category": "litchi_opc::packuri::PackURI::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 92,
+          "trace_count": 9
+        },
+        {
+          "calls": 7,
+          "category": "litchi_opc::phys_pkg::try_owned_string",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 91,
+          "trace_count": 7
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::package::RelationshipBinding::from_relationships",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 80,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::part::BlobPart::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 40,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::phys_pkg::PhysPkgWriter::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 24,
+          "trace_count": 1
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::footnote_columns::codec::is_root",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 21,
+          "trace_count": 7
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::rel::Relationships::next_r_id",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 6,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::package::OpcPackage::relate_to",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::package::OpcPackage::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1,
+          "trace_count": 1
+        }
+      ],
+      "exact_conservation": true,
+      "inputs": {
+        "decoder_summary": {
+          "bytes": 1987,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-independent_sources-heaptrack-v1/summary.json",
+          "sha256": "a89f262f27755457823e99bca42ad3784a827ee923f3698a36d277954a6f89bb"
+        },
+        "trace_aggregates": {
+          "bytes": 43765203,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-independent_sources-heaptrack-v1/trace-aggregates.jsonl",
+          "sha256": "86e314f5e49a169119a2ebd5a2bfabd0257c04d122e954e95efb5671f5dd6b60"
+        }
+      },
+      "special_buckets": {
+        "other": {
+          "calls": 9,
+          "category": "<other>",
+          "classification": "no_litchi_frame",
+          "requested_bytes": 2620,
+          "trace_count": 9
+        },
+        "unknown": {
+          "calls": 1,
+          "category": "<unknown>",
+          "classification": "no_resolved_litchi_frame_with_unknown",
+          "requested_bytes": 73728,
+          "trace_count": 1
+        }
+      },
+      "whole_process": {
+        "calls": 178052276,
+        "requested_bytes": 13077355214,
+        "trace_count": 6969
+      }
+    },
+    "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1": {
+      "categories": [
+        {
+          "calls": 25411584,
+          "category": "litchi_docx::section::inventory::Inventory::parse_with_limits",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1925267601,
+          "trace_count": 374
+        },
+        {
+          "calls": 14057604,
+          "category": "litchi_docx::source_backed::ensure_source_section_inventory_xml",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1616580372,
+          "trace_count": 187
+        },
+        {
+          "calls": 14598480,
+          "category": "litchi_docx::section::footnote_columns::codec::read_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1091634180,
+          "trace_count": 387
+        },
+        {
+          "calls": 16223166,
+          "category": "litchi_docx::section::codec::attributes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1023042831,
+          "trace_count": 1148
+        },
+        {
+          "calls": 13517010,
+          "category": "litchi_docx::section::model::Section::from_xml_bytes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 747758580,
+          "trace_count": 410
+        },
+        {
+          "calls": 12978039,
+          "category": "litchi_docx::section::codec::decode",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 669962016,
+          "trace_count": 918
+        },
+        {
+          "calls": 1623600,
+          "category": "litchi_docx::section::inventory::append_section",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 413527488,
+          "trace_count": 119
+        },
+        {
+          "calls": 4325376,
+          "category": "litchi_docx::section::codec::root_namespace_bindings",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 342786048,
+          "trace_count": 136
+        },
+        {
+          "calls": 4325628,
+          "category": "litchi_docx::section::codec::validate_attribute_qnames",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 276840192,
+          "trace_count": 138
+        },
+        {
+          "calls": 3244032,
+          "category": "litchi_docx::section::codec::escape_namespace_uri",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 194641920,
+          "trace_count": 102
+        },
+        {
+          "calls": 1081470,
+          "category": "litchi_docx::section::codec::Raw::detached_fragment",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 166551171,
+          "trace_count": 76
+        },
+        {
+          "calls": 1081386,
+          "category": "litchi_docx::section::footnote_columns::transaction::Snapshot::from_xml_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 121114416,
+          "trace_count": 48
+        },
+        {
+          "calls": 540693,
+          "category": "litchi_docx::section::inventory::self_contained_fragment",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 77861391,
+          "trace_count": 24
+        },
+        {
+          "calls": 2704137,
+          "category": "litchi_docx::section::inventory::NamespaceContext::enter",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 70900155,
+          "trace_count": 204
+        },
+        {
+          "calls": 1081470,
+          "category": "litchi_ooxml_common::xml::attributes::SeenNames$LT$K$GT$::insert",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 69214080,
+          "trace_count": 76
+        },
+        {
+          "calls": 1081410,
+          "category": "litchi_docx::section::inventory::validate_namespace_bindings",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 69210240,
+          "trace_count": 34
+        },
+        {
+          "calls": 1081410,
+          "category": "litchi_docx::source_backed::ensure_source_mce_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 69210240,
+          "trace_count": 34
+        },
+        {
+          "calls": 1081410,
+          "category": "litchi_docx::source_backed::validate_source_section_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 69210240,
+          "trace_count": 34
+        },
+        {
+          "calls": 2162772,
+          "category": "litchi_docx::section::inventory::root_declares_prefix",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 43255440,
+          "trace_count": 96
+        },
+        {
+          "calls": 540672,
+          "category": "litchi_docx::section::footnote_columns::codec::root_ignorable_value",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 34603008,
+          "trace_count": 17
+        },
+        {
+          "calls": 84,
+          "category": "litchi_docx::section::layout::replace_range",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 24586254,
+          "trace_count": 21
+        },
+        {
+          "calls": 114,
+          "category": "litchi_opc::source_backed::SourceBackedPackage::load_part_with_accounting",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 24238180,
+          "trace_count": 30
+        },
+        {
+          "calls": 252,
+          "category": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 16908300,
+          "trace_count": 48
+        },
+        {
+          "calls": 73917,
+          "category": "litchi_opc::source_backed::validate_source_part_replacement_xml",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4734936,
+          "trace_count": 42
+        },
+        {
+          "calls": 8216,
+          "category": "litchi_perf_baseline::docx_section_retention::run_capture",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4417940,
+          "trace_count": 19
+        },
+        {
+          "calls": 190,
+          "category": "litchi_opc::pkgreader::read_structural_member",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3079121,
+          "trace_count": 50
+        },
+        {
+          "calls": 37,
+          "category": "litchi_opc::source_backed::SourceArtifact::fingerprint",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2424832,
+          "trace_count": 9
+        },
+        {
+          "calls": 1081470,
+          "category": "litchi_docx::section::codec::root_attribute_prefix",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1081470,
+          "trace_count": 76
+        },
+        {
+          "calls": 1081344,
+          "category": "litchi_docx::section::footnote_columns::codec::is_extension_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1081344,
+          "trace_count": 17
+        },
+        {
+          "calls": 18,
+          "category": "litchi_opc::source_backed::write_exact_snapshot",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 819306,
+          "trace_count": 4
+        },
+        {
+          "calls": 8216,
+          "category": "litchi_opc::pkgwriter::PackageWriter::audit_published_xml",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 525680,
+          "trace_count": 22
+        },
+        {
+          "calls": 26,
+          "category": "litchi_opc::phys_pkg::PhysPkgWriter$LT$W$GT$::write",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 492218,
+          "trace_count": 26
+        },
+        {
+          "calls": 38,
+          "category": "litchi_perf_baseline::docx_section_retention::open_source_package",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 485645,
+          "trace_count": 10
+        },
+        {
+          "calls": 1254,
+          "category": "litchi_ooxml_common::mce::model::Capabilities::understand_namespace",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 112332,
+          "trace_count": 51
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::pkgreader::PackageReader::walk_relationship_graph",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 83068,
+          "trace_count": 10
+        },
+        {
+          "calls": 1,
+          "category": "<unknown>",
+          "classification": "no_resolved_litchi_frame_with_unknown",
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        {
+          "calls": 504,
+          "category": "litchi_docx::section::layout::FragmentAnalysis::parse",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 60186,
+          "trace_count": 84
+        },
+        {
+          "calls": 651,
+          "category": "litchi_docx::section::layout::push_fragment_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 46473,
+          "trace_count": 126
+        },
+        {
+          "calls": 840,
+          "category": "litchi_docx::section::layout::lexical_attributes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 32550,
+          "trace_count": 84
+        },
+        {
+          "calls": 304,
+          "category": "litchi_opc::pkgreader::indexed_archive_with_limits",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 28690,
+          "trace_count": 50
+        },
+        {
+          "calls": 19,
+          "category": "litchi_opc::pkgreader::PackageReader::load_part_catalog",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 20672,
+          "trace_count": 5
+        },
+        {
+          "calls": 357,
+          "category": "litchi_docx::section::codec::encode",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 19383,
+          "trace_count": 119
+        },
+        {
+          "calls": 231,
+          "category": "litchi_docx::section::layout::Edit::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 15708,
+          "trace_count": 77
+        },
+        {
+          "calls": 462,
+          "category": "litchi_docx::section::codec::write_columns",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 15288,
+          "trace_count": 126
+        },
+        {
+          "calls": 420,
+          "category": "litchi_docx::section::model::Section::set_columns",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 13188,
+          "trace_count": 126
+        },
+        {
+          "calls": 76,
+          "category": "litchi_opc::source_backed::relationships_for_package_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 12046,
+          "trace_count": 20
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::source_backed::read_ahead::StructuralPrefetch::prime",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 11457,
+          "trace_count": 10
+        },
+        {
+          "calls": 378,
+          "category": "litchi_docx::section::layout::patch_known_attributes_with_info",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 11214,
+          "trace_count": 91
+        },
+        {
+          "calls": 66,
+          "category": "litchi_docx::section::inventory::inspect_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 10560,
+          "trace_count": 17
+        },
+        {
+          "calls": 133,
+          "category": "litchi_opc::pkgreader::PackageReader::parse_rels_xml_with_source",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8626,
+          "trace_count": 35
+        },
+        {
+          "calls": 133,
+          "category": "litchi_opc::content_type::ContentTypeMap::from_xml_reporting",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8531,
+          "trace_count": 35
+        },
+        {
+          "calls": 133,
+          "category": "litchi_opc::source_backed::SourceBackedPackage::from_read_at_inner",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8474,
+          "trace_count": 35
+        },
+        {
+          "calls": 7,
+          "category": "litchi_perf_baseline::docx_section_retention::run_from_args",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8352,
+          "trace_count": 6
+        },
+        {
+          "calls": 1,
+          "category": "litchi_perf_baseline::docx_section_retention::_::_$LT$impl$u20$serde_core..ser..Serialize$u20$for$u20$litchi_perf_baseline..docx_section_retention..Gauge$GT$::serialize",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8192,
+          "trace_count": 1
+        },
+        {
+          "calls": 300,
+          "category": "litchi_opc::packuri::PackURI::from_rel_ref",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 8100,
+          "trace_count": 76
+        },
+        {
+          "calls": 171,
+          "category": "litchi_opc::content_type::required_attributes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 6992,
+          "trace_count": 30
+        },
+        {
+          "calls": 57,
+          "category": "litchi_opc::members::PartNameIndex::try_with_capacity",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 6992,
+          "trace_count": 15
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::content_type::ContentTypeMap::add_override",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 6194,
+          "trace_count": 10
+        },
+        {
+          "calls": 609,
+          "category": "litchi_docx::section::codec::Raw::attribute_name",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5880,
+          "trace_count": 168
+        },
+        {
+          "calls": 171,
+          "category": "litchi_opc::pkgreader::inspect_relationship_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5567,
+          "trace_count": 35
+        },
+        {
+          "calls": 57,
+          "category": "litchi_opc::source_backed::PartView::data",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5472,
+          "trace_count": 15
+        },
+        {
+          "calls": 63,
+          "category": "litchi_docx::section::layout::rewrite_known_children",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 5292,
+          "trace_count": 21
+        },
+        {
+          "calls": 189,
+          "category": "litchi_docx::section::model::Section::set_start",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4578,
+          "trace_count": 63
+        },
+        {
+          "calls": 63,
+          "category": "litchi_docx::section::layout::direct_children",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4200,
+          "trace_count": 21
+        },
+        {
+          "calls": 57,
+          "category": "litchi_opc::content_type::ContentTypeMap::add_default",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4161,
+          "trace_count": 10
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::pkgreader::PackageReader::classify_part_members",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4104,
+          "trace_count": 10
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::pkgreader::RelationshipLedger::record_relationship_xml_metrics",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4047,
+          "trace_count": 10
+        },
+        {
+          "calls": 42,
+          "category": "litchi_docx::section::codec::insert_missing_before",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3969,
+          "trace_count": 14
+        },
+        {
+          "calls": 126,
+          "category": "litchi_docx::section::layout::FragmentContext::in_scope_word_attribute_prefix",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3843,
+          "trace_count": 14
+        },
+        {
+          "calls": 19,
+          "category": "litchi_opc::source_backed::PartCache::insert_locked",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3420,
+          "trace_count": 5
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::layout::direct_children_with_context",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3360,
+          "trace_count": 7
+        },
+        {
+          "calls": 57,
+          "category": "litchi_opc::pkgreader::PackageReader::source_catalog",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 3249,
+          "trace_count": 15
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::model::Section::to_xml_bytes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2814,
+          "trace_count": 7
+        },
+        {
+          "calls": 9,
+          "category": "<other>",
+          "classification": "no_litchi_frame",
+          "requested_bytes": 2620,
+          "trace_count": 9
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::content_type::ContentTypeMap::get",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2584,
+          "trace_count": 10
+        },
+        {
+          "calls": 84,
+          "category": "litchi_docx::section::codec::write_page_size",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2520,
+          "trace_count": 28
+        },
+        {
+          "calls": 152,
+          "category": "litchi_opc::members::PartNameIndex::insert",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2356,
+          "trace_count": 20
+        },
+        {
+          "calls": 63,
+          "category": "litchi_docx::section::inventory::Inventory::source_fragment",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2289,
+          "trace_count": 21
+        },
+        {
+          "calls": 135,
+          "category": "litchi_opc::packuri::PackURI::rels_uri",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 2188,
+          "trace_count": 37
+        },
+        {
+          "calls": 105,
+          "category": "litchi_docx::section::model::Section::set_page_size",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1995,
+          "trace_count": 35
+        },
+        {
+          "calls": 19,
+          "category": "litchi_docx::source_backed::Package::with_execution",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1976,
+          "trace_count": 5
+        },
+        {
+          "calls": 19,
+          "category": "litchi_opc::source_backed::read_ahead::structural_runs",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1824,
+          "trace_count": 5
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::pkgreader::PackageReader::load_rels_lazy",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1596,
+          "trace_count": 10
+        },
+        {
+          "calls": 147,
+          "category": "litchi_docx::section::codec::Raw::element_name",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1176,
+          "trace_count": 42
+        },
+        {
+          "calls": 84,
+          "category": "litchi_docx::section::layout::word_attribute_info",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1113,
+          "trace_count": 28
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::layout::Edit::commit",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 840,
+          "trace_count": 7
+        },
+        {
+          "calls": 19,
+          "category": "litchi_core::source::OwnedSource::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 760,
+          "trace_count": 5
+        },
+        {
+          "calls": 15,
+          "category": "litchi_perf_baseline_alloc::main",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 717,
+          "trace_count": 2
+        },
+        {
+          "calls": 37,
+          "category": "litchi_docx::source_backed::Package::main_section_layout_snapshot",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 666,
+          "trace_count": 9
+        },
+        {
+          "calls": 57,
+          "category": "litchi_opc::content_type::ContentTypeMap::lookup",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 646,
+          "trace_count": 15
+        },
+        {
+          "calls": 3,
+          "category": "litchi_opc::rel::Relationships::add_relationship",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 633,
+          "trace_count": 3
+        },
+        {
+          "calls": 9,
+          "category": "litchi_perf_baseline::sha256_hex",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 576,
+          "trace_count": 2
+        },
+        {
+          "calls": 38,
+          "category": "litchi_opc::members::part_name_for_member",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 570,
+          "trace_count": 5
+        },
+        {
+          "calls": 57,
+          "category": "litchi_opc::content_type::inspect_element",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 475,
+          "trace_count": 10
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::pkgwriter::authored_content_types_xml_with_limits",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 461,
+          "trace_count": 2
+        },
+        {
+          "calls": 40,
+          "category": "litchi_opc::rel::Relationships::for_source",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 460,
+          "trace_count": 12
+        },
+        {
+          "calls": 19,
+          "category": "litchi_opc::pkgreader::PackageReader::locate_content_types_member",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 456,
+          "trace_count": 5
+        },
+        {
+          "calls": 5,
+          "category": "litchi_opc::phys_pkg::PartNameSet::prepare",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 434,
+          "trace_count": 5
+        },
+        {
+          "calls": 19,
+          "category": "litchi_opc::pkgreader::PackageReader::enqueue_target",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 342,
+          "trace_count": 5
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::rel::Relationships::try_to_xml_bytes",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 305,
+          "trace_count": 2
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::package::OpcPackage::try_add_part",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 198,
+          "trace_count": 2
+        },
+        {
+          "calls": 2,
+          "category": "litchi_perf_baseline::docx_section_retention::parse_config",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 168,
+          "trace_count": 2
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::pkgwriter::PublicationPlan::from_package",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 112,
+          "trace_count": 1
+        },
+        {
+          "calls": 3,
+          "category": "litchi_opc::package::clone_relationship_binding_text",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 103,
+          "trace_count": 3
+        },
+        {
+          "calls": 2,
+          "category": "litchi_opc::rel::Relationships::get_or_add",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 99,
+          "trace_count": 2
+        },
+        {
+          "calls": 7,
+          "category": "litchi_opc::phys_pkg::try_owned_string",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 91,
+          "trace_count": 7
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::package::RelationshipBinding::from_relationships",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 80,
+          "trace_count": 1
+        },
+        {
+          "calls": 23,
+          "category": "litchi_opc::packuri::PackURI::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 78,
+          "trace_count": 9
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::part::BlobPart::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 40,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::phys_pkg::PhysPkgWriter::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 24,
+          "trace_count": 1
+        },
+        {
+          "calls": 21,
+          "category": "litchi_docx::section::footnote_columns::codec::is_root",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 21,
+          "trace_count": 7
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::rel::Relationships::next_r_id",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 6,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::package::OpcPackage::relate_to",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 4,
+          "trace_count": 1
+        },
+        {
+          "calls": 1,
+          "category": "litchi_opc::package::OpcPackage::new",
+          "classification": "nearest_litchi_frame",
+          "requested_bytes": 1,
+          "trace_count": 1
+        }
+      ],
+      "exact_conservation": true,
+      "inputs": {
+        "decoder_summary": {
+          "bytes": 1995,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/summary.json",
+          "sha256": "50f60b33617043525f18965236fc418a8f6c1da45d9fc235502b49b6eb3f939d"
+        },
+        "trace_aggregates": {
+          "bytes": 43763716,
+          "path": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/trace-aggregates.jsonl",
+          "sha256": "5f5ac27166dfc1b4316feb27f0100d8e2619af7befec520fb916eacccd391390"
+        }
+      },
+      "special_buckets": {
+        "other": {
+          "calls": 9,
+          "category": "<other>",
+          "classification": "no_litchi_frame",
+          "requested_bytes": 2620,
+          "trace_count": 9
+        },
+        "unknown": {
+          "calls": 1,
+          "category": "<unknown>",
+          "classification": "no_resolved_litchi_frame_with_unknown",
+          "requested_bytes": 73728,
+          "trace_count": 1
+        }
+      },
+      "whole_process": {
+        "calls": 125004757,
+        "requested_bytes": 9178781390,
+        "trace_count": 6969
+      }
+    }
+  },
+  "classifier": {
+    "definition": "For each trace aggregate, scan stack frames from leaf toward root. Select the first resolved function whose name starts with litchi_; strip only a terminal Rust ::h plus 16 hex digits. A trace with no such frame is <other> when all frame names resolve, or <unknown> when any frame name is unresolved. Each trace is assigned exactly one category.",
+    "non_litchi_frames": "allocator, RawVec, serde, libc, and other frames are skipped until the nearest resolved litchi_ frame; they are not independently summed",
+    "scope": "whole-process heaptrack requested allocation bytes before frees; this is a source-symbol attribution, not a phase attribution or speedup/adoption claim"
+  },
+  "generated_utc": "2026-10-06T16:21:29.254861+00:00",
+  "inputs": {
+    "capture_index": {
+      "bytes": 9046,
+      "path": "/home/zhuhe/litchi-performance-0932/capture-index-v1.json",
+      "sha256": "b670b5cb162d774eca7d49b6a3d13dc5683663b4475bec025e10f61076598ac3"
+    },
+    "immediate_caller_receipt": {
+      "bytes": 238516,
+      "path": "/home/zhuhe/litchi-performance-0932/heaptrack-attribution-v2.json",
+      "sha256": "d467b64f1cabeea03e821949483c3c9d0ff6bc28267da5a0f3223e0eda5fe7c7"
+    }
+  },
+  "schema": "litchi.performance.0932.heaptrack-nearest-litchi.v1",
+  "status": "completed"
+}

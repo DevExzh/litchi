@@ -1,0 +1,15 @@
+{
+  "analysis_started": false,
+  "child_terminals_written_before_analysis": true,
+  "children": [
+    "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+    "s8192-c08-exact-independent_sources-heaptrack-v1"
+  ],
+  "ended_utc": "2026-10-06T15:58:00.274479+00:00",
+  "exit_code": 0,
+  "runner_error": null,
+  "schema": "litchi.performance.0932.heaptrack-runner-terminal.v1",
+  "started_utc": "2026-10-06T15:56:00.474701+00:00",
+  "status": "terminal",
+  "wall_seconds": 119.7997636590153
+}

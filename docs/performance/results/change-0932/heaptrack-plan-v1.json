@@ -1,0 +1,123 @@
+{
+  "binary": {
+    "build_receipt": {
+      "bytes": 2774,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+      "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+    },
+    "bytes": 68431264,
+    "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+  },
+  "child_command_template": [
+    "/usr/bin/time",
+    "-v",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "<child>/heaptrack-data.gz",
+    "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "docx-section-retention",
+    "--sections",
+    "8192",
+    "--concurrent-commits",
+    "8",
+    "--policy",
+    "exact",
+    "--ownership",
+    "<shared_snapshot_clones|independent_sources>",
+    "--source-revision",
+    "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+    "--output",
+    "<child>/report.json"
+  ],
+  "child_environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "LITCHI_PERF_0931_MEMORY_DIAGNOSTIC": "1",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0",
+    "profiler_injection": "heaptrack-managed LD_PRELOAD; no caller-provided LD_PRELOAD"
+  },
+  "claim_scope": "Descriptive attribution only; no latency, speedup, adoption, or allocation-saving claim.",
+  "created_utc": "2026-10-06T15:55:54.936879+00:00",
+  "custody": {
+    "external_root": "/home/zhuhe/litchi-performance-0932",
+    "profile_expected": "heaptrack recorder output; retain full file regardless of size",
+    "raw_artifacts_external": true,
+    "report_expected": "application JSON; retain full file regardless of size",
+    "terminal_first": "Each child terminal.json is written before any report/profile parsing; runner-terminal.json is written before offline analysis."
+  },
+  "interpretation": {
+    "authoritative_phase_context": "0931 counting allocator after_snapshot_drop and release regions",
+    "required_exports": "heaptrack_print callsite/stack totals for allocation calls and requested bytes, plus unknown/unattributed totals and conservation checks",
+    "rss_context": "time -v output is setup-inclusive context, not an allocation metric",
+    "whole_process_limit": "heaptrack includes initialization, retention admission, prevalidation, creation, correctness/publication/inverse, and release work; no exact phase attribution without markers"
+  },
+  "matrix": {
+    "children": 2,
+    "concurrent_commits": 8,
+    "cpu": 12,
+    "deadline_seconds_per_child": 600,
+    "order": "shared_snapshot_clones then independent_sources",
+    "ownership_modes": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "policy": "exact",
+    "recapture": false,
+    "sections": 8192
+  },
+  "no_workload_before_plan": true,
+  "purpose": "Whole-process allocation callsite diagnostic for the retained 0931 8192-section, eight-commit retention scenarios.",
+  "schema": "litchi.performance.0932.heaptrack-plan.v1",
+  "source": {
+    "base_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+    "full_source_listing": {
+      "bytes": 1665247,
+      "path": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+      "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a"
+    },
+    "overlay_receipt": {
+      "bytes": 4453,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+      "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+    },
+    "scope_note": "Interpret against retained source-final ELF and frozen 0931 overlay; source revision is not current HEAD.",
+    "source_receipt": {
+      "bytes": 1083,
+      "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+      "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+    },
+    "source_root": "/home/zhuhe/litchi-performance-0931/source-final"
+  },
+  "status": "authorized_prospective",
+  "tooling": {
+    "analyzer": {
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d",
+      "version": "1.5.0"
+    },
+    "profiler": {
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+      "version": "1.5.0"
+    },
+    "runner": {
+      "bytes": 7155,
+      "path": "/home/zhuhe/litchi-performance-0932/run_heaptrack_v1.py",
+      "sha256": "83de50a8950dcc8fa2fc3e894e1bf3c8ee428b6a6936dad40b6d9bf1418f436f"
+    },
+    "taskset": {
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "time": {
+      "path": "/usr/bin/time",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"
+    }
+  }
+}

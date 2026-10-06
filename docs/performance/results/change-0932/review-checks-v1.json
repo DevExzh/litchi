@@ -1,0 +1,13 @@
+{
+  "schema": "litchi.performance.0932.review-checks.v1",
+  "checks": {
+    "json": "All JSON parses, except two verbatim original terminal records whose documented normalized derivatives parse.",
+    "python": "All frozen Python scripts compile via compile(...), without execution or pycache.",
+    "perl": "Frozen independent verifier passes perl -c.",
+    "links": "All local links in 0932 change record resolve.",
+    "size": "Every change-0932 file is below 1 MiB; no compiled executable.",
+    "arithmetic": "Both combined scanner-byte totals equal constituent categories.",
+    "whitespace": "Default staged diff --check reports only new blank line at EOF in nearest_litchi_v1.py:177 and summarize_heaptrack_v2.py:365. These frozen scripts retain exact executed bytes and bound hashes. With blank-at-eof disabled, staged diff --check passes."
+  },
+  "production_tests": "None; diagnostic/documentation batch with no production or harness changes."
+}

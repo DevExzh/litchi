@@ -1,0 +1,196 @@
+{
+  "schema": "docx_section_retention_0932_source_counter_audit_v1",
+  "status": "descriptive_source_and_counter_audit",
+  "generated_utc": "2026-10-06",
+  "repository_head": "7400b94f7eb7b6f991d92b8e7c982fb4406c6bd5",
+  "prior_reduction": {
+    "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-v1.json",
+    "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+  },
+  "raw_packet": "/home/zhuhe/litchi-performance-0931/formal-packet-v1",
+  "source_bindings": [
+    {
+      "path": "tools/perf-baseline/src/allocation_metrics.rs",
+      "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5",
+      "lines": "661-725",
+      "role": "alloc/dealloc/realloc counter updates and live/peak accounting"
+    },
+    {
+      "path": "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+      "sha256": "80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068",
+      "lines": "16-55",
+      "role": "System allocator wrapper records only successful old/new request sizes"
+    },
+    {
+      "path": "tools/perf-baseline/src/docx_section_retention.rs",
+      "sha256": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+      "lines": "373-405, 614-811",
+      "role": "synthetic XML/archive generator, source opening, and ownership-mode regions"
+    },
+    {
+      "path": "crates/litchi-docx/src/section/layout.rs",
+      "sha256": "0c1732a566d35096a9cc02949f880b81dd07b0a1bf3db4dcc4a43d87cf6da03e",
+      "lines": "56-109, 376-452, 2284-2306",
+      "role": "full XML/inventory parse, changed target construction, and full-buffer replacement"
+    },
+    {
+      "path": "crates/litchi-docx/src/section/inventory.rs",
+      "sha256": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99",
+      "lines": "302-442",
+      "role": "Arc-backed inventory clone and retained-byte estimate"
+    },
+    {
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "sha256": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d",
+      "lines": "428-430, 2116-2167",
+      "role": "catalog-only open and deferred main XML materialization/query"
+    }
+  ],
+  "counter_semantics": {
+    "allocated_bytes": "sum of successful alloc/alloc_zeroed request sizes plus new_size for every successful realloc",
+    "deallocated_bytes": "sum of successful dealloc request sizes plus old_size for every successful realloc",
+    "allocation_calls": "fresh allocation calls plus successful realloc calls",
+    "reallocation_calls": "successful realloc call count",
+    "live_bytes": "allocated_bytes minus deallocated_bytes at the callback boundary",
+    "peak_live_bytes": "maximum process-wide callback live gauge",
+    "not_measured": [
+      "bytes copied by realloc",
+      "whether realloc moved or extended in place",
+      "allocator-internal capacity or usable-size changes",
+      "physical writes, unique object ownership, or RSS"
+    ]
+  },
+  "source_corpus": {
+    "generator": "tools/perf-baseline/src/docx_section_retention.rs::source_document",
+    "section_16": {
+      "document_xml_bytes": 2316,
+      "source_archive_bytes": 1052,
+      "source_archive_sha256": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726"
+    },
+    "section_8192": {
+      "document_xml_bytes": 1170499,
+      "source_archive_bytes": 25498,
+      "source_archive_sha256": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3"
+    },
+    "derivation": "count UTF-8 bytes of the exact source_document strings, including retention-section-{index:03} expansion; reported archive sizes are compressed OPC bytes"
+  },
+  "after_snapshot_drop_exact_policy": [
+    {
+      "sections": 16,
+      "commits": 1,
+      "ownership": "shared_snapshot_clones",
+      "allocated_bytes": 892501,
+      "deallocated_bytes": 876134,
+      "allocation_calls": 8185,
+      "reallocation_calls": 605
+    },
+    {
+      "sections": 16,
+      "commits": 1,
+      "ownership": "independent_sources",
+      "allocated_bytes": 892501,
+      "deallocated_bytes": 876134,
+      "allocation_calls": 8185,
+      "reallocation_calls": 605
+    },
+    {
+      "sections": 16,
+      "commits": 8,
+      "ownership": "shared_snapshot_clones",
+      "allocated_bytes": 2970668,
+      "deallocated_bytes": 2880946,
+      "allocation_calls": 38271,
+      "reallocation_calls": 2950
+    },
+    {
+      "sections": 16,
+      "commits": 8,
+      "ownership": "independent_sources",
+      "allocated_bytes": 7140008,
+      "deallocated_bytes": 6952496,
+      "allocation_calls": 65480,
+      "reallocation_calls": 4840
+    },
+    {
+      "sections": 8192,
+      "commits": 1,
+      "ownership": "shared_snapshot_clones",
+      "allocated_bytes": 278349133,
+      "deallocated_bytes": 272399042,
+      "allocation_calls": 3785533,
+      "reallocation_calls": 245921
+    },
+    {
+      "sections": 8192,
+      "commits": 1,
+      "ownership": "independent_sources",
+      "allocated_bytes": 278349133,
+      "deallocated_bytes": 272399042,
+      "allocation_calls": 3785533,
+      "reallocation_calls": 245921
+    },
+    {
+      "sections": 8192,
+      "commits": 8,
+      "ownership": "shared_snapshot_clones",
+      "allocated_bytes": 1251354390,
+      "deallocated_bytes": 1208570367,
+      "allocation_calls": 17036337,
+      "reallocation_calls": 1106872
+    },
+    {
+      "sections": 8192,
+      "commits": 8,
+      "ownership": "independent_sources",
+      "allocated_bytes": 2226793064,
+      "deallocated_bytes": 2150552464,
+      "allocation_calls": 30284264,
+      "reallocation_calls": 1967368
+    }
+  ],
+  "topology_decomposition": {
+    "method": "c1 exact region = F + C; shared c8 = F + 8C; independent c8 = 8F + 8C; Snapshot/Inventory clones are Arc-backed shallow clones",
+    "sections_16": {
+      "fixed_open_and_query_F": {
+        "allocated_bytes": 595620,
+        "allocation_calls": 3887,
+        "reallocation_calls": 270
+      },
+      "per_commit_C": {
+        "allocated_bytes": 296881,
+        "allocation_calls": 4298,
+        "reallocation_calls": 335
+      }
+    },
+    "sections_8192": {
+      "fixed_open_and_query_F": {
+        "allocated_bytes": 139348382,
+        "allocation_calls": 1892561,
+        "reallocation_calls": 122928
+      },
+      "per_commit_C": {
+        "allocated_bytes": 139000751,
+        "allocation_calls": 1892972,
+        "reallocation_calls": 122993
+      }
+    },
+    "interpretation": "F is the one-time open/query path and C is topology-specific commit construction; neither term is parser-only or copy-only. Exact linearity is measured in the retained reports."
+  },
+  "bounded_conclusions": [
+    "Large construction-region requested traffic can include substantial realloc capacity churn because each realloc contributes its entire new_size to allocated_bytes.",
+    "The reports cannot determine how many reallocations moved or how many bytes were copied; no copy-volume or parser-only claim is made.",
+    "The independent/shared gap is source-topology evidence: independent mode repeats open/query for each source, while shared mode opens/query once and shallow-clones the snapshot. It does not isolate XML parsing from package indexing or inventory allocation.",
+    "after_snapshot_drop is the construction/query/commit boundary. Correctness publication and inverse validation occur afterward, so commits_retained cumulative allocated_bytes must not be relabeled construction traffic."
+  ],
+  "future_evidence_required": [
+    "Record phase-tagged successful allocator events with operation, pointer, old_size, new_size, returned pointer, alignment, and failure status.",
+    "Report fresh allocation request sum separately from realloc new_size sum; also report positive growth deltas, shrink deltas, moved-realloc count, and moved-byte semantic bounds.",
+    "Attribute events to open/query, edit/commit, XML replacement, and inventory parsing (or add source-level capacity telemetry for the major buffers) before inferring copied-byte or parser-cost shares.",
+    "Keep publication/validation in a separate phase so its allocations cannot enter a construction attribution."
+  ],
+  "limitations": [
+    "This is a read-only post hoc audit of the retained 0931 packet; no build, workload, or capture was run.",
+    "The synthetic XML is highly compressible and is not representative corpus coverage.",
+    "The allocator callback is process-global and excludes allocator-internal overlap and RSS."
+  ]
+}

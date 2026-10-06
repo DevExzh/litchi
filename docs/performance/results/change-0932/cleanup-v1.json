@@ -1,0 +1,118 @@
+{
+  "schema": "litchi.performance.0932.cleanup.v1",
+  "completed_utc": "2026-10-06T16:38:18.727421+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0932/inspect-shared-print-v1.txt",
+      "bytes": 387138,
+      "sha256": "ca8e729597927090d68f2ff1ef156ceb694b5883a19a935dca1917a7141cfe12"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0932/inspect-shared-nomerge-v1.txt",
+      "bytes": 153953,
+      "sha256": "4ad206a50b011edd30d2664a92f1ac698b6aef699676901d7f6fff9393db19f8"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0932/inspect-shared-print-v1.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0932/inspect-shared-nomerge-v1.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/audit/independent-allocators.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/audit/independent-allocators.txt",
+      "bytes": 125425,
+      "sha256": "c16003ec4661930e6e852a310d6a8e500b6f7f8b107dc227242da786ab09cec9"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/audit/shared-allocators.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/audit/shared-allocators.txt",
+      "bytes": 124929,
+      "sha256": "26289317b3795ea87d2a498cb75fdec2879b7617fa7b0c28d08b61c83d21d47a"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/independent-folded-nosuppress",
+      "bytes": 7675006,
+      "sha256": "e3ce6d81e215f70607071301438ef0387cf328f4a09f116956be2cadbde6a1e9"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/independent-folded-nosuppress.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/independent-primary-stacks-v1.tsv",
+      "bytes": 1688159,
+      "sha256": "12440534ff6f858b6b7f8c1226674fe2a541fcac7b2b26bb23674dbb83c8ded7"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/independent-schema-check-v2.json",
+      "bytes": 34825,
+      "sha256": "ee0f710670cd1fdcec9f2f80779d1f9a9378b287c450bfd2cf62294d19795e52"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/independent-schema-check-v3.json",
+      "bytes": 41380,
+      "sha256": "4441c4ef9e235070917af4b38289e022c13bf695db7d43a7fddd33552c3abf46"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/independent-schema-check-v4.json",
+      "bytes": 41380,
+      "sha256": "4441c4ef9e235070917af4b38289e022c13bf695db7d43a7fddd33552c3abf46"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-folded-nosuppress",
+      "bytes": 7674438,
+      "sha256": "17b7bee32f8830df34949f77a14d0d4f2a63c828317c442548924749d4c278dd"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-folded-nosuppress.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-primary-stacks-v1.tsv",
+      "bytes": 1687495,
+      "sha256": "56710e020a0c1dd88a192780319b7beb9c4db6c01b9d75b3d5b30012ccc6886e"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-schema-check-v2.json",
+      "bytes": 40481,
+      "sha256": "a5474f9cb3c11e758b9eb925ba8c6e5cb0300e03cf15114067c61f5884ae06bb"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-schema-check-v3.json",
+      "bytes": 42156,
+      "sha256": "7fa35dd9ec4cd835a102282653ee9e2a2af9fe325a20231e294b30f9b6124844"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-schema-check-v4.json",
+      "bytes": 42156,
+      "sha256": "7fa35dd9ec4cd835a102282653ee9e2a2af9fe325a20231e294b30f9b6124844"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/shared-schema-check.json",
+      "bytes": 5996,
+      "sha256": "6c55bb576e5caa7cac9f4ea70308c36d77b7ef4b664d8642215ecd45c1e6e241"
+    },
+    {
+      "path": "/tmp/litchi-performance-0932/verify_heaptrack_schema_v2.pl",
+      "bytes": 3908,
+      "sha256": "5a9dafeadd7449baa9d11644c0eace53d0311082c80bbd9d03bfe7ae7cbfcab3"
+    }
+  ],
+  "total_logical_bytes": 19768825,
+  "scope": "Disposable exploratory heaptrack_print outputs only; not canonical archive members or receipt inputs. Canonical evidence, unused decoder draft, source and measured binary retained. No build directories created or removed this batch. Removed audit scratch duplicates and obsolete exploratory parser outputs after verifying persisted final verifier/output hashes in independent-audit-v1.json."
+}

@@ -1,0 +1,193 @@
+{
+  "decision": "Pass for the bounded descriptive allocation-attribution audit; no blocker for the 0932 diagnostic evidence packet. Do not promote these results to phase or performance claims.",
+  "independent_comparisons": {
+    "folded_outputs": {
+      "canonical": {
+        "command": "heaptrack_print -f PROFILE -m 1 -n 1000000 -s 1000000 -F OUTPUT --flamegraph-cost-type allocations",
+        "independent": {
+          "audit_regenerated_file": {
+            "bytes": 7675006,
+            "path": "/home/zhuhe/litchi-performance-0932/independent-folded-nosuppress-v1.folded",
+            "sha256": "e3ce6d81e215f70607071301438ef0387cf328f4a09f116956be2cadbde6a1e9"
+          },
+          "calls": 178052276,
+          "canonical_file": {
+            "bytes": 7675006,
+            "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-independent_sources-heaptrack-v1/allocation-stacks.folded",
+            "sha256": "e3ce6d81e215f70607071301438ef0387cf328f4a09f116956be2cadbde6a1e9"
+          }
+        },
+        "result": "Both canonical folded files and the independent regenerated folded files sum to the exact raw and histogram call totals. Full folded strings retain inline frames and are not used as physical-primary equality without normalization.",
+        "shared": {
+          "audit_regenerated_file": {
+            "bytes": 7674438,
+            "path": "/home/zhuhe/litchi-performance-0932/shared-folded-nosuppress-v1.folded",
+            "sha256": "17b7bee32f8830df34949f77a14d0d4f2a63c828317c442548924749d4c278dd"
+          },
+          "calls": 125004757,
+          "canonical_file": {
+            "bytes": 7674438,
+            "path": "/home/zhuhe/litchi-performance-0932/heaptrack-analysis-v1/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/allocation-stacks.folded",
+            "sha256": "17b7bee32f8830df34949f77a14d0d4f2a63c828317c442548924749d4c278dd"
+          }
+        }
+      }
+    },
+    "histogram_exact": {
+      "independent": {
+        "calls": 178052276,
+        "requested_bytes": 13077355214
+      },
+      "result": "Both raw totals and every allocation-size count matched heaptrack_print allocation-size.histogram.",
+      "shared": {
+        "calls": 125004757,
+        "requested_bytes": 9178781390
+      }
+    },
+    "primary_stack_exact": {
+      "independent": {
+        "raw_groups": 1375,
+        "v2_groups": 1375,
+        "weight_mismatches_after_unknown_label_normalization": 0
+      },
+      "normalization": "Stack frames are compared leaf-to-root using each frame locations[0] only; inline locations[1:] are excluded. The sole unknown event label is normalized from <no-frame> in the independent decoder to <unknown> in v2.",
+      "result": "Every primary stack group calls/bytes pair matched v2 trace-aggregates after the stated unknown-label normalization.",
+      "shared": {
+        "raw_groups": 1375,
+        "v2_groups": 1375,
+        "weight_mismatches_after_unknown_label_normalization": 0
+      }
+    }
+  },
+  "limits": [
+    "Requested bytes are heaptrack allocation sizes before frees; they are not copied bytes, allocator live deltas, RSS, latency, or a phase measurement.",
+    "Profiles cover setup, correctness, publication, and release activity process-wide; run_scenario is inlined and no frozen phase marker exists.",
+    "The one unresolved 73728-byte event remains in the unknown bucket; no source owner is inferred for it.",
+    "Nearest-litchi buckets are disjoint source-symbol attribution only and do not prove operation ownership or speedup."
+  ],
+  "nearest_litchi_crosscheck": {
+    "independent": {
+      "combined_bytes": 5044450039,
+      "ensure_source_inventory_bytes": 2302402348,
+      "parse_with_limits_bytes": 2742047691,
+      "whole_process_bytes": 13077355214
+    },
+    "receipt": {
+      "path": "docs/performance/results/change-0932/heaptrack-nearest-litchi-v1.json",
+      "sha256": "4f5af66b8fc2b769202a58b99ad830842181355bdaad8f6456f9db93a59eb527"
+    },
+    "shared": {
+      "combined_bytes": 3541847973,
+      "ensure_source_inventory_bytes": 1616580372,
+      "parse_with_limits_bytes": 1925267601,
+      "whole_process_bytes": 9178781390
+    }
+  },
+  "profiles": {
+    "independent": {
+      "allocation_events": 178052276,
+      "allocation_info_definitions": 8460,
+      "child": "s8192-c08-exact-independent_sources-heaptrack-v1",
+      "deallocation_events": 178052275,
+      "plus_index_misses": 0,
+      "primary_stack_groups": 1375,
+      "profile": {
+        "bytes": 1868403,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "03c7cb95d1f8c86bb25a8155a65d93996ee94eebada27f2274a4acf0f4636686"
+      },
+      "raw_stack_tsv_sha256": "12440534ff6f858b6b7f8c1226674fe2a541fcac7b2b26bb23674dbb83c8ded7",
+      "requested_bytes": 13077355214,
+      "trace_definitions": 27022,
+      "unknown_events": {
+        "calls": 1,
+        "requested_bytes": 73728
+      }
+    },
+    "shared": {
+      "allocation_events": 125004757,
+      "allocation_info_definitions": 8459,
+      "child": "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+      "deallocation_events": 125004756,
+      "plus_index_misses": 0,
+      "primary_stack_groups": 1375,
+      "profile": {
+        "bytes": 1405193,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "5025b7cac8d5f7d9eb2baf1572a4de82d99878747a11ef25ab449020d66deb8d"
+      },
+      "raw_stack_tsv_sha256": "56710e020a0c1dd88a192780319b7beb9c4db6c01b9d75b3d5b30012ccc6886e",
+      "requested_bytes": 9178781390,
+      "trace_definitions": 27022,
+      "unknown_events": {
+        "calls": 1,
+        "requested_bytes": 73728
+      }
+    }
+  },
+  "schema": "litchi.performance.0932.independent-audit.v1",
+  "scope": "Independent post-capture audit of the two retained 0931 whole-process heaptrack profiles; no workload, build, or recapture was performed.",
+  "source_schema": {
+    "header_version": [
+      "10500",
+      "3"
+    ],
+    "heaptrack_package": "1.5.0+dfsg1-6ubuntu1",
+    "installed_tools": [
+      {
+        "path": "/usr/bin/heaptrack",
+        "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574"
+      },
+      {
+        "path": "/usr/bin/heaptrack_print",
+        "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d"
+      },
+      {
+        "path": "/usr/lib/heaptrack/libexec/heaptrack_interpret",
+        "sha256": "5c4f673e94f77d3d2fc0a34f47925bbc44d6fc96f9bd994e3a7ae22ce5ffe847"
+      }
+    ],
+    "primary_authority_url": "https://github.com/KDE/heaptrack/blob/v1.5.0/src/interpret/heaptrack_interpret.cpp",
+    "rules_verified": [
+      "s records use a hexadecimal byte length; string IDs are implicit in record order.",
+      "i records receive implicit IP IDs in record order.",
+      "t records receive implicit trace IDs in record order; field 1 selects an IP and field 2 selects the parent trace.",
+      "a records receive implicit allocation-info IDs in record order; each + field indexes that table and may reuse an earlier entry."
+    ]
+  },
+  "status": "approved_descriptive",
+  "verifier": {
+    "commands": [
+      "STACK_OUT=/home/zhuhe/litchi-performance-0932/shared-primary-stacks-v1.tsv perl /home/zhuhe/litchi-performance-0932/verify_primary_stack_schema_v1.pl /home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst > /home/zhuhe/litchi-performance-0932/shared-schema-check-v4.json",
+      "STACK_OUT=/home/zhuhe/litchi-performance-0932/independent-primary-stacks-v1.tsv perl /home/zhuhe/litchi-performance-0932/verify_primary_stack_schema_v1.pl /home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst > /home/zhuhe/litchi-performance-0932/independent-schema-check-v4.json"
+    ],
+    "method": "Independent Perl decoder using the v1.5.0 implicit-index schema; raw allocation-info index lookup, trace/IP chain resolution, and primary locations[0] stack aggregation.",
+    "outputs": [
+      {
+        "bytes": 42156,
+        "path": "/home/zhuhe/litchi-performance-0932/shared-schema-check-v4.json",
+        "sha256": "7fa35dd9ec4cd835a102282653ee9e2a2af9fe325a20231e294b30f9b6124844"
+      },
+      {
+        "bytes": 41380,
+        "path": "/home/zhuhe/litchi-performance-0932/independent-schema-check-v4.json",
+        "sha256": "4441c4ef9e235070917af4b38289e022c13bf695db7d43a7fddd33552c3abf46"
+      },
+      {
+        "bytes": 1687495,
+        "path": "/home/zhuhe/litchi-performance-0932/shared-primary-stacks-v1.tsv",
+        "sha256": "56710e020a0c1dd88a192780319b7beb9c4db6c01b9d75b3d5b30012ccc6886e"
+      },
+      {
+        "bytes": 1688159,
+        "path": "/home/zhuhe/litchi-performance-0932/independent-primary-stacks-v1.tsv",
+        "sha256": "12440534ff6f858b6b7f8c1226674fe2a541fcac7b2b26bb23674dbb83c8ded7"
+      }
+    ],
+    "script": {
+      "bytes": 3908,
+      "path": "/home/zhuhe/litchi-performance-0932/verify_primary_stack_schema_v1.pl",
+      "sha256": "5a9dafeadd7449baa9d11644c0eace53d0311082c80bbd9d03bfe7ae7cbfcab3"
+    }
+  }
+}

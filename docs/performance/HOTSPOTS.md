@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0932 — scanner copies are the next bounded allocation candidate
+
+[0932](0932-docx-allocation-attribution.md) assigns 38.5873% of shared and
+38.5739% of independent whole-process requested bytes to the nearest frames
+`Inventory::parse_with_limits` and `ensure_source_section_inventory_xml`
+combined.
+Source inspection finds per-event namespace-resolver clones, owned inventory
+events and copied element names. A future borrowed-scanner-state implementation must preserve
+fresh target parsing, refusal order, namespace validation and source spans.
+These buckets include other allocations and do not predict removable bytes or
+speedup. Repeated fragment parsing is a separate candidate constrained by lazy
+public semantic errors and footnote-validation order. No optimization is
+adopted here.
+
 ## 0931 — logical retention differs from shared live memory
 
 [0931](0931-docx-retention-memory.md) confirms bounded admission and release

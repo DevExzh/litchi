@@ -1,0 +1,21 @@
+{
+  "corrected_decoder": {
+    "bytes": 11494,
+    "path": "/home/zhuhe/litchi-performance-0932/decode_heaptrack_raw_v2.py",
+    "repository_copy": "decode_heaptrack_raw_v2.py",
+    "sha256": "c128caddd800dff1950dc922616dd7c9dfc899014fdc6f398232b7bb3b6c64f9"
+  },
+  "execution": {
+    "executed": false,
+    "output_root": null,
+    "terminal_receipt": null
+  },
+  "reason": "Superseded before execution: the draft used current allocation-info metadata rather than resolving each + event through its implicit allocation-info index. Corrected v2 was the only raw decoder executed.",
+  "schema": "litchi.performance.0932.heaptrack-raw-decoder-draft.v1",
+  "script": {
+    "bytes": 9513,
+    "path": "/home/zhuhe/litchi-performance-0932/decode_heaptrack_raw_v1.py",
+    "sha256": "94dcbd6fc8cbed7e0c197379688de5e8d4482343f219f55645d2c721935f28ba"
+  },
+  "status": "draft_not_used"
+}

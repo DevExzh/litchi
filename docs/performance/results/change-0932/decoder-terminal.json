@@ -1,0 +1,129 @@
+{
+  "ended_utc": "2026-10-06T16:18:12.970388+00:00",
+  "output_root": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2",
+  "profiles": [
+    {
+      "a_plus_adjacency_mismatches": 0,
+      "allocation_events": 178052276,
+      "allocation_info_definitions": 8460,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 178052275,
+      "debuggee_command": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees and separate from the 0931 counting allocator.",
+      "header_version": [
+        "10500",
+        "3"
+      ],
+      "ip_definitions": 867,
+      "outputs": {
+        "size_aggregates": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-independent_sources-heaptrack-v1/size-aggregates.tsv",
+        "trace_aggregates": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-independent_sources-heaptrack-v1/trace-aggregates.jsonl"
+      },
+      "plus_without_metadata": 0,
+      "profile": {
+        "bytes": 1868403,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "03c7cb95d1f8c86bb25a8155a65d93996ee94eebada27f2274a4acf0f4636686"
+      },
+      "raw_marker_counts": {
+        "#": 2,
+        "+": 178052276,
+        "-": 178052275,
+        "I": 1,
+        "R": 6965,
+        "X": 1,
+        "a": 8460,
+        "c": 6965,
+        "i": 867,
+        "s": 370,
+        "t": 27022,
+        "v": 1
+      },
+      "requested_bytes_total": 13077355214,
+      "schema": "litchi.performance.0932.heaptrack-raw-decode.v2",
+      "status": "completed",
+      "string_definitions": 370,
+      "string_length_errors": [],
+      "trace_definitions": 27022,
+      "unique_trace_ids": 6969,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unresolved_trace_definitions": 0,
+      "zstd": {
+        "path": "/usr/bin/zstd",
+        "version": "1.5.7"
+      }
+    },
+    {
+      "a_plus_adjacency_mismatches": 0,
+      "allocation_events": 125004757,
+      "allocation_info_definitions": 8459,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 125004756,
+      "debuggee_command": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees and separate from the 0931 counting allocator.",
+      "header_version": [
+        "10500",
+        "3"
+      ],
+      "ip_definitions": 867,
+      "outputs": {
+        "size_aggregates": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/size-aggregates.tsv",
+        "trace_aggregates": "/home/zhuhe/litchi-performance-0932/heaptrack-raw-decoder-v2/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/trace-aggregates.jsonl"
+      },
+      "plus_without_metadata": 0,
+      "profile": {
+        "bytes": 1405193,
+        "path": "/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/heaptrack-data.gz.zst",
+        "sha256": "5025b7cac8d5f7d9eb2baf1572a4de82d99878747a11ef25ab449020d66deb8d"
+      },
+      "raw_marker_counts": {
+        "#": 2,
+        "+": 125004757,
+        "-": 125004756,
+        "I": 1,
+        "R": 4799,
+        "X": 1,
+        "a": 8459,
+        "c": 4799,
+        "i": 867,
+        "s": 370,
+        "t": 27022,
+        "v": 1
+      },
+      "requested_bytes_total": 9178781390,
+      "schema": "litchi.performance.0932.heaptrack-raw-decode.v2",
+      "status": "completed",
+      "string_definitions": 370,
+      "string_length_errors": [],
+      "trace_definitions": 27022,
+      "unique_trace_ids": 6969,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unresolved_trace_definitions": 0,
+      "zstd": {
+        "path": "/usr/bin/zstd",
+        "version": "1.5.7"
+      }
+    }
+  ],
+  "schema": "litchi.performance.0932.heaptrack-raw-decode-run.v2",
+  "started_utc": "2026-10-06T16:14:59.516853+00:00",
+  "status": "terminal"
+}

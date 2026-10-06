@@ -1,0 +1,97 @@
+{
+  "batch": "0932",
+  "candidates": [
+    {
+      "files": [
+        {
+          "lines": "759-763",
+          "path": "crates/litchi-docx/src/section/inventory.rs"
+        },
+        {
+          "lines": "2734-2740",
+          "path": "crates/litchi-docx/src/source_backed.rs"
+        }
+      ],
+      "id": "borrowed_resolver_and_event",
+      "mechanism": "Use the input-borrowed Event from read_event and borrow reader.resolver() directly; remove Event::into_owned in the inventory scan and NamespaceResolver clones in both source scans.",
+      "preservation": "Same event order, namespace resolution, limits, error paths, and source freshness checks; compile/lifetime validation and measurement remain required.",
+      "status": "unimplemented_unprofiled"
+    },
+    {
+      "files": [
+        {
+          "lines": "736,818-824,877-883",
+          "path": "crates/litchi-docx/src/section/inventory.rs"
+        }
+      ],
+      "id": "borrowed_element_name_stack",
+      "mechanism": "Store input-borrowed element-name slices instead of allocating Vec<u8> for every Start event.",
+      "preservation": "Retains exact nesting and mismatch checks; compile/lifetime validation and measurement remain required.",
+      "status": "unimplemented_unprofiled"
+    },
+    {
+      "files": [
+        {
+          "lines": "1207-1223",
+          "path": "crates/litchi-docx/src/section/inventory.rs"
+        },
+        {
+          "lines": "444-450,770-793",
+          "path": "crates/litchi-docx/src/section/model.rs"
+        },
+        {
+          "lines": "128-149,740-972",
+          "path": "crates/litchi-docx/src/section/codec.rs"
+        }
+      ],
+      "id": "single_internal_fragment_parse",
+      "mechanism": "Inventory-only constructor could retain one parsed Raw representation, run borrowed footnote validation, then decode it once.",
+      "risks": "Must preserve codec validation before footnote validation, tolerance/error precedence, lossless raw bytes, and public lazy Section behavior; no optimization claim is made.",
+      "status": "deferred_unimplemented"
+    }
+  ],
+  "caveats": [
+    "No production optimization was implemented or benchmarked.",
+    "MCE processing is not counted as a primary allocation target: source preflight rejects MCE and the clean fast path returns Cow::Borrowed.",
+    "Requested-byte attribution remains a source-bound hypothesis pending heaptrack/callsite evidence."
+  ],
+  "evidence": {
+    "arithmetic": "shared c8 = c1 + 7*139000751; independent c8 = c1 + 7*278349133",
+    "independent_c8_requested_bytes": 2226793064,
+    "independent_increment_per_extra_commit": 278349133,
+    "one_commit_requested_bytes": 278349133,
+    "retained_inventory_probe_bytes": 3580192,
+    "sections": 8192,
+    "shared_c8_requested_bytes": 1251354390,
+    "shared_increment_per_extra_commit": 139000751,
+    "source": "/tmp/litchi-performance-0931/audit-copy-v1/children/*/report.json"
+  },
+  "larger_deferred_candidate": {
+    "boundary": "crates/litchi-docx/src/section/layout.rs:405-422",
+    "reason": "Target inventory rebuild repeats all descriptors/spans; blind reuse is invalid because the edited descriptor changes and later source offsets may shift.",
+    "required_proof": "Fresh full validation/limits/security scan plus correct descriptor/source-span rebasing and semantic readback."
+  },
+  "quick_xml": {
+    "borrow_pattern_ref": "name.rs:936-943 (read_event + reader.resolver().resolve_event)",
+    "borrowed_event_ref": "reader/ns_reader.rs:455-520 (read_event returns Event<'i> borrowing &[u8])",
+    "files": {
+      "name.rs": "7c4c007d6feccc90b7c3081cc43cae338e3e5dd9d5d976151162d8c8fe25a845",
+      "reader/ns_reader.rs": "0dafdfe6fcbcc5a9994102ee1b8b574e6823ef9adf8438c00f734242e805dc9f"
+    },
+    "resolved_event_ref": "reader/ns_reader.rs:582-585 (read_resolved_event alternative)",
+    "resolver_layout_ref": "name.rs:518-531 (String buffer + Vec bindings cloned)",
+    "version": "0.42.0"
+  },
+  "review_kind": "static_source_review",
+  "schema": "candidate_review_v1",
+  "source_files": {
+    "crates/litchi-docx/src/section/codec.rs": "dac8d1495653973be53eb2bb971430d87a924e8b9bac9c7d97a59fc0ac3ee886",
+    "crates/litchi-docx/src/section/inventory.rs": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99",
+    "crates/litchi-docx/src/section/layout.rs": "0c1732a566d35096a9cc02949f880b81dd07b0a1bf3db4dcc4a43d87cf6da03e",
+    "crates/litchi-docx/src/section/model.rs": "2c6c6929e25d00f4ff7d8e0d274ff12fbc3ff4465e346296fe7ca4d817cadd83",
+    "crates/litchi-docx/src/source_backed.rs": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d",
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/adr/README.md": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028"
+  },
+  "source_revision": "7400b94f7eb7b6f991d92b8e7c982fb4406c6bd5"
+}

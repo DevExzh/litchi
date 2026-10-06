@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0932 — DOCX allocation traffic attributed
+
+[0932](0932-docx-allocation-attribution.md) profiles two complete diagnostic
+processes with eight 8,192-section commits. Shared snapshots request
+9,178,781,390 bytes across 125,004,757 allocation events; independent sources
+request 13,077,355,214 bytes across 178,052,276 events. Raw decoding and
+heaptrack allocation histograms reconcile exactly. Nearest-Litchi attribution
+assigns about 38.6% of requested bytes to inventory and source-admission
+scanners combined. These whole-process totals include correctness work and are not the
+0931 construction interval. No production change or speedup claim is made.
+
 ## 0931 — DOCX retained-base memory lifetime measured
 
 [0931](0931-docx-retention-memory.md) adds a harness-only allocation diagnostic:

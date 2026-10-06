@@ -1,0 +1,36 @@
+{
+  "analysis_started": false,
+  "command": [
+    "env",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0932/run_heaptrack_v1.py"
+  ],
+  "exec_session_id": 46931,
+  "recorded_utc": "2026-10-06T15:58:09.908738+00:00",
+  "runner_terminal": {
+    "bytes": 493,
+    "path": "/home/zhuhe/litchi-performance-0932/runner-terminal.json",
+    "sha256": "ec19bd4f69fd43240b7ca172f61068c049089e16c1229fc81e926b3be92dc7e4"
+  },
+  "runner_terminal_content": {
+    "analysis_started": false,
+    "child_terminals_written_before_analysis": true,
+    "children": [
+      "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+      "s8192-c08-exact-independent_sources-heaptrack-v1"
+    ],
+    "ended_utc": "2026-10-06T15:58:00.274479+00:00",
+    "exit_code": 0,
+    "runner_error": null,
+    "schema": "litchi.performance.0932.heaptrack-runner-terminal.v1",
+    "started_utc": "2026-10-06T15:56:00.474701+00:00",
+    "status": "terminal",
+    "wall_seconds": 119.7997636590153
+  },
+  "schema": "litchi.performance.0932.heaptrack-outer-tool-return.v1",
+  "tool_return_exit_code": 0,
+  "tool_return_output": "{\"children\": [\"s8192-c08-exact-shared_snapshot_clones-heaptrack-v1\", \"s8192-c08-exact-independent_sources-heaptrack-v1\"], \"exit_code\": 0, \"packet\": \"/home/zhuhe/litchi-performance-0932/heaptrack-packet-v1\"}",
+  "workdir": "/home/zhuhe/code/litchi"
+}
