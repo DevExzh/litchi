@@ -1,0 +1,122 @@
+{
+  "conclusion": "No material blocker remains. The authorized 96-row manifest, source closure, release build, runner, controls, and idle barrier all verify. Root may launch the exact frozen cohort with its required approval environment; no latency, speedup, physical-heap, RSS-only, or production-adoption claim is authorized by this diagnostic.",
+  "frozen_bindings": {
+    "base_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+    "binary": {
+      "bytes": 68431264,
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+    },
+    "build_receipt": {
+      "bytes": 2774,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+      "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+    },
+    "host_idle": {
+      "bytes": 6116,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/host-and-idle-v1.json",
+      "sha256": "7c36e66522cd342ca4931a8a9780bab2c6888a64b8f9fa0019541d4b29b0d219"
+    },
+    "plan": {
+      "bytes": 10174,
+      "path": "docs/performance/results/change-0931/comparison-plan-v1.json",
+      "sha256": "2154f7659d0eab657d5dac8bc0d4af9841d77d330de7b6e0d5bd531563c202af"
+    },
+    "quality": {
+      "bytes": 19474,
+      "path": "docs/performance/results/change-0931/new-quality.json",
+      "sha256": "35823cb557cf9585711d5dabb576c70961024a85768f22d44778cd7edf48ad3c"
+    },
+    "runner": {
+      "bytes": 56056,
+      "path": "docs/performance/results/change-0931/comparison-0931-memory.py",
+      "sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36"
+    },
+    "source_closure_addendum_v3": {
+      "bytes": 4453,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+      "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+    },
+    "source_listing": {
+      "bytes": 1665247,
+      "path": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+      "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a"
+    },
+    "source_receipt": {
+      "bytes": 1083,
+      "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+      "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+    },
+    "source_test_approval": {
+      "bytes": 2623,
+      "path": "docs/performance/results/change-0931/independent-source-test-approval-v2.json",
+      "sha256": "824e78c6c6c11ea4cc55caf8ae6eb88ab93423cc5b15ec2014acce15a84a19de"
+    },
+    "tooling_validation": {
+      "bytes": 3577,
+      "path": "docs/performance/results/change-0931/comparison-tooling-validation-v1.json",
+      "sha256": "2391897bf6e6ef5376ec6a8a5cfa151b5840b86cf0ed268bf3d71c3f44173dcb"
+    }
+  },
+  "manifest": {
+    "bytes": 40455,
+    "path": "/home/zhuhe/litchi-performance-0931/formal-manifest-authorized-v1.json",
+    "sha256": "37c82f3ae1afb2d712e172995cccf7f208dc741139023dc5b0e04670699f1c47"
+  },
+  "manifest_verification": {
+    "authorized": true,
+    "command": "LITCHI_PERF_0931_CAPTURE_APPROVED=1 PYTHONDONTWRITEBYTECODE=1 python3 -B <import comparison-0931-memory.py; verify_manifest(manifest, authorized=True)>",
+    "replay_external_rehash": true,
+    "runner_sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36",
+    "schedule_hash": "b26df6473ffd9424ff679ff113d8efbe9bd275691b83ef990e161622b0094c24",
+    "schedule_rows": 96,
+    "status": "passed"
+  },
+  "preflight": {
+    "boundary_checks_passed": true,
+    "child_terminal_exit_codes": [
+      0,
+      0
+    ],
+    "descriptive_children": 2,
+    "formal_children_started": 0,
+    "outer_wrapper_exit_code": 1,
+    "outer_wrapper_note": "Post-run display KeyError after valid child terminal/report writes; no retries or recapture. Retained as an honest descriptive limitation.",
+    "receipt": {
+      "bytes": 7418,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/prelight-v1-validation.json",
+      "sha256": "7e532f1f91c7cc7f8e041695eb1ad6e04263387940d071c3521f308da64d54c1"
+    },
+    "sections_16_required_retained_base_bytes": 7280,
+    "sections_8192_required_retained_base_bytes": 3580192
+  },
+  "review_scope": "Independent read-only review of the authorized 0931 manifest and all frozen source, tooling, build, and preflight bindings. This reviewer launched no workload or formal capture.",
+  "schema": "litchi.performance.0931.independent-final-precapture-review.v2",
+  "source_closure": {
+    "actual_ancillary_paths_verified": [
+      [
+        "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx",
+        74104,
+        "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d"
+      ],
+      [
+        "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx",
+        302210,
+        "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283"
+      ],
+      [
+        "crates/litchi/examples/bench_word_parse.rs",
+        6390,
+        "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac"
+      ],
+      [
+        "Cargo.lock",
+        138201,
+        "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+      ]
+    ],
+    "root_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "standalone_tools_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "status": "approved_for_formal_capture"
+}

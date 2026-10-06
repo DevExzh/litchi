@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "--locked",
+    "-j2",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0931/source-final/tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/litchi-performance-0931/release-target"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0931/source-final",
+  "ended_utc": "2026-10-06T15:17:11.142265+00:00",
+  "env_recorded": {
+    "CARGO_ENCODED_RUSTFLAGS": "unset",
+    "RUSTFLAGS": "-C force-frame-pointers=yes"
+  },
+  "exec_session_id": 41161,
+  "exit_code": 130,
+  "pid": 1686127,
+  "reason": "Missing --release; stopped before any diagnostic workload. Exact start time was not captured by the initial exec wrapper and is intentionally unknown.",
+  "schema": "litchi.performance.0931.build-attempt.v1",
+  "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "source_root": "/home/zhuhe/litchi-performance-0931/source-final",
+  "started_utc": null,
+  "status": "stopped_configuration_error"
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "docx-section-retention-independent-source-test-approval-v2",
+  "review_scope": "read-only source/test custody and semantic review; no benchmark child or capture launched by this reviewer",
+  "status": "approved_for_runner_review",
+  "source_bindings": {
+    "base_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+    "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+    "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+    "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+  },
+  "approved_source_controls": [
+    "independent_sources opens a fresh OwnedSource/package/snapshot per commit and verifies zero shared inventory pairs",
+    "shared_snapshot_clones uses one source package and cloned snapshots and verifies every inventory pair shares allocation",
+    "public retained_base_bytes admission is checked at zero, one-under, exact, and default caps using a 64 MiB probe ceiling",
+    "all distinct commits receive preflight exact output/inverse/shape checks; measured validation scope is explicit: every distinct commit for independent sources, one original-lineage representative plus all preflight commits for shared ownership",
+    "publication, reopen, output, and inverse validation finish before the raw held-commit checkpoint; no source package or external snapshot owner remains at release checkpoints",
+    "release-all-but-last, release-last, and commit-drop are separate regions; held commits are a plain post-validation gauge with no fabricated regional peak",
+    "logical retained-byte sums are labeled accounting values and are not treated as unique heap or RSS"
+  ],
+  "approved_test_controls": [
+    "integration checks cover small shared exact retention and large independent one-under fallback",
+    "validator checks the omitted held-checkpoint region peak and requires regional peaks only on measured regions",
+    "validator treats verified independent non-sharing as a successful topology check",
+    "allocator counter sequence, live-byte conservation, observer flags, and return-to-baseline are checked"
+  ],
+  "scope_boundary": "This receipt approves the frozen diagnostic source/test pair only. Final comparison runner, manifest/source/build custody, release binary, and any capture authorization require separate review and receipts."
+}

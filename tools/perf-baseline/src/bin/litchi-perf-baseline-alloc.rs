@@ -21,6 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("docx-provider-lifecycle") => {
             litchi_perf_baseline::docx_provider_lifecycle::run_from_args(args)
         },
+        Some(selector) if selector == std::ffi::OsStr::new("docx-section-retention") => {
+            litchi_perf_baseline::docx_section_retention::run_from_args(args)
+        },
         Some(selector) if selector == std::ffi::OsStr::new("docx-edit-provider-cold") => {
             litchi_perf_baseline::docx_edit_provider::run_cold_from_args(args)
         },

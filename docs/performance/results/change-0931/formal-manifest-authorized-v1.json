@@ -1,0 +1,1187 @@
+{
+  "authorization_note": "Root authorizes exactly the frozen 96-child diagnostic cohort after source, quality, runner and build review plus two cap-boundary preflights. No retries or selective recapture. No normal-release speedup claim. Independent final receipt required before launch.",
+  "authorized_utc": "2026-10-06T15:32:49.609273+00:00",
+  "binary": {
+    "bytes": 68431264,
+    "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+  },
+  "build_receipt": {
+    "bytes": 2774,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+    "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+  },
+  "capture_policy": {
+    "formal_children_started": 0,
+    "no_retries": true,
+    "no_selective_recapture": true,
+    "retain_failed_children": true,
+    "terminal_before_report_parse": true
+  },
+  "child_environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "LITCHI_PERF_0931_MEMORY_DIAGNOSTIC": "1",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0"
+  },
+  "cpu": 12,
+  "created_utc": "2026-10-06T15:30:51.616281+00:00",
+  "custody_sources": {
+    "comparison-plan-v1.json": {
+      "bytes": 10174,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-plan-v1.json",
+      "sha256": "2154f7659d0eab657d5dac8bc0d4af9841d77d330de7b6e0d5bd531563c202af"
+    },
+    "comparison-tooling-validation-v1.json": {
+      "bytes": 3577,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-tooling-validation-v1.json",
+      "sha256": "2391897bf6e6ef5376ec6a8a5cfa151b5840b86cf0ed268bf3d71c3f44173dcb"
+    },
+    "host-and-idle-v1.json": {
+      "bytes": 6116,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/host-and-idle-v1.json",
+      "sha256": "7c36e66522cd342ca4931a8a9780bab2c6888a64b8f9fa0019541d4b29b0d219"
+    },
+    "independent-source-test-approval-v2.json": {
+      "bytes": 2623,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/independent-source-test-approval-v2.json",
+      "sha256": "824e78c6c6c11ea4cc55caf8ae6eb88ab93423cc5b15ec2014acce15a84a19de"
+    },
+    "new-quality.json": {
+      "bytes": 19474,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/new-quality.json",
+      "sha256": "35823cb557cf9585711d5dabb576c70961024a85768f22d44778cd7edf48ad3c"
+    },
+    "prelight-v1-validation.json": {
+      "bytes": 7418,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/prelight-v1-validation.json",
+      "sha256": "7e532f1f91c7cc7f8e041695eb1ad6e04263387940d071c3521f308da64d54c1"
+    },
+    "regenerate-source-list-v1.py": {
+      "bytes": 932,
+      "path": "/home/zhuhe/litchi-performance-0931/regenerate-source-list-v1.py",
+      "sha256": "18b2e15029c772e6217c8f93af90b53af57a1e7a066aab7e97d2a702398f0808"
+    },
+    "source-closure-addendum-v3.json": {
+      "bytes": 4453,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+      "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+    },
+    "source-final-list.jsonl": {
+      "bytes": 1665247,
+      "path": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+      "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a"
+    }
+  },
+  "deadline_seconds": 120,
+  "plan": {
+    "bytes": 10174,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-plan-v1.json",
+    "sha256": "2154f7659d0eab657d5dac8bc0d4af9841d77d330de7b6e0d5bd531563c202af"
+  },
+  "prelight_validation": {
+    "bytes": 7418,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/prelight-v1-validation.json",
+    "sha256": "7e532f1f91c7cc7f8e041695eb1ad6e04263387940d071c3521f308da64d54c1"
+  },
+  "quality": {
+    "bytes": 19474,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/new-quality.json",
+    "sha256": "35823cb557cf9585711d5dabb576c70961024a85768f22d44778cd7edf48ad3c"
+  },
+  "replay_external_rehash": true,
+  "runner_descriptor": {
+    "bytes": 56056,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-0931-memory.py",
+    "sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36"
+  },
+  "runner_sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36",
+  "schedule": {
+    "children": 96,
+    "matrix": "2 section counts x 2 commit counts x 4 cap policies x 2 ownership modes x 3 repetitions",
+    "rows": [
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-default-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-default-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-default-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-default-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-default-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-default-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-zero-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-zero-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-zero-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-zero-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-zero-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-zero-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-exact-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-exact-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-exact-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-exact-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-exact-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-exact-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-one_under-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-one_under-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-one_under-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-one_under-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-one_under-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c01-one_under-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-default-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-default-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-default-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-default-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-default-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-default-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-zero-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-zero-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-zero-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-zero-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-zero-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-zero-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-exact-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-exact-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-exact-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-exact-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-exact-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-exact-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-one_under-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-one_under-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-one_under-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-one_under-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-one_under-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s0016-c08-one_under-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 16,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-default-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-default-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-default-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-default-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-default-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-default-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-zero-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-zero-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-zero-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-zero-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-zero-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-zero-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-exact-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-exact-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-exact-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-exact-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-exact-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-exact-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-one_under-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-one_under-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-one_under-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-one_under-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-one_under-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 1,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c01-one_under-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-default-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-default-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-default-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-default-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-default-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-default-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "default",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-zero-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-zero-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-zero-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-zero-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-zero-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-zero-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "zero",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-exact-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-exact-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-exact-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-exact-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-exact-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-exact-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-one_under-shared_snapshot_clones-r01",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-one_under-shared_snapshot_clones-r02",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-one_under-shared_snapshot_clones-r03",
+        "ownership": "shared_snapshot_clones",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-one_under-independent_sources-r01",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 1,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-one_under-independent_sources-r02",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 2,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      },
+      {
+        "concurrent_commits": 8,
+        "cpu": 12,
+        "deadline_seconds": 120,
+        "id": "s8192-c08-one_under-independent_sources-r03",
+        "ownership": "independent_sources",
+        "policy": "one_under",
+        "repetition": 3,
+        "section_count": 8192,
+        "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f"
+      }
+    ],
+    "sha256": "b26df6473ffd9424ff679ff113d8efbe9bd275691b83ef990e161622b0094c24"
+  },
+  "schema": "litchi.performance.0931.memory-manifest.v1",
+  "source_closure_addendum": {
+    "bytes": 4453,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+    "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+  },
+  "source_receipt": {
+    "bytes": 1083,
+    "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+    "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+  },
+  "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "source_root": "/home/zhuhe/litchi-performance-0931/source-final",
+  "source_test_approval": {
+    "bytes": 2623,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/independent-source-test-approval-v2.json",
+    "sha256": "824e78c6c6c11ea4cc55caf8ae6eb88ab93423cc5b15ec2014acce15a84a19de"
+  },
+  "status": "authorized",
+  "supersedes_manifest": {
+    "bytes": 39527,
+    "path": "/home/zhuhe/litchi-performance-0931/formal-manifest-pending-v2.json",
+    "sha256": "7ea58f7cfc098d5b760b97a0df12be79a32f6892b89c690936884ef42482986a"
+  }
+}

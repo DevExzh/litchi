@@ -1,0 +1,129 @@
+{
+  "canonical_reduction": {
+    "cells": 32,
+    "external": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "reduction_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py reduce --packet /home/zhuhe/litchi-performance-0931/formal-packet-v1 --output /home/zhuhe/litchi-performance-0931/formal-reduction-v1.json",
+    "repository_copy": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/formal-reduction-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "repository_copy_byte_identical": true,
+    "samples_per_cell": 3
+  },
+  "capture": {
+    "children_expected": 96,
+    "children_run": 96,
+    "failed_children": 0,
+    "packet": {
+      "bytes": 7112542,
+      "file_count": 684,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1"
+    },
+    "status": "completed",
+    "validation_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py validate --packet /home/zhuhe/litchi-performance-0931/formal-packet-v1 --require-completed",
+    "validation_exit_code": 0
+  },
+  "capture_terminal": {
+    "bytes": 1759,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/formal-capture-terminal-v1.json",
+    "sha256": "a8277b6f78e11c8c3379f6e1448a0c7ab57a223c53144399449699a1ade87af6"
+  },
+  "checks": {
+    "all_raw_reports_external": true,
+    "formal_capture_retried": false,
+    "formal_capture_selectively_recaptured": false,
+    "largest_committed_evidence_bytes": 302036,
+    "negative_controls_from_v1_preserved": true
+  },
+  "copied_packet_replay": {
+    "canonical_reduction_sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa",
+    "packet": {
+      "bytes": 7112542,
+      "file_count": 684,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1-moved"
+    },
+    "reduction": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-moved-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "reduction_byte_for_byte_equal": true,
+    "validation_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py validate --packet /home/zhuhe/litchi-performance-0931/formal-packet-v1-moved --require-completed",
+    "validation_exit_code": 0
+  },
+  "created_utc": "2026-10-06T15:43:11.290999+00:00",
+  "custody": {
+    "binary": {
+      "bytes": 68431264,
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+    },
+    "build_receipt": {
+      "bytes": 2774,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+      "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+    },
+    "source_closure_addendum": {
+      "bytes": 4453,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+      "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+    },
+    "source_listing": {
+      "bytes": 1665247,
+      "path": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+      "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a"
+    },
+    "source_listing_regeneration_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0931/regenerate-source-list-v1.py --root /home/zhuhe/litchi-performance-0931/source-final --output /home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+    "source_receipt": {
+      "bytes": 1083,
+      "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+      "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+    }
+  },
+  "manifest": {
+    "bytes": 40455,
+    "path": "/home/zhuhe/litchi-performance-0931/formal-manifest-authorized-v1.json",
+    "sha256": "37c82f3ae1afb2d712e172995cccf7f208dc741139023dc5b0e04670699f1c47"
+  },
+  "packet_archive": {
+    "archive": {
+      "bytes": 7680000,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1.tar",
+      "sha256": "faea4d1d0120feb07d69cb80bff155b1a446dce6f1bf33c50fb2403ec590e641"
+    },
+    "regeneration_command": "tar -cf /home/zhuhe/litchi-performance-0931/formal-packet-v1.tar -C /home/zhuhe/litchi-performance-0931 formal-packet-v1",
+    "source_packet": {
+      "bytes": 7112542,
+      "file_count": 684,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1"
+    }
+  },
+  "plan": {
+    "bytes": 10174,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-plan-v1.json",
+    "sha256": "2154f7659d0eab657d5dac8bc0d4af9841d77d330de7b6e0d5bd531563c202af"
+  },
+  "precapture_review": {
+    "bytes": 5579,
+    "path": "/tmp/litchi-performance-0931/independent-final-precapture-review-v2.json",
+    "sha256": "54325d890cbe02629eac145a65bdd531f2e10bbc61e4e1ebcc081475e963de6c"
+  },
+  "runner": {
+    "bytes": 56056,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-0931-memory.py",
+    "sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36"
+  },
+  "schema": "litchi.performance.0931.tooling-validation.v2",
+  "scope": "Final 0931 formal allocator/live-memory cohort custody, validation, reduction, and moved-packet replay. No latency, speedup, allocation-saving, or adoption claim.",
+  "status": "passed",
+  "supersedes": {
+    "bytes": 3577,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-tooling-validation-v1.json",
+    "sha256": "2391897bf6e6ef5376ec6a8a5cfa151b5840b86cf0ed268bf3d71c3f44173dcb"
+  }
+}

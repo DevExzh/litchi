@@ -1,0 +1,80 @@
+{
+  "ancillary": {
+    "bench_example": {
+      "path": "/home/zhuhe/litchi-performance-0931/source-final/crates/litchi/examples/bench_word_parse.rs",
+      "present": true,
+      "sha256": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac",
+      "size_bytes": 6390
+    },
+    "ignored_svg_fixture": {
+      "path": "/home/zhuhe/litchi-performance-0931/source-final/3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx",
+      "present": true,
+      "sha256": "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d",
+      "size_bytes": 74104
+    },
+    "ignored_tdf_fixture": {
+      "path": "/home/zhuhe/litchi-performance-0931/source-final/3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx",
+      "present": true,
+      "sha256": "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283",
+      "size_bytes": 302210
+    },
+    "root_cargo_lock": {
+      "path": "/home/zhuhe/litchi-performance-0931/source-final/Cargo.lock",
+      "present": true,
+      "sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+      "size_bytes": 138201
+    },
+    "superseded_full_archive_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0931/measurement-source-full-archive-attempt.json",
+      "present": true,
+      "sha256": "f95200d455599125c9385cf8bedfd839aac15c97e8e18f9d78f80692225ed552",
+      "size_bytes": 800
+    }
+  },
+  "base_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "build_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+    "present": true,
+    "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3",
+    "size_bytes": 2774
+  },
+  "closure_notes": [
+    "The selected allocator binary was built from source-final with tools/perf-baseline/Cargo.lock db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5 and --bin litchi-perf-baseline-alloc; generated targets were excluded from the source listing.",
+    "The source-final tree contains root Cargo.lock 10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9; it is ancillary to the selected standalone tools/perf-baseline lock and was not the standalone --locked lock.",
+    "The source-final tree contains crates/litchi/examples/bench_word_parse.rs 2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac; the selected --bin litchi-perf-baseline-alloc does not compile this example.",
+    "The two ignored fixtures are present at the exact 3rdparty paths bound above. They are ancillary assets and are not read by this generated-corpus allocator workload. Earlier addenda used incorrect paths; this correction changes no build input.",
+    "A superseded full-archive setup attempt is retained externally at source-full-archive-attempt and is not the build source."
+  ],
+  "created_utc": "2026-10-06T15:30:23.108920+00:00",
+  "schema": "litchi.performance.0931.source-closure-addendum.v3",
+  "source_listing": {
+    "path": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+    "present": true,
+    "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a",
+    "size_bytes": 1665247
+  },
+  "source_listing_regeneration": {
+    "byte_for_byte_match": true,
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0931/regenerate-source-list-v1.py --root /home/zhuhe/litchi-performance-0931/source-final --output /home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+    "script": {
+      "path": "/home/zhuhe/litchi-performance-0931/regenerate-source-list-v1.py",
+      "present": true,
+      "sha256": "18b2e15029c772e6217c8f93af90b53af57a1e7a066aab7e97d2a702398f0808",
+      "size_bytes": 932
+    },
+    "verification_output": {
+      "path": "/home/zhuhe/litchi-performance-0931/source-list-regenerated-v1.jsonl",
+      "present": true,
+      "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a",
+      "size_bytes": 1665247
+    }
+  },
+  "source_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+    "present": true,
+    "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f",
+    "size_bytes": 1083
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0931/source-final",
+  "supersedes": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v2.json"
+}

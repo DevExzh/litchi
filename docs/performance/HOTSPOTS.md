@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0931 — logical retention differs from shared live memory
+
+[0931](0931-docx-retention-memory.md) confirms bounded admission and release
+across 96 diagnostic children. Eight shared large-document commits keep one
+optional base allocation set alive until the last release; eight independent
+sources release eight sets. The same 28,641,536-byte logical sum therefore
+corresponds to 3,579,984 versus 28,639,872 freed allocator bytes. Required
+targets and patch/source state remain after optional release, and all live
+deltas return to baseline after commit drop. No default-cap change is justified.
+Construction requests 1.251 GB (shared) or 2.227 GB (independent) for the large
+eight-commit workload; these are cumulative allocation traffic, not live bytes.
+Attribute that construction traffic and reprofile remaining publication work
+before proposing another optimization. Mandatory fingerprint checks remain.
+
 ## 0930 — repeated base inventory parsing removed within a cap
 
 [0930](0930-docx-commit-base-retention.md) reuses a commit's validated base

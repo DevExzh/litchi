@@ -1,0 +1,41 @@
+{
+  "analysis_started_after_receipt": true,
+  "argv": [
+    "env",
+    "LITCHI_PERF_0931_CAPTURE_APPROVED=1",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "-B",
+    "docs/performance/results/change-0931/comparison-0931-memory.py",
+    "capture",
+    "--manifest",
+    "/home/zhuhe/litchi-performance-0931/formal-manifest-authorized-v1.json",
+    "--packet",
+    "/home/zhuhe/litchi-performance-0931/formal-packet-v1"
+  ],
+  "children_expected": 96,
+  "children_run": 96,
+  "created_utc": "2026-10-06T15:39:41.933166+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "failed_count": 0,
+  "manifest": {
+    "bytes": 40455,
+    "path": "/home/zhuhe/litchi-performance-0931/formal-manifest-authorized-v1.json",
+    "sha256": "37c82f3ae1afb2d712e172995cccf7f208dc741139023dc5b0e04670699f1c47"
+  },
+  "note": "This receipt records the original outer tool result before offline validation/reduction. It does not infer child status from parsing; the runner terminal result itself returned exit 0.",
+  "packet": "/home/zhuhe/litchi-performance-0931/formal-packet-v1",
+  "packet_state_at_terminal": {
+    "bytes": 78214,
+    "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1/capture-state.json",
+    "sha256": "364a3a9bc909426a78191ab61125a11e77f1e694d8000292a1acd11bae3d80cb"
+  },
+  "packet_state_ended_utc": "2026-10-06T15:39:09.292481+00:00",
+  "packet_state_started_utc": "2026-10-06T15:35:03.937166+00:00",
+  "retries": 0,
+  "schema": "litchi.performance.0931.formal-capture-terminal.v1",
+  "status": "outer-terminal-recorded",
+  "tool_return_exit_code": 0,
+  "tool_return_stdout": "{\"children_run\": 96, \"failed\": 0, \"packet\": \"/home/zhuhe/litchi-performance-0931/formal-packet-v1\", \"status\": \"completed\"}",
+  "tool_session_id": 79261
+}

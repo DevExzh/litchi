@@ -1,0 +1,20 @@
+{
+  "archive_scope": "retained 0931 clean source closure from /tmp/litchi-performance-0931/source; production hashes independently match HEAD; lock files retained",
+  "base_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "created_utc": "2026-10-06T15:14:41.457174+00:00",
+  "file_count": 10778,
+  "full_source_listing": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+  "full_source_listing_bytes": 1665247,
+  "full_source_listing_sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a",
+  "generated_targets_included": false,
+  "overlay_paths": [
+    "tools/perf-baseline/src/docx_section_retention.rs",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+    "tools/perf-baseline/tests/docx_section_retention.rs"
+  ],
+  "schema": "litchi.performance.0931.measurement-source-receipt.v2",
+  "source_bytes": 259945978,
+  "source_root": "/home/zhuhe/litchi-performance-0931/source-final",
+  "supersedes": "/home/zhuhe/litchi-performance-0931/measurement-source-full-archive-attempt.json"
+}

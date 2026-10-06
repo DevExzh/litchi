@@ -1,0 +1,137 @@
+{
+  "cap_outcomes": {
+    "all_boundary_checks_verified": true,
+    "sections_16": {
+      "default_fallback": false,
+      "default_or_exact_retained_each": 7280,
+      "one_under_or_zero_retained_each": 0,
+      "required_retained_base_bytes": 7280
+    },
+    "sections_8192": {
+      "default_fallback": true,
+      "default_or_one_under_or_zero_retained_each": 0,
+      "exact_retained_each": 3580192,
+      "required_retained_base_bytes": 3580192
+    }
+  },
+  "checks": {
+    "all_required_phases_present": 96,
+    "deadline_false": 96,
+    "held_checkpoint_region_peak_null": 96,
+    "measured_inverse_verified": 96,
+    "measured_output_verified": 96,
+    "measured_shape_verified": 96,
+    "observer_valid_and_not_overflowed": 96,
+    "preflight_inverse_verified": 96,
+    "preflight_output_verified": 96,
+    "process_group_closed": 96,
+    "retention_boundary_checks": 96,
+    "returned_to_baseline": 96,
+    "runner_error_null": 96,
+    "source_inventory_sharing_verified": 96,
+    "terminal_exit_code_zero": 96,
+    "validation_passed": 96
+  },
+  "conclusion": "Independent copied-packet replay and reduction pass with identical original and moved reductions; all 32 cells and 96 children satisfy the frozen correctness, cap, release, and allocator-observer controls.",
+  "interpretation_limits": [
+    "Allocator callbacks are process-wide requested-byte/live-byte observations, not unique physical heap ownership or RSS-only retention.",
+    "Exact and zero after-snapshot requested allocation totals match, while their region peak values differ by 3 bytes in the inspected cells; report this boundary as effectively unchanged, not bit-identical.",
+    "No latency, speedup, or production-adoption claim is supported by this packet."
+  ],
+  "matrix": {
+    "cells": 32,
+    "failed_children": 0,
+    "passed_children": 96,
+    "repetitions_per_cell": 3,
+    "replicate_phase_curves_byte_equal_per_cell": true,
+    "scheduled_children": 96,
+    "source_archive_sha256_by_sections": {
+      "16": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726",
+      "8192": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3"
+    }
+  },
+  "outer_terminal": {
+    "bytes": 1759,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/formal-capture-terminal-v1.json",
+    "sha256": "a8277b6f78e11c8c3379f6e1448a0c7ab57a223c53144399449699a1ade87af6"
+  },
+  "outer_terminal_claims": {
+    "analysis_started_after_receipt": true,
+    "children_expected": 96,
+    "children_run": 96,
+    "failed_count": 0,
+    "retries": 0,
+    "status": "outer-terminal-recorded",
+    "tool_return_exit_code": 0
+  },
+  "packet": {
+    "copied_capture_state": {
+      "bytes": 78214,
+      "path": "/tmp/litchi-performance-0931/audit-copy-v1/capture-state.json",
+      "sha256": "364a3a9bc909426a78191ab61125a11e77f1e694d8000292a1acd11bae3d80cb"
+    },
+    "copied_root": "/tmp/litchi-performance-0931/audit-copy-v1",
+    "copy_state_byte_identical": true,
+    "file_count": 684,
+    "original_capture_state": {
+      "bytes": 78214,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1/capture-state.json",
+      "sha256": "364a3a9bc909426a78191ab61125a11e77f1e694d8000292a1acd11bae3d80cb"
+    },
+    "original_root": "/home/zhuhe/litchi-performance-0931/formal-packet-v1"
+  },
+  "release_curves": {
+    "large_8192_commit8_exact_independent": {
+      "actual_optional_release_bytes": 28639872,
+      "after_commit_drop_live_delta": 0,
+      "after_release_all_but_last_live_delta": 50948944,
+      "after_release_last_live_delta": 47368960,
+      "commits_retained_live_delta": 76008832,
+      "logical_retained_sum": 28641536
+    },
+    "large_8192_commit8_exact_shared": {
+      "actual_optional_release_bytes": 3579984,
+      "after_commit_drop_live_delta": 0,
+      "after_release_all_but_last_live_delta": 42755052,
+      "after_release_last_live_delta": 39175068,
+      "commits_retained_live_delta": 42755052,
+      "logical_retained_sum": 28641536
+    },
+    "large_query_requested_bytes_after_snapshot_drop": {
+      "independent_sources": 2226793064,
+      "shared_snapshot_clones": 1251354390
+    },
+    "small_actual_optional_release_per_retained_base": 7072,
+    "small_logical_retained_base_bytes": 7280
+  },
+  "replay": {
+    "all_three_reductions_byte_identical": true,
+    "independent_reduction": {
+      "bytes": 302036,
+      "path": "/tmp/litchi-performance-0931/formal-reduction-independent-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "moved_reduction": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-moved-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "original_reduction": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "reduce_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /tmp/litchi-performance-0931/audit-copy-v1/scripts/comparison-0931-memory.py reduce --packet /tmp/litchi-performance-0931/audit-copy-v1 --output /tmp/litchi-performance-0931/formal-reduction-independent-v1.json",
+    "script": "/tmp/litchi-performance-0931/audit-copy-v1/scripts/comparison-0931-memory.py",
+    "script_sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36",
+    "validate_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /tmp/litchi-performance-0931/audit-copy-v1/scripts/comparison-0931-memory.py validate --packet /tmp/litchi-performance-0931/audit-copy-v1 --require-completed",
+    "validate_result": {
+      "passed_children": 96,
+      "scheduled_children": 96,
+      "status": "completed"
+    }
+  },
+  "schema": "litchi.performance.0931.independent-postcapture-audit.v1",
+  "scope": "Independent copied-packet validation and reduction audit; no workload rerun or recapture.",
+  "status": "passed"
+}

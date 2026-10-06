@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0931 — DOCX retained-base memory lifetime measured
+
+[0931](0931-docx-retention-memory.md) adds a harness-only allocation diagnostic:
+96 fresh processes across two section counts, two live-commit counts, four
+cap policies and two ownership modes all pass. For eight 8,192-section commits,
+the logical sum is 28,641,536 bytes in both modes; releasing bases frees
+28,639,872 allocator bytes with independent sources and 3,579,984 with shared
+snapshots. Every child returns to its measured baseline after commit drop.
+Default retention keeps the 7,280-byte small base and falls back to parsing for
+the 3,580,192-byte large base. Independent copied-packet replay reproduces the
+reduction exactly. Production code and the default cap are unchanged; no
+normal-release latency or speedup claim is made.
+
 ## 0930 — bounded DOCX commit base retention adopted
 
 [0930](0930-docx-commit-base-retention.md) adopts capped retention of an already

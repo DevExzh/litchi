@@ -1,0 +1,72 @@
+{
+  "schema": "litchi.performance.0931.cleanup.v1",
+  "started_utc": "2026-10-06T15:45:01.888819+00:00",
+  "scope": "Owned disposable build intermediates and unused setup source copies only. Shared checkout target and unrelated user work untouched. Raw evidence, final source, listings and measured binary retained.",
+  "removals": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/quality-target",
+      "regular_files": 22951,
+      "logical_bytes": 46478987617
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/debug",
+      "regular_files": 6183,
+      "logical_bytes": 4221853705
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/source-full-archive-attempt",
+      "regular_files": 453229,
+      "logical_bytes": 6139344782
+    },
+    {
+      "path": "/tmp/litchi-performance-0931/source",
+      "regular_files": 10777,
+      "logical_bytes": 259935600
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/.fingerprint",
+      "regular_files": 986,
+      "logical_bytes": 314727
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/deps",
+      "regular_files": 625,
+      "logical_bytes": 1163310577
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/examples",
+      "regular_files": 0,
+      "logical_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/.cargo-lock",
+      "regular_files": 1,
+      "logical_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/build",
+      "regular_files": 166,
+      "logical_bytes": 24869989
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/incremental",
+      "regular_files": 0,
+      "logical_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc.d",
+      "regular_files": 1,
+      "logical_bytes": 372705
+    }
+  ],
+  "logical_bytes_removed": 58288989702,
+  "physical_bytes_reclaimed": "not measured; logical sum may include hardlinks",
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "bytes": 68431264,
+    "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+  },
+  "completed_utc": "2026-10-06T15:45:08.269840+00:00",
+  "status": "completed",
+  "binary_rehash_after_cleanup": true
+}

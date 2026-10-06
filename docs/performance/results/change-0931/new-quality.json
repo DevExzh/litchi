@@ -1,0 +1,370 @@
+{
+  "cleanup": {
+    "active_quality_processes_after_checks": 0,
+    "moved_disposable_target": {
+      "approx_bytes": 28991029248,
+      "from": "/tmp/litchi-performance-0931/target",
+      "to": "/home/zhuhe/litchi-performance-0931/quality-target"
+    },
+    "shared_target_removed": false
+  },
+  "commands": [
+    {
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0931/target cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --test docx_section_retention -- --nocapture",
+      "cargo_exit": "unknown",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.exit",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "log_write_error": "printf: write error: Disk quota exceeded",
+      "name": "integration_initial_tmpfs",
+      "observed_exit": 101,
+      "result": "resource/setup failure: captured linker failure; 8 KiB stderr is truncated; wrapper then failed writing status with Disk quota exceeded, so cargo exit is unknown",
+      "session_handle": 45202,
+      "source_binding": {
+        "test_hash_note": "not captured: the attempt failed while linking unrelated harness binaries before this integration test target ran",
+        "tools/perf-baseline/src/docx_section_retention.rs": "c0d870b8c937bba50d4d13d438b90cd8e9d24a5444563ebc4f40b4b3129d07a8",
+        "tools/perf-baseline/tests/docx_section_retention.rs": null
+      },
+      "stderr": {
+        "bytes": 8192,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.stderr.log",
+        "sha256": "2cb52fbe5100d20c861e2fddd680ccbb3bf54b6244c29ca0c09d381ca3ebc319"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --test docx_section_retention -- --nocapture",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/docx-section-retention.integration.retry1.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "integration_retry1",
+      "observed_exit": 0,
+      "result": "2 passed; unused Path import warning in test file",
+      "session_handle": 20879,
+      "source_binding": {
+        "test_hash_note": "captured intermediate test file; stderr records the unused Path warning later removed before retry2",
+        "tools/perf-baseline/src/docx_section_retention.rs": "c0d870b8c937bba50d4d13d438b90cd8e9d24a5444563ebc4f40b4b3129d07a8",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "db5c6632aa0a148c7cb2c27fb793a83fe511b4e07aa1c0e6b65a0fbe8ba9f204"
+      },
+      "stderr": {
+        "bytes": 711,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.retry1.stderr.log",
+        "sha256": "06aca1acf14ed9be26ea3bf007393849a9a51a09dd7ec73b221128990d2f16ed"
+      },
+      "stdout": {
+        "bytes": 271,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.retry1.stdout.log",
+        "sha256": "9f37ab1b9561eecf13fc4df10b5e82977ac1b8b9cf7db61e88317219ab11e47f"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --test docx_section_retention -- --nocapture",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/docx-section-retention.integration.retry2.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "integration_retry2",
+      "observed_exit": 0,
+      "result": "2 passed; warning removed",
+      "session_handle": 48985,
+      "source_binding": {
+        "tools/perf-baseline/src/docx_section_retention.rs": "c0d870b8c937bba50d4d13d438b90cd8e9d24a5444563ebc4f40b4b3129d07a8",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 309,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.retry2.stderr.log",
+        "sha256": "be805cf913f6d527d1de00c2fe4d331dce0cbd55a0ab86b52985f69776a0fbf5"
+      },
+      "stdout": {
+        "bytes": 271,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.retry2.stdout.log",
+        "sha256": "08a0fb33775ee19ee3adbc133a34e2e48c9e8b33240dc40fd8f9df9724e55404"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --lib docx_section_retention::tests -- --nocapture",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/docx-section-retention.unit.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "module_unit_initial",
+      "observed_exit": 0,
+      "result": "2 passed; 586 filtered",
+      "session_handle": 71391,
+      "source_binding": {
+        "tools/perf-baseline/src/docx_section_retention.rs": "c0d870b8c937bba50d4d13d438b90cd8e9d24a5444563ebc4f40b4b3129d07a8"
+      },
+      "stderr": {
+        "bytes": 297,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.unit.stderr.log",
+        "sha256": "8eda99ddd43caf65535cfb6f1ceac45a5ec0ff4d2b18b229699483f8c881f631"
+      },
+      "stdout": {
+        "bytes": 290,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.unit.stdout.log",
+        "sha256": "069549857e6d00ed6a56dde3cd06fd113f084ea724939b505ddfb509d3659943"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 clippy --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --lib --bin litchi-perf-baseline-alloc --test docx_section_retention -- -D warnings",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 4,
+        "path": "/home/zhuhe/litchi-performance-0931/perf-baseline-clippy-selected.exit",
+        "sha256": "39b8dc3fc8b44765c8e6f1adee04c5b465e555ab791cc42d0d9e810d5b64297c"
+      },
+      "name": "clippy_initial",
+      "observed_exit": 101,
+      "result": "failed on two needless_return and one vec_init_then_push in diagnostic module",
+      "session_handle": 87586,
+      "source_binding": {
+        "tools/perf-baseline/src/docx_section_retention.rs": "c0d870b8c937bba50d4d13d438b90cd8e9d24a5444563ebc4f40b4b3129d07a8",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 6753,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-clippy-selected.stderr.log",
+        "sha256": "3b81329b3efa65faa62f512373448080f13ce4ffcc5735c14f5e0938d3c62782"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-clippy-selected.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --test docx_section_retention -- --nocapture",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/docx-section-retention.integration.final.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "integration_final",
+      "observed_exit": 0,
+      "result": "2 passed: small 2-section exact/shared and large 8192-section one_under/independent",
+      "session_handle": 84774,
+      "source_binding": {
+        "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+        "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+        "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 310,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.final.stderr.log",
+        "sha256": "828ca84b80909292222c6c04cefe0746c9f94e0bd0a5cfbc6faab73befce08d1"
+      },
+      "stdout": {
+        "bytes": 271,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.integration.final.stdout.log",
+        "sha256": "7132511eb23799bee2c1b2ddcf92d121de4aa6bd983dc180275a8871d3593977"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 test --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --lib docx_section_retention::tests -- --nocapture",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/docx-section-retention.unit.final.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "module_unit_final",
+      "observed_exit": 0,
+      "result": "2 passed; 586 filtered",
+      "session_handle": 94249,
+      "source_binding": {
+        "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+        "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+        "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 296,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.unit.final.stderr.log",
+        "sha256": "2dcd92a112b8c1bc0f1ed1903f9322ebb8f6d0e408c04ef77cc94f60992fd409"
+      },
+      "stdout": {
+        "bytes": 290,
+        "path": "/tmp/litchi-performance-0931/quality/docx-section-retention.unit.final.stdout.log",
+        "sha256": "069549857e6d00ed6a56dde3cd06fd113f084ea724939b505ddfb509d3659943"
+      }
+    },
+    {
+      "argv": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 clippy --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics -j2 --lib --bin litchi-perf-baseline-alloc --test docx_section_retention -- -D warnings",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/perf-baseline-clippy-selected.retry1.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "clippy_final",
+      "observed_exit": 0,
+      "result": "clean with warnings denied",
+      "session_handle": 9651,
+      "source_binding": {
+        "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+        "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+        "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 160,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-clippy-selected.retry1.stderr.log",
+        "sha256": "0a19f7b505b0c111fef0ec3e0d0ae04194ccae093e2e898b9144b54927f4647b"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-clippy-selected.retry1.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": "RUSTDOCFLAGS='-D warnings' CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0931/quality-target cargo +1.95.0 doc --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --features allocator-metrics --no-deps --lib",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/perf-baseline-rustdoc.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "rustdoc_final",
+      "observed_exit": 0,
+      "result": "clean with warnings denied",
+      "session_handle": 74145,
+      "source_binding": {
+        "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+        "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+        "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 259,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-rustdoc.stderr.log",
+        "sha256": "fe09861ab34e17b6243a618ceadab44a466589e14ad8c23acb7fa5cd62bd04ee"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-rustdoc.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": "rustfmt +1.95.0 --edition 2024 --check tools/perf-baseline/src/docx_section_retention.rs tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs tools/perf-baseline/src/lib.rs tools/perf-baseline/tests/docx_section_retention.rs",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_file": {
+        "bytes": 2,
+        "path": "/home/zhuhe/litchi-performance-0931/perf-baseline-rustfmt.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      "name": "rustfmt_final",
+      "observed_exit": 0,
+      "result": "clean",
+      "source_binding": {
+        "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+        "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+        "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+        "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-rustfmt.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0931/quality/perf-baseline-rustfmt.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "git_head": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "lock": {
+    "bytes": 56289,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "manifest": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+  "passes": {
+    "clippy_final": {
+      "exit": 0,
+      "warnings_denied": true
+    },
+    "integration_final": {
+      "exit": 0,
+      "failed": 0,
+      "tests": 2
+    },
+    "module_unit_final": {
+      "exit": 0,
+      "failed": 0,
+      "filtered": 586,
+      "tests": 2
+    },
+    "module_unit_initial": {
+      "exit": 0,
+      "failed": 0,
+      "filtered": 586,
+      "tests": 2
+    },
+    "rustdoc_final": {
+      "exit": 0,
+      "warnings_denied": true
+    },
+    "rustfmt_final": {
+      "exit": 0
+    }
+  },
+  "preliminary_coder_receipt": {
+    "bytes": 3645,
+    "log": {
+      "bytes": 8135,
+      "path": "/tmp/litchi-performance-0931/retention-small.log",
+      "sha256": "477dab7876e2f0cf173944765d59cc806441bd51b6dd2948ea451dd9bed080e4"
+    },
+    "observed_error": "SectionLayoutForeignSource",
+    "path": "/tmp/litchi-performance-0931/retention-small-preliminary-receipt.json",
+    "session_handle": 2713,
+    "sha256": "30918e023620e3d342cd2f6d24f949c09b502138c0a25d9809ac591412a7dbf2",
+    "source_binding": {
+      "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+      "tools/perf-baseline/src/docx_section_retention.rs": "ec3a2498e6664d4655550e4e019a73eef48c14e245989654616180e97a6a76e1",
+      "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c"
+    },
+    "status": "preserved preliminary functional failure; not a qualification or capture",
+    "wrapper_exit": null,
+    "wrapper_exit_note": "session later unavailable to write_stdin; do not infer cargo/application exit from log"
+  },
+  "recorded_utc": "2026-10-06T15:15:30.282901Z",
+  "schema": "docx_section_retention_quality_v2",
+  "scope": "harness-only allocator lifetime/memory diagnostic; no timing capture; no production library changes",
+  "source_files_final": {
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5",
+    "tools/perf-baseline/src/docx_section_retention.rs": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238",
+    "tools/perf-baseline/src/lib.rs": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c",
+    "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+  },
+  "source_files_pre_clippy_fix": {
+    "tools/perf-baseline/src/docx_section_retention.rs": "c0d870b8c937bba50d4d13d438b90cd8e9d24a5444563ebc4f40b4b3129d07a8",
+    "tools/perf-baseline/tests/docx_section_retention.rs": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+  },
+  "target_dir": "/home/zhuhe/litchi-performance-0931/quality-target",
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616 2026-04-14)"
+  }
+}

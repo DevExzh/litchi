@@ -1,0 +1,175 @@
+{
+  "binary": {
+    "bytes": 68431264,
+    "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+  },
+  "build_receipt": {
+    "bytes": 2774,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+    "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+  },
+  "child_environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "LITCHI_PERF_0931_MEMORY_DIAGNOSTIC": "1",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0"
+  },
+  "children": [
+    {
+      "boundary_checks_verified": true,
+      "default_retained_base_bytes": 7280,
+      "exact_retained_base_bytes": 7280,
+      "id": "s0016-c01-exact-shared_snapshot_clones-prelight",
+      "logical_retained_base_bytes_sum": 7280,
+      "one_under_retained_base_bytes": 0,
+      "report": {
+        "bytes": 6505,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s0016-c01-exact-shared_snapshot_clones-prelight/report.json",
+        "sha256": "03ae57c7b59a11eb8557a7d0e82a32c92b4b95b4bd703d49bb861a77de8274d4"
+      },
+      "required_retained_base_bytes": 7280,
+      "required_weight_boundary": "small<=1MiB",
+      "returned_to_baseline": true,
+      "rss_bytes": 13127680,
+      "source_archive_bytes": 1052,
+      "source_archive_sha256": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726",
+      "stderr": {
+        "bytes": 1119,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s0016-c01-exact-shared_snapshot_clones-prelight/stderr.log",
+        "sha256": "326d4f85769a1ac080859a8b9197c0e4e6928eb6d86a38e9f42bbd9d1f934403"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s0016-c01-exact-shared_snapshot_clones-prelight/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2277,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s0016-c01-exact-shared_snapshot_clones-prelight/terminal.json",
+        "sha256": "a66cb784611fb5502d9669499e7ae8495795bcbd02ff8329c5289446acae5843"
+      },
+      "terminal_exit_code": 0,
+      "time": {
+        "bytes": 1119,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s0016-c01-exact-shared_snapshot_clones-prelight/time.log",
+        "sha256": "326d4f85769a1ac080859a8b9197c0e4e6928eb6d86a38e9f42bbd9d1f934403"
+      },
+      "validated": true,
+      "zero_retained_base_bytes": 0
+    },
+    {
+      "boundary_checks_verified": true,
+      "default_retained_base_bytes": 0,
+      "exact_retained_base_bytes": 3580192,
+      "id": "s8192-c01-exact-shared_snapshot_clones-prelight",
+      "logical_retained_base_bytes_sum": 3580192,
+      "one_under_retained_base_bytes": 0,
+      "report": {
+        "bytes": 6662,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s8192-c01-exact-shared_snapshot_clones-prelight/report.json",
+        "sha256": "3265e10f3f10e15f49e32683283e370510b48155176aae58b93be6cc08457387"
+      },
+      "required_retained_base_bytes": 3580192,
+      "required_weight_boundary": "large>1MiB",
+      "returned_to_baseline": true,
+      "rss_bytes": 43233280,
+      "source_archive_bytes": 25498,
+      "source_archive_sha256": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3",
+      "stderr": {
+        "bytes": 1122,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s8192-c01-exact-shared_snapshot_clones-prelight/stderr.log",
+        "sha256": "1b9094c49ca555d3a325c79dda17aa875f45328f53e33979c07493143ce7ec76"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s8192-c01-exact-shared_snapshot_clones-prelight/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2278,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s8192-c01-exact-shared_snapshot_clones-prelight/terminal.json",
+        "sha256": "264af46e3c1569a9517110d963a5ef85392c54054bb7d13a70fd485d458f1550"
+      },
+      "terminal_exit_code": 0,
+      "time": {
+        "bytes": 1122,
+        "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/children/s8192-c01-exact-shared_snapshot_clones-prelight/time.log",
+        "sha256": "1b9094c49ca555d3a325c79dda17aa875f45328f53e33979c07493143ce7ec76"
+      },
+      "validated": true,
+      "zero_retained_base_bytes": 0
+    }
+  ],
+  "claims": [
+    "preflight custody and retention-boundary validation only",
+    "no timing claim",
+    "no adoption claim",
+    "not a formal 96-child cohort"
+  ],
+  "command_template": [
+    "/usr/bin/time",
+    "-v",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "docx-section-retention",
+    "--sections",
+    "{16|8192}",
+    "--concurrent-commits",
+    "1",
+    "--policy",
+    "exact",
+    "--ownership",
+    "shared_snapshot_clones",
+    "--source-revision",
+    "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+    "--output",
+    "<child>/report.json"
+  ],
+  "comparison_runner": {
+    "bytes": 56056,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-0931-memory.py",
+    "sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36"
+  },
+  "created_utc": "2026-10-06T15:27:49.242800+00:00",
+  "cwd": "/home/zhuhe/litchi-performance-0931/source-final",
+  "formal_capture_started": false,
+  "formal_matrix_rows_started": 0,
+  "packet": {
+    "path": "/home/zhuhe/litchi-performance-0931/prelight-v1",
+    "summary": {
+      "bytes": 21182,
+      "path": "/home/zhuhe/litchi-performance-0931/prelight-v1/prelight-summary.json",
+      "sha256": "744b460d8e302322fc0878aaa711c3761bee732aeeab3ff380c1a66e862ddeb0"
+    }
+  },
+  "prelight_runner": {
+    "bytes": 4006,
+    "path": "/home/zhuhe/litchi-performance-0931/prelight-v1-run.py",
+    "sha256": "e6e148ac74dfaa3eb885c858a8b7ccc5082c95bee0421bb26b5eb2163999f400"
+  },
+  "schema": "litchi.performance.0931.prelight-validation.v1",
+  "source_closure_addendum": {
+    "bytes": 3066,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v1.json",
+    "sha256": "781be03dfef72aa6fe50482b41d85be8cd39ec7a3b9a06fb203998d4f62ad44a"
+  },
+  "source_receipt": {
+    "bytes": 1083,
+    "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+    "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+  },
+  "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "source_root": "/home/zhuhe/litchi-performance-0931/source-final",
+  "status": "descriptive-preflight-complete",
+  "validation_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B <offline validator importing docs/performance/results/change-0931/comparison-0931-memory.py> validate_report(row, report) for both retained child reports",
+  "wrapper_terminal": {
+    "cause": "post-run display KeyError after both child terminal/summary files and reports were written",
+    "outer_python_exit_code": 1,
+    "terminal_records_written_before_report_parse": true,
+    "workload_children_retried": false
+  }
+}

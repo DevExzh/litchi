@@ -1,0 +1,2022 @@
+{
+  "bindings": {
+    "binary": {
+      "bytes": 68431264,
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+    },
+    "build_receipt": {
+      "bytes": 2774,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+      "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+    },
+    "host_context": {
+      "bytes": 6116,
+      "path": "docs/performance/results/change-0931/host-and-idle-v1.json",
+      "sha256": "7c36e66522cd342ca4931a8a9780bab2c6888a64b8f9fa0019541d4b29b0d219"
+    },
+    "independent_postcapture_audit": {
+      "bytes": 5987,
+      "path": "docs/performance/results/change-0931/independent-postcapture-audit-v1.json",
+      "sha256": "13bae8dc3a283b6a461f2eb134d6105b638ba240520c5e943a3944ad8244bd82"
+    },
+    "prelight_validation": {
+      "bytes": 7418,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/prelight-v1-validation.json",
+      "sha256": "7e532f1f91c7cc7f8e041695eb1ad6e04263387940d071c3521f308da64d54c1"
+    },
+    "runner": {
+      "bytes": 56056,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0931/comparison-0931-memory.py",
+      "sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36"
+    },
+    "source_closure_addendum": {
+      "bytes": 4453,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+      "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+    },
+    "source_receipt": {
+      "bytes": 1083,
+      "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+      "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+    },
+    "tooling_validation": {
+      "bytes": 6001,
+      "path": "docs/performance/results/change-0931/comparison-tooling-validation-v2.json",
+      "sha256": "d5ba999e3ef6556a767f5a3cff75f81e61004203447e57290afc123949ca2c0d"
+    }
+  },
+  "capture": {
+    "auditor_final_precapture_review": {
+      "bytes": 5579,
+      "path": "/tmp/litchi-performance-0931/independent-final-precapture-review-v2.json",
+      "sha256": "54325d890cbe02629eac145a65bdd531f2e10bbc61e4e1ebcc081475e963de6c"
+    },
+    "children_expected": 96,
+    "children_run": 96,
+    "failed_children": 0,
+    "manifest": {
+      "bytes": 40455,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-manifest-authorized-v1.json",
+      "sha256": "37c82f3ae1afb2d712e172995cccf7f208dc741139023dc5b0e04670699f1c47"
+    },
+    "manifest_status": "authorized",
+    "outer_terminal_receipt": {
+      "bytes": 1759,
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/formal-capture-terminal-v1.json",
+      "sha256": "a8277b6f78e11c8c3379f6e1448a0c7ab57a223c53144399449699a1ade87af6"
+    },
+    "packet": {
+      "bytes": 7112542,
+      "file_count": 684,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1"
+    },
+    "packet_archive": {
+      "bytes": 7680000,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1.tar",
+      "sha256": "faea4d1d0120feb07d69cb80bff155b1a446dce6f1bf33c50fb2403ec590e641"
+    },
+    "packet_archive_regeneration_command": "tar -cf /home/zhuhe/litchi-performance-0931/formal-packet-v1.tar -C /home/zhuhe/litchi-performance-0931 formal-packet-v1",
+    "validation_status": "completed"
+  },
+  "claim_scope": "Descriptive allocator/live-memory diagnostic only; no latency, speedup, allocation-saving, or adoption claim.",
+  "copied_packet_replay": {
+    "byte_for_byte_equal": true,
+    "canonical_reduction_sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa",
+    "moved_packet": {
+      "bytes": 7112542,
+      "file_count": 684,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-packet-v1-moved"
+    },
+    "reduce_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py reduce --packet /home/zhuhe/litchi-performance-0931/formal-packet-v1-moved --output /home/zhuhe/litchi-performance-0931/formal-reduction-moved-v1.json",
+    "replay_reduction": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-moved-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "validate_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py validate --packet /home/zhuhe/litchi-performance-0931/formal-packet-v1-moved --require-completed",
+    "validate_exit_code": 0
+  },
+  "created_utc": "2026-10-06T15:41:36.469918+00:00",
+  "no_recapture": true,
+  "reduction": {
+    "canonical": {
+      "bytes": 302036,
+      "path": "/home/zhuhe/litchi-performance-0931/formal-reduction-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "cells": [
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2720478,
+          "deallocated_bytes_delta": 2701564,
+          "live_bytes_delta": 18914,
+          "logical_retained_base_bytes": 7280,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 1,
+          "rss_bytes": 12873728
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2720478,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18504,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25576,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2708636,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25576,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 869062,
+            "live_bytes_delta": 23439,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94112,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2720478,
+          "deallocated_bytes_delta": 2701564,
+          "live_bytes_delta": 18914,
+          "logical_retained_base_bytes": 7280,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 1,
+          "rss_bytes": 13012992
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2720478,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18513,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25585,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2708636,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25585,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 869062,
+            "live_bytes_delta": 23439,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94121,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2720478,
+          "deallocated_bytes_delta": 2701564,
+          "live_bytes_delta": 18914,
+          "logical_retained_base_bytes": 7280,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 1,
+          "rss_bytes": 12754944
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2720478,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18498,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25570,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2708636,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25570,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 869062,
+            "live_bytes_delta": 23439,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94106,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2720478,
+          "deallocated_bytes_delta": 2701564,
+          "live_bytes_delta": 18914,
+          "logical_retained_base_bytes": 7280,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 1,
+          "rss_bytes": 12959744
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2720478,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18507,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25579,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2708636,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 25579,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 869062,
+            "live_bytes_delta": 23439,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94115,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2720478,
+            "deallocated_bytes_delta": 2701564,
+            "live_bytes_delta": 18914,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2990995,
+          "deallocated_bytes_delta": 2979153,
+          "live_bytes_delta": 11842,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12722176
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2990995,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18510,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18510,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18510,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 876134,
+            "live_bytes_delta": 16367,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94118,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2990995,
+          "deallocated_bytes_delta": 2979153,
+          "live_bytes_delta": 11842,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12804096
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2990995,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18519,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18519,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18519,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 876134,
+            "live_bytes_delta": 16367,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94127,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2990995,
+          "deallocated_bytes_delta": 2979153,
+          "live_bytes_delta": 11842,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12832768
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2990995,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18495,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18495,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18495,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 876134,
+            "live_bytes_delta": 16367,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94103,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 2990995,
+          "deallocated_bytes_delta": 2979153,
+          "live_bytes_delta": 11842,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 4036,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12742656
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2990995,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18504,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18504,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": 18504,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 892501,
+            "deallocated_bytes_delta": 876134,
+            "live_bytes_delta": 16367,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 94112,
+            "region_peak_live_bytes_delta_from_begin_live": 87450
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 2990995,
+            "deallocated_bytes_delta": 2979153,
+            "live_bytes_delta": 11842,
+            "peak_live_bytes_delta": 4036,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 21763824,
+          "deallocated_bytes_delta": 21612512,
+          "live_bytes_delta": 151312,
+          "logical_retained_base_bytes": 58240,
+          "peak_live_bytes_delta": 187317,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 8,
+          "rss_bytes": 13160448
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21763824,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": 130000,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21662016,
+            "live_bytes_delta": 101808,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": 186576,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21669088,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": 137072,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 7140008,
+            "deallocated_bytes_delta": 6952496,
+            "live_bytes_delta": 187512,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 232836,
+            "region_peak_live_bytes_delta_from_begin_live": 197572
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21612512,
+            "live_bytes_delta": 151312,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 4798645,
+          "deallocated_bytes_delta": 4713448,
+          "live_bytes_delta": 85197,
+          "logical_retained_base_bytes": 58240,
+          "peak_live_bytes_delta": 76031,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 8,
+          "rss_bytes": 12836864
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4798645,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99902,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4713448,
+            "live_bytes_delta": 85197,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 106974,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4720520,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 106974,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2970668,
+            "deallocated_bytes_delta": 2880946,
+            "live_bytes_delta": 89722,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 121559,
+            "region_peak_live_bytes_delta_from_begin_live": 99782
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4713448,
+            "live_bytes_delta": 85197,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 21763824,
+          "deallocated_bytes_delta": 21612512,
+          "live_bytes_delta": 151312,
+          "logical_retained_base_bytes": 58240,
+          "peak_live_bytes_delta": 187317,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 8,
+          "rss_bytes": 13029376
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21763824,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": 129994,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21662016,
+            "live_bytes_delta": 101808,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": 186570,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21669088,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": 137066,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 7140008,
+            "deallocated_bytes_delta": 6952496,
+            "live_bytes_delta": 187512,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 232830,
+            "region_peak_live_bytes_delta_from_begin_live": 197572
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 21763824,
+            "deallocated_bytes_delta": 21612512,
+            "live_bytes_delta": 151312,
+            "peak_live_bytes_delta": 187317,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 4798645,
+          "deallocated_bytes_delta": 4713448,
+          "live_bytes_delta": 85197,
+          "logical_retained_base_bytes": 58240,
+          "peak_live_bytes_delta": 76031,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 8,
+          "rss_bytes": 12730368
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4798645,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99896,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4713448,
+            "live_bytes_delta": 85197,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 106968,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4720520,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 106968,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2970668,
+            "deallocated_bytes_delta": 2880946,
+            "live_bytes_delta": 89722,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 121553,
+            "region_peak_live_bytes_delta_from_begin_live": 99782
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 4798645,
+            "deallocated_bytes_delta": 4713448,
+            "live_bytes_delta": 85197,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 23927960,
+          "deallocated_bytes_delta": 23833224,
+          "live_bytes_delta": 94736,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 137813,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12709888
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23927960,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": 130006,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23833224,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": 130006,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23833224,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": 130006,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 7140008,
+            "deallocated_bytes_delta": 7009072,
+            "live_bytes_delta": 130936,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 232842,
+            "region_peak_live_bytes_delta_from_begin_live": 197572
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23833224,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 5069162,
+          "deallocated_bytes_delta": 4991037,
+          "live_bytes_delta": 78125,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 76031,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12824576
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 5069162,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99908,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 4991037,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99908,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 4991037,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99908,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2970668,
+            "deallocated_bytes_delta": 2888018,
+            "live_bytes_delta": 82650,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 121565,
+            "region_peak_live_bytes_delta_from_begin_live": 99782
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 4991037,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 23927960,
+          "deallocated_bytes_delta": 23833224,
+          "live_bytes_delta": 94736,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 137813,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 12640256
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23927960,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": 129991,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23833224,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": 129991,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23833224,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": 129991,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 7140008,
+            "deallocated_bytes_delta": 7009072,
+            "live_bytes_delta": 130936,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 232827,
+            "region_peak_live_bytes_delta_from_begin_live": 197572
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 23927960,
+            "deallocated_bytes_delta": 23833224,
+            "live_bytes_delta": 94736,
+            "peak_live_bytes_delta": 137813,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 5069162,
+          "deallocated_bytes_delta": 4991037,
+          "live_bytes_delta": 78125,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 76031,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 13008896
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 5069162,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99893,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 4991037,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99893,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 4991037,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": 99893,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2970668,
+            "deallocated_bytes_delta": 2888018,
+            "live_bytes_delta": 82650,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 121550,
+            "region_peak_live_bytes_delta_from_begin_live": 99782
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 5069162,
+            "deallocated_bytes_delta": 4991037,
+            "live_bytes_delta": 78125,
+            "peak_live_bytes_delta": 76031,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 16
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 833744146,
+          "deallocated_bytes_delta": 827823026,
+          "live_bytes_delta": 5921120,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 43335680
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 833744146,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026590,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026590,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026590,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 272399042,
+            "live_bytes_delta": 5950091,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934885,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 833744146,
+          "deallocated_bytes_delta": 827823026,
+          "live_bytes_delta": 5921120,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 43188224
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 833744146,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026599,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026599,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026599,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 272399042,
+            "live_bytes_delta": 5950091,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934894,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 695937942,
+          "deallocated_bytes_delta": 686436838,
+          "live_bytes_delta": 9501104,
+          "logical_retained_base_bytes": 3580192,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 1,
+          "rss_bytes": 43405312
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 695937942,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026584,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 686436838,
+            "live_bytes_delta": 9501104,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 9606568,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 690016822,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 9606568,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 268819058,
+            "live_bytes_delta": 9530075,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934879,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 686436838,
+            "live_bytes_delta": 9501104,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 695937942,
+          "deallocated_bytes_delta": 686436838,
+          "live_bytes_delta": 9501104,
+          "logical_retained_base_bytes": 3580192,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 1,
+          "rss_bytes": 43294720
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 695937942,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026593,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 686436838,
+            "live_bytes_delta": 9501104,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 9606577,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 690016822,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 9606577,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 268819058,
+            "live_bytes_delta": 9530075,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934888,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 695937942,
+            "deallocated_bytes_delta": 686436838,
+            "live_bytes_delta": 9501104,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 833744146,
+          "deallocated_bytes_delta": 827823026,
+          "live_bytes_delta": 5921120,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 43376640
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 833744146,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026596,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026596,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026596,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 272399042,
+            "live_bytes_delta": 5950091,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934891,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 833744146,
+          "deallocated_bytes_delta": 827823026,
+          "live_bytes_delta": 5921120,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 43061248
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 833744146,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026605,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026605,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026605,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 272399042,
+            "live_bytes_delta": 5950091,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934900,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 833744146,
+          "deallocated_bytes_delta": 827823026,
+          "live_bytes_delta": 5921120,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 43241472
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 833744146,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026581,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026581,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026581,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 272399042,
+            "live_bytes_delta": 5950091,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934876,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 1,
+        "median": {
+          "allocated_bytes_delta": 833744146,
+          "deallocated_bytes_delta": 827823026,
+          "live_bytes_delta": 5921120,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 0,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 43302912
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 833744146,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026590,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026590,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 6026590,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 278349133,
+            "deallocated_bytes_delta": 272399042,
+            "live_bytes_delta": 5950091,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": 11934885,
+            "region_peak_live_bytes_delta_from_begin_live": 11829415
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 833744146,
+            "deallocated_bytes_delta": 827823026,
+            "live_bytes_delta": 5921120,
+            "peak_live_bytes_delta": 0,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 6669953168,
+          "deallocated_bytes_delta": 6622584208,
+          "live_bytes_delta": 47368960,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 51219177,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 99782656
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6669953168,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848944,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848944,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848944,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2226793064,
+            "deallocated_bytes_delta": 2179192336,
+            "live_bytes_delta": 47600728,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 79019924,
+            "region_peak_live_bytes_delta_from_begin_live": 78539940
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 1806749403,
+          "deallocated_bytes_delta": 1767574335,
+          "live_bytes_delta": 39175068,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 29733128,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 76750848
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1806749403,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641565,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641565,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641565,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 1251354390,
+            "deallocated_bytes_delta": 1212150351,
+            "live_bytes_delta": 39204039,
+            "peak_live_bytes_delta": 17749104,
+            "region_peak_live_bytes": 45549860,
+            "region_peak_live_bytes_delta_from_begin_live": 45083363
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "default",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 5567503536,
+          "deallocated_bytes_delta": 5491494704,
+          "live_bytes_delta": 76008832,
+          "logical_retained_base_bytes": 28641536,
+          "peak_live_bytes_delta": 63203201,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 8,
+          "rss_bytes": 115843072
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 5567503536,
+            "deallocated_bytes_delta": 5567503536,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 63203201,
+            "region_peak_live_bytes": 47848938,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 5567503536,
+            "deallocated_bytes_delta": 5516554592,
+            "live_bytes_delta": 50948944,
+            "peak_live_bytes_delta": 63203201,
+            "region_peak_live_bytes": 76488810,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 5567503536,
+            "deallocated_bytes_delta": 5520134576,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 63203201,
+            "region_peak_live_bytes": 51428922,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2226793064,
+            "deallocated_bytes_delta": 2150552464,
+            "live_bytes_delta": 76240600,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 79019918,
+            "region_peak_live_bytes_delta_from_begin_live": 78539940
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 5567503536,
+            "deallocated_bytes_delta": 5491494704,
+            "live_bytes_delta": 76008832,
+            "peak_live_bytes_delta": 63203201,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 1668943199,
+          "deallocated_bytes_delta": 1626188147,
+          "live_bytes_delta": 42755052,
+          "logical_retained_base_bytes": 28641536,
+          "peak_live_bytes_delta": 29733128,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 8,
+          "rss_bytes": 77127680
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 1668943199,
+            "deallocated_bytes_delta": 1668943199,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641559,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 1668943199,
+            "deallocated_bytes_delta": 1626188147,
+            "live_bytes_delta": 42755052,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 43221543,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 1668943199,
+            "deallocated_bytes_delta": 1629768131,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 43221543,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 1251354390,
+            "deallocated_bytes_delta": 1208570367,
+            "live_bytes_delta": 42784023,
+            "peak_live_bytes_delta": 17749104,
+            "region_peak_live_bytes": 45549854,
+            "region_peak_live_bytes_delta_from_begin_live": 45083363
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 1668943199,
+            "deallocated_bytes_delta": 1626188147,
+            "live_bytes_delta": 42755052,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "exact",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 6669953168,
+          "deallocated_bytes_delta": 6622584208,
+          "live_bytes_delta": 47368960,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 51219177,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 99794944
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6669953168,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848950,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848950,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848950,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2226793064,
+            "deallocated_bytes_delta": 2179192336,
+            "live_bytes_delta": 47600728,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 79019930,
+            "region_peak_live_bytes_delta_from_begin_live": 78539940
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 1806749403,
+          "deallocated_bytes_delta": 1767574335,
+          "live_bytes_delta": 39175068,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 29733128,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 77279232
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1806749403,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641571,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641571,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641571,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 1251354390,
+            "deallocated_bytes_delta": 1212150351,
+            "live_bytes_delta": 39204039,
+            "peak_live_bytes_delta": 17749104,
+            "region_peak_live_bytes": 45549866,
+            "region_peak_live_bytes_delta_from_begin_live": 45083363
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "one_under",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 6669953168,
+          "deallocated_bytes_delta": 6622584208,
+          "live_bytes_delta": 47368960,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 51219177,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 99758080
+        },
+        "ownership": "independent_sources",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6669953168,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848935,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848935,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 47848935,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 2226793064,
+            "deallocated_bytes_delta": 2179192336,
+            "live_bytes_delta": 47600728,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": 79019915,
+            "region_peak_live_bytes_delta_from_begin_live": 78539940
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 6669953168,
+            "deallocated_bytes_delta": 6622584208,
+            "live_bytes_delta": 47368960,
+            "peak_live_bytes_delta": 51219177,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 8192
+      },
+      {
+        "concurrent_commits": 8,
+        "median": {
+          "allocated_bytes_delta": 1806749403,
+          "deallocated_bytes_delta": 1767574335,
+          "live_bytes_delta": 39175068,
+          "logical_retained_base_bytes": 0,
+          "peak_live_bytes_delta": 29733128,
+          "release_live_bytes_delta": 0,
+          "retained_commit_count": 0,
+          "rss_bytes": 76767232
+        },
+        "ownership": "shared_snapshot_clones",
+        "phase_median": {
+          "after_commit_drop": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1806749403,
+            "live_bytes_delta": 0,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641556,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_all_but_last": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641556,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_release_last": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": 39641556,
+            "region_peak_live_bytes_delta_from_begin_live": 0
+          },
+          "after_snapshot_drop": {
+            "allocated_bytes_delta": 1251354390,
+            "deallocated_bytes_delta": 1212150351,
+            "live_bytes_delta": 39204039,
+            "peak_live_bytes_delta": 17749104,
+            "region_peak_live_bytes": 45549851,
+            "region_peak_live_bytes_delta_from_begin_live": 45083363
+          },
+          "commits_retained": {
+            "allocated_bytes_delta": 1806749403,
+            "deallocated_bytes_delta": 1767574335,
+            "live_bytes_delta": 39175068,
+            "peak_live_bytes_delta": 29733128,
+            "region_peak_live_bytes": null,
+            "region_peak_live_bytes_delta_from_begin_live": null
+          }
+        },
+        "policy": "zero",
+        "replications": 3,
+        "section_count": 8192
+      }
+    ],
+    "packet_status": "completed",
+    "passed_children": 96,
+    "repository_copy": {
+      "bytes": 302036,
+      "path": "docs/performance/results/change-0931/formal-reduction-v1.json",
+      "sha256": "919e10175e0ee14cafd6e0acd7bfa5e28347d400cb3d6c0a9d75fa4ff25811aa"
+    },
+    "scheduled_children": 96,
+    "schema": "litchi.performance.0931.memory-reduction.v1",
+    "source_archive_sha256_by_sections": {
+      "16": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726",
+      "8192": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3"
+    }
+  },
+  "regeneration": {
+    "reduction_command": "env PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py reduce --packet /home/zhuhe/litchi-performance-0931/formal-packet-v1 --output /home/zhuhe/litchi-performance-0931/formal-reduction-v1.json",
+    "source_listing": {
+      "bytes": 1665247,
+      "path": "/home/zhuhe/litchi-performance-0931/source-final-list.jsonl",
+      "sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a"
+    },
+    "source_listing_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0931/regenerate-source-list-v1.py --root /home/zhuhe/litchi-performance-0931/source-final --output /home/zhuhe/litchi-performance-0931/source-final-list.jsonl"
+  },
+  "schema": "litchi.performance.0931.memory-result.v1"
+}

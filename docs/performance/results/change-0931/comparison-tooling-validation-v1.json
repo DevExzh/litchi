@@ -1,0 +1,91 @@
+{
+  "schema": "litchi.performance.0931.tooling-validation.v1",
+  "status": "passed",
+  "created_utc": "2026-10-06T15:31:00Z",
+  "artifacts": {
+    "plan": {
+      "path": "comparison-plan-v1.json",
+      "bytes": 10174,
+      "sha256": "2154f7659d0eab657d5dac8bc0d4af9841d77d330de7b6e0d5bd531563c202af"
+    },
+    "runner_reducer": {
+      "path": "comparison-0931-memory.py",
+      "bytes": 56056,
+      "sha256": "f0dbf2cc3f7ec0501795730f62bbcfde2b6b072fa5429eb89a82f911e9695c36"
+    },
+    "source_closure_addendum": {
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/source-closure-addendum-v3.json",
+      "bytes": 4453,
+      "sha256": "31f931a671e806bc9fda1c3e7cb937e17df37910799a31c3f96c1b1f03676de5"
+    },
+    "build_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+      "bytes": 2774,
+      "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+    },
+    "binary": {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "bytes": 68431264,
+      "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+    }
+  },
+  "checks": {
+    "self_test": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0931/comparison-0931-memory.py self-test",
+      "status": "passed",
+      "schedule_children": 96,
+      "topology_negative": true,
+      "observer_flags_negative": true,
+      "region_peak_negative": true,
+      "path_negative": true,
+      "environment_negative": true,
+      "cap_negative": true,
+      "checkpoint_conservation": true
+    },
+    "synthetic_packet": {
+      "status": "passed",
+      "workload_started": false,
+      "validated_children": 96,
+      "reduced_cells": 32,
+      "reduction_bytes": 287064,
+      "packet_lifetime": "temporary external packet removed after moved-path validator/reducer pass"
+    },
+    "capture": {
+      "status": "not_run",
+      "reason": "Formal 96-child capture remains pending root authorization; only the two approved descriptive prelights ran."
+    },
+    "build": {
+      "status": "passed",
+      "terminal_exit_code": 0,
+      "workload_started": false,
+      "receipt": {
+        "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+        "bytes": 2774,
+        "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+      },
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+        "bytes": 68431264,
+        "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+      }
+    },
+    "prelight": {
+      "status": "passed-descriptive-only",
+      "receipt": {
+        "path": "/home/zhuhe/litchi-performance-0931/receipts/prelight-v1-validation.json",
+        "bytes": 7418,
+        "sha256": "7e532f1f91c7cc7f8e041695eb1ad6e04263387940d071c3521f308da64d54c1"
+      },
+      "children": 2,
+      "formal_children_started": 0,
+      "sections_16_required_retained_base_bytes": 7280,
+      "sections_8192_required_retained_base_bytes": 3580192,
+      "small_weight_le_1MiB": true,
+      "large_weight_gt_1MiB": true,
+      "all_boundary_checks_verified": true,
+      "wrapper_outer_exit_code": 1,
+      "wrapper_exit_note": "post-run display KeyError after child terminal/report writes; no rerun"
+    }
+  },
+  "scope": "Tooling, custody, synthetic validation, and two approved descriptive prelights; no formal 96-child capture, timing claim, or adoption claim."
+}
