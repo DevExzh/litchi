@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0927 — test-only provider phase attribution
+
+[0927](0927-provider-phase-diagnostic.md) observes 1,692 open bytes, 2,102,808
+query bytes and 4,203,561 publication bytes on both full-return and 4 KiB
+short providers. Operation totals match 0925's descriptive counters; the new
+diagnostic contains no elapsed-time measurement and does not qualify that
+earlier cohort. Production and native benchmark code remain unchanged.
+
 ## 0926 — retained provider counters independently reconciled
 
 [0926](0926-provider-read-attribution.md) verifies the 42 retained 0925 report

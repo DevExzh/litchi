@@ -1,0 +1,12 @@
+{
+  "schema": "litchi.performance.0927.cleanup.v1",
+  "removed": [
+    {
+      "path": "/tmp/litchi-performance-0927/reconstructed-diagnostic.patch",
+      "bytes": 18141,
+      "sha256": "d7b7863fe154e64e457d0fa8a67ddb8bc58570efa4ee9846c97730d2d46b03ba"
+    }
+  ],
+  "retained_external": "/tmp/litchi-performance-0927 holds the source-bound test binary and small canonical diagnostic/review artifacts referenced by archived receipts",
+  "repository_rule": "No binaries or evidence files >=1MiB staged"
+}

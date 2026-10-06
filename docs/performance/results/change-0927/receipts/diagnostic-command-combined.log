@@ -1,0 +1,141 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-8fb54a160ae47866)
+
+running 1 test
+DOCX_SECTION_LAYOUT_READ_DIAGNOSTIC_JSON=[{"route":"full_64k_unpaced","max_returned_bytes":65536,"source_bytes":2101427,"phases":[{"phase":"open","logical_cumulative":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0},"logical_delta":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0},"underlying_cumulative":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0},"underlying_delta":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0}},{"phase":"query","logical_cumulative":{"read_calls":48,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"logical_delta":{"read_calls":34,"requested_bytes":2102808,"returned_bytes":2102808,"short_reads":0},"underlying_cumulative":{"read_calls":48,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"underlying_delta":{"read_calls":34,"requested_bytes":2102808,"returned_bytes":2102808,"short_reads":0}},{"phase":"edit","logical_cumulative":{"read_calls":48,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"logical_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0},"underlying_cumulative":{"read_calls":48,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"underlying_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0}},{"phase":"commit","logical_cumulative":{"read_calls":48,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"logical_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0},"underlying_cumulative":{"read_calls":48,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"underlying_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0}},{"phase":"publication","logical_cumulative":{"read_calls":165,"requested_bytes":6308061,"returned_bytes":6308061,"short_reads":0},"logical_delta":{"read_calls":117,"requested_bytes":4203561,"returned_bytes":4203561,"short_reads":0},"underlying_cumulative":{"read_calls":165,"requested_bytes":6308061,"returned_bytes":6308061,"short_reads":0},"underlying_delta":{"read_calls":117,"requested_bytes":4203561,"returned_bytes":4203561,"short_reads":0}}],"logical_operation":{"read_calls":165,"requested_bytes":6308061,"returned_bytes":6308061,"short_reads":0},"underlying_operation":{"read_calls":165,"requested_bytes":6308061,"returned_bytes":6308061,"short_reads":0},"two_fingerprint_lower_bound_bytes":4202854,"logical_bytes_after_two_fingerprint_lower_bound":2105207,"underlying_bytes_after_two_fingerprint_lower_bound":2105207,"logical_operation_conservation_verified":true,"underlying_operation_conservation_verified":true,"source_sha256":"183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8","output_sha256":"5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec","source_version_stable":true,"inverse_source_restored":true,"sink_accepted_bytes":2101446,"sink_largest_write":65536,"output_verified":true},{"route":"short_4k_unpaced","max_returned_bytes":4096,"source_bytes":2101427,"phases":[{"phase":"open","logical_cumulative":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0},"logical_delta":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0},"underlying_cumulative":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0},"underlying_delta":{"read_calls":14,"requested_bytes":1692,"returned_bytes":1692,"short_reads":0}},{"phase":"query","logical_cumulative":{"read_calls":529,"requested_bytes":33134385,"returned_bytes":2104500,"short_reads":513},"logical_delta":{"read_calls":515,"requested_bytes":33132693,"returned_bytes":2102808,"short_reads":513},"underlying_cumulative":{"read_calls":529,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"underlying_delta":{"read_calls":515,"requested_bytes":2102808,"returned_bytes":2102808,"short_reads":0}},{"phase":"edit","logical_cumulative":{"read_calls":529,"requested_bytes":33134385,"returned_bytes":2104500,"short_reads":513},"logical_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0},"underlying_cumulative":{"read_calls":529,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"underlying_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0}},{"phase":"commit","logical_cumulative":{"read_calls":529,"requested_bytes":33134385,"returned_bytes":2104500,"short_reads":513},"logical_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0},"underlying_cumulative":{"read_calls":529,"requested_bytes":2104500,"returned_bytes":2104500,"short_reads":0},"underlying_delta":{"read_calls":0,"requested_bytes":0,"returned_bytes":0,"short_reads":0}},{"phase":"publication","logical_cumulative":{"read_calls":1607,"requested_bytes":84096471,"returned_bytes":6308061,"short_reads":1506},"logical_delta":{"read_calls":1078,"requested_bytes":50962086,"returned_bytes":4203561,"short_reads":993},"underlying_cumulative":{"read_calls":1607,"requested_bytes":6308061,"returned_bytes":6308061,"short_reads":0},"underlying_delta":{"read_calls":1078,"requested_bytes":4203561,"returned_bytes":4203561,"short_reads":0}}],"logical_operation":{"read_calls":1607,"requested_bytes":84096471,"returned_bytes":6308061,"short_reads":1506},"underlying_operation":{"read_calls":1607,"requested_bytes":6308061,"returned_bytes":6308061,"short_reads":0},"two_fingerprint_lower_bound_bytes":4202854,"logical_bytes_after_two_fingerprint_lower_bound":2105207,"underlying_bytes_after_two_fingerprint_lower_bound":2105207,"logical_operation_conservation_verified":true,"underlying_operation_conservation_verified":true,"source_sha256":"183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8","output_sha256":"5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec","source_version_stable":true,"inverse_source_restored":true,"sink_accepted_bytes":2101446,"sink_largest_write":65536,"output_verified":true}]
+test tests::docx_section_layout_read_diagnostic_conserves_full_and_short_phases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 585 filtered out; finished in 1.05s
+
+     Running unittests src/bin/attribute_checks.rs (tools/perf-baseline/target/debug/deps/attribute_checks-18804e10339f5643)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/attribute_checks_equivalence.rs (tools/perf-baseline/target/debug/deps/attribute_checks_equivalence-36f53d7867270d48)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_bounded_tail_append_compare.rs (tools/perf-baseline/target/debug/deps/docx_bounded_tail_append_compare-d617dd1e39c888e8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_plain_paragraph_tail_append.rs (tools/perf-baseline/target/debug/deps/docx_plain_paragraph_tail_append-a73f2159f05d56c5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_replayable_tail_append.rs (tools/perf-baseline/target/debug/deps/docx_replayable_tail_append-83f5a67bd007c3d9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_source_selected_paragraph.rs (tools/perf-baseline/target/debug/deps/docx_source_selected_paragraph-8eb901eac0898876)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (tools/perf-baseline/target/debug/deps/litchi_perf_baseline-f32a3c77d6405cdf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/odp_native_tail_append_probe.rs (tools/perf-baseline/target/debug/deps/odp_native_tail_append_probe-ba034713364333e6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/ordinary_save_artifacts.rs (tools/perf-baseline/target/debug/deps/ordinary_save_artifacts-952b7cb58b9b1b4a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_external_cross_copy.rs (tools/perf-baseline/target/debug/deps/pptx_external_cross_copy-6546a147e56db1fe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_metadata_spool.rs (tools/perf-baseline/target/debug/deps/pptx_metadata_spool-8036ab4d613bd950)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_native_copy_probe.rs (tools/perf-baseline/target/debug/deps/pptx_native_copy_probe-f5cb7793c9f74662)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_semantic_inventory.rs (tools/perf-baseline/target/debug/deps/pptx_semantic_inventory-d90b0186398bffae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/security_corpus.rs (tools/perf-baseline/target/debug/deps/security_corpus-ea45c2fbc4de76b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsx_cell_values_abba.rs (tools/perf-baseline/target/debug/deps/xlsx_cell_values_abba-fc05b207bffca35e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsx_merge_source_abba.rs (tools/perf-baseline/target/debug/deps/xlsx_merge_source_abba-3ed23f29f596ba7e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsx_planning_guard.rs (tools/perf-baseline/target/debug/deps/xlsx_planning_guard-9351c8a9aa4c641c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xml_attribute_bounds.rs (tools/perf-baseline/target/debug/deps/xml_attribute_bounds-94b1a2e940aa6ffb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xml_stream_audit.rs (tools/perf-baseline/target/debug/deps/xml_stream_audit-2f526408ca1643c5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/zip_directory_spool.rs (tools/perf-baseline/target/debug/deps/zip_directory_spool-93237181e078a728)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_filesystem.rs (tools/perf-baseline/target/debug/deps/xlsx_filesystem-4eff0bb0fdfe95bd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/xlsx_planning_allocations.rs (tools/perf-baseline/target/debug/deps/xlsx_planning_allocations-a008e9d0e910f9f0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

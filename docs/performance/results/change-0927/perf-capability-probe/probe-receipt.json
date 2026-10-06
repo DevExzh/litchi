@@ -1,0 +1,38 @@
+{
+  "schema": "litchi.performance.0927.perf-capability-probe.v1",
+  "claim_scope": "capability probe only; no workload timing, profile, or native attribution claim",
+  "command": [
+    "perf",
+    "stat",
+    "-e",
+    "cycles:u",
+    "--",
+    "true"
+  ],
+  "exit_code": 0,
+  "perf_version": "perf version 7.0.14",
+  "perf_event_paranoid": "1",
+  "created_epoch": 1791288039.8054814,
+  "artifacts": {
+    "command.txt": {
+      "bytes": 30,
+      "sha256": "c2ced613f4029379efe946541b801bce9c54445d716b92846c650215f0e0d285"
+    },
+    "perf-event-paranoid.txt": {
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    "perf-version.txt": {
+      "bytes": 20,
+      "sha256": "496b3d503a88d37a5f9137643742e6101b6a7f183075dd04d279982e92dcc662"
+    },
+    "probe-stderr.txt": {
+      "bytes": 243,
+      "sha256": "810c25db1040d89cc83b266f88692a4d1b8d1809ba29dcb6b50c9a27e32fc9fb"
+    },
+    "probe-stdout.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

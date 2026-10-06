@@ -1,0 +1,35 @@
+{
+  "schema": "litchi.performance.0927.root-replay.v1",
+  "created_utc": "2026-10-06T12:09:11.896064+00:00",
+  "command": [
+    "/tmp/litchi-performance-0927/diagnostic-test-binary-8fb54a160ae47866",
+    "--exact",
+    "tests::docx_section_layout_read_diagnostic_conserves_full_and_short_phases",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "test_output_reports_pass": true,
+  "test_child_exit_code": null,
+  "parser_initial_status": "failed because --test-threads=1 prefixes the JSON marker with the test name",
+  "initial_wrapper_exit_code": 1,
+  "recovery": "Parsed the same retained stdout with JSONDecoder.raw_decode after its unique marker; no test rerun",
+  "exact_json_matches_coder_diagnostic": true,
+  "source_sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+  "binary": {
+    "path": "/tmp/litchi-performance-0927/diagnostic-test-binary-8fb54a160ae47866",
+    "bytes": 885251120,
+    "sha256": "8a262ea02d27bcdadab214767dd36d714c704fbcd786a8df17bfd49614f80834"
+  },
+  "logs": {
+    "root-diagnostic.stdout": {
+      "bytes": 6268,
+      "sha256": "e2247b41d94bf881ba7e7517eade962fed87d9906b023677f81394caad320cc6"
+    },
+    "root-diagnostic.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "claim_scope": "Additional diagnostic replay; child return code and execution timestamps were not persisted before the parser failed. Test output and exact JSON equality are independently checked; no timing claim."
+}

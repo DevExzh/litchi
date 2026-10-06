@@ -1,0 +1,174 @@
+{
+  "claim_scope": "focused DOCX section-layout phase-counter diagnostic and scoped quality only; no timing/native performance claim",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "docx_section_layout_read_diagnostic_conserves_full_and_short_phases",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "log": {
+        "bytes": 11935,
+        "path": "/tmp/litchi-performance-0927/diagnostic-focused.log",
+        "sha256": "1d44dc3d805bd13b46554428c1a03611df3f33141d74c2c509acbeb2a5308b59"
+      },
+      "name": "coder_focused_diagnostic",
+      "note": "Coder execution report; archived log has no argv header. Target was tools/perf-baseline/target/debug/deps/litchi_perf_baseline-8fb54a160ae47866."
+    },
+    {
+      "argv": [
+        "python3",
+        "/tmp/litchi-performance-0927/reviewer_phase_replay.py"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "name": "independent_replay",
+      "receipt": {
+        "bytes": 4351,
+        "path": "/tmp/litchi-performance-0927/reviewer-phase-replay.json",
+        "sha256": "04448c7f2d0aedecad171a8e0c53d29c73bdd5f3383a14b8f719465291fa032f"
+      },
+      "scope": "offline JSON/log replay only; no build or new binary execution"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "log": {
+        "bytes": 160,
+        "path": "/tmp/litchi-performance-0927/clippy-lib.log",
+        "sha256": "16da4a206511c9f09bbcc6ed32c61c3f74549a3cde8abb62e43bc0af8731c2fa"
+      },
+      "name": "clippy_lib_strict"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--tests",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "baseline_failure": "clippy::result-large-err in unchanged tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 101,
+      "log": {
+        "bytes": 3636,
+        "path": "/tmp/litchi-performance-0927/clippy-lib-tests.log",
+        "sha256": "a6d8e55da476dcb720820f3ed4219fd5c777d901767a5cee74faaeb1107fcfd9"
+      },
+      "name": "clippy_lib_tests_strict"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--tests",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "clippy::result-large-err"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "log": {
+        "bytes": 160,
+        "path": "/tmp/litchi-performance-0927/clippy-lib-tests-allow-baseline.log",
+        "sha256": "0f462f47f37260c8d692021b39910beeb0131a7db8a71a1a76bb2a96a60d5938"
+      },
+      "name": "clippy_lib_tests_known_baseline_allowed",
+      "scope": "only the unchanged baseline lint allowed"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "tools/perf-baseline/src/lib.rs"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "name": "git_diff_check"
+    }
+  ],
+  "copied_artifacts": {
+    "clippy-lib-tests-allow-baseline.log": {
+      "bytes": 160,
+      "path": "/tmp/litchi-performance-0927/quality/clippy-lib-tests-allow-baseline.log",
+      "sha256": "0f462f47f37260c8d692021b39910beeb0131a7db8a71a1a76bb2a96a60d5938"
+    },
+    "clippy-lib-tests.log": {
+      "bytes": 3636,
+      "path": "/tmp/litchi-performance-0927/quality/clippy-lib-tests.log",
+      "sha256": "a6d8e55da476dcb720820f3ed4219fd5c777d901767a5cee74faaeb1107fcfd9"
+    },
+    "clippy-lib.log": {
+      "bytes": 160,
+      "path": "/tmp/litchi-performance-0927/quality/clippy-lib.log",
+      "sha256": "16da4a206511c9f09bbcc6ed32c61c3f74549a3cde8abb62e43bc0af8731c2fa"
+    },
+    "reviewer-phase-replay.json": {
+      "bytes": 4351,
+      "path": "/tmp/litchi-performance-0927/quality/reviewer-phase-replay.json",
+      "sha256": "04448c7f2d0aedecad171a8e0c53d29c73bdd5f3383a14b8f719465291fa032f"
+    },
+    "reviewer_phase_replay.py": {
+      "bytes": 11512,
+      "path": "/tmp/litchi-performance-0927/quality/reviewer_phase_replay.py",
+      "sha256": "5c6cdb92bda1604adfc330997f9a2a87532b3fbd59a7f7c5a423d880a6646e4f"
+    }
+  },
+  "created_utc": "2026-10-06T12:10:02.030345+00:00",
+  "no_reruns": true,
+  "schema": "litchi.performance.0927.shared-owner-quality.v1",
+  "source": {
+    "baseline_revision": "d2ce19788234036e1db30a7f3cf682af1fb77c7d",
+    "baseline_warning_file": "/home/zhuhe/code/litchi/tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+    "baseline_warning_file_git_blob_at_base": "8abc2f1ec40fb66b5ef26eb4535c31cdc15b623b",
+    "baseline_warning_file_git_blob_current": "8abc2f1ec40fb66b5ef26eb4535c31cdc15b623b",
+    "baseline_warning_file_sha256_at_base": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a",
+    "baseline_warning_file_sha256_current": "f70148c654408689b9a970d309da5266408d4cd51eb28e7f171efad985bd396a",
+    "baseline_warning_file_unchanged": true,
+    "candidate_file": {
+      "bytes": 3076438,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+      "sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9"
+    },
+    "candidate_sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+    "changed_file_scope": [
+      "tools/perf-baseline/src/lib.rs"
+    ],
+    "cwd": "/home/zhuhe/code/litchi"
+  },
+  "status": "passed_with_known_baseline_clippy_failure"
+}

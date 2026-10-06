@@ -1,0 +1,413 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 8ed1e84b22..02ad9668df 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -61827,13 +61827,14 @@ mod tests {
+ 
+     use std::{
+         collections::{BTreeMap, BTreeSet},
++        error::Error,
+         io::{Read, Write},
+         num::NonZeroU64,
+         sync::Arc,
+         time::Duration,
+     };
+ 
+-    use litchi_core::{Position, ReadAt};
++    use litchi_core::{OwnedSource, Position, ReadAt};
+ 
+     use crate::{
+         PPTX_CROSS_COPY_INSERTION_POSITION, PptxSourceBackedCrossCopyLifecycleExpectation,
+@@ -61912,6 +61913,296 @@ mod tests {
+         xlsb_expected_cells, xlsx_cell_count, xlsx_spec, zip_member_ranges,
+     };
+ 
++    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize)]
++    struct DocxReadDiagnosticTotals {
++        read_calls: u64,
++        requested_bytes: u64,
++        returned_bytes: u64,
++        short_reads: u64,
++    }
++
++    impl DocxReadDiagnosticTotals {
++        fn from_observation(observation: &DocxProviderReadObservation) -> Self {
++            Self {
++                read_calls: observation.read_calls,
++                requested_bytes: observation.requested_bytes,
++                returned_bytes: observation.returned_bytes,
++                short_reads: observation.short_reads,
++            }
++        }
++
++        fn delta(self, before: Self) -> Result<Self, Box<dyn Error>> {
++            Ok(Self {
++                read_calls: self
++                    .read_calls
++                    .checked_sub(before.read_calls)
++                    .ok_or("diagnostic provider read-call counter regressed")?,
++                requested_bytes: self
++                    .requested_bytes
++                    .checked_sub(before.requested_bytes)
++                    .ok_or("diagnostic provider requested-byte counter regressed")?,
++                returned_bytes: self
++                    .returned_bytes
++                    .checked_sub(before.returned_bytes)
++                    .ok_or("diagnostic provider returned-byte counter regressed")?,
++                short_reads: self
++                    .short_reads
++                    .checked_sub(before.short_reads)
++                    .ok_or("diagnostic provider short-read counter regressed")?,
++            })
++        }
++
++        fn checked_add(self, other: Self) -> Result<Self, Box<dyn Error>> {
++            Ok(Self {
++                read_calls: self
++                    .read_calls
++                    .checked_add(other.read_calls)
++                    .ok_or("diagnostic provider read-call sum overflowed")?,
++                requested_bytes: self
++                    .requested_bytes
++                    .checked_add(other.requested_bytes)
++                    .ok_or("diagnostic provider requested-byte sum overflowed")?,
++                returned_bytes: self
++                    .returned_bytes
++                    .checked_add(other.returned_bytes)
++                    .ok_or("diagnostic provider returned-byte sum overflowed")?,
++                short_reads: self
++                    .short_reads
++                    .checked_add(other.short_reads)
++                    .ok_or("diagnostic provider short-read sum overflowed")?,
++            })
++        }
++    }
++
++    #[derive(Clone, Copy, Debug, serde::Serialize)]
++    struct DocxReadDiagnosticSnapshot {
++        logical: DocxReadDiagnosticTotals,
++        underlying: DocxReadDiagnosticTotals,
++    }
++
++    #[derive(Clone, Debug, serde::Serialize)]
++    struct DocxReadDiagnosticPhase {
++        phase: &'static str,
++        logical_cumulative: DocxReadDiagnosticTotals,
++        logical_delta: DocxReadDiagnosticTotals,
++        underlying_cumulative: DocxReadDiagnosticTotals,
++        underlying_delta: DocxReadDiagnosticTotals,
++    }
++
++    #[derive(Clone, Debug, serde::Serialize)]
++    struct DocxReadDiagnosticRoute {
++        route: &'static str,
++        max_returned_bytes: usize,
++        source_bytes: u64,
++        phases: Vec<DocxReadDiagnosticPhase>,
++        logical_operation: DocxReadDiagnosticTotals,
++        underlying_operation: DocxReadDiagnosticTotals,
++        two_fingerprint_lower_bound_bytes: u64,
++        logical_bytes_after_two_fingerprint_lower_bound: u64,
++        underlying_bytes_after_two_fingerprint_lower_bound: u64,
++        logical_operation_conservation_verified: bool,
++        underlying_operation_conservation_verified: bool,
++        source_sha256: String,
++        output_sha256: String,
++        source_version_stable: bool,
++        inverse_source_restored: bool,
++        sink_accepted_bytes: u64,
++        sink_largest_write: u64,
++        output_verified: bool,
++    }
++
++    fn docx_read_diagnostic_snapshot(
++        range_source: &super::PptxRangeSource,
++        provider_counter: &super::DocxProviderReadCounter,
++    ) -> Result<DocxReadDiagnosticSnapshot, Box<dyn Error>> {
++        let logical = super::DocxProviderReadObservation::from_range(range_source.snapshot()?);
++        let underlying = provider_counter.snapshot();
++        Ok(DocxReadDiagnosticSnapshot {
++            logical: DocxReadDiagnosticTotals::from_observation(&logical),
++            underlying: DocxReadDiagnosticTotals::from_observation(&underlying),
++        })
++    }
++
++    fn docx_read_diagnostic_phase(
++        phase: &'static str,
++        before: DocxReadDiagnosticSnapshot,
++        after: DocxReadDiagnosticSnapshot,
++    ) -> Result<DocxReadDiagnosticPhase, Box<dyn Error>> {
++        Ok(DocxReadDiagnosticPhase {
++            phase,
++            logical_cumulative: after.logical,
++            logical_delta: after.logical.delta(before.logical)?,
++            underlying_cumulative: after.underlying,
++            underlying_delta: after.underlying.delta(before.underlying)?,
++        })
++    }
++
++    fn expected_docx_section_layout_diagnostic_output(
++        corpus: &super::Corpus,
++    ) -> Result<Vec<u8>, Box<dyn Error>> {
++        let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
++            OwnedSource::new(corpus.archive.clone()),
++        ))?;
++        let snapshot = package.section_layout_snapshot()?;
++        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
++            super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
++        )))?;
++        edit.set_columns(Some(litchi_docx::section::Columns {
++            equal_width: true,
++            count: 3,
++            space: Some(litchi_docx::section::Emu::from_twips(240)),
++            separator: true,
++            columns: Vec::new(),
++        }))?;
++        let commit = edit.commit()?;
++        let mut output = Vec::new();
++        package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
++        Ok(output)
++    }
++
++    fn run_docx_section_layout_read_diagnostic_route(
++        corpus: &super::Corpus,
++        route: (&'static str, usize),
++        expected_output: &[u8],
++    ) -> Result<DocxReadDiagnosticRoute, Box<dyn Error>> {
++        let source_bytes = u64::try_from(corpus.archive.len())?;
++        let source_sha256 = sha256_hex(&corpus.archive);
++        if source_sha256 != corpus.manifest.archive_sha256 {
++            return Err("DOCX section-layout diagnostic source hash differs from manifest".into());
++        }
++        let provider_counter = Arc::new(super::DocxProviderReadCounter::new(Arc::new(
++            OwnedSource::new(corpus.archive.clone()),
++        )));
++        let range_source = Arc::new(super::PptxRangeSource::new(
++            provider_counter.clone(),
++            super::PptxRangeSourceConfig::new(Some(route.1), None),
++        ));
++        let provider_version_before = range_source.version()?;
++        let package = litchi_docx::source_backed::Package::from_read_at(range_source.clone())?;
++
++        let mut snapshots = Vec::with_capacity(5);
++        snapshots.push(("open", {
++            std::hint::black_box(&package);
++            docx_read_diagnostic_snapshot(&range_source, &provider_counter)?
++        }));
++
++        let snapshot = package.section_layout_snapshot()?;
++        snapshots.push((
++            "query",
++            docx_read_diagnostic_snapshot(&range_source, &provider_counter)?,
++        ));
++
++        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
++            super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
++        )))?;
++        edit.set_columns(Some(litchi_docx::section::Columns {
++            equal_width: true,
++            count: 3,
++            space: Some(litchi_docx::section::Emu::from_twips(240)),
++            separator: true,
++            columns: Vec::new(),
++        }))?;
++        snapshots.push((
++            "edit",
++            docx_read_diagnostic_snapshot(&range_source, &provider_counter)?,
++        ));
++
++        let commit = edit.commit()?;
++        snapshots.push((
++            "commit",
++            docx_read_diagnostic_snapshot(&range_source, &provider_counter)?,
++        ));
++
++        let maximum = u64::try_from(expected_output.len())?
++            .checked_mul(2)
++            .and_then(|value| value.checked_add(64 * 1024))
++            .ok_or("DOCX section-layout diagnostic output ceiling overflows u64")?;
++        let mut sink = super::CountingSink::bounded(maximum, 64 * 1024);
++        sink.reserve_budget()?;
++        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
++        let publication_snapshot = docx_read_diagnostic_snapshot(&range_source, &provider_counter)?;
++        snapshots.push(("publication", publication_snapshot));
++        let provider_version_at_publication = range_source.version()?;
++
++        if sink.bytes != expected_output {
++            return Err("DOCX section-layout diagnostic output differs from oracle".into());
++        }
++        super::verify_docx_section_layout_output(corpus, &sink.bytes, [3, 2, 2])?;
++        let reopened = litchi_docx::source_backed::Package::from_read_at(Arc::new(
++            OwnedSource::new(sink.bytes.clone()),
++        ))?;
++        let mut restored_output = Vec::new();
++        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
++        let inverse_source_restored = restored_output == corpus.archive;
++        if !inverse_source_restored {
++            return Err("DOCX section-layout diagnostic inverse did not restore source".into());
++        }
++        let provider_version_after_check = range_source.version()?;
++        let source_version_stable = provider_version_before == provider_version_at_publication
++            && provider_version_at_publication == provider_version_after_check;
++        if !source_version_stable {
++            return Err("DOCX section-layout diagnostic source version changed".into());
++        }
++
++        let mut phases = Vec::with_capacity(snapshots.len());
++        let mut previous = DocxReadDiagnosticSnapshot {
++            logical: DocxReadDiagnosticTotals::default(),
++            underlying: DocxReadDiagnosticTotals::default(),
++        };
++        for (phase, current) in snapshots {
++            phases.push(docx_read_diagnostic_phase(phase, previous, current)?);
++            previous = current;
++        }
++        let logical_operation = publication_snapshot.logical;
++        let underlying_operation = publication_snapshot.underlying;
++        let mut logical_sum = DocxReadDiagnosticTotals::default();
++        let mut underlying_sum = DocxReadDiagnosticTotals::default();
++        for phase in &phases {
++            logical_sum = logical_sum.checked_add(phase.logical_delta)?;
++            underlying_sum = underlying_sum.checked_add(phase.underlying_delta)?;
++        }
++        let logical_operation_conservation_verified = logical_sum == logical_operation;
++        let underlying_operation_conservation_verified = underlying_sum == underlying_operation;
++        if !logical_operation_conservation_verified || !underlying_operation_conservation_verified {
++            return Err(
++                "DOCX section-layout diagnostic phase reads do not conserve operation totals"
++                    .into(),
++            );
++        }
++        let two_fingerprint_lower_bound_bytes = source_bytes
++            .checked_mul(2)
++            .ok_or("DOCX section-layout fingerprint lower bound overflowed")?;
++        let logical_bytes_after_two_fingerprint_lower_bound = logical_operation
++            .returned_bytes
++            .checked_sub(two_fingerprint_lower_bound_bytes)
++            .ok_or("logical provider bytes are below two-fingerprint lower bound")?;
++        let underlying_bytes_after_two_fingerprint_lower_bound = underlying_operation
++            .returned_bytes
++            .checked_sub(two_fingerprint_lower_bound_bytes)
++            .ok_or("underlying provider bytes are below two-fingerprint lower bound")?;
++        let sink_summary = sink.summary();
++        Ok(DocxReadDiagnosticRoute {
++            route: route.0,
++            max_returned_bytes: route.1,
++            source_bytes,
++            phases,
++            logical_operation,
++            underlying_operation,
++            two_fingerprint_lower_bound_bytes,
++            logical_bytes_after_two_fingerprint_lower_bound,
++            underlying_bytes_after_two_fingerprint_lower_bound,
++            logical_operation_conservation_verified,
++            underlying_operation_conservation_verified,
++            source_sha256,
++            output_sha256: sha256_hex(&sink.bytes),
++            source_version_stable,
++            inverse_source_restored,
++            sink_accepted_bytes: sink_summary.accepted_bytes,
++            sink_largest_write: sink_summary.largest_write,
++            output_verified: true,
++        })
++    }
++
+     #[test]
+     fn detection_selectors_are_opt_in_with_exact_oracles() {
+         let cases = [
+@@ -66136,6 +66427,95 @@ mod tests {
+         assert_eq!(DocxIngressRoute::RangeDelayed.name(), "range_delayed");
+     }
+ 
++    #[test]
++    fn docx_section_layout_read_diagnostic_conserves_full_and_short_phases() {
++        let corpus = build_docx_section_layout_corpus().unwrap();
++        let expected_output = expected_docx_section_layout_diagnostic_output(&corpus).unwrap();
++        let full = run_docx_section_layout_read_diagnostic_route(
++            &corpus,
++            ("full_64k_unpaced", 64 * 1024),
++            &expected_output,
++        )
++        .unwrap();
++        let short = run_docx_section_layout_read_diagnostic_route(
++            &corpus,
++            ("short_4k_unpaced", 4 * 1024),
++            &expected_output,
++        )
++        .unwrap();
++
++        let expected_source_bytes = u64::try_from(corpus.archive.len()).unwrap();
++        let expected_operation_bytes = 6_308_061;
++        let expected_two_fingerprint_bytes = 4_202_854;
++        let expected_source_sha256 =
++            "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8";
++        let expected_output_sha256 =
++            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec";
++        assert_eq!(expected_source_bytes, 2_101_427);
++        assert_eq!(full.source_bytes, expected_source_bytes);
++        assert_eq!(short.source_bytes, expected_source_bytes);
++        assert_eq!(full.logical_operation.read_calls, 165);
++        assert_eq!(
++            full.logical_operation.requested_bytes,
++            expected_operation_bytes
++        );
++        assert_eq!(
++            full.logical_operation.returned_bytes,
++            expected_operation_bytes
++        );
++        assert_eq!(full.underlying_operation, full.logical_operation);
++        assert_eq!(short.logical_operation.read_calls, 1_607);
++        assert_eq!(short.logical_operation.requested_bytes, 84_096_471);
++        assert_eq!(
++            short.logical_operation.returned_bytes,
++            expected_operation_bytes
++        );
++        assert_eq!(short.underlying_operation.read_calls, 1_607);
++        assert_eq!(
++            short.underlying_operation.requested_bytes,
++            expected_operation_bytes
++        );
++        assert_eq!(
++            short.underlying_operation.returned_bytes,
++            expected_operation_bytes
++        );
++        for report in [&full, &short] {
++            assert_eq!(
++                report.two_fingerprint_lower_bound_bytes,
++                expected_two_fingerprint_bytes
++            );
++            assert_eq!(
++                report.logical_bytes_after_two_fingerprint_lower_bound,
++                expected_operation_bytes - expected_two_fingerprint_bytes
++            );
++            assert_eq!(
++                report.underlying_bytes_after_two_fingerprint_lower_bound,
++                expected_operation_bytes - expected_two_fingerprint_bytes
++            );
++            assert!(report.logical_operation_conservation_verified);
++            assert!(report.underlying_operation_conservation_verified);
++            assert_eq!(report.source_sha256, expected_source_sha256);
++            assert_eq!(report.output_sha256, expected_output_sha256);
++            assert!(report.source_version_stable);
++            assert!(report.inverse_source_restored);
++            assert_eq!(report.sink_accepted_bytes, expected_output.len() as u64);
++            assert!(report.sink_largest_write <= 64 * 1024);
++            assert!(report.output_verified);
++            assert_eq!(report.output_sha256, sha256_hex(&expected_output));
++            assert_eq!(report.phases.len(), 5);
++            assert_eq!(report.phases[0].phase, "open");
++            assert_eq!(report.phases[1].phase, "query");
++            assert_eq!(report.phases[2].phase, "edit");
++            assert_eq!(report.phases[3].phase, "commit");
++            assert_eq!(report.phases[4].phase, "publication");
++        }
++
++        println!(
++            "DOCX_SECTION_LAYOUT_READ_DIAGNOSTIC_JSON={}",
++            serde_json::to_string(&[full, short]).unwrap()
++        );
++    }
++
+     #[test]
+     fn pptx_source_edit_is_deterministic_and_emits_complete_evidence() {
+         let corpus = build_pptx_source_edit_corpus().unwrap();

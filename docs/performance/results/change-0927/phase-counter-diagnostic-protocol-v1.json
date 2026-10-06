@@ -1,0 +1,124 @@
+{
+  "schema": "litchi.performance.0927.docx-section-layout-phase-counter-diagnostic.v1",
+  "created_utc": "2026-10-06T11:58:52Z",
+  "status": "planned_source_pending",
+  "purpose": "A single, untimed diagnostic invocation for the test-only DOCX existing-section-layout provider phase-counter helper. It records deterministic counters and correctness identities so the helper's phase boundaries can be reviewed without creating a performance cohort.",
+  "claim_scope": {
+    "performance_claim": "none",
+    "timing_claim": false,
+    "provider_comparison": false,
+    "native_performance_children_run": 0,
+    "recapture": false,
+    "production_change": false
+  },
+  "adr_basis": [
+    "0001 priorities and strict public layers",
+    "0002 dependency direction and crate ownership",
+    "0005 positional I/O, budgets, and measured evidence",
+    "0006 nonmutating validation, preservation, and compatibility",
+    "0008 reproducible verification and evidence gates",
+    "0010 facade/archive ownership",
+    "0011 OOXML physical-package ownership",
+    "0024 current workspace topology",
+    "0030 lazy OPC decode behind fallible accessors",
+    "0031 explicit execution budgets",
+    "0032 bounded snapshot-derived memos"
+  ],
+  "source_binding": {
+    "base_git_revision": "d2ce19788234036e1db30a7f3cf682af1fb77c7d",
+    "base_git_revision_required_exact": true,
+    "candidate_patch": {
+      "status": "pending_candidate_review_and_source_freeze",
+      "external_path": null,
+      "bytes": null,
+      "sha256": null,
+      "must_be_applied_to_base": true,
+      "must_bind_exact_changed_file_set": true
+    },
+    "changed_file_allowlist": null,
+    "full_source_listing": {
+      "storage": "external_scratch_only",
+      "path": null,
+      "bytes": null,
+      "sha256": null,
+      "repo_descriptor": "retain only path, byte count, SHA-256, and regeneration command"
+    },
+    "workspace_policy": "Compile only the reviewed base plus the exact test-only helper patch. Do not include unrelated working-tree files, generated targets, historical evidence, iWork records, or production edits."
+  },
+  "toolchain_binding": {
+    "host": "x86_64-unknown-linux-gnu",
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "rustc_verbose_output_sha256": null,
+    "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cargo_verbose_output_sha256": null,
+    "profile": null,
+    "rustflags": null,
+    "cargo_lock_sha256_at_plan": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "harness_manifest_sha256_at_plan": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "rustfmt_toml_sha256_at_plan": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "final_receipt_rule": "The final invocation receipt must record the actual rustc -Vv and cargo -V output hashes, final manifest and lock hashes, profile, target, relevant environment, and any changed values."
+  },
+  "command_binding": {
+    "status": "pending_candidate_test_name_and_source_freeze",
+    "exact_command": null,
+    "required_properties": [
+      "run from the clean source checkout or an explicitly recorded equivalent",
+      "use the reviewed manifest and lock with --locked",
+      "use no native benchmark runner, profiler, heap sampler, or child performance process",
+      "write one diagnostic JSON output and retain stdout/stderr hashes",
+      "record exit status and test-binary identity"
+    ],
+    "no_placeholder_acceptance": "A receipt is invalid until the exact command string is populated; the planned shape is not execution evidence."
+  },
+  "test_binary_binding": {
+    "status": "pending_source_freeze_and_build",
+    "external_path": null,
+    "bytes": null,
+    "sha256": null,
+    "repo_storage": "never commit the executable",
+    "identity_rule": "The final receipt must hash the exact test binary selected by the command and must reject a missing, swapped, or post-build-mutated binary."
+  },
+  "corpus_binding": {
+    "generator": "litchi-docx-section-layout-source-v1",
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "target_entry": "word/document.xml",
+    "identity_rule": "The diagnostic may report counters only when the source and output identities match these retained corpus bindings and the helper's semantic and inverse checks pass."
+  },
+  "diagnostic_output_contract": {
+    "output_path": null,
+    "output_sha256": null,
+    "output_bytes": null,
+    "maximum_repo_output_bytes": 1048575,
+    "required_sections": [
+      "schema and helper version",
+      "source length and SHA-256",
+      "output length and SHA-256",
+      "integer phase-counter values with explicit phase names and boundary descriptions",
+      "integer provider/source counters with explicit scope and unavailable values represented as null",
+      "semantic reopen and exact inverse/preservation checks",
+      "exact command, exit status, stdout/stderr hashes, and test-binary SHA-256",
+      "native_performance_children_run=0"
+    ],
+    "forbidden_claims": [
+      "elapsed-time improvement or regression",
+      "p50, p95, p99, speedup, throughput, RSS, allocation, or memory claim",
+      "physical filesystem or network I/O claim from wrapper counters",
+      "provider ranking or production adoption"
+    ],
+    "raw_stdout_policy": "Keep verbose stdout/stderr and any full source listing outside the repository; retain only compact hashes, sizes, and regeneration paths here."
+  },
+  "execution_gate": {
+    "authorized": false,
+    "release_conditions": [
+      "candidate_review approves the test-only helper and exact changed-file allowlist",
+      "source receipt binds base revision plus exact patch and external full listing",
+      "toolchain and lock/profile receipt is complete",
+      "test binary is built once in an external target and its SHA-256 is recorded",
+      "reviewer confirms the actual output schema and no timing fields are being interpreted as timing evidence"
+    ],
+    "failure_policy": "Do not rerun or replace a diagnostic invocation after a malformed output, timeout, or identity mismatch. Preserve the original output and record the failure; this plan authorizes no fresh formal cohort."
+  }
+}

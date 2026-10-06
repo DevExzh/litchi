@@ -1,0 +1,144 @@
+{
+  "checks": {
+    "checked_cumulative_delta_and_sum": true,
+    "fixed_source_output_hashes": true,
+    "log_test_passed": true,
+    "phase_names": [
+      "open",
+      "query",
+      "edit",
+      "commit",
+      "publication"
+    ],
+    "route_names": [
+      "full_64k_unpaced",
+      "short_4k_unpaced"
+    ],
+    "routes": 2,
+    "same_sink_bound_and_inverse": true,
+    "source_version_stable": true
+  },
+  "claim_scope": "read-counter diagnostic replay only; no timing, native CPU, or performance claim",
+  "created_utc": "2026-10-06T12:08:49.071153+00:00",
+  "errors": [],
+  "inputs": {
+    "diagnostic_json": {
+      "bytes": 9333,
+      "path": "/tmp/litchi-performance-0927/diagnostic.json",
+      "sha256": "9a9d1ef6240c56d7613fa42b40e3c68c142103a24ad48d9f97b497d50270922b"
+    },
+    "diagnostic_patch": {
+      "bytes": 18141,
+      "path": "/tmp/litchi-performance-0927/diagnostic.patch",
+      "sha256": "d7b7863fe154e64e457d0fa8a67ddb8bc58570efa4ee9846c97730d2d46b03ba"
+    },
+    "focused_log": {
+      "bytes": 11935,
+      "path": "/tmp/litchi-performance-0927/diagnostic-focused.log",
+      "sha256": "1d44dc3d805bd13b46554428c1a03611df3f33141d74c2c509acbeb2a5308b59"
+    }
+  },
+  "observed_command": {
+    "argv": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "docx_section_layout_read_diagnostic_conserves_full_and_short_phases",
+      "--",
+      "--nocapture"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_status": 0,
+    "independent_replay": {
+      "argv": [
+        "python3",
+        "/tmp/litchi-performance-0927/reviewer_phase_replay.py"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "scope": "offline JSON/log replay only; no build or new binary execution"
+    },
+    "log_target": "tools/perf-baseline/target/debug/deps/litchi_perf_baseline-8fb54a160ae47866",
+    "source": "coder execution report; the archived focused log contains the test output but no argv header"
+  },
+  "quality_checks": {
+    "clippy_lib_strict": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "log": {
+        "bytes": 160,
+        "path": "/tmp/litchi-performance-0927/clippy-lib.log",
+        "sha256": "16da4a206511c9f09bbcc6ed32c61c3f74549a3cde8abb62e43bc0af8731c2fa"
+      }
+    },
+    "clippy_strict": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--tests",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "baseline_warning": "clippy::result-large-err in unchanged tools/perf-baseline/src/producer_shape/selected_route_tests.rs",
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 101,
+      "log": {
+        "bytes": 3636,
+        "path": "/tmp/litchi-performance-0927/clippy-lib-tests.log",
+        "sha256": "a6d8e55da476dcb720820f3ed4219fd5c777d901767a5cee74faaeb1107fcfd9"
+      }
+    },
+    "clippy_with_known_baseline_allowed": {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--tests",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "clippy::result-large-err"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_status": 0,
+      "log": {
+        "bytes": 160,
+        "path": "/tmp/litchi-performance-0927/clippy-lib-tests-allow-baseline.log",
+        "sha256": "0f462f47f37260c8d692021b39910beeb0131a7db8a71a1a76bb2a96a60d5938"
+      }
+    }
+  },
+  "schema": "litchi.performance.0927.independent-phase-replay.v1",
+  "source": {
+    "expected_sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+    "sha256_end": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+    "sha256_start": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9",
+    "unchanged_during_replay": true
+  },
+  "status": "passed"
+}

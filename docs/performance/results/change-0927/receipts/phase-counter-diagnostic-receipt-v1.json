@@ -1,0 +1,171 @@
+{
+  "claim_scope": {
+    "native_performance_children_run": 0,
+    "performance_claim": "none",
+    "production_change": false,
+    "provider_comparison": false,
+    "recapture": false,
+    "timing_claim": false
+  },
+  "corpus_binding": {
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "generator": "litchi-docx-section-layout-source-v1",
+    "source_bytes": 2101427,
+    "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "target_entry": "word/document.xml"
+  },
+  "diagnostic_output": {
+    "bytes": 9333,
+    "external_path": "/tmp/litchi-performance-0927/diagnostic.json",
+    "repository_path": "docs/performance/results/change-0927/receipts/diagnostic-output.json",
+    "routes": [
+      {
+        "conservation_verified": true,
+        "inverse_source_restored": true,
+        "logical_operation": {
+          "read_calls": 165,
+          "requested_bytes": 6308061,
+          "returned_bytes": 6308061,
+          "short_reads": 0
+        },
+        "max_returned_bytes": 65536,
+        "output_verified": true,
+        "phase_count": 5,
+        "phase_names": [
+          "open",
+          "query",
+          "edit",
+          "commit",
+          "publication"
+        ],
+        "route": "full_64k_unpaced",
+        "sink_accepted_bytes": 2101446,
+        "sink_largest_write": 65536,
+        "source_version_stable": true,
+        "underlying_operation": {
+          "read_calls": 165,
+          "requested_bytes": 6308061,
+          "returned_bytes": 6308061,
+          "short_reads": 0
+        }
+      },
+      {
+        "conservation_verified": true,
+        "inverse_source_restored": true,
+        "logical_operation": {
+          "read_calls": 1607,
+          "requested_bytes": 84096471,
+          "returned_bytes": 6308061,
+          "short_reads": 1506
+        },
+        "max_returned_bytes": 4096,
+        "output_verified": true,
+        "phase_count": 5,
+        "phase_names": [
+          "open",
+          "query",
+          "edit",
+          "commit",
+          "publication"
+        ],
+        "route": "short_4k_unpaced",
+        "sink_accepted_bytes": 2101446,
+        "sink_largest_write": 65536,
+        "source_version_stable": true,
+        "underlying_operation": {
+          "read_calls": 1607,
+          "requested_bytes": 6308061,
+          "returned_bytes": 6308061,
+          "short_reads": 0
+        }
+      }
+    ],
+    "sha256": "9a9d1ef6240c56d7613fa42b40e3c68c142103a24ad48d9f97b497d50270922b"
+  },
+  "independent_checks": {
+    "binary_sha256_recorded_outside_checkout": true,
+    "combined_log_contains_named_test_pass": true,
+    "full_and_short_counter_totals_match": true,
+    "inverse_source_restored_per_route": true,
+    "no_timing_fields_in_diagnostic_payload": true,
+    "output_length_and_sha256_match": true,
+    "phase_counters_conserve_operation_totals": true,
+    "raw_output_json_parsed": true,
+    "sink_output_and_write_bound_verified_per_route": true,
+    "source_length_and_sha256_match": true,
+    "source_version_stable_per_route": true,
+    "two_routes_and_fixed_phase_order": true
+  },
+  "invocation": {
+    "argv": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "docx_section_layout_read_diagnostic_conserves_full_and_short_phases",
+      "--",
+      "--nocapture"
+    ],
+    "combined_log": {
+      "bytes": 11935,
+      "external_path": "/tmp/litchi-performance-0927/diagnostic-focused.log",
+      "kind": "combined_cargo_status_and_test_output",
+      "repository_path": "docs/performance/results/change-0927/receipts/diagnostic-command-combined.log",
+      "sha256": "1d44dc3d805bd13b46554428c1a03611df3f33141d74c2c509acbeb2a5308b59"
+    },
+    "command": "cargo test --manifest-path tools/perf-baseline/Cargo.toml docx_section_layout_read_diagnostic_conserves_full_and_short_phases -- --nocapture",
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_status": 0,
+    "provenance": "coder execution record; the retained log is a combined Cargo status/test log, not pure stdout"
+  },
+  "raw_report_retention": {
+    "capability_probe_is_separate_and_not_document_evidence": true,
+    "full_source_closure_not_copied": true,
+    "raw_logs_and_json_are_each_under_1MiB": true
+  },
+  "schema": "litchi.performance.0927.docx-section-layout-phase-counter-diagnostic-receipt.v1",
+  "source_binding": {
+    "base_git_revision": "d2ce19788234036e1db30a7f3cf682af1fb77c7d",
+    "candidate_patch": {
+      "bytes": 18141,
+      "external_path": "/tmp/litchi-performance-0927/diagnostic.patch",
+      "repository_external_bytes_equal": true,
+      "repository_path": "docs/performance/results/change-0927/receipts/diagnostic.patch",
+      "sha256": "d7b7863fe154e64e457d0fa8a67ddb8bc58570efa4ee9846c97730d2d46b03ba"
+    },
+    "observed_head": "d2ce19788234036e1db30a7f3cf682af1fb77c7d",
+    "source_closure": "exact pinned base revision plus the bound one-file patch; no full source archive or listing was copied",
+    "source_file": {
+      "bytes": 3076438,
+      "changed_file_set_from_base": [
+        "tools/perf-baseline/src/lib.rs"
+      ],
+      "path": "tools/perf-baseline/src/lib.rs",
+      "sha256": "23ce48a33ffb9afd05571738642c78a3511338d34ce361f75ab3a710bfd74ab9"
+    },
+    "unrelated_worktree_files_compiled": false
+  },
+  "status": "passed",
+  "test_binary": {
+    "bytes": 885251120,
+    "external_path": "/tmp/litchi-performance-0927/diagnostic-test-binary-8fb54a160ae47866",
+    "repository_copy": false,
+    "sha256": "8a262ea02d27bcdadab214767dd36d714c704fbcd786a8df17bfd49614f80834",
+    "source_target_copy_note": "Exact binary copied from the coder target after the passing test; no rebuild or rerun performed by this receipt step."
+  },
+  "toolchain_binding": {
+    "cargo_command": "cargo -V",
+    "cargo_lock_sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "cargo_output": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+    "cargo_output_sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+    "harness_manifest_sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "host": "x86_64-unknown-linux-gnu",
+    "profile": "test (unoptimized + debuginfo)",
+    "rustc_command": "rustc -Vv",
+    "rustc_output": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+    "rustc_output_sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad",
+    "rustfmt_toml_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "target_dir_used_by_coder": "tools/perf-baseline/target"
+  }
+}

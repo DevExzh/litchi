@@ -1,0 +1,1 @@
+perf stat -e cycles:u -- true

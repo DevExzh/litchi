@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0927 — provider request amplification localized to query and publication
+
+[0927](0927-provider-phase-diagnostic.md) adds a test-only phase counter
+diagnostic. Open makes 14 calls on both unpaced routes; query makes 34 full
+or 515 short calls; publication makes 117 or 1,078. Edit and commit make no
+provider reads. Returned bytes agree by phase, and inverse/preservation checks
+pass. After subtracting the source-derived hash model, query has one 1,381-byte
+read; publication retains 2,102,134 bytes of combined preservation work.
+Counts do not rank CPU costs. A current process-scoped perf capability probe
+succeeds, making a properly scoped native CPU profile the next evidence step.
+
 ## 0926 — two full fingerprints explain most provider bytes
 
 [0926](0926-provider-read-attribution.md) reconciles all 42 retained 0925 reports
