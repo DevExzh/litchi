@@ -1,0 +1,260 @@
+{
+  "archive": {
+    "bytes": 176574454,
+    "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.tar.zst",
+    "sha256": "bc03acd40a3a1992df8b27047904039139db72f5e46abdc28586d222ed609301"
+  },
+  "archive_command": [
+    "/usr/bin/tar",
+    "--create",
+    "--zstd",
+    "--format=posix",
+    "--numeric-owner",
+    "--owner=0",
+    "--group=0",
+    "--mtime=@0",
+    "--no-recursion",
+    "--null",
+    "--verbatim-files-from",
+    "--directory",
+    "/home/zhuhe",
+    "--files-from",
+    "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.members.list",
+    "--file",
+    "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.tar.zst"
+  ],
+  "archive_file_count": 21823,
+  "archive_logical_bytes": 845267181,
+  "archive_receipt": {
+    "bytes": 4215,
+    "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.archive-receipt.json",
+    "sha256": "744dfdead5a2c1b2c98b0965b674c2fe4526f45ab4cca82523bf7e5a433f23cf"
+  },
+  "archive_script": {
+    "bytes": 28792,
+    "path": "/home/zhuhe/litchi-performance-0942/repository-artifacts/archive-0942-v1.py",
+    "sha256": "f2010527cecf0424fbe83b506a6f272c61c8bac2619a20efbbedf54c23341e22"
+  },
+  "bound_binaries": {
+    "target-profile-v1/release/doc_retention_probe_0942_cfb_profile": {
+      "bytes": 125803872,
+      "path": "/home/zhuhe/litchi-performance-0942/target-profile-v1/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "838326af3130bc2aee6cbf1e9c68054e04321dec468274d173f431cceefe2530"
+    },
+    "target-profile-v2/release/doc_retention_probe_0942_cfb_profile": {
+      "bytes": 126326672,
+      "path": "/home/zhuhe/litchi-performance-0942/target-profile-v2/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "92f85ce6019405fa1b0d97ec796947cd7ec240d2b8143f9cf06356d97409e70e"
+    }
+  },
+  "caller_analysis": [
+    {
+      "bytes": 29125,
+      "path": "/home/zhuhe/litchi-performance-0942/analysis/cfb-marker-scope-v1.py",
+      "sha256": "f560a4131230ef3c97baa6e084eccfa2df8248e8fe716edf32b42d92da27077e"
+    },
+    {
+      "bytes": 353420,
+      "path": "/home/zhuhe/litchi-performance-0942/analysis/cfb-marker-scope-v1.json",
+      "sha256": "d34f9db937c0f28c5fbc0f27c3dc73960d27682e7979b61653a629912e5974fb"
+    },
+    {
+      "bytes": 10457,
+      "path": "/home/zhuhe/litchi-performance-0942/analysis/cfb-marker-scope-v1.md",
+      "sha256": "84861b5370a1e04cf1d938f7009b41d72b3bf6803977876ebe4db0baba754295"
+    },
+    {
+      "bytes": 2802,
+      "path": "/home/zhuhe/litchi-performance-0942/analysis/cfb-marker-scope-v2-addendum.md",
+      "sha256": "77ac222cb2b2a3d5cabfb0c457867730ff66f24af3d2e88ce9964611401aaac4"
+    }
+  ],
+  "cleanup": {
+    "bound_binaries_retained": true,
+    "receipt": {
+      "bytes": 332445,
+      "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.cleanup-receipt.json",
+      "sha256": "d90659e0794e736af41b353a708ce96ea6d437a3b4942143b2869d4c560ca4d6"
+    },
+    "removed_pycache_paths": [
+      "analysis/__pycache__"
+    ],
+    "removed_target_path_count": 3924,
+    "removed_verification_extraction": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.extract",
+    "status": "completed"
+  },
+  "file_manifest": {
+    "bytes": 3696471,
+    "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.files.jsonl",
+    "sha256": "67e90e50c38a42e98054ebb1c744116e3a0bf11e11a80e1533d795b301fd4f5e"
+  },
+  "independent_count": {
+    "bytes": 7051,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/root-independent-count-v1.json",
+    "sha256": "bf06e766fbb351668c648c922777a591c315f1f7e19712cdf69386fdd3379718"
+  },
+  "independent_replay": {
+    "bytes": 13823,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/independent-formal-audit-v1.json",
+    "sha256": "31375b7f2a8fde461c0dfb2f4a9b7ca5d6e134fdaa2d0c1f2978cfe51b34d786"
+  },
+  "member_list": {
+    "bytes": 1925584,
+    "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.members.list",
+    "sha256": "ec08308ddc77373d237bb2e0466850742d07ae3677b342d20dfc42add5e24491"
+  },
+  "moved_replay": {
+    "bytes": 10704,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/independent-moved-replay-v1.json",
+    "sha256": "d54c475e551a19ab3229de3ca01450cee328da18a945d0e130580bd6a1f05cf1"
+  },
+  "preparation_note": "Superseded source/build/plan preparation was retained before any Office workload; final capture uses source-v2, build profile-v3, plan/runner-v5. Caller analysis explanatory labels were revised before archival; no capture/reduction changed.",
+  "quality_review": {
+    "bytes": 7315,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/review-v2/review-v2.json",
+    "sha256": "0c2ecd3574989fa1a398b61d382dca070be8e77f3cb839b48ba56e93dea861a6"
+  },
+  "regeneration_commands": {
+    "archive": "LITCHI_PERF_0942_ARCHIVE_GO=1 /usr/bin/python3 /home/zhuhe/litchi-performance-0942/repository-artifacts/archive-0942-v1.py --go --archive",
+    "cleanup_after_verification": "LITCHI_PERF_0942_ARCHIVE_GO=1 /usr/bin/python3 /home/zhuhe/litchi-performance-0942/repository-artifacts/archive-0942-v1.py --go --cleanup",
+    "verify": "LITCHI_PERF_0942_ARCHIVE_GO=1 /usr/bin/python3 /home/zhuhe/litchi-performance-0942/repository-artifacts/archive-0942-v1.py --go --verify"
+  },
+  "schema": "litchi.performance.0942.custody-summary.v1",
+  "scope": "DOC repeated-edit native CPU attribution; no production, timing, memory-improvement or adoption claim",
+  "source_build_command": {
+    "binary": {
+      "bytes": 126326672,
+      "path": "/home/zhuhe/litchi-performance-0942/target-profile-v2/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "92f85ce6019405fa1b0d97ec796947cd7ec240d2b8143f9cf06356d97409e70e"
+    },
+    "binary_name": "doc_retention_probe_0942_cfb_profile",
+    "command": [
+      "/home/zhuhe/.cargo/bin/cargo",
+      "+1.95.0",
+      "build",
+      "--offline",
+      "--locked",
+      "-j2",
+      "--release",
+      "--message-format=json-render-diagnostics",
+      "--bin",
+      "doc_retention_probe_0942_cfb_profile",
+      "--manifest-path",
+      "/home/zhuhe/litchi-performance-0942/source-v2/tools/perf-cfb-profile/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/litchi-performance-0942/target-profile-v2"
+    ],
+    "environment": {
+      "allowlist": [
+        "HOME",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "PATH",
+        "LC_ALL",
+        "LANG",
+        "TZ"
+      ],
+      "encoded_rustflags_forbidden": true,
+      "explicit": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "2",
+        "CARGO_TERM_COLOR": "never",
+        "RUSTFLAGS": "-Cforce-frame-pointers=yes"
+      }
+    },
+    "lock": "/home/zhuhe/litchi-performance-0942/source-v2/tools/perf-cfb-profile/Cargo.lock",
+    "manifest": "/home/zhuhe/litchi-performance-0942/source-v2/tools/perf-cfb-profile/Cargo.toml",
+    "marker_static_address": "0xdf130",
+    "marker_static_end": "0xdf1c0",
+    "marker_static_symbol": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+    "receipt": {
+      "bytes": 3402,
+      "path": "/home/zhuhe/litchi-performance-0942/builds/profile-v3/terminal.json",
+      "sha256": "5e10c69149ecc824b3f967a172e4ca065dafb65ee1bfe7b5d02da5dea546a904"
+    },
+    "target_dir": "/home/zhuhe/litchi-performance-0942/target-profile-v2"
+  },
+  "source_manifests": [
+    {
+      "bytes": 1666964,
+      "path": "/home/zhuhe/litchi-performance-0942/source-manifest-v1.jsonl",
+      "sha256": "c115a29d7a2c1d2d05a12cf98de38ea252cc51cd892dfbbbda12dcaf2f8adee5"
+    },
+    {
+      "bytes": 1666964,
+      "path": "/home/zhuhe/litchi-performance-0942/source-manifest-v2.jsonl",
+      "sha256": "bf99dd9d4ea021a29c3f003d3b38b6642019f70d9e664837ea8c061e040897f8"
+    }
+  ],
+  "source_revision": "73559c87c37898b675100b02985181a7764c66d2",
+  "supplemental_cleanup": {
+    "note": "These two reviewer setup files were outside the archived evidence root; retained before removing temporary originals.",
+    "owned_preparation_files": [
+      {
+        "bytes": 72010,
+        "removed": "/tmp/profile-runner-0942-v4-review.py",
+        "retained": "/home/zhuhe/litchi-performance-0942-archive/supplemental-preparation/profile-runner-0942-v4-review.py",
+        "sha256": "a721504ecc9de172a627cf32ca41377cc20a5518c4f7664e594541de82d006de"
+      },
+      {
+        "bytes": 0,
+        "removed": "/tmp/perf942-script.err",
+        "retained": "/home/zhuhe/litchi-performance-0942-archive/supplemental-preparation/perf942-script.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "verification": {
+    "archive": {
+      "bytes": 176574454,
+      "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.tar.zst",
+      "sha256": "bc03acd40a3a1992df8b27047904039139db72f5e46abdc28586d222ed609301"
+    },
+    "archive_receipt": {
+      "bytes": 4215,
+      "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.archive-receipt.json",
+      "sha256": "744dfdead5a2c1b2c98b0965b674c2fe4526f45ab4cca82523bf7e5a433f23cf"
+    },
+    "bytes": 845267181,
+    "cleanup_authorized_by_this_receipt": false,
+    "every_file_rehashed": true,
+    "extraction_root": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.extract",
+    "file_set_exact": true,
+    "files": 21823,
+    "manifest": {
+      "bytes": 3696471,
+      "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.files.jsonl",
+      "sha256": "67e90e50c38a42e98054ebb1c744116e3a0bf11e11a80e1533d795b301fd4f5e"
+    },
+    "schema": "litchi.performance.0942.archive-verify-receipt.v1",
+    "script": {
+      "bytes": 28792,
+      "path": "/home/zhuhe/litchi-performance-0942/repository-artifacts/archive-0942-v1.py",
+      "sha256": "f2010527cecf0424fbe83b506a6f272c61c8bac2619a20efbbedf54c23341e22"
+    },
+    "status": "passed",
+    "tar_command": [
+      "/usr/bin/tar",
+      "--zstd",
+      "--extract",
+      "--file",
+      "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.tar.zst",
+      "--directory",
+      "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.extract",
+      "--no-same-owner",
+      "--no-same-permissions"
+    ],
+    "tar_command_shell": "/usr/bin/tar --zstd --extract --file /home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.tar.zst --directory /home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.extract --no-same-owner --no-same-permissions",
+    "verified_utc": "2026-10-06T23:25:23.554125Z",
+    "verify_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.verify.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "verify_stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0942-archive/litchi-performance-0942-v1.verify.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

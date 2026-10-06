@@ -1,0 +1,173 @@
+{
+  "binary": {
+    "bytes": 126326672,
+    "path": "/home/zhuhe/litchi-performance-0942/target-profile-v2/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "92f85ce6019405fa1b0d97ec796947cd7ec240d2b8143f9cf06356d97409e70e"
+  },
+  "capture_audit": {
+    "all_period": 81705880567,
+    "all_samples": 19694,
+    "checks": {
+      "actual_argv_environment_cwd_fixture_binding": "passed",
+      "correctness_report_validation": "passed",
+      "manifest_and_build_binding": "passed",
+      "marker_dso_and_static_addr2line_binding": "passed",
+      "raw_report_and_perf_script_replay": "passed",
+      "source_revision_and_source_root": "passed",
+      "weighted_period_partition": "passed"
+    },
+    "children": 17,
+    "fully_resolved_marker_samples": 5947,
+    "lost_records": 0,
+    "marker_period": 25895755779,
+    "marker_samples": 6080,
+    "native_dso_frame_lines": 6080,
+    "owner_buckets": {
+      "cfb": {
+        "period": 9109037562,
+        "samples": 2135
+      },
+      "core": {
+        "period": 34187255,
+        "samples": 8
+      },
+      "doc": {
+        "period": 13411626341,
+        "samples": 3153
+      },
+      "ole-common": {
+        "period": 3171985618,
+        "samples": 744
+      },
+      "other": {
+        "period": 168919003,
+        "samples": 40
+      }
+    },
+    "truncated_samples": 0
+  },
+  "conclusion": "PASS for the bounded parser/custody review. Marker membership is diagnostic; unresolved and no-marker periods remain explicit. Results do not support timing, source-module exclusive-cost, memory, or adoption claims.",
+  "formal_audit": {
+    "bytes": 13823,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/independent-formal-audit-v1.json",
+    "sha256": "31375b7f2a8fde461c0dfb2f4a9b7ca5d6e134fdaa2d0c1f2978cfe51b34d786"
+  },
+  "formal_audit_script": {
+    "bytes": 8676,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/independent-formal-audit-v1.py",
+    "sha256": "d23c5ea92eae2a24291c2efc52eb98fe29fd4447e88f4c49f05e7ba889d84178"
+  },
+  "limitations": [
+    "system/prebuilt frames can be unresolved; nearest observed project frame is a descriptive bucket",
+    "no-marker samples are membership-unknown",
+    "marker wrapper includes harness ABI result-copy overhead",
+    "formal output remains external and is bound by size/SHA descriptors"
+  ],
+  "manifest": {
+    "bytes": 17088,
+    "path": "/home/zhuhe/litchi-performance-0942/manifests/cfb-profile-manifest-v5.json",
+    "sha256": "27f7a1e4c21f6b77ba26e6180894a016299396131a96028d92d5c34f694cea27",
+    "status": "authorized"
+  },
+  "moved_replay": {
+    "bytes": 10704,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/independent-moved-replay-v1.json",
+    "sha256": "d54c475e551a19ab3229de3ca01450cee328da18a945d0e130580bd6a1f05cf1"
+  },
+  "moved_replay_checks": {
+    "copied_file_count": 170,
+    "copied_total_bytes": 65786371,
+    "original_receipt_byte_and_json_equality": "passed",
+    "original_vs_moved_replay_equality": "passed",
+    "owned_copy_cleanup": "passed",
+    "relative_descriptor_paths": "passed",
+    "report_and_profile_replay_equality": "passed",
+    "terminal_first_revalidation": "passed"
+  },
+  "moved_replay_script": {
+    "bytes": 3782,
+    "path": "/home/zhuhe/litchi-performance-0942/receipts/independent-moved-replay-v1.py",
+    "sha256": "ae616eaaa9ac43b1ce36527adf2c9f3d5689e8f4c6202f9a33e1d7b0dd9c9666"
+  },
+  "parser_control_script": {
+    "bytes": 4776,
+    "path": "/home/zhuhe/litchi-performance-0942/controls/v5/independent-parser-controls-v1.py",
+    "sha256": "4fba931ad2f07d5375889545bec29391980b574cb3a48fcbbc4cdaacc783f7be"
+  },
+  "parser_control_summary": {
+    "positive": {
+      "status": "accepted",
+      "summary": {
+        "fully_resolved_samples": 1,
+        "lost_records": 1,
+        "marker_period": 12,
+        "marker_samples": 2,
+        "native_dso_frame_lines": 2,
+        "period": 21,
+        "samples": 5,
+        "truncated_period": 4,
+        "truncated_samples": 1
+      }
+    },
+    "rejected": {
+      "bad_pid_separator": {
+        "error": "unparsed perf-script line outside a frame/header: /tmp/cfb-0942-d0wyz96r.txt: doc_retention_probe_0942_cfb_profile 2243093 2243093 193948.958749:          5 cycles:u:",
+        "error_type": "RunnerError",
+        "status": "rejected"
+      },
+      "reversed_period_event": {
+        "error": "unparsed perf-script line outside a frame/header: /tmp/cfb-0942-3rzvq57y.txt: doc_retention_probe_0942_cfb_profile 2243093/2243093 193948.958749:          cycles:u: 5",
+        "error_type": "RunnerError",
+        "status": "rejected"
+      },
+      "wrong_event": {
+        "error": "perf script event field mismatch: /tmp/cfb-0942-__pseeev.txt",
+        "error_type": "RunnerError",
+        "status": "rejected"
+      },
+      "wrong_marker_dso": {
+        "error": "marker symbol or DSO is not bound to the profile binary",
+        "error_type": "RunnerError",
+        "status": "rejected"
+      },
+      "zero_period": {
+        "error": "perf script header exposes a non-positive period",
+        "error_type": "RunnerError",
+        "status": "rejected"
+      }
+    },
+    "static_marker_binding": "passed",
+    "truncated_marker": {
+      "status": "accepted",
+      "summary": {
+        "fully_resolved_samples": 0,
+        "lost_records": 1,
+        "marker_period": 12,
+        "marker_samples": 2,
+        "native_dso_frame_lines": 2,
+        "period": 21,
+        "samples": 5,
+        "truncated_period": 9,
+        "truncated_samples": 2
+      }
+    }
+  },
+  "parser_controls": {
+    "bytes": 2955,
+    "path": "/home/zhuhe/litchi-performance-0942/controls/v5/independent-parser-controls-v1.json",
+    "sha256": "395cd635a9e3ec0bfbf02dc6a5f16e0eeb4c9fab3a692d948b7f5c23d4dee504"
+  },
+  "plan": {
+    "bytes": 18703,
+    "path": "/home/zhuhe/litchi-performance-0942/plans/cfb-profile-plan-v5.json",
+    "sha256": "da528371ec2c8fe0328fde6cbe9e81d66967bedacf4746819cfe161c5e955862"
+  },
+  "runner": {
+    "bytes": 72010,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0942/profile-runner.py",
+    "sha256": "a721504ecc9de172a627cf32ca41377cc20a5518c4f7664e594541de82d006de"
+  },
+  "schema": "litchi.performance.0942.independent-review.v1",
+  "scope": "read-only native CFB attribution protocol/capture audit; no timing comparison, adoption, or production claim",
+  "source_revision": "73559c87c37898b675100b02985181a7764c66d2"
+}

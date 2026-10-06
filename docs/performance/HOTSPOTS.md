@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0942 — DOC lifecycle marker separates observed CPU samples
+
+[0942](0942-doc-cfb-operation-profile.md) profiles the restored repeated-edit
+path with a dedicated frame-pointer build. All sixteen formal children pass
+correctness; 5,866 of 18,209 samples contain the measured-lifecycle marker.
+No-marker samples retain unknown membership. This is diagnostic attribution,
+not a timing comparison or a standalone CFB benchmark.
+
+At 32 edits, nearest observed physical CFB frames receive 56.8–58.7% of
+NoHeadFoot marker weight and 36.8–38.5% for FloatingPictures. DOC frames receive
+48.1–48.6% for FloatingPictures; copying and parsing remain visible. Short
+NoHeadFoot cells are too sparse for detailed rankings. Follow-up should inspect
+the repeated reconstruction and parsing mechanisms, then qualify any candidate
+prospectively. These subset weights are not speedup bounds and do not overturn
+the 0920–0922 rejections.
+
 ## 0941 — bounded reader growth reduces requests but fails latency safety
 
 [0941](0941-opc-bounded-reader-growth.md) tests a 1/32 growth fraction capped at

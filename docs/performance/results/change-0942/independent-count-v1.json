@@ -1,0 +1,245 @@
+{
+  "binary_receipt_and_terminal_argv_checked": true,
+  "children": [
+    {
+      "all_period": 6041860449,
+      "all_samples": 1399,
+      "id": "profile-r01-docfloat-e01",
+      "marker_period": 863745461,
+      "marker_samples": 198,
+      "owner_periods": {
+        "cfb": 161508954,
+        "doc": 632367543,
+        "ole-common": 52398291,
+        "other": 17470673
+      },
+      "raw_sha256": "84ef0e33464cc52ddfafd8c4d51d0cf7b2fdf1ebe4955179a8425addc523d13a"
+    },
+    {
+      "all_period": 6459882316,
+      "all_samples": 1565,
+      "id": "profile-r01-docfloat-e02",
+      "marker_period": 1072177355,
+      "marker_samples": 254,
+      "owner_periods": {
+        "cfb": 228084838,
+        "core": 4237424,
+        "doc": 734361151,
+        "ole-common": 97128388,
+        "other": 8365554
+      },
+      "raw_sha256": "395a4c069163ac98dc5da469828a5b801a2f0e21d6dea49610af8f0dd6ae034d"
+    },
+    {
+      "all_period": 7847134550,
+      "all_samples": 1926,
+      "id": "profile-r01-docfloat-e08",
+      "marker_period": 2208030685,
+      "marker_samples": 526,
+      "owner_periods": {
+        "cfb": 697575808,
+        "doc": 1186921976,
+        "ole-common": 311086920,
+        "other": 12445981
+      },
+      "raw_sha256": "a827d811980bc76fc5c2b78a09c123771171ab182d47f3ceef168fec751000ca"
+    },
+    {
+      "all_period": 13521913169,
+      "all_samples": 3270,
+      "id": "profile-r01-docfloat-e32",
+      "marker_period": 6900502499,
+      "marker_samples": 1623,
+      "owner_periods": {
+        "cfb": 2536226845,
+        "core": 4282760,
+        "doc": 3355819070,
+        "ole-common": 970617425,
+        "other": 33556399
+      },
+      "raw_sha256": "fd9677463beb7e2822f172ee16c7e3de21d7ce4537e8bc8a07adc241214d96dd"
+    },
+    {
+      "all_period": 668676298,
+      "all_samples": 167,
+      "id": "profile-r01-docnohf-e01",
+      "marker_period": 68731710,
+      "marker_samples": 16,
+      "owner_periods": {
+        "cfb": 34123351,
+        "doc": 21612821,
+        "ole-common": 12995538
+      },
+      "raw_sha256": "6ebddccb2fdf17ceda5b332ceddb52ac7553c181bf3d97cb024624ee0e097096"
+    },
+    {
+      "all_period": 706569454,
+      "all_samples": 175,
+      "id": "profile-r01-docnohf-e02",
+      "marker_period": 142632422,
+      "marker_samples": 33,
+      "owner_periods": {
+        "cfb": 60437158,
+        "doc": 47573455,
+        "ole-common": 34621809
+      },
+      "raw_sha256": "7b66e7a92cd5fc90bf963e7e7da69335111ac6cd45d1a9c046eb57e113333aea"
+    },
+    {
+      "all_period": 879551486,
+      "all_samples": 216,
+      "id": "profile-r01-docnohf-e08",
+      "marker_period": 313965397,
+      "marker_samples": 73,
+      "owner_periods": {
+        "cfb": 146463096,
+        "doc": 111212735,
+        "ole-common": 51960154,
+        "other": 4329412
+      },
+      "raw_sha256": "8b0a117581b36eb8d8fc970cf4b3e355a045b6b024645bdb503f5a780ff323a1"
+    },
+    {
+      "all_period": 1659915769,
+      "all_samples": 394,
+      "id": "profile-r01-docnohf-e32",
+      "marker_period": 901402946,
+      "marker_samples": 208,
+      "owner_periods": {
+        "cfb": 529311403,
+        "doc": 246102500,
+        "ole-common": 125989043
+      },
+      "raw_sha256": "5b2fe63da13e0d916ac7c4dc3ef5f186eeed41ed859c4bcd0c6f9680971d2f49"
+    },
+    {
+      "all_period": 6235938845,
+      "all_samples": 1527,
+      "id": "profile-r02-docfloat-e01",
+      "marker_period": 953041791,
+      "marker_samples": 227,
+      "owner_periods": {
+        "cfb": 189113499,
+        "doc": 679908504,
+        "ole-common": 71354813,
+        "other": 12664975
+      },
+      "raw_sha256": "b7c4775acdc89cff22337ff0abb179f3c5f28b7d63b9bf649632d77381d06d9c"
+    },
+    {
+      "all_period": 6373660140,
+      "all_samples": 1509,
+      "id": "profile-r02-docfloat-e02",
+      "marker_period": 1104301543,
+      "marker_samples": 257,
+      "owner_periods": {
+        "cfb": 214938250,
+        "core": 4312277,
+        "doc": 782060982,
+        "ole-common": 98700353,
+        "other": 4289681
+      },
+      "raw_sha256": "8122b3d429c6585f6db4a32c799aa1ebf7f0bba96a91abf7db588c09f7e6fe59"
+    },
+    {
+      "all_period": 7827294714,
+      "all_samples": 1910,
+      "id": "profile-r02-docfloat-e08",
+      "marker_period": 2205999781,
+      "marker_samples": 524,
+      "owner_periods": {
+        "cfb": 737983307,
+        "core": 4219528,
+        "doc": 1211814797,
+        "ole-common": 222783614,
+        "other": 29198535
+      },
+      "raw_sha256": "21e5a4301ee87c623e283d064d93d69ac32c402bc3de8dc11c32536b98bf89e8"
+    },
+    {
+      "all_period": 13394725465,
+      "all_samples": 3201,
+      "id": "profile-r02-docfloat-e32",
+      "marker_period": 6800382222,
+      "marker_samples": 1592,
+      "owner_periods": {
+        "cfb": 2615951304,
+        "core": 17135266,
+        "doc": 3270338929,
+        "ole-common": 871653259,
+        "other": 25303464
+      },
+      "raw_sha256": "415e853638bcfff9827a569143f1298595ba28357cf1f4050d75c229ad9b209b"
+    },
+    {
+      "all_period": 671858718,
+      "all_samples": 167,
+      "id": "profile-r02-docnohf-e01",
+      "marker_period": 124936523,
+      "marker_samples": 29,
+      "owner_periods": {
+        "cfb": 51797521,
+        "doc": 47567521,
+        "ole-common": 21292695,
+        "other": 4278786
+      },
+      "raw_sha256": "996f092699c1a0d0c58bdd8bf764cd039ffb2144e5a218cedaaa1b31203d0a79"
+    },
+    {
+      "all_period": 701581320,
+      "all_samples": 173,
+      "id": "profile-r02-docnohf-e02",
+      "marker_period": 129544424,
+      "marker_samples": 30,
+      "owner_periods": {
+        "cfb": 47226430,
+        "doc": 52031650,
+        "ole-common": 30286344
+      },
+      "raw_sha256": "3385569925396119db3b623de7077f13014602d9b6a3bc1dfa6f855942d4c915"
+    },
+    {
+      "all_period": 883157161,
+      "all_samples": 217,
+      "id": "profile-r02-docnohf-e08",
+      "marker_period": 292724416,
+      "marker_samples": 68,
+      "owner_periods": {
+        "cfb": 141313463,
+        "doc": 121144039,
+        "ole-common": 30266914
+      },
+      "raw_sha256": "18f1183a5ccb82f87dbf116cead38a8ab4933a16969ee0a3523c861ddfed47c8"
+    },
+    {
+      "all_period": 1656834300,
+      "all_samples": 393,
+      "id": "profile-r02-docnohf-e32",
+      "marker_period": 902914682,
+      "marker_samples": 208,
+      "owner_periods": {
+        "cfb": 512681364,
+        "doc": 264014704,
+        "ole-common": 126218614
+      },
+      "raw_sha256": "3bd9accd18709dd52f0c202740a7447fd45709f1baf63ab811db4b465b5147e9"
+    },
+    {
+      "all_period": 6175326413,
+      "all_samples": 1485,
+      "id": "real-preflight-docfloat-e01",
+      "marker_period": 910721922,
+      "marker_samples": 214,
+      "owner_periods": {
+        "cfb": 204300971,
+        "doc": 646773964,
+        "ole-common": 42631444,
+        "other": 17015543
+      },
+      "raw_sha256": "1de587a8f0cdc7e282b02c0e1660d88209f2c4d33fd5a669cda041de1de67cdf"
+    }
+  ],
+  "schema": "litchi.performance.0942.root-independent-count.v1",
+  "script_uses_capture_parser": false,
+  "status": "passed"
+}
