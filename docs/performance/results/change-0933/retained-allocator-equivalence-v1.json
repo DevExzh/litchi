@@ -1,0 +1,33 @@
+{
+  "baseline_allocator_rebuild": "not rerun; retained 0931 binary is bound only through this explicit equivalence receipt",
+  "baseline_source_root": "/home/zhuhe/litchi-performance-0933/baseline-source",
+  "created_utc": "2026-10-06T17:01:17.406671+00:00",
+  "full_source_differential": {
+    "bytes": 1577,
+    "path": "/home/zhuhe/litchi-performance-0933/receipts/full-source-differential-v1.json",
+    "sha256": "a984c64879a064a697456c7c4104e347237e4eec9b30b2f0a666f28451462ec3"
+  },
+  "origin_to_baseline_difference": "only crates/litchi-docx/src/section/tests.rs, the current unit-test overlay; runtime and allocator binary inputs are unchanged",
+  "retained_binary": {
+    "bytes": 68431264,
+    "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf"
+  },
+  "retained_build_receipt": {
+    "bytes": 2774,
+    "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+    "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+  },
+  "retained_source_root": "/home/zhuhe/litchi-performance-0931/source-final",
+  "runtime_common_paths": [
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/docx_section_retention.rs",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/Cargo.lock",
+    "crates/litchi-docx/src/section/inventory.rs",
+    "crates/litchi-docx/src/source_backed.rs"
+  ],
+  "schema": "litchi.performance.0933.retained-allocator-equivalence.v1",
+  "status": "verified_runtime_input_equivalence"
+}

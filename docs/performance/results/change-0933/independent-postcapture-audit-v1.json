@@ -1,0 +1,580 @@
+{
+  "adoption_assessment": {
+    "allocation_memory_gate": {
+      "all_four_cells": true,
+      "allocation_adoption_eligible_under_frozen_gate": true,
+      "allocator_counter_gate_pass": true,
+      "no_tail_or_route_max_rss_flags": true,
+      "no_tail_or_rss_flags": true,
+      "normal_safety_gate": "per-route max RSS/tails pass; one paired owned_reader RSS outlier requires documented review",
+      "normal_safety_per_route_policy_pass": true,
+      "paired_rss_review_required": true,
+      "scope": "supports the separate allocator/memory adoption decision under the frozen plan; does not imply a 5% latency speedup",
+      "status": "passed_with_paired_rss_review"
+    },
+    "latency_improvement_gate": {
+      "bootstrap_lower_95": 1.025509247825844,
+      "gate_pass": false,
+      "no_5_percent_latency_claim": true,
+      "ratio": 1.0266873390600004,
+      "reason": "primary generic_read_at baseline/candidate p50 ratio is below 1.05",
+      "required_median_ratio": 1.05,
+      "status": "failed"
+    },
+    "overall_decision": "allocation counters pass; latency improvement gate fails; one paired RSS outlier is documented for review",
+    "paired_rss_review_required": true
+  },
+  "allocator_audit": {
+    "all_cells_gate_pass": true,
+    "allocator_rows": 24,
+    "cells": [
+      {
+        "allocation_calls_reduction_fraction": 0.2579760131692404,
+        "allocation_calls_strictly_decreased": true,
+        "allocation_gate_pass": true,
+        "baseline": {
+          "after_snapshot_drop_allocated_bytes_delta": 2970668,
+          "after_snapshot_drop_allocation_calls_delta": 38271,
+          "commits_retained_allocated_bytes_delta": 4798645,
+          "commits_retained_allocation_calls_delta": 49728,
+          "release_live_bytes_delta": 0
+        },
+        "candidate": {
+          "after_snapshot_drop_allocated_bytes_delta": 2108662,
+          "after_snapshot_drop_allocation_calls_delta": 28398,
+          "commits_retained_allocated_bytes_delta": 3649331,
+          "commits_retained_allocation_calls_delta": 36564,
+          "release_live_bytes_delta": 0
+        },
+        "ownership": "shared_snapshot_clones",
+        "requested_bytes_reduction_fraction": 0.2901724460626364,
+        "section_count": 16
+      },
+      {
+        "allocation_calls_reduction_fraction": 0.2680513133781307,
+        "allocation_calls_strictly_decreased": true,
+        "allocation_gate_pass": true,
+        "baseline": {
+          "after_snapshot_drop_allocated_bytes_delta": 7140008,
+          "after_snapshot_drop_allocation_calls_delta": 65480,
+          "commits_retained_allocated_bytes_delta": 21763824,
+          "commits_retained_allocation_calls_delta": 157136,
+          "release_live_bytes_delta": 0
+        },
+        "candidate": {
+          "after_snapshot_drop_allocated_bytes_delta": 5607808,
+          "after_snapshot_drop_allocation_calls_delta": 47928,
+          "commits_retained_allocated_bytes_delta": 17933160,
+          "commits_retained_allocation_calls_delta": 113256,
+          "release_live_bytes_delta": 0
+        },
+        "ownership": "independent_sources",
+        "requested_bytes_reduction_fraction": 0.21459359709400885,
+        "section_count": 16
+      },
+      {
+        "allocation_calls_reduction_fraction": 0.3029262100180338,
+        "allocation_calls_strictly_decreased": true,
+        "allocation_gate_pass": true,
+        "baseline": {
+          "after_snapshot_drop_allocated_bytes_delta": 1251354390,
+          "after_snapshot_drop_allocation_calls_delta": 17036337,
+          "commits_retained_allocated_bytes_delta": 1668943199,
+          "commits_retained_allocation_calls_delta": 22721993,
+          "release_live_bytes_delta": 0
+        },
+        "candidate": {
+          "after_snapshot_drop_allocated_bytes_delta": 800608673,
+          "after_snapshot_drop_allocation_calls_delta": 11875584,
+          "commits_retained_allocated_bytes_delta": 1067948937,
+          "commits_retained_allocation_calls_delta": 15840989,
+          "release_live_bytes_delta": 0
+        },
+        "ownership": "shared_snapshot_clones",
+        "requested_bytes_reduction_fraction": 0.3602062857668961,
+        "section_count": 8192
+      },
+      {
+        "allocation_calls_reduction_fraction": 0.30295179040837844,
+        "allocation_calls_strictly_decreased": true,
+        "allocation_gate_pass": true,
+        "baseline": {
+          "after_snapshot_drop_allocated_bytes_delta": 2226793064,
+          "after_snapshot_drop_allocation_calls_delta": 30284264,
+          "commits_retained_allocated_bytes_delta": 5567503536,
+          "commits_retained_allocation_calls_delta": 75769512,
+          "release_live_bytes_delta": 0
+        },
+        "candidate": {
+          "after_snapshot_drop_allocated_bytes_delta": 1425467600,
+          "after_snapshot_drop_allocation_calls_delta": 21109592,
+          "commits_retained_allocated_bytes_delta": 3564189712,
+          "commits_retained_allocation_calls_delta": 52832832,
+          "release_live_bytes_delta": 0
+        },
+        "ownership": "independent_sources",
+        "requested_bytes_reduction_fraction": 0.35985627805063075,
+        "section_count": 8192
+      }
+    ],
+    "exact_fixture_and_report_checks": "source archive/output bytes+SHA, cap admission boundaries, retained logical sum/count, validation scope, gauge conservation, release-to-baseline, source revision, and terminal identity all passed",
+    "normal_allocator_gate_flags": {
+      "allocation_calls_strictly_decreased": true,
+      "requested_bytes_minimum_fraction": 0.2,
+      "rss_or_peak_substitution": false
+    },
+    "schema": "litchi.performance.0933.independent-allocator-check.v2"
+  },
+  "audited_utc": "2026-10-06T17:17:43.577427+00:00",
+  "capture_terminal": {
+    "capture_state": {
+      "bytes": 78432,
+      "path": "/home/zhuhe/litchi-performance-0933/formal-packet-v1/capture-state.json",
+      "sha256": "fd8ca95262d8be597e7925a5f45ca6930f2c715cd1933a61cada4bacbb6ba125"
+    },
+    "children": 72,
+    "failed": 0,
+    "outer": {
+      "bytes": 1013,
+      "exit_code": 0,
+      "path": "/home/zhuhe/litchi-performance-0933/capture-outer-terminal-v1.json",
+      "pid": 1816433,
+      "sha256": "7d3d5c92a417666f0b96608fe2fadeef8578e18bda9a752e8ce3f5e9a76d0474"
+    },
+    "packet_manifest": {
+      "bytes": 53798,
+      "path": "/home/zhuhe/litchi-performance-0933/formal-packet-v1/manifest.json",
+      "sha256": "a34df5abf6eded56888a4e8f8786a455f74979b0ee145eab0d1b443c1433fc18"
+    },
+    "tool": {
+      "bytes": 507,
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 72,
+      "path": "/home/zhuhe/litchi-performance-0933/capture-tool-terminal-v1.json",
+      "session_id": 84576,
+      "sha256": "ee548ec430b0e3ba9ecb6add4a4eb59714f0fed5613d47766368b08887245bfa"
+    }
+  },
+  "change": "0933",
+  "custody_and_replay": {
+    "checker": {
+      "bytes": 21740,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0933/independent-allocator-check-v2.py",
+      "sha256": "82981d5542b7b503227eb474f4133128333eaf31a7c792b5dce93fd6c28a6c4f"
+    },
+    "checker_original_moved_equal_except_packet_path": true,
+    "formal_reduction": {
+      "bytes": 26815,
+      "path": "/home/zhuhe/litchi-performance-0933/formal-reduction-v1.json",
+      "sha256": "4217b3dd231d4e4817939e9ddd41bf2b7561d5767c75ae921f54007821d9ec5a"
+    },
+    "formal_reduction_equal_to_independent_replay_except_packet_output_fields": true,
+    "identity_receipt": {
+      "bytes": 23483,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0933/independent-allocator-identity-v2.json",
+      "sha256": "6f80bdecfb85b6e4d8295fef12b6775c0720215c7f5bdff397fa694be77dd4e1"
+    },
+    "moved_checker_output": {
+      "bytes": 6645,
+      "path": "/home/zhuhe/litchi-performance-0933/independent-check-moved-v2.json",
+      "sha256": "990a619aeff7630714d08469105bc1000babdbf67d8e130532226ddede9c7e21",
+      "status": "passed",
+      "terminal_identity_rows": 72
+    },
+    "original_checker_output": {
+      "bytes": 6639,
+      "path": "/home/zhuhe/litchi-performance-0933/independent-check-original-v2.json",
+      "sha256": "01ca8d9270753d5dc3ea966e00435143a45af4476da5a3af28502dce7643563b",
+      "status": "passed",
+      "terminal_identity_rows": 72
+    },
+    "replay_original_moved_equal_except_packet_output_fields": true,
+    "runner_replay_moved_output": {
+      "bytes": 26821,
+      "path": "/home/zhuhe/litchi-performance-0933/moved-replay-stdout-v1.log",
+      "sha256": "237a471474af2a29ff98bcf157863ceb6f88e1b9c31a447562319a40e24bd209"
+    },
+    "runner_replay_moved_terminal": {
+      "bytes": 1187,
+      "path": "/home/zhuhe/litchi-performance-0933/moved-replay-terminal-v1.json",
+      "sha256": "da90395a0a2c74985367c7331cc51abd46cb3dcc3efa7ff98c0e17788b71c5f8"
+    },
+    "runner_replay_original": {
+      "bytes": 26815,
+      "path": "/home/zhuhe/litchi-performance-0933/replay-original-runner-v2.json",
+      "sha256": "4217b3dd231d4e4817939e9ddd41bf2b7561d5767c75ae921f54007821d9ec5a",
+      "status": "passed"
+    }
+  },
+  "limitations": [
+    "The allocator checker validates requested allocator bytes and counters, not physical copied bytes or latency.",
+    "Normal replay supports descriptive route comparisons and the frozen safety gate; it does not support a 5% speedup claim.",
+    "No capture rerun or source/build mutation occurred during this audit."
+  ],
+  "normal_audit": {
+    "all_candidate_over_baseline_p50_at_most_1_05": true,
+    "all_paired_p95_p99_under_5_percent": true,
+    "children_per_version_route": 6,
+    "no_normal_rss_regression_over_5_percent": true,
+    "no_tail_regression_over_5_percent": true,
+    "paired_gate": {
+      "bootstrap_lower_95_strictly_greater_than": 1.0,
+      "claim": "descriptive paired gate only; adoption requires independent review and semantic controls",
+      "median_ratio_minimum": 1.05,
+      "per_route": {
+        "generic_read_at": {
+          "baseline_p50_ns": [
+            4146457.0,
+            4159121.0,
+            4151231.5,
+            4151831.5,
+            4155391.5,
+            4147946.5
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 1.025509247825844,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0272449229253968,
+          "candidate_p50_ns": [
+            4037087.0,
+            4050926.5,
+            4052496.0,
+            4041111.0,
+            4047461.5,
+            4040256.0
+          ],
+          "median_ratio": 1.0266873390600004,
+          "paired_baseline_over_candidate_p50": [
+            1.0270913160900421,
+            1.0267085813578696,
+            1.0243641202853748,
+            1.0273985297607515,
+            1.026666096762131,
+            1.0266543753663133
+          ],
+          "pairs": 6
+        },
+        "owned_reader": {
+          "baseline_p50_ns": [
+            3504684.5,
+            3492284.0,
+            3501284.0,
+            3723954.5,
+            3507224.5,
+            3500734.0
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 0.9690512609724361,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0621793579014414,
+          "candidate_p50_ns": [
+            3406704.0,
+            3405254.0,
+            3616114.0,
+            3410024.0,
+            3397493.5,
+            3609534.0
+          ],
+          "median_ratio": 1.0271593244480677,
+          "paired_baseline_over_candidate_p50": [
+            1.0287610840272592,
+            1.0255575648688762,
+            0.9682449170573715,
+            1.0920610822680428,
+            1.0322976335348397,
+            0.9698576048875007
+          ],
+          "pairs": 6
+        },
+        "owned_vec": {
+          "baseline_p50_ns": [
+            3378004.0,
+            3382809.0,
+            3388388.0,
+            3386483.0,
+            3373453.5,
+            3385699.0
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 1.0320483271199437,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0349969695559114,
+          "candidate_p50_ns": [
+            3275428.0,
+            3272103.5,
+            3273162.5,
+            3278998.0,
+            3265693.5,
+            3271868.0
+          ],
+          "median_ratio": 1.033415357204029,
+          "paired_baseline_over_candidate_p50": [
+            1.031316823328127,
+            1.0338331290559728,
+            1.0352031101419499,
+            1.0327798309117602,
+            1.0329975853520852,
+            1.0347908289698728
+          ],
+          "pairs": 6
+        },
+        "range_short": {
+          "baseline_p50_ns": [
+            4197432.0,
+            3979336.5,
+            3982125.5,
+            4200237.0,
+            4193592.0,
+            3976406.0
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 0.973664464602833,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0262583217526156,
+          "candidate_p50_ns": [
+            4090887.0,
+            4082627.0,
+            4087521.0,
+            4095736.0,
+            4085441.5,
+            4086271.0
+          ],
+          "median_ratio": 1.0001072874547476,
+          "paired_baseline_over_candidate_p50": [
+            1.0260444739734929,
+            0.9746999909617019,
+            0.9742153006675685,
+            1.0255145839477935,
+            1.0264721695317385,
+            0.9731136285380975
+          ],
+          "pairs": 6
+        }
+      },
+      "primary_pass": false,
+      "primary_route": "generic_read_at",
+      "ratio": "baseline_p50 / candidate_p50",
+      "schema": "litchi.performance.0933.paired-gate.v1"
+    },
+    "paired_rss_over_5_percent_review_flags": [
+      {
+        "baseline_rss_bytes": 37904384,
+        "candidate_over_baseline_rss": 1.0824508320726172,
+        "candidate_rss_bytes": 41029632,
+        "delta_fraction": 0.08245083207261716,
+        "pair_id": "normal-block-03-03-owned_reader",
+        "route": "owned_reader"
+      }
+    ],
+    "paired_rss_review_note": "One owned_reader pair exceeds +5% paired RSS; route-wide maximum RSS remains below +5%, and no p95/p99 paired or pooled tail exceeds +5%.",
+    "paired_rss_review_required": true,
+    "per_route_max_rss_under_5_percent": true,
+    "pooled_all_routes": {
+      "baseline_p95_ns": 4201857.0,
+      "baseline_p99_ns": 4219867.0,
+      "baseline_samples": 1200,
+      "candidate_over_baseline_p95": 0.9759937094479894,
+      "candidate_over_baseline_p99": 0.9777220466900971,
+      "candidate_p95_ns": 4100986.0,
+      "candidate_p99_ns": 4125857.0,
+      "candidate_samples": 1200
+    },
+    "primary_route": "generic_read_at",
+    "routes": {
+      "generic_read_at": {
+        "baseline_p50_ns": 4151372.0,
+        "candidate_over_baseline_p50": 0.974279346683458,
+        "candidate_over_baseline_p95": 0.9729644286531176,
+        "candidate_over_baseline_p99": 0.9682887584999204,
+        "candidate_p50_ns": 4044596.0,
+        "normal_rss_max_delta_fraction": 0.0032975215402617497,
+        "normal_rss_median_delta_fraction": 0.005756711680206639,
+        "paired_max_candidate_over_baseline_p95": 0.9756160931871001,
+        "paired_max_candidate_over_baseline_p99": 0.9805775899749513,
+        "paired_max_candidate_over_baseline_rss": 1.0168992586131704,
+        "paired_p95_over_1_05_count": 0,
+        "paired_p99_over_1_05_count": 0,
+        "paired_rss_over_1_05_count": 0,
+        "pooled_baseline_p95_ns": 4184857.0,
+        "pooled_baseline_p99_ns": 4221216.0,
+        "pooled_candidate_over_baseline_p95": 0.9729644286531176,
+        "pooled_candidate_over_baseline_p99": 0.9682887584999204,
+        "pooled_candidate_p95_ns": 4071717.0,
+        "pooled_candidate_p99_ns": 4087356.0,
+        "route_max_rss_delta_fraction": 0.0032975215402617497
+      },
+      "owned_reader": {
+        "baseline_p50_ns": 3504684.5,
+        "candidate_over_baseline_p50": 0.973364078849323,
+        "candidate_over_baseline_p95": 0.970331671215115,
+        "candidate_over_baseline_p99": 0.9681961142426961,
+        "candidate_p50_ns": 3411334.0,
+        "normal_rss_max_delta_fraction": 0.03097982708933711,
+        "normal_rss_median_delta_fraction": 0.004490537795359684,
+        "paired_max_candidate_over_baseline_p95": 1.0338735495047193,
+        "paired_max_candidate_over_baseline_p99": 1.0312010239411595,
+        "paired_max_candidate_over_baseline_rss": 1.0824508320726172,
+        "paired_p95_over_1_05_count": 0,
+        "paired_p99_over_1_05_count": 0,
+        "paired_rss_over_1_05_count": 1,
+        "pooled_baseline_p95_ns": 3739004.0,
+        "pooled_baseline_p99_ns": 3772495.0,
+        "pooled_candidate_over_baseline_p95": 0.970331671215115,
+        "pooled_candidate_over_baseline_p99": 0.9681961142426961,
+        "pooled_candidate_p95_ns": 3628074.0,
+        "pooled_candidate_p99_ns": 3652515.0,
+        "route_max_rss_delta_fraction": 0.03097982708933711
+      },
+      "owned_vec": {
+        "baseline_p50_ns": 3382468.5,
+        "candidate_over_baseline_p50": 0.967638870842404,
+        "candidate_over_baseline_p95": 0.9654464053341874,
+        "candidate_over_baseline_p99": 0.9639404900755955,
+        "candidate_p50_ns": 3273008.0,
+        "normal_rss_max_delta_fraction": 0.013241468403488055,
+        "normal_rss_median_delta_fraction": 0.009003145677405344,
+        "paired_max_candidate_over_baseline_p95": 0.9752401414345072,
+        "paired_max_candidate_over_baseline_p99": 1.0116082062489753,
+        "paired_max_candidate_over_baseline_rss": 1.020271002710027,
+        "paired_p95_over_1_05_count": 0,
+        "paired_p99_over_1_05_count": 0,
+        "paired_rss_over_1_05_count": 0,
+        "pooled_baseline_p95_ns": 3415853.0,
+        "pooled_baseline_p99_ns": 3451794.0,
+        "pooled_candidate_over_baseline_p95": 0.9654464053341874,
+        "pooled_candidate_over_baseline_p99": 0.9639404900755955,
+        "pooled_candidate_p95_ns": 3297823.0,
+        "pooled_candidate_p99_ns": 3327324.0,
+        "route_max_rss_delta_fraction": 0.013241468403488055
+      },
+      "range_short": {
+        "baseline_p50_ns": 4179391.5,
+        "candidate_over_baseline_p50": 0.9782373821643653,
+        "candidate_over_baseline_p95": 0.9781544480357837,
+        "candidate_over_baseline_p99": 0.9871191627716116,
+        "candidate_p50_ns": 4088437.0,
+        "normal_rss_max_delta_fraction": 0.00021188685242079508,
+        "normal_rss_median_delta_fraction": 0.007054008938667922,
+        "paired_max_candidate_over_baseline_p95": 1.0251394445572832,
+        "paired_max_candidate_over_baseline_p99": 1.038743562433195,
+        "paired_max_candidate_over_baseline_rss": 1.0199782844733984,
+        "paired_p95_over_1_05_count": 0,
+        "paired_p99_over_1_05_count": 0,
+        "paired_rss_over_1_05_count": 0,
+        "pooled_baseline_p95_ns": 4216007.0,
+        "pooled_baseline_p99_ns": 4225657.0,
+        "pooled_candidate_over_baseline_p95": 0.9781544480357837,
+        "pooled_candidate_over_baseline_p99": 0.9871191627716116,
+        "pooled_candidate_p95_ns": 4123906.0,
+        "pooled_candidate_p99_ns": 4171227.0,
+        "route_max_rss_delta_fraction": 0.00021188685242079508
+      }
+    },
+    "samples_per_child": 50,
+    "warmups": 5
+  },
+  "schema": "litchi.performance.0933.independent-postcapture-audit.v1",
+  "static_quality": {
+    "all_listed_quality_receipts_passed": true,
+    "quality_receipts": [
+      {
+        "bytes": 2831,
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--all-targets"
+        ],
+        "path": "/home/zhuhe/litchi-performance-0933/quality/candidate-all-targets-receipt.json",
+        "sha256": "aa33e286d3a38b7fe0963c3aba9ec4f3acf79a8ec21212d674512d4160dc930c",
+        "status": "passed"
+      },
+      {
+        "bytes": 2147,
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "path": "/home/zhuhe/litchi-performance-0933/quality/candidate-clippy-receipt.json",
+        "sha256": "ccbdb87f296bc63362c9bfea5ab1ee36d2d8ff7bf1d9a61dc656d69867a04d22",
+        "status": "passed"
+      },
+      {
+        "bytes": 2204,
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--doc"
+        ],
+        "path": "/home/zhuhe/litchi-performance-0933/quality/candidate-doctests-receipt.json",
+        "sha256": "1e69b6c16911fc8a76772bef0f698cfda86352ae17f9da9b878e24cbecdc7064",
+        "status": "passed"
+      },
+      {
+        "bytes": 2243,
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "doc",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--no-deps"
+        ],
+        "path": "/home/zhuhe/litchi-performance-0933/quality/candidate-rustdoc-receipt.json",
+        "sha256": "a6351c86ce491b052e19c41f89cc8a33e1ac0b942f0ea55fe99af229c715f3d3",
+        "status": "passed"
+      },
+      {
+        "bytes": 2848,
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "-p",
+          "litchi-docx",
+          "--lib",
+          "inventory_"
+        ],
+        "path": "/home/zhuhe/litchi-performance-0933/quality/baseline-inventory-receipt.json",
+        "sha256": "e553b47391d70882cfdb06be47cf0887c316471b8d21e357f4ae04e205d84dac",
+        "status": "passed"
+      }
+    ],
+    "review_receipt": {
+      "bytes": 8707,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0933/static-review-v1.json",
+      "sha256": "98bcec700fb5c5013975d916ea42c49bf83a03f5185e001f11dc3eafbcaeb559"
+    },
+    "runtime_source_changes_bound_by_full_source_differential": true,
+    "scope": "candidate all-targets, clippy -D warnings, doctests, rustdoc -D warnings; baseline inventory tests"
+  },
+  "status": "passed_with_separate_allocation_gate"
+}

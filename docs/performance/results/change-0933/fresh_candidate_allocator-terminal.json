@@ -1,0 +1,40 @@
+{
+  "name": "fresh_candidate_allocator",
+  "cwd": "/home/zhuhe/litchi-performance-0933/candidate-source",
+  "argv": [
+    "env",
+    "-u",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTFLAGS=-C force-frame-pointers=yes",
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "--locked",
+    "-j2",
+    "--release",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0933/candidate-source/tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/litchi-performance-0933/target-candidate-allocator"
+  ],
+  "env_policy": "inherited environment with RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS removed; allocator sets RUSTFLAGS explicitly in argv",
+  "started_utc": "2026-10-06T16:50:32.820820+00:00",
+  "pid": 1787302,
+  "exit_code": 0,
+  "ended_utc": "2026-10-06T16:59:45.321736+00:00",
+  "stdout": {
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_candidate_allocator/stdout.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_candidate_allocator/stderr.log",
+    "bytes": 9046,
+    "sha256": "b72c8f7ae176f13a53ab520cc42ee6b2d8f02ad0e6bd198891c3816fcb04d0a0"
+  }
+}

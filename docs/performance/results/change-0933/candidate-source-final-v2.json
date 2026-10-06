@@ -1,0 +1,47 @@
+{
+  "base_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "baseline_source_root": "/home/zhuhe/litchi-performance-0933/baseline-source",
+  "candidate_patch": {
+    "bytes": 5011,
+    "path": "/home/zhuhe/litchi-performance-0933/candidate-production.patch",
+    "sha256": "aff40e7b5cd5dd4f07fbc14be5fde6f9877b214a341c2a0ff6182ab67495e023"
+  },
+  "candidate_patch_regeneration": "difflib unified diff over exactly changed_paths against baseline-source",
+  "changed_path_count": 2,
+  "changed_paths": [
+    "crates/litchi-docx/src/section/inventory.rs",
+    "crates/litchi-docx/src/source_backed.rs"
+  ],
+  "common_runtime_paths": [
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/docx_section_retention.rs",
+    "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+    "tools/perf-baseline/tests/docx_section_retention.rs",
+    "crates/litchi-docx/src/section/tests.rs"
+  ],
+  "created_utc": "2026-10-06T17:01:08.673695+00:00",
+  "differential_receipt": {
+    "bytes": 1577,
+    "path": "/home/zhuhe/litchi-performance-0933/receipts/full-source-differential-v1.json",
+    "sha256": "a984c64879a064a697456c7c4104e347237e4eec9b30b2f0a666f28451462ec3"
+  },
+  "full_source_listing": "/home/zhuhe/litchi-performance-0933/candidate-source-list-v1.jsonl",
+  "full_source_listing_bytes": 1870029,
+  "full_source_listing_sha256": "40208ad0ae53f2f0c046d55f9bd8970ae454ff03c4d91d8c94039da40fd4ce12",
+  "generated_targets_included": false,
+  "generator_file": "/home/zhuhe/litchi-performance-0933/generate-source-list-v1.py",
+  "generator_sha256": "e49d26666dec0511ebe466b1844e75ecf5e23f9a096671d3a18e9286718d82a0",
+  "patch_identity": "exact unified diff generated from baseline_source_root to source_root over changed_paths",
+  "perf_baseline_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+  "regeneration_command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0933/generate-source-list-v1.py /home/zhuhe/litchi-performance-0933/candidate-source /home/zhuhe/litchi-performance-0933/candidate-source-list-v1.jsonl",
+  "role": "candidate",
+  "root_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+  "rustfmt_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+  "schema": "litchi.performance.0933.source-receipt.v2",
+  "source_bytes": 259949019,
+  "source_file_count": 10778,
+  "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+  "source_revision_kind": "current HEAD label plus exact candidate patch",
+  "source_root": "/home/zhuhe/litchi-performance-0933/candidate-source",
+  "status": "closed"
+}

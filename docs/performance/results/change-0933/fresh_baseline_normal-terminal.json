@@ -1,0 +1,37 @@
+{
+  "name": "fresh_baseline_normal",
+  "cwd": "/home/zhuhe/litchi-performance-0933/baseline-source",
+  "argv": [
+    "env",
+    "-u",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "--locked",
+    "-j2",
+    "--release",
+    "--bin",
+    "litchi-perf-baseline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0933/baseline-source/tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/litchi-performance-0933/target-baseline-normal"
+  ],
+  "env_policy": "inherited environment with RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS removed; allocator sets RUSTFLAGS explicitly in argv",
+  "started_utc": "2026-10-06T16:50:32.819979+00:00",
+  "pid": 1787300,
+  "exit_code": 0,
+  "ended_utc": "2026-10-06T16:59:41.272248+00:00",
+  "stdout": {
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/stdout.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/stderr.log",
+    "bytes": 9065,
+    "sha256": "4c56db5b316dd0ec33b825e39936a5dae1e8aa9f9df08e2c32c3dc9ec31848fb"
+  }
+}

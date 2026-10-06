@@ -1,0 +1,81 @@
+{
+  "approval_scope": "The retained 0931 allocator binary may serve the 0933 baseline allocation lane. This approval does not bind it to the normal latency lane or to the candidate arm.",
+  "change": "0933",
+  "limits": [
+    "Reuse is valid only for the 0933 baseline allocator lane and only while the final manifest retains these source/build/differential bindings.",
+    "Fresh current baseline and candidate normal binaries remain required for the four-route latency lane.",
+    "No capture or benchmark was run by this audit."
+  ],
+  "method": {
+    "baseline_to_candidate_differences": [
+      {
+        "baseline_sha256": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99",
+        "candidate_sha256": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b",
+        "classification": "reviewed scanner candidate",
+        "path": "crates/litchi-docx/src/section/inventory.rs"
+      },
+      {
+        "baseline_sha256": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d",
+        "candidate_sha256": "cd36ca380c36054d78b77ddd8ed9120c9d22713f63de9194f1b503c93452e452",
+        "classification": "reviewed source-section scanner candidate",
+        "path": "crates/litchi-docx/src/source_backed.rs"
+      }
+    ],
+    "description": "Independently SHA-256 hashed every regular file in each isolated source tree and compared path sets and bytes.",
+    "differential_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/full-source-differential-v1.json",
+      "sha256": "a984c64879a064a697456c7c4104e347237e4eec9b30b2f0a666f28451462ec3"
+    },
+    "file_counts": {
+      "baseline_0933": 10778,
+      "candidate_0933": 10778,
+      "origin_0931": 10778
+    },
+    "origin_to_baseline_differences": [
+      {
+        "baseline_sha256": "00a46f8455ef3e436874875779c63b3de7981f37322a17ca9f99d46fda36fd1c",
+        "classification": "unit-test-only overlay",
+        "origin_sha256": "2b6942ccbeaaca8e0b8af23df3006313c80a5b6954a2efa1fd760a38c5f2008b",
+        "path": "crates/litchi-docx/src/section/tests.rs"
+      }
+    ]
+  },
+  "retained_build": {
+    "binary_path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+    "binary_sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf",
+    "binary_size_bytes": 68431264,
+    "build_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0931/receipts/build-release-final.json",
+      "sha256": "1de592210eaf7c50939812f08a74a089322675951b69a8eb64c0499e71129eb3"
+    },
+    "runtime_harness_paths": [
+      "tools/perf-baseline/src/docx_section_retention.rs",
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+      "tools/perf-baseline/tests/docx_section_retention.rs"
+    ],
+    "rustflags": "-C force-frame-pointers=yes",
+    "source_listing_sha256": "c5f194fa5aeb6cee0d7abaa67eed29e88dd8e9c1aaf022dc7d38a0a1b130db8a",
+    "source_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0931/measurement-source-final-receipt.json",
+      "sha256": "00ea8b9687265abb210938d7f30ebb0af64bb0303e6ac1fab08af18e61de3b3f"
+    },
+    "workload_capture": false
+  },
+  "schema": "litchi.performance.0933.retained-allocator-approval.v1",
+  "source_trees": {
+    "baseline": "/home/zhuhe/litchi-performance-0933/baseline-source",
+    "candidate": "/home/zhuhe/litchi-performance-0933/candidate-source",
+    "canonical_root_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "origin": "/home/zhuhe/litchi-performance-0931/source-final",
+    "perf_baseline_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "status": "approved_for_baseline_allocator_lane",
+  "test_only_proof": {
+    "consequence": "The sole origin-to-baseline difference is excluded from release binary compilation; no release include path for section/tests.rs was found.",
+    "lines": "17-18",
+    "path": "crates/litchi-docx/src/section/mod.rs",
+    "sha256_origin_baseline_candidate": "7f9161f792df7d1c3e1ff768d714d4fe734d0c4633ca6ab7cf0bae8fd663a26a",
+    "text": "#[cfg(test)]\\nmod tests;"
+  }
+}

@@ -2735,7 +2735,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let resolver = reader.resolver().clone();
+        let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
@@ -2757,7 +2757,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
                         actual: depth,
                     });
                 }
-                validate_source_section_element(&resolver, decoder, &namespace, &element)?;
+                validate_source_section_element(resolver, decoder, &namespace, &element)?;
             },
             Event::Empty(element) => {
                 if depth == 0 {
@@ -2779,7 +2779,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
                         actual: element_depth,
                     });
                 }
-                validate_source_section_element(&resolver, decoder, &namespace, &element)?;
+                validate_source_section_element(resolver, decoder, &namespace, &element)?;
             },
             Event::End(_) => {
                 depth = depth

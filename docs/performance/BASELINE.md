@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0933 — borrowed DOCX scanners reduce allocation requests
+
+[0933](0933-docx-borrowed-inventory-scanners.md) adopts borrowed scanner events,
+namespace resolvers and topology views after 72 paired diagnostic children
+pass. Construction requested bytes fall 21.46–36.02% across four eight-commit
+cells, with fewer allocation calls in every cell. The normal generic paired
+p50 ratio is 1.026687, below the frozen 1.05 latency improvement threshold;
+adoption rests on the separate allocation gate. Per-route maximum RSS stays
+within 5%; one reader pair's 8.25% RSS increase is retained and reviewed.
+Independent replay, 1,925 DOCX tests, 78 doctests and boundary checks pass.
+
 ## 0932 — DOCX allocation traffic attributed
 
 [0932](0932-docx-allocation-attribution.md) profiles two complete diagnostic

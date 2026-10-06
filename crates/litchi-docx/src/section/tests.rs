@@ -492,6 +492,76 @@ fn inventory_uses_original_namespace_aliases_and_ignores_nested_story_paragraphs
     assert!(inventory.sections()[1].paragraphs().is_empty());
 }
 
+#[test]
+fn inventory_restores_outer_namespace_after_nested_rebinding() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:sdt xmlns:w="urn:foreign"><w:p><w:pPr><w:sectPr/></w:pPr></w:p></w:sdt><w:p/><w:sectPr/></w:body></w:document>"#
+    );
+    let inventory = Inventory::parse(xml.as_bytes()).expect("namespace rebinding is valid XML");
+
+    // The nested foreign subtree is inert. After its end event, the outer
+    // Word binding must be restored so the following paragraph and body-final
+    // sectPr remain visible to the main-story scanner.
+    assert_eq!(inventory.paragraph_count(), 2);
+    assert_eq!(inventory.sections().len(), 2);
+    assert_eq!(
+        inventory.sections()[0].ownership(),
+        Ownership::Paragraph(litchi_core::Position::new(0))
+    );
+    assert_eq!(inventory.sections()[0].paragraphs().len(), 1);
+    assert_eq!(inventory.sections()[1].ownership(), Ownership::BodyFinal);
+    assert_eq!(inventory.sections()[1].paragraphs().len(), 1);
+}
+
+#[test]
+fn inventory_ignores_foreign_rebound_section_properties() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr xmlns:w="urn:foreign"/></w:pPr></w:p><w:p/><w:sectPr/></w:body></w:document>"#
+    );
+    let inventory = Inventory::parse(xml.as_bytes()).expect("foreign sectPr is inert");
+
+    assert_eq!(inventory.paragraph_count(), 2);
+    assert_eq!(inventory.sections().len(), 1);
+    assert_eq!(inventory.sections()[0].ownership(), Ownership::BodyFinal);
+    assert_eq!(inventory.sections()[0].paragraphs().len(), 2);
+}
+
+#[test]
+fn inventory_rejects_malformed_end_after_namespace_rebinding() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let malformed = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:x="urn:foreign"><w:body><w:sdt xmlns:w="urn:foreign"><w:p/></x:sdt></w:body></w:document>"#
+    );
+    assert!(Inventory::parse(malformed.as_bytes()).is_err());
+}
+
+#[test]
+fn inventory_enforces_explicit_section_limit_at_the_boundary() {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let one = format!(r#"<w:document xmlns:w="{W}"><w:body><w:sectPr/></w:body></w:document>"#);
+    let one_limit = Limits {
+        max_sections: 1,
+        ..Limits::default()
+    };
+    let inventory = Inventory::parse_with_limits(one.as_bytes(), &one_limit)
+        .expect("one explicit section fits the one-section limit");
+    assert_eq!(inventory.sections().len(), 1);
+
+    let two = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:sectPr/></w:body></w:document>"#
+    );
+    assert!(matches!(
+        Inventory::parse_with_limits(two.as_bytes(), &one_limit),
+        Err(crate::Error::SectionInventoryLimit {
+            resource: "sections",
+            maximum: 1,
+            actual: 2,
+        })
+    ));
+}
+
 /// Leniency F2.7: a column model Word lays out despite schema deviations is
 /// repaired per section and recorded with offsets into the section XML.
 #[test]

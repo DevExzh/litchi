@@ -733,7 +733,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut element_stack = Vec::<Vec<u8>>::new();
+    let mut element_stack = Vec::<BytesStart<'_>>::new();
     let mut events = 0usize;
     let mut root_seen = false;
     let mut body_depth = None;
@@ -757,11 +757,10 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
         let event_start = offset(&reader, origin)?;
         let event = reader
             .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+            .map_err(|error| Error::Xml(error.to_string()))?;
         let event_end = offset(&reader, origin)?;
+        let resolver = reader.resolver();
+        let (namespace, event) = resolver.resolve_event(event);
         events = events
             .checked_add(1)
             .ok_or_else(|| Error::InvalidFormat("section event counter overflow".into()))?;
@@ -780,7 +779,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 enforce_limit("XML depth", child_depth, limits.max_depth)?;
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
-                validate_namespace_bindings(&element, &namespace, &resolver, reader.decoder())?;
+                validate_namespace_bindings(&element, &namespace, resolver, reader.decoder())?;
                 namespace_context.enter(&element, reader.decoder())?;
                 let namespace_bindings = if word && local.as_ref() == b"sectPr" {
                     namespace_context.snapshot()
@@ -790,7 +789,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 inspect_reference(
                     &element,
                     &namespace,
-                    &resolver,
+                    resolver,
                     reader.decoder(),
                     child_depth,
                     limits,
@@ -821,7 +820,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                         resource: "section inventory XML element stack",
                         source,
                     })?;
-                element_stack.push(element.name().as_ref().to_vec());
+                element_stack.push(element);
                 depth = child_depth;
             },
             Event::Empty(element) => {
@@ -836,7 +835,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 enforce_limit("XML depth", child_depth, limits.max_depth)?;
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
-                validate_namespace_bindings(&element, &namespace, &resolver, reader.decoder())?;
+                validate_namespace_bindings(&element, &namespace, resolver, reader.decoder())?;
                 namespace_context.enter(&element, reader.decoder())?;
                 let namespace_bindings = if word && local.as_ref() == b"sectPr" {
                     namespace_context.snapshot()
@@ -846,7 +845,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 inspect_reference(
                     &element,
                     &namespace,
-                    &resolver,
+                    resolver,
                     reader.decoder(),
                     child_depth,
                     limits,
@@ -877,7 +876,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 let expected = element_stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("main-document XML has an unmatched end element".into())
                 })?;
-                if expected != element.name().as_ref() {
+                if expected.name().as_ref() != element.name().as_ref() {
                     return Err(Error::InvalidFormat(
                         "main-document XML has mismatched element nesting".into(),
                     ));

@@ -1,0 +1,33 @@
+{
+  "schema": "litchi.performance.0933.full-source-differential.v1",
+  "checked_utc": "2026-10-06T16:52:25.054400+00:00",
+  "method": "SHA-256 every regular file in all three complete isolated source trees; compare path sets and file bytes",
+  "origin": "/home/zhuhe/litchi-performance-0931/source-final",
+  "baseline": "/home/zhuhe/litchi-performance-0933/baseline-source",
+  "candidate": "/home/zhuhe/litchi-performance-0933/candidate-source",
+  "file_counts": [
+    10778,
+    10778,
+    10778
+  ],
+  "origin_to_baseline": [
+    {
+      "path": "crates/litchi-docx/src/section/tests.rs",
+      "left": "2b6942ccbeaaca8e0b8af23df3006313c80a5b6954a2efa1fd760a38c5f2008b",
+      "right": "00a46f8455ef3e436874875779c63b3de7981f37322a17ca9f99d46fda36fd1c"
+    }
+  ],
+  "baseline_to_candidate": [
+    {
+      "path": "crates/litchi-docx/src/section/inventory.rs",
+      "left": "5b95b7d1cd82475cd2149fbfa5cf7ddda58c18ccff1718c423354fc168371d99",
+      "right": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b"
+    },
+    {
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "left": "04ac80afe7a0f177b66ad77cdc9773a552bb3cb125da96a86292bb99db69745d",
+      "right": "cd36ca380c36054d78b77ddd8ed9120c9d22713f63de9194f1b503c93452e452"
+    }
+  ],
+  "conclusion": "0931 retained allocator runtime/build inputs are identical to the baseline tree; the sole change is the unit-test-only section/tests.rs. Baseline and candidate differ only in the two reviewed production scanner files. Canonical root and standalone locks are identical across all trees."
+}

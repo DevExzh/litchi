@@ -1,0 +1,16 @@
+{
+  "schema": "litchi.performance.0933.build-outer-tool-results.v1",
+  "session_id": 99782,
+  "launch": {
+    "chunk_id": "32f522",
+    "exit_code": null,
+    "session_id": 99782,
+    "output": "{\"started\": \"fresh_baseline_normal\", \"pid\": 1787300}\n{\"started\": \"fresh_candidate_normal\", \"pid\": 1787301}\n{\"started\": \"fresh_candidate_allocator\", \"pid\": 1787302}\n"
+  },
+  "final": {
+    "chunk_id": "2d2168",
+    "exit_code": 0,
+    "output": "{\"ended\": \"fresh_candidate_normal\", \"exit\": 0}\n{\"ended\": \"fresh_baseline_normal\", \"exit\": 0}\n{\"ended\": \"fresh_candidate_allocator\", \"exit\": 0}\n{\"all_builds_terminal\": true, \"codes\": [0, 0, 0]}\n"
+  },
+  "scope": "Original observed launch/final tool outputs; per-command argv/cwd/environment policy/start/end/stdout/stderr are in each build terminal.json."
+}

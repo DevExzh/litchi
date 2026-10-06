@@ -1,0 +1,11 @@
+{
+  "schema": "litchi.performance.0933.capture-tool-terminal.v1",
+  "session_id": 84576,
+  "launch_chunk": "087421",
+  "pid": 1816433,
+  "terminal_chunk": "232b05",
+  "outer_tool_exit_code": 0,
+  "terminal_receipt": "/home/zhuhe/litchi-performance-0933/capture-outer-terminal-v1.json",
+  "terminal_stdout": "{\n  \"children_run\": 72,\n  \"failed\": 0,\n  \"packet\": \"/home/zhuhe/litchi-performance-0933/formal-packet-v1\",\n  \"passed\": 72,\n  \"status\": \"completed\"\n}\n",
+  "terminal_stderr": ""
+}

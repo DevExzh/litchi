@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.performance.0933.adoption-decision.v1",
+  "decided_utc": "2026-10-06T17:22:42.855843+00:00",
+  "decision": "adopt_for_construction_allocation_reduction",
+  "frozen_gate_result": {
+    "allocation_requested_bytes_reduction_at_least_20_percent_every_cell": true,
+    "allocation_calls_strictly_lower_every_cell": true,
+    "normal_route_median_safety_pass": true,
+    "paired_and_pooled_tail_safety_pass": true,
+    "route_maximum_RSS_safety_pass": true,
+    "normal_latency_improvement_gate_pass": false
+  },
+  "rss_pair_review": {
+    "route": "owned_reader",
+    "pair": "normal-block-03-03-owned_reader",
+    "baseline_bytes": 37904384,
+    "candidate_bytes": 41029632,
+    "increase_percent": 8.245083207261716,
+    "disposition": "Reviewed and accepted under the frozen per-route policy: route maximum RSS increases 3.09798%, median RSS increases approximately 0.45%, and all allocation cells reduce requests. Pair remains in evidence without rerun; no claim that cause is proven or that RSS improves."
+  },
+  "quality_limit": "Full workspace formatting fails identically on baseline and candidate in six unrelated files; changed DOCX formatting, full DOCX tests, Clippy, rustdoc, and final full boundary check pass.",
+  "claim_limits": [
+    "Allocation counters measure requested construction traffic, not bytes copied, live heap or RSS.",
+    "Primary normal paired ratio fails the 1.05 improvement threshold; no qualified 5% latency improvement claim.",
+    "Measurements cover named generated fixtures, one host and frozen routes; not a general Office speedup."
+  ],
+  "evidence": [
+    {
+      "path": "docs/performance/results/change-0933/comparison-plan-v1.json",
+      "bytes": 11606,
+      "sha256": "25b3852fd65edd61059be6b8814d1305ee249399581d3812a104777d9b800cc6"
+    },
+    {
+      "path": "docs/performance/results/change-0933/comparison-formal-gate-correction-v1.json",
+      "bytes": 1219,
+      "sha256": "bc68db26c51d2cefc2efae5124c317acfc1c3f80d437c5499997f91bc911e36c"
+    },
+    {
+      "path": "docs/performance/results/change-0933/formal-reduction-v1.json",
+      "bytes": 26815,
+      "sha256": "4217b3dd231d4e4817939e9ddd41bf2b7561d5767c75ae921f54007821d9ec5a"
+    },
+    {
+      "path": "docs/performance/results/change-0933/independent-postcapture-audit-v1.json",
+      "bytes": 22291,
+      "sha256": "16366c763acb1c2f05af9a60830c846a1f46d6a068d1155bd3fedb7edc3e9494"
+    },
+    {
+      "path": "docs/performance/results/change-0933/new-quality.json",
+      "bytes": 22758,
+      "sha256": "c277e8077670149ed220f2b82d64159542a20d6e98c748f3ee3c3f67c25cdb79"
+    }
+  ]
+}

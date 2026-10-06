@@ -1,0 +1,296 @@
+{
+  "adoption_review": {
+    "allocation_secondary": "Each of the four allocator cells must reduce after_snapshot_drop construction requested bytes by >=20% baseline-to-candidate and strictly reduce allocation calls, with all correctness/counter/RSS gates passing.",
+    "claims": "Normal latency and allocator retention are reported as separate evidence; no gate is inferred from RSS alone.",
+    "latency_safety": "For allocation-supported adoption review, every normal route candidate_p50 / baseline_p50 <= 1.05; tails or RSS increases >5% require resolution.",
+    "normal_primary": "baseline_p50 / candidate_p50 >= 1.05 with nearest-rank bootstrap lower 95% > 1.0 on generic_read_at; per-route tails and RSS >5% are review flags"
+  },
+  "allocator_lane": {
+    "binary_feature": "allocator-metrics",
+    "cell_count_per_version": 4,
+    "child_selector": "docx-section-retention",
+    "children_total": 24,
+    "claim_scope": "descriptive allocator retention evidence; no timing speedup or adoption gate",
+    "command_shape": [
+      "/usr/bin/time",
+      "-v",
+      "taskset",
+      "-c",
+      "12",
+      "<allocator-binary>",
+      "docx-section-retention",
+      "--sections",
+      "<16|8192>",
+      "--concurrent-commits",
+      "8",
+      "--policy",
+      "exact",
+      "--ownership",
+      "<shared_snapshot_clones|independent_sources>",
+      "--source-revision",
+      "<bound-source-id>",
+      "--output",
+      "<report>"
+    ],
+    "concurrent_commits": 8,
+    "correctness_gates": [
+      "schema docx_section_retention_v1",
+      "boundary_checks_verified true",
+      "overflowed false and observer_invalid false for all gauges",
+      "monotonic allocator counters and live-byte conservation across every adjacent checkpoint",
+      "each region peak >= its endpoint; held commits checkpoint region peak remains null",
+      "returned_to_baseline true and final live bytes equal baseline",
+      "shared pair count 28 and measured validation count 1 for shared; shared pair count 0 and validation count 8 for independent",
+      "all retained vectors equal exact retained base bytes; measured output/inverse/shape verification true"
+    ],
+    "metrics": [
+      "retention_admission.required_retained_base_bytes",
+      "scenarios[].gauges.after_snapshot_drop.absolute.allocated_bytes",
+      "scenarios[].gauges.after_snapshot_drop.absolute.allocation_calls",
+      "retained_base_bytes_each",
+      "source_inventory_pair_count",
+      "source_inventory_shared_pairs",
+      "measured_commit_validation_count",
+      "gauges returned_to_baseline",
+      "whole-process max RSS"
+    ],
+    "ownership": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "policy": "exact",
+    "reduction_scope": "report integer requested allocation calls/bytes and checkpoint deltas separately for baseline/candidate and ownership; do not infer allocation bytes from RSS or claim phase attribution",
+    "repetitions_per_cell_per_version": 3,
+    "review_flags": [
+      "candidate RSS increase >5%",
+      "any cap/correctness/gauge/identity mismatch"
+    ],
+    "sections": [
+      16,
+      8192
+    ]
+  },
+  "allocator_paired_cohort": {
+    "children": 24,
+    "concurrent_commits": 8,
+    "deadline_seconds": 600,
+    "ownership": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "pair_unit": "same section count, ownership, and repetition; version order alternates by repetition",
+    "policy": "exact",
+    "repetitions_per_cell_per_version": 3,
+    "section_counts": [
+      16,
+      8192
+    ]
+  },
+  "builds": {
+    "fresh_baseline_normal": {
+      "command": [
+        "env",
+        "-u",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "--locked",
+        "-j2",
+        "--release",
+        "--bin",
+        "litchi-perf-baseline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0933/baseline-source/tools/perf-baseline/Cargo.toml",
+        "--target-dir",
+        "/home/zhuhe/litchi-performance-0933/target-baseline-normal"
+      ],
+      "source": "/home/zhuhe/litchi-performance-0933/baseline-source",
+      "target": "/home/zhuhe/litchi-performance-0933/target-baseline-normal"
+    },
+    "fresh_candidate_allocator": {
+      "command": [
+        "env",
+        "-u",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "RUSTFLAGS=-C force-frame-pointers=yes",
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "--locked",
+        "-j2",
+        "--release",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0933/candidate-source/tools/perf-baseline/Cargo.toml",
+        "--target-dir",
+        "/home/zhuhe/litchi-performance-0933/target-candidate-allocator"
+      ],
+      "source": "/home/zhuhe/litchi-performance-0933/candidate-source",
+      "target": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator"
+    },
+    "fresh_candidate_normal": {
+      "command": [
+        "env",
+        "-u",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "--locked",
+        "-j2",
+        "--release",
+        "--bin",
+        "litchi-perf-baseline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0933/candidate-source/tools/perf-baseline/Cargo.toml",
+        "--target-dir",
+        "/home/zhuhe/litchi-performance-0933/target-candidate-normal"
+      ],
+      "source": "/home/zhuhe/litchi-performance-0933/candidate-source",
+      "target": "/home/zhuhe/litchi-performance-0933/target-candidate-normal"
+    },
+    "retained_baseline_allocator": {
+      "path": "/home/zhuhe/litchi-performance-0931/release-target/release/litchi-perf-baseline-alloc",
+      "sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf",
+      "size_bytes": 68431264,
+      "use": "historical reference only until exact runtime-source/harness equivalence to baseline-source is recorded"
+    }
+  },
+  "created_utc": "2026-10-06T16:49:41.235727+00:00",
+  "formal_paired_cohort": {
+    "blocks": 6,
+    "children": 48,
+    "children_per_route_per_version": 6,
+    "deadline_seconds": 900,
+    "even_block_route_order": [
+      "range_short",
+      "owned_reader",
+      "owned_vec",
+      "generic_read_at"
+    ],
+    "measured_samples_per_route_per_version": 300,
+    "odd_block_route_order": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "pair_unit": "same route, block, and position; version order alternates by block"
+  },
+  "historical_context": {
+    "allocator_0931_sha256": "ad4e6a43c81af7057a961abb5c5893ddde61c7823620a22327f672290d2208cf",
+    "normal_0930_sha256": "ae9d7c303496a30ae2850e397076093322adb6fe2be4a598ac446b206bd88eff",
+    "note": "retained binaries remain historical references; fresh matched normal baseline/candidate and candidate allocator are required for 0933 binding"
+  },
+  "normal_lane": {
+    "blocks": 6,
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "child_command_shape": [
+      "/usr/bin/time",
+      "-v",
+      "taskset",
+      "-c",
+      "12",
+      "<binary>",
+      "--case",
+      "docx_source_backed_existing_section_layout_edit_save",
+      "--samples",
+      "50",
+      "--warmup",
+      "5",
+      "--json",
+      "<report>"
+    ],
+    "children": 48,
+    "claim_scope": "normal-lane paired measurements only; no adoption claim in tooling receipt",
+    "corpus_archive_bytes": 2101427,
+    "corpus_archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "cpu": "12",
+    "env_allowlist": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    },
+    "expected_output_bytes": 2101446,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "failure_policy": "persist terminal status and raw streams before parsing; preserve failures; no retries, selective recapture, or replacing children",
+    "gate": "ratio >= 1.05 and nearest-rank bootstrap lower 95% > 1.0; seed 930, 10000 paired draws",
+    "order": "alternating baseline/candidate pairs within each route block",
+    "pairs_per_route": 6,
+    "primary_statistic": "baseline_p50 / candidate_p50",
+    "review_flags": [
+      "per-route p95/p99 and spread",
+      "whole-process max RSS increase >5%",
+      "any correctness/counter/output mismatch"
+    ],
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "samples_per_child": 50,
+    "selector_env": "LITCHI_DOCX_INGRESS_ROUTE",
+    "warmups_per_child": 5
+  },
+  "purpose": "paired normal-release comparison of the borrowed DOCX section scanner with a targeted allocator retention diagnostic; setup only until final candidate source/build review",
+  "routes": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader",
+    "range_short"
+  ],
+  "runner_expected": "comparison-formal-runner-v2.py",
+  "schema": "litchi.performance.0933.comparison-plan.v2",
+  "source_bindings": {
+    "base_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "baseline_source": "/home/zhuhe/litchi-performance-0933/baseline-source",
+    "baseline_source_receipt": "/home/zhuhe/litchi-performance-0933/baseline-quality-source-v1.json",
+    "candidate_changed_runtime_paths": [
+      "crates/litchi-docx/src/section/inventory.rs",
+      "crates/litchi-docx/src/source_backed.rs"
+    ],
+    "candidate_full_listing": "/home/zhuhe/litchi-performance-0933/candidate-source-list-v1.jsonl",
+    "candidate_full_listing_sha256": "40208ad0ae53f2f0c046d55f9bd8970ae454ff03c4d91d8c94039da40fd4ce12",
+    "candidate_regression_test_path": "crates/litchi-docx/src/section/tests.rs",
+    "candidate_source": "/home/zhuhe/litchi-performance-0933/candidate-source",
+    "candidate_source_identity_receipt": "/home/zhuhe/litchi-performance-0933/receipts/source-identity-audit-v2.json",
+    "candidate_source_receipt": "/home/zhuhe/litchi-performance-0933/receipts/candidate-source-v2.json",
+    "common_harness_paths": [
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/docx_section_retention.rs",
+      "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+      "tools/perf-baseline/tests/docx_section_retention.rs"
+    ],
+    "iwork_scope": "excluded",
+    "source_patch": "to be generated and hash-bound after candidate review; no patch is inferred from the mutable checkout"
+  },
+  "status": "prospective_frozen_shape_pending_source_build_manifest",
+  "terminal_and_replay": {
+    "build_authorized": true,
+    "capture_authorized": false,
+    "output_policy": "external packet per child; exclusive-create report/stream/terminal files",
+    "process_group": "poll/terminate only on confirmed deadline; observation polling is not failure",
+    "replay": "rehash source, binary, runner, report, terminal and manifest descriptors from a moved packet before reduction",
+    "terminal_first": true
+  },
+  "toolchain_and_locks": {
+    "cargo_selector": "+1.95.0",
+    "jobs": 2,
+    "offline_locked": true,
+    "perf_baseline_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "root_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "rustc": "1.95.0",
+    "rustfmt_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "total_frozen_children": 72
+}

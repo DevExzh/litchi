@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0933 — scanner copies removed; fragment work remains
+
+[0933](0933-docx-borrowed-inventory-scanners.md) removes per-event resolver
+clones and inventory event/name copies while preserving fresh validation.
+For eight 8,192-section commits, construction requested bytes fall from
+1,251,354,390 to 800,608,673 (shared) and from 2,226,793,064 to 1,425,467,600
+(independent). Small-document reductions are 21.46–29.02%. Normal latency
+passes the safety guardrail but misses the 5% improvement gate. No RSS saving
+is claimed; the reader-pair outlier is documented. Reprofile the adopted
+implementation before ranking further work. Fragment validation/decoding
+remains a candidate constrained by lazy semantic errors, footnote validation,
+namespace context and exact source offsets.
+
 ## 0932 — scanner copies are the next bounded allocation candidate
 
 [0932](0932-docx-allocation-attribution.md) assigns 38.5873% of shared and

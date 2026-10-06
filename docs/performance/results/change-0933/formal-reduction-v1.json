@@ -1,0 +1,910 @@
+{
+  "allocator": {
+    "cells": {
+      "sections=16/independent_sources": {
+        "gate_review": {
+          "allocation_calls_strictly_reduced_all": true,
+          "pairs": 3,
+          "requested_bytes_reduction_all_ge_20_percent": true,
+          "requested_bytes_reduction_fractions": [
+            0.21459359709400883,
+            0.21459359709400883,
+            0.21459359709400883
+          ]
+        },
+        "ownership": "independent_sources",
+        "pairs": [
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 65480,
+            "baseline_requested_bytes": 7140008,
+            "baseline_rss_bytes": 13213696,
+            "candidate_allocation_calls": 47928,
+            "candidate_requested_bytes": 5607808,
+            "candidate_rss_bytes": 13303808,
+            "pair_id": "allocator-section-00016-independent_sources-rep-01",
+            "requested_bytes_reduction_fraction": 0.21459359709400883
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 65480,
+            "baseline_requested_bytes": 7140008,
+            "baseline_rss_bytes": 13070336,
+            "candidate_allocation_calls": 47928,
+            "candidate_requested_bytes": 5607808,
+            "candidate_rss_bytes": 13070336,
+            "pair_id": "allocator-section-00016-independent_sources-rep-02",
+            "requested_bytes_reduction_fraction": 0.21459359709400883
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 65480,
+            "baseline_requested_bytes": 7140008,
+            "baseline_rss_bytes": 13185024,
+            "candidate_allocation_calls": 47928,
+            "candidate_requested_bytes": 5607808,
+            "candidate_rss_bytes": 13537280,
+            "pair_id": "allocator-section-00016-independent_sources-rep-03",
+            "requested_bytes_reduction_fraction": 0.21459359709400883
+          }
+        ],
+        "sections": 16
+      },
+      "sections=16/shared_snapshot_clones": {
+        "gate_review": {
+          "allocation_calls_strictly_reduced_all": true,
+          "pairs": 3,
+          "requested_bytes_reduction_all_ge_20_percent": true,
+          "requested_bytes_reduction_fractions": [
+            0.29017244606263637,
+            0.29017244606263637,
+            0.29017244606263637
+          ]
+        },
+        "ownership": "shared_snapshot_clones",
+        "pairs": [
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 38271,
+            "baseline_requested_bytes": 2970668,
+            "baseline_rss_bytes": 12705792,
+            "candidate_allocation_calls": 28398,
+            "candidate_requested_bytes": 2108662,
+            "candidate_rss_bytes": 13111296,
+            "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-01",
+            "requested_bytes_reduction_fraction": 0.29017244606263637
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 38271,
+            "baseline_requested_bytes": 2970668,
+            "baseline_rss_bytes": 12677120,
+            "candidate_allocation_calls": 28398,
+            "candidate_requested_bytes": 2108662,
+            "candidate_rss_bytes": 13234176,
+            "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-02",
+            "requested_bytes_reduction_fraction": 0.29017244606263637
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 38271,
+            "baseline_requested_bytes": 2970668,
+            "baseline_rss_bytes": 12787712,
+            "candidate_allocation_calls": 28398,
+            "candidate_requested_bytes": 2108662,
+            "candidate_rss_bytes": 12730368,
+            "pair_id": "allocator-section-00016-shared_snapshot_clones-rep-03",
+            "requested_bytes_reduction_fraction": 0.29017244606263637
+          }
+        ],
+        "sections": 16
+      },
+      "sections=8192/independent_sources": {
+        "gate_review": {
+          "allocation_calls_strictly_reduced_all": true,
+          "pairs": 3,
+          "requested_bytes_reduction_all_ge_20_percent": true,
+          "requested_bytes_reduction_fractions": [
+            0.3598562780506308,
+            0.3598562780506308,
+            0.3598562780506308
+          ]
+        },
+        "ownership": "independent_sources",
+        "pairs": [
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 30284264,
+            "baseline_requested_bytes": 2226793064,
+            "baseline_rss_bytes": 114495488,
+            "candidate_allocation_calls": 21109592,
+            "candidate_requested_bytes": 1425467600,
+            "candidate_rss_bytes": 114008064,
+            "pair_id": "allocator-section-08192-independent_sources-rep-01",
+            "requested_bytes_reduction_fraction": 0.3598562780506308
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 30284264,
+            "baseline_requested_bytes": 2226793064,
+            "baseline_rss_bytes": 114491392,
+            "candidate_allocation_calls": 21109592,
+            "candidate_requested_bytes": 1425467600,
+            "candidate_rss_bytes": 113946624,
+            "pair_id": "allocator-section-08192-independent_sources-rep-02",
+            "requested_bytes_reduction_fraction": 0.3598562780506308
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 30284264,
+            "baseline_requested_bytes": 2226793064,
+            "baseline_rss_bytes": 115347456,
+            "candidate_allocation_calls": 21109592,
+            "candidate_requested_bytes": 1425467600,
+            "candidate_rss_bytes": 115773440,
+            "pair_id": "allocator-section-08192-independent_sources-rep-03",
+            "requested_bytes_reduction_fraction": 0.3598562780506308
+          }
+        ],
+        "sections": 8192
+      },
+      "sections=8192/shared_snapshot_clones": {
+        "gate_review": {
+          "allocation_calls_strictly_reduced_all": true,
+          "pairs": 3,
+          "requested_bytes_reduction_all_ge_20_percent": true,
+          "requested_bytes_reduction_fractions": [
+            0.3602062857668962,
+            0.3602062857668962,
+            0.3602062857668962
+          ]
+        },
+        "ownership": "shared_snapshot_clones",
+        "pairs": [
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 17036337,
+            "baseline_requested_bytes": 1251354390,
+            "baseline_rss_bytes": 76460032,
+            "candidate_allocation_calls": 11875584,
+            "candidate_requested_bytes": 800608673,
+            "candidate_rss_bytes": 76664832,
+            "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-01",
+            "requested_bytes_reduction_fraction": 0.3602062857668962
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 17036337,
+            "baseline_requested_bytes": 1251354390,
+            "baseline_rss_bytes": 77086720,
+            "candidate_allocation_calls": 11875584,
+            "candidate_requested_bytes": 800608673,
+            "candidate_rss_bytes": 77004800,
+            "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-02",
+            "requested_bytes_reduction_fraction": 0.3602062857668962
+          },
+          {
+            "allocation_calls_strictly_reduced": true,
+            "baseline_allocation_calls": 17036337,
+            "baseline_requested_bytes": 1251354390,
+            "baseline_rss_bytes": 77271040,
+            "candidate_allocation_calls": 11875584,
+            "candidate_requested_bytes": 800608673,
+            "candidate_rss_bytes": 76554240,
+            "pair_id": "allocator-section-08192-shared_snapshot_clones-rep-03",
+            "requested_bytes_reduction_fraction": 0.3602062857668962
+          }
+        ],
+        "sections": 8192
+      }
+    }
+  },
+  "children": 72,
+  "normal": {
+    "paired_gate": {
+      "bootstrap_lower_95_strictly_greater_than": 1.0,
+      "claim": "descriptive paired gate only; adoption requires independent review and semantic controls",
+      "median_ratio_minimum": 1.05,
+      "per_route": {
+        "generic_read_at": {
+          "baseline_p50_ns": [
+            4146457.0,
+            4159121.0,
+            4151231.5,
+            4151831.5,
+            4155391.5,
+            4147946.5
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 1.025509247825844,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0272449229253968,
+          "candidate_p50_ns": [
+            4037087.0,
+            4050926.5,
+            4052496.0,
+            4041111.0,
+            4047461.5,
+            4040256.0
+          ],
+          "median_ratio": 1.0266873390600004,
+          "paired_baseline_over_candidate_p50": [
+            1.0270913160900421,
+            1.0267085813578696,
+            1.0243641202853748,
+            1.0273985297607515,
+            1.026666096762131,
+            1.0266543753663133
+          ],
+          "pairs": 6
+        },
+        "owned_reader": {
+          "baseline_p50_ns": [
+            3504684.5,
+            3492284.0,
+            3501284.0,
+            3723954.5,
+            3507224.5,
+            3500734.0
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 0.9690512609724361,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0621793579014414,
+          "candidate_p50_ns": [
+            3406704.0,
+            3405254.0,
+            3616114.0,
+            3410024.0,
+            3397493.5,
+            3609534.0
+          ],
+          "median_ratio": 1.0271593244480677,
+          "paired_baseline_over_candidate_p50": [
+            1.0287610840272592,
+            1.0255575648688762,
+            0.9682449170573715,
+            1.0920610822680428,
+            1.0322976335348397,
+            0.9698576048875007
+          ],
+          "pairs": 6
+        },
+        "owned_vec": {
+          "baseline_p50_ns": [
+            3378004.0,
+            3382809.0,
+            3388388.0,
+            3386483.0,
+            3373453.5,
+            3385699.0
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 1.0320483271199437,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0349969695559114,
+          "candidate_p50_ns": [
+            3275428.0,
+            3272103.5,
+            3273162.5,
+            3278998.0,
+            3265693.5,
+            3271868.0
+          ],
+          "median_ratio": 1.033415357204029,
+          "paired_baseline_over_candidate_p50": [
+            1.031316823328127,
+            1.0338331290559728,
+            1.0352031101419499,
+            1.0327798309117602,
+            1.0329975853520852,
+            1.0347908289698728
+          ],
+          "pairs": 6
+        },
+        "range_short": {
+          "baseline_p50_ns": [
+            4197432.0,
+            3979336.5,
+            3982125.5,
+            4200237.0,
+            4193592.0,
+            3976406.0
+          ],
+          "bootstrap_draws": 10000,
+          "bootstrap_lower_95": 0.973664464602833,
+          "bootstrap_seed": 930,
+          "bootstrap_upper_95": 1.0262583217526156,
+          "candidate_p50_ns": [
+            4090887.0,
+            4082627.0,
+            4087521.0,
+            4095736.0,
+            4085441.5,
+            4086271.0
+          ],
+          "median_ratio": 1.0001072874547476,
+          "paired_baseline_over_candidate_p50": [
+            1.0260444739734929,
+            0.9746999909617019,
+            0.9742153006675685,
+            1.0255145839477935,
+            1.0264721695317385,
+            0.9731136285380975
+          ],
+          "pairs": 6
+        }
+      },
+      "primary_pass": false,
+      "primary_route": "generic_read_at",
+      "ratio": "baseline_p50 / candidate_p50",
+      "schema": "litchi.performance.0933.paired-gate.v1"
+    },
+    "per_version_route": {
+      "baseline/generic_read_at": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 4422457,
+          "mean": 4156590.2266666666,
+          "min": 4127296,
+          "p50": 4151372.0,
+          "p95": 4184857.0,
+          "p99": 4221216.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 379441,
+            "mean": 346739.4766666667,
+            "min": 335562,
+            "p50": 344861.5,
+            "p95": 357031.0,
+            "p99": 375052.0
+          },
+          "edit_ns": {
+            "max": 78760,
+            "mean": 52993.35333333333,
+            "min": 50361,
+            "p50": 52060.0,
+            "p95": 61420.0,
+            "p99": 66480.0
+          },
+          "open_ns": {
+            "max": 58910,
+            "mean": 45241.71,
+            "min": 42300,
+            "p50": 44750.0,
+            "p95": 50790.0,
+            "p99": 53140.0
+          },
+          "preparation_ns": {
+            "max": 64490,
+            "mean": 36754.50666666667,
+            "min": 32400,
+            "p50": 35170.0,
+            "p95": 41430.0,
+            "p99": 47700.0
+          },
+          "publication_ns": {
+            "max": 2498129,
+            "mean": 2341186.71,
+            "min": 2323960,
+            "p50": 2338484.5,
+            "p95": 2361220.0,
+            "p99": 2391519.0
+          },
+          "query_ns": {
+            "max": 1388205,
+            "mean": 1333674.47,
+            "min": 1320675,
+            "p50": 1331675.5,
+            "p95": 1348045.0,
+            "p99": 1368576.0
+          }
+        },
+        "rss_bytes": [
+          38293504,
+          37584896,
+          37568512,
+          38105088,
+          38027264,
+          38506496
+        ],
+        "samples": 300
+      },
+      "baseline/owned_reader": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 3794715,
+          "mean": 3532905.8066666666,
+          "min": 3255542,
+          "p50": 3504684.5,
+          "p95": 3739004.0,
+          "p99": 3772495.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 381311,
+            "mean": 344334.2766666667,
+            "min": 332831,
+            "p50": 343341.5,
+            "p95": 355022.0,
+            "p99": 370302.0
+          },
+          "edit_ns": {
+            "max": 66370,
+            "mean": 52453.443333333336,
+            "min": 49880,
+            "p50": 51930.0,
+            "p95": 57111.0,
+            "p99": 61260.0
+          },
+          "open_ns": {
+            "max": 410481,
+            "mean": 382896.45,
+            "min": 341162,
+            "p50": 382826.5,
+            "p95": 394781.0,
+            "p99": 400601.0
+          },
+          "preparation_ns": {
+            "max": 253621,
+            "mean": 61717.206666666665,
+            "min": 32450,
+            "p50": 34650.5,
+            "p95": 241921.0,
+            "p99": 248531.0
+          },
+          "publication_ns": {
+            "max": 1411436,
+            "mean": 1358678.9233333333,
+            "min": 1140794,
+            "p50": 1357466.0,
+            "p95": 1382995.0,
+            "p99": 1397965.0
+          },
+          "query_ns": {
+            "max": 1379915,
+            "mean": 1332825.5066666666,
+            "min": 1318065,
+            "p50": 1331725.0,
+            "p95": 1346335.0,
+            "p99": 1359866.0
+          }
+        },
+        "rss_bytes": [
+          38539264,
+          38510592,
+          37904384,
+          39796736,
+          38109184,
+          37867520
+        ],
+        "samples": 300
+      },
+      "baseline/owned_vec": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 3544884,
+          "mean": 3386269.8333333335,
+          "min": 3353684,
+          "p50": 3382468.5,
+          "p95": 3415853.0,
+          "p99": 3451794.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 383881,
+            "mean": 347047.92333333334,
+            "min": 334772,
+            "p50": 344871.5,
+            "p95": 360361.0,
+            "p99": 375272.0
+          },
+          "edit_ns": {
+            "max": 64500,
+            "mean": 52312.363333333335,
+            "min": 49300,
+            "p50": 51660.0,
+            "p95": 58550.0,
+            "p99": 63860.0
+          },
+          "open_ns": {
+            "max": 57890,
+            "mean": 45288.846666666665,
+            "min": 42850,
+            "p50": 44835.0,
+            "p95": 49070.0,
+            "p99": 53470.0
+          },
+          "preparation_ns": {
+            "max": 267281,
+            "mean": 240194.12333333332,
+            "min": 234341,
+            "p50": 238731.0,
+            "p95": 247231.0,
+            "p99": 252401.0
+          },
+          "publication_ns": {
+            "max": 1452556,
+            "mean": 1367384.9666666666,
+            "min": 1349206,
+            "p50": 1365110.5,
+            "p95": 1384196.0,
+            "p99": 1409685.0
+          },
+          "query_ns": {
+            "max": 1362406,
+            "mean": 1334041.61,
+            "min": 1321296,
+            "p50": 1332640.0,
+            "p95": 1347915.0,
+            "p99": 1357765.0
+          }
+        },
+        "rss_bytes": [
+          37523456,
+          38047744,
+          38002688,
+          37707776,
+          37785600,
+          37736448
+        ],
+        "samples": 300
+      },
+      "baseline/range_short": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 4239956,
+          "mean": 4096476.4566666665,
+          "min": 3955316,
+          "p50": 4179391.5,
+          "p95": 4216007.0,
+          "p99": 4225657.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 381382,
+            "mean": 345648.93,
+            "min": 334411,
+            "p50": 344331.0,
+            "p95": 356801.0,
+            "p99": 365511.0
+          },
+          "edit_ns": {
+            "max": 63261,
+            "mean": 52450.933333333334,
+            "min": 49760,
+            "p50": 51760.0,
+            "p95": 55890.0,
+            "p99": 60701.0
+          },
+          "open_ns": {
+            "max": 58530,
+            "mean": 45825.13333333333,
+            "min": 41450,
+            "p50": 45015.0,
+            "p95": 55071.0,
+            "p99": 56740.0
+          },
+          "preparation_ns": {
+            "max": 49780,
+            "mean": 37807.19666666666,
+            "min": 31350,
+            "p50": 37585.0,
+            "p95": 42920.0,
+            "p99": 48040.0
+          },
+          "publication_ns": {
+            "max": 2395519,
+            "mean": 2271381.316666667,
+            "min": 2149169,
+            "p50": 2359085.0,
+            "p95": 2376799.0,
+            "p99": 2382039.0
+          },
+          "query_ns": {
+            "max": 1380545,
+            "mean": 1343362.9466666668,
+            "min": 1328496,
+            "p50": 1341945.5,
+            "p95": 1358855.0,
+            "p99": 1367995.0
+          }
+        },
+        "rss_bytes": [
+          38133760,
+          38096896,
+          37724160,
+          37969920,
+          38662144,
+          37904384
+        ],
+        "samples": 300
+      },
+      "candidate/generic_read_at": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 4107666,
+          "mean": 4046963.3133333335,
+          "min": 4021767,
+          "p50": 4044596.0,
+          "p95": 4071717.0,
+          "p99": 4087356.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 334931,
+            "mean": 292837.92,
+            "min": 281692,
+            "p50": 290816.0,
+            "p95": 303381.0,
+            "p99": 311422.0
+          },
+          "edit_ns": {
+            "max": 73950,
+            "mean": 54143.84333333333,
+            "min": 50550,
+            "p50": 53695.0,
+            "p95": 58290.0,
+            "p99": 64200.0
+          },
+          "open_ns": {
+            "max": 53760,
+            "mean": 44905.15666666667,
+            "min": 42520,
+            "p50": 44616.0,
+            "p95": 47330.0,
+            "p99": 51660.0
+          },
+          "preparation_ns": {
+            "max": 49231,
+            "mean": 37961.52,
+            "min": 33150,
+            "p50": 39305.0,
+            "p95": 43440.0,
+            "p99": 47850.0
+          },
+          "publication_ns": {
+            "max": 2383029,
+            "mean": 2339597.92,
+            "min": 2325139,
+            "p50": 2338575.0,
+            "p95": 2353000.0,
+            "p99": 2364810.0
+          },
+          "query_ns": {
+            "max": 1327826,
+            "mean": 1277516.9533333334,
+            "min": 1261355,
+            "p50": 1276355.0,
+            "p95": 1290836.0,
+            "p99": 1305565.0
+          }
+        },
+        "rss_bytes": [
+          38424576,
+          38174720,
+          38203392,
+          38633472,
+          38367232,
+          38199296
+        ],
+        "samples": 300
+      },
+      "candidate/owned_reader": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 3683445,
+          "mean": 3464465.223333333,
+          "min": 3129823,
+          "p50": 3411334.0,
+          "p95": 3628074.0,
+          "p99": 3652515.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 312761,
+            "mean": 289280.44666666666,
+            "min": 278971,
+            "p50": 288576.5,
+            "p95": 300971.0,
+            "p99": 307911.0
+          },
+          "edit_ns": {
+            "max": 62820,
+            "mean": 53912.23333333333,
+            "min": 51230,
+            "p50": 53400.0,
+            "p95": 59440.0,
+            "p99": 61640.0
+          },
+          "open_ns": {
+            "max": 439751,
+            "mean": 385233.87,
+            "min": 328562,
+            "p50": 384426.5,
+            "p95": 402922.0,
+            "p99": 409301.0
+          },
+          "preparation_ns": {
+            "max": 264982,
+            "mean": 95614.78333333334,
+            "min": 33270,
+            "p50": 35970.0,
+            "p95": 248821.0,
+            "p99": 250681.0
+          },
+          "publication_ns": {
+            "max": 1442676,
+            "mean": 1360804.8066666666,
+            "min": 1141895,
+            "p50": 1361105.5,
+            "p95": 1380566.0,
+            "p99": 1389765.0
+          },
+          "query_ns": {
+            "max": 1320825,
+            "mean": 1279619.0833333333,
+            "min": 1267225,
+            "p50": 1278210.0,
+            "p95": 1293216.0,
+            "p99": 1309415.0
+          }
+        },
+        "rss_bytes": [
+          38531072,
+          38432768,
+          41029632,
+          37490688,
+          38203392,
+          39378944
+        ],
+        "samples": 300
+      },
+      "candidate/owned_vec": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 3449324,
+          "mean": 3275315.33,
+          "min": 3248333,
+          "p50": 3273008.0,
+          "p95": 3297823.0,
+          "p99": 3327324.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 317651,
+            "mean": 291477.88333333336,
+            "min": 278951,
+            "p50": 289596.0,
+            "p95": 302211.0,
+            "p99": 309122.0
+          },
+          "edit_ns": {
+            "max": 68321,
+            "mean": 54161.43,
+            "min": 51540,
+            "p50": 53520.5,
+            "p95": 59821.0,
+            "p99": 65590.0
+          },
+          "open_ns": {
+            "max": 64540,
+            "mean": 45054.34,
+            "min": 42370,
+            "p50": 44545.5,
+            "p95": 50080.0,
+            "p99": 53200.0
+          },
+          "preparation_ns": {
+            "max": 261641,
+            "mean": 239186.89666666667,
+            "min": 233481,
+            "p50": 238121.0,
+            "p95": 245741.0,
+            "p99": 248761.0
+          },
+          "publication_ns": {
+            "max": 1442216,
+            "mean": 1367677.1466666667,
+            "min": 1353156,
+            "p50": 1366320.0,
+            "p95": 1381306.0,
+            "p99": 1401466.0
+          },
+          "query_ns": {
+            "max": 1308075,
+            "mean": 1277757.6333333333,
+            "min": 1262565,
+            "p50": 1276975.0,
+            "p95": 1291705.0,
+            "p99": 1297695.0
+          }
+        },
+        "rss_bytes": [
+          38195200,
+          37240832,
+          37900288,
+          38187008,
+          38551552,
+          38014976
+        ],
+        "samples": 300
+      },
+      "candidate/range_short": {
+        "children": 6,
+        "elapsed_ns": {
+          "max": 4404227,
+          "mean": 4092888.4233333333,
+          "min": 4065577,
+          "p50": 4088437.0,
+          "p95": 4123906.0,
+          "p99": 4171227.0
+        },
+        "phase_statistics_ns": {
+          "commit_ns": {
+            "max": 326781,
+            "mean": 292979.01,
+            "min": 284141,
+            "p50": 291256.0,
+            "p95": 303531.0,
+            "p99": 312581.0
+          },
+          "edit_ns": {
+            "max": 80440,
+            "mean": 54433.026666666665,
+            "min": 51321,
+            "p50": 53450.0,
+            "p95": 62050.0,
+            "p99": 68830.0
+          },
+          "open_ns": {
+            "max": 72230,
+            "mean": 47017.24333333333,
+            "min": 43770,
+            "p50": 46195.0,
+            "p95": 54500.0,
+            "p99": 57880.0
+          },
+          "preparation_ns": {
+            "max": 60010,
+            "mean": 39755.25,
+            "min": 33080,
+            "p50": 39580.5,
+            "p95": 45580.0,
+            "p99": 50731.0
+          },
+          "publication_ns": {
+            "max": 2554110,
+            "mean": 2370432.83,
+            "min": 2352989,
+            "p50": 2366704.5,
+            "p95": 2395850.0,
+            "p99": 2417799.0
+          },
+          "query_ns": {
+            "max": 1321935,
+            "mean": 1288271.0633333332,
+            "min": 1272995,
+            "p50": 1287510.5,
+            "p95": 1301245.0,
+            "p99": 1314605.0
+          }
+        },
+        "rss_bytes": [
+          38166528,
+          37904384,
+          38477824,
+          38670336,
+          38436864,
+          37507072
+        ],
+        "samples": 300
+      }
+    }
+  },
+  "packet": "/home/zhuhe/litchi-performance-0933/formal-packet-v1",
+  "schema": "litchi.performance.0933.formal-replay.v2",
+  "source": "all reports, terminal streams, and scalar validations rehashed from packet",
+  "status": "passed"
+}

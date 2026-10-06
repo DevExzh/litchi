@@ -1,0 +1,120 @@
+{
+  "argv": [
+    "env",
+    "-u",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--offline",
+    "--locked",
+    "-j2",
+    "--release",
+    "--bin",
+    "litchi-perf-baseline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0933/baseline-source/tools/perf-baseline/Cargo.toml",
+    "--target-dir",
+    "/home/zhuhe/litchi-performance-0933/target-baseline-normal"
+  ],
+  "binary": {
+    "bytes": 69942800,
+    "path": "/home/zhuhe/litchi-performance-0933/target-baseline-normal/release/litchi-perf-baseline",
+    "sha256": "84a5563533160c0e1158b3b0384a2940fa5fd5d7a29ef1544508574fe000f170"
+  },
+  "binary_name": "litchi-perf-baseline",
+  "binary_receipt": {
+    "bytes": 205,
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/binary.json",
+    "sha256": "5d6bf73b6fcdc2f2d21974a200e4a6e24ec23d45123966b66ee458c8af6ca72c"
+  },
+  "build_log": {
+    "bytes": 9065,
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/stderr.log",
+    "sha256": "4c56db5b316dd0ec33b825e39936a5dae1e8aa9f9df08e2c32c3dc9ec31848fb"
+  },
+  "created_utc": "2026-10-06T17:01:17.406038+00:00",
+  "cwd": "/home/zhuhe/litchi-performance-0933/baseline-source",
+  "derivation": {
+    "binary_record_original": {
+      "bytes": 205,
+      "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/binary.json",
+      "sha256": "5d6bf73b6fcdc2f2d21974a200e4a6e24ec23d45123966b66ee458c8af6ca72c"
+    },
+    "build_output_logs_original": [
+      {
+        "bytes": 9065,
+        "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/stderr.log",
+        "sha256": "4c56db5b316dd0ec33b825e39936a5dae1e8aa9f9df08e2c32c3dc9ec31848fb"
+      },
+      {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "note": "This compact receipt was assembled after the original terminal and binary records completed; timestamps are copied only from terminal.json and no build event is reconstructed.",
+    "start_record_original": {
+      "bytes": 702,
+      "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/start.json",
+      "sha256": "214a1c3a402d0228f0008878e4955e9315d5e25a0c0aa7f10fe7b0fbb48b6a80"
+    },
+    "terminal_record_original": {
+      "bytes": 1206,
+      "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/terminal.json",
+      "sha256": "c130a73cf6d1644c30bda974e3107f2828321132f6648d78d8f105ffdbc4c2bf"
+    }
+  },
+  "ended_utc": "2026-10-06T16:59:41.272248+00:00",
+  "env_policy": "inherited environment with RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS removed; allocator sets RUSTFLAGS explicitly in argv",
+  "exit_code": 0,
+  "full_source_listing": {
+    "bytes": 1870029,
+    "path": "/home/zhuhe/litchi-performance-0933/baseline-source-list-v1.jsonl",
+    "sha256": "7bb16f092371134c16622dea8b2690c4266ec0538788c6352c5a089080ccbc19"
+  },
+  "lane": "normal",
+  "locks": {
+    "perf_baseline_cargo_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "root_cargo_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "rustfmt_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "profile": "release",
+  "record_kind": "postterminal_binding_adapter",
+  "role": "fresh_baseline_normal",
+  "schema": "litchi.performance.0933.build-receipt.v2",
+  "source_custody": {
+    "full_source_listing_sha256": "7bb16f092371134c16622dea8b2690c4266ec0538788c6352c5a089080ccbc19",
+    "source_receipt_sha256": "e9f3de7ff8d3721fdfe9c863add96de976fa24f205c7f8a3495375f2aa254172",
+    "source_root": "/home/zhuhe/litchi-performance-0933/baseline-source"
+  },
+  "source_receipt": {
+    "bytes": 1972,
+    "path": "/home/zhuhe/litchi-performance-0933/receipts/baseline-source-final-v1.json",
+    "sha256": "e9f3de7ff8d3721fdfe9c863add96de976fa24f205c7f8a3495375f2aa254172"
+  },
+  "source_revision": "a17d87da48504e8d1c1a6240a6c5d1b11219031f",
+  "start_receipt": {
+    "bytes": 702,
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/start.json",
+    "sha256": "214a1c3a402d0228f0008878e4955e9315d5e25a0c0aa7f10fe7b0fbb48b6a80"
+  },
+  "started_utc": "2026-10-06T16:50:32.819979+00:00",
+  "status": "completed",
+  "stdout_log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "terminal_receipt": {
+    "bytes": 1206,
+    "path": "/home/zhuhe/litchi-performance-0933/builds/fresh_baseline_normal/terminal.json",
+    "sha256": "c130a73cf6d1644c30bda974e3107f2828321132f6648d78d8f105ffdbc4c2bf"
+  },
+  "terminal_record_original": true,
+  "toolchain": {
+    "cargo": "cargo +1.95.0",
+    "rustc": "rustc 1.95.0 (standalone selector)"
+  },
+  "workload_started": false
+}
