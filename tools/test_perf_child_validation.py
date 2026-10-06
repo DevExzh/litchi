@@ -69,6 +69,63 @@ def _child_command(report: Path, mode: str) -> tuple[str, ...]:
     return (sys.executable, "-c", code, str(report), mode)
 
 
+def _json_child_command(report: Path, value: Mapping[str, Any]) -> tuple[str, ...]:
+    payload = json.dumps(value, sort_keys=True)
+    code = (
+        "import pathlib, sys; "
+        "pathlib.Path(sys.argv[1]).write_text(sys.argv[2], encoding='utf-8')"
+    )
+    return (sys.executable, "-c", code, str(report), payload)
+
+
+def _docx_owned_report(
+    *, case: str, route: str, warmups: int = 1, samples: int = 2, digest: str = DIGEST
+) -> dict[str, Any]:
+    workload = case == "workload"
+    gate = {
+        "snapshot_shape_verified": True,
+        "changed_nonnoop_columns_verified": True,
+        "patch_forward_inverse_stale_verified": True,
+        "publication_inverse_applicable_verified": True,
+        "output_verified": True,
+        "reopened_output_verified": True,
+        "inverse_source_verified": True,
+        "source_immutability_verified": True,
+        "cache_contract_verified": True,
+        "cache_deterministic_verified": True,
+        "sink_bounds_verified": True,
+        "owned_reader_ingress_verified": True,
+        "cache_hits": 0,
+        "cache_cold_loads": 1,
+        "cache_successful_loads": 1,
+        "cache_retained_entries": 1,
+        "cache_retained_bytes": 1,
+    }
+    return {
+        "schema": "docx_owned_ingress_attribution_v1",
+        "scenario": "docx-owned-ingress-attribution",
+        "case": case,
+        "route": route,
+        "diagnostic_enabled": case == "calibration",
+        "warmup_iterations": warmups,
+        "sample_count": samples,
+        "expected_output_sha256": digest if workload else None,
+        "output_sha256": [digest] * samples if workload else [],
+        "correctness_status": "verified" if workload else "not_applicable",
+        "correctness_verified": [True] * samples if workload else [],
+        "inverse_source_verified": [True] * samples if workload else [],
+        "correctness_gates": [gate] * samples if workload else [],
+        "sink": (
+            [{"accepted_bytes": 1, "write_calls": 1, "largest_write": 1}] * samples
+            if workload
+            else []
+        ),
+        "owned_ingress_read_calls": [None] * samples if workload else [],
+        "owned_ingress_read_bytes": [None] * samples if workload else [],
+        "owned_input_bytes": [1] * samples if workload else [],
+    }
+
+
 def _historical_child_command(report: Path, mode: str = "valid") -> tuple[str, ...]:
     code = (
         "import json, pathlib, sys; "
@@ -131,6 +188,18 @@ class ChildValidationIntegrationTests(unittest.TestCase):
             expected_output_sha256=DIGEST,
             binary={"path": "fixture-binary", "bytes": 1, "sha256": "c" * 64},
             deadline_seconds=10.0,
+        )
+
+    def docx_spec(
+        self, report: Mapping[str, Any], *, contract: str, expected: str | None
+    ) -> perf_child_validation.ChildSpec:
+        return replace(
+            self.spec("valid"),
+            command=_json_child_command(self.paths.report, report),
+            route=str(report["route"]),
+            label=f"{contract}-fixture",
+            expected_output_sha256=expected,
+            report_contract=contract,
         )
 
     def run_historical_cli(self, mode: str = "valid") -> subprocess.CompletedProcess[str]:
@@ -274,6 +343,170 @@ class ChildValidationIntegrationTests(unittest.TestCase):
         self.assertEqual(json.loads(process.stdout)["status"], "failed")
         self.assertTrue(self.paths.terminal.is_file())
         self.assertIn("output", json.loads(self.paths.validation.read_text())["error"])
+
+    def test_docx_owned_workload_checks_top_level_per_sample_digests(self) -> None:
+        report = _docx_owned_report(case="workload", route="owned_vec")
+        validator = _FixtureValidator(self.paths.terminal)
+        outcome = perf_child_validation.run_child_and_validate(
+            self.docx_spec(
+                report,
+                contract=perf_child_validation.REPORT_CONTRACT_DOCX_OWNED_WORKLOAD,
+                expected=DIGEST,
+            ),
+            validator,
+        )
+
+        self.assertEqual(outcome["status"], "passed")
+        self.assertEqual(outcome["result"]["output_sha256"], DIGEST)
+        self.assertEqual(outcome["result"]["sample_count"], 2)
+        terminal = json.loads(self.paths.terminal.read_text())
+        self.assertEqual(terminal["report_contract"], "docx-owned-workload")
+        self.assertEqual(
+            json.loads(self.paths.validation.read_text())["report_contract"],
+            "docx-owned-workload",
+        )
+
+    def test_docx_owned_calibration_has_no_output_digest(self) -> None:
+        report = _docx_owned_report(case="calibration", route="route_independent")
+        validator = _FixtureValidator(self.paths.terminal)
+        outcome = perf_child_validation.run_child_and_validate(
+            self.docx_spec(
+                report,
+                contract=perf_child_validation.REPORT_CONTRACT_DOCX_OWNED_CALIBRATION,
+                expected=None,
+            ),
+            validator,
+        )
+
+        self.assertEqual(outcome["status"], "passed")
+        self.assertNotIn("output_sha256", outcome["result"])
+        validation = json.loads(self.paths.validation.read_text())
+        self.assertNotIn("output_sha256", validation)
+        terminal = json.loads(self.paths.terminal.read_text())
+        self.assertIsNone(terminal["expected_output_sha256"])
+
+    def test_docx_owned_workload_rejects_legacy_contract(self) -> None:
+        report = _docx_owned_report(case="workload", route="owned_vec")
+        validator = _FixtureValidator(self.paths.terminal)
+        outcome = perf_child_validation.run_child_and_validate(
+            replace(
+                self.docx_spec(report, contract="legacy", expected=DIGEST),
+                route="owned_vec",
+            ),
+            validator,
+        )
+
+        self.assertEqual(outcome["status"], "failed")
+        self.assertEqual(validator.calls, 0)
+        self.assertIn("report.results", outcome["validation"]["error"])
+
+    def test_legacy_contract_rejects_wrong_expected_digest(self) -> None:
+        validator = _FixtureValidator(self.paths.terminal)
+        outcome = perf_child_validation.run_child_and_validate(
+            replace(self.spec("mutated"), expected_output_sha256=DIGEST),
+            validator,
+        )
+
+        self.assertEqual(outcome["status"], "failed")
+        self.assertEqual(validator.calls, 0)
+        self.assertIn("does not match expected_output_sha256", outcome["validation"]["error"])
+
+    def test_docx_owned_contract_rejects_wrong_route_before_start(self) -> None:
+        report = _docx_owned_report(case="workload", route="owned_vec")
+        spec = replace(
+            self.docx_spec(
+                report,
+                contract=perf_child_validation.REPORT_CONTRACT_DOCX_OWNED_WORKLOAD,
+                expected=DIGEST,
+            ),
+            route="generic_read_at",
+        )
+
+        with self.assertRaisesRegex(
+            perf_child_validation.ChildValidationError,
+            "route must be owned_vec or owned_reader",
+        ):
+            perf_child_validation.run_child_and_validate(spec, _FixtureValidator(self.paths.terminal))
+        self.assertFalse(self.paths.terminal.exists())
+
+    def test_docx_owned_calibration_rejects_forged_output(self) -> None:
+        report = _docx_owned_report(case="calibration", route="route_independent")
+        report["output_sha256"] = [DIGEST]
+        validator = _FixtureValidator(self.paths.terminal)
+        outcome = perf_child_validation.run_child_and_validate(
+            self.docx_spec(
+                report,
+                contract=perf_child_validation.REPORT_CONTRACT_DOCX_OWNED_CALIBRATION,
+                expected=None,
+            ),
+            validator,
+        )
+
+        self.assertEqual(outcome["status"], "failed")
+        self.assertEqual(validator.calls, 0)
+        self.assertIn("must not publish per-sample output digests", outcome["validation"]["error"])
+
+    def test_cli_explicitly_runs_docx_calibration_contract(self) -> None:
+        report = _docx_owned_report(case="calibration", route="route_independent")
+        self.paths.report.unlink(missing_ok=True)
+        validator_path = self.root / "docx_validator.py"
+        validator_path.write_text(
+            "def validate_report(report, route, *, warmups, samples, label, binary):\n"
+            "    return {'elapsed_ns': [11] * samples}\n",
+            encoding="utf-8",
+        )
+        validator_sha256 = hashlib.sha256(validator_path.read_bytes()).hexdigest()
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tools/perf_child_validation.py"),
+                "--validator",
+                str(validator_path),
+                "--validator-sha256",
+                validator_sha256,
+                "--cwd",
+                str(self.root),
+                "--report",
+                str(self.paths.report),
+                "--stdout",
+                str(self.paths.stdout),
+                "--stderr",
+                str(self.paths.stderr),
+                "--terminal",
+                str(self.paths.terminal),
+                "--validation",
+                str(self.paths.validation),
+                "--route",
+                "route_independent",
+                "--label",
+                "docx-calibration-cli",
+                "--warmups",
+                "1",
+                "--samples",
+                "2",
+                "--report-contract",
+                "docx-owned-calibration",
+                "--env",
+                "PATH=/usr/bin:/bin",
+                "--env",
+                "LC_ALL=C",
+                "--command",
+                *_json_child_command(self.paths.report, report),
+            ],
+            cwd=ROOT,
+            env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(json.loads(process.stdout)["status"], "passed")
+        self.assertEqual(
+            json.loads(self.paths.terminal.read_text())["report_contract"],
+            "docx-owned-calibration",
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover

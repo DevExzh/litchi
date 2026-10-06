@@ -1,0 +1,86 @@
+{
+  "adr_scope": "Applicable accepted ADRs and docs/adr/README were read in the prior 0939 turn; docs/adr has no diff at this HEAD. iWork-only records remain excluded.",
+  "bindings": {
+    "baseline_copy_receipt": {
+      "bytes": 4097,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/source-baseline-copy-v1.json",
+      "sha256": "cfcac9bd9d9d4d2f5a56128d9a6272a1e13fbb351907c6d346b850d80cd3e5e5"
+    },
+    "comparison": {
+      "bytes": 24548,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison.py",
+      "sha256": "9762ecd276b74a00adecfe8d0ec513d459bc4324337636c844cc8000a188594b"
+    },
+    "helper": {
+      "bytes": 28257,
+      "path": "/home/zhuhe/code/litchi/tools/perf_child_validation.py",
+      "sha256": "198223e4231fe62c503f60010b7867724aa9d8311f8067a14b36ed56eb69667a"
+    },
+    "helper_tests": {
+      "bytes": 20946,
+      "path": "/home/zhuhe/code/litchi/tools/test_perf_child_validation.py",
+      "sha256": "0d237515317703b34fdd060b1714a5d5c97e9210b5eae88a099b0e71b6dcbc41"
+    },
+    "plan_v3": {
+      "bytes": 15367,
+      "path": "/home/zhuhe/litchi-performance-0940/plans/prospective-plan-v3.json",
+      "sha256": "a653a45f4f15110df6b1ff2fd175a428df677fc9702b02750813df4227fa2417"
+    },
+    "preflight_receipt": {
+      "bytes": 2219,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/preflight-v2.json",
+      "sha256": "9b205419a06e43796d508cda24ac6edde1f963855ea67ca5d17c87d87eaf418b"
+    },
+    "runner": {
+      "bytes": 20280,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison-runner.py",
+      "sha256": "f28b6107672ea84b92eb527754731684fbaa3508d604fb14e9eb22bc65bd140d"
+    }
+  },
+  "execution": {
+    "candidate_source_overlay_created": false,
+    "capture_authorization": false,
+    "formal_children_started": false,
+    "rust_builds_started": false
+  },
+  "preflight": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/litchi-performance-0940/pycache python3 -B docs/performance/results/change-0940/comparison-runner.py --preflight --helper-sha256 198223e4231fe62c503f60010b7867724aa9d8311f8067a14b36ed56eb69667a --comparison-sha256 9762ecd276b74a00adecfe8d0ec513d459bc4324337636c844cc8000a188594b --preflight-scratch /home/zhuhe/litchi-performance-0940/preflight-v2 --preflight-output /home/zhuhe/litchi-performance-0940/receipts/preflight-v2.json",
+    "negative_mutated_output": "rejected after terminal receipt",
+    "positive_calibration": "passed",
+    "positive_workload": "passed",
+    "receipt": {
+      "bytes": 2219,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/preflight-v2.json",
+      "sha256": "9b205419a06e43796d508cda24ac6edde1f963855ea67ca5d17c87d87eaf418b"
+    },
+    "retained_artifacts": true
+  },
+  "schedule": {
+    "calibration_children": 8,
+    "children": 80,
+    "cpu": 12,
+    "deadline_seconds": 900,
+    "samples": 50,
+    "sha256": "9ba2e96533a271ff89d38351c321990d914cdc8387ecb333589e65a039560b8a",
+    "warmups": 5,
+    "workload_children": 72
+  },
+  "schema": "litchi.performance.0940.tooling-validation.v1",
+  "scope": "DOCX owned ingress diagnostic; iWork excluded",
+  "source_baseline_copy": {
+    "bytes": 259962058,
+    "canonical_diff_exit": 0,
+    "files": 10779,
+    "receipt": {
+      "bytes": 4097,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/source-baseline-copy-v1.json",
+      "sha256": "cfcac9bd9d9d4d2f5a56128d9a6272a1e13fbb351907c6d346b850d80cd3e5e5"
+    },
+    "root": "/home/zhuhe/litchi-performance-0940/source-baseline"
+  },
+  "status": "preflight_passed_builds_and_formal_workload_not_started",
+  "superseded": {
+    "preflight-v1_receipt": "/home/zhuhe/litchi-performance-0940/receipts/preflight-v1.json",
+    "reason": "v1 referenced temporary artifacts; v2 retains complete fixture packet"
+  }
+}

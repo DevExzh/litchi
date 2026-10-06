@@ -1,0 +1,704 @@
+{
+  "adr": {
+    "accepted_non_iwork_text": "Applicable accepted ADR text was read before tooling edits; the accepted corpus was unchanged in this batch.",
+    "iwork_only_records": "Excluded per user scope after original decisions and non-iWork constraints were read.",
+    "readme": {
+      "bytes": 5766,
+      "path": "/home/zhuhe/code/litchi/docs/adr/README.md",
+      "sha256": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028"
+    }
+  },
+  "artifact_policy": "Large source listing, binaries, raw packet, reports, and reductions remain outside the repository; this receipt is metadata-only and below 1 MiB.",
+  "builds": {
+    "allocator": {
+      "binary": {
+        "bytes": 70036128,
+        "identity": null,
+        "path": "/home/zhuhe/litchi-performance-0940/target-allocator-v1/release/litchi-perf-baseline-alloc",
+        "sha256": "769b9bf2df27ed27f1b509c1c8abfca1d80633fccb418420e832cc052f946b4e"
+      },
+      "binary_receipt": {
+        "bytes": 208,
+        "path": "/home/zhuhe/litchi-performance-0940/builds/allocator-v1/binary.json",
+        "sha256": "7209263709f5efafed6c958387423fb50a92546b132a7a5d16fb3f52a6df4cc3"
+      },
+      "command": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "--locked",
+        "-j2",
+        "--release",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+        "--target-dir",
+        "/home/zhuhe/litchi-performance-0940/target-allocator-v1"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0940/source-candidate-v1",
+      "environment_policy": "allowlisted build variables; RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS explicitly unset",
+      "identity": "litchi-perf-baseline-alloc",
+      "lane": "allocator-v1",
+      "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+      "start": {
+        "receipt": {
+          "bytes": 2073,
+          "path": "/home/zhuhe/litchi-performance-0940/builds/allocator-v1/start.json",
+          "sha256": "26ad052ab7c6fa62be853fd869a178b3e766929a1874a681c60b10b9eba74157"
+        },
+        "started_utc": "2026-10-06T21:20:53.798072Z"
+      },
+      "terminal": {
+        "ended_utc": "2026-10-06T21:29:51.963664Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2651,
+          "path": "/home/zhuhe/litchi-performance-0940/builds/allocator-v1/terminal.json",
+          "sha256": "a682b1edbf9e7d15f4e12c836b150c16fc0c5c408014e64bd40b44617cf9b34f"
+        }
+      }
+    },
+    "normal": {
+      "binary": {
+        "bytes": 70076392,
+        "identity": null,
+        "path": "/home/zhuhe/litchi-performance-0940/target-normal-v1/release/litchi-perf-baseline",
+        "sha256": "c735995c902d410b68d43348d169535728d01df6efbf1169263c2345b8666e92"
+      },
+      "binary_receipt": {
+        "bytes": 199,
+        "path": "/home/zhuhe/litchi-performance-0940/builds/normal-v1/binary.json",
+        "sha256": "941d038f27ec2bddcb2f6049bcbb3afade0cc97e3f99a7cb073140873842e6c8"
+      },
+      "command": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "+1.95.0",
+        "build",
+        "--offline",
+        "--locked",
+        "-j2",
+        "--release",
+        "--bin",
+        "litchi-perf-baseline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+        "--target-dir",
+        "/home/zhuhe/litchi-performance-0940/target-normal-v1"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0940/source-candidate-v1",
+      "environment_policy": "allowlisted build variables; RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS explicitly unset",
+      "identity": "litchi-perf-baseline",
+      "lane": "normal-v1",
+      "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+      "start": {
+        "receipt": {
+          "bytes": 2015,
+          "path": "/home/zhuhe/litchi-performance-0940/builds/normal-v1/start.json",
+          "sha256": "baf39be1f1c6e82a4161b7699a99d387dd3a935eddb0cb34ae1299df4750507b"
+        },
+        "started_utc": "2026-10-06T21:20:53.799368Z"
+      },
+      "terminal": {
+        "ended_utc": "2026-10-06T21:29:51.899558Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2581,
+          "path": "/home/zhuhe/litchi-performance-0940/builds/normal-v1/terminal.json",
+          "sha256": "7da47d549ed9f06a3380ae16565ce74ef5fe283394c8a2d4a116e6801a31b0ac"
+        }
+      }
+    }
+  },
+  "checks": {
+    "all_successful_exit_zero": true,
+    "python_helper_tests": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tools.test_perf_child_validation",
+      "passed": 14,
+      "receipt": {
+        "bytes": 1252,
+        "path": "/home/zhuhe/litchi-performance-0940/python-validation-tests-v1.json",
+        "sha256": "a0b6d9ac1a9d5bef4b7d4770a7fc77fd379980c507c349cac775ab5af6f78fc9"
+      },
+      "stderr": {
+        "bytes": 113,
+        "path": "/home/zhuhe/litchi-performance-0940/python-validation-tests-v1.stderr.log",
+        "sha256": "4aec3af3b635a8337a771c91b6cce29126485d41b502cb038ee154de639bba39"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0940/python-validation-tests-v1.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tests": 14
+    },
+    "successful_scoped_checks": {
+      "allocator_clippy_Dwarnings": {
+        "argv": [
+          "/home/zhuhe/.cargo/bin/cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "--release",
+          "--features",
+          "allocator-metrics",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0940/target-allocator-v1",
+          "--bin",
+          "litchi-perf-baseline-alloc",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "ended_utc": "2026-10-06T21:37:06.898159Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2493,
+          "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-clippy-v1/terminal.json",
+          "sha256": "3954b05a2839dc5fffd8c4d37ccc1450f56d4bba9774a8f620eaa356f07b34fc"
+        },
+        "started_utc": "2026-10-06T21:35:57.915518Z"
+      },
+      "allocator_rustdoc_Dwarnings": {
+        "argv": [
+          "/home/zhuhe/.cargo/bin/cargo",
+          "+1.95.0",
+          "rustdoc",
+          "--offline",
+          "--locked",
+          "-j2",
+          "--release",
+          "--features",
+          "allocator-metrics",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0940/target-allocator-v1",
+          "--lib",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "ended_utc": "2026-10-06T21:38:21.856176Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2462,
+          "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-rustdoc-v4/terminal.json",
+          "sha256": "8614e30934ffb5ab9bec505a621f1e322bf435c0e5b2e9afaa273a32f492931c"
+        },
+        "started_utc": "2026-10-06T21:38:18.407962Z"
+      },
+      "allocator_tests": {
+        "argv": [
+          "/home/zhuhe/.cargo/bin/cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "--release",
+          "--features",
+          "allocator-metrics",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0940/target-allocator-v1",
+          "--lib",
+          "docx_owned_attribution"
+        ],
+        "ended_utc": "2026-10-06T21:35:42.285352Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2449,
+          "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-tests-v1/terminal.json",
+          "sha256": "001d50cbe9ecf2d8b2896254e61e7358ac68a1e2309b5885166d59ac40e9c17c"
+        },
+        "started_utc": "2026-10-06T21:34:07.593054Z"
+      },
+      "normal_clippy_Dwarnings": {
+        "argv": [
+          "/home/zhuhe/.cargo/bin/cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-j2",
+          "--release",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0940/target-normal-v1",
+          "--bin",
+          "litchi-perf-baseline",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "ended_utc": "2026-10-06T21:37:06.393663Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2429,
+          "path": "/home/zhuhe/litchi-performance-0940/checks/normal-clippy-v1/terminal.json",
+          "sha256": "92166633ac56454b1015f6a9ffa1c8522e76800cbbc33019f2e390890efe103b"
+        },
+        "started_utc": "2026-10-06T21:35:57.914300Z"
+      },
+      "normal_rustdoc_Dwarnings": {
+        "argv": [
+          "/home/zhuhe/.cargo/bin/cargo",
+          "+1.95.0",
+          "rustdoc",
+          "--offline",
+          "--locked",
+          "-j2",
+          "--release",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0940/target-normal-v1",
+          "--lib",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "ended_utc": "2026-10-06T21:37:52.143421Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2404,
+          "path": "/home/zhuhe/litchi-performance-0940/checks/normal-rustdoc-v3/terminal.json",
+          "sha256": "f8cbf085dfa73597f937355e9c419573d1d29b63a2e1f6101ca9a9f2dba0d87b"
+        },
+        "started_utc": "2026-10-06T21:37:48.669715Z"
+      },
+      "normal_tests": {
+        "argv": [
+          "/home/zhuhe/.cargo/bin/cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-j2",
+          "--release",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0940/target-normal-v1",
+          "--lib",
+          "docx_owned_attribution"
+        ],
+        "ended_utc": "2026-10-06T21:35:41.936256Z",
+        "exit_code": 0,
+        "receipt": {
+          "bytes": 2391,
+          "path": "/home/zhuhe/litchi-performance-0940/checks/normal-tests-v1/terminal.json",
+          "sha256": "0aafb69132bb43cdbb6d5e12ddfca6bb7cd9624c333d39cc4e7c7f14d7404eff"
+        },
+        "started_utc": "2026-10-06T21:34:07.593368Z"
+      }
+    }
+  },
+  "created_utc": "2026-10-06T21:50:40.763181+00:00",
+  "disposal_plan": {
+    "after_root_decision": "Copy or retain the two exact release binaries and their hashes, then remove only disposable intermediate target-cache files under target-normal-v1 and target-allocator-v1.",
+    "executed_now": false,
+    "never_remove_or_touch": [
+      "/home/zhuhe/code/litchi/tools/perf-baseline/target"
+    ],
+    "retain_before_disposal": [
+      {
+        "bytes": 70076392,
+        "path": "/home/zhuhe/litchi-performance-0940/target-normal-v1/release/litchi-perf-baseline",
+        "sha256": "c735995c902d410b68d43348d169535728d01df6efbf1169263c2345b8666e92"
+      },
+      {
+        "bytes": 70036128,
+        "path": "/home/zhuhe/litchi-performance-0940/target-allocator-v1/release/litchi-perf-baseline-alloc",
+        "sha256": "769b9bf2df27ed27f1b509c1c8abfca1d80633fccb418420e832cc052f946b4e"
+      },
+      "build start/terminal/binary receipts, source closure, and formal packet remain external and hash-bound."
+    ],
+    "status": "deferred_until_root_freeze_and_independent_audit"
+  },
+  "formal_capture": {
+    "manifest": {
+      "bytes": 38997,
+      "path": "/home/zhuhe/litchi-performance-0940/manifests/formal-manifest-authorized-v2.json",
+      "sha256": "14c6c32810f03017711e2e4d86e30a984c35834d3eb649cba94224da92d250f4"
+    },
+    "manifest_sha256": "14c6c32810f03017711e2e4d86e30a984c35834d3eb649cba94224da92d250f4",
+    "moved_packet": {
+      "index": {
+        "bytes": 39294,
+        "path": "/home/zhuhe/litchi-performance-0940/replay-moved-index-v1.json",
+        "sha256": "0fd1f5f1d161bffaf323b21a00ac55406912485ed830cad2f3298fdbdcdb2198"
+      },
+      "packet": "/home/zhuhe/litchi-performance-0940/formal-packet-v1-moved",
+      "reduction": {
+        "bytes": 1286410,
+        "path": "/home/zhuhe/litchi-performance-0940/reduction-moved-v1.json",
+        "sha256": "08c6e8a6e0d4cc9a7b95b082b841cf6fc3a219633c07c3a09c9b9ac7f768f211"
+      },
+      "replay": {
+        "bytes": 675,
+        "path": "/home/zhuhe/litchi-performance-0940/replay-moved-v1.json",
+        "sha256": "b90eb86acd1849aa1fdca10f389034786a06946f37104642cf868c4ad598c832"
+      },
+      "review": {
+        "bytes": 612,
+        "path": "/home/zhuhe/litchi-performance-0940/replay-moved-v1-review.json",
+        "sha256": "b47ff98523d246c16ee88a0bddb4951ad1d7c950cd4d1a82dd94ff42c972765d"
+      },
+      "status": "passed",
+      "tree": {
+        "bytes": 45653539,
+        "file_count": 481,
+        "sha256": "cf9cfde82c5c5eb64cb6eddd3a40c83c94c91b8a350be442cb4f14296c3d4f23"
+      }
+    },
+    "outer_result": {
+      "cwd": "/home/zhuhe/code/litchi",
+      "ended_utc": "2026-10-06T21:47:16.576565Z",
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "LITCHI_PERF_0940_CAPTURE_APPROVED": "1",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "UTC"
+      },
+      "exit_code": 0,
+      "packet": "/home/zhuhe/litchi-performance-0940/formal-packet-v1",
+      "runner": {
+        "bytes": 38939,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison-runner.py",
+        "sha256": "142c896d22290c1325548e6c46728de12de834a8c88d43e4cb536d15f4cc264b"
+      },
+      "started_utc": "2026-10-06T21:46:10.631731Z"
+    },
+    "outer_start": {
+      "bytes": 1171,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/formal-outer-start-v2.json",
+      "sha256": "8fa3f179a71609c3cf078cb5545c3d2af3769f5e47d9c4e0b8b8b6f723d4fd0c"
+    },
+    "outer_terminal": {
+      "bytes": 1692,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/formal-outer-terminal-v2.json",
+      "sha256": "2240e82ba2a198af706c4ef35a1945ae1c3201b031b1c4c14154d17c18a77013"
+    },
+    "packet": {
+      "index": {
+        "bytes": 38817,
+        "path": "/home/zhuhe/litchi-performance-0940/replay-original-index-v1.json",
+        "sha256": "a7460e7eb05e91d7fb7e62acf8c237936b46e4daddc59c16997aa91c6396ed27"
+      },
+      "packet": "/home/zhuhe/litchi-performance-0940/formal-packet-v1",
+      "reduction": {
+        "bytes": 1285933,
+        "path": "/home/zhuhe/litchi-performance-0940/reduction-original-v1.json",
+        "sha256": "b16e1047a77e0654c1e0d7f1b9b2e0c2b31a93df666c49f3e598cca5238bb116"
+      },
+      "replay": {
+        "bytes": 669,
+        "path": "/home/zhuhe/litchi-performance-0940/replay-original-v1.json",
+        "sha256": "2bce3e7a25d1552885e3e0d1371dda794c18b8f0deacb9f2a56d59aaf50e5ce7"
+      },
+      "review": {
+        "bytes": 612,
+        "path": "/home/zhuhe/litchi-performance-0940/replay-original-v1-review.json",
+        "sha256": "2ef488ca8271fecffe2182c587fb4b82bcbdc8c3aa8529852ccb231a6063c9e1"
+      },
+      "status": "passed",
+      "tree": {
+        "bytes": 45653539,
+        "file_count": 481,
+        "sha256": "cf9cfde82c5c5eb64cb6eddd3a40c83c94c91b8a350be442cb4f14296c3d4f23"
+      }
+    },
+    "reduction_outputs": {
+      "moved": {
+        "bytes": 1286410,
+        "path": "/home/zhuhe/litchi-performance-0940/reduction-moved-v1.json",
+        "sha256": "08c6e8a6e0d4cc9a7b95b082b841cf6fc3a219633c07c3a09c9b9ac7f768f211"
+      },
+      "original": {
+        "bytes": 1285933,
+        "path": "/home/zhuhe/litchi-performance-0940/reduction-original-v1.json",
+        "sha256": "b16e1047a77e0654c1e0d7f1b9b2e0c2b31a93df666c49f3e598cca5238bb116"
+      }
+    },
+    "reduction_script": {
+      "bytes": 9694,
+      "path": "/home/zhuhe/litchi-performance-0940/analyze-0940-v1.py",
+      "sha256": "65e82195c66c5e90f7537c8bf39835392b4df91c25a7b37c54b2e14cb96faa90"
+    },
+    "replay_equivalence": {
+      "bytes": 4936,
+      "path": "/home/zhuhe/litchi-performance-0940/replay-equivalence-v1.json",
+      "sha256": "eee1812b533ed4a5e938d940ba42f163abb6c224f3cc888723b8e0fda8a0ae1b"
+    },
+    "replay_script": {
+      "bytes": 9977,
+      "path": "/home/zhuhe/litchi-performance-0940/replay-formal-v1.py",
+      "sha256": "26ee25fc025ad6596ed28eae5a830629281fa4246052337bcd0cb7da9f81ee37"
+    },
+    "replay_status": {
+      "moved_children": 80,
+      "moved_reduction_canonical_sha256": "3b8d06e7be18d81583de66db55740650bab9d6ad4c77d8b68841a51003324c94",
+      "moved_replay_passed": true,
+      "original_children": 80,
+      "original_reduction_canonical_sha256": "3b8d06e7be18d81583de66db55740650bab9d6ad4c77d8b68841a51003324c94",
+      "original_replay_passed": true,
+      "semantic_reduction_equal": true
+    },
+    "tree_identity": true
+  },
+  "schema": "litchi.performance.0940.postcapture-custody.v1",
+  "scope": {
+    "adoption_or_speedup_claim": false,
+    "formal_children": 80,
+    "formal_retries_or_replacements": 0,
+    "format": "DOCX owned-ingress diagnostic only",
+    "iWork": "excluded",
+    "native_comparative_capture": false,
+    "production_edits": false
+  },
+  "source": {
+    "changed_paths": [
+      "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+      "tools/perf-baseline/src/docx_owned_attribution.rs",
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/main.rs"
+    ],
+    "chronology": "The source copy/overlay preceded build launch, but source receipt/listing publication occurred after build start; timestamps are retained and not backdated.",
+    "closure": "Full source closure was revalidated after the aborted wrong-target test setup and before formal capture.",
+    "file_count": 10780,
+    "full_listing": {
+      "bytes": 1665554,
+      "path": "/home/zhuhe/litchi-performance-0940/source-candidate-manifest-v1.jsonl",
+      "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0940/generate-source-candidate-list-v1.py",
+      "sha256": "8eb16940342230e36c4c121a71a49675e30b77b67a52f73e18b977fa1a100f1f"
+    },
+    "regular_file_bytes": 260009611,
+    "revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "root": "/home/zhuhe/litchi-performance-0940/source-candidate-v1",
+    "source_receipt": {
+      "bytes": 1232,
+      "path": "/home/zhuhe/litchi-performance-0940/receipts/source-candidate-v1.json",
+      "sha256": "83317ba38fcd14a407bff85671624e353ab3a8ccbc70ffadecad4ef1537fe74e"
+    }
+  },
+  "superseded_history": {
+    "formal_capture": "The authorized formal runner completed exactly once; no child was replaced after observation, validation, or parsing.",
+    "preflight_route_omission": {
+      "artifact": {
+        "bytes": 35324,
+        "path": "/home/zhuhe/litchi-performance-0940/real-preflight-v1/summary.json",
+        "sha256": "34b1900085230be0569168f2b844226056ac1f448f90dee0cbf8702a1b04a411"
+      },
+      "cause": "Initial one-sample preflight omitted --route; no formal workload ran.",
+      "corrected_preflight": {
+        "bytes": 38825,
+        "path": "/home/zhuhe/litchi-performance-0940/real-preflight-v2/summary.json",
+        "sha256": "a29e629868c47306d4473695e966eaa09220c8e426c75dbcf681295aa673bc1c"
+      },
+      "final_5_warmup_50_sample_preflight": {
+        "bytes": 38872,
+        "path": "/home/zhuhe/litchi-performance-0940/real-preflight-v3/summary.json",
+        "sha256": "e4ae2a9540d6cccb7eb1b81693fdcecb26d4c166fa8a441c8c3959e0d94993b2"
+      },
+      "status": "failed_preserved"
+    },
+    "rustdoc_flags": {
+      "attempts": [
+        {
+          "argv": [
+            "/home/zhuhe/.cargo/bin/cargo",
+            "+1.95.0",
+            "rustdoc",
+            "--offline",
+            "--locked",
+            "-j2",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+            "--target-dir",
+            "/home/zhuhe/litchi-performance-0940/target-normal-v1",
+            "--lib",
+            "--no-deps",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "diagnosis": "error: unexpected argument '--no-deps' found\n\n  tip: to pass '--no-deps' as a value, use '-- --no-deps'\n\nUsage: cargo rustdoc --offline --locked --jobs <N> --release --manifest-path <PATH> --target-dir <DIRECTORY> --lib [ARGS]...\n\nFor more information, try '--help'.",
+          "exit_code": 1,
+          "name": "normal-rustdoc-v1",
+          "stderr": {
+            "bytes": 267,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/normal-rustdoc-v1/stderr.log",
+            "sha256": "863a3b964a7ab1964aaf4bf0d578bb3e4740a5fde7f4baf8e2f8e6972ad591c5"
+          },
+          "terminal": {
+            "bytes": 2421,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/normal-rustdoc-v1/terminal.json",
+            "sha256": "ab13b4dc9b8da8315922f5275d6a7845e25123bc735efab4598ed567ad32d9a2"
+          }
+        },
+        {
+          "argv": [
+            "/home/zhuhe/.cargo/bin/cargo",
+            "+1.95.0",
+            "rustdoc",
+            "--offline",
+            "--locked",
+            "-j2",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+            "--target-dir",
+            "/home/zhuhe/litchi-performance-0940/target-normal-v1",
+            "--lib",
+            "--",
+            "--no-deps",
+            "-D",
+            "warnings"
+          ],
+          "diagnosis": "Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline)\nerror: Unrecognized option: 'no-deps'\n\nerror: could not document `litchi-perf-baseline`",
+          "exit_code": 101,
+          "name": "normal-rustdoc-v2",
+          "stderr": {
+            "bytes": 363,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/normal-rustdoc-v2/stderr.log",
+            "sha256": "6088f129c4b35b20fc510eee3447b0c50cff5522a9d3caebe1284902bbbcda03"
+          },
+          "terminal": {
+            "bytes": 2423,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/normal-rustdoc-v2/terminal.json",
+            "sha256": "eae1358255aab44157831082e2114b2afe9e7c6d36a983ef3e82c6d700b30d8e"
+          }
+        },
+        {
+          "argv": [
+            "/home/zhuhe/.cargo/bin/cargo",
+            "+1.95.0",
+            "rustdoc",
+            "--offline",
+            "--locked",
+            "-j2",
+            "--release",
+            "--features",
+            "allocator-metrics",
+            "--manifest-path",
+            "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+            "--target-dir",
+            "/home/zhuhe/litchi-performance-0940/target-allocator-v1",
+            "--lib",
+            "--no-deps",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "diagnosis": "error: unexpected argument '--no-deps' found\n\n  tip: to pass '--no-deps' as a value, use '-- --no-deps'\n\nUsage: cargo rustdoc --offline --locked --jobs <N> --release --features <FEATURES> --manifest-path <PATH> --target-dir <DIRECTORY> --lib [ARGS]...\n\nFor more information, try '--help'.",
+          "exit_code": 1,
+          "name": "allocator-rustdoc-v1",
+          "stderr": {
+            "bytes": 289,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-rustdoc-v1/stderr.log",
+            "sha256": "95ff82b47b3c706121adcb839e8e64eeba0c77f78a2c0a358f613354288217dc"
+          },
+          "terminal": {
+            "bytes": 2479,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-rustdoc-v1/terminal.json",
+            "sha256": "307e7e5ce2448fe87e6ebfae87d8fefa438cb2d0086b84d8c70baec6d1468bd7"
+          }
+        },
+        {
+          "argv": [
+            "/home/zhuhe/.cargo/bin/cargo",
+            "+1.95.0",
+            "rustdoc",
+            "--offline",
+            "--locked",
+            "-j2",
+            "--release",
+            "--features",
+            "allocator-metrics",
+            "--manifest-path",
+            "/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+            "--target-dir",
+            "/home/zhuhe/litchi-performance-0940/target-allocator-v1",
+            "--lib",
+            "--",
+            "--no-deps",
+            "-D",
+            "warnings"
+          ],
+          "diagnosis": "Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n    Blocking waiting for file lock on package cache\n Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/litchi-performance-0940/source-candidate-v1/tools/perf-baseline)\nerror: Unrecognized option: 'no-deps'\n\nerror: could not document `litchi-perf-baseline`",
+          "exit_code": 101,
+          "name": "allocator-rustdoc-v2",
+          "stderr": {
+            "bytes": 363,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-rustdoc-v2/stderr.log",
+            "sha256": "6088f129c4b35b20fc510eee3447b0c50cff5522a9d3caebe1284902bbbcda03"
+          },
+          "terminal": {
+            "bytes": 2481,
+            "path": "/home/zhuhe/litchi-performance-0940/checks/allocator-rustdoc-v2/terminal.json",
+            "sha256": "35fc4090b435006c1b4e4fdf54fd1e56ab09b0785500bae271b445b3d3545ace"
+          }
+        }
+      ],
+      "summary": "v1 passed --no-deps to cargo and was rejected as an unexpected cargo argument; v2 passed --no-deps after -- and rustdoc rejected it as an unrecognized option. These setup failures were preserved; v3/v4 are the successful -D warnings checks."
+    },
+    "wrong_target_test": {
+      "cause": "Initial scoped test command omitted --target-dir and created the external source candidate tools/perf-baseline/target; it was stopped before completion. No formal workload ran.",
+      "receipt": {
+        "bytes": 877,
+        "path": "/home/zhuhe/litchi-performance-0940/receipts/test-target-cleanup-v1.json",
+        "sha256": "6104a11bf3f2e16853b9fd3e80db7ae2ac05489c966de196d51f8569fd1a6f4a"
+      },
+      "status": "stopped_before_completion",
+      "target_removed_and_source_revalidated": true
+    }
+  },
+  "tooling": {
+    "child_validation_helper": {
+      "bytes": 28257,
+      "path": "/home/zhuhe/code/litchi/tools/perf_child_validation.py",
+      "sha256": "198223e4231fe62c503f60010b7867724aa9d8311f8067a14b36ed56eb69667a"
+    },
+    "comparison_validator": {
+      "bytes": 33689,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison.py",
+      "sha256": "c332d90b6e2a542adc24ea97942d0d2b43705b34f9f08d0c28511c5ed8d2745a"
+    },
+    "historical_note": "v1/v2 are retained historical preparation receipts; the authorized formal manifest binds the final runner SHA above.",
+    "historical_tooling_v1": {
+      "bytes": 3842,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison-tooling-validation-v1.json",
+      "sha256": "8511ff0c3174cd66a8e2806037ee3ff8fccd8e0b0e365644af330137ec5df99d"
+    },
+    "historical_tooling_v2": {
+      "bytes": 18929,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison-tooling-validation-v2.json",
+      "sha256": "0f1eb6d2d78bb4db5e7b4adb2b28536bf0821b9d263876d49c417b793cb46d2d"
+    },
+    "runner_final_v2_authorized": {
+      "bytes": 38939,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0940/comparison-runner.py",
+      "sha256": "142c896d22290c1325548e6c46728de12de834a8c88d43e4cb536d15f4cc264b"
+    },
+    "runner_final_v2_sha256": "142c896d22290c1325548e6c46728de12de834a8c88d43e4cb536d15f4cc264b",
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "cleanup_after_receipt": {
+    "archive_v2_unchanged": true,
+    "remove_only": [
+      "/home/zhuhe/litchi-performance-0940-final-sidecar-v1",
+      "/home/zhuhe/litchi-performance-0940-final-sidecar-verify-v1",
+      "/home/zhuhe/litchi-performance-0940-final-sidecar-verify-v2"
+    ],
+    "retain": [
+      "/home/zhuhe/litchi-performance-0940-final-sidecar-v1.tar.zst",
+      "/home/zhuhe/litchi-performance-0940-final-sidecar-verification-v1.json"
+    ]
+  },
+  "created_utc": "2026-10-06T22:06:39.206327+00:00",
+  "final_doc": {
+    "sha256": "835b18df2487f7755b813a091549cd2fde1a20c42366e622a1080c4128feaf60",
+    "sidecar_member": "litchi-performance-0940-final-sidecar-v1/repo-evidence/docs/performance/0940-docx-owned-ingress-attribution.md",
+    "source": {
+      "bytes": 11581,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0940-docx-owned-ingress-attribution.md",
+      "sha256": "835b18df2487f7755b813a091549cd2fde1a20c42366e622a1080c4128feaf60"
+    }
+  },
+  "included_origins": {
+    "archive_verification_v2": {
+      "bytes": 3536,
+      "path": "/home/zhuhe/litchi-performance-0940/archive-verification-v2.json",
+      "sha256": "657b0f5c766d687ca31c831174a54ba8a94dbf5ea417556022a4115fef04907e"
+    },
+    "helper": "/home/zhuhe/code/litchi/tools/perf_child_validation.py",
+    "repo_results": "/home/zhuhe/code/litchi/docs/performance/results/change-0940 (12 files, helper/test exact copies)",
+    "sidecar_cleanup_v1": {
+      "bytes": 10807,
+      "path": "/home/zhuhe/litchi-performance-0940/sidecar-cleanup-v1.json",
+      "sha256": "38b82207e15bcbeba577444cc9909947026daeb972f9812b246457a0f182f0cb"
+    },
+    "tests": "/home/zhuhe/code/litchi/tools/test_perf_child_validation.py"
+  },
+  "regeneration_command": "tar --zstd --create --file /home/zhuhe/litchi-performance-0940-final-sidecar-v1.tar.zst --directory /home/zhuhe litchi-performance-0940-final-sidecar-v1",
+  "repository_policy": "All committed evidence remains below 1 MiB and no executable is committed.",
+  "schema": "litchi.performance.0940.final-custody.v1",
+  "scope": "Final DOCX owned-ingress report plus sidecar-only evidence custody; no workload rerun and no bound capture-file mutation.",
+  "sidecar_archive": {
+    "bytes": 79722,
+    "member_root": "litchi-performance-0940-final-sidecar-v1/",
+    "path": "/home/zhuhe/litchi-performance-0940-final-sidecar-v1.tar.zst",
+    "sha256": "158a3c3f1f6fcff5b6fa33bd96e68cfafbb1e4f6b89ab5492fef4737f6c0988d",
+    "staging_tree": {
+      "bytes": 548448,
+      "files": 20,
+      "max_file_bytes": 217839,
+      "sha256": "463552455aa148c4c69b51238dfeaae3e7424d3a8d4a93d5ab9fdcf0263132a1"
+    }
+  },
+  "sidecar_verification": {
+    "bytes": 2608,
+    "path": "/home/zhuhe/litchi-performance-0940-final-sidecar-verification-v1.json",
+    "sha256": "4b6487afd0cb0a95eec39553462954c0c169293c87ad731a6b4a3e89d7004b88"
+  },
+  "superseded_unexecuted_plan": "The earlier staged fullarchivev3 command was never executed; it is retained as a superseded manifest member. This final artifact is sidecar-only.",
+  "verification_command": "mkdir -p /home/zhuhe/litchi-performance-0940-final-sidecar-verify-v2 && tar --zstd --extract --file /home/zhuhe/litchi-performance-0940-final-sidecar-v1.tar.zst --directory /home/zhuhe/litchi-performance-0940-final-sidecar-verify-v2"
+}

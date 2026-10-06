@@ -36,6 +36,17 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 OUTPUT_SHA256_RE = re.compile(r"\A[0-9a-f]{64}\Z")
 SCHEMA = "litchi.performance.child-validation.v1"
 DEFAULT_MAX_REPORT_BYTES = 1 << 20
+REPORT_CONTRACT_LEGACY = "legacy"
+REPORT_CONTRACT_DOCX_OWNED_WORKLOAD = "docx-owned-workload"
+REPORT_CONTRACT_DOCX_OWNED_CALIBRATION = "docx-owned-calibration"
+REPORT_CONTRACTS = frozenset(
+    {
+        REPORT_CONTRACT_LEGACY,
+        REPORT_CONTRACT_DOCX_OWNED_WORKLOAD,
+        REPORT_CONTRACT_DOCX_OWNED_CALIBRATION,
+    }
+)
+DOCX_OWNED_SCHEMA = "docx_owned_ingress_attribution_v1"
 
 
 class ChildValidationError(ValueError):
@@ -81,8 +92,9 @@ class ChildSpec:
     label: str
     warmups: int
     samples: int
-    expected_output_sha256: str
+    expected_output_sha256: str | None
     binary: Mapping[str, Any] | None
+    report_contract: str = REPORT_CONTRACT_LEGACY
     deadline_seconds: float = 120.0
     observation_seconds: float = 0.25
     max_report_bytes: int = DEFAULT_MAX_REPORT_BYTES
@@ -187,6 +199,91 @@ def extract_output_sha256(report: Mapping[str, Any]) -> str:
     return _require_digest(first.get("output_sha256"), "report.results[0].output_sha256")
 
 
+def _require_exact_int(value: Any, expected: int, location: str) -> None:
+    if type(value) is not int or value != expected:
+        raise ChildValidationError(f"{location} must equal {expected}")
+
+
+def _require_list(value: Any, location: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise ChildValidationError(f"{location} must be a list")
+    return value
+
+
+def _validate_docx_owned_common(
+    report: Mapping[str, Any], spec: ChildSpec, *, case: str, route: str
+) -> None:
+    if report.get("schema") != DOCX_OWNED_SCHEMA:
+        raise ChildValidationError("DOCX owned report schema does not match report contract")
+    if report.get("scenario") != "docx-owned-ingress-attribution":
+        raise ChildValidationError("DOCX owned report scenario does not match report contract")
+    if report.get("case") != case:
+        raise ChildValidationError(f"DOCX owned report case must be {case!r}")
+    if report.get("route") != route:
+        raise ChildValidationError(f"DOCX owned report route must be {route!r}")
+    _require_exact_int(report.get("warmup_iterations"), spec.warmups, "warmup_iterations")
+    _require_exact_int(report.get("sample_count"), spec.samples, "sample_count")
+
+
+def _extract_docx_owned_workload_output_sha256(
+    report: Mapping[str, Any], spec: ChildSpec
+) -> str:
+    expected = _require_digest(spec.expected_output_sha256, "expected_output_sha256")
+    route = spec.route
+    _validate_docx_owned_common(report, spec, case="workload", route=route)
+    report_expected = _require_digest(
+        report.get("expected_output_sha256"), "report.expected_output_sha256"
+    )
+    if report_expected != expected:
+        raise ChildValidationError("report.expected_output_sha256 does not match expected output")
+    output_values = _require_list(report.get("output_sha256"), "report.output_sha256")
+    if len(output_values) != spec.samples:
+        raise ChildValidationError("report.output_sha256 length does not match samples")
+    for index, value in enumerate(output_values):
+        observed = _require_digest(value, f"report.output_sha256[{index}]")
+        if observed != expected:
+            raise ChildValidationError(
+                f"report.output_sha256[{index}] does not match expected output"
+            )
+    return expected
+
+
+def _validate_docx_owned_calibration(report: Mapping[str, Any], spec: ChildSpec) -> None:
+    _validate_docx_owned_common(report, spec, case="calibration", route=spec.route)
+    if report.get("diagnostic_enabled") is not True:
+        raise ChildValidationError("calibration must have diagnostic_enabled=true")
+    if report.get("expected_output_sha256") is not None:
+        raise ChildValidationError("calibration must not publish an expected output digest")
+    output_values = _require_list(report.get("output_sha256"), "report.output_sha256")
+    if output_values:
+        raise ChildValidationError("calibration must not publish per-sample output digests")
+    if report.get("correctness_status") != "not_applicable":
+        raise ChildValidationError("calibration correctness_status must be not_applicable")
+    for key in (
+        "correctness_verified",
+        "inverse_source_verified",
+        "correctness_gates",
+        "sink",
+        "owned_ingress_read_calls",
+        "owned_ingress_read_bytes",
+        "owned_input_bytes",
+    ):
+        values = _require_list(report.get(key), f"report.{key}")
+        if values:
+            raise ChildValidationError(f"calibration report.{key} must be empty")
+
+
+def _extract_contract_output_sha256(report: Mapping[str, Any], spec: ChildSpec) -> str | None:
+    if spec.report_contract == REPORT_CONTRACT_LEGACY:
+        return extract_output_sha256(report)
+    if spec.report_contract == REPORT_CONTRACT_DOCX_OWNED_WORKLOAD:
+        return _extract_docx_owned_workload_output_sha256(report, spec)
+    if spec.report_contract == REPORT_CONTRACT_DOCX_OWNED_CALIBRATION:
+        _validate_docx_owned_calibration(report, spec)
+        return None
+    raise ChildValidationError(f"unknown report contract: {spec.report_contract}")
+
+
 def _invoke_validator(
     validator: ReportValidator | Callable[..., Mapping[str, Any]],
     report: dict[str, Any],
@@ -223,17 +320,26 @@ def validate_and_construct_result(
     verified value.
     """
 
+    observed = _extract_contract_output_sha256(report, spec)
+    if spec.report_contract != REPORT_CONTRACT_DOCX_OWNED_CALIBRATION:
+        expected = _require_digest(spec.expected_output_sha256, "expected_output_sha256")
+        if observed != expected:
+            if spec.report_contract == REPORT_CONTRACT_LEGACY:
+                raise ChildValidationError(
+                    "report.results[0].output_sha256 does not match expected_output_sha256"
+                )
+            raise ChildValidationError(
+                "report.expected_output_sha256 does not match expected output"
+            )
     validated = _invoke_validator(validator, report, spec)
-    observed = extract_output_sha256(report)
-    expected = _require_digest(spec.expected_output_sha256, "expected_output_sha256")
-    if observed != expected:
-        raise ChildValidationError(
-            "report.results[0].output_sha256 does not match expected_output_sha256"
-        )
     result = dict(validated)
-    if "output_sha256" in result and result["output_sha256"] != observed:
-        raise ChildValidationError("validator output_sha256 disagrees with report")
-    result["output_sha256"] = observed
+    if observed is None:
+        if "output_sha256" in result:
+            raise ChildValidationError("calibration validator returned output_sha256")
+    else:
+        if "output_sha256" in result and result["output_sha256"] != observed:
+            raise ChildValidationError("validator output_sha256 disagrees with report")
+        result["output_sha256"] = observed
     elapsed = result.get("elapsed_ns")
     if elapsed is not None:
         if not isinstance(elapsed, Sequence) or isinstance(elapsed, (str, bytes)):
@@ -260,7 +366,25 @@ def _validate_spec(spec: ChildSpec) -> None:
         raise ChildValidationError("child deadlines must be positive")
     if spec.max_report_bytes <= 0:
         raise ChildValidationError("max_report_bytes must be positive")
-    _require_digest(spec.expected_output_sha256, "expected_output_sha256")
+    if spec.report_contract not in REPORT_CONTRACTS:
+        raise ChildValidationError(f"unknown report contract: {spec.report_contract}")
+    if spec.report_contract == REPORT_CONTRACT_DOCX_OWNED_CALIBRATION:
+        if spec.route != "route_independent":
+            raise ChildValidationError(
+                "docx-owned-calibration route must be route_independent"
+            )
+        if spec.expected_output_sha256 is not None:
+            raise ChildValidationError(
+                "docx-owned-calibration must omit expected_output_sha256"
+            )
+    elif spec.report_contract == REPORT_CONTRACT_DOCX_OWNED_WORKLOAD:
+        if spec.route not in {"owned_vec", "owned_reader"}:
+            raise ChildValidationError(
+                "docx-owned-workload route must be owned_vec or owned_reader"
+            )
+        _require_digest(spec.expected_output_sha256, "expected_output_sha256")
+    else:
+        _require_digest(spec.expected_output_sha256, "expected_output_sha256")
     output_paths = (
         spec.paths.report,
         spec.paths.stdout,
@@ -404,6 +528,8 @@ def run_child_and_validate(
         "report_error": None if report_descriptor is None else report_descriptor.get("error"),
         "route": spec.route,
         "label": spec.label,
+        "report_contract": spec.report_contract,
+        "expected_output_sha256": spec.expected_output_sha256,
         "binary": None if spec.binary is None else dict(spec.binary),
     }
     # This is intentionally before _read_report and before validator invocation.
@@ -435,16 +561,19 @@ def run_child_and_validate(
             "status": "passed",
             "route": spec.route,
             "label": spec.label,
+            "report_contract": spec.report_contract,
             "report": report_descriptor,
-            "output_sha256": validated_result["output_sha256"],
             "sample_count": validated_result["sample_count"],
         }
+        if "output_sha256" in validated_result:
+            validation["output_sha256"] = validated_result["output_sha256"]
     except Exception as error:
         validation = {
             "schema": SCHEMA,
             "status": "failed",
             "route": spec.route,
             "label": spec.label,
+            "report_contract": spec.report_contract,
             "report": report_descriptor,
             "error": f"{type(error).__name__}: {error}",
         }
@@ -495,7 +624,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--label", required=True)
     parser.add_argument("--warmups", required=True, type=int)
     parser.add_argument("--samples", required=True, type=int)
-    parser.add_argument("--expected-output-sha256", required=True)
+    parser.add_argument(
+        "--report-contract",
+        choices=sorted(REPORT_CONTRACTS),
+        default=REPORT_CONTRACT_LEGACY,
+    )
+    parser.add_argument("--expected-output-sha256")
     parser.add_argument("--binary-json", type=Path)
     parser.add_argument("--env", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--deadline-seconds", type=float, default=120.0)
@@ -535,6 +669,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             samples=args.samples,
             expected_output_sha256=args.expected_output_sha256,
             binary=binary,
+            report_contract=args.report_contract,
             deadline_seconds=args.deadline_seconds,
             observation_seconds=args.observation_seconds,
         )
