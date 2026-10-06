@@ -1,0 +1,215 @@
+{
+  "acceptance_invariants": [
+    "No public API, constructor signature, authored XML bytes, source span, or public error family changes.",
+    "Public semantic decoding remains lazy; only the historical inventory local_state boundary may force it.",
+    "Validation/error order remains codec raw validation, focused footnote validation, then deferred semantic decode; inventory preflight limits remain earlier.",
+    "NamespaceContext shadowing/restoration and self-contained declaration accounting remain exact, including default and remapped prefixes.",
+    "Tolerance defect offsets are reported in original main-document coordinates after any synthetic insertion.",
+    "Footnote Context/ignorable semantics are either preserved exactly or changed only by an explicit, tested private context route; no extension is skipped.",
+    "Failures do not publish partial inventory/output, and no-op/changed/inverse source preservation remains byte exact."
+  ],
+  "adr_read": {
+    "accepted_adr_markdown_files": 33,
+    "accepted_adr_name_content_sha256": "82af8241b9f85e4573fa1bb417669514ecd0cf6a8023f3649281516d0dacfea6",
+    "constraints_applied": [
+      "Preserve authored bytes and unknown markup; private views do not become public API.",
+      "Keep source identity, finite limits, deterministic typed refusals, and atomic source-checked publication.",
+      "A lazy or reused representation must not move an error/refusal without an explicit accepted contract."
+    ],
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "relevant": [
+      "0001-priorities-and-api-layers",
+      "0002-crate-topology",
+      "0003-snapshots-edits-and-patches",
+      "0005-io-memory-and-performance",
+      "0006-validation-security-and-compatibility",
+      "0008-migration-and-verification",
+      "0030-lazy-opc-part-decode",
+      "0032-snapshot-derived-value-memos"
+    ]
+  },
+  "change": "0934",
+  "coverage_gaps_and_required_cases": [
+    {
+      "case": "Build a structurally valid sectPr with a semantic-only invalid known value and valid footnote state.",
+      "expected": "Section::from_xml_bytes succeeds; the first semantic accessor/local_state returns the existing semantic Error family. A private inventory reuse path may decode eagerly at its historical local_state boundary, but must not make the public constructor eager.",
+      "id": "lazy-semantic-error-timing",
+      "why": "Existing tests exercise semantic values but do not pin constructor-success versus first-access failure as a reuse invariant."
+    },
+    {
+      "case": "Use one section with malformed codec topology/QName and malformed footnoteColumns payload.",
+      "expected": "The codec validation error wins, matching Section::from_xml_bytes order; no footnote or semantic error may replace it. Compare variant and stable diagnostic/resource context.",
+      "id": "codec-before-footnote",
+      "why": "A shared raw parse can accidentally reorder focused-footnote work or expose a later error first."
+    },
+    {
+      "case": "Use structurally valid XML with malformed footnoteColumns and a separate semantic-only invalid Word property.",
+      "expected": "Construction fails with the focused footnote error before semantic decode. With valid footnote XML, construction succeeds and the semantic error remains at local_state/first semantic access.",
+      "id": "footnote-before-deferred-semantic",
+      "why": "Pins the current validate -> footnote parse -> deferred codec decode sequence."
+    },
+    {
+      "case": "Combine an over-limit relationship ID/reference total or max_section_bytes violation (including injected xmlns bytes) with a semantic error.",
+      "expected": "The existing SectionInventoryLimit resource and observed/maximum details win before private raw/footnote/semantic materialization. max_section_bytes charges source plus the exact declarations that self_contained_fragment would add, even if a future route avoids the Vec.",
+      "id": "preflight-and-size-order",
+      "why": "Existing inventory_preflights_reference_limits_before_semantic_retention and inventory_bounds_inherited_namespace_materialization are the required order controls."
+    },
+    {
+      "case": "Use inherited default/Word, relationship, MC, and extension aliases; include a nested prefix rebind to a foreign URI, a quoted > attribute, and both nonempty and self-closing sectPr roots.",
+      "expected": "Only Word-bound sections are captured; outer aliases resume after nested scope exit; self_contained_fragment adds each missing binding once, does not duplicate root declarations, and does not leak synthetic xmlns bytes into source spans or public output.",
+      "id": "namespace-scope-and-injection",
+      "why": "Current tests cover scanner scope and some injection shape separately, but not their combined source-span/temporary-fragment contract."
+    },
+    {
+      "case": "Put tolerated w:cols/w:col deviations and a nonconforming relationship ID in a section whose fragment needs multiple inherited declarations.",
+      "expected": "Defect kinds/order are unchanged and every context equals the original main-document offset, including paragraph-owned and body-final sections; no synthetic insertion delta is double-subtracted.",
+      "id": "tolerance-offset-remap",
+      "why": "Detached Section offsets are covered, but inventory mapping with multiple injected declarations is not."
+    },
+    {
+      "case": "Compare absent extension, explicit w12:footnoteColumns val=0, local remapped alias with local mc:Ignorable, and inherited mc:Ignorable/context variants. Include malformed value and missing-ignorable controls.",
+      "expected": "None and Some(Layout{count:0}) remain distinct; malformed/missing-ignorable errors remain typed and ordered; authored XML is unchanged. If inherited context is newly supported, it must use an explicit out-of-band Context equivalent to footnote_columns::parse_part. If not supported, the current rejection must remain a stable refusal rather than being silently accepted or skipped.",
+      "id": "footnote-context-and-zero",
+      "why": "Focused footnote tests cover these cases detached/package-wise, but Inventory\u2019s synthetic fragment path does not combine them; self_contained_fragment injects namespace declarations, not inherited mc:Ignorable attributes."
+    },
+    {
+      "case": "Run the existing source-backed section edit, no-op, changed publish, and inverse controls on a document using inherited/remapped namespaces and a footnote extension.",
+      "expected": "Descriptor values, tolerance report, output, and inverse bytes match the baseline route; temporary validation state cannot become publication source or alter unknown/opaque markup.",
+      "id": "publication-parity",
+      "why": "This is the smallest end-to-end preservation control after the private reuse path lands; it is not a request for a new broad matrix."
+    }
+  ],
+  "created_utc": "2026-10-06T17:34:58.905247+00:00",
+  "current_seam": {
+    "codec_and_footnote": [
+      "codec::validate parses only the bounded raw topology; codec::decode parses raw topology again and then decode_state applies semantic checks/tolerance.",
+      "footnote_columns::Snapshot::from_xml_with_context retains an out-of-band namespace/ignorable Context; package::parse_part is the existing inherited-context precedent."
+    ],
+    "inventory": [
+      "inventory::NamespaceContext tracks active prefix bindings and restores shadowed bindings on scope exit.",
+      "append_section checks source length, section count, and reference preflight before parsing the selected section.",
+      "self_contained_fragment injects missing root xmlns declarations, charges source plus inserted bytes against max_section_bytes, and returns a temporary Vec.",
+      "append_section calls Section::from_xml_bytes(fragment), then local_state(), then maps tolerance contexts from synthetic-fragment offsets back to original document offsets."
+    ],
+    "optimization_boundary": "Any fragment/raw reuse must stay private to inventory/section internals. The public Section constructor, authored XML, lazy semantic timing, and footnote validation contract remain unchanged.",
+    "public_section": [
+      "Section::from_xml_bytes at model.rs:444 calls codec::validate first, then footnote_columns::Snapshot::from_xml, and leaves codec::Snapshot unset.",
+      "snapshot_mut at model.rs:770 is the first semantic codec::decode; local_state/tolerance_report therefore force semantic decoding.",
+      "footnote_columns_snapshot at model.rs:643 reparses the authored/current section XML through the focused footnote codec."
+    ]
+  },
+  "execution": {
+    "builds_run": false,
+    "note": "Read-only source and accepted-ADR review; no runtime or quality command was started.",
+    "source_edits": false,
+    "tests_run": false
+  },
+  "existing_coverage": [
+    {
+      "covers": "scanner topology, scope restoration, source-size/section/reference limits, raw semantic tolerance values, and original-offset assertions for a detached Section",
+      "file": "crates/litchi-docx/src/section/tests.rs",
+      "tests": [
+        "inventory_materializes_inherited_namespaces_after_quoted_gt_and_refuses_malformed_opening",
+        "inventory_rejects_unbound_prefixes_and_records_non_xml_relationship_ids",
+        "inventory_preflights_reference_limits_before_semantic_retention",
+        "inventory_bounds_inherited_namespace_materialization",
+        "inventory_uses_original_namespace_aliases_and_ignores_nested_story_paragraphs",
+        "inventory_restores_outer_namespace_after_nested_rebinding",
+        "inventory_ignores_foreign_rebound_section_properties",
+        "inventory_rejects_malformed_end_after_namespace_rebinding",
+        "inventory_enforces_explicit_section_limit_at_the_boundary",
+        "column_model_deviations_are_repaired_and_recorded"
+      ]
+    },
+    {
+      "covers": "absent versus explicit zero, out-of-band inherited Context, ignorable requirements, malformed extension refusal, alias collisions, and authored-byte preservation",
+      "file": "crates/litchi-docx/src/section/footnote_columns/tests.rs",
+      "tests": [
+        "reads_zero_and_preserves_absence",
+        "package_discovery_retains_inherited_namespace_context",
+        "package_discovery_rejects_unignorable_inherited_extension",
+        "malformed_extension_and_missing_ignorable_are_rejected",
+        "inherited_ignorable_tokens_are_not_duplicated_or_rebound_locally"
+      ]
+    },
+    {
+      "covers": "public source-backed publication/inverse and preservation controls, but does not directly exercise inventory append_section plus footnote validation together",
+      "file": "crates/litchi-docx/tests/source_backed_sections.rs",
+      "tests": [
+        "section_layout_namespace_shadowing_restores_section_root_alias",
+        "section_layout_default_word_namespace_rebinds_inserted_qnames",
+        "section_layout_alias_foreign_children_and_column_comments_are_preserved",
+        "section_layout_retained_malformed_source_keeps_parse_error_before_sink",
+        "section_layout_complex_noop_remains_byte_exact"
+      ]
+    }
+  ],
+  "non_goals": [
+    "No tests, builds, benchmark/profiler runs, fixture normalization, or production edits in this review.",
+    "No claim that existing focused tests prove the proposed private reuse; candidate implementation must satisfy the differential cases above.",
+    "No iWork or unrelated workspace boundary audit."
+  ],
+  "planned_validation_commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-docx inventory_ -- --nocapture",
+    "cargo +1.95.0 test --offline --locked -p litchi-docx footnote_columns -- --nocapture",
+    "cargo +1.95.0 test --offline --locked -p litchi-docx --test source_backed_sections section_layout_ -- --nocapture"
+  ],
+  "schema": "litchi.performance.0934.docx-inventory-fragment-validation.v1",
+  "source_binding": {
+    "files": [
+      {
+        "bytes": 61433,
+        "path": "crates/litchi-docx/src/section/inventory.rs",
+        "sha256": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b"
+      },
+      {
+        "bytes": 30091,
+        "path": "crates/litchi-docx/src/section/model.rs",
+        "sha256": "2c6c6929e25d00f4ff7d8e0d274ff12fbc3ff4465e346296fe7ca4d817cadd83"
+      },
+      {
+        "bytes": 76303,
+        "path": "crates/litchi-docx/src/section/codec.rs",
+        "sha256": "dac8d1495653973be53eb2bb971430d87a924e8b9bac9c7d97a59fc0ac3ee886"
+      },
+      {
+        "bytes": 40435,
+        "path": "crates/litchi-docx/src/section/footnote_columns/codec.rs",
+        "sha256": "98886c4f99e541d35aec8e48a96ba4d65304451fe789bcf3b9f11b735497f14d"
+      },
+      {
+        "bytes": 8293,
+        "path": "crates/litchi-docx/src/section/footnote_columns/package.rs",
+        "sha256": "1767c77dc95bac6c303fb48ef99ea27bf5d90b465a0e6efcfddc750a4db9e18f"
+      },
+      {
+        "bytes": 7324,
+        "path": "crates/litchi-docx/src/section/footnote_columns/transaction.rs",
+        "sha256": "9e46406cf3105877ba5764313d3f038e05c91770cb34415217908459f482a8b7"
+      },
+      {
+        "bytes": 31434,
+        "path": "crates/litchi-docx/src/section/tests.rs",
+        "sha256": "00a46f8455ef3e436874875779c63b3de7981f37322a17ca9f99d46fda36fd1c"
+      },
+      {
+        "bytes": 16407,
+        "path": "crates/litchi-docx/src/section/footnote_columns/tests.rs",
+        "sha256": "1907778dd18b3a89946b030aec5bc65399a2a4f370fe79da733f86d84ec245d2"
+      },
+      {
+        "bytes": 61823,
+        "path": "crates/litchi-docx/tests/source_backed_sections.rs",
+        "sha256": "ebaf55b70aa023d2e5fe0ef54922f02e86a553bb46624664a9ab349b0376e6e0"
+      }
+    ],
+    "head": "5f05944e9994a4cc1b387823c503fbab8650aca3",
+    "unrelated_worktree_changes_seen": [
+      "tools/check_iwork_leaf_public_api.py",
+      "crates/litchi/examples/bench_word_parse.rs",
+      "docs/UNIFIED_OPS_API_DESIGN.md",
+      "docs/performance/0934-docx-post-scanner-allocation-profile.md"
+    ]
+  },
+  "status": "design_review_only"
+}

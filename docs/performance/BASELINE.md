@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0934 — adopted scanner allocation profile
+
+[0934](0934-docx-post-scanner-allocation-profile.md) records exactly two
+whole-process heaptrack diagnostics of the retained 0933 candidate. Shared and
+independent ownership request 5,873,313,617 and 8,369,567,879 bytes, about 36%
+below the corresponding 0932 profiles. Creation counters match 0933 exactly.
+Fragment codec and footnote validation now lead the remaining attribution.
+No production code changes or normal-release speedup claim are made.
+
 ## 0933 — borrowed DOCX scanners reduce allocation requests
 
 [0933](0933-docx-borrowed-inventory-scanners.md) adopts borrowed scanner events,

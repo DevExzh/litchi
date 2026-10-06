@@ -1,0 +1,197 @@
+{
+  "audited_utc": "2026-10-06T17:28:13.227782+00:00",
+  "candidate_patch": {
+    "bytes": 5011,
+    "path": "/home/zhuhe/litchi-performance-0933/candidate-production.patch",
+    "sha256": "aff40e7b5cd5dd4f07fbc14be5fde6f9877b214a341c2a0ff6182ab67495e023"
+  },
+  "candidate_source_listing": {
+    "bytes": 1870029,
+    "path": "/home/zhuhe/litchi-performance-0933/candidate-source-list-v1.jsonl",
+    "sha256": "40208ad0ae53f2f0c046d55f9bd8970ae454ff03c4d91d8c94039da40fd4ce12"
+  },
+  "candidate_source_receipt": {
+    "bytes": 2651,
+    "path": "/home/zhuhe/litchi-performance-0933/receipts/candidate-source-final-v2.json",
+    "sha256": "dc4499bb89acc4b0d9748e7282e97ccc3d5415100fda3a97525c57663cba4fd6"
+  },
+  "candidate_source_revision_in_receipt": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+  "candidate_source_root": "/home/zhuhe/litchi-performance-0933/candidate-source",
+  "change": "0934",
+  "conclusion": "Current HEAD runtime and allocator harness paths match the immutable 0933 candidate source byte-for-byte. The retained allocator binary is source-bound by the 0933 candidate receipt and binary hash. This binding receipt starts no workload, build, or heaptrack process.",
+  "current_head": "5f05944e9994a4cc1b387823c503fbab8650aca3",
+  "full_source_differential": {
+    "bytes": 1577,
+    "path": "/home/zhuhe/litchi-performance-0933/receipts/full-source-differential-v1.json",
+    "sha256": "a984c64879a064a697456c7c4104e347237e4eec9b30b2f0a666f28451462ec3"
+  },
+  "independent_full_listing_rehash": {
+    "candidate_entries": 10778,
+    "candidate_passed": 10778,
+    "current_worktree_mismatch": {
+      "candidate_bytes": 138201,
+      "candidate_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+      "current_bytes": 138465,
+      "current_sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+      "path": "Cargo.lock",
+      "reason": "ignored/untracked workspace root lock; measured tools/perf-baseline/Cargo.lock matches"
+    },
+    "current_worktree_passed": 10777,
+    "no_missing_paths": true
+  },
+  "lock_binding": {
+    "note": "The checkout root Cargo.lock is ignored/untracked stale workspace state and is excluded from the tracked runtime closure; tools/perf-baseline/Cargo.lock matches candidate source exactly.",
+    "perf_baseline_cargo_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "root_lock_sha256_in_candidate_receipt": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+  },
+  "retained_allocator_binary": {
+    "bytes": 68448792,
+    "expected_bytes": 68448792,
+    "expected_sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9",
+    "path": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+    "sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9"
+  },
+  "runtime_harness_paths": [
+    {
+      "candidate_source": {
+        "bytes": 3076470,
+        "sha256": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c"
+      },
+      "current": {
+        "bytes": 3076470,
+        "sha256": "22e176eaba12359243354697b8841c6a9c5677aed45bcab5370897c0a0562b2c"
+      },
+      "equal": true,
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 38530,
+        "sha256": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238"
+      },
+      "current": {
+        "bytes": 38530,
+        "sha256": "fefa8ba01a2396f7a6e7231aa600deccca541523661c33f209457581c7387238"
+      },
+      "equal": true,
+      "path": "tools/perf-baseline/src/docx_section_retention.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 2348,
+        "sha256": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5"
+      },
+      "current": {
+        "bytes": 2348,
+        "sha256": "0454969fb7c91d3795b561a246cc01575f66cdc492f8b30ce7d1b0b4e80fa1c5"
+      },
+      "equal": true,
+      "path": "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 9377,
+        "sha256": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "current": {
+        "bytes": 9377,
+        "sha256": "11ebadd1e59f940553f7f485a192e08881f11095ca06fd385c199e5bdd5c2bd6"
+      },
+      "equal": true,
+      "path": "tools/perf-baseline/tests/docx_section_retention.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 31434,
+        "sha256": "00a46f8455ef3e436874875779c63b3de7981f37322a17ca9f99d46fda36fd1c"
+      },
+      "current": {
+        "bytes": 31434,
+        "sha256": "00a46f8455ef3e436874875779c63b3de7981f37322a17ca9f99d46fda36fd1c"
+      },
+      "equal": true,
+      "path": "crates/litchi-docx/src/section/tests.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 61433,
+        "sha256": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b"
+      },
+      "current": {
+        "bytes": 61433,
+        "sha256": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b"
+      },
+      "equal": true,
+      "path": "crates/litchi-docx/src/section/inventory.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 146638,
+        "sha256": "cd36ca380c36054d78b77ddd8ed9120c9d22713f63de9194f1b503c93452e452"
+      },
+      "current": {
+        "bytes": 146638,
+        "sha256": "cd36ca380c36054d78b77ddd8ed9120c9d22713f63de9194f1b503c93452e452"
+      },
+      "equal": true,
+      "path": "crates/litchi-docx/src/source_backed.rs"
+    },
+    {
+      "candidate_source": {
+        "bytes": 56289,
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      "current": {
+        "bytes": 56289,
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      "equal": true,
+      "path": "tools/perf-baseline/Cargo.lock"
+    },
+    {
+      "candidate_source": {
+        "bytes": 3286,
+        "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+      },
+      "current": {
+        "bytes": 3286,
+        "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+      },
+      "equal": true,
+      "path": "tools/perf-baseline/Cargo.toml"
+    },
+    {
+      "candidate_source": {
+        "bytes": 10257,
+        "sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7"
+      },
+      "current": {
+        "bytes": 10257,
+        "sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7"
+      },
+      "equal": true,
+      "path": "Cargo.toml"
+    }
+  ],
+  "schema": "litchi.performance.0934.independent-source-binding.v1",
+  "source_equivalence_v2": {
+    "ancillary_worktree_matches": [
+      "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx",
+      "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx",
+      "crates/litchi/examples/bench_word_parse.rs"
+    ],
+    "bytes": 3705,
+    "candidate_listing_entries": 10778,
+    "candidate_listing_rehash_passed": 10778,
+    "current_worktree_mismatch": [
+      "Cargo.lock"
+    ],
+    "current_worktree_rehash_passed": 10777,
+    "path": "/home/zhuhe/litchi-performance-0934/source-equivalence-v2.json",
+    "sha256": "d320bccbe636f08dc26f4ac6d426c1e7ff3c9a53c34ec885d5921d2b5aeedfcb",
+    "status": "passed",
+    "tracked_head_blob_checked_count": 10774,
+    "tracked_head_blob_mismatch_count": 0
+  },
+  "status": "source_binding_passed_no_capture"
+}

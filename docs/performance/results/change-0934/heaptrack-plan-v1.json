@@ -1,0 +1,218 @@
+{
+  "binary": {
+    "build_receipt": {
+      "bytes": 5191,
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+      "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+    },
+    "build_source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "bytes": 68448792,
+    "note": "Retained 0933 candidate allocator binary; no rebuild or repackaging for 0934.",
+    "path": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+    "sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9"
+  },
+  "capture_authorization": "Exactly two heaptrack --record-only children, in fixed order shared_snapshot_clones then independent_sources; no retry or recapture.",
+  "capture_started": false,
+  "child_command_template": [
+    "/usr/bin/time",
+    "-v",
+    "/usr/bin/taskset",
+    "-c",
+    "12",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "<child>/heaptrack-data.gz",
+    "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+    "docx-section-retention",
+    "--sections",
+    "8192",
+    "--concurrent-commits",
+    "8",
+    "--policy",
+    "exact",
+    "--ownership",
+    "<shared_snapshot_clones|independent_sources>",
+    "--source-revision",
+    "5f05944e9994a4cc1b387823c503fbab8650aca3",
+    "--output",
+    "<child>/report.json"
+  ],
+  "child_environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "LITCHI_PERF_0931_MEMORY_DIAGNOSTIC": "1",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0",
+    "profiler_injection": "heaptrack-managed LD_PRELOAD; no caller-provided LD_PRELOAD"
+  },
+  "claim_scope": "Descriptive whole-process allocation attribution only. No latency, speedup, phase, adoption, or allocation-saving claim is made by heaptrack.",
+  "comparison_context": {
+    "prior_attribution": {
+      "bytes": 238516,
+      "path": "/home/zhuhe/litchi-performance-0932/heaptrack-attribution-v2.json",
+      "sha256": "d467b64f1cabeea03e821949483c3c9d0ff6bc28267da5a0f3223e0eda5fe7c7"
+    },
+    "prior_nearest_litchi": {
+      "bytes": 59218,
+      "path": "/home/zhuhe/litchi-performance-0932/heaptrack-nearest-litchi-v1.json",
+      "sha256": "4f5af66b8fc2b769202a58b99ad830842181355bdaad8f6456f9db93a59eb527"
+    },
+    "prior_plan": {
+      "bytes": 4901,
+      "path": "/home/zhuhe/litchi-performance-0932/heaptrack-plan-v1.json",
+      "sha256": "baacc8216567ac69d786dc411862ddf917fd07e3965b2074426d0d8ce0bcd520"
+    },
+    "same_rules": "Compare whole-process requested allocation bytes/calls and nearest-physical-litchi buckets only; retain unknown/unattributed totals and do not infer phase or speedup."
+  },
+  "correctness_fixtures": {
+    "default_cap_bytes": 1048576,
+    "default_retained_base_bytes": 0,
+    "exact_cap_bytes": 3580192,
+    "expected_output_bytes": [
+      25545,
+      25545,
+      25545,
+      25545,
+      25545,
+      25545,
+      25545,
+      25545
+    ],
+    "expected_output_sha256": [
+      "e087fe9e71eaabad6adafb630f0165b9be6f8a0106018e8f3b2fc6e536471caf",
+      "21311b30407f4169981e49975dee475a1424edfd53b0314b2949f68fa916ce0b",
+      "338c76b4d93da473c2d2251044cc419528c04a71322f1cb150d12dbe42fa8049",
+      "4823bf871699999c7d646080da83dd080798ba0b1fff4a922d41aee9903a4546",
+      "e087fe9e71eaabad6adafb630f0165b9be6f8a0106018e8f3b2fc6e536471caf",
+      "21311b30407f4169981e49975dee475a1424edfd53b0314b2949f68fa916ce0b",
+      "338c76b4d93da473c2d2251044cc419528c04a71322f1cb150d12dbe42fa8049",
+      "4823bf871699999c7d646080da83dd080798ba0b1fff4a922d41aee9903a4546"
+    ],
+    "logical_retained_base_bytes_sum": 28641536,
+    "one_under_cap_bytes": 3580191,
+    "one_under_retained_base_bytes": 0,
+    "probe_ceiling_bytes": 67108864,
+    "required_retained_base_bytes": 3580192,
+    "source_archive_bytes": 25498,
+    "source_archive_sha256": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3",
+    "zero_cap_bytes": 0
+  },
+  "created_utc": "2026-10-06T17:29:07.596046+00:00",
+  "failure_policy": "Preserve every terminal/profile/report; malformed output or analysis failure invalidates interpretation but never authorizes rerunning a child.",
+  "heaptrack": {
+    "export_command_template": [
+      "/usr/bin/heaptrack_print",
+      "-f",
+      "<profile>",
+      "-m",
+      "1",
+      "-n",
+      "1000000",
+      "-s",
+      "1000000",
+      "-a",
+      "-p",
+      "-T",
+      "-l",
+      "-H",
+      "<allocation-size.histogram>",
+      "-F",
+      "<allocation-stacks.folded>",
+      "--flamegraph-cost-type",
+      "allocations"
+    ],
+    "exports": "Only allocation-size.histogram and allocation-stacks.folded are required; retain raw profile regardless of size. Do not generate peak or temporary exports.",
+    "print": {
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d",
+      "version": "1.5.0"
+    },
+    "profiler": {
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+      "version": "1.5.0"
+    },
+    "raw_profiles_external": true,
+    "record_mode": "--record-only"
+  },
+  "large_artifacts": "All heaptrack raw profiles, folded stacks, decoder trace aggregates, and archives remain under the external 0934 root; repository receipts stay below 1 MiB.",
+  "matrix": {
+    "children": 2,
+    "concurrent_commits": 8,
+    "cpu": 12,
+    "deadline_seconds_per_child": 600,
+    "order": "shared_snapshot_clones then independent_sources",
+    "ownership_modes": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "policy": "exact",
+    "recapture": false,
+    "sections": 8192
+  },
+  "offline_tooling": {
+    "adaptation_rule": "Copy the corrected 0932 decoder/classifier/conservation scripts to the 0934 external root with only root/path/source binding updates; derive new totals from 0934 decoder summaries and heaptrack histograms rather than reusing 0932 expected totals.",
+    "classifier_scope": "Nearest resolved physical litchi_ frame, stripping only terminal Rust hash; optimizer/inlining can move attribution across symbols. Use whole-process totals and size histograms for conservation, not statement-level allocation proof.",
+    "conservation_template": {
+      "bytes": 16273,
+      "path": "/home/zhuhe/litchi-performance-0932/summarize_heaptrack_v2.py",
+      "sha256": "5aab90d3a48f7c9cae74773c36b8acfa47c1f1332d0c17580758ccd7092fee87"
+    },
+    "decoder_template": {
+      "bytes": 11494,
+      "path": "/home/zhuhe/litchi-performance-0932/decode_heaptrack_raw_v2.py",
+      "sha256": "c128caddd800dff1950dc922616dd7c9dfc899014fdc6f398232b7bb3b6c64f9"
+    },
+    "external_root": "/home/zhuhe/litchi-performance-0934",
+    "nearest_physical_litchi_template": {
+      "bytes": 7467,
+      "path": "/home/zhuhe/litchi-performance-0932/nearest_litchi_v1.py",
+      "sha256": "8de588fd59d58c6b783d7272ab9fb8beb40c5ba38a70515fd0834b9e72eb7180"
+    },
+    "runner": {
+      "bytes": 7384,
+      "path": "/home/zhuhe/litchi-performance-0934/run_heaptrack_0934_v1.py",
+      "sha256": "dced1d2ed6453e542b335353e1af6463de73e2724185406d729a660739527c49"
+    },
+    "schema_check_template": {
+      "bytes": 3908,
+      "path": "/home/zhuhe/litchi-performance-0932/verify_primary_stack_schema_v1.pl",
+      "sha256": "5a9dafeadd7449baa9d11644c0eace53d0311082c80bbd9d03bfe7ae7cbfcab3"
+    }
+  },
+  "purpose": "Whole-process allocation attribution for the adopted 0933 candidate allocator binary at 8192 sections and eight exact-retention commits.",
+  "schema": "litchi.performance.0934.heaptrack-plan.v1",
+  "source": {
+    "binary_build_source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "candidate_source_listing": {
+      "bytes": 1870029,
+      "path": "/home/zhuhe/litchi-performance-0933/candidate-source-list-v1.jsonl",
+      "sha256": "40208ad0ae53f2f0c046d55f9bd8970ae454ff03c4d91d8c94039da40fd4ce12"
+    },
+    "candidate_source_receipt": {
+      "bytes": 2651,
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/candidate-source-final-v2.json",
+      "sha256": "dc4499bb89acc4b0d9748e7282e97ccc3d5415100fda3a97525c57663cba4fd6"
+    },
+    "current_head": "5f05944e9994a4cc1b387823c503fbab8650aca3",
+    "current_head_runtime_equivalence": {
+      "bytes": 7580,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/independent-source-binding-v1.json",
+      "sha256": "6b69121e6cadef6d35c20d13dab714c93f401896c721ac9a36fbe9e5a9caf657"
+    },
+    "equivalence_note": "The current HEAD runtime and allocator harness paths are byte-equivalent to the frozen candidate source closure under the bound source receipt. The original binary build receipt remains bound to 3ae...; the 5f... label is a runtime-equivalence label, not a retroactive build identity.",
+    "perf_baseline_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "source_revision_label": "5f05944e9994a4cc1b387823c503fbab8650aca3",
+    "source_root": "/home/zhuhe/litchi-performance-0933/candidate-source"
+  },
+  "status": "authorized_prospective",
+  "terminal_custody": {
+    "cwd": "/home/zhuhe/litchi-performance-0933/candidate-source",
+    "observation_timeout_is_not_retry": true,
+    "original_outer_terminal_before_offline_analysis": true,
+    "process_group_must_close": true,
+    "retain_stdout_stderr_time_and_heaptrack_profile": true,
+    "terminal_json_before_report_or_profile_reads": true
+  }
+}

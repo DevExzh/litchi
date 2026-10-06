@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0934 — fragment validation and decoding lead remaining allocations
+
+[0934](0934-docx-post-scanner-allocation-profile.md) reprofiles the adopted
+borrowed scanners. Footnote validation, section attributes, Section construction
+and semantic decoding are now the four largest nearest-physical-Litchi buckets;
+their requested-byte totals are unchanged from 0932. Source review identifies a
+private inventory helper that could reuse a raw codec parse while retaining
+footnote validation before semantic decoding. Preserve public lazy errors,
+namespace context, limits and tolerance offsets, and measure temporary peak
+memory from keeping raw state alive longer. This candidate is not implemented;
+profile bucket totals are not removable-byte or speedup estimates.
+
 ## 0933 — scanner copies removed; fragment work remains
 
 [0933](0933-docx-borrowed-inventory-scanners.md) removes per-event resolver

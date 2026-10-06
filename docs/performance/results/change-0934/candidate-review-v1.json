@@ -1,0 +1,119 @@
+{
+  "schema": "candidate_review_v1",
+  "batch": "0934",
+  "review_kind": "static_source_review",
+  "status": "unimplemented_unprofiled",
+  "scope": "DOCX main-document inventory section fragments after the adopted 0933 borrowed scanners; no production edits, builds, or captures were performed.",
+  "source_revision": "5f05944e9994a4cc1b387823c503fbab8650aca3",
+  "source_files": {
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/adr/README.md": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028",
+    "docs/performance/results/change-0932/candidate-review-v1.json": "c5f21b736169639816ed9ed51f071c817914b27662a904c43bca5a35c181e099",
+    "crates/litchi-docx/src/section/inventory.rs": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b",
+    "crates/litchi-docx/src/section/codec.rs": "dac8d1495653973be53eb2bb971430d87a924e8b9bac9c7d97a59fc0ac3ee886",
+    "crates/litchi-docx/src/section/footnote_columns/mod.rs": "56b9f9977c38955a5c15770676bd2e292a15d8b1bbdc33e81b14a5e466b0b9dd",
+    "crates/litchi-docx/src/section/footnote_columns/transaction.rs": "9e46406cf3105877ba5764313d3f038e05c91770cb34415217908459f482a8b7",
+    "crates/litchi-docx/src/section/model.rs": "2c6c6929e25d00f4ff7d8e0d274ff12fbc3ff4465e346296fe7ca4d817cadd83",
+    "crates/litchi-docx/src/section/layout.rs": "0c1732a566d35096a9cc02949f880b81dd07b0a1bf3db4dcc4a43d87cf6da03e"
+  },
+  "call_path": [
+    {
+      "path": "crates/litchi-docx/src/section/inventory.rs",
+      "lines": "334-343,709-729,731-760,1117-1179,1190-1292",
+      "stage": "Inventory::parse_with_limits -> parse_inventory -> scan_visible_document -> append_section",
+      "facts": "The scanner computes the original source range, enforces section and input limits, creates the self-contained fragment, and then performs semantic/reference/tolerance accounting before reserving the descriptor and source span."
+    },
+    {
+      "path": "crates/litchi-docx/src/section/inventory.rs",
+      "lines": "1200-1215,1487-1538",
+      "stage": "fragment preparation",
+      "facts": "self_contained_fragment performs the required namespace injection and fallible fragment reservation/copy. The proposed parse reuse does not remove this copy or change original source offsets."
+    },
+    {
+      "path": "crates/litchi-docx/src/section/model.rs",
+      "lines": "420-450,770-793",
+      "stage": "current fragment model path",
+      "facts": "Section::from_xml_bytes first calls codec::validate, then footnote_columns::Snapshot::from_xml on a clone, and leaves semantic snapshot None. local_state later calls snapshot_mut, which invokes codec::decode and clones State; tolerance_report then clones the report."
+    },
+    {
+      "path": "crates/litchi-docx/src/section/codec.rs",
+      "lines": "128-150,740-973,975-1035",
+      "stage": "codec passes",
+      "facts": "validate runs parse_raw and discards Raw. decode runs parse_raw again, then decode_state, retaining Raw, State, and ToleranceReport in Snapshot."
+    },
+    {
+      "path": "crates/litchi-docx/src/section/footnote_columns/transaction.rs",
+      "lines": "23-43",
+      "stage": "footnote validation",
+      "facts": "Snapshot::from_xml converts the input to Vec, calls codec::read_with_context, then retains the bytes in Arc<[u8]>; inventory only uses the validation result, so that temporary snapshot and clone are immediately dropped."
+    },
+    {
+      "path": "crates/litchi-docx/src/section/footnote_columns/codec.rs",
+      "lines": "154-194,435-452",
+      "stage": "borrowable footnote parser boundary",
+      "facts": "read_with_context already accepts &[u8] and returns an owned Parsed result. It is currently behind the private footnote codec module; a crate-private wrapper is needed for the sibling inventory codec without changing the public Snapshot API."
+    }
+  ],
+  "current_redundancy": {
+    "codec_raw_passes": 2,
+    "order": [
+      "codec::validate -> parse_raw -> drop Raw",
+      "footnote_columns::Snapshot::from_xml(fragment.clone()) -> read_with_context -> drop temporary Snapshot",
+      "codec::decode -> parse_raw -> decode_state -> retain temporary Section Snapshot",
+      "local_state and tolerance_report clone the values consumed by append_section"
+    ],
+    "independent_parser": "The footnote-columns parser is a separate required validation pass; it must not be counted as a second section codec parse."
+  },
+  "candidate": {
+    "id": "inventory_single_codec_parse_borrowed_footnote",
+    "rank": "deferred until the current 0934 profile attributes this path",
+    "files_if_authorized": [
+      "crates/litchi-docx/src/section/inventory.rs",
+      "crates/litchi-docx/src/section/codec.rs",
+      "crates/litchi-docx/src/section/footnote_columns/mod.rs"
+    ],
+    "mechanism": "Add a crate-private inventory-only codec entry point that parses Raw once, invokes a crate-private footnote validation wrapper over read_with_context(&[u8], default Context), then runs decode_state on that same Raw and returns (State, ToleranceReport). Change append_section to consume those two values directly. Keep Section::from_xml_bytes and its lazy snapshot behavior unchanged.",
+    "smallest_seam": "The helper belongs beside codec::validate/decode; no public Section constructor, public footnote API, source provider, or layout publication path needs to change. The footnote wrapper should return only validation success and must not retain an Arc or copied XML for this inventory-only call.",
+    "work_removed": [
+      "the first parse_raw allocation and drop performed by codec::validate",
+      "the temporary Section/codec::Snapshot Raw retention and State clone used only to obtain inventory values",
+      "the temporary footnote Snapshot byte clone/Arc retention, while retaining its read_with_context validation"
+    ],
+    "work_retained": [
+      "self_contained_fragment namespace copy and its checked reservation",
+      "one section codec parse_raw plus one decode_state pass",
+      "the independent footnote read_with_context pass",
+      "all inventory descriptor, span, relationship, namespace, reference, limit, and tolerance bookkeeping"
+    ]
+  },
+  "invariants_to_preserve": [
+    "codec structural validation must occur before footnote-columns validation; semantic decode remains after both",
+    "public Section::from_xml_bytes remains eager for structural/footnote validation but lazy for semantic codec state, with unchanged error timing and unknown-markup round-trip behavior",
+    "append_section remains eager for inventory semantic decoding and receives the same State and ToleranceReport; tolerance contexts are mapped with the existing inserted namespace-byte adjustment",
+    "source spans and relationship/namespace bindings continue to reference the original document XML, not the injected fragment",
+    "reference-byte agreement, max_reference_bytes, max_section_bytes, max_sections, paragraph ownership/order, and fallible descriptor/span reservations remain in their current order",
+    "fresh source-backed/layout snapshots and publication/inverse paths remain untouched"
+  ],
+  "risks_and_boundaries": [
+    "The single Raw is live across footnote validation, whereas the current validation Raw is dropped before that pass. This can change transient peak overlap and allocation-failure timing even while typed parse-error precedence is unchanged; it requires focused failure/order and allocation evidence.",
+    "Calling read_with_context through a private wrapper deliberately skips only the inventory-unneeded footnote Snapshot byte retention. Do not redirect public footnote Snapshot construction or Section::from_xml_bytes to this path.",
+    "This candidate removes a duplicate section codec parse, not all XML work: footnote parsing, decode_state, namespace injection, and raw child copies remain.",
+    "No current 0934 profile percentage is inferred from 0932/0933 measurements; the live profile must establish whether this duplicate parse is material before implementation."
+  ],
+  "required_experiment": {
+    "status": "pending_current_profile",
+    "comparison": "Current append_section path versus an isolated private helper with identical fragment bytes and limits.",
+    "oracles": [
+      "Inventory descriptors and section order",
+      "SourceSpan original start/end and namespace/relationship bindings",
+      "ToleranceReport contexts after inserted-byte mapping",
+      "Reference-byte totals and all limit/error cases",
+      "Malformed codec versus malformed footnote precedence",
+      "Semantic decode failures after successful structural and footnote validation",
+      "Public Section lazy state, exact XML bytes, and publication/inverse round-trip outside the helper"
+    ],
+    "measurement_note": "Do not report a benefit until fresh allocation/requested-byte attribution covers the append_section path; no build or capture was run for this review."
+  },
+  "related_prior_review": "docs/performance/results/change-0932/candidate-review-v1.json#single_internal_fragment_parse",
+  "caveat": "This is a source-bound candidate design, not an optimization approval or production change."
+}

@@ -1,0 +1,477 @@
+{
+  "archive": {
+    "compressed": {
+      "bytes": 1983540,
+      "label": "canonical compressed archive",
+      "path": "/home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar.zst",
+      "role": "external large evidence",
+      "sha256": "653f292cf9f729e4f04c8cb89d5a91326e23e2bc776a4f2828ca3400bb9fee4c"
+    },
+    "members": [
+      "heaptrack-packet-v1",
+      "heaptrack-analysis-v2",
+      "heaptrack-raw-decoder-v2",
+      "heaptrack-analysis-v1-terminal-defect"
+    ],
+    "regeneration_commands": [
+      "tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C /home/zhuhe/litchi-performance-0934 -cf /home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar heaptrack-packet-v1 heaptrack-analysis-v2 heaptrack-raw-decoder-v2 heaptrack-analysis-v1-terminal-defect",
+      "zstd -19 -T2 -f /home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar -o /home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar.zst"
+    ],
+    "uncompressed": {
+      "bytes": 213196800,
+      "label": "canonical uncompressed archive",
+      "path": "/home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar",
+      "role": "external large evidence",
+      "sha256": "fd36f7080daf2a83d09fb29f3aee2afd99200869a863f094280756d518999049"
+    }
+  },
+  "artifacts": [
+    {
+      "bytes": 9832,
+      "label": "final prospective plan",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/heaptrack-plan-v2.json",
+      "role": "repository binding",
+      "sha256": "5a6591c799f2139f3ae17b09276b1177ddda1bf97cc779e006e93f8ba6f04791"
+    },
+    {
+      "bytes": 7580,
+      "label": "source equivalence binding",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/independent-source-binding-v1.json",
+      "role": "repository binding",
+      "sha256": "6b69121e6cadef6d35c20d13dab714c93f401896c721ac9a36fbe9e5a9caf657"
+    },
+    {
+      "bytes": 9180,
+      "label": "candidate review",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/candidate-review-v1.json",
+      "role": "repository review reference",
+      "sha256": "7f2a1de367dfe48f44d4c14d817289e9679b4019549afdae571a4d797f310e56"
+    },
+    {
+      "bytes": 14079,
+      "label": "validation review",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/validation-review.json",
+      "role": "repository review reference",
+      "sha256": "73bca3378d6eaa002ec4e9036dc05b2a3822eb7524959b648eacb47919f2458f"
+    },
+    {
+      "bytes": 6081,
+      "label": "capture index",
+      "path": "/home/zhuhe/litchi-performance-0934/capture-index-v1.json",
+      "role": "capture descriptor",
+      "sha256": "12e35f78d351771e9de0588536387914fd8c75fed6f746b2ad0cb8c9b2bd33f5"
+    },
+    {
+      "bytes": 492,
+      "label": "runner terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/runner-terminal.json",
+      "role": "capture terminal",
+      "sha256": "28b781a55b5429a185f4dda0565512ad883d9e9b2f9d1b0040638850a9e5e472"
+    },
+    {
+      "bytes": 567,
+      "label": "outer runner tool terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/outer-tool-terminal-v1.json",
+      "role": "capture terminal",
+      "sha256": "e15f21d9ba9db8e37f9a9eb914b8a5536685f3715cff5e06d47a1546a56a1e9f"
+    },
+    {
+      "bytes": 7376,
+      "label": "shared report",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/report.json",
+      "role": "raw capture report",
+      "sha256": "db7bf7b6437ea6f11bb2a4102bd7973261831e574b3dd36820d199b67836f4e7"
+    },
+    {
+      "bytes": 3588,
+      "label": "shared child terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-packet-v1/children/s8192-c08-exact-shared_snapshot_clones-heaptrack-v1/terminal.json",
+      "role": "capture terminal",
+      "sha256": "87cd1e3b086127ad22b530d38adaf59764f7a2c79cc8e34b8e1bb51926ed861d"
+    },
+    {
+      "bytes": 7348,
+      "label": "independent report",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/report.json",
+      "role": "raw capture report",
+      "sha256": "bc0561fac2c8783f66d0a273e5d9d447dcad8dd8a4d6202abbefeb87eef54cc0"
+    },
+    {
+      "bytes": 3560,
+      "label": "independent child terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-packet-v1/children/s8192-c08-exact-independent_sources-heaptrack-v1/terminal.json",
+      "role": "capture terminal",
+      "sha256": "b23c7824605593180449a422d098c0bd5707dd001361a56637e4ffcdeea5161a"
+    },
+    {
+      "bytes": 904,
+      "label": "heaptrack print v2 terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-print-tool-terminal-v2.json",
+      "role": "offline analysis terminal",
+      "sha256": "efdc19d38c8c17d7244bbc25fa4efc9370fd5f3efa5a6c17009763f1d8926200"
+    },
+    {
+      "bytes": 629,
+      "label": "raw decoder terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/decode-tool-terminal-v1.json",
+      "role": "offline analysis terminal",
+      "sha256": "534507d72621104aeaaf866e8ed840ab1e7a278db19062c4015aefbf293b879b"
+    },
+    {
+      "bytes": 518,
+      "label": "nearest classifier terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/nearest-tool-terminal-v1.json",
+      "role": "offline analysis terminal",
+      "sha256": "99081072c822024d59538379db0bfe23a694bc7f26f7eaa0e559518e2a5f53bb"
+    },
+    {
+      "bytes": 734,
+      "label": "conservation crosscheck terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/crosscheck-tool-terminal-v1.json",
+      "role": "offline validation terminal",
+      "sha256": "4d8424f6571d839f4e7c6fb4538de02d9bd6a5c01b5f9f67abd23c53396f0d5e"
+    },
+    {
+      "bytes": 61520,
+      "label": "exact conservation result",
+      "path": "/home/zhuhe/litchi-performance-0934/conservation-crosscheck-v1.json",
+      "role": "offline validation result",
+      "sha256": "a6ac4899cfe9ad6a63ddfc9fb33eb8c65fdf9db1fdcdf23e1558eac3bed5fefd"
+    },
+    {
+      "bytes": 59294,
+      "label": "nearest physical litchi result",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-nearest-litchi-v1.json",
+      "role": "offline attribution result",
+      "sha256": "cb5c5ad187b09236925a4936e868cc4c47bfff0ab9f31cc6c4e14edeb99904fb"
+    },
+    {
+      "bytes": 7384,
+      "label": "frozen capture runner",
+      "path": "/home/zhuhe/litchi-performance-0934/run_heaptrack_0934_v1.py",
+      "role": "tool source",
+      "sha256": "0981905a23a42c5908ebab33d095ef539c9093ec8f5eb6a3096fcce27575f39c"
+    },
+    {
+      "bytes": 4318,
+      "label": "corrected offline export runner",
+      "path": "/home/zhuhe/litchi-performance-0934/run_heaptrack_print_0934_v2.py",
+      "role": "tool source",
+      "sha256": "054566d72228ff7c53c74d4b09f6e0226ad4d2ee73752dec9474cea65e46b510"
+    },
+    {
+      "bytes": 11494,
+      "label": "corrected heaptrack raw decoder",
+      "path": "/home/zhuhe/litchi-performance-0934/decode_heaptrack_raw_0934_v1.py",
+      "role": "tool source",
+      "sha256": "a5e52147fa8d143230f27b002b69f0d0c67fbf872e202df3436b35579eed9632"
+    },
+    {
+      "bytes": 7578,
+      "label": "nearest physical litchi classifier",
+      "path": "/home/zhuhe/litchi-performance-0934/nearest_litchi_0934_v1.py",
+      "role": "tool source",
+      "sha256": "0b31489b94bc73585f1626af52ecb3e0cf0636b852ac0f412715ed4ab26cb9a8"
+    },
+    {
+      "bytes": 7548,
+      "label": "independent conservation checker",
+      "path": "/home/zhuhe/litchi-performance-0934/crosscheck_conservation_0934_v1.py",
+      "role": "tool source",
+      "sha256": "ebdec3111d236f612994488e32e86258291b2362b6fd0392690106be604676f6"
+    },
+    {
+      "bytes": 213196800,
+      "label": "uncompressed canonical evidence archive",
+      "path": "/home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar",
+      "role": "external archive",
+      "sha256": "fd36f7080daf2a83d09fb29f3aee2afd99200869a863f094280756d518999049"
+    },
+    {
+      "bytes": 1983540,
+      "label": "compressed canonical evidence archive",
+      "path": "/home/zhuhe/litchi-performance-0934/canonical-evidence-v1.tar.zst",
+      "role": "external archive",
+      "sha256": "653f292cf9f729e4f04c8cb89d5a91326e23e2bc776a4f2828ca3400bb9fee4c"
+    },
+    {
+      "bytes": 1870029,
+      "label": "full source listing",
+      "path": "/home/zhuhe/litchi-performance-0933/candidate-source-list-v1.jsonl",
+      "role": "external source custody",
+      "sha256": "40208ad0ae53f2f0c046d55f9bd8970ae454ff03c4d91d8c94039da40fd4ce12"
+    },
+    {
+      "bytes": 2651,
+      "label": "candidate source receipt",
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/candidate-source-final-v2.json",
+      "role": "external source custody",
+      "sha256": "dc4499bb89acc4b0d9748e7282e97ccc3d5415100fda3a97525c57663cba4fd6"
+    },
+    {
+      "bytes": 5191,
+      "label": "candidate allocator build receipt",
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+      "role": "external build custody",
+      "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+    },
+    {
+      "bytes": 1577,
+      "label": "source differential receipt",
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/full-source-differential-v1.json",
+      "role": "external source custody",
+      "sha256": "a984c64879a064a697456c7c4104e347237e4eec9b30b2f0a666f28451462ec3"
+    }
+  ],
+  "capture": {
+    "children_all_exit_code_zero": true,
+    "matrix": [
+      {
+        "commits": 8,
+        "id": "s8192-c08-exact-shared_snapshot_clones-heaptrack-v1",
+        "ownership": "shared_snapshot_clones",
+        "policy": "exact",
+        "sections": 8192
+      },
+      {
+        "commits": 8,
+        "id": "s8192-c08-exact-independent_sources-heaptrack-v1",
+        "ownership": "independent_sources",
+        "policy": "exact",
+        "sections": 8192
+      }
+    ],
+    "outer_terminal": {
+      "bytes": 567,
+      "label": "original outer terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/outer-tool-terminal-v1.json",
+      "role": "terminal-first",
+      "sha256": "e15f21d9ba9db8e37f9a9eb914b8a5536685f3715cff5e06d47a1546a56a1e9f"
+    },
+    "plan": {
+      "bytes": 9832,
+      "label": "final plan",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0934/heaptrack-plan-v2.json",
+      "role": "plan",
+      "sha256": "5a6591c799f2139f3ae17b09276b1177ddda1bf97cc779e006e93f8ba6f04791"
+    },
+    "profiles_are_retained_raw_heaptrack_data": true,
+    "retry_or_recapture": false,
+    "runner": {
+      "bytes": 7384,
+      "label": "frozen runner",
+      "path": "/home/zhuhe/litchi-performance-0934/run_heaptrack_0934_v1.py",
+      "role": "runner",
+      "sha256": "0981905a23a42c5908ebab33d095ef539c9093ec8f5eb6a3096fcce27575f39c"
+    },
+    "runner_terminal": {
+      "bytes": 492,
+      "label": "runner terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/runner-terminal.json",
+      "role": "terminal-first",
+      "sha256": "28b781a55b5429a185f4dda0565512ad883d9e9b2f9d1b0040638850a9e5e472"
+    },
+    "tool_exit_code": 0
+  },
+  "change": "0934",
+  "created_utc": "2026-10-06T17:38:14.174268+00:00",
+  "offline_pipeline": {
+    "crosscheck": {
+      "bytes": 7548,
+      "label": "conservation checker",
+      "path": "/home/zhuhe/litchi-performance-0934/crosscheck_conservation_0934_v1.py",
+      "role": "offline tool",
+      "sha256": "ebdec3111d236f612994488e32e86258291b2362b6fd0392690106be604676f6"
+    },
+    "crosscheck_terminal": {
+      "bytes": 734,
+      "label": "crosscheck terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/crosscheck-tool-terminal-v1.json",
+      "role": "offline terminal",
+      "sha256": "4d8424f6571d839f4e7c6fb4538de02d9bd6a5c01b5f9f67abd23c53396f0d5e"
+    },
+    "decoder": {
+      "bytes": 11494,
+      "label": "corrected raw decoder",
+      "path": "/home/zhuhe/litchi-performance-0934/decode_heaptrack_raw_0934_v1.py",
+      "role": "offline tool",
+      "sha256": "a5e52147fa8d143230f27b002b69f0d0c67fbf872e202df3436b35579eed9632"
+    },
+    "decoder_notes": [
+      "Decoder uses explicit sequential IP, trace, and allocation-info tables with explicit reuse-reference failure; no 0932 expected totals are hardcoded.",
+      "The v2 print/export and decoder runs are post-capture analysis only."
+    ],
+    "decoder_terminal": {
+      "bytes": 629,
+      "label": "decoder terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/decode-tool-terminal-v1.json",
+      "role": "offline terminal",
+      "sha256": "534507d72621104aeaaf866e8ed840ab1e7a278db19062c4015aefbf293b879b"
+    },
+    "nearest_classifier": {
+      "bytes": 7578,
+      "label": "nearest classifier",
+      "path": "/home/zhuhe/litchi-performance-0934/nearest_litchi_0934_v1.py",
+      "role": "offline tool",
+      "sha256": "0b31489b94bc73585f1626af52ecb3e0cf0636b852ac0f412715ed4ab26cb9a8"
+    },
+    "nearest_terminal": {
+      "bytes": 518,
+      "label": "nearest terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/nearest-tool-terminal-v1.json",
+      "role": "offline terminal",
+      "sha256": "99081072c822024d59538379db0bfe23a694bc7f26f7eaa0e559518e2a5f53bb"
+    },
+    "print_runner_v1": {
+      "bytes": 4319,
+      "label": "superseded print helper",
+      "path": "/home/zhuhe/litchi-performance-0934/run_heaptrack_print_0934_v1.py",
+      "role": "historical offline attempt",
+      "sha256": "58967af36d9cbbdf04e8cf8be07e005872aa4767a61ffa4a3a6488b995f6b649"
+    },
+    "print_terminal_v2": {
+      "bytes": 904,
+      "label": "corrected print terminal",
+      "path": "/home/zhuhe/litchi-performance-0934/heaptrack-print-tool-terminal-v2.json",
+      "role": "offline terminal",
+      "sha256": "efdc19d38c8c17d7244bbc25fa4efc9370fd5f3efa5a6c17009763f1d8926200"
+    },
+    "print_v1_defect": {
+      "analysis_root": "/home/zhuhe/litchi-performance-0934/heaptrack-analysis-v1-terminal-defect",
+      "defect": "The v1 terminal JSON objects ended with a literal backslash-n after the closing object. Raw stdout, allocation histograms, and folded exports were produced and preserved.",
+      "effect": "No capture input was changed and no workload was rerun.",
+      "receipt": {
+        "bytes": 604,
+        "label": "v1 print terminal",
+        "path": "/home/zhuhe/litchi-performance-0934/heaptrack-print-tool-terminal-v1.json",
+        "role": "historical offline attempt",
+        "sha256": "ad49b2e89cb4d96b5faf75a357be63909d2cfed647688b9ae4ec9f9f93731243"
+      },
+      "status": "preserved_superseded"
+    },
+    "print_v2": {
+      "bytes": 4318,
+      "label": "corrected print helper",
+      "path": "/home/zhuhe/litchi-performance-0934/run_heaptrack_print_0934_v2.py",
+      "role": "offline tool",
+      "sha256": "054566d72228ff7c53c74d4b09f6e0226ad4d2ee73752dec9474cea65e46b510"
+    }
+  },
+  "results": {
+    "all_exact_conservation": true,
+    "children": {
+      "independent_sources": {
+        "calls": 124151078,
+        "nearest_top5": [
+          [
+            "litchi_docx::section::footnote_columns::codec::read_with_context",
+            20791632,
+            1554744898
+          ],
+          [
+            "litchi_docx::section::codec::attributes",
+            23104530,
+            1457022545
+          ],
+          [
+            "litchi_docx::section::model::Section::from_xml_bytes",
+            19251410,
+            1064986736
+          ],
+          [
+            "litchi_docx::section::codec::decode",
+            18483063,
+            954159454
+          ],
+          [
+            "litchi_docx::section::inventory::append_section",
+            2312400,
+            588963392
+          ]
+        ],
+        "requested_bytes": 8369567879,
+        "size_keys": 180,
+        "trace_aggregates": 6850,
+        "unknown_calls": 1,
+        "unknown_requested_bytes": 73728
+      },
+      "shared_snapshot_clones": {
+        "calls": 87159235,
+        "nearest_top5": [
+          [
+            "litchi_docx::section::footnote_columns::codec::read_with_context",
+            14598480,
+            1091634180
+          ],
+          [
+            "litchi_docx::section::codec::attributes",
+            16223166,
+            1023042831
+          ],
+          [
+            "litchi_docx::section::model::Section::from_xml_bytes",
+            13517010,
+            747758580
+          ],
+          [
+            "litchi_docx::section::codec::decode",
+            12978039,
+            669962016
+          ],
+          [
+            "litchi_docx::section::inventory::append_section",
+            1623600,
+            413527488
+          ]
+        ],
+        "requested_bytes": 5873313617,
+        "size_keys": 179,
+        "trace_aggregates": 6850,
+        "unknown_calls": 1,
+        "unknown_requested_bytes": 73728
+      }
+    },
+    "conservation_status": "passed",
+    "prior_0932_descriptive_comparison": {
+      "independent_calls": {
+        "0932": 178052276,
+        "0934": 124151078,
+        "reduction_fraction": 0.302726812658
+      },
+      "independent_requested_bytes": {
+        "0932": 13077355214,
+        "0934": 8369567879,
+        "reduction_fraction": 0.359995370468
+      },
+      "note": "Volume comparison only; different diagnostic capture context and no latency/adoption inference.",
+      "shared_calls": {
+        "0932": 125004757,
+        "0934": 87159235,
+        "reduction_fraction": 0.302752654445
+      },
+      "shared_requested_bytes": {
+        "0932": 9178781390,
+        "0934": 5873313617,
+        "reduction_fraction": 0.360120546786
+      }
+    }
+  },
+  "retention": "All raw profiles, reports, decoder outputs, folded stacks, source listing, binary, and archives remain outside the repository. This receipt is intentionally below the repository 1 MiB evidence limit.",
+  "schema": "litchi.performance.0934.heaptrack-evidence-bundle.v1",
+  "scope": {
+    "binary_build_source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "binary_bytes": 68448792,
+    "binary_sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9",
+    "claim": "Whole-process heaptrack requested-allocation calls/bytes and nearest-physical-litchi attribution for two retained allocator-binary children.",
+    "current_head_runtime_equivalence": "The retained 0933 candidate runtime/harness paths are byte-equivalent to current HEAD under the independent source-binding receipt; the binary remains bound to its original 0933 build receipt.",
+    "no_claims": [
+      "latency or speedup",
+      "phase attribution",
+      "adoption decision",
+      "allocation savings from this diagnostic alone"
+    ],
+    "source_binding_receipt_sha256": "6b69121e6cadef6d35c20d13dab714c93f401896c721ac9a36fbe9e5a9caf657",
+    "source_revision_label": "5f05944e9994a4cc1b387823c503fbab8650aca3"
+  },
+  "status": "completed_descriptive_attribution"
+}
